@@ -51,7 +51,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
         // REPORTS LINKS
         { name: "Reports", href: "/reports", icon: BarChart2, roles: ["ADMIN", "MANAGER"] },
-        { name: "My Reports", href: "/reports", icon: BarChart2, roles: ["CLIENT"] },
+        { name: "Company Reports", href: "/reports", icon: BarChart2, roles: ["CLIENT", "INSPECTION_BOY"] },
 
         // CLIENT LINKS
         { name: "Client Portal", href: "/client", icon: FileText, roles: ["CLIENT"] },

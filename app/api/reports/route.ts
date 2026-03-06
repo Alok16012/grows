@@ -30,14 +30,38 @@ export async function GET(req: Request) {
     const year = parseInt(searchParams.get("year") || String(now.getFullYear()))
     const role = session.user.role
 
-    // Determine companyId filter
+    // Determine filters
     let companyId: string | null = null
+    let inspectorId: string | null = null
+
     if (role === "CLIENT") {
-        // Clients always see their own company
         const user = await prisma.user.findUnique({ where: { id: session.user.id } })
         companyId = user?.companyId ?? null
+    } else if (role === "INSPECTION_BOY") {
+        // Find companies where this inspector has assignments
+        const assignments = await prisma.assignment.findMany({
+            where: { inspectionBoyId: session.user.id },
+            include: { project: { include: { company: true } } }
+        })
+        const allowedCompanyIds = Array.from(new Set(assignments.map(a => a.project.companyId)))
+
+        const requestedCompanyId = searchParams.get("companyId")
+        if (requestedCompanyId && allowedCompanyIds.includes(requestedCompanyId)) {
+            companyId = requestedCompanyId
+        } else if (allowedCompanyIds.length > 0) {
+            companyId = allowedCompanyIds[0]
+        } else {
+            // No assignments, but check if they have a companyId on their profile
+            const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+            companyId = user?.companyId ?? null
+        }
+
+        // IMPORTANT: To show "Company Report", we do NOT filter by inspectorId
+        // This allows them to see aggregate data for the company they work for.
+        inspectorId = null
     } else if (role === "ADMIN" || role === "MANAGER") {
         companyId = searchParams.get("companyId") || null
+        inspectorId = searchParams.get("inspectorId") || null
     } else {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -56,9 +80,8 @@ export async function GET(req: Request) {
                     lte: endDate,
                 },
                 assignment: {
-                    project: companyId
-                        ? { companyId }
-                        : undefined,
+                    project: companyId ? { companyId } : undefined,
+                    inspectionBoyId: inspectorId || undefined,
                 },
             },
             include: {
@@ -96,49 +119,20 @@ export async function GET(req: Request) {
             partModel: "",
         }
 
-        // Part-wise accumulator
-        const partMap: Record<string, {
-            partName: string;
-            totalInspected: number;
-            totalAccepted: number;
-            totalRework: number;
-            totalRejected: number;
-        }> = {}
-
-        // Day-wise accumulator
-        const dayMap: Record<string, {
-            date: string;
-            totalInspected: number;
-            totalAccepted: number;
-            totalRework: number;
-            totalRejected: number;
-        }> = {}
-
-        // Inspector-wise accumulator
-        const inspectorMap: Record<string, {
-            inspectorName: string;
-            totalInspected: number;
-            totalAccepted: number;
-            totalRework: number;
-            totalRejected: number;
-        }> = {}
-
-        // Location-wise accumulator
-        const locationMap: Record<string, {
-            location: string;
-            totalInspected: number;
-            totalRework: number;
-            totalRejected: number;
-        }> = {}
-
-        // Defect accumulator
+        // Accumulators
+        const partMap: Record<string, any> = {}
+        const dayMap: Record<string, any> = {}
+        const inspectorMap: Record<string, any> = {}
+        const locationMap: Record<string, any> = {}
+        const companyMap: Record<string, any> = {}
         const defectMap: Record<string, number> = {}
-
         const partModels = new Set<string>()
 
         for (const inspection of inspections) {
             const responses = inspection.responses
             const inspectorName = inspection.assignment.inspectionBoy.name
+            const companyName = inspection.assignment.project.company.name
+            const companyId = inspection.assignment.project.companyId
             const date = inspection.submittedAt
                 ? new Date(inspection.submittedAt).toISOString().slice(0, 10)
                 : new Date(inspection.createdAt).toISOString().slice(0, 10)
@@ -150,7 +144,6 @@ export async function GET(req: Request) {
             let rework = 0
             let rejected = 0
             let location = "Main"
-            let partModel = ""
 
             for (const r of responses) {
                 const label = r.field.fieldLabel
@@ -160,7 +153,7 @@ export async function GET(req: Request) {
                     if (val) partName = val
                 }
                 if (matchesLabel(label, ["part model", "model", "component model"])) {
-                    if (val) { partModel = val; partModels.add(val) }
+                    if (val) partModels.add(val)
                 }
                 if (matchesLabel(label, ["total inspected", "inspected", "qty inspected", "quantity inspected"])) {
                     inspected = parseNum(val)
@@ -177,7 +170,6 @@ export async function GET(req: Request) {
                 if (matchesLabel(label, ["location", "shift location", "plant location"])) {
                     if (val) location = val
                 }
-                // Defect fields - any field starting with defect
                 if (matchesLabel(label, ["defect", "defect type", "defect name", "defect reason"])) {
                     if (val && val.trim()) {
                         defectMap[val.trim()] = (defectMap[val.trim()] || 0) + 1
@@ -185,58 +177,31 @@ export async function GET(req: Request) {
                 }
             }
 
-            // If inspected is 0 but accepted/rework/rejected are present, compute inspected
-            if (inspected === 0 && (accepted + rework + rejected) > 0) {
-                inspected = accepted + rework + rejected
-            }
-            // If accepted is 0 and we have inspected, rework, rejected
-            if (accepted === 0 && inspected > 0) {
-                accepted = Math.max(0, inspected - rework - rejected)
-            }
+            if (inspected === 0 && (accepted + rework + rejected) > 0) inspected = accepted + rework + rejected
+            if (accepted === 0 && inspected > 0) accepted = Math.max(0, inspected - rework - rejected)
 
-            // Accumulate summary
             summary.totalInspected += inspected
             summary.totalAccepted += accepted
             summary.totalRework += rework
             summary.totalRejected += rejected
 
-            // Part-wise
-            if (!partMap[partName]) {
-                partMap[partName] = { partName, totalInspected: 0, totalAccepted: 0, totalRework: 0, totalRejected: 0 }
+            // Utility to accumulate maps
+            const accumulate = (map: any, key: string, nameField: string, nameValue: string) => {
+                if (!map[key]) map[key] = { [nameField]: nameValue, totalInspected: 0, totalAccepted: 0, totalRework: 0, totalRejected: 0 }
+                map[key].totalInspected += inspected
+                map[key].totalAccepted += accepted
+                map[key].totalRework += rework
+                map[key].totalRejected += rejected
             }
-            partMap[partName].totalInspected += inspected
-            partMap[partName].totalAccepted += accepted
-            partMap[partName].totalRework += rework
-            partMap[partName].totalRejected += rejected
 
-            // Day-wise
-            if (!dayMap[date]) {
-                dayMap[date] = { date, totalInspected: 0, totalAccepted: 0, totalRework: 0, totalRejected: 0 }
-            }
-            dayMap[date].totalInspected += inspected
-            dayMap[date].totalAccepted += accepted
-            dayMap[date].totalRework += rework
-            dayMap[date].totalRejected += rejected
-
-            // Inspector-wise
-            if (!inspectorMap[inspectorName]) {
-                inspectorMap[inspectorName] = { inspectorName, totalInspected: 0, totalAccepted: 0, totalRework: 0, totalRejected: 0 }
-            }
-            inspectorMap[inspectorName].totalInspected += inspected
-            inspectorMap[inspectorName].totalAccepted += accepted
-            inspectorMap[inspectorName].totalRework += rework
-            inspectorMap[inspectorName].totalRejected += rejected
-
-            // Location-wise
-            if (!locationMap[location]) {
-                locationMap[location] = { location, totalInspected: 0, totalRework: 0, totalRejected: 0 }
-            }
-            locationMap[location].totalInspected += inspected
-            locationMap[location].totalRework += rework
-            locationMap[location].totalRejected += rejected
+            accumulate(partMap, partName, "partName", partName)
+            accumulate(dayMap, date, "date", date)
+            accumulate(inspectorMap, inspectorName, "inspectorName", inspectorName)
+            accumulate(locationMap, location, "location", location)
+            accumulate(companyMap, companyId, "companyName", companyName)
         }
 
-        // Compute rates
+        // Compute summary rates
         const total = summary.totalInspected
         if (total > 0) {
             summary.acceptanceRate = parseFloat(((summary.totalAccepted / total) * 100).toFixed(2))
@@ -248,47 +213,24 @@ export async function GET(req: Request) {
         }
         summary.partModel = Array.from(partModels).join(", ") || "N/A"
 
-        // Build partWise array
-        const partWise = Object.values(partMap)
-            .sort((a, b) => b.totalInspected - a.totalInspected)
-            .map(p => ({
-                ...p,
-                reworkPercent: p.totalInspected > 0
-                    ? parseFloat(((p.totalRework / p.totalInspected) * 100).toFixed(2))
-                    : 0,
-                rejectionPercent: p.totalInspected > 0
-                    ? parseFloat(((p.totalRejected / p.totalInspected) * 100).toFixed(2))
-                    : 0,
-                qualityRate: p.totalInspected > 0
-                    ? parseFloat((((p.totalAccepted) / p.totalInspected) * 100).toFixed(2))
-                    : 0,
+        // Helper for map to array
+        const mapToArray = (map: any, sortFn: (a: any, b: any) => number) =>
+            Object.values(map).sort(sortFn).map((item: any) => ({
+                ...item,
+                qualityRate: item.totalInspected > 0 ? parseFloat(((item.totalAccepted / item.totalInspected) * 100).toFixed(2)) : 0
             }))
 
-        // Build dayWise array
-        const dayWise = Object.values(dayMap)
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .map(d => ({
-                ...d,
-                qualityRate: d.totalInspected > 0
-                    ? parseFloat(((d.totalAccepted / d.totalInspected) * 100).toFixed(2))
-                    : 0,
-            }))
+        const partWise = mapToArray(partMap, (a, b) => b.totalInspected - a.totalInspected).map(p => ({
+            ...p,
+            reworkPercent: p.totalInspected > 0 ? parseFloat(((p.totalRework / p.totalInspected) * 100).toFixed(2)) : 0,
+            rejectionPercent: p.totalInspected > 0 ? parseFloat(((p.totalRejected / p.totalInspected) * 100).toFixed(2)) : 0,
+        }))
 
-        // Build inspectorWise array
-        const inspectorWise = Object.values(inspectorMap)
-            .sort((a, b) => b.totalInspected - a.totalInspected)
-            .map(i => ({
-                ...i,
-                qualityRate: i.totalInspected > 0
-                    ? parseFloat(((i.totalAccepted / i.totalInspected) * 100).toFixed(2))
-                    : 0,
-            }))
+        const dayWise = mapToArray(dayMap, (a, b) => a.date.localeCompare(b.date))
+        const inspectorWise = mapToArray(inspectorMap, (a, b) => b.totalInspected - a.totalInspected)
+        const locationWise = Object.values(locationMap).sort((a: any, b: any) => b.totalInspected - a.totalInspected)
+        const companyWise = mapToArray(companyMap, (a, b) => b.totalInspected - a.totalInspected)
 
-        // Build locationWise array
-        const locationWise = Object.values(locationMap)
-            .sort((a, b) => b.totalInspected - a.totalInspected)
-
-        // Build topDefects array (sorted descending by count)
         const totalDefects = Object.values(defectMap).reduce((a, b) => a + b, 0)
         const topDefects = Object.entries(defectMap)
             .sort(([, a], [, b]) => b - a)
@@ -305,7 +247,35 @@ export async function GET(req: Request) {
             dayWise,
             inspectorWise,
             locationWise,
+            companyWise,
             topDefects,
+            records: inspections.map(i => {
+                const r: any = {
+                    id: i.id,
+                    inspector: i.assignment.inspectionBoy.name,
+                    date: i.submittedAt || i.createdAt,
+                    company: i.assignment.project.company.name,
+                    project: i.assignment.project.name,
+                    inspected: 0,
+                    accepted: 0,
+                    rework: 0,
+                    rejected: 0,
+                    partName: "General",
+                    location: "Main"
+                }
+                for (const resp of i.responses) {
+                    const label = resp.field.fieldLabel.toLowerCase()
+                    const val = resp.value || ""
+                    if (label.includes("part name") || label.includes("partname")) r.partName = val
+                    if (label.includes("inspected")) r.inspected = parseNum(val)
+                    if (label.includes("accepted")) r.accepted = parseNum(val)
+                    if (label.includes("rework")) r.rework = parseNum(val)
+                    if (label.includes("rejected")) r.rejected = parseNum(val)
+                    if (label.includes("location")) r.location = val
+                }
+                if (r.inspected === 0) r.inspected = r.accepted + r.rework + r.rejected
+                return r
+            })
         })
     } catch (error) {
         console.error("[REPORTS_GET]", error)

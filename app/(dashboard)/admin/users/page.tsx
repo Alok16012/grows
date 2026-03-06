@@ -57,6 +57,17 @@ export default function UserManagementPage() {
     const [newPassword, setNewPassword] = useState("")
     const [submitting, setSubmitting] = useState(false)
 
+    const [managers, setManagers] = useState<any[]>([])
+    const [groupProjects, setGroupProjects] = useState<any[]>([])
+    const [groupCompanies, setGroupCompanies] = useState<any[]>([])
+
+    // Group assignment for inspector creation
+    const [groupMode, setGroupMode] = useState<"none" | "existing" | "new">("none")
+    const [groupCompanyId, setGroupCompanyId] = useState("")
+    const [groupProjectId, setGroupProjectId] = useState("")
+    const [newGroupProjectName, setNewGroupProjectName] = useState("")
+    const [groupManagerIds, setGroupManagerIds] = useState<string[]>([])
+
     // Form state
     const [formData, setFormData] = useState({
         name: "",
@@ -69,16 +80,20 @@ export default function UserManagementPage() {
     const fetchData = async () => {
         setLoading(true)
         try {
-            const [usersRes, companiesRes] = await Promise.all([
+            const [usersRes, companiesRes, managersRes] = await Promise.all([
                 fetch("/api/admin/users"),
-                fetch("/api/companies")
+                fetch("/api/companies"),
+                fetch("/api/users?role=MANAGER")
             ])
-            const [usersData, companiesData] = await Promise.all([
+            const [usersData, companiesData, managersData] = await Promise.all([
                 usersRes.json(),
-                companiesRes.json()
+                companiesRes.json(),
+                managersRes.json()
             ])
             setUsers(Array.isArray(usersData) ? usersData : [])
             setCompanies(Array.isArray(companiesData) ? companiesData : [])
+            setGroupCompanies(Array.isArray(companiesData) ? companiesData : [])
+            setManagers(Array.isArray(managersData) ? managersData : [])
         } catch (error) {
             console.error("Failed to fetch admin data", error)
             toast.error("Failed to load user data")
@@ -106,9 +121,50 @@ export default function UserManagementPage() {
                 throw new Error(data.message || data.error || "Failed to create user")
             }
 
+            const newUser = await res.json()
+
+            // Handle group assignment for inspectors
+            if (formData.role === "INSPECTION_BOY") {
+                let assignProjectId = groupProjectId
+
+                if (groupMode === "new" && groupCompanyId && newGroupProjectName.trim()) {
+                    // Create new project first
+                    const projRes = await fetch("/api/projects", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ companyId: groupCompanyId, name: newGroupProjectName.trim() })
+                    })
+                    if (projRes.ok) {
+                        const proj = await projRes.json()
+                        assignProjectId = proj.id
+                    }
+                }
+
+                if (assignProjectId && newUser.id) {
+                    await fetch("/api/assignments", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            projectId: assignProjectId,
+                            inspectorIds: [newUser.id],
+                            managerIds: groupManagerIds.length > 0 ? groupManagerIds : undefined,
+                        })
+                    })
+                    toast.success("User created and assigned to group")
+                } else {
+                    toast.success("User created successfully")
+                }
+            } else {
+                toast.success("User created successfully")
+            }
+
             setIsCreateModalOpen(false)
             setFormData({ name: "", email: "", password: "", role: "CLIENT", companyId: "" })
-            toast.success("User created successfully")
+            setGroupMode("none")
+            setGroupCompanyId("")
+            setGroupProjectId("")
+            setNewGroupProjectName("")
+            setGroupManagerIds([])
             fetchData()
         } catch (error: any) {
             toast.error(error.message)
@@ -154,6 +210,14 @@ export default function UserManagementPage() {
         } finally {
             setSubmitting(false)
         }
+    }
+
+    const fetchGroupProjects = async (companyId: string) => {
+        if (!companyId) { setGroupProjects([]); setGroupProjectId(""); return }
+        try {
+            const res = await fetch(`/api/projects?companyId=${companyId}`)
+            if (res.ok) setGroupProjects(await res.json())
+        } catch { }
     }
 
     const filteredUsers = users.filter(u => {
@@ -202,94 +266,185 @@ export default function UserManagementPage() {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                             <form onSubmit={handleCreateUser}>
-                            <DialogHeader>
-                                <DialogTitle>Create New User</DialogTitle>
-                                <DialogDescription>
-                                    Provision a new account with specific role-based permissions.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="name" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Full Name</Label>
-                                    <Input
-                                        id="name"
-                                        required
-                                        value={formData.name}
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        placeholder="John Doe"
-                                        className="h-11"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="email" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Email Address</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        required
-                                        value={formData.email}
-                                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        placeholder="john@example.com"
-                                        className="h-11"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="password" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Initial Password</Label>
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        required
-                                        value={formData.password}
-                                        onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                        placeholder="••••••••"
-                                        className="h-11"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="role" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Assignment Role</Label>
-                                    <Select
-                                        value={formData.role}
-                                        onValueChange={v => setFormData({ ...formData, role: v })}
-                                    >
-                                        <SelectTrigger className="h-11">
-                                            <SelectValue placeholder="Select a role" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="ADMIN">Administrator</SelectItem>
-                                            <SelectItem value="MANAGER">Manager</SelectItem>
-                                            <SelectItem value="INSPECTION_BOY">Inspector</SelectItem>
-                                            <SelectItem value="CLIENT">Client Portal User</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                {formData.role === "CLIENT" && (
+                                <DialogHeader>
+                                    <DialogTitle>Create New User</DialogTitle>
+                                    <DialogDescription>
+                                        Provision a new account with specific role-based permissions.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="company" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Designated Company</Label>
-                                        <Select
-                                            value={formData.companyId}
-                                            onValueChange={v => setFormData({ ...formData, companyId: v })}
+                                        <Label htmlFor="name" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Full Name</Label>
+                                        <Input
+                                            id="name"
                                             required
+                                            value={formData.name}
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                            placeholder="John Doe"
+                                            className="h-11"
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="email" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Email Address</Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            required
+                                            value={formData.email}
+                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                            placeholder="john@example.com"
+                                            className="h-11"
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="password" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Initial Password</Label>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            required
+                                            value={formData.password}
+                                            onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                            placeholder="••••••••"
+                                            className="h-11"
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="role" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Assignment Role</Label>
+                                        <Select
+                                            value={formData.role}
+                                            onValueChange={v => setFormData({ ...formData, role: v })}
                                         >
                                             <SelectTrigger className="h-11">
-                                                <SelectValue placeholder="Select a company" />
+                                                <SelectValue placeholder="Select a role" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {companies.map(c => (
-                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                                ))}
+                                                <SelectItem value="ADMIN">Administrator</SelectItem>
+                                                <SelectItem value="MANAGER">Manager</SelectItem>
+                                                <SelectItem value="INSPECTION_BOY">Inspector</SelectItem>
+                                                <SelectItem value="CLIENT">Client Portal User</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                )}
-                            </div>
-                            <DialogFooter>
-                                <Button type="submit" disabled={submitting} className="w-full h-11 font-bold">
-                                    {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                                    Complete Provisioning
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                                    {formData.role === "CLIENT" && (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="company" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Designated Company</Label>
+                                            <Select
+                                                value={formData.companyId}
+                                                onValueChange={v => setFormData({ ...formData, companyId: v })}
+                                                required
+                                            >
+                                                <SelectTrigger className="h-11">
+                                                    <SelectValue placeholder="Select a company" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {companies.map(c => (
+                                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+
+                                    {/* Group Assignment — Inspector only */}
+                                    {formData.role === "INSPECTION_BOY" && (
+                                        <div className="space-y-3 border rounded-lg p-3 bg-amber-50/40 border-amber-200">
+                                            <Label className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Assign to Group (Optional)</Label>
+                                            <div className="flex gap-2">
+                                                {(["none", "existing", "new"] as const).map(m => (
+                                                    <button
+                                                        type="button"
+                                                        key={m}
+                                                        onClick={() => { setGroupMode(m); setGroupCompanyId(""); setGroupProjectId(""); setNewGroupProjectName(""); setGroupProjects([]); setGroupManagerIds([]) }}
+                                                        className={`flex-1 text-xs py-1.5 rounded border font-medium transition-colors ${groupMode === m
+                                                                ? "bg-amber-600 text-white border-amber-600"
+                                                                : "bg-white border-gray-200 hover:bg-amber-50"
+                                                            }`}
+                                                    >
+                                                        {m === "none" ? "Skip" : m === "existing" ? "Existing Group" : "New Group"}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {groupMode !== "none" && (
+                                                <>
+                                                    <div className="grid gap-1">
+                                                        <label className="text-xs font-medium">Company</label>
+                                                        <select
+                                                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                            value={groupCompanyId}
+                                                            onChange={(e) => { setGroupCompanyId(e.target.value); fetchGroupProjects(e.target.value); setGroupProjectId("") }}
+                                                        >
+                                                            <option value="">Select Company</option>
+                                                            {groupCompanies.map(c => (
+                                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {groupMode === "existing" && groupCompanyId && (
+                                                        <div className="grid gap-1">
+                                                            <label className="text-xs font-medium">Project (Group)</label>
+                                                            <select
+                                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                                value={groupProjectId}
+                                                                onChange={(e) => setGroupProjectId(e.target.value)}
+                                                            >
+                                                                <option value="">Select Project</option>
+                                                                {groupProjects.map(p => (
+                                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
+
+                                                    {groupMode === "new" && groupCompanyId && (
+                                                        <div className="grid gap-1">
+                                                            <label className="text-xs font-medium">New Group Name</label>
+                                                            <Input
+                                                                placeholder="Enter project/group name"
+                                                                value={newGroupProjectName}
+                                                                onChange={e => setNewGroupProjectName(e.target.value)}
+                                                                className="h-9 text-sm"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {managers.length > 0 && (groupProjectId || (groupMode === "new" && newGroupProjectName)) && (
+                                                        <div className="grid gap-1">
+                                                            <label className="text-xs font-medium">Add Managers (Optional)</label>
+                                                            <div className="border rounded max-h-28 overflow-y-auto p-2 space-y-1 bg-white">
+                                                                {managers.map(m => (
+                                                                    <label key={m.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/40 p-1 rounded text-sm">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={groupManagerIds.includes(m.id)}
+                                                                            onChange={e => {
+                                                                                if (e.target.checked) setGroupManagerIds([...groupManagerIds, m.id])
+                                                                                else setGroupManagerIds(groupManagerIds.filter(id => id !== m.id))
+                                                                            }}
+                                                                            className="rounded border-gray-300"
+                                                                        />
+                                                                        <span className="font-medium">{m.name}</span>
+                                                                        <span className="text-xs text-muted-foreground">({m.email})</span>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" disabled={submitting} className="w-full h-11 font-bold">
+                                        {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                        Complete Provisioning
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
 

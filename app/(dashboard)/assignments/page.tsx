@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Search, Loader2, Calendar, User, Briefcase, Building2, Trash2 } from "lucide-react"
+import { Search, Loader2, Calendar, User, Briefcase, Building2, Trash2, Users, Zap } from "lucide-react"
 
 export default function AssignmentsPage() {
     const { data: session, status } = useSession()
@@ -28,12 +28,12 @@ export default function AssignmentsPage() {
     const [inspectors, setInspectors] = useState<any[]>([])
     const [managers, setManagers] = useState<any[]>([])
     const [assignments, setAssignments] = useState<any[]>([])
-
+    const [groups, setGroups] = useState<any[]>([])
 
     const [selectedCompanyId, setSelectedCompanyId] = useState("")
     const [selectedProjectId, setSelectedProjectId] = useState("")
     const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
-    const [selectedManagerId, setSelectedManagerId] = useState("")
+    const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
 
     const [loading, setLoading] = useState(false)
     const [fetching, setFetching] = useState(true)
@@ -42,6 +42,7 @@ export default function AssignmentsPage() {
 
     useEffect(() => {
         fetchInitialData()
+        fetchGroups()
     }, [])
 
     useEffect(() => {
@@ -53,6 +54,36 @@ export default function AssignmentsPage() {
         }
     }, [selectedCompanyId])
 
+    const fetchGroups = async () => {
+        try {
+            const res = await fetch("/api/groups")
+            if (res.ok) setGroups(await res.json())
+        } catch (error) {
+            console.error("Failed to fetch groups", error)
+        }
+    }
+
+    const handleGroupSelect = async (groupProjectId: string) => {
+        if (!groupProjectId) return
+        // Find company by searching groups
+        for (const company of groups) {
+            const project = company.projects?.find((p: any) => p.id === groupProjectId)
+            if (project) {
+                setSelectedCompanyId(company.id)
+                // fetch projects for that company first
+                try {
+                    const res = await fetch(`/api/projects?companyId=${company.id}`)
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (Array.isArray(data)) setProjects(data)
+                    }
+                } catch { }
+                setSelectedProjectId(groupProjectId)
+                break
+            }
+        }
+    }
+
     const fetchInitialData = async () => {
         setFetching(true)
         try {
@@ -60,23 +91,15 @@ export default function AssignmentsPage() {
                 fetch("/api/companies"),
                 fetch("/api/users?role=INSPECTION_BOY"),
                 fetch("/api/users?role=MANAGER"),
-                fetch("/api/assignments")
+                fetch(`/api/assignments?t=${Date.now()}`)
             ])
 
             if (compRes.ok) setCompanies(await compRes.json())
             if (insRes.ok) setInspectors(await insRes.json())
-            if (mgrRes.ok) {
-                setManagers(await mgrRes.json())
-            } else {
-            }
+            if (mgrRes.ok) setManagers(await mgrRes.json())
             if (assRes.ok) {
                 const data = await assRes.json()
-                if (Array.isArray(data)) {
-                    setAssignments(data)
-                } else {
-                    setAssignments([])
-                }
-            } else {
+                setAssignments(Array.isArray(data) ? data : [])
             }
         } catch (error) {
             console.error("Failed to fetch data", error)
@@ -107,7 +130,7 @@ export default function AssignmentsPage() {
 
     const handleAssign = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!selectedProjectId || selectedInspectorIds.length === 0) return
+        if (!selectedProjectId || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)) return
 
         setLoading(true)
         try {
@@ -116,33 +139,35 @@ export default function AssignmentsPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     projectId: selectedProjectId,
-                    inspectorIds: selectedInspectorIds,
-                    managerId: selectedManagerId || null
+                    inspectorIds: selectedInspectorIds.length > 0 ? selectedInspectorIds : undefined,
+                    managerIds: selectedManagerIds.length > 0 ? selectedManagerIds : undefined
                 })
             })
 
             if (res.ok) {
                 const result = await res.json()
-                
-                // Refresh list
-                const assRes = await fetch("/api/assignments")
+
+                // Refresh list and groups
+                const assRes = await fetch(`/api/assignments?t=${Date.now()}`)
                 const assData = await assRes.json()
-                setAssignments(assData)
+                setAssignments(Array.isArray(assData) ? assData : [])
+                fetchGroups() // Also update the group dropdown data
 
                 // Reset form
                 setSelectedInspectorIds([])
-                setSelectedManagerId("")
+                setSelectedManagerIds([])
                 setSelectedProjectId("")
                 setSelectedCompanyId("")
 
                 // Show results
                 const createdCount = result.created?.length || 0
                 const failedCount = result.failed?.length || 0
-                
+                const managerAssigned = selectedManagerIds.length > 0
+
                 if (failedCount > 0) {
-                    alert(`${createdCount} inspector(s) assigned. ${failedCount} failed (duplicates).`)
-                } else {
-                    alert(`${createdCount} inspector(s) assigned successfully!`)
+                    alert(`${createdCount} inspector(s) assigned. ${failedCount} failed (duplicates). ${managerAssigned ? 'Managers also assigned.' : ''}`)
+                } else if (createdCount > 0 || managerAssigned) {
+                    alert(`${createdCount > 0 ? createdCount + ' inspector(s)' : ''} ${managerAssigned ? (createdCount > 0 ? 'and ' : '') + selectedManagerIds.length + ' manager(s)' : ''} assigned successfully!`)
                 }
             } else {
                 const error = await res.json()
@@ -209,6 +234,37 @@ export default function AssignmentsPage() {
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold tracking-tight">Assignments</h1>
             </div>
+
+            {/* Quick Select Group */}
+            {groups.length > 0 && (
+                <Card className="max-w-4xl border-blue-200 bg-blue-50/30">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Zap className="h-4 w-4 text-blue-600" />
+                            Quick Select Existing Group
+                        </CardTitle>
+                        <CardDescription>
+                            Select an existing group to auto-fill Company and Project below
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <select
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            defaultValue=""
+                            onChange={(e) => handleGroupSelect(e.target.value)}
+                        >
+                            <option value="">— Select a group to auto-fill —</option>
+                            {groups.map((company: any) =>
+                                company.projects?.map((project: any) => (
+                                    <option key={project.id} value={project.id}>
+                                        {company.name} → {project.name} ({project.inspectors?.length ?? 0} inspectors)
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Create Assignment Form */}
             <Card className="max-w-4xl">
@@ -282,24 +338,43 @@ export default function AssignmentsPage() {
                             )}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="manager">Assign Manager (Optional)</Label>
-                            <select
-                                id="manager"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                value={selectedManagerId}
-                                onChange={(e) => setSelectedManagerId(e.target.value)}
-                            >
-                                <option value="">No Manager</option>
-                                {managers.map((m) => (
-                                    <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
-                                ))}
-                            </select>
+                            <Label>Assign Managers (Optional - Multiple)</Label>
+                            <div className="border rounded-md max-h-48 overflow-y-auto p-3 space-y-2 bg-muted/20">
+                                {managers.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No managers available</p>
+                                ) : (
+                                    managers.map((m) => (
+                                        <label key={m.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedManagerIds.includes(m.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedManagerIds([...selectedManagerIds, m.id])
+                                                    } else {
+                                                        setSelectedManagerIds(selectedManagerIds.filter(id => id !== m.id))
+                                                    }
+                                                }}
+                                                className="rounded border-gray-300"
+                                            />
+                                            <span className="text-sm">{m.name}</span>
+                                            <span className="text-xs text-muted-foreground">({m.email})</span>
+                                        </label>
+                                    ))
+                                )}
+                            </div>
+                            {selectedManagerIds.length > 0 && (
+                                <p className="text-xs text-muted-foreground">{selectedManagerIds.length} manager(s) selected</p>
+                            )}
                         </div>
                     </CardContent>
                     <CardFooter className="justify-end border-t p-4">
-                        <Button type="submit" disabled={loading || !selectedProjectId || selectedInspectorIds.length === 0}>
+                        <Button type="submit" disabled={loading || !selectedProjectId || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Assign {selectedInspectorIds.length > 0 ? `${selectedInspectorIds.length} Inspector${selectedInspectorIds.length > 1 ? 's' : ''}` : 'Inspector'}{selectedManagerId ? ' + Manager' : ''}
+                            Assign {selectedInspectorIds.length > 0 ? `${selectedInspectorIds.length} Inspector${selectedInspectorIds.length > 1 ? 's' : ''}` : ''}
+                            {selectedInspectorIds.length > 0 && selectedManagerIds.length > 0 ? ' + ' : ''}
+                            {selectedManagerIds.length > 0 ? `${selectedManagerIds.length} Manager${selectedManagerIds.length > 1 ? 's' : ''}` : ''}
+                            {selectedInspectorIds.length === 0 && selectedManagerIds.length === 0 ? 'Members' : ''}
                         </Button>
                     </CardFooter>
                 </form>
@@ -366,19 +441,16 @@ export default function AssignmentsPage() {
                                                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                                                     {assignment.project.name}
                                                 </div>
-                                                {assignment.project.projectManagers?.length > 0 && (
-                                                    <div className="mt-1">
-                                                        <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
-                                                            Mgr: {assignment.project.projectManagers[0]?.manager?.name}
-                                                        </Badge>
-                                                    </div>
-                                                )}
                                             </td>
                                             <td className="p-4">
                                                 {assignment.project.managers?.length > 0 ? (
-                                                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                                        {assignment.project.managers[0]?.name || "Manager"}
-                                                    </Badge>
+                                                    <div className="flex flex-col gap-1">
+                                                        {assignment.project.managers.map((m: any) => (
+                                                            <Badge key={m.id} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs w-fit">
+                                                                {m.name}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
                                                 ) : (
                                                     <span className="text-muted-foreground text-xs">No manager</span>
                                                 )}
@@ -386,11 +458,11 @@ export default function AssignmentsPage() {
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
                                                     <User className="h-4 w-4 text-muted-foreground" />
-                                                    {assignment.inspectionBoy.name}
+                                                    {assignment.inspectionBoy?.name || "Pending Inspector"}
                                                 </div>
                                             </td>
                                             <td className="p-4 text-muted-foreground">
-                                                {assignment.assigner.name}
+                                                {assignment.assigner?.name || "System"}
                                             </td>
                                             <td className="p-4 text-muted-foreground">
                                                 <div className="flex items-center gap-2">
@@ -400,10 +472,16 @@ export default function AssignmentsPage() {
                                             </td>
                                             <td className="p-4">
                                                 <Badge
-                                                    variant="outline"
-                                                    className={`capitalize font-medium ${getStatusColor(assignment.status)}`}
+                                                    variant="secondary"
+                                                    className={
+                                                        assignment.status === "active"
+                                                            ? "bg-green-50 text-green-700 border-green-100"
+                                                            : assignment.status === "manager_only"
+                                                                ? "bg-blue-50 text-blue-700 border-blue-100"
+                                                                : "bg-amber-50 text-amber-700 border-amber-100"
+                                                    }
                                                 >
-                                                    {assignment.status}
+                                                    {assignment.status === "manager_only" ? "Manager Assigned" : assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
                                                 </Badge>
                                             </td>
                                             <td className="p-4 text-right">

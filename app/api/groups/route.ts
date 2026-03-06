@@ -5,6 +5,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
 
@@ -85,7 +87,7 @@ export async function GET(req: Request) {
                             managers,
                             inspectors
                         }
-                    }).filter(p => p.managers.length > 0 || p.inspectors.length > 0)
+                    })
             })).filter(c => c.projects.length > 0)
 
         return NextResponse.json(grouped)
@@ -95,7 +97,7 @@ export async function GET(req: Request) {
     }
 }
 
-// DELETE - Remove inspector from project
+// DELETE - Remove inspector from project OR remove manager from project
 export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions)
 
@@ -106,9 +108,19 @@ export async function DELETE(req: Request) {
     try {
         const { searchParams } = new URL(req.url)
         const assignmentId = searchParams.get("assignmentId")
+        const managerId = searchParams.get("managerId")
+        const projectId = searchParams.get("projectId")
+
+        if (managerId && projectId) {
+            // Remove manager from project
+            await prisma.projectManager.deleteMany({
+                where: { managerId, projectId }
+            })
+            return NextResponse.json({ success: true })
+        }
 
         if (!assignmentId) {
-            return NextResponse.json({ error: "Assignment ID required" }, { status: 400 })
+            return NextResponse.json({ error: "Assignment ID or (managerId + projectId) required" }, { status: 400 })
         }
 
         await prisma.assignment.delete({

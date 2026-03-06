@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const { inspectors } = body
+        const { inspectors, projectId, managerIds } = body
 
         if (!Array.isArray(inspectors) || inspectors.length === 0) {
             return NextResponse.json({ error: "No inspectors provided" }, { status: 400 })
@@ -74,9 +74,42 @@ export async function POST(req: Request) {
                     failed.push({ name, email, error: err.message || "Failed to create user" })
                 }
             }
+
+            // If projectId provided, auto-assign created inspectors to the project
+            if (projectId && created.length > 0) {
+                for (const inspector of created) {
+                    try {
+                        await tx.assignment.create({
+                            data: {
+                                projectId,
+                                inspectionBoyId: inspector.id,
+                                assignedBy: session.user.id,
+                                status: "active"
+                            }
+                        })
+                    } catch (err) {
+                        console.log(`Assignment creation skipped for ${inspector.email}:`, err)
+                    }
+                }
+            }
+
+            // If managerIds provided, upsert managers for the project
+            if (projectId && managerIds && Array.isArray(managerIds) && managerIds.length > 0) {
+                for (const managerId of managerIds) {
+                    try {
+                        await tx.projectManager.upsert({
+                            where: { projectId_managerId: { projectId, managerId } },
+                            create: { projectId, managerId, assignedBy: session.user.id },
+                            update: {}
+                        })
+                    } catch (err) {
+                        console.log(`Manager assignment skipped for ${managerId}:`, err)
+                    }
+                }
+            }
         })
 
-        return NextResponse.json({ created, failed })
+        return NextResponse.json({ created, failed, projectAssigned: !!projectId })
     } catch (error) {
         console.error("BULK_CREATE_INSPECTORS_ERROR", error)
         return NextResponse.json({ error: "Internal Error" }, { status: 500 })

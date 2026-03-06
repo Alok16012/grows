@@ -16,7 +16,12 @@ import {
     History,
     FileEdit,
     Clock,
-    LayoutDashboard
+    LayoutDashboard,
+    BarChart3,
+    FileText,
+    TrendingUp,
+    TrendingDown,
+    Minus
 } from "lucide-react"
 import Link from "next/link"
 import { format, formatDistanceToNow } from "date-fns"
@@ -28,6 +33,8 @@ export default function InspectionDashboard() {
     const [assignments, setAssignments] = useState<any[]>([])
     const [recentSubmissions, setRecentSubmissions] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [reportData, setReportData] = useState<any>(null)
+    const [reportLoading, setReportLoading] = useState(true)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -48,6 +55,25 @@ export default function InspectionDashboard() {
         }
         fetchData()
     }, [])
+
+    useEffect(() => {
+        const fetchReport = async () => {
+            if (!session?.user?.id) return
+            try {
+                const now = new Date()
+                const month = now.getMonth() + 1
+                const year = now.getFullYear()
+                const res = await fetch(`/api/reports?month=${month}&year=${year}&inspectorId=${session.user.id}`)
+                const data = await res.json()
+                setReportData(data)
+            } catch (error) {
+                console.error("Failed to fetch report", error)
+            } finally {
+                setReportLoading(false)
+            }
+        }
+        fetchReport()
+    }, [session])
 
     if (loading) {
         return (
@@ -115,6 +141,102 @@ export default function InspectionDashboard() {
                         </div>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* Company Wise Report Section */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    Company Wise Reports (Current Month)
+                </h2>
+                {reportLoading ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+                    </div>
+                ) : reportData?.summary ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Card className="border-none shadow-sm bg-white">
+                            <CardContent className="p-4 flex items-center gap-3">
+                                <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                                    <ClipboardList className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase">Total Inspected</p>
+                                    <p className="text-xl font-bold">{reportData.summary.totalInspected.toLocaleString()}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-none shadow-sm bg-white">
+                            <CardContent className="p-4 flex items-center gap-3">
+                                <div className="bg-emerald-50 text-emerald-600 p-2 rounded-lg">
+                                    <CheckCircle2 className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase">Accepted</p>
+                                    <p className="text-xl font-bold">{reportData.summary.totalAccepted.toLocaleString()}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-none shadow-sm bg-white">
+                            <CardContent className="p-4 flex items-center gap-3">
+                                <div className="bg-amber-50 text-amber-600 p-2 rounded-lg">
+                                    <FileEdit className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase">Rework</p>
+                                    <p className="text-xl font-bold">{reportData.summary.totalRework.toLocaleString()}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-none shadow-sm bg-white">
+                            <CardContent className="p-4 flex items-center gap-3">
+                                <div className="bg-red-50 text-red-600 p-2 rounded-lg">
+                                    <AlertCircle className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase">Rejected</p>
+                                    <p className="text-xl font-bold">{reportData.summary.totalRejected.toLocaleString()}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                ) : (
+                    <Card className="border-dashed bg-muted/5">
+                        <CardContent className="p-8 text-center">
+                            <BarChart3 className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">No inspection data for this month</p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {reportData?.summary && (
+                    <div className="flex flex-wrap gap-3">
+                        <Card className="flex-1 min-w-[150px] border-none shadow-sm bg-gradient-to-r from-emerald-50 to-white">
+                            <CardContent className="p-4">
+                                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Quality Rate</p>
+                                <p className="text-2xl font-black text-emerald-600">{reportData.summary.acceptanceRate}%</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="flex-1 min-w-[150px] border-none shadow-sm bg-gradient-to-r from-amber-50 to-white">
+                            <CardContent className="p-4">
+                                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Rework Rate</p>
+                                <p className="text-2xl font-black text-amber-600">{reportData.summary.reworkRate}%</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="flex-1 min-w-[150px] border-none shadow-sm bg-gradient-to-r from-red-50 to-white">
+                            <CardContent className="p-4">
+                                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Rejection Rate</p>
+                                <p className="text-2xl font-black text-red-600">{reportData.summary.rejectionRate}%</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="flex-1 min-w-[150px] border-none shadow-sm bg-gradient-to-r from-slate-50 to-white">
+                            <CardContent className="p-4">
+                                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Total Inspections</p>
+                                <p className="text-2xl font-black text-slate-600">{reportData.totalInspections || 0}</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
