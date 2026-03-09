@@ -94,6 +94,7 @@ model FormTemplate {
   fieldLabel   String
   fieldType    String
   options      String?
+  defaultValue String?
   isRequired   Boolean          @default(false)
   displayOrder Int              @default(0)
   createdAt    DateTime         @default(now())

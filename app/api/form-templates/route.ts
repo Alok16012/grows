@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { projectId, fieldLabel, fieldType, options, isRequired, displayOrder } = body
+        const { projectId, fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder } = body
 
         if (!projectId || !fieldLabel || !fieldType) {
             return new NextResponse("projectId, fieldLabel, and fieldType are required", { status: 400 })
@@ -48,6 +48,7 @@ export async function POST(req: Request) {
                 fieldLabel,
                 fieldType,
                 options: options || null,
+                defaultValue: defaultValue || null,
                 isRequired: isRequired ?? false,
                 displayOrder: displayOrder ?? 0,
             },

@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import {
     Plus, GripVertical, Pencil, Trash2, X, Save, Loader2,
-    AlignLeft, Hash, Calendar, ChevronDown, CheckSquare, FileText, FileUp
+    AlignLeft, Hash, Calendar, ChevronDown, CheckSquare, FileText, FileUp, Copy
 } from "lucide-react"
 
 type FieldType = "text" | "number" | "date" | "dropdown" | "checkbox" | "textarea" | "file"
@@ -36,6 +36,7 @@ type FormField = {
     fieldLabel: string
     fieldType: FieldType
     options: string | null
+    defaultValue: string | null
     isRequired: boolean
     displayOrder: number
 }
@@ -62,10 +63,11 @@ function FieldEditorForm({ initialData, onSave, onCancel, saving }: FieldEditorF
     const [type, setType] = useState<FieldType>(initialData?.fieldType || "text")
     const [required, setRequired] = useState(initialData?.isRequired || false)
     const [options, setOptions] = useState(initialData?.options || "")
+    const [defaultValue, setDefaultValue] = useState(initialData?.defaultValue || "")
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        onSave({ fieldLabel: label, fieldType: type, isRequired: required, options: type === "dropdown" ? options : null })
+        onSave({ fieldLabel: label, fieldType: type, isRequired: required, options: type === "dropdown" ? options : null, defaultValue: defaultValue || null })
     }
 
     return (
@@ -92,6 +94,23 @@ function FieldEditorForm({ initialData, onSave, onCancel, saving }: FieldEditorF
                     <Input value={options} onChange={e => setOptions(e.target.value)} placeholder="e.g. Good, Average, Poor" className="h-8 text-sm" />
                 </div>
             )}
+            <div className="space-y-1">
+                <Label className="text-xs">Default Value</Label>
+                {type === "dropdown" ? (
+                    <select
+                        value={defaultValue}
+                        onChange={e => setDefaultValue(e.target.value)}
+                        className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <option value="">No Default</option>
+                        {options.split(",").map(o => o.trim()).filter(Boolean).map(o => (
+                            <option key={o} value={o}>{o}</option>
+                        ))}
+                    </select>
+                ) : (
+                    <Input value={defaultValue} onChange={e => setDefaultValue(e.target.value)} placeholder={type === "number" ? "e.g. 0" : "e.g. Sample"} className="h-8 text-sm" />
+                )}
+            </div>
             <div className="flex items-center gap-2">
                 <label className="flex items-center gap-2 cursor-pointer text-sm select-none">
                     <div
@@ -172,22 +191,22 @@ function FieldPreview({ field }: { field: FormField }) {
                 {field.fieldLabel}
                 {field.isRequired && <span className="text-destructive ml-0.5">*</span>}
             </label>
-            {field.fieldType === "text" && <input type="text" disabled placeholder={`Enter ${field.fieldLabel.toLowerCase()}`} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed" />}
-            {field.fieldType === "number" && <input type="number" disabled placeholder="0" className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed" />}
-            {field.fieldType === "date" && <input type="date" disabled className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed" />}
+            {field.fieldType === "text" && <input type="text" disabled defaultValue={field.defaultValue || ""} placeholder={`Enter ${field.fieldLabel.toLowerCase()}`} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed" />}
+            {field.fieldType === "number" && <input type="number" disabled defaultValue={field.defaultValue || ""} placeholder="0" className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed" />}
+            {field.fieldType === "date" && <input type="date" disabled defaultValue={field.defaultValue || ""} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed" />}
             {field.fieldType === "dropdown" && (
-                <select disabled className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed">
+                <select disabled defaultValue={field.defaultValue || ""} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed">
                     <option value="">Select an option</option>
                     {optionList.map(o => <option key={o}>{o}</option>)}
                 </select>
             )}
             {field.fieldType === "checkbox" && (
                 <div className="flex items-center gap-2">
-                    <input type="checkbox" disabled className="h-4 w-4 cursor-not-allowed" />
+                    <input type="checkbox" disabled defaultChecked={field.defaultValue === "true"} className="h-4 w-4 cursor-not-allowed" />
                     <span className="text-sm text-muted-foreground">{field.fieldLabel}</span>
                 </div>
             )}
-            {field.fieldType === "textarea" && <textarea disabled placeholder={`Enter ${field.fieldLabel.toLowerCase()}`} rows={3} className="flex w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed resize-none" />}
+            {field.fieldType === "textarea" && <textarea disabled placeholder={field.defaultValue || `Enter ${field.fieldLabel.toLowerCase()}`} rows={3} className="flex w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed resize-none" />}
             {field.fieldType === "file" && <input type="file" disabled className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-not-allowed" />}
         </div>
     )
@@ -208,6 +227,7 @@ export default function FormBuilderClient({
     const [editingId, setEditingId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [deletingId, setDeletingId] = useState<string | null>(null)
+    const [loadingDefault, setLoadingDefault] = useState(false)
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -287,6 +307,21 @@ export default function FormBuilderClient({
         )
     }
 
+    const handleLoadDefaultForm = async () => {
+        if (!confirm("This will replace all your current fields with the default template. Continue?")) return
+        setLoadingDefault(true)
+        try {
+            const res = await fetch("/api/form-templates/bulk-default", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ projectId }),
+            })
+            if (!res.ok) throw new Error("Failed to load default form")
+            await fetchFields()
+        } catch { /* ignore */ }
+        finally { setLoadingDefault(false) }
+    }
+
     return (
         <div className="space-y-4">
             <div>
@@ -308,11 +343,17 @@ export default function FormBuilderClient({
                                     <CardTitle className="text-base">Field Editor</CardTitle>
                                     <CardDescription className="text-xs">{fields.length} field{fields.length !== 1 ? "s" : ""} defined</CardDescription>
                                 </div>
-                                {!showAddForm && (
-                                    <Button size="sm" onClick={() => { setShowAddForm(true); setEditingId(null) }}>
-                                        <Plus className="h-4 w-4 mr-1" /> Add Field
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" onClick={handleLoadDefaultForm} disabled={loadingDefault}>
+                                        {loadingDefault ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Copy className="h-4 w-4 mr-1" />}
+                                        Load Default Form
                                     </Button>
-                                )}
+                                    {!showAddForm && (
+                                        <Button size="sm" onClick={() => { setShowAddForm(true); setEditingId(null) }}>
+                                            <Plus className="h-4 w-4 mr-1" /> Add Field
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
