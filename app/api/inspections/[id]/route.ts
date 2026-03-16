@@ -37,54 +37,59 @@ export async function PATCH(
         }
 
         // Update status and submittedAt if pending
-        const updateData: any = { status }
-        if (status === "pending") {
-            updateData.submittedAt = new Date()
-        }
-        // If reverting to draft, clear submittedAt
-        if (isRevertToDraft) {
-            updateData.submittedAt = null
+        const updateData: any = {}
+        if (status) {
+            updateData.status = status
+            if (status === "pending") {
+                updateData.submittedAt = new Date()
+            }
+            if (isRevertToDraft) {
+                updateData.submittedAt = null
+            }
         }
 
-        // Use transaction for status update and response upserts
-        await prisma.$transaction(async (tx) => {
-            // Update main inspection
-            await tx.inspection.update({
+        let validResponses = (responses || []).filter((r: any) => r.fieldId && r.fieldId !== "undefined")
+
+        // Handle paperFormPhoto if sent inside responses
+        const paperFormResponseIndex = validResponses.findIndex((r: any) => r.fieldId === "paperFormPhoto")
+        if (paperFormResponseIndex !== -1) {
+            updateData.paperFormPhoto = validResponses[paperFormResponseIndex].value
+            validResponses.splice(paperFormResponseIndex, 1)
+        }
+
+        console.log(`Updating inspection ${inspectionId}, status: ${status}, responses: ${validResponses.length}`)
+
+        // Filter to only valid field IDs in one query (avoids FK violations)
+        const fieldIds = validResponses.map((r: any) => r.fieldId)
+        const validFields = fieldIds.length > 0
+            ? await prisma.formTemplate.findMany({
+                where: { id: { in: fieldIds } },
+                select: { id: true }
+            })
+            : []
+        const validFieldIds = new Set(validFields.map((f: any) => f.id))
+        const filteredResponses = validResponses.filter((r: any) => validFieldIds.has(r.fieldId))
+
+        // Use batch transaction (array form) — works reliably with PgBouncer
+        // and avoids N×2 sequential queries inside an interactive transaction
+        const ops: any[] = []
+
+        if (Object.keys(updateData).length > 0) {
+            ops.push(prisma.inspection.update({
                 where: { id: inspectionId },
                 data: updateData
-            })
+            }))
+        }
 
-            // Upsert responses
-            if (responses && Array.isArray(responses)) {
-                for (const response of responses) {
-                    const { fieldId, value } = response
+        ops.push(prisma.inspectionData.deleteMany({ where: { inspectionId } }))
 
-                    // Direct upsert is tricky with UUIDs if we don't have the response ID
-                    // Better to find if it exists by inspectionId and fieldId
-                    const existingResponse = await tx.inspectionData.findFirst({
-                        where: {
-                            inspectionId,
-                            fieldId
-                        }
-                    })
+        for (const { fieldId, value } of filteredResponses) {
+            ops.push(prisma.inspectionData.create({
+                data: { inspectionId, fieldId, value: value || "" }
+            }))
+        }
 
-                    if (existingResponse) {
-                        await tx.inspectionData.update({
-                            where: { id: existingResponse.id },
-                            data: { value }
-                        })
-                    } else {
-                        await tx.inspectionData.create({
-                            data: {
-                                inspectionId,
-                                fieldId,
-                                value
-                            }
-                        })
-                    }
-                }
-            }
-        })
+        await prisma.$transaction(ops)
 
         const updatedInspection = await prisma.inspection.findUnique({
             where: { id: inspectionId },
@@ -92,8 +97,12 @@ export async function PATCH(
         })
 
         return NextResponse.json(updatedInspection)
-    } catch (error) {
-        console.error("PATCH_INSPECTION_ERROR", error)
-        return NextResponse.json({ error: "Internal Error" }, { status: 500 })
+    } catch (error: any) {
+        console.error("PATCH_INSPECTION_ERROR:", error)
+        return NextResponse.json({
+            error: "Internal Error",
+            details: error.message,
+            code: error.code
+        }, { status: 500 })
     }
 }
