@@ -57,7 +57,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "MANAGEMENT",
             links: [
                 { name: "Companies", href: "/companies", icon: Building2, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"] },
-                { name: "Projects", href: "/projects", icon: Folder, roles: ["ADMIN", "MANAGER"] },
+                { name: "Projects", href: "/projects", icon: Folder, roles: [] },
                 { name: "Assignments", href: "/assignments", icon: HardHat, roles: ["ADMIN", "MANAGER"] },
                 { name: "Groups", href: "/groups", icon: Users2, roles: ["ADMIN", "MANAGER"] },
                 { name: "Approvals", href: "/approvals", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], badge: true },
