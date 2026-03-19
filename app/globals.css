@@ -67,6 +67,5 @@
   body {
     background-color: var(--bg);
     color: var(--text);
-    font-family: 'Inter', sans-serif;
   }
 }
