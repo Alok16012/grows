@@ -34,15 +34,13 @@ export async function POST(req: Request) {
         const buffer = Buffer.from(bytes)
 
         const filename = `${uuidv4()}-${file.name}`
-        const uploadDir = path.join(process.cwd(), "public", "uploads")
+        const mimeType = file.type || 'application/octet-stream'
+        const base64Data = buffer.toString('base64')
+        const dataUrl = `data:${mimeType};base64,${base64Data}`
 
-        // Ensure directory exists (though handled by command earlier)
-        await fs.mkdir(uploadDir, { recursive: true })
-
-        const filePath = path.join(uploadDir, filename)
-        await fs.writeFile(filePath, buffer)
-
-        return NextResponse.json({ url: `/uploads/${filename}` })
+        // Bypass Vercel's read-only filesystem by returning the Base64 Data URI directly.
+        // It will be stored natively in the generic string columns across the PostgreSQL database.
+        return NextResponse.json({ url: dataUrl })
     } catch (error) {
         console.error("UPLOAD_ERROR", error)
         return NextResponse.json({ error: "Internal Error" }, { status: 500 })
