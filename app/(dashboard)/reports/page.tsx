@@ -181,43 +181,74 @@ export default function ReportsPage() {
     }, [data?.records, searchTerm])
 
     const handleExportExcel = () => {
-        if (!filteredRecords || filteredRecords.length === 0) return
+        let formattedData: any = []
+        let sheetName = ""
+        let fileNamePrefix = ""
 
-        const formattedData = filteredRecords.map((r: any) => {
-            const row: any = {
-                "Date": r.date ? format(new Date(r.date), "dd/MM/yyyy HH:mm") : "—",
-                "Shift": r.shift || "—",
-                "Company": r.company || "—",
-                "Project": r.project || "—",
-                "Location": r.location || "—",
-                "Part Name": r.partName || "—",
-                "Part Number": r.partNumber || "—",
-                "Inspected Qty": r.inspected || 0,
-                "Accepted Qty": r.accepted || 0,
-                "Rework Qty": r.rework || 0,
-                "Rejected Qty": r.rejected || 0,
-                "Rework %": r.inspected ? ((r.rework / r.inspected) * 100).toFixed(2) + "%" : "0%",
-                "Rejected %": r.inspected ? ((r.rejected / r.inspected) * 100).toFixed(2) + "%" : "0%",
-                "Rework PPM": r.inspected ? Math.round((r.rework / r.inspected) * 1000000) : 0,
-                "Rejection PPM": r.inspected ? Math.round((r.rejected / r.inspected) * 1000000) : 0,
-                "Inspector Name": r.inspector || "—"
-            }
-
-            const baseKeys = ["id", "date", "shift", "company", "project", "location", "partName", "partNumber", "inspected", "accepted", "rework", "rejected", "inspector"]
-            Object.keys(r).forEach(k => {
-                if (!baseKeys.includes(k) && typeof r[k] === 'number') {
-                    row[k] = r[k]
+        if (activeTab === "Day Wise") {
+            if (!data?.dayWise || data.dayWise.length === 0) return
+            formattedData = data.dayWise.map((d: any) => ({
+                "Date": d.date ? format(parseISO(d.date), "dd MMM yyyy, EEE") : "—",
+                "Inspected": d.totalInspected,
+                "Accepted": d.totalAccepted,
+                "Rework": d.totalRework,
+                "Rejected": d.totalRejected,
+                "Quality Rate": d.qualityRate.toFixed(1) + "%"
+            }))
+            sheetName = "Day Wise"
+            fileNamePrefix = "DayWiseReport"
+        } else if (activeTab === "Part Wise") {
+            if (!data?.partWise || data.partWise.length === 0) return
+            formattedData = data.partWise.map((p: any) => ({
+                "Component": p.partName,
+                "Inspected": p.totalInspected,
+                "Accepted": p.totalAccepted,
+                "Rework": p.totalRework,
+                "Rejected": p.totalRejected,
+                "Quality Rate": p.qualityRate.toFixed(1) + "%"
+            }))
+            sheetName = "Part Wise"
+            fileNamePrefix = "PartWiseReport"
+        } else {
+            if (!filteredRecords || filteredRecords.length === 0) return
+            formattedData = filteredRecords.map((r: any) => {
+                const row: any = {
+                    "Date": r.date ? format(new Date(r.date), "dd/MM/yyyy HH:mm") : "—",
+                    "Shift": r.shift || "—",
+                    "Company": r.company || "—",
+                    "Project": r.project || "—",
+                    "Location": r.location || "—",
+                    "Part Name": r.partName || "—",
+                    "Part Number": r.partNumber || "—",
+                    "Inspected Qty": r.inspected || 0,
+                    "Accepted Qty": r.accepted || 0,
+                    "Rework Qty": r.rework || 0,
+                    "Rejected Qty": r.rejected || 0,
+                    "Rework %": r.inspected ? ((r.rework / r.inspected) * 100).toFixed(2) + "%" : "0%",
+                    "Rejected %": r.inspected ? ((r.rejected / r.inspected) * 100).toFixed(2) + "%" : "0%",
+                    "Rework PPM": r.inspected ? Math.round((r.rework / r.inspected) * 1000000) : 0,
+                    "Rejection PPM": r.inspected ? Math.round((r.rejected / r.inspected) * 1000000) : 0,
+                    "Inspector Name": r.inspector || "—"
                 }
+
+                const baseKeys = ["id", "date", "shift", "company", "project", "location", "partName", "partNumber", "inspected", "accepted", "rework", "rejected", "inspector"]
+                Object.keys(r).forEach(k => {
+                    if (!baseKeys.includes(k) && typeof r[k] === 'number') {
+                        row[k] = r[k]
+                    }
+                })
+                return row
             })
-            return row
-        })
+            sheetName = "Inspections"
+            fileNamePrefix = "InspectionReport"
+        }
 
         const worksheet = XLSX.utils.json_to_sheet(formattedData)
         const workbook = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Inspections")
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
 
         const companyName = companies.find(c => c.id === selectedCompanyId)?.name || "Global"
-        const fileName = `InspectionReport_${companyName.replace(/\s+/g, '')}_${MONTHS[selectedMonth - 1]}_${selectedYear}.xlsx`
+        const fileName = `${fileNamePrefix}_${companyName.replace(/\s+/g, '')}_${MONTHS[selectedMonth - 1]}_${selectedYear}.xlsx`
         XLSX.writeFile(workbook, fileName)
     }
 
@@ -326,24 +357,26 @@ export default function ReportsPage() {
                 </div>
 
                 <div className="flex items-center gap-[8px]">
-                    {activeTab !== "Inspection Report" && (
+                    {!["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab) && (
                         <button
                             onClick={handleExportPdf}
                             disabled={loading || exportingPdf}
-                            className="flex items-center gap-[6px] bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[14px] py-[8px] hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors disabled:opacity-50"
+                            className="flex items-center gap-[6px] bg-[#dc2626] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[14px] py-[8px] hover:bg-[#b91c1c] transition-colors disabled:opacity-50"
                         >
                             <FileText className="h-[14px] w-[14px]" />
-                            {exportingPdf ? "Generating PDF..." : "Export PDF"}
+                            {exportingPdf ? "Generating PDF..." : "Export Full Report PDF"}
                         </button>
                     )}
-                    <button
-                        onClick={handleExportExcel}
-                        disabled={loading || !data?.records?.length}
-                        className="flex items-center gap-[6px] bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[14px] py-[8px] hover:bg-[#e8f7f1] hover:text-[#0d6b4a] hover:border-[rgba(26,158,110,0.3)] transition-colors disabled:opacity-50"
-                    >
-                        <FileSpreadsheet className="h-[14px] w-[14px]" />
-                        Export Excel
-                    </button>
+                    {(["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab)) && (
+                        <button
+                            onClick={handleExportExcel}
+                            disabled={loading || (activeTab === "Day Wise" ? !data?.dayWise?.length : activeTab === "Part Wise" ? !data?.partWise?.length : !filteredRecords?.length)}
+                            className="flex items-center gap-[6px] bg-[#1a9e6e] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[14px] py-[8px] hover:bg-[#158a5e] focus:bg-[#158a5e] transition-colors disabled:opacity-50"
+                        >
+                            <FileSpreadsheet className="h-[14px] w-[14px]" />
+                            Export Excel
+                        </button>
+                    )}
                     <button
                         onClick={fetchReport}
                         disabled={loading}
@@ -609,22 +642,6 @@ export default function ReportsPage() {
                                                 onChange={e => setSearchTerm(e.target.value)}
                                             />
                                         </div>
-                                        <button
-                                            onClick={handleExportExcel}
-                                            disabled={loading || filteredRecords.length === 0}
-                                            className="flex items-center justify-center gap-[6px] bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[12.5px] font-[500] px-[12px] h-[36px] hover:bg-[#e8f7f1] hover:text-[#0d6b4a] hover:border-[rgba(26,158,110,0.3)] transition-colors disabled:opacity-50"
-                                        >
-                                            <FileSpreadsheet className="h-[14px] w-[14px]" />
-                                            EXCEL
-                                        </button>
-                                        <button
-                                            onClick={handleExportPdf}
-                                            disabled={loading || exportingPdf}
-                                            className="flex items-center justify-center gap-[6px] bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[12.5px] font-[500] px-[12px] h-[36px] hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors disabled:opacity-50"
-                                        >
-                                            <FileText className="h-[14px] w-[14px]" />
-                                            PDF
-                                        </button>
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto">
