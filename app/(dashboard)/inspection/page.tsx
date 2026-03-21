@@ -377,7 +377,7 @@ export default function InspectionDashboard() {
                                     href={`/inspection/${a.id}/form`}
                                     className="flex items-center justify-center gap-2 w-full bg-[#1a9e6e] text-white rounded-[9px] py-2.5 text-[13px] font-medium hover:bg-[#158a5e] transition-colors"
                                 >
-                                    Start Inspection
+                                    {a.inspection?.status === "draft" ? "Complete Inspection" : "Start Inspection"}
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <line x1="5" y1="12" x2="19" y2="12" />
                                         <polyline points="12 5 19 12 12 19" />
@@ -476,7 +476,7 @@ export default function InspectionDashboard() {
                                         <span className="bg-[#fef2f2] text-[#dc2626] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Rejected</span>
                                     )}
                                     <Link href={`/inspection/${s.assignmentId}/form`} className="text-[12.5px] font-medium text-[#1a9e6e] hover:underline">
-                                        Resume →
+                                        {s.status === "draft" ? "Complete Inspection" : "Resume"} →
                                     </Link>
                                 </div>
                             </div>

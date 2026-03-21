@@ -671,8 +671,8 @@ export default function InspectionFormPage() {
                                     disabled={saving}
                                     className="bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#158a5e] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
                                 >
-                                    <span className="hidden sm:inline">Submit for Approval</span>
-                                    <span className="sm:hidden inline">Submit</span>
+                                    <span className="hidden sm:inline">Complete Inspection & Submit</span>
+                                    <span className="sm:hidden inline">Complete</span>
                                 </button>
                             </>
                         )}
