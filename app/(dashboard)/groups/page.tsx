@@ -388,7 +388,7 @@ function GroupsContent() {
 
     const openCreateGroupDialog = async () => {
         setCreateGroupOpen(true)
-        if (companies.length === 0) {
+        if (companies.length === 0 && (session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER")) {
             setFetchingCompanies(true)
             try {
                 const res = await fetch("/api/companies")
@@ -415,8 +415,10 @@ function GroupsContent() {
     }, [status, session, router])
 
     useEffect(() => {
-        fetchGroups()
-    }, [])
+        if (session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER") {
+            fetchGroups()
+        }
+    }, [session?.user?.role])
 
     const fetchGroups = async () => {
         setLoading(true)

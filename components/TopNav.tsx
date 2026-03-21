@@ -74,7 +74,11 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
         <div className="sticky top-0 z-30 flex h-[54px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-3 md:px-6 shrink-0 gap-2">
             {/* Left: Mobile Menu & Breadcrumb */}
             <div className="flex items-center gap-2 shrink-0">
-                <button onClick={onMenuClick} className="inline-flex items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] active:bg-[var(--surface2)] md:hidden transition-colors">
+                <button
+                    onClick={onMenuClick}
+                    suppressHydrationWarning
+                    className="inline-flex items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] active:bg-[var(--surface2)] md:hidden transition-colors"
+                >
                     <Menu size={20} />
                 </button>
 

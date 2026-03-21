@@ -38,9 +38,11 @@ export default function AssignmentsPage() {
     const [filterStatus, setFilterStatus] = useState("all")
 
     useEffect(() => {
-        fetchInitialData()
-        fetchGroups()
-    }, [])
+        if (isManagerOrAdmin) {
+            fetchInitialData()
+            fetchGroups()
+        }
+    }, [isManagerOrAdmin])
 
     useEffect(() => {
         if (selectedCompanyId) {
@@ -404,13 +406,12 @@ export default function AssignmentsPage() {
                                         key={opt.value}
                                         type="button"
                                         onClick={() => setRecurrenceType(opt.value)}
-                                        className={`flex-1 flex flex-col items-center gap-[4px] p-[10px_8px] rounded-[10px] border-[1.5px] transition-all text-[12px] font-[500] ${
-                                            recurrenceType === opt.value
+                                        className={`flex-1 flex flex-col items-center gap-[4px] p-[10px_8px] rounded-[10px] border-[1.5px] transition-all text-[12px] font-[500] ${recurrenceType === opt.value
                                                 ? opt.value === "none"
                                                     ? "border-[#1a9e6e] bg-[#f0fdf4] text-[#0d6b4a]"
                                                     : "border-[#3b82f6] bg-[#eff6ff] text-[#1d4ed8]"
                                                 : "border-[#e8e6e1] bg-[#f9f8f5] text-[#6b6860] hover:bg-white"
-                                        }`}
+                                            }`}
                                     >
                                         <span className="text-[16px]">{opt.icon}</span>
                                         {opt.label}
