@@ -1,12 +1,11 @@
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer"
+import { Document, Page, View, Text, StyleSheet, Image } from "@react-pdf/renderer"
 
 const styles = StyleSheet.create({
     page: { fontFamily: "Helvetica", padding: 36, fontSize: 10, backgroundColor: "#ffffff" },
     header: { marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1.5, borderBottomColor: "#1a9e6e" },
     headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
     headerLeft: { flex: 1 },
-    logoBadge: { width: 44, height: 44, backgroundColor: "#1a9e6e", borderRadius: 8, alignItems: "center", justifyContent: "center", marginLeft: 12 },
-    logoText: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#ffffff" },
+    logoImg: { width: 80, height: 40, objectFit: "contain", marginLeft: 12 },
     headerTitle: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#1a1a18", marginBottom: 3 },
     headerProject: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#1a9e6e", marginBottom: 4 },
     headerSub: { fontSize: 8, color: "#6b6860" },
@@ -39,17 +38,14 @@ const styles = StyleSheet.create({
     pageNum: { position: "absolute", bottom: 22, right: 36, fontSize: 8, color: "#9e9b95" },
 })
 
-export function ReportDocument({ data, companyName, period, project, inspector }: {
-    data: any, companyName: string, period: string, project: string, inspector: string
+export function ReportDocument({ data, companyName, period, project, inspector, logoUrl }: {
+    data: any, companyName: string, period: string, project: string, inspector: string, logoUrl?: string
 }) {
     const s = data?.summary
     const topDefects: any[] = (data?.topDefects || []).slice(0, 5)
     const dayWise: any[] = data?.dayWise || []
     const partWise: any[] = data?.partWise || []
     const inspectorWise: any[] = data?.inspectorWise || []
-
-    // Derive initials for logo badge
-    const initials = companyName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()
 
     return (
         <Document>
@@ -77,9 +73,9 @@ export function ReportDocument({ data, companyName, period, project, inspector }
                                 </View>
                             </View>
                         </View>
-                        <View style={styles.logoBadge}>
-                            <Text style={styles.logoText}>{initials || 'CO'}</Text>
-                        </View>
+                        {logoUrl && (
+                            <Image src={logoUrl} style={styles.logoImg} />
+                        )}
                     </View>
                 </View>
 

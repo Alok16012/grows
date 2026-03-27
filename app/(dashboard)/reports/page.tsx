@@ -329,6 +329,8 @@ export default function ReportsPage() {
             const project = projects.find(p => p.id === selectedProjectId)?.name || "All Projects"
             const inspector = inspectors.find(i => i.id === selectedInspectorId)?.name || "All Inspectors"
 
+            const logoUrl = `${window.location.origin}/logo.png`
+
             const blob = await pdf(
                 <ReportDocument
                     data={data}
@@ -336,6 +338,7 @@ export default function ReportsPage() {
                     period={period}
                     project={project}
                     inspector={inspector}
+                    logoUrl={logoUrl}
                 />
             ).toBlob()
 

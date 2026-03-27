@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
+import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
     page: {
@@ -22,20 +22,11 @@ const styles = StyleSheet.create({
     headerLeft: {
         flex: 1,
     },
-    logoBadge: {
-        width: 48,
-        height: 48,
-        backgroundColor: '#1a9e6e',
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
+    logoImg: {
+        width: 90,
+        height: 45,
+        objectFit: 'contain',
         marginLeft: 16,
-    },
-    logoText: {
-        fontSize: 13,
-        fontFamily: 'Helvetica-Bold',
-        color: '#ffffff',
-        textAlign: 'center',
     },
     companyName: {
         fontSize: 20,
@@ -144,8 +135,7 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
         ? new Date(inspection.approvedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
         : 'N/A'
 
-    // Derive initials for logo badge
-    const initials = companyName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()
+    const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png'
 
     return (
         <Document>
@@ -183,10 +173,8 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
                             </View>
                         </View>
 
-                        {/* Top Right: Company Logo Badge */}
-                        <View style={styles.logoBadge}>
-                            <Text style={styles.logoText}>{initials || 'CO'}</Text>
-                        </View>
+                        {/* Top Right: GROWS Logo */}
+                        <Image src={logoUrl} style={styles.logoImg} />
                     </View>
                 </View>
 
