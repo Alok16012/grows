@@ -155,9 +155,20 @@ export default function ReportsPage() {
     const [colFilters, setColFilters] = useState<Partial<Record<ColKey, string>>>({})
 
     useEffect(() => {
-        if (mounted && (role === "ADMIN" || role === "MANAGER")) {
+        if (!mounted) return
+        if (role === "ADMIN" || role === "MANAGER") {
             fetch("/api/companies").then(r => r.json()).then(d => setCompanies(Array.isArray(d) ? d : [])).catch(() => { })
             fetch("/api/users?role=INSPECTION_BOY").then(r => r.json()).then(d => setInspectors(Array.isArray(d) ? d : [])).catch(() => { })
+        } else if (role === "INSPECTION_BOY") {
+            // Fetch projects the inspector is assigned to, derive unique companies
+            fetch("/api/projects").then(r => r.json()).then((allProjects: any[]) => {
+                if (!Array.isArray(allProjects)) return
+                const companyMap = new Map<string, { id: string; name: string }>()
+                allProjects.forEach(p => {
+                    if (p.company) companyMap.set(p.company.id, { id: p.company.id, name: p.company.name })
+                })
+                setCompanies(Array.from(companyMap.values()))
+            }).catch(() => { })
         }
     }, [role, mounted])
 

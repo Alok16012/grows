@@ -40,29 +40,12 @@ export async function GET(req: Request) {
         const user = await prisma.user.findUnique({ where: { id: session.user.id } })
         companyId = user?.companyId ?? null
     } else if (role === "INSPECTION_BOY") {
-        // Lean query — only select the companyId we need, no heavy includes
-        const assignments = await prisma.assignment.findMany({
-            where: { inspectionBoyId: session.user.id },
-            select: { project: { select: { companyId: true } } }
-        })
-        const allowedCompanyIds = Array.from(new Set(assignments.map(a => a.project.companyId)))
-
-        const requestedCompanyId = searchParams.get("companyId")
-        if (requestedCompanyId && allowedCompanyIds.includes(requestedCompanyId)) {
-            companyId = requestedCompanyId
-        } else if (allowedCompanyIds.length > 0) {
-            companyId = allowedCompanyIds[0]
-        } else {
-            // No assignments — fall back to profile companyId
-            const user = await prisma.user.findUnique({
-                where: { id: session.user.id },
-                select: { companyId: true }
-            })
-            companyId = user?.companyId ?? null
-        }
-
-        // Show only their own aggregated data
+        // Always restrict to their own inspections only
         inspectorId = session.user.id
+        // Honor company/project filters if provided
+        const requestedCompanyId = searchParams.get("companyId")
+        if (requestedCompanyId) companyId = requestedCompanyId
+        // If no company selected, companyId stays null → shows all their data across companies
     } else if (role === "ADMIN" || role === "MANAGER") {
         companyId = searchParams.get("companyId") || null
         inspectorId = searchParams.get("inspectorId") || null
