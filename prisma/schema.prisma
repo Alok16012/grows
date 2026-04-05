@@ -746,3 +746,63 @@ model Expense {
   @@index([submittedBy])
   @@index([date])
 }
+
+// ─── CLIENT & CONTRACT MANAGEMENT ─────────────────────────────────────────────
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+}
+
+enum ContractType {
+  FIXED_TERM
+  ONGOING
+  PROJECT_BASED
+  RETAINER
+}
+
+model ClientContract {
+  id               String         @id @default(uuid())
+  contractNo       String         @unique   // CTR-0001
+  clientName       String
+  clientCompanyId  String?        // optional link to existing Company
+  contactPerson    String?
+  contactEmail     String?
+  contactPhone     String?
+  contractType     ContractType   @default(FIXED_TERM)
+  status           ContractStatus @default(DRAFT)
+  startDate        DateTime
+  endDate          DateTime?
+  value            Float?         // total contract value
+  monthlyValue     Float?         // monthly billing amount
+  manpowerCount    Int?           // number of employees to deploy
+  serviceType      String?        // Security, Housekeeping, Facility Mgmt, etc.
+  slaTerms         String?        // SLA description
+  billingCycle     String?        // Monthly, Bi-monthly, etc.
+  paymentTerms     String?        // Net 30, Net 15, etc.
+  notes            String?
+  createdBy        String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  renewals         ContractRenewal[]
+
+  @@index([status])
+  @@index([clientName])
+  @@index([startDate])
+}
+
+model ContractRenewal {
+  id           String         @id @default(uuid())
+  contractId   String
+  renewedAt    DateTime       @default(now())
+  newEndDate   DateTime
+  newValue     Float?
+  notes        String?
+  renewedBy    String
+  contract     ClientContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+}

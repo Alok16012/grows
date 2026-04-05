@@ -32,7 +32,8 @@ import {
     Package,
     Headphones,
     Receipt,
-    CreditCard
+    CreditCard,
+    FileSignature
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -78,6 +79,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER"] },
                 { name: "Sites", href: "/sites", icon: MapPin, roles: ["ADMIN", "MANAGER"] },
                 { name: "Billing", href: "/billing", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
+                { name: "Contracts", href: "/contracts", icon: FileSignature, roles: ["ADMIN", "MANAGER"] },
                 { name: "Approvals", href: "/approvals", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], badge: true },
             ]
         },
