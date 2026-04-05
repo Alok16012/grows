@@ -31,7 +31,8 @@ import {
     LogOut,
     Package,
     Headphones,
-    Receipt
+    Receipt,
+    CreditCard
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -87,6 +88,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Leaves", href: "/leaves", icon: CalendarOff, roles: ["ADMIN", "MANAGER"] },
                 { name: "Payroll", href: "/payroll", icon: Wallet, roles: ["ADMIN", "MANAGER"] },
                 { name: "Assets", href: "/assets", icon: Package, roles: ["ADMIN", "MANAGER"] },
+                { name: "Expenses", href: "/expenses", icon: CreditCard, roles: ["ADMIN", "MANAGER"] },
             ]
         },
         {

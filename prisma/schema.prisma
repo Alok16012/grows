@@ -697,3 +697,52 @@ model Payment {
 
   @@index([invoiceId])
 }
+
+// ─── EXPENSE MANAGEMENT ───────────────────────────────────────────────────────
+
+enum ExpenseStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum ExpenseCategory {
+  TRAVEL
+  FOOD
+  ACCOMMODATION
+  FUEL
+  OFFICE_SUPPLIES
+  COMMUNICATION
+  MEDICAL
+  UNIFORM
+  TRAINING
+  OTHER
+}
+
+model Expense {
+  id              String          @id @default(uuid())
+  expenseNo       String          @unique   // EXP-0001
+  title           String
+  category        ExpenseCategory
+  amount          Float
+  date            DateTime
+  description     String?
+  receiptUrl      String?         // file upload URL
+  submittedBy     String          // userId
+  employeeId      String?         // optional: on behalf of employee
+  approvedBy      String?         // userId
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  paidAt          DateTime?
+  paymentMode     String?         // Cash, NEFT, etc.
+  status          ExpenseStatus   @default(DRAFT)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([status])
+  @@index([submittedBy])
+  @@index([date])
+}
