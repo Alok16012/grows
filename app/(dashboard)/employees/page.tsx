@@ -794,7 +794,7 @@ export default function EmployeesPage() {
     }, [statusFilter, deptFilter, empTypeFilter, search])
 
     useEffect(() => {
-        if (status === "authenticated") fetchEmployees()
+        if (status !== "unauthenticated") fetchEmployees()
     }, [status, fetchEmployees])
 
     useEffect(() => {
@@ -844,13 +844,6 @@ export default function EmployeesPage() {
         return updated.getMonth() === now.getMonth() && updated.getFullYear() === now.getFullYear()
     }).length
 
-    if (status === "loading") {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
-            </div>
-        )
-    }
 
     return (
         <div className="space-y-5">
