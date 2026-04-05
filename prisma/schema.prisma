@@ -326,12 +326,15 @@ model Branch {
 }
 
 model Department {
-  id        String     @id @default(uuid())
-  name      String
-  branchId  String
-  createdAt DateTime   @default(now())
-  branch    Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  employees Employee[]
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  branchId    String
+  headId      String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  branch      Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  employees   Employee[]
 }
 
 model Site {
@@ -395,9 +398,14 @@ model Employee {
   departmentId      String?
   branchId          String
   dateOfJoining     DateTime?
+  dateOfLeaving     DateTime?
   status            EmployeeStatus     @default(ACTIVE)
   employmentType    String             @default("Full-time")
+  salaryType        String?
   basicSalary       Float              @default(0)
+  managerId         String?
+  notes             String?
+  createdBy         String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   branch            Branch             @relation(fields: [branchId], references: [id])

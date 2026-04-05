@@ -16,11 +16,18 @@ export async function GET(req: Request) {
         const departmentId = searchParams.get("departmentId")
         const status = searchParams.get("status")
         const search = searchParams.get("search")
+        const employmentType = searchParams.get("employmentType")
+        const companyId = searchParams.get("companyId")
 
         const where: Record<string, unknown> = {}
         if (branchId) where.branchId = branchId
         if (departmentId) where.departmentId = departmentId
         if (status) where.status = status
+        if (employmentType) where.employmentType = employmentType
+        if (companyId) {
+            // filter via branch -> company
+            where.branch = { companyId }
+        }
         if (search) {
             where.OR = [
                 { firstName: { contains: search, mode: "insensitive" } },
@@ -58,20 +65,38 @@ export async function POST(req: Request) {
 
         const body = await req.json()
         const {
-            employeeId, firstName, lastName, email, phone, alternatePhone,
+            firstName, lastName, email, phone, alternatePhone,
             dateOfBirth, gender, address, city, state, pincode,
             aadharNumber, panNumber, bankAccountNumber, bankIFSC, bankName,
             photo, designation, departmentId, branchId,
-            dateOfJoining, status, employmentType, basicSalary,
+            dateOfJoining, status, employmentType, basicSalary, notes,
         } = body
 
-        if (!employeeId || !firstName || !lastName || !phone || !branchId) {
-            return new NextResponse("employeeId, firstName, lastName, phone and branchId are required", { status: 400 })
+        if (!firstName || !lastName || !phone || !branchId) {
+            return new NextResponse("firstName, lastName, phone and branchId are required", { status: 400 })
         }
+
+        // Auto-generate employeeId as EMP-NNNN
+        const lastEmployee = await prisma.employee.findFirst({
+            orderBy: { createdAt: "desc" },
+            select: { employeeId: true },
+        })
+        let nextNum = 1
+        if (lastEmployee?.employeeId) {
+            const match = lastEmployee.employeeId.match(/\d+$/)
+            if (match) nextNum = parseInt(match[0]) + 1
+        }
+        const employeeId = `EMP-${String(nextNum).padStart(4, "0")}`
+
+        // Check uniqueness (race condition safety)
+        const existing = await prisma.employee.findUnique({ where: { employeeId } })
+        const finalId = existing
+            ? `EMP-${String(nextNum + 1).padStart(4, "0")}`
+            : employeeId
 
         const employee = await prisma.employee.create({
             data: {
-                employeeId,
+                employeeId: finalId,
                 firstName,
                 lastName,
                 email,
