@@ -630,3 +630,70 @@ model ExitRequest {
   @@index([employeeId])
   @@index([status])
 }
+
+// ─── BILLING / INVOICING ──────────────────────────────────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNo     String        @unique   // INV-2024-0001
+  clientName    String
+  clientEmail   String?
+  clientAddress String?
+  clientGST     String?
+  companyId     String?
+  billingMonth  Int           // 1-12
+  billingYear   Int
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Float         @default(0)
+  taxRate       Float         @default(18)  // GST %
+  taxAmount     Float         @default(0)
+  totalAmount   Float         @default(0)
+  paidAmount    Float         @default(0)
+  notes         String?
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         InvoiceItem[]
+  payments      Payment[]
+
+  @@index([status])
+  @@index([billingMonth, billingYear])
+  @@index([createdAt])
+}
+
+model InvoiceItem {
+  id            String  @id @default(uuid())
+  invoiceId     String
+  description   String
+  employeeCount Int     @default(1)
+  ratePerHead   Float
+  days          Int     @default(26)
+  amount        Float
+  invoice       Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  invoiceId     String
+  amount        Float
+  paymentDate   DateTime
+  paymentMode   String   // Cash, Cheque, NEFT, RTGS, UPI
+  referenceNo   String?
+  remarks       String?
+  recordedBy    String
+  createdAt     DateTime @default(now())
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
