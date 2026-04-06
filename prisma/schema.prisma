@@ -704,33 +704,63 @@ model KPI {
 
 // ─── EXIT MANAGEMENT ──────────────────────────────────────────────────────────
 
+enum ExitType {
+  RESIGNATION
+  TERMINATION
+  RETIREMENT
+  CONTRACT_END
+  ABSCONDING
+}
+
 enum ExitStatus {
-  RESIGNATION_SUBMITTED
+  INITIATED
   NOTICE_PERIOD
   CLEARANCE_PENDING
-  FNF_PROCESSING
+  FULL_FINAL_PENDING
   COMPLETED
-  ABSCONDING
+  CANCELLED
 }
 
 model ExitRequest {
   id                String     @id @default(uuid())
   employeeId        String     @unique
-  reason            String
+  exitType          ExitType
+  status            ExitStatus @default(INITIATED)
+  resignationDate   DateTime
   lastWorkingDate   DateTime?
   noticePeriodDays  Int        @default(30)
-  status            ExitStatus @default(RESIGNATION_SUBMITTED)
-  resignationLetter String?
-  interviewNotes    String?
-  clearanceItems    Json
+  reason            String?
+  hrComments        String?
   fnfAmount         Float?
-  fnfStatus         String?
+  fnfPaidAt         DateTime?
+  fnfPaidBy         String?
+  initiatedBy       String
+  approvedBy        String?
+  approvedAt        DateTime?
+  completedAt       DateTime?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
-  employee          Employee   @relation(fields: [employeeId], references: [id])
+  employee          Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  clearanceTasks    ExitClearanceTask[]
 
-  @@index([employeeId])
   @@index([status])
+  @@index([exitType])
+}
+
+model ExitClearanceTask {
+  id           String      @id @default(uuid())
+  exitId       String
+  title        String
+  department   String
+  status       String      @default("PENDING")
+  dueDate      DateTime?
+  completedAt  DateTime?
+  completedBy  String?
+  remarks      String?
+  order        Int         @default(0)
+  exitRequest  ExitRequest @relation(fields: [exitId], references: [id], onDelete: Cascade)
+
+  @@index([exitId])
 }
 
 // ─── BILLING / INVOICING ──────────────────────────────────────────────────────
