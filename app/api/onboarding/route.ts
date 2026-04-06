@@ -4,15 +4,20 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 
 const DEFAULT_TASKS = [
-    { title: "Offer Letter Signed", category: "DOCUMENT" },
-    { title: "Aadhar Copy Submitted", category: "DOCUMENT" },
-    { title: "PAN Card Submitted", category: "DOCUMENT" },
-    { title: "Bank Details Submitted", category: "DOCUMENT" },
-    { title: "Uniform Issued", category: "OTHER" },
-    { title: "ID Card Issued", category: "OTHER" },
-    { title: "Site Induction Done", category: "INDUCTION" },
-    { title: "Safety Training", category: "TRAINING" },
-    { title: "System Access Setup", category: "IT_SETUP" },
+    { title: "Collect Aadhar Card", category: "Documents", order: 1 },
+    { title: "Collect PAN Card", category: "Documents", order: 2 },
+    { title: "Collect Bank Details", category: "Documents", order: 3 },
+    { title: "Collect Passport Photo", category: "Documents", order: 4 },
+    { title: "Sign Offer Letter", category: "Documents", order: 5 },
+    { title: "Sign NDA / Agreement", category: "Documents", order: 6 },
+    { title: "Issue ID Card", category: "Welcome Kit", order: 7 },
+    { title: "Issue Uniform", category: "Welcome Kit", order: 8 },
+    { title: "Site/Location Briefing", category: "Orientation", order: 9 },
+    { title: "Safety Training", category: "Training", order: 10 },
+    { title: "Role & Responsibility Briefing", category: "Orientation", order: 11 },
+    { title: "Add to Attendance System", category: "IT Setup", order: 12 },
+    { title: "PF Registration", category: "Compliance", order: 13 },
+    { title: "ESI Registration", category: "Compliance", order: 14 },
 ]
 
 export async function GET(req: Request) {
@@ -23,33 +28,46 @@ export async function GET(req: Request) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
-        const employees = await prisma.employee.findMany({
-            where: { status: { in: ["ACTIVE", "INACTIVE"] } },
-            select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                employeeId: true,
-                designation: true,
-                photo: true,
-                dateOfJoining: true,
-                branch: { select: { name: true } },
-                onboardingTasks: {
+        const { searchParams } = new URL(req.url)
+        const status = searchParams.get("status")
+        const search = searchParams.get("search")
+
+        const where: Record<string, unknown> = {}
+        if (status && status !== "ALL") where.status = status
+
+        if (search) {
+            where.employee = {
+                OR: [
+                    { firstName: { contains: search, mode: "insensitive" } },
+                    { lastName: { contains: search, mode: "insensitive" } },
+                    { employeeId: { contains: search, mode: "insensitive" } },
+                ],
+            }
+        }
+
+        const records = await prisma.onboardingRecord.findMany({
+            where,
+            include: {
+                employee: {
                     select: {
                         id: true,
-                        title: true,
-                        category: true,
-                        status: true,
-                        completedAt: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeId: true,
+                        designation: true,
+                        dateOfJoining: true,
+                        photo: true,
+                        branch: { select: { name: true } },
                     },
+                },
+                tasks: {
+                    select: { id: true, status: true, category: true, isRequired: true },
                 },
             },
             orderBy: { createdAt: "desc" },
         })
 
-        // Only return employees who have onboarding tasks started
-        const withOnboarding = employees.filter(e => e.onboardingTasks.length > 0)
-        return NextResponse.json(withOnboarding)
+        return NextResponse.json(records)
     } catch (error) {
         console.error("[ONBOARDING_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })
@@ -65,32 +83,53 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { employeeId } = body
+        const { employeeId, assignedTo, notes } = body
 
         if (!employeeId) {
             return new NextResponse("employeeId is required", { status: 400 })
         }
 
-        // Check if already started
-        const existing = await prisma.onboardingTask.findFirst({ where: { employeeId } })
+        const existing = await prisma.onboardingRecord.findUnique({ where: { employeeId } })
         if (existing) {
             return new NextResponse("Onboarding already started for this employee", { status: 400 })
         }
 
-        const tasks = await prisma.$transaction(
-            DEFAULT_TASKS.map(t =>
-                prisma.onboardingTask.create({
-                    data: {
+        const employee = await prisma.employee.findUnique({ where: { id: employeeId } })
+        if (!employee) return new NextResponse("Employee not found", { status: 404 })
+
+        const record = await prisma.onboardingRecord.create({
+            data: {
+                employeeId,
+                status: "IN_PROGRESS",
+                startedAt: new Date(),
+                assignedTo: assignedTo || null,
+                notes: notes || null,
+                tasks: {
+                    create: DEFAULT_TASKS.map(t => ({
                         employeeId,
                         title: t.title,
                         category: t.category,
-                        status: "PENDING",
+                        order: t.order,
+                        status: "PENDING" as const,
+                        isRequired: true,
+                    })),
+                },
+            },
+            include: {
+                tasks: true,
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeId: true,
+                        designation: true,
                     },
-                })
-            )
-        )
+                },
+            },
+        })
 
-        return NextResponse.json(tasks)
+        return NextResponse.json(record)
     } catch (error) {
         console.error("[ONBOARDING_POST]", error)
         return new NextResponse("Internal Error", { status: 500 })

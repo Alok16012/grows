@@ -416,6 +416,7 @@ model Employee {
   payrolls          Payroll[]
   assets            EmployeeAsset[]
   documents         EmployeeDocument[]
+  onboardingRecord  OnboardingRecord?
   onboardingTasks   OnboardingTask[]
   reviews           PerformanceReview[]
   exitRequest       ExitRequest?
@@ -581,26 +582,56 @@ model EmployeeAsset {
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
 
 enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum TaskStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
-  CANCELLED
+  SKIPPED
+}
+
+model OnboardingRecord {
+  id          String           @id @default(uuid())
+  employeeId  String           @unique
+  status      OnboardingStatus @default(NOT_STARTED)
+  startedAt   DateTime?
+  completedAt DateTime?
+  assignedTo  String?
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  tasks       OnboardingTask[]
+  employee    Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }
 
 model OnboardingTask {
-  id          String   @id @default(uuid())
-  employeeId  String
-  title       String
-  description String?
-  category    String
-  dueDate     DateTime?
-  completedAt DateTime?
-  status      String   @default("PENDING")
-  assignedTo  String?
-  createdAt   DateTime @default(now())
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id           String           @id @default(uuid())
+  onboardingId String
+  employeeId   String
+  title        String
+  description  String?
+  category     String
+  status       TaskStatus       @default(PENDING)
+  dueDate      DateTime?
+  completedAt  DateTime?
+  completedBy  String?
+  assignedTo   String?
+  order        Int              @default(0)
+  isRequired   Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  onboarding   OnboardingRecord @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
+  @@index([onboardingId])
   @@index([employeeId])
+  @@index([status])
 }
 
 model OnboardingChecklist {
