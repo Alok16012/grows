@@ -277,6 +277,124 @@ function CourseCard({ enrollment, onClick }: { enrollment: Enrollment; onClick: 
     )
 }
 
+
+// ─── Feedback Modal ─────────────────────────────────────────────────────────
+
+function FeedbackModal({ courseId, enrollmentId, courseTitle, onClose }: {
+    courseId: string
+    enrollmentId: string
+    courseTitle: string
+    onClose: () => void
+}) {
+    const [rating, setRating] = useState(0)
+    const [hovered, setHovered] = useState(0)
+    const [comment, setComment] = useState("")
+    const [submitting, setSubmitting] = useState(false)
+    const [existing, setExisting] = useState<{ rating: number; comment?: string } | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        fetch(`/api/lms/feedback?courseId=${courseId}`)
+            .then(r => r.json())
+            .then(d => {
+                if (d?.rating) { setRating(d.rating); setComment(d.comment ?? ""); setExisting(d) }
+                setLoading(false)
+            })
+            .catch(() => setLoading(false))
+    }, [courseId])
+
+    const handleSubmit = async () => {
+        if (!rating) { toast.error("Please select a star rating"); return }
+        setSubmitting(true)
+        try {
+            const res = await fetch("/api/lms/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ courseId, enrollmentId, rating, comment }),
+            })
+            if (!res.ok) { toast.error(await res.text()); return }
+            toast.success(existing ? "Feedback updated!" : "Thank you for your feedback! ⭐")
+            onClose()
+        } catch { toast.error("Failed to submit feedback") }
+        finally { setSubmitting(false) }
+    }
+
+    const LABELS = ["", "Poor", "Below Average", "Average", "Good", "Excellent"]
+    const COLORS = ["", "#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e"]
+    const effectiveRating = hovered || rating
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+            <div className="relative bg-[var(--surface)] rounded-[20px] border border-[var(--border)] shadow-2xl w-full max-w-md">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                    <div>
+                        <h2 className="text-[16px] font-semibold text-[var(--text)]">Rate this Course</h2>
+                        <p className="text-[11px] text-[var(--text3)] mt-0.5 line-clamp-1">{courseTitle}</p>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface2)] text-[var(--text3)]"><X size={18} /></button>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-[var(--accent)]" /></div>
+                ) : (
+                    <div className="p-6 space-y-5">
+                        {/* Star Rating */}
+                        <div className="text-center">
+                            <div className="flex items-center justify-center gap-2 mb-3">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                    <button
+                                        key={star}
+                                        onMouseEnter={() => setHovered(star)}
+                                        onMouseLeave={() => setHovered(0)}
+                                        onClick={() => setRating(star)}
+                                        className="transition-transform hover:scale-110 active:scale-95"
+                                    >
+                                        <svg viewBox="0 0 24 24" width={38} height={38} fill={star <= effectiveRating ? (COLORS[effectiveRating] ?? "#eab308") : "none"}
+                                            stroke={star <= effectiveRating ? (COLORS[effectiveRating] ?? "#eab308") : "var(--border)"}
+                                            strokeWidth={1.5} className="transition-all duration-150">
+                                            <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                                        </svg>
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[14px] font-semibold transition-all" style={{ color: effectiveRating ? COLORS[effectiveRating] : "var(--text3)" }}>
+                                {effectiveRating ? LABELS[effectiveRating] : "Tap a star to rate"}
+                            </p>
+                        </div>
+
+                        {/* Comment */}
+                        <div>
+                            <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">
+                                Share your thoughts <span className="text-[var(--text3)] font-normal">(optional)</span>
+                            </label>
+                            <textarea
+                                value={comment}
+                                onChange={e => setComment(e.target.value)}
+                                placeholder="What did you like? What could be improved?"
+                                rows={3}
+                                className="w-full px-3 py-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] resize-none"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border)]">
+                    <button onClick={onClose} className="h-9 px-4 text-[13px] border border-[var(--border)] rounded-[8px] text-[var(--text2)] hover:bg-[var(--surface2)]">Skip</button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting || !rating || loading}
+                        className="h-9 px-5 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2 disabled:opacity-60"
+                    >
+                        {submitting && <Loader2 size={14} className="animate-spin" />}
+                        {existing ? "Update Rating" : "Submit Feedback"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: {
     quiz: Enrollment["course"]["quiz"]
     courseId: string
@@ -524,6 +642,7 @@ function CourseDetailView({ enrollment, onBack, onComplete }: {
     const [showQuiz, setShowQuiz] = useState(false)
     const [completedModules, setCompletedModules] = useState<Set<string>>(new Set())
     const [showCertificate, setShowCertificate] = useState(false)
+    const [showFeedback, setShowFeedback] = useState(false)
     const [updatingProgress, setUpdatingProgress] = useState(false)
 
     const { course } = enrollment
@@ -678,6 +797,18 @@ function CourseDetailView({ enrollment, onBack, onComplete }: {
                 </button>
             )}
 
+            {enrollment.status === "COMPLETED" && (
+                <button
+                    onClick={() => setShowFeedback(true)}
+                    className="w-full h-11 border-2 border-[var(--accent)] text-[var(--accent)] rounded-[10px] font-medium flex items-center justify-center gap-2 hover:bg-[var(--accent)] hover:text-white transition-colors"
+                >
+                    <svg viewBox="0 0 24 24" width={16} height={16} fill="currentColor" className="shrink-0">
+                        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                    </svg>
+                    Rate this Course
+                </button>
+            )}
+
             {showQuiz && course.quiz && (
                 <QuizTakingModal
                     quiz={course.quiz}
@@ -685,9 +816,18 @@ function CourseDetailView({ enrollment, onBack, onComplete }: {
                     enrollmentId={enrollment.id}
                     onClose={() => setShowQuiz(false)}
                     onComplete={(passed, score) => {
-                        if (passed) onComplete()
+                        if (passed) { onComplete(); setShowFeedback(true) }
                         setShowQuiz(false)
                     }}
+                />
+            )}
+
+            {showFeedback && (
+                <FeedbackModal
+                    courseId={course.id}
+                    enrollmentId={enrollment.id}
+                    courseTitle={course.title}
+                    onClose={() => setShowFeedback(false)}
                 />
             )}
 

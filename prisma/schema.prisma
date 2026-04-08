@@ -489,6 +489,7 @@ model Employee {
   checkIns          FieldCheckIn[]
   policyAcknowledgments PolicyAcknowledgment[]
   iltAttendances   ILTAttendance[]
+  courseFeedbacks  CourseFeedback[]
 
   @@index([branchId])
   @@index([status])
@@ -1091,6 +1092,7 @@ model Course {
   quiz         Quiz?
   enrollments  CourseEnrollment[]
   assignmentRules CourseAssignmentRule[]
+  feedbacks    CourseFeedback[]
 
   @@index([status])
   @@index([category])
@@ -1202,6 +1204,22 @@ model CourseEnrollment {
   @@index([employeeId])
   @@index([courseId])
   @@index([status])
+}
+
+model CourseFeedback {
+  id           String           @id @default(uuid())
+  courseId     String
+  employeeId   String
+  enrollmentId String?
+  rating       Int              // 1-5 stars
+  comment      String?
+  submittedAt  DateTime         @default(now())
+  course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, employeeId])
+  @@index([courseId])
+  @@index([employeeId])
 }
 
 // ─── BILLING / INVOICING ──────────────────────────────────────────────────────
