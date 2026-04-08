@@ -15,6 +15,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
             where: { id: params.id },
             include: {
                 modules: { orderBy: { order: "asc" } },
+                quiz: {
+                    include: {
+                        questions: {
+                            include: { options: { orderBy: { order: "asc" } } },
+                            orderBy: { order: "asc" },
+                        },
+                    },
+                },
                 _count: { select: { enrollments: true } },
             },
         })

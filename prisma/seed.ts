@@ -154,7 +154,43 @@ async function main() {
     }
 }
 
+async function seedKPITemplates() {
+    const templates = [
+        // INSPECTOR
+        { role: 'INSPECTOR', kraTitle: 'Inspection Accuracy', kpiTitle: 'No. of inspections/day', targetHint: '≥ 10/day', weightage: 15 },
+        { role: 'INSPECTOR', kraTitle: 'Inspection Accuracy', kpiTitle: 'Error rate %', targetHint: '< 2%', weightage: 15 },
+        { role: 'INSPECTOR', kraTitle: 'Inspection Accuracy', kpiTitle: 'Defect detection %', targetHint: '> 95%', weightage: 20 },
+        { role: 'INSPECTOR', kraTitle: 'Report Submission', kpiTitle: 'Report TAT hours', targetHint: '< 4hrs', weightage: 25 },
+        { role: 'INSPECTOR', kraTitle: 'Report Submission', kpiTitle: 'Late submission %', targetHint: '< 5%', weightage: 25 },
+        // HR_RECRUITER
+        { role: 'HR_RECRUITER', kraTitle: 'Hiring', kpiTitle: 'No. of joinings/month', targetHint: '≥ 10', weightage: 20 },
+        { role: 'HR_RECRUITER', kraTitle: 'Hiring', kpiTitle: 'Conversion ratio %', targetHint: '> 30%', weightage: 20 },
+        { role: 'HR_RECRUITER', kraTitle: 'Hiring', kpiTitle: 'Time to hire days', targetHint: '< 7', weightage: 20 },
+        { role: 'HR_RECRUITER', kraTitle: 'Pipeline Efficiency', kpiTitle: 'Offer acceptance rate %', targetHint: '> 80%', weightage: 20 },
+        { role: 'HR_RECRUITER', kraTitle: 'Pipeline Efficiency', kpiTitle: 'Drop rate %', targetHint: '< 20%', weightage: 20 },
+        // HR_MANAGER
+        { role: 'HR_MANAGER', kraTitle: 'HR Strategy', kpiTitle: 'Attrition rate %', targetHint: '< 5%', weightage: 34 },
+        { role: 'HR_MANAGER', kraTitle: 'HR Strategy', kpiTitle: 'Employee satisfaction score', targetHint: '> 4', weightage: 33 },
+        { role: 'HR_MANAGER', kraTitle: 'HR Strategy', kpiTitle: 'Compliance score %', targetHint: '100%', weightage: 33 },
+        // PAYROLL_MANAGER
+        { role: 'PAYROLL_MANAGER', kraTitle: 'Payroll Accuracy', kpiTitle: 'Payroll error %', targetHint: '0%', weightage: 34 },
+        { role: 'PAYROLL_MANAGER', kraTitle: 'Payroll Accuracy', kpiTitle: 'On-time salary %', targetHint: '100%', weightage: 33 },
+        { role: 'PAYROLL_MANAGER', kraTitle: 'Payroll Accuracy', kpiTitle: 'Compliance filing accuracy %', targetHint: '100%', weightage: 33 },
+    ]
+
+    for (const t of templates) {
+        const exists = await prisma.kPITemplate.findFirst({
+            where: { role: t.role, kpiTitle: t.kpiTitle },
+        })
+        if (!exists) {
+            await prisma.kPITemplate.create({ data: t })
+            console.log(`Created KPI template: ${t.role} / ${t.kraTitle} / ${t.kpiTitle}`)
+        }
+    }
+}
+
 main()
+    .then(() => seedKPITemplates())
     .catch((e) => {
         console.error(e)
         process.exit(1)

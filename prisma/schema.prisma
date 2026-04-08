@@ -32,6 +32,7 @@ model User {
   leadActivities           LeadActivity[]   @relation("LeadActivityUser")
   leadDocsUploaded         LeadDocument[]   @relation("LeadDocUploader")
   leadFollowUpsCreated     LeadFollowUp[]   @relation("LeadFollowUpCreator")
+  hrApprovedReviews        PerformanceReview[] @relation("HRApprover")
 }
 
 model Company {
@@ -481,10 +482,13 @@ model Employee {
   onboardingRecord  OnboardingRecord?
   onboardingTasks   OnboardingTask[]
   reviews           PerformanceReview[]
+  pips              PIP[]
   exitRequest       ExitRequest?
   enrollments       CourseEnrollment[]
   fieldTasks        FieldTask[]
   checkIns          FieldCheckIn[]
+  policyAcknowledgments PolicyAcknowledgment[]
+  iltAttendances   ILTAttendance[]
 
   @@index([branchId])
   @@index([status])
@@ -773,22 +777,45 @@ model PerformanceReview {
   employeeComments     String?
   promotionRecommended Boolean      @default(false)
   incrementPercent     Float?
+  selfRating           Float?
+  selfComments         String?
+  hrApprovedAt         DateTime?
+  hrApprovedBy         String?
+  bonusPercent         Float?
+  performanceRank      String?
+  pipRequired          Boolean      @default(false)
   submittedAt          DateTime?
   acknowledgedAt       DateTime?
   completedAt          DateTime?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   employee             Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  hrApprover           User?        @relation("HRApprover", fields: [hrApprovedBy], references: [id], onDelete: SetNull)
   kpis                 KPI[]
+  kras                 KRA[]
+  pip                  PIP?
 
   @@index([employeeId])
   @@index([status])
   @@index([cycle])
 }
 
+model KRA {
+  id          String            @id @default(uuid())
+  reviewId    String
+  title       String
+  description String?
+  weightage   Float             @default(25)
+  kpis        KPI[]
+  review      PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+}
+
 model KPI {
   id          String            @id @default(uuid())
   reviewId    String
+  kraId       String?
   title       String
   description String?
   target      String
@@ -797,8 +824,38 @@ model KPI {
   rating      Float?
   remarks     String?
   review      PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  kra         KRA?              @relation(fields: [kraId], references: [id], onDelete: SetNull)
 
   @@index([reviewId])
+  @@index([kraId])
+}
+
+model PIP {
+  id           String            @id @default(uuid())
+  reviewId     String            @unique
+  employeeId   String
+  startDate    DateTime
+  endDate      DateTime
+  goals        String
+  status       String            @default("ACTIVE")
+  managerNotes String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  review       PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  employee     Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model KPITemplate {
+  id          String   @id @default(uuid())
+  role        String
+  kraTitle    String
+  kpiTitle    String
+  description String?
+  targetHint  String?
+  weightage   Float    @default(10)
+  createdAt   DateTime @default(now())
 }
 
 // ─── EXIT MANAGEMENT ──────────────────────────────────────────────────────────
@@ -935,6 +992,86 @@ enum EnrollmentStatus {
   DROPPED
 }
 
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+}
+
+model Policy {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  category    String    // SAFETY, HR, COMPLIANCE, SOP
+  fileUrl     String?
+  isRequired  Boolean   @default(true)
+  isActive    Boolean   @default(true)
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  acknowledgments PolicyAcknowledgment[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model PolicyAcknowledgment {
+  id           String   @id @default(uuid())
+  policyId     String
+  employeeId   String
+  acknowledgedAt DateTime @default(now())
+  ipAddress    String?
+  policy       Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, employeeId])
+  @@index([employeeId])
+  @@index([policyId])
+}
+
+enum ILTStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model ILTSession {
+  id           String      @id @default(uuid())
+  title        String
+  description  String?
+  instructorId String
+  courseId     String?
+  location     String?
+  startTime    DateTime
+  endTime      DateTime
+  maxSeats     Int         @default(20)
+  status       ILTStatus   @default(SCHEDULED)
+  materialsUrl String?
+  feedbackForm Json?
+  createdBy    String?
+  createdAt    DateTime    @default(now())
+  attendances  ILTAttendance[]
+
+  @@index([status])
+  @@index([instructorId])
+  @@index([startTime])
+}
+
+model ILTAttendance {
+  id          String    @id @default(uuid())
+  sessionId   String
+  employeeId  String
+  attendedAt  DateTime?
+  status      String    @default("PENDING") // PENDING, PRESENT, ABSENT, LATE
+  feedback    String?
+  rating      Int?      // 1-5
+  session     ILTSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, employeeId])
+  @@index([sessionId])
+  @@index([employeeId])
+}
+
 model Course {
   id           String       @id @default(uuid())
   courseCode   String       @unique
@@ -947,13 +1084,30 @@ model Course {
   status       CourseStatus @default(DRAFT)
   createdBy    String?
   thumbnail    String?
+  validityDays Int?         // null = forever, e.g., 365 for 1 year validity
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   modules      CourseModule[]
+  quiz         Quiz?
   enrollments  CourseEnrollment[]
+  assignmentRules CourseAssignmentRule[]
 
   @@index([status])
   @@index([category])
+}
+
+model CourseAssignmentRule {
+  id         String   @id @default(uuid())
+  courseId   String
+  assignTo   String   // ROLE, DESIGNATION, SITE, CLIENT, BRANCH, ALL
+  value      String   // e.g., "OPERATOR", "Safety", siteId, clientName, etc.
+  dueDays    Int?     // Days from enrollment to complete
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([assignTo])
 }
 
 model CourseModule {
@@ -968,6 +1122,63 @@ model CourseModule {
   course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([courseId])
+}
+
+model Quiz {
+  id           String            @id @default(uuid())
+  courseId     String            @unique
+  title        String            @default("Course Assessment")
+  description  String?
+  passingScore Int               @default(70)
+  timeLimit    Int?              // in minutes, null = no limit
+  maxAttempts  Int               @default(3)
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  course       Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions    QuizQuestion[]
+  attempts     QuizAttempt[]
+
+  @@index([courseId])
+}
+
+model QuizQuestion {
+  id           String       @id @default(uuid())
+  quizId       String
+  question     String
+  questionType QuestionType @default(MULTIPLE_CHOICE)
+  options      QuizOption[]
+  order        Int          @default(0)
+  points       Int          @default(1)
+  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+}
+
+model QuizOption {
+  id         String        @id @default(uuid())
+  questionId String
+  text       String
+  isCorrect  Boolean       @default(false)
+  order      Int           @default(0)
+  question   QuizQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model QuizAttempt {
+  id           String       @id @default(uuid())
+  quizId       String
+  employeeId   String
+  score        Float?
+  passed       Boolean?
+  startedAt    DateTime     @default(now())
+  submittedAt  DateTime?
+  answers      Json?       // { questionId: optionId }
+  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@index([employeeId])
 }
 
 model CourseEnrollment {

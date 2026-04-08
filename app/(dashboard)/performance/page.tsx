@@ -1,17 +1,22 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     Plus, Loader2, X, Star, Search,
-    ChevronDown, MoreVertical, Trash2, Eye,
-    TrendingUp, CheckCircle2, Clock, AlertCircle,
-    Send, ChevronRight
+    ChevronDown, Trash2, TrendingUp, CheckCircle2,
+    Clock, AlertCircle, Send, Users, Award,
+    BarChart2, Settings, FileText, Target,
+    ChevronRight, Check, AlertTriangle, Edit2
 } from "lucide-react"
 import { format } from "date-fns"
+import {
+    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+    LineChart, Line, CartesianGrid, Legend
+} from "recharts"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 type ReviewStatus = "DRAFT" | "SUBMITTED" | "ACKNOWLEDGED" | "COMPLETED"
 type ReviewCycle = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "ANNUAL"
@@ -19,6 +24,7 @@ type ReviewCycle = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "ANNUAL"
 type KPI = {
     id: string
     reviewId: string
+    kraId?: string | null
     title: string
     description?: string | null
     target: string
@@ -26,6 +32,26 @@ type KPI = {
     weightage: number
     rating?: number | null
     remarks?: string | null
+}
+
+type KRA = {
+    id: string
+    reviewId: string
+    title: string
+    description?: string | null
+    weightage: number
+    kpis: KPI[]
+}
+
+type PIP = {
+    id: string
+    reviewId: string
+    employeeId: string
+    startDate: string
+    endDate: string
+    goals: string
+    status: string
+    managerNotes?: string | null
 }
 
 type PerformanceReview = {
@@ -41,8 +67,15 @@ type PerformanceReview = {
     improvements?: string | null
     managerComments?: string | null
     employeeComments?: string | null
+    selfRating?: number | null
+    selfComments?: string | null
     promotionRecommended: boolean
     incrementPercent?: number | null
+    bonusPercent?: number | null
+    performanceRank?: string | null
+    pipRequired: boolean
+    hrApprovedAt?: string | null
+    hrApprovedBy?: string | null
     submittedAt?: string | null
     acknowledgedAt?: string | null
     completedAt?: string | null
@@ -57,12 +90,42 @@ type PerformanceReview = {
         photo?: string | null
         branch: { name: string }
     }
-    kpis: { id: string; rating?: number | null }[]
+    kpis: KPI[]
+    kras: KRA[]
+    pip?: PIP | null
 }
 
-type EmployeeOption = { id: string; firstName: string; lastName: string; employeeId: string }
+type EmployeeOption = {
+    id: string
+    firstName: string
+    lastName: string
+    employeeId: string
+    designation?: string | null
+}
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+type DashboardData = {
+    summary: { total: number; pending: number; completed: number; avgScore: number }
+    rankDistrib: Record<string, number>
+    topPerformers: {
+        id: string
+        overallRating: number | null
+        performanceRank: string | null
+        employee: { firstName: string; lastName: string; designation: string | null; employeeId: string }
+    }[]
+    roleAvgScores: { role: string; avgScore: number; count: number }[]
+    monthlyTrend: { month: string; avgScore: number; count: number }[]
+}
+
+type KPITemplate = {
+    id: string
+    role: string
+    kraTitle: string
+    kpiTitle: string
+    targetHint?: string | null
+    weightage: number
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
@@ -80,15 +143,14 @@ const CYCLE_CONFIG: Record<ReviewCycle, { label: string; color: string; bg: stri
     ANNUAL:      { label: "Annual",     color: "#1a9e6e", bg: "#e8f7f1" },
 }
 
-const RATING_CONFIG: Record<number, { label: string; color: string }> = {
-    5: { label: "Excellent",     color: "#1a9e6e" },
-    4: { label: "Good",          color: "#0891b2" },
-    3: { label: "Average",       color: "#d97706" },
-    2: { label: "Below Average", color: "#ea580c" },
-    1: { label: "Poor",          color: "#ef4444" },
+const RANK_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    TOP_PERFORMER:  { label: "Top Performer",  color: "#1a9e6e", bg: "#e8f7f1" },
+    HIGH_PERFORMER: { label: "High Performer", color: "#2563eb", bg: "#eff6ff" },
+    AVERAGE:        { label: "Average",        color: "#d97706", bg: "#fef3c7" },
+    LOW_PERFORMER:  { label: "Low Performer",  color: "#ef4444", bg: "#fee2e2" },
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getAvatarColor(first: string, last: string) {
     return AVATAR_COLORS[(first.charCodeAt(0) + (last.charCodeAt(0) || 0)) % AVATAR_COLORS.length]
@@ -99,729 +161,97 @@ function fmtDate(d?: string | null) {
     try { return format(new Date(d), "MMM yyyy") } catch { return "—" }
 }
 
-function fmtFull(d?: string | null) {
+function fmtDateFull(d?: string | null) {
     if (!d) return "—"
     try { return format(new Date(d), "dd MMM yyyy") } catch { return "—" }
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+function calcRank(score: number): string {
+    if (score >= 4.5) return "TOP_PERFORMER"
+    if (score >= 3.5) return "HIGH_PERFORMER"
+    if (score >= 2.5) return "AVERAGE"
+    return "LOW_PERFORMER"
+}
 
-function Avatar({ firstName, lastName, photo, size = 36 }: {
-    firstName: string; lastName: string; photo?: string | null; size?: number
-}) {
-    const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
-    const bg = getAvatarColor(firstName, lastName)
-    if (photo) {
-        return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" />
+function calcOverallScore(kras: KRA[]): number | null {
+    if (!kras.length) return null
+    let weightedSum = 0
+    let totalWeight = 0
+    for (const kra of kras) {
+        if (!kra.kpis.length) continue
+        let kraScore = 0
+        let kraKpiWeightSum = 0
+        for (const kpi of kra.kpis) {
+            const targetNum = parseFloat(kpi.target)
+            const actualNum = parseFloat(kpi.actual ?? "")
+            const rating = kpi.rating ?? 3
+            if (!isNaN(targetNum) && !isNaN(actualNum) && targetNum > 0) {
+                kraScore += (actualNum / targetNum) * rating * kpi.weightage
+            } else {
+                kraScore += rating * kpi.weightage
+            }
+            kraKpiWeightSum += kpi.weightage
+        }
+        if (kraKpiWeightSum > 0) {
+            const kraFinalScore = (kraScore / kraKpiWeightSum) * 5
+            weightedSum += kraFinalScore * kra.weightage
+            totalWeight += kra.weightage
+        }
     }
-    return (
-        <div style={{ width: size, height: size, background: bg, fontSize: size * 0.33 }}
-            className="rounded-full flex items-center justify-center text-white font-semibold shrink-0 select-none">
-            {initials}
-        </div>
-    )
+    if (totalWeight === 0) return null
+    return Math.round((weightedSum / totalWeight) * 100) / 100
 }
 
-// ─── Star Rating Display ───────────────────────────────────────────────────────
+// ─── StarRating ───────────────────────────────────────────────────────────────
 
-function StarDisplay({ rating, size = 14 }: { rating?: number | null; size?: number }) {
-    if (!rating) return <span className="text-[12px] text-[var(--text3)] italic">Not rated</span>
-    const cfg = RATING_CONFIG[Math.round(rating)] || RATING_CONFIG[3]
-    return (
-        <div className="flex items-center gap-1">
-            <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map(i => (
-                    <Star
-                        key={i}
-                        size={size}
-                        style={{ color: i <= rating ? cfg.color : "#d1d5db" }}
-                        fill={i <= rating ? cfg.color : "none"}
-                    />
-                ))}
-            </div>
-            <span className="text-[11px] font-medium" style={{ color: cfg.color }}>{rating.toFixed(1)}</span>
-        </div>
-    )
-}
-
-// ─── Clickable Star Rating ─────────────────────────────────────────────────────
-
-function StarRating({ value, onChange, size = 24, disabled = false }: {
-    value?: number | null; onChange: (v: number) => void; size?: number; disabled?: boolean
+function StarRating({
+    value,
+    onChange,
+    readonly = false,
+    size = 16,
+}: {
+    value?: number | null
+    onChange?: (v: number) => void
+    readonly?: boolean
+    size?: number
 }) {
-    const [hovered, setHovered] = useState<number | null>(null)
-    const display = hovered ?? value ?? 0
+    const [hover, setHover] = useState<number | null>(null)
     return (
-        <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map(i => {
-                const cfg = RATING_CONFIG[i] || RATING_CONFIG[3]
-                const filled = i <= display
-                return (
-                    <button
-                        key={i}
-                        type="button"
-                        disabled={disabled}
-                        onMouseEnter={() => !disabled && setHovered(i)}
-                        onMouseLeave={() => setHovered(null)}
-                        onClick={() => !disabled && onChange(i)}
-                        className="transition-transform hover:scale-110 disabled:cursor-not-allowed"
-                    >
-                        <Star
-                            size={size}
-                            style={{ color: filled ? cfg.color : "#d1d5db" }}
-                            fill={filled ? cfg.color : "none"}
-                        />
-                    </button>
-                )
-            })}
-        </div>
-    )
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, color, bg, icon }: {
-    label: string; value: string | number; color: string; bg: string; icon: React.ReactNode
-}) {
-    return (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
-            <div style={{ background: bg, color }} className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0">{icon}</div>
-            <div>
-                <p className="text-[22px] font-bold text-[var(--text)] leading-tight">{value}</p>
-                <p className="text-[11.5px] text-[var(--text3)]">{label}</p>
-            </div>
-        </div>
-    )
-}
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: ReviewStatus }) {
-    const cfg = STATUS_CONFIG[status]
-    return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-            style={{ background: cfg.bg, color: cfg.color }}>
-            {cfg.label}
+        <span style={{ display: "inline-flex", gap: 2 }}>
+            {[1, 2, 3, 4, 5].map(n => (
+                <Star
+                    key={n}
+                    size={size}
+                    style={{
+                        cursor: readonly ? "default" : "pointer",
+                        fill: (hover ?? value ?? 0) >= n ? "#f59e0b" : "transparent",
+                        color: (hover ?? value ?? 0) >= n ? "#f59e0b" : "#d1d5db",
+                    }}
+                    onMouseEnter={() => !readonly && setHover(n)}
+                    onMouseLeave={() => !readonly && setHover(null)}
+                    onClick={() => !readonly && onChange?.(n)}
+                />
+            ))}
         </span>
     )
 }
 
-// ─── Cycle Badge ──────────────────────────────────────────────────────────────
+// ─── Badge ────────────────────────────────────────────────────────────────────
 
-function CycleBadge({ cycle }: { cycle: ReviewCycle }) {
-    const cfg = CYCLE_CONFIG[cycle]
+function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
     return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-            style={{ background: cfg.bg, color: cfg.color }}>
-            {cfg.label}
+        <span style={{
+            display: "inline-block",
+            padding: "2px 10px",
+            borderRadius: 99,
+            fontSize: 11,
+            fontWeight: 600,
+            color,
+            background: bg,
+            letterSpacing: 0.2,
+        }}>
+            {label}
         </span>
-    )
-}
-
-// ─── New Review Modal ─────────────────────────────────────────────────────────
-
-function NewReviewModal({
-    onClose, onCreated, currentUserId
-}: { onClose: () => void; onCreated: () => void; currentUserId: string }) {
-    const [employees, setEmployees] = useState<EmployeeOption[]>([])
-    const [loading, setLoading] = useState(false)
-    const [form, setForm] = useState({
-        employeeId: "",
-        cycle: "QUARTERLY" as ReviewCycle,
-        periodStart: "",
-        periodEnd: "",
-        reviewerId: currentUserId,
-    })
-
-    useEffect(() => {
-        fetch("/api/employees?status=ACTIVE&limit=500")
-            .then(r => r.json())
-            .then(d => setEmployees(Array.isArray(d.employees) ? d.employees : Array.isArray(d) ? d : []))
-            .catch(() => setEmployees([]))
-    }, [])
-
-    async function handleSubmit(e: React.FormEvent) {
-        e.preventDefault()
-        if (!form.employeeId || !form.periodStart || !form.periodEnd) {
-            toast.error("Please fill all required fields")
-            return
-        }
-        setLoading(true)
-        try {
-            const res = await fetch("/api/performance", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
-            })
-            if (!res.ok) throw new Error(await res.text())
-            toast.success("Review created with default KPIs")
-            onCreated()
-            onClose()
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Failed to create review")
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] shadow-2xl w-full max-w-md mx-4">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-                    <h2 className="text-[15px] font-semibold text-[var(--text)]">New Performance Review</h2>
-                    <button onClick={onClose} className="p-1.5 hover:bg-[var(--surface2)] rounded-md text-[var(--text3)]"><X size={16} /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Employee <span className="text-[var(--red)]">*</span></label>
-                        <select
-                            value={form.employeeId}
-                            onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
-                            className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                            required
-                        >
-                            <option value="">Select employee...</option>
-                            {employees.map(e => (
-                                <option key={e.id} value={e.id}>
-                                    {e.firstName} {e.lastName} ({e.employeeId})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Review Cycle <span className="text-[var(--red)]">*</span></label>
-                        <select
-                            value={form.cycle}
-                            onChange={e => setForm(f => ({ ...f, cycle: e.target.value as ReviewCycle }))}
-                            className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                        >
-                            <option value="MONTHLY">Monthly</option>
-                            <option value="QUARTERLY">Quarterly</option>
-                            <option value="HALF_YEARLY">Half-Yearly</option>
-                            <option value="ANNUAL">Annual</option>
-                        </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Period Start <span className="text-[var(--red)]">*</span></label>
-                            <input
-                                type="date"
-                                value={form.periodStart}
-                                onChange={e => setForm(f => ({ ...f, periodStart: e.target.value }))}
-                                className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Period End <span className="text-[var(--red)]">*</span></label>
-                            <input
-                                type="date"
-                                value={form.periodEnd}
-                                onChange={e => setForm(f => ({ ...f, periodEnd: e.target.value }))}
-                                className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button type="button" onClick={onClose} className="h-9 px-4 rounded-[8px] text-[13px] font-medium text-[var(--text2)] border border-[var(--border)] hover:bg-[var(--surface2)]">
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="h-9 px-5 rounded-[8px] text-[13px] font-medium bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
-                        >
-                            {loading && <Loader2 size={14} className="animate-spin" />}
-                            Create Review
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    )
-}
-
-// ─── Review Detail Drawer ──────────────────────────────────────────────────────
-
-function ReviewDrawer({
-    reviewId, onClose, onUpdated, currentUserRole
-}: { reviewId: string; onClose: () => void; onUpdated: () => void; currentUserRole: string }) {
-    const [review, setReview] = useState<PerformanceReview & { kpis: KPI[] } | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [tab, setTab] = useState<"overview" | "kpis" | "feedback">("overview")
-    const [saving, setSaving] = useState(false)
-    const [overallRating, setOverallRating] = useState<number | null>(null)
-    const [promotion, setPromotion] = useState(false)
-    const [increment, setIncrement] = useState("")
-    const [strengths, setStrengths] = useState("")
-    const [improvements, setImprovements] = useState("")
-    const [managerComments, setManagerComments] = useState("")
-    const [employeeComments, setEmployeeComments] = useState("")
-    const [kpis, setKpis] = useState<KPI[]>([])
-    const [addKpiForm, setAddKpiForm] = useState({ title: "", target: "", weightage: "10" })
-    const [addingKpi, setAddingKpi] = useState(false)
-    const [showAddKpi, setShowAddKpi] = useState(false)
-
-    const fetchReview = useCallback(async () => {
-        setLoading(true)
-        try {
-            const res = await fetch(`/api/performance/${reviewId}`)
-            if (!res.ok) throw new Error("Failed to load")
-            const data = await res.json()
-            setReview(data)
-            setKpis(data.kpis || [])
-            setOverallRating(data.overallRating ?? null)
-            setPromotion(data.promotionRecommended ?? false)
-            setIncrement(data.incrementPercent?.toString() ?? "")
-            setStrengths(data.strengths ?? "")
-            setImprovements(data.improvements ?? "")
-            setManagerComments(data.managerComments ?? "")
-            setEmployeeComments(data.employeeComments ?? "")
-        } catch {
-            toast.error("Failed to load review")
-        } finally {
-            setLoading(false)
-        }
-    }, [reviewId])
-
-    useEffect(() => { fetchReview() }, [fetchReview])
-
-    async function saveField(field: Record<string, unknown>) {
-        setSaving(true)
-        try {
-            const res = await fetch(`/api/performance/${reviewId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(field),
-            })
-            if (!res.ok) throw new Error("Failed to save")
-            onUpdated()
-        } catch {
-            toast.error("Failed to save")
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    async function handleStatusChange(newStatus: ReviewStatus) {
-        setSaving(true)
-        try {
-            const res = await fetch(`/api/performance/${reviewId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: newStatus }),
-            })
-            if (!res.ok) throw new Error("Failed to update status")
-            toast.success(`Review ${newStatus === "SUBMITTED" ? "submitted" : newStatus === "COMPLETED" ? "completed" : "updated"}`)
-            await fetchReview()
-            onUpdated()
-        } catch {
-            toast.error("Failed to update status")
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    async function handleKpiUpdate(kpiId: string, field: Record<string, unknown>) {
-        try {
-            const res = await fetch(`/api/performance/${reviewId}/kpis/${kpiId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(field),
-            })
-            if (!res.ok) throw new Error("Failed to save KPI")
-            setKpis(prev => prev.map(k => k.id === kpiId ? { ...k, ...field } : k))
-        } catch {
-            toast.error("Failed to save KPI")
-        }
-    }
-
-    async function handleKpiDelete(kpiId: string) {
-        if (!confirm("Delete this KPI?")) return
-        try {
-            const res = await fetch(`/api/performance/${reviewId}/kpis/${kpiId}`, { method: "DELETE" })
-            if (!res.ok) throw new Error("Failed to delete")
-            setKpis(prev => prev.filter(k => k.id !== kpiId))
-            toast.success("KPI removed")
-        } catch {
-            toast.error("Failed to delete KPI")
-        }
-    }
-
-    async function handleAddKpi() {
-        if (!addKpiForm.title || !addKpiForm.target) {
-            toast.error("Title and target required")
-            return
-        }
-        setAddingKpi(true)
-        try {
-            const res = await fetch(`/api/performance/${reviewId}/kpis`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: addKpiForm.title,
-                    target: addKpiForm.target,
-                    weightage: parseFloat(addKpiForm.weightage) || 10,
-                }),
-            })
-            if (!res.ok) throw new Error("Failed to add KPI")
-            const newKpi = await res.json()
-            setKpis(prev => [...prev, newKpi])
-            setAddKpiForm({ title: "", target: "", weightage: "10" })
-            setShowAddKpi(false)
-            toast.success("KPI added")
-        } catch {
-            toast.error("Failed to add KPI")
-        } finally {
-            setAddingKpi(false)
-        }
-    }
-
-    const totalWeightage = kpis.reduce((s, k) => s + k.weightage, 0)
-    const weightedScore = kpis.reduce((s, k) => {
-        if (k.rating && k.weightage) return s + (k.rating * k.weightage) / 100
-        return s
-    }, 0)
-    const ratedCount = kpis.filter(k => k.rating).length
-
-    if (loading) {
-        return (
-            <div className="fixed inset-0 z-40 flex justify-end">
-                <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-                <div className="relative bg-[var(--surface)] w-full max-w-[520px] h-full flex items-center justify-center shadow-2xl">
-                    <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
-                </div>
-            </div>
-        )
-    }
-
-    if (!review) return null
-
-    const emp = review.employee
-    const isAdminOrManager = currentUserRole === "ADMIN" || currentUserRole === "MANAGER"
-    const statusOrder: ReviewStatus[] = ["DRAFT", "SUBMITTED", "ACKNOWLEDGED", "COMPLETED"]
-    const currentStatusIdx = statusOrder.indexOf(review.status)
-
-    return (
-        <div className="fixed inset-0 z-40 flex justify-end">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-[var(--surface)] w-full max-w-[520px] h-full flex flex-col shadow-2xl overflow-hidden">
-                {/* Drawer Header */}
-                <div className="flex items-start justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
-                    <div className="flex items-start gap-3">
-                        <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={44} />
-                        <div>
-                            <p className="text-[15px] font-semibold text-[var(--text)]">{emp.firstName} {emp.lastName}</p>
-                            <p className="text-[12px] text-[var(--text3)]">{emp.employeeId} · {emp.designation || "—"}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                                <CycleBadge cycle={review.cycle} />
-                                <span className="text-[11px] text-[var(--text3)]">{fmtDate(review.periodStart)} – {fmtDate(review.periodEnd)}</span>
-                                <StatusBadge status={review.status} />
-                            </div>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="p-1.5 hover:bg-[var(--surface2)] rounded-md text-[var(--text3)] shrink-0">
-                        <X size={16} />
-                    </button>
-                </div>
-
-                {/* Tabs */}
-                <div className="flex border-b border-[var(--border)] px-6 shrink-0">
-                    {(["overview", "kpis", "feedback"] as const).map(t => (
-                        <button
-                            key={t}
-                            onClick={() => setTab(t)}
-                            className={`py-3 px-1 mr-5 text-[13px] font-medium border-b-2 transition-colors capitalize ${
-                                tab === t
-                                    ? "border-[var(--accent)] text-[var(--accent)]"
-                                    : "border-transparent text-[var(--text3)] hover:text-[var(--text2)]"
-                            }`}
-                        >
-                            {t === "kpis" ? "KPIs" : t.charAt(0).toUpperCase() + t.slice(1)}
-                        </button>
-                    ))}
-                    {saving && <div className="ml-auto flex items-center gap-1 py-3 text-[11px] text-[var(--text3)]"><Loader2 size={12} className="animate-spin" /> Saving…</div>}
-                </div>
-
-                {/* Drawer Body */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-                    {/* ── OVERVIEW TAB ── */}
-                    {tab === "overview" && (
-                        <>
-                            {/* Overall Rating */}
-                            <div className="bg-[var(--surface2)] rounded-[12px] p-4">
-                                <p className="text-[12px] font-medium text-[var(--text2)] mb-3">Overall Rating</p>
-                                <StarRating
-                                    value={overallRating}
-                                    size={32}
-                                    onChange={v => {
-                                        setOverallRating(v)
-                                        saveField({ overallRating: v })
-                                    }}
-                                    disabled={!isAdminOrManager}
-                                />
-                                {overallRating && (
-                                    <p className="mt-2 text-[13px] font-medium" style={{ color: (RATING_CONFIG[Math.round(overallRating)] || RATING_CONFIG[3]).color }}>
-                                        {(RATING_CONFIG[Math.round(overallRating)] || RATING_CONFIG[3]).label}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Weighted Score */}
-                            <div className="bg-[var(--surface2)] rounded-[12px] p-4 flex items-center justify-between">
-                                <div>
-                                    <p className="text-[11px] text-[var(--text3)]">Weighted Score</p>
-                                    <p className="text-[20px] font-bold text-[var(--text)]">{weightedScore.toFixed(2)}<span className="text-[13px] text-[var(--text3)] font-normal"> / 5.00</span></p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[11px] text-[var(--text3)]">KPIs Rated</p>
-                                    <p className="text-[15px] font-semibold text-[var(--text)]">{ratedCount}/{kpis.length}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[11px] text-[var(--text3)]">Total Weightage</p>
-                                    <p className="text-[15px] font-semibold" style={{ color: totalWeightage === 100 ? "#1a9e6e" : "#ef4444" }}>{totalWeightage}%</p>
-                                </div>
-                            </div>
-
-                            {/* Promotion + Increment */}
-                            {isAdminOrManager && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-[var(--surface2)] rounded-[12px] p-4">
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={promotion}
-                                                onChange={e => {
-                                                    setPromotion(e.target.checked)
-                                                    saveField({ promotionRecommended: e.target.checked })
-                                                }}
-                                                className="w-4 h-4 accent-[var(--accent)]"
-                                            />
-                                            <span className="text-[12px] font-medium text-[var(--text2)]">Promotion Recommended</span>
-                                        </label>
-                                    </div>
-                                    <div className="bg-[var(--surface2)] rounded-[12px] p-4">
-                                        <p className="text-[11px] text-[var(--text3)] mb-1.5">Increment %</p>
-                                        <input
-                                            type="number"
-                                            value={increment}
-                                            onChange={e => setIncrement(e.target.value)}
-                                            onBlur={() => saveField({ incrementPercent: increment ? parseFloat(increment) : null })}
-                                            placeholder="e.g. 10"
-                                            min="0"
-                                            max="100"
-                                            className="w-full h-8 px-2 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Status Timeline */}
-                            <div className="bg-[var(--surface2)] rounded-[12px] p-4">
-                                <p className="text-[12px] font-medium text-[var(--text2)] mb-3">Progress</p>
-                                <div className="flex items-center gap-1">
-                                    {statusOrder.map((s, i) => {
-                                        const done = i <= currentStatusIdx
-                                        const cfg = STATUS_CONFIG[s]
-                                        return (
-                                            <div key={s} className="flex items-center flex-1 last:flex-none">
-                                                <div className="flex flex-col items-center gap-1 flex-1">
-                                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
-                                                        style={{ background: done ? cfg.bg : "#f3f4f6", color: done ? cfg.color : "#9ca3af", border: `1.5px solid ${done ? cfg.color : "#e5e7eb"}` }}>
-                                                        {done && i < currentStatusIdx ? "✓" : i + 1}
-                                                    </div>
-                                                    <span className="text-[9px] text-[var(--text3)] text-center whitespace-nowrap">{cfg.label}</span>
-                                                </div>
-                                                {i < statusOrder.length - 1 && (
-                                                    <div className="h-[2px] flex-1 mx-1 mb-4 rounded-full" style={{ background: i < currentStatusIdx ? "#1a9e6e" : "#e5e7eb" }} />
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            {isAdminOrManager && review.status === "DRAFT" && (
-                                <button
-                                    onClick={() => handleStatusChange("SUBMITTED")}
-                                    disabled={saving}
-                                    className="w-full h-10 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60"
-                                >
-                                    <Send size={14} />
-                                    Submit Review
-                                </button>
-                            )}
-                            {review.status === "SUBMITTED" && (
-                                <div className="bg-[#eff6ff] border border-[#bfdbfe] rounded-[10px] p-3 flex items-center gap-2">
-                                    <AlertCircle size={14} className="text-[#2563eb] shrink-0" />
-                                    <p className="text-[12px] text-[#1d4ed8]">Review submitted — waiting for employee acknowledgement.</p>
-                                </div>
-                            )}
-                            {review.status === "ACKNOWLEDGED" && isAdminOrManager && (
-                                <button
-                                    onClick={() => handleStatusChange("COMPLETED")}
-                                    disabled={saving}
-                                    className="w-full h-10 rounded-[8px] bg-[#1a9e6e] text-white text-[13px] font-medium flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60"
-                                >
-                                    <CheckCircle2 size={14} />
-                                    Mark as Completed
-                                </button>
-                            )}
-                            {review.status === "SUBMITTED" && !isAdminOrManager && (
-                                <button
-                                    onClick={() => handleStatusChange("ACKNOWLEDGED")}
-                                    disabled={saving}
-                                    className="w-full h-10 rounded-[8px] bg-[#2563eb] text-white text-[13px] font-medium flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60"
-                                >
-                                    <CheckCircle2 size={14} />
-                                    Acknowledge Review
-                                </button>
-                            )}
-                        </>
-                    )}
-
-                    {/* ── KPIs TAB ── */}
-                    {tab === "kpis" && (
-                        <>
-                            {totalWeightage !== 100 && (
-                                <div className="bg-[#fef3c7] border border-[#fde68a] rounded-[8px] px-3 py-2 flex items-center gap-2">
-                                    <AlertCircle size={13} className="text-[#d97706] shrink-0" />
-                                    <p className="text-[11.5px] text-[#92400e]">Total weightage is {totalWeightage}% — should be 100%</p>
-                                </div>
-                            )}
-
-                            <div className="space-y-2">
-                                {kpis.map(kpi => (
-                                    <div key={kpi.id} className="bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] p-3">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[13px] font-medium text-[var(--text)] truncate">{kpi.title}</p>
-                                                <p className="text-[11px] text-[var(--text3)]">Target: <span className="font-medium text-[var(--text2)]">{kpi.target}</span> · Weightage: <span className="font-medium text-[var(--text2)]">{kpi.weightage}%</span></p>
-                                            </div>
-                                            <button
-                                                onClick={() => handleKpiDelete(kpi.id)}
-                                                className="p-1 text-[var(--text3)] hover:text-[var(--red)] rounded shrink-0"
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
-                                        </div>
-                                        <div className="mt-2 grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label className="block text-[10.5px] text-[var(--text3)] mb-1">Actual Achieved</label>
-                                                <input
-                                                    defaultValue={kpi.actual ?? ""}
-                                                    onBlur={e => handleKpiUpdate(kpi.id, { actual: e.target.value })}
-                                                    placeholder="Enter actual..."
-                                                    className="w-full h-7 px-2 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10.5px] text-[var(--text3)] mb-1">Remarks</label>
-                                                <input
-                                                    defaultValue={kpi.remarks ?? ""}
-                                                    onBlur={e => handleKpiUpdate(kpi.id, { remarks: e.target.value })}
-                                                    placeholder="Optional..."
-                                                    className="w-full h-7 px-2 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="mt-2">
-                                            <label className="block text-[10.5px] text-[var(--text3)] mb-1">Rating</label>
-                                            <StarRating
-                                                value={kpi.rating}
-                                                size={20}
-                                                onChange={v => handleKpiUpdate(kpi.id, { rating: v })}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Weighted Score Summary */}
-                            <div className="bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] p-3 flex justify-between items-center">
-                                <p className="text-[12px] text-[var(--text2)]">Weighted Score: <strong>Σ(rating × weightage) / 100</strong></p>
-                                <p className="text-[16px] font-bold text-[var(--accent)]">{weightedScore.toFixed(2)}</p>
-                            </div>
-
-                            {/* Add KPI */}
-                            {!showAddKpi ? (
-                                <button
-                                    onClick={() => setShowAddKpi(true)}
-                                    className="w-full h-9 rounded-[8px] border border-dashed border-[var(--border)] text-[12px] text-[var(--text3)] hover:border-[var(--accent)] hover:text-[var(--accent)] flex items-center justify-center gap-1.5 transition-colors"
-                                >
-                                    <Plus size={13} /> Add KPI
-                                </button>
-                            ) : (
-                                <div className="bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] p-3 space-y-2">
-                                    <p className="text-[12px] font-medium text-[var(--text2)]">Add Custom KPI</p>
-                                    <input
-                                        value={addKpiForm.title}
-                                        onChange={e => setAddKpiForm(f => ({ ...f, title: e.target.value }))}
-                                        placeholder="KPI Title"
-                                        className="w-full h-8 px-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
-                                    />
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <input
-                                            value={addKpiForm.target}
-                                            onChange={e => setAddKpiForm(f => ({ ...f, target: e.target.value }))}
-                                            placeholder="Target (e.g. ≥95%)"
-                                            className="w-full h-8 px-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
-                                        />
-                                        <input
-                                            type="number"
-                                            value={addKpiForm.weightage}
-                                            onChange={e => setAddKpiForm(f => ({ ...f, weightage: e.target.value }))}
-                                            placeholder="Weightage %"
-                                            className="w-full h-8 px-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setShowAddKpi(false)} className="h-8 px-3 rounded-[6px] text-[12px] text-[var(--text2)] border border-[var(--border)] hover:bg-[var(--surface)]">Cancel</button>
-                                        <button onClick={handleAddKpi} disabled={addingKpi} className="h-8 px-4 rounded-[6px] text-[12px] bg-[var(--accent)] text-white flex items-center gap-1.5 disabled:opacity-60">
-                                            {addingKpi && <Loader2 size={11} className="animate-spin" />}
-                                            Add
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {/* ── FEEDBACK TAB ── */}
-                    {tab === "feedback" && (
-                        <div className="space-y-4">
-                            {(
-                                [
-                                    { key: "strengths", label: "Strengths", value: strengths, setter: setStrengths, editable: isAdminOrManager },
-                                    { key: "improvements", label: "Areas for Improvement", value: improvements, setter: setImprovements, editable: isAdminOrManager },
-                                    { key: "managerComments", label: "Manager Comments", value: managerComments, setter: setManagerComments, editable: isAdminOrManager },
-                                    { key: "employeeComments", label: "Employee Comments", value: employeeComments, setter: setEmployeeComments, editable: true },
-                                ] as Array<{ key: string; label: string; value: string; setter: (v: string) => void; editable: boolean }>
-                            ).map(({ key, label, value, setter, editable }) => (
-                                <div key={key}>
-                                    <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">{label}</label>
-                                    <textarea
-                                        value={value}
-                                        onChange={e => setter(e.target.value)}
-                                        onBlur={() => saveField({ [key]: value })}
-                                        disabled={!editable}
-                                        rows={4}
-                                        placeholder={editable ? `Enter ${label.toLowerCase()}...` : "Not provided"}
-                                        className="w-full px-3 py-2 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 disabled:bg-[var(--surface2)] disabled:text-[var(--text3)]"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
     )
 }
 
@@ -831,261 +261,2035 @@ export default function PerformancePage() {
     const { data: session, status } = useSession()
     const router = useRouter()
 
+    const [activeTab, setActiveTab] = useState<"dashboard" | "reviews" | "templates">("dashboard")
+
+    // Reviews state
     const [reviews, setReviews] = useState<PerformanceReview[]>([])
     const [loading, setLoading] = useState(true)
-    const [statusFilter, setStatusFilter] = useState("ALL")
-    const [cycleFilter, setCycleFilter] = useState("ALL")
     const [search, setSearch] = useState("")
-    const [showNewModal, setShowNewModal] = useState(false)
-    const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
-    const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+    const [filterCycle, setFilterCycle] = useState("ALL")
+    const [filterStatus, setFilterStatus] = useState("ALL")
 
-    useEffect(() => {
-        if (status !== "unauthenticated") return
-        router.push("/login")
-    }, [status, router])
+    // Selected review for drawer
+    const [selectedReview, setSelectedReview] = useState<PerformanceReview | null>(null)
+    const [drawerTab, setDrawerTab] = useState<"overview" | "self" | "kra" | "manager" | "hr" | "pip">("overview")
+
+    // Create modal
+    const [showCreateModal, setShowCreateModal] = useState(false)
+    const [employees, setEmployees] = useState<EmployeeOption[]>([])
+    const [creating, setCreating] = useState(false)
+    const [createForm, setCreateForm] = useState({
+        employeeId: "",
+        cycle: "QUARTERLY" as ReviewCycle,
+        periodStart: "",
+        periodEnd: "",
+    })
+
+    // Dashboard
+    const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+    const [dashLoading, setDashLoading] = useState(true)
+
+    // Templates
+    const [templates, setTemplates] = useState<KPITemplate[]>([])
+    const [templatesLoading, setTemplatesLoading] = useState(false)
+
+    const isAdminOrManager =
+        session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
 
     const fetchReviews = useCallback(async () => {
         setLoading(true)
         try {
             const params = new URLSearchParams()
-            if (statusFilter !== "ALL") params.set("status", statusFilter)
-            if (cycleFilter !== "ALL") params.set("cycle", cycleFilter)
             if (search) params.set("search", search)
+            if (filterCycle !== "ALL") params.set("cycle", filterCycle)
+            if (filterStatus !== "ALL") params.set("status", filterStatus)
             const res = await fetch(`/api/performance?${params}`)
-            if (!res.ok) throw new Error("Failed to fetch")
-            const data = await res.json()
-            setReviews(Array.isArray(data) ? data : [])
-        } catch {
-            toast.error("Failed to load reviews")
+            if (res.ok) setReviews(await res.json())
         } finally {
             setLoading(false)
         }
-    }, [statusFilter, cycleFilter, search])
+    }, [search, filterCycle, filterStatus])
+
+    const fetchDashboard = useCallback(async () => {
+        setDashLoading(true)
+        try {
+            const res = await fetch("/api/performance/dashboard")
+            if (res.ok) setDashboard(await res.json())
+        } finally {
+            setDashLoading(false)
+        }
+    }, [])
+
+    const fetchTemplates = useCallback(async () => {
+        setTemplatesLoading(true)
+        try {
+            const res = await fetch("/api/performance/templates")
+            if (res.ok) setTemplates(await res.json())
+        } finally {
+            setTemplatesLoading(false)
+        }
+    }, [])
+
+    const fetchEmployees = useCallback(async () => {
+        const res = await fetch("/api/employees?limit=500")
+        if (res.ok) {
+            const data = await res.json()
+            setEmployees(data.employees || data)
+        }
+    }, [])
 
     useEffect(() => {
-        if (status === "authenticated") fetchReviews()
-    }, [status, fetchReviews])
+        if (status !== "unauthenticated") {
+            fetchReviews()
+            fetchDashboard()
+        }
+    }, [status, fetchReviews, fetchDashboard])
 
-    async function handleDelete(id: string) {
-        if (!confirm("Delete this review? This cannot be undone.")) return
+    useEffect(() => {
+        if (activeTab === "templates" && templates.length === 0) {
+            fetchTemplates()
+        }
+    }, [activeTab, templates.length, fetchTemplates])
+
+    useEffect(() => {
+        if (showCreateModal && employees.length === 0) fetchEmployees()
+    }, [showCreateModal, employees.length, fetchEmployees])
+
+    const handleCreateReview = async () => {
+        if (!createForm.employeeId || !createForm.periodStart || !createForm.periodEnd) {
+            toast.error("Please fill in all required fields")
+            return
+        }
+        setCreating(true)
         try {
-            const res = await fetch(`/api/performance/${id}`, { method: "DELETE" })
+            const res = await fetch("/api/performance", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(createForm),
+            })
             if (!res.ok) throw new Error(await res.text())
-            toast.success("Review deleted")
-            setReviews(prev => prev.filter(r => r.id !== id))
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Failed to delete")
+            toast.success("Review created")
+            setShowCreateModal(false)
+            setCreateForm({ employeeId: "", cycle: "QUARTERLY", periodStart: "", periodEnd: "" })
+            fetchReviews()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setCreating(false)
         }
     }
 
-    // Stats
-    const totalReviews = reviews.length
-    const completed = reviews.filter(r => r.status === "COMPLETED")
-    const avgRating = completed.filter(r => r.overallRating).length > 0
-        ? (completed.filter(r => r.overallRating).reduce((s, r) => s + (r.overallRating || 0), 0) / completed.filter(r => r.overallRating).length).toFixed(1)
-        : "—"
-    const pendingAck = reviews.filter(r => r.status === "SUBMITTED").length
+    const openDrawer = async (review: PerformanceReview) => {
+        // Fetch full detail with kras/pip
+        const res = await fetch(`/api/performance/${review.id}`)
+        if (res.ok) {
+            const full = await res.json()
+            setSelectedReview(full)
+        } else {
+            setSelectedReview(review)
+        }
+        setDrawerTab("overview")
+    }
 
-    const now = new Date()
-    const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
-    const completedThisQ = reviews.filter(r => {
-        if (r.status !== "COMPLETED" || !r.completedAt) return false
-        return new Date(r.completedAt) >= qStart
-    }).length
+    const refreshSelected = async () => {
+        if (!selectedReview) return
+        const res = await fetch(`/api/performance/${selectedReview.id}`)
+        if (res.ok) {
+            const full = await res.json()
+            setSelectedReview(full)
+            setReviews(prev => prev.map(r => r.id === full.id ? full : r))
+        }
+    }
 
-    const currentUserRole = session?.user?.role || ""
-    const currentUserId = session?.user?.id || ""
-
-    const STATUS_PILLS = ["ALL", "DRAFT", "SUBMITTED", "ACKNOWLEDGED", "COMPLETED"]
+    // ─── Tabs ──────────────────────────────────────────────────────────────────
+    const tabStyle = (active: boolean) => ({
+        padding: "10px 20px",
+        border: "none",
+        background: "none",
+        cursor: "pointer",
+        fontWeight: active ? 700 : 500,
+        fontSize: 14,
+        color: active ? "var(--accent)" : "var(--text)",
+        borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+        transition: "all 0.15s",
+    })
 
     return (
-        <div className="flex-1 flex flex-col min-h-0 bg-[var(--surface2)]">
+        <div style={{ padding: "24px 28px", minHeight: "100vh", background: "var(--surface)" }}>
             {/* Header */}
-            <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between shrink-0">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
-                    <h1 className="text-[18px] font-bold text-[var(--text)]">Performance Management</h1>
-                    <p className="text-[12.5px] text-[var(--text3)] mt-0.5">KPIs, reviews & appraisals</p>
+                    <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "var(--text)" }}>
+                        Performance Management
+                    </h1>
+                    <p style={{ fontSize: 13, color: "#6b7280", margin: "2px 0 0" }}>
+                        Track, review, and improve employee performance
+                    </p>
                 </div>
-                {(currentUserRole === "ADMIN" || currentUserRole === "MANAGER") && (
+                {isAdminOrManager && activeTab === "reviews" && (
                     <button
-                        onClick={() => setShowNewModal(true)}
-                        className="h-9 px-4 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium flex items-center gap-2 hover:opacity-90"
+                        onClick={() => setShowCreateModal(true)}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "9px 18px",
+                            background: "var(--accent)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 8,
+                            fontWeight: 600,
+                            fontSize: 14,
+                            cursor: "pointer",
+                        }}
                     >
-                        <Plus size={15} />
+                        <Plus size={16} />
                         New Review
                     </button>
                 )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <StatCard label="Total Reviews" value={totalReviews} color="#2563eb" bg="#eff6ff" icon={<TrendingUp size={18} />} />
-                    <StatCard label="Avg Rating" value={`${avgRating}/5`} color="#1a9e6e" bg="#e8f7f1" icon={<Star size={18} />} />
-                    <StatCard label="Pending Acknowledgement" value={pendingAck} color="#d97706" bg="#fef3c7" icon={<Clock size={18} />} />
-                    <StatCard label="Completed This Quarter" value={completedThisQ} color="#1a9e6e" bg="#e8f7f1" icon={<CheckCircle2 size={18} />} />
-                </div>
+            {/* Tab Bar */}
+            <div style={{
+                display: "flex",
+                borderBottom: "1px solid var(--border)",
+                marginBottom: 24,
+                gap: 0,
+            }}>
+                <button style={tabStyle(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <BarChart2 size={14} /> Dashboard
+                    </span>
+                </button>
+                <button style={tabStyle(activeTab === "reviews")} onClick={() => setActiveTab("reviews")}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <FileText size={14} /> Reviews
+                    </span>
+                </button>
+                <button style={tabStyle(activeTab === "templates")} onClick={() => setActiveTab("templates")}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Settings size={14} /> Templates
+                    </span>
+                </button>
+            </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap gap-2 items-center">
-                    {/* Status Pills */}
-                    <div className="flex gap-1 flex-wrap">
-                        {STATUS_PILLS.map(s => (
-                            <button
-                                key={s}
-                                onClick={() => setStatusFilter(s)}
-                                className={`h-8 px-3 rounded-full text-[12px] font-medium transition-all ${
-                                    statusFilter === s
-                                        ? "bg-[var(--accent)] text-white"
-                                        : "bg-[var(--surface)] border border-[var(--border)] text-[var(--text2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                                }`}
-                            >
-                                {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
-                            </button>
+            {/* ─── DASHBOARD TAB ─────────────────────────────────────────────── */}
+            {activeTab === "dashboard" && (
+                <DashboardTab data={dashboard} loading={dashLoading} />
+            )}
+
+            {/* ─── REVIEWS TAB ───────────────────────────────────────────────── */}
+            {activeTab === "reviews" && (
+                <ReviewsTab
+                    reviews={reviews}
+                    loading={loading}
+                    search={search}
+                    setSearch={setSearch}
+                    filterCycle={filterCycle}
+                    setFilterCycle={setFilterCycle}
+                    filterStatus={filterStatus}
+                    setFilterStatus={setFilterStatus}
+                    onCardClick={openDrawer}
+                    isAdminOrManager={isAdminOrManager}
+                    onCreateClick={() => setShowCreateModal(true)}
+                />
+            )}
+
+            {/* ─── TEMPLATES TAB ─────────────────────────────────────────────── */}
+            {activeTab === "templates" && (
+                <TemplatesTab templates={templates} loading={templatesLoading} />
+            )}
+
+            {/* ─── REVIEW DRAWER ─────────────────────────────────────────────── */}
+            {selectedReview && (
+                <ReviewDrawer
+                    review={selectedReview}
+                    tab={drawerTab}
+                    setTab={setDrawerTab}
+                    onClose={() => setSelectedReview(null)}
+                    onRefresh={refreshSelected}
+                    isAdminOrManager={isAdminOrManager}
+                    session={session}
+                    templates={templates}
+                    fetchTemplates={fetchTemplates}
+                />
+            )}
+
+            {/* ─── CREATE MODAL ──────────────────────────────────────────────── */}
+            {showCreateModal && (
+                <CreateReviewModal
+                    employees={employees}
+                    form={createForm}
+                    setForm={setCreateForm}
+                    onClose={() => setShowCreateModal(false)}
+                    onSubmit={handleCreateReview}
+                    creating={creating}
+                />
+            )}
+        </div>
+    )
+}
+
+// ─── DashboardTab ─────────────────────────────────────────────────────────────
+
+function DashboardTab({ data, loading }: { data: DashboardData | null; loading: boolean }) {
+    if (loading) {
+        return (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 200 }}>
+                <Loader2 size={28} style={{ animation: "spin 1s linear infinite", color: "var(--accent)" }} />
+            </div>
+        )
+    }
+
+    if (!data) return null
+
+    const { summary, rankDistrib, topPerformers, roleAvgScores, monthlyTrend } = data
+
+    const summaryCards = [
+        { label: "Total Reviews", value: summary.total, icon: FileText, color: "#3b82f6", bg: "#eff6ff" },
+        { label: "Pending Reviews", value: summary.pending, icon: Clock, color: "#d97706", bg: "#fef3c7" },
+        { label: "Completed", value: summary.completed, icon: CheckCircle2, color: "#1a9e6e", bg: "#e8f7f1" },
+        { label: "Avg Score", value: summary.avgScore.toFixed(2), icon: TrendingUp, color: "#8b5cf6", bg: "#f5f3ff" },
+    ]
+
+    const rankCards = [
+        { key: "TOP_PERFORMER", label: "Top Performers", color: "#1a9e6e", bg: "#e8f7f1" },
+        { key: "HIGH_PERFORMER", label: "High Performers", color: "#2563eb", bg: "#eff6ff" },
+        { key: "AVERAGE", label: "Average", color: "#d97706", bg: "#fef3c7" },
+        { key: "LOW_PERFORMER", label: "Low Performers", color: "#ef4444", bg: "#fee2e2" },
+    ]
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {/* Summary Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                {summaryCards.map(c => (
+                    <div key={c.label} style={{
+                        background: "#fff",
+                        borderRadius: 12,
+                        padding: "18px 20px",
+                        border: "1px solid var(--border)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                    }}>
+                        <div style={{
+                            width: 44, height: 44, borderRadius: 10,
+                            background: c.bg, display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                            <c.icon size={20} color={c.color} />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{c.value}</div>
+                            <div style={{ fontSize: 12, color: "#6b7280" }}>{c.label}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Ranking Strip */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                {rankCards.map(r => (
+                    <div key={r.key} style={{
+                        background: r.bg,
+                        borderRadius: 10,
+                        padding: "14px 18px",
+                        textAlign: "center",
+                        border: `1px solid ${r.color}30`,
+                    }}>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: r.color }}>
+                            {rankDistrib[r.key] ?? 0}
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: r.color }}>{r.label}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 20 }}>
+                {/* Top 5 Performers */}
+                <div style={{
+                    background: "#fff",
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    padding: "18px 20px",
+                }}>
+                    <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                        Top 5 Performers
+                    </h3>
+                    {topPerformers.length === 0 && (
+                        <p style={{ color: "#9ca3af", fontSize: 13 }}>No rated reviews yet</p>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {topPerformers.map((p, i) => (
+                            <div key={p.id} style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                padding: "8px 0", borderBottom: i < topPerformers.length - 1 ? "1px solid var(--border)" : "none",
+                            }}>
+                                <div style={{
+                                    width: 24, height: 24, borderRadius: "50%",
+                                    background: i === 0 ? "#f59e0b" : i === 1 ? "#9ca3af" : i === 2 ? "#b45309" : "#e5e7eb",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 11, fontWeight: 700, color: "#fff",
+                                }}>
+                                    {i + 1}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                                        {p.employee.firstName} {p.employee.lastName}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#6b7280" }}>{p.employee.designation || "—"}</div>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a9e6e" }}>
+                                        {p.overallRating?.toFixed(1) ?? "—"}
+                                    </div>
+                                    {p.performanceRank && (
+                                        <Badge
+                                            label={RANK_CONFIG[p.performanceRank]?.label ?? p.performanceRank}
+                                            color={RANK_CONFIG[p.performanceRank]?.color ?? "#6b7280"}
+                                            bg={RANK_CONFIG[p.performanceRank]?.bg ?? "#f3f4f6"}
+                                        />
+                                    )}
+                                </div>
+                            </div>
                         ))}
                     </div>
-
-                    {/* Cycle Filter */}
-                    <div className="relative ml-1">
-                        <select
-                            value={cycleFilter}
-                            onChange={e => setCycleFilter(e.target.value)}
-                            className="h-8 pl-3 pr-7 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text2)] appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                        >
-                            <option value="ALL">All Cycles</option>
-                            <option value="MONTHLY">Monthly</option>
-                            <option value="QUARTERLY">Quarterly</option>
-                            <option value="HALF_YEARLY">Half-Yearly</option>
-                            <option value="ANNUAL">Annual</option>
-                        </select>
-                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
-                    </div>
-
-                    {/* Search */}
-                    <div className="relative ml-auto">
-                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
-                        <input
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Search employee..."
-                            className="h-8 pl-8 pr-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] text-[var(--text)] w-52 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                        />
-                    </div>
                 </div>
 
-                {/* Review List */}
-                <div className="bg-[var(--surface)] rounded-[12px] border border-[var(--border)] overflow-hidden">
-                    {loading ? (
-                        <div className="flex items-center justify-center py-16">
-                            <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
-                        </div>
-                    ) : reviews.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 gap-2">
-                            <Star size={32} className="text-[var(--text3)]" />
-                            <p className="text-[13px] text-[var(--text3)]">No reviews found</p>
-                            {(currentUserRole === "ADMIN" || currentUserRole === "MANAGER") && (
-                                <button
-                                    onClick={() => setShowNewModal(true)}
-                                    className="mt-2 h-8 px-4 rounded-[8px] bg-[var(--accent)] text-white text-[12px] font-medium"
-                                >
-                                    Create First Review
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
-                                        {["Employee", "Designation", "Cycle", "Period", "KPIs", "Overall Rating", "Status", ""].map(h => (
-                                            <th key={h} className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.4px] px-4 py-3 whitespace-nowrap">{h}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[var(--border)]">
-                                    {reviews.map(review => {
-                                        const emp = review.employee
-                                        const ratedKpis = review.kpis.filter(k => k.rating).length
-                                        return (
-                                            <tr key={review.id} className="hover:bg-[var(--surface2)] transition-colors group">
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={32} />
-                                                        <div>
-                                                            <p className="text-[13px] font-medium text-[var(--text)]">{emp.firstName} {emp.lastName}</p>
-                                                            <p className="text-[11px] text-[var(--text3)]">{emp.employeeId}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-[12.5px] text-[var(--text2)]">{emp.designation || "—"}</td>
-                                                <td className="px-4 py-3"><CycleBadge cycle={review.cycle} /></td>
-                                                <td className="px-4 py-3 text-[12px] text-[var(--text2)] whitespace-nowrap">{fmtDate(review.periodStart)} – {fmtDate(review.periodEnd)}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className="text-[12px] font-medium text-[var(--text2)]">{ratedKpis}/{review.kpis.length} <span className="text-[var(--text3)] font-normal">rated</span></span>
-                                                </td>
-                                                <td className="px-4 py-3"><StarDisplay rating={review.overallRating} /></td>
-                                                <td className="px-4 py-3"><StatusBadge status={review.status} /></td>
-                                                <td className="px-4 py-3">
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={() => setOpenMenuId(openMenuId === review.id ? null : review.id)}
-                                                            className="p-1.5 rounded-[6px] text-[var(--text3)] hover:bg-[var(--surface2)] opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            <MoreVertical size={14} />
-                                                        </button>
-                                                        {openMenuId === review.id && (
-                                                            <div className="absolute right-0 top-7 z-20 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] shadow-lg w-36 py-1" onClick={() => setOpenMenuId(null)}>
-                                                                <button
-                                                                    onClick={() => setSelectedReviewId(review.id)}
-                                                                    className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)]"
-                                                                >
-                                                                    <Eye size={13} /> View / Edit
-                                                                </button>
-                                                                {review.status === "DRAFT" && (currentUserRole === "ADMIN" || currentUserRole === "MANAGER") && (
-                                                                    <button
-                                                                        onClick={() => handleDelete(review.id)}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-[#fef2f2]"
-                                                                    >
-                                                                        <Trash2 size={13} /> Delete
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                {/* Monthly Trend */}
+                <div style={{
+                    background: "#fff",
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    padding: "18px 20px",
+                }}>
+                    <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                        Monthly Score Trend (Last 6 Months)
+                    </h3>
+                    <ResponsiveContainer width="100%" height={180}>
+                        <LineChart data={monthlyTrend}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                            <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                            <Tooltip />
+                            <Line type="monotone" dataKey="avgScore" stroke="var(--accent)" strokeWidth={2} dot={{ r: 4 }} name="Avg Score" />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Role-wise Avg Score */}
+            {roleAvgScores.length > 0 && (
+                <div style={{
+                    background: "#fff",
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    padding: "18px 20px",
+                }}>
+                    <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                        Role-wise Avg Score
+                    </h3>
+                    <ResponsiveContainer width="100%" height={Math.max(120, roleAvgScores.length * 36)}>
+                        <BarChart data={roleAvgScores} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 11 }} />
+                            <YAxis type="category" dataKey="role" width={130} tick={{ fontSize: 11 }} />
+                            <Tooltip />
+                            <Bar dataKey="avgScore" fill="var(--accent)" radius={[0, 4, 4, 0]} name="Avg Score" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── ReviewsTab ───────────────────────────────────────────────────────────────
+
+function ReviewsTab({
+    reviews, loading, search, setSearch,
+    filterCycle, setFilterCycle, filterStatus, setFilterStatus,
+    onCardClick, isAdminOrManager, onCreateClick,
+}: {
+    reviews: PerformanceReview[]
+    loading: boolean
+    search: string
+    setSearch: (v: string) => void
+    filterCycle: string
+    setFilterCycle: (v: string) => void
+    filterStatus: string
+    setFilterStatus: (v: string) => void
+    onCardClick: (r: PerformanceReview) => void
+    isAdminOrManager: boolean
+    onCreateClick: () => void
+}) {
+    return (
+        <div>
+            {/* Toolbar */}
+            <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
+                    <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search employee..."
+                        style={{
+                            width: "100%", paddingLeft: 32, paddingRight: 10, height: 36,
+                            border: "1px solid var(--border)", borderRadius: 8, fontSize: 13,
+                            background: "#fff", color: "var(--text)", boxSizing: "border-box",
+                        }}
+                    />
+                </div>
+                <select
+                    value={filterCycle}
+                    onChange={e => setFilterCycle(e.target.value)}
+                    style={{
+                        height: 36, padding: "0 10px", border: "1px solid var(--border)",
+                        borderRadius: 8, fontSize: 13, background: "#fff", color: "var(--text)",
+                    }}
+                >
+                    <option value="ALL">All Cycles</option>
+                    {(["MONTHLY", "QUARTERLY", "HALF_YEARLY", "ANNUAL"] as ReviewCycle[]).map(c => (
+                        <option key={c} value={c}>{CYCLE_CONFIG[c].label}</option>
+                    ))}
+                </select>
+                <select
+                    value={filterStatus}
+                    onChange={e => setFilterStatus(e.target.value)}
+                    style={{
+                        height: 36, padding: "0 10px", border: "1px solid var(--border)",
+                        borderRadius: 8, fontSize: 13, background: "#fff", color: "var(--text)",
+                    }}
+                >
+                    <option value="ALL">All Status</option>
+                    {(["DRAFT", "SUBMITTED", "ACKNOWLEDGED", "COMPLETED"] as ReviewStatus[]).map(s => (
+                        <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+                    ))}
+                </select>
+            </div>
+
+            {loading ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+                    <Loader2 size={28} style={{ animation: "spin 1s linear infinite", color: "var(--accent)" }} />
+                </div>
+            ) : reviews.length === 0 ? (
+                <div style={{
+                    textAlign: "center", padding: "60px 20px",
+                    color: "#9ca3af", fontSize: 14,
+                    background: "#fff", borderRadius: 12, border: "1px solid var(--border)",
+                }}>
+                    <FileText size={36} style={{ margin: "0 auto 12px", display: "block", color: "#d1d5db" }} />
+                    No reviews found
+                </div>
+            ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                    {reviews.map(r => (
+                        <ReviewCard key={r.id} review={r} onClick={() => onCardClick(r)} />
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── ReviewCard ───────────────────────────────────────────────────────────────
+
+function ReviewCard({ review, onClick }: { review: PerformanceReview; onClick: () => void }) {
+    const emp = review.employee
+    const name = `${emp.firstName} ${emp.lastName}`
+    const initials = `${emp.firstName[0]}${emp.lastName[0]}`.toUpperCase()
+    const avatarColor = getAvatarColor(emp.firstName, emp.lastName)
+    const statusCfg = STATUS_CONFIG[review.status]
+    const cycleCfg = CYCLE_CONFIG[review.cycle]
+    const rankCfg = review.performanceRank ? RANK_CONFIG[review.performanceRank] : null
+
+    return (
+        <div
+            onClick={onClick}
+            style={{
+                background: "#fff",
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: "16px 18px",
+                cursor: "pointer",
+                transition: "box-shadow 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={e => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"
+                ;(e.currentTarget as HTMLDivElement).style.borderColor = "var(--accent)"
+            }}
+            onMouseLeave={e => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow = "none"
+                ;(e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"
+            }}
+        >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <div style={{
+                    width: 42, height: 42, borderRadius: "50%",
+                    background: avatarColor, display: "flex", alignItems: "center",
+                    justifyContent: "center", fontWeight: 700, fontSize: 15, color: "#fff",
+                    flexShrink: 0,
+                }}>
+                    {initials}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {name}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>{emp.designation || "—"}</div>
+                </div>
+                <Badge label={statusCfg.label} color={statusCfg.color} bg={statusCfg.bg} />
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                <Badge label={cycleCfg.label} color={cycleCfg.color} bg={cycleCfg.bg} />
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                    {fmtDate(review.periodStart)} – {fmtDate(review.periodEnd)}
+                </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <StarRating value={review.overallRating} readonly size={14} />
+                    {review.overallRating && (
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>
+                            {review.overallRating.toFixed(1)}
+                        </span>
+                    )}
+                </div>
+                {rankCfg && (
+                    <Badge label={rankCfg.label} color={rankCfg.color} bg={rankCfg.bg} />
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ─── ReviewDrawer ─────────────────────────────────────────────────────────────
+
+function ReviewDrawer({
+    review, tab, setTab, onClose, onRefresh,
+    isAdminOrManager, session, templates, fetchTemplates,
+}: {
+    review: PerformanceReview
+    tab: string
+    setTab: (t: "overview" | "self" | "kra" | "manager" | "hr" | "pip") => void
+    onClose: () => void
+    onRefresh: () => void
+    isAdminOrManager: boolean
+    session: ReturnType<typeof useSession>["data"]
+    templates: KPITemplate[]
+    fetchTemplates: () => void
+}) {
+    const drawerTabs = [
+        { id: "overview", label: "Overview" },
+        { id: "self", label: "Self Review" },
+        { id: "kra", label: "KRA / KPI" },
+        { id: "manager", label: "Manager Review" },
+        { id: "hr", label: "HR Approval" },
+        { id: "pip", label: "PIP" },
+    ]
+
+    return (
+        <div style={{
+            position: "fixed", right: 0, top: 0, bottom: 0,
+            width: 640, background: "#fff",
+            boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
+            zIndex: 1000, display: "flex", flexDirection: "column",
+            borderLeft: "1px solid var(--border)",
+        }}>
+            {/* Drawer Header */}
+            <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "16px 20px", borderBottom: "1px solid var(--border)",
+            }}>
+                <div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>
+                        {review.employee.firstName} {review.employee.lastName}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        {review.employee.designation || "—"} · {CYCLE_CONFIG[review.cycle]?.label}
+                    </div>
+                </div>
+                <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                    <X size={20} color="#6b7280" />
+                </button>
+            </div>
+
+            {/* Sub-tabs */}
+            <div style={{
+                display: "flex", borderBottom: "1px solid var(--border)",
+                overflowX: "auto", flexShrink: 0,
+            }}>
+                {drawerTabs.map(t => (
+                    <button
+                        key={t.id}
+                        onClick={() => setTab(t.id as "overview" | "self" | "kra" | "manager" | "hr" | "pip")}
+                        style={{
+                            padding: "10px 16px", border: "none", background: "none", cursor: "pointer",
+                            fontWeight: tab === t.id ? 700 : 500, fontSize: 13,
+                            color: tab === t.id ? "var(--accent)" : "#6b7280",
+                            borderBottom: tab === t.id ? "2px solid var(--accent)" : "2px solid transparent",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Drawer Content */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+                {tab === "overview" && <DrawerOverview review={review} />}
+                {tab === "self" && (
+                    <DrawerSelfReview review={review} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+                )}
+                {tab === "kra" && (
+                    <DrawerKRAKPI
+                        review={review}
+                        onRefresh={onRefresh}
+                        isAdminOrManager={isAdminOrManager}
+                        templates={templates}
+                        fetchTemplates={fetchTemplates}
+                    />
+                )}
+                {tab === "manager" && (
+                    <DrawerManagerReview review={review} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+                )}
+                {tab === "hr" && (
+                    <DrawerHRApproval review={review} onRefresh={onRefresh} session={session} />
+                )}
+                {tab === "pip" && (
+                    <DrawerPIP review={review} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ─── DrawerOverview ───────────────────────────────────────────────────────────
+
+function DrawerOverview({ review }: { review: PerformanceReview }) {
+    const emp = review.employee
+    const statusCfg = STATUS_CONFIG[review.status]
+    const rankCfg = review.performanceRank ? RANK_CONFIG[review.performanceRank] : null
+
+    const rows: [string, React.ReactNode][] = [
+        ["Employee ID", emp.employeeId],
+        ["Branch", emp.branch.name],
+        ["Designation", emp.designation || "—"],
+        ["Review Cycle", CYCLE_CONFIG[review.cycle]?.label],
+        ["Period", `${fmtDateFull(review.periodStart)} — ${fmtDateFull(review.periodEnd)}`],
+        ["Status", <Badge key="s" label={statusCfg.label} color={statusCfg.color} bg={statusCfg.bg} />],
+        ["Overall Rating", review.overallRating != null ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <StarRating value={review.overallRating} readonly size={14} />
+                <strong>{review.overallRating.toFixed(1)}</strong>
+            </span>
+        ) : "—"],
+        ["Performance Rank", rankCfg ? <Badge key="r" label={rankCfg.label} color={rankCfg.color} bg={rankCfg.bg} /> : "—"],
+        ["Promotion Recommended", review.promotionRecommended ? "Yes" : "No"],
+        ["Increment %", review.incrementPercent != null ? `${review.incrementPercent}%` : "—"],
+        ["Bonus %", review.bonusPercent != null ? `${review.bonusPercent}%` : "—"],
+        ["Submitted", fmtDateFull(review.submittedAt)],
+        ["Acknowledged", fmtDateFull(review.acknowledgedAt)],
+        ["Completed", fmtDateFull(review.completedAt)],
+        ["HR Approved", review.hrApprovedAt ? fmtDateFull(review.hrApprovedAt) : "—"],
+    ]
+
+    return (
+        <div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <tbody>
+                    {rows.map(([label, val]) => (
+                        <tr key={label} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td style={{ padding: "9px 0", color: "#6b7280", width: "44%" }}>{label}</td>
+                            <td style={{ padding: "9px 0", color: "var(--text)", fontWeight: 500 }}>{val}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            {review.strengths && (
+                <div style={{ marginTop: 16 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Strengths</div>
+                    <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{review.strengths}</div>
+                </div>
+            )}
+            {review.improvements && (
+                <div style={{ marginTop: 12 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Areas of Improvement</div>
+                    <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{review.improvements}</div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── DrawerSelfReview ─────────────────────────────────────────────────────────
+
+function DrawerSelfReview({
+    review, onRefresh, isAdminOrManager,
+}: {
+    review: PerformanceReview
+    onRefresh: () => void
+    isAdminOrManager: boolean
+}) {
+    const [selfRating, setSelfRating] = useState<number>(review.selfRating ?? 0)
+    const [selfComments, setSelfComments] = useState(review.selfComments ?? "")
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        setSelfRating(review.selfRating ?? 0)
+        setSelfComments(review.selfComments ?? "")
+    }, [review.selfRating, review.selfComments])
+
+    const handleSave = async () => {
+        setSaving(true)
+        try {
+            const res = await fetch(`/api/performance/${review.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ selfRating, selfComments }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Self review saved")
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const ratingLabels: Record<number, string> = {
+        1: "Poor", 2: "Needs Improvement", 3: "Meets Expectations",
+        4: "Exceeds Expectations", 5: "Outstanding",
+    }
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 8 }}>
+                    Self Rating (1–5 Stars)
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <StarRating value={selfRating} onChange={setSelfRating} size={22} />
+                    {selfRating > 0 && (
+                        <span style={{ fontSize: 13, color: "#6b7280" }}>{ratingLabels[selfRating]}</span>
                     )}
                 </div>
             </div>
 
-            {/* Modals */}
-            {showNewModal && (
-                <NewReviewModal
-                    onClose={() => setShowNewModal(false)}
-                    onCreated={fetchReviews}
-                    currentUserId={currentUserId}
+            <div>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>
+                    Self Assessment Comments
+                </label>
+                <textarea
+                    value={selfComments}
+                    onChange={e => setSelfComments(e.target.value)}
+                    rows={6}
+                    placeholder="Describe your performance, achievements, and challenges..."
+                    style={{
+                        width: "100%", padding: "10px 12px", border: "1px solid var(--border)",
+                        borderRadius: 8, fontSize: 13, resize: "vertical", color: "var(--text)",
+                        boxSizing: "border-box",
+                    }}
                 />
+            </div>
+
+            <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
+                    background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8,
+                    fontWeight: 600, fontSize: 13, cursor: saving ? "not-allowed" : "pointer",
+                    alignSelf: "flex-start", opacity: saving ? 0.7 : 1,
+                }}
+            >
+                {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
+                Save Self Review
+            </button>
+        </div>
+    )
+}
+
+// ─── DrawerKRAKPI ─────────────────────────────────────────────────────────────
+
+function DrawerKRAKPI({
+    review, onRefresh, isAdminOrManager, templates, fetchTemplates,
+}: {
+    review: PerformanceReview
+    onRefresh: () => void
+    isAdminOrManager: boolean
+    templates: KPITemplate[]
+    fetchTemplates: () => void
+}) {
+    const [showAddKRA, setShowAddKRA] = useState(false)
+    const [newKRATitle, setNewKRATitle] = useState("")
+    const [newKRAWeight, setNewKRAWeight] = useState(25)
+    const [addingKRA, setAddingKRA] = useState(false)
+    const [showTemplateLoad, setShowTemplateLoad] = useState(false)
+
+    const kras = review.kras ?? []
+    const loosekpis = review.kpis?.filter(k => !k.kraId) ?? []
+
+    const calcScore = calcOverallScore(kras)
+
+    const handleAddKRA = async () => {
+        if (!newKRATitle) return
+        setAddingKRA(true)
+        try {
+            const res = await fetch(`/api/performance/${review.id}/kras`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: newKRATitle, weightage: newKRAWeight }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("KRA added")
+            setNewKRATitle("")
+            setNewKRAWeight(25)
+            setShowAddKRA(false)
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setAddingKRA(false)
+        }
+    }
+
+    const handleLoadTemplate = async (role: string) => {
+        if (templates.length === 0) await fetchTemplates()
+        const roleTemplates = templates.filter(t => t.role === role)
+        if (!roleTemplates.length) {
+            toast.error("No templates for this role")
+            return
+        }
+        // Group by kraTitle
+        const kraMap: Record<string, KPITemplate[]> = {}
+        for (const t of roleTemplates) {
+            if (!kraMap[t.kraTitle]) kraMap[t.kraTitle] = []
+            kraMap[t.kraTitle].push(t)
+        }
+        for (const [kraTitle, kpis] of Object.entries(kraMap)) {
+            const res = await fetch(`/api/performance/${review.id}/kras`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: kraTitle,
+                    weightage: 25,
+                    kpis: kpis.map(k => ({
+                        title: k.kpiTitle,
+                        target: k.targetHint || "—",
+                        weightage: k.weightage,
+                    })),
+                }),
+            })
+            if (!res.ok) toast.error(`Failed to add KRA: ${kraTitle}`)
+        }
+        toast.success("Template loaded")
+        setShowTemplateLoad(false)
+        onRefresh()
+    }
+
+    return (
+        <div>
+            {/* Score summary */}
+            {calcScore !== null && (
+                <div style={{
+                    background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
+                    padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12,
+                }}>
+                    <TrendingUp size={18} color="#1a9e6e" />
+                    <div>
+                        <div style={{ fontSize: 13, color: "#166534" }}>
+                            <strong>Calculated Overall Score:</strong> {calcScore.toFixed(2)} / 5
+                        </div>
+                        <div style={{ fontSize: 12, color: "#15803d" }}>
+                            Rank: {RANK_CONFIG[calcRank(calcScore)]?.label}
+                        </div>
+                    </div>
+                </div>
             )}
 
-            {selectedReviewId && (
-                <ReviewDrawer
-                    reviewId={selectedReviewId}
-                    onClose={() => setSelectedReviewId(null)}
-                    onUpdated={fetchReviews}
-                    currentUserRole={currentUserRole}
-                />
+            {/* Toolbar */}
+            {isAdminOrManager && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                    <button
+                        onClick={() => setShowAddKRA(v => !v)}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
+                            background: "var(--accent)", color: "#fff", border: "none",
+                            borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600,
+                        }}
+                    >
+                        <Plus size={14} /> Add KRA
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (templates.length === 0) fetchTemplates()
+                            setShowTemplateLoad(v => !v)
+                        }}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
+                            background: "#fff", color: "var(--accent)", border: "1px solid var(--accent)",
+                            borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600,
+                        }}
+                    >
+                        <Settings size={14} /> Load Template
+                    </button>
+                </div>
             )}
 
-            {/* Close menu on outside click */}
-            {openMenuId && (
-                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+            {/* Load template dropdown */}
+            {showTemplateLoad && (
+                <div style={{
+                    background: "#fff", border: "1px solid var(--border)", borderRadius: 8,
+                    padding: 14, marginBottom: 14,
+                }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Select role to load template</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {["INSPECTOR", "HR_RECRUITER", "HR_MANAGER", "PAYROLL_MANAGER"].map(r => (
+                            <button
+                                key={r}
+                                onClick={() => handleLoadTemplate(r)}
+                                style={{
+                                    padding: "6px 12px", borderRadius: 6, border: "1px solid var(--border)",
+                                    background: "#f9fafb", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                                    color: "var(--text)",
+                                }}
+                            >
+                                {r.replace(/_/g, " ")}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             )}
+
+            {/* Add KRA Form */}
+            {showAddKRA && (
+                <div style={{
+                    background: "#f9fafb", border: "1px solid var(--border)", borderRadius: 8,
+                    padding: 14, marginBottom: 14,
+                }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>KRA Title</label>
+                            <input
+                                value={newKRATitle}
+                                onChange={e => setNewKRATitle(e.target.value)}
+                                placeholder="e.g. Inspection Accuracy"
+                                style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div style={{ width: 80 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>Weight %</label>
+                            <input
+                                type="number"
+                                value={newKRAWeight}
+                                onChange={e => setNewKRAWeight(Number(e.target.value))}
+                                style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 13 }}
+                            />
+                        </div>
+                        <button
+                            onClick={handleAddKRA}
+                            disabled={addingKRA}
+                            style={{
+                                padding: "7px 14px", background: "var(--accent)", color: "#fff",
+                                border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13,
+                            }}
+                        >
+                            {addingKRA ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Add"}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* KRAs */}
+            {kras.length === 0 && loosekpis.length === 0 && (
+                <div style={{ color: "#9ca3af", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+                    No KRAs or KPIs yet. Add a KRA or load a template.
+                </div>
+            )}
+
+            {kras.map(kra => (
+                <KRABlock key={kra.id} kra={kra} reviewId={review.id} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+            ))}
+
+            {/* Loose KPIs (no KRA) */}
+            {loosekpis.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#6b7280", marginBottom: 8 }}>KPIs (ungrouped)</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {loosekpis.map(kpi => (
+                            <KPIRow key={kpi.id} kpi={kpi} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── KRABlock ─────────────────────────────────────────────────────────────────
+
+function KRABlock({
+    kra, reviewId, onRefresh, isAdminOrManager,
+}: {
+    kra: KRA
+    reviewId: string
+    onRefresh: () => void
+    isAdminOrManager: boolean
+}) {
+    const [showAddKPI, setShowAddKPI] = useState(false)
+    const [newKPITitle, setNewKPITitle] = useState("")
+    const [newKPITarget, setNewKPITarget] = useState("")
+    const [newKPIWeight, setNewKPIWeight] = useState(10)
+    const [addingKPI, setAddingKPI] = useState(false)
+
+    // KRA score calc
+    let kraScore: number | null = null
+    if (kra.kpis.length > 0) {
+        let sum = 0, wSum = 0
+        for (const kpi of kra.kpis) {
+            const rating = kpi.rating ?? 3
+            sum += rating * kpi.weightage
+            wSum += kpi.weightage
+        }
+        if (wSum > 0) kraScore = Math.round((sum / wSum) * 100) / 100
+    }
+
+    const handleAddKPI = async () => {
+        if (!newKPITitle || !newKPITarget) return
+        setAddingKPI(true)
+        try {
+            const res = await fetch(`/api/performance/${reviewId}/kpis`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: newKPITitle,
+                    target: newKPITarget,
+                    weightage: newKPIWeight,
+                    kraId: kra.id,
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("KPI added")
+            setNewKPITitle(""); setNewKPITarget(""); setNewKPIWeight(10)
+            setShowAddKPI(false)
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setAddingKPI(false)
+        }
+    }
+
+    return (
+        <div style={{
+            border: "1px solid var(--border)", borderRadius: 10,
+            marginBottom: 14, overflow: "hidden",
+        }}>
+            <div style={{
+                background: "#f8fafc", padding: "10px 14px",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+                <div>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{kra.title}</span>
+                    <span style={{ fontSize: 12, color: "#6b7280", marginLeft: 8 }}>Weight: {kra.weightage}%</span>
+                    {kraScore !== null && (
+                        <span style={{ fontSize: 12, color: "#1a9e6e", marginLeft: 8, fontWeight: 600 }}>
+                            Score: {kraScore.toFixed(2)}
+                        </span>
+                    )}
+                </div>
+                {isAdminOrManager && (
+                    <button
+                        onClick={() => setShowAddKPI(v => !v)}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 4, padding: "4px 10px",
+                            background: "var(--accent)", color: "#fff", border: "none",
+                            borderRadius: 5, fontSize: 11, cursor: "pointer", fontWeight: 600,
+                        }}
+                    >
+                        <Plus size={11} /> KPI
+                    </button>
+                )}
+            </div>
+
+            {showAddKPI && (
+                <div style={{ padding: "10px 14px", background: "#fafbff", borderBottom: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                        <input
+                            value={newKPITitle}
+                            onChange={e => setNewKPITitle(e.target.value)}
+                            placeholder="KPI Title"
+                            style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
+                        />
+                        <input
+                            value={newKPITarget}
+                            onChange={e => setNewKPITarget(e.target.value)}
+                            placeholder="Target"
+                            style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
+                        />
+                        <input
+                            type="number"
+                            value={newKPIWeight}
+                            onChange={e => setNewKPIWeight(Number(e.target.value))}
+                            placeholder="Weight"
+                            style={{ width: 60, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
+                        />
+                        <button
+                            onClick={handleAddKPI}
+                            disabled={addingKPI}
+                            style={{
+                                padding: "6px 12px", background: "var(--accent)", color: "#fff",
+                                border: "none", borderRadius: 5, cursor: "pointer", fontWeight: 600, fontSize: 12,
+                            }}
+                        >
+                            Add
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div style={{ padding: "0 14px" }}>
+                {kra.kpis.length === 0 && (
+                    <div style={{ padding: "12px 0", color: "#9ca3af", fontSize: 12 }}>No KPIs yet</div>
+                )}
+                {kra.kpis.map(kpi => (
+                    <KPIRow key={kpi.id} kpi={kpi} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ─── KPIRow ───────────────────────────────────────────────────────────────────
+
+function KPIRow({
+    kpi, onRefresh, isAdminOrManager,
+}: {
+    kpi: KPI
+    onRefresh: () => void
+    isAdminOrManager: boolean
+}) {
+    const [actual, setActual] = useState(kpi.actual ?? "")
+    const [rating, setRating] = useState<number>(kpi.rating ?? 0)
+    const [saving, setSaving] = useState(false)
+    const dirty = useRef(false)
+
+    useEffect(() => {
+        setActual(kpi.actual ?? "")
+        setRating(kpi.rating ?? 0)
+    }, [kpi.actual, kpi.rating])
+
+    const handleSave = async () => {
+        setSaving(true)
+        try {
+            const res = await fetch(`/api/performance/${kpi.reviewId}/kpis/${kpi.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ actual, rating }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setSaving(false)
+            dirty.current = false
+        }
+    }
+
+    const targetNum = parseFloat(kpi.target)
+    const actualNum = parseFloat(actual)
+    let weightedScore: number | null = null
+    if (!isNaN(targetNum) && !isNaN(actualNum) && targetNum > 0 && rating > 0) {
+        weightedScore = Math.round((actualNum / targetNum) * rating * kpi.weightage * 100) / 100
+    }
+
+    return (
+        <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 80px 80px 100px 60px 36px",
+            gap: 8, padding: "10px 0", borderBottom: "1px solid var(--border)",
+            alignItems: "center", fontSize: 12,
+        }}>
+            <div>
+                <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 13 }}>{kpi.title}</div>
+                <div style={{ color: "#6b7280" }}>Target: {kpi.target} · Weight: {kpi.weightage}%</div>
+            </div>
+            <input
+                value={actual}
+                onChange={e => { setActual(e.target.value); dirty.current = true }}
+                placeholder="Actual"
+                style={{
+                    padding: "5px 7px", border: "1px solid var(--border)", borderRadius: 5,
+                    fontSize: 12, width: "100%", boxSizing: "border-box",
+                }}
+            />
+            <div>
+                <StarRating value={rating} onChange={v => { setRating(v); dirty.current = true }} size={13} />
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280" }}>
+                {weightedScore !== null ? `Score: ${weightedScore}` : "—"}
+            </div>
+            <div style={{ fontSize: 11, color: "#9ca3af" }}>w={kpi.weightage}</div>
+            <button
+                onClick={handleSave}
+                disabled={saving}
+                title="Save"
+                style={{
+                    background: "none", border: "1px solid var(--border)", borderRadius: 5,
+                    cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+            >
+                {saving
+                    ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
+                    : <Check size={12} color="#1a9e6e" />
+                }
+            </button>
+        </div>
+    )
+}
+
+// ─── DrawerManagerReview ──────────────────────────────────────────────────────
+
+function DrawerManagerReview({
+    review, onRefresh, isAdminOrManager,
+}: {
+    review: PerformanceReview
+    onRefresh: () => void
+    isAdminOrManager: boolean
+}) {
+    const [form, setForm] = useState({
+        overallRating: review.overallRating ?? 0,
+        managerComments: review.managerComments ?? "",
+        strengths: review.strengths ?? "",
+        improvements: review.improvements ?? "",
+        promotionRecommended: review.promotionRecommended,
+        incrementPercent: review.incrementPercent ?? "",
+        bonusPercent: review.bonusPercent ?? "",
+        performanceRank: review.performanceRank ?? "",
+        pipRequired: review.pipRequired,
+    })
+    const [saving, setSaving] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+
+    useEffect(() => {
+        setForm({
+            overallRating: review.overallRating ?? 0,
+            managerComments: review.managerComments ?? "",
+            strengths: review.strengths ?? "",
+            improvements: review.improvements ?? "",
+            promotionRecommended: review.promotionRecommended,
+            incrementPercent: review.incrementPercent ?? "",
+            bonusPercent: review.bonusPercent ?? "",
+            performanceRank: review.performanceRank ?? "",
+            pipRequired: review.pipRequired,
+        })
+    }, [review])
+
+    // Auto-suggest rank from rating
+    useEffect(() => {
+        if (form.overallRating > 0 && !form.performanceRank) {
+            setForm(f => ({ ...f, performanceRank: calcRank(f.overallRating) }))
+        }
+    }, [form.overallRating]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleSave = async () => {
+        setSaving(true)
+        try {
+            const res = await fetch(`/api/performance/${review.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    overallRating: form.overallRating || null,
+                    managerComments: form.managerComments,
+                    strengths: form.strengths,
+                    improvements: form.improvements,
+                    promotionRecommended: form.promotionRecommended,
+                    incrementPercent: form.incrementPercent !== "" ? Number(form.incrementPercent) : null,
+                    bonusPercent: form.bonusPercent !== "" ? Number(form.bonusPercent) : null,
+                    performanceRank: form.performanceRank || null,
+                    pipRequired: form.pipRequired,
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Review saved")
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleSubmit = async () => {
+        setSubmitting(true)
+        try {
+            await handleSave()
+            const res = await fetch(`/api/performance/${review.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "SUBMITTED" }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Review submitted")
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    if (!isAdminOrManager) {
+        return (
+            <div style={{ fontSize: 13, color: "#6b7280" }}>
+                <p>Manager review details:</p>
+                <p><strong>Rating:</strong> {review.overallRating ?? "—"}</p>
+                <p><strong>Comments:</strong> {review.managerComments || "—"}</p>
+                <p><strong>Strengths:</strong> {review.strengths || "—"}</p>
+                <p><strong>Improvements:</strong> {review.improvements || "—"}</p>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>Overall Rating</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <StarRating value={form.overallRating} onChange={v => setForm(f => ({ ...f, overallRating: v }))} size={22} />
+                    {form.overallRating > 0 && (
+                        <span style={{ fontSize: 13, color: "#6b7280" }}>
+                            {["", "Poor", "Needs Improvement", "Meets Expectations", "Exceeds Expectations", "Outstanding"][form.overallRating]}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Manager Comments</label>
+                <textarea
+                    value={form.managerComments}
+                    onChange={e => setForm(f => ({ ...f, managerComments: e.target.value }))}
+                    rows={3}
+                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                    <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Strengths</label>
+                    <textarea
+                        value={form.strengths}
+                        onChange={e => setForm(f => ({ ...f, strengths: e.target.value }))}
+                        rows={3}
+                        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                    />
+                </div>
+                <div>
+                    <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Areas of Improvement</label>
+                    <textarea
+                        value={form.improvements}
+                        onChange={e => setForm(f => ({ ...f, improvements: e.target.value }))}
+                        rows={3}
+                        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                    />
+                </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div>
+                    <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Increment %</label>
+                    <input
+                        type="number"
+                        value={form.incrementPercent}
+                        onChange={e => setForm(f => ({ ...f, incrementPercent: e.target.value }))}
+                        style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, boxSizing: "border-box" }}
+                    />
+                </div>
+                <div>
+                    <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Bonus %</label>
+                    <input
+                        type="number"
+                        value={form.bonusPercent}
+                        onChange={e => setForm(f => ({ ...f, bonusPercent: e.target.value }))}
+                        style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, boxSizing: "border-box" }}
+                    />
+                </div>
+                <div>
+                    <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Performance Rank</label>
+                    <select
+                        value={form.performanceRank}
+                        onChange={e => setForm(f => ({ ...f, performanceRank: e.target.value }))}
+                        style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, background: "#fff" }}
+                    >
+                        <option value="">— Select —</option>
+                        <option value="TOP_PERFORMER">Top Performer</option>
+                        <option value="HIGH_PERFORMER">High Performer</option>
+                        <option value="AVERAGE">Average</option>
+                        <option value="LOW_PERFORMER">Low Performer</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    <input
+                        type="checkbox"
+                        checked={form.promotionRecommended}
+                        onChange={e => setForm(f => ({ ...f, promotionRecommended: e.target.checked }))}
+                    />
+                    Promotion Recommended
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    <input
+                        type="checkbox"
+                        checked={form.pipRequired}
+                        onChange={e => setForm(f => ({ ...f, pipRequired: e.target.checked }))}
+                    />
+                    PIP Required
+                </label>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+                <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    style={{
+                        display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
+                        background: "#fff", color: "var(--accent)", border: "1px solid var(--accent)",
+                        borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: saving ? "not-allowed" : "pointer",
+                    }}
+                >
+                    {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
+                    Save
+                </button>
+                {review.status === "DRAFT" && (
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
+                            background: "var(--accent)", color: "#fff", border: "none",
+                            borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: submitting ? "not-allowed" : "pointer",
+                        }}
+                    >
+                        {submitting ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={14} />}
+                        Submit Review
+                    </button>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ─── DrawerHRApproval ─────────────────────────────────────────────────────────
+
+function DrawerHRApproval({
+    review, onRefresh, session,
+}: {
+    review: PerformanceReview
+    onRefresh: () => void
+    session: ReturnType<typeof useSession>["data"]
+}) {
+    const [notes, setNotes] = useState(review.managerComments ?? "")
+    const [approving, setApproving] = useState(false)
+
+    const isHR = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+
+    const handleApprove = async () => {
+        setApproving(true)
+        try {
+            const res = await fetch(`/api/performance/${review.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    hrApprovedAt: new Date().toISOString(),
+                    hrApprovedBy: session?.user?.id,
+                    status: "COMPLETED",
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Review approved and completed")
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setApproving(false)
+        }
+    }
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{
+                background: review.hrApprovedAt ? "#e8f7f1" : "#fef3c7",
+                border: `1px solid ${review.hrApprovedAt ? "#86efac" : "#fde68a"}`,
+                borderRadius: 8, padding: "10px 14px", fontSize: 13,
+            }}>
+                <strong>Status:</strong>{" "}
+                {review.hrApprovedAt
+                    ? `Approved on ${fmtDateFull(review.hrApprovedAt)}`
+                    : "Pending HR Approval"}
+            </div>
+
+            <div>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Review Summary</label>
+                <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.7 }}>
+                    <div><strong>Overall Rating:</strong> {review.overallRating ?? "—"} / 5</div>
+                    <div><strong>Rank:</strong> {review.performanceRank ? RANK_CONFIG[review.performanceRank]?.label : "—"}</div>
+                    <div><strong>Promotion:</strong> {review.promotionRecommended ? "Yes" : "No"}</div>
+                    <div><strong>Increment:</strong> {review.incrementPercent != null ? `${review.incrementPercent}%` : "—"}</div>
+                    <div><strong>Bonus:</strong> {review.bonusPercent != null ? `${review.bonusPercent}%` : "—"}</div>
+                    <div><strong>PIP Required:</strong> {review.pipRequired ? "Yes" : "No"}</div>
+                </div>
+            </div>
+
+            {review.strengths && (
+                <div>
+                    <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Strengths</label>
+                    <p style={{ fontSize: 13, color: "#374151", margin: 0 }}>{review.strengths}</p>
+                </div>
+            )}
+            {review.improvements && (
+                <div>
+                    <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Areas of Improvement</label>
+                    <p style={{ fontSize: 13, color: "#374151", margin: 0 }}>{review.improvements}</p>
+                </div>
+            )}
+
+            {isHR && !review.hrApprovedAt && review.status === "SUBMITTED" && (
+                <button
+                    onClick={handleApprove}
+                    disabled={approving}
+                    style={{
+                        display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
+                        background: "#1a9e6e", color: "#fff", border: "none",
+                        borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: approving ? "not-allowed" : "pointer",
+                        alignSelf: "flex-start",
+                    }}
+                >
+                    {approving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
+                    Approve & Complete
+                </button>
+            )}
+        </div>
+    )
+}
+
+// ─── DrawerPIP ────────────────────────────────────────────────────────────────
+
+type PIPGoal = { goal: string; metric: string; targetDate: string }
+
+function DrawerPIP({
+    review, onRefresh, isAdminOrManager,
+}: {
+    review: PerformanceReview
+    onRefresh: () => void
+    isAdminOrManager: boolean
+}) {
+    const pip = review.pip
+    const [form, setForm] = useState({
+        startDate: pip?.startDate ? pip.startDate.split("T")[0] : "",
+        endDate: pip?.endDate ? pip.endDate.split("T")[0] : "",
+        managerNotes: pip?.managerNotes ?? "",
+        status: pip?.status ?? "ACTIVE",
+    })
+    const [goals, setGoals] = useState<PIPGoal[]>(
+        pip ? (() => { try { return JSON.parse(pip.goals) } catch { return [{ goal: pip.goals, metric: "", targetDate: "" }] } })()
+            : [{ goal: "", metric: "", targetDate: "" }]
+    )
+    const [saving, setSaving] = useState(false)
+
+    const handleSave = async () => {
+        if (!form.startDate || !form.endDate) {
+            toast.error("Start and end date are required")
+            return
+        }
+        setSaving(true)
+        try {
+            const body = {
+                startDate: form.startDate,
+                endDate: form.endDate,
+                goals: JSON.stringify(goals),
+                managerNotes: form.managerNotes,
+                status: form.status,
+            }
+            const method = pip ? "PATCH" : "POST"
+            const res = await fetch(`/api/performance/${review.id}/pip`, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(pip ? "PIP updated" : "PIP created")
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const addGoal = () => setGoals(g => [...g, { goal: "", metric: "", targetDate: "" }])
+    const removeGoal = (i: number) => setGoals(g => g.filter((_, idx) => idx !== i))
+    const updateGoal = (i: number, field: keyof PIPGoal, val: string) => {
+        setGoals(g => g.map((item, idx) => idx === i ? { ...item, [field]: val } : item))
+    }
+
+    const showForm = review.pipRequired || (review.performanceRank === "LOW_PERFORMER") || !!pip
+
+    if (!showForm && !isAdminOrManager) {
+        return (
+            <div style={{ color: "#6b7280", fontSize: 13, padding: "20px 0" }}>
+                No PIP required for this employee.
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {!pip && !review.pipRequired && isAdminOrManager && (
+                <div style={{
+                    background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 8,
+                    padding: "10px 14px", fontSize: 13, color: "#92400e",
+                    display: "flex", alignItems: "center", gap: 8,
+                }}>
+                    <AlertTriangle size={14} />
+                    Create a PIP plan for this employee if performance improvement is needed.
+                </div>
+            )}
+
+            {pip && (
+                <div style={{
+                    background: pip.status === "ACTIVE" ? "#fff7ed" : pip.status === "COMPLETED" ? "#e8f7f1" : "#f3f4f6",
+                    border: "1px solid var(--border)", borderRadius: 8,
+                    padding: "10px 14px", fontSize: 13,
+                }}>
+                    <strong>PIP Status:</strong> {pip.status}
+                    {isAdminOrManager && (
+                        <select
+                            value={form.status}
+                            onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                            style={{ marginLeft: 12, padding: "3px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12, background: "#fff" }}
+                        >
+                            <option value="ACTIVE">Active</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+                    )}
+                </div>
+            )}
+
+            {isAdminOrManager && (
+                <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                            <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Start Date</label>
+                            <input
+                                type="date"
+                                value={form.startDate}
+                                onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
+                                style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>End Date</label>
+                            <input
+                                type="date"
+                                value={form.endDate}
+                                onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
+                                style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, boxSizing: "border-box" }}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <label style={{ fontWeight: 600, fontSize: 13 }}>PIP Goals</label>
+                            <button
+                                onClick={addGoal}
+                                style={{
+                                    display: "flex", alignItems: "center", gap: 4, padding: "4px 10px",
+                                    background: "var(--accent)", color: "#fff", border: "none",
+                                    borderRadius: 5, fontSize: 11, cursor: "pointer", fontWeight: 600,
+                                }}
+                            >
+                                <Plus size={11} /> Add Goal
+                            </button>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {goals.map((g, i) => (
+                                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 80px 110px 28px", gap: 6, alignItems: "center" }}>
+                                    <input
+                                        value={g.goal}
+                                        onChange={e => updateGoal(i, "goal", e.target.value)}
+                                        placeholder="Goal description"
+                                        style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
+                                    />
+                                    <input
+                                        value={g.metric}
+                                        onChange={e => updateGoal(i, "metric", e.target.value)}
+                                        placeholder="Metric"
+                                        style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
+                                    />
+                                    <input
+                                        type="date"
+                                        value={g.targetDate}
+                                        onChange={e => updateGoal(i, "targetDate", e.target.value)}
+                                        style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
+                                    />
+                                    <button onClick={() => removeGoal(i)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                                        <X size={12} color="#ef4444" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Manager Notes</label>
+                        <textarea
+                            value={form.managerNotes}
+                            onChange={e => setForm(f => ({ ...f, managerNotes: e.target.value }))}
+                            rows={3}
+                            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                        />
+                    </div>
+
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
+                            background: "var(--accent)", color: "#fff", border: "none",
+                            borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: saving ? "not-allowed" : "pointer",
+                            alignSelf: "flex-start",
+                        }}
+                    >
+                        {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
+                        {pip ? "Update PIP" : "Create PIP"}
+                    </button>
+                </>
+            )}
+
+            {/* Read-only display for non-admins */}
+            {!isAdminOrManager && pip && (
+                <div style={{ fontSize: 13, color: "#374151" }}>
+                    <p><strong>Period:</strong> {fmtDateFull(pip.startDate)} — {fmtDateFull(pip.endDate)}</p>
+                    <p><strong>Status:</strong> {pip.status}</p>
+                    <p><strong>Goals:</strong></p>
+                    <ul style={{ paddingLeft: 18, margin: 0 }}>
+                        {goals.map((g, i) => (
+                            <li key={i}>{g.goal} {g.metric && `(${g.metric})`} {g.targetDate && `— by ${fmtDateFull(g.targetDate)}`}</li>
+                        ))}
+                    </ul>
+                    {pip.managerNotes && <p><strong>Notes:</strong> {pip.managerNotes}</p>}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── TemplatesTab ─────────────────────────────────────────────────────────────
+
+function TemplatesTab({ templates, loading }: { templates: KPITemplate[]; loading: boolean }) {
+    if (loading) {
+        return (
+            <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+                <Loader2 size={28} style={{ animation: "spin 1s linear infinite", color: "var(--accent)" }} />
+            </div>
+        )
+    }
+
+    if (templates.length === 0) {
+        return (
+            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af", fontSize: 14 }}>
+                No templates found
+            </div>
+        )
+    }
+
+    // Group by role, then by kraTitle
+    const roleMap: Record<string, Record<string, KPITemplate[]>> = {}
+    for (const t of templates) {
+        if (!roleMap[t.role]) roleMap[t.role] = {}
+        if (!roleMap[t.role][t.kraTitle]) roleMap[t.role][t.kraTitle] = []
+        roleMap[t.role][t.kraTitle].push(t)
+    }
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {Object.entries(roleMap).map(([role, kras]) => (
+                <div key={role} style={{
+                    background: "#fff", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden",
+                }}>
+                    <div style={{
+                        padding: "14px 18px", background: "#f8fafc",
+                        borderBottom: "1px solid var(--border)",
+                        display: "flex", alignItems: "center", gap: 10,
+                    }}>
+                        <Award size={16} color="var(--accent)" />
+                        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>
+                            {role.replace(/_/g, " ")}
+                        </span>
+                    </div>
+
+                    <div style={{ padding: "14px 18px" }}>
+                        {Object.entries(kras).map(([kraTitle, kpis]) => (
+                            <div key={kraTitle} style={{ marginBottom: 16 }}>
+                                <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", marginBottom: 8 }}>
+                                    KRA: {kraTitle}
+                                </div>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                    <thead>
+                                        <tr style={{ background: "#f9fafb" }}>
+                                            <th style={{ padding: "6px 10px", textAlign: "left", color: "#6b7280", fontWeight: 600, border: "1px solid var(--border)" }}>KPI Title</th>
+                                            <th style={{ padding: "6px 10px", textAlign: "left", color: "#6b7280", fontWeight: 600, border: "1px solid var(--border)" }}>Target Hint</th>
+                                            <th style={{ padding: "6px 10px", textAlign: "center", color: "#6b7280", fontWeight: 600, border: "1px solid var(--border)", width: 80 }}>Weight %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {kpis.map(k => (
+                                            <tr key={k.id}>
+                                                <td style={{ padding: "6px 10px", border: "1px solid var(--border)", color: "var(--text)" }}>{k.kpiTitle}</td>
+                                                <td style={{ padding: "6px 10px", border: "1px solid var(--border)", color: "#6b7280" }}>{k.targetHint ?? "—"}</td>
+                                                <td style={{ padding: "6px 10px", border: "1px solid var(--border)", color: "var(--text)", textAlign: "center" }}>{k.weightage}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+// ─── CreateReviewModal ────────────────────────────────────────────────────────
+
+function CreateReviewModal({
+    employees, form, setForm, onClose, onSubmit, creating,
+}: {
+    employees: EmployeeOption[]
+    form: { employeeId: string; cycle: ReviewCycle; periodStart: string; periodEnd: string }
+    setForm: React.Dispatch<React.SetStateAction<{ employeeId: string; cycle: ReviewCycle; periodStart: string; periodEnd: string }>>
+    onClose: () => void
+    onSubmit: () => void
+    creating: boolean
+}) {
+    return (
+        <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000,
+        }}>
+            <div style={{
+                background: "#fff", borderRadius: 14, width: 480,
+                padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                    <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text)" }}>Create Performance Review</h2>
+                    <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}>
+                        <X size={20} color="#6b7280" />
+                    </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div>
+                        <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 5 }}>Employee *</label>
+                        <select
+                            value={form.employeeId}
+                            onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
+                            style={{
+                                width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                                borderRadius: 8, fontSize: 13, background: "#fff", color: "var(--text)",
+                            }}
+                        >
+                            <option value="">— Select Employee —</option>
+                            {employees.map(e => (
+                                <option key={e.id} value={e.id}>
+                                    {e.firstName} {e.lastName} ({e.employeeId}){e.designation ? ` — ${e.designation}` : ""}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 5 }}>Review Cycle *</label>
+                        <select
+                            value={form.cycle}
+                            onChange={e => setForm(f => ({ ...f, cycle: e.target.value as ReviewCycle }))}
+                            style={{
+                                width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                                borderRadius: 8, fontSize: 13, background: "#fff", color: "var(--text)",
+                            }}
+                        >
+                            {(["MONTHLY", "QUARTERLY", "HALF_YEARLY", "ANNUAL"] as ReviewCycle[]).map(c => (
+                                <option key={c} value={c}>{CYCLE_CONFIG[c].label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                            <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 5 }}>Period Start *</label>
+                            <input
+                                type="date"
+                                value={form.periodStart}
+                                onChange={e => setForm(f => ({ ...f, periodStart: e.target.value }))}
+                                style={{
+                                    width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                                    borderRadius: 8, fontSize: 13, boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 5 }}>Period End *</label>
+                            <input
+                                type="date"
+                                value={form.periodEnd}
+                                onChange={e => setForm(f => ({ ...f, periodEnd: e.target.value }))}
+                                style={{
+                                    width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                                    borderRadius: 8, fontSize: 13, boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            padding: "9px 18px", background: "#fff", color: "#6b7280",
+                            border: "1px solid var(--border)", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onSubmit}
+                        disabled={creating}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
+                            background: "var(--accent)", color: "#fff", border: "none",
+                            borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: creating ? "not-allowed" : "pointer",
+                            opacity: creating ? 0.7 : 1,
+                        }}
+                    >
+                        {creating ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Plus size={14} />}
+                        Create Review
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }

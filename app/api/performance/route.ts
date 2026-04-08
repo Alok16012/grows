@@ -3,16 +3,6 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 
-const DEFAULT_KPIS = [
-    { title: "Attendance Rate", target: "≥95%", weightage: 20 },
-    { title: "Punctuality (On-time arrival)", target: "≥95%", weightage: 15 },
-    { title: "Client Complaints", target: "0 complaints", weightage: 20 },
-    { title: "Safety Compliance", target: "100%", weightage: 15 },
-    { title: "Task Completion Rate", target: "≥90%", weightage: 15 },
-    { title: "Team Cooperation", target: "Good", weightage: 10 },
-    { title: "Discipline & Conduct", target: "No violations", weightage: 5 },
-]
-
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -30,7 +20,6 @@ export async function GET(req: Request) {
         const where: Record<string, any> = {}
 
         if (!isAdminOrManager) {
-            // Non-admin/manager: find their employee record and restrict to own reviews
             const emp = await prisma.employee.findFirst({
                 where: { email: session.user.email ?? undefined },
                 select: { id: true },
@@ -71,7 +60,8 @@ export async function GET(req: Request) {
                         branch: { select: { name: true } },
                     },
                 },
-                kpis: { select: { id: true, rating: true } },
+                kpis: { select: { id: true, rating: true, kraId: true } },
+                kras: { select: { id: true, title: true, weightage: true } },
             },
             orderBy: { createdAt: "desc" },
         })
@@ -109,16 +99,10 @@ export async function POST(req: Request) {
                 periodStart: new Date(periodStart),
                 periodEnd: new Date(periodEnd),
                 status: "DRAFT",
-                kpis: {
-                    create: DEFAULT_KPIS.map(k => ({
-                        title: k.title,
-                        target: k.target,
-                        weightage: k.weightage,
-                    })),
-                },
             },
             include: {
                 kpis: true,
+                kras: true,
                 employee: {
                     select: {
                         id: true,
