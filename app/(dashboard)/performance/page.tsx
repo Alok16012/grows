@@ -8,7 +8,7 @@ import {
     ChevronDown, Trash2, TrendingUp, CheckCircle2,
     Clock, AlertCircle, Send, Users, Award,
     BarChart2, Settings, FileText, Target,
-    ChevronRight, Check, AlertTriangle, Edit2
+    ChevronRight, Check, AlertTriangle, Edit2, RefreshCw
 } from "lucide-react"
 import { format } from "date-fns"
 import {
@@ -169,7 +169,7 @@ function fmtDateFull(d?: string | null) {
 function calcRank(score: number): string {
     if (score >= 4.5) return "TOP_PERFORMER"
     if (score >= 3.5) return "HIGH_PERFORMER"
-    if (score >= 2.5) return "AVERAGE"
+    if (score >= 2.8) return "AVERAGE"
     return "LOW_PERFORMER"
 }
 
@@ -182,18 +182,24 @@ function calcOverallScore(kras: KRA[]): number | null {
         let kraScore = 0
         let kraKpiWeightSum = 0
         for (const kpi of kra.kpis) {
-            const targetNum = parseFloat(kpi.target)
-            const actualNum = parseFloat(kpi.actual ?? "")
-            const rating = kpi.rating ?? 3
-            if (!isNaN(targetNum) && !isNaN(actualNum) && targetNum > 0) {
-                kraScore += (actualNum / targetNum) * rating * kpi.weightage
+            const targetNum = Number(kpi.target) || 0
+            const actualNum = Number(kpi.actual) || 0
+            const weight = kpi.weightage
+            
+            // Formula: Achievement % = (Actual/Target) * 100
+            // Score (1-5) = (Achievement/100) * 5
+            if (targetNum > 0) {
+                const achievement = (actualNum / targetNum)
+                const score1to5 = Math.min(achievement * 5, 5) // Cap at 5
+                kraScore += score1to5 * weight
             } else {
-                kraScore += rating * kpi.weightage
+                // Fallback to manual rating if target is 0
+                kraScore += (kpi.rating ?? 3) * weight
             }
-            kraKpiWeightSum += kpi.weightage
+            kraKpiWeightSum += weight
         }
         if (kraKpiWeightSum > 0) {
-            const kraFinalScore = (kraScore / kraKpiWeightSum) * 5
+            const kraFinalScore = (kraScore / kraKpiWeightSum) 
             weightedSum += kraFinalScore * kra.weightage
             totalWeight += kra.weightage
         }
@@ -216,8 +222,16 @@ function StarRating({
     size?: number
 }) {
     const [hover, setHover] = useState<number | null>(null)
+    const labels: Record<number, string> = {
+        5: "उत्कृष्ट (Outstanding)",
+        4: "Exceeds Expectations",
+        3: "Meets Expectations",
+        2: "Needs Improvement",
+        1: "Poor"
+    }
+    
     return (
-        <span style={{ display: "inline-flex", gap: 2 }}>
+        <span style={{ display: "inline-flex", gap: 2, alignItems: "center" }}>
             {[1, 2, 3, 4, 5].map(n => (
                 <Star
                     key={n}
@@ -232,6 +246,11 @@ function StarRating({
                     onClick={() => !readonly && onChange?.(n)}
                 />
             ))}
+            {(hover || value) && (
+                <span style={{ fontSize: 10, color: "#6b7280", marginLeft: 6 }}>
+                    {labels[Math.round(hover ?? value ?? 1)]}
+                </span>
+            )}
         </span>
     )
 }
@@ -561,30 +580,30 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* Summary Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-                {summaryCards.map(c => (
-                    <div key={c.label} style={{
-                        background: "#fff",
-                        borderRadius: 12,
-                        padding: "18px 20px",
-                        border: "1px solid var(--border)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 14,
-                    }}>
-                        <div style={{
-                            width: 44, height: 44, borderRadius: 10,
-                            background: c.bg, display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                            <c.icon size={20} color={c.color} />
-                        </div>
                         <div>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{c.value}</div>
                             <div style={{ fontSize: 12, color: "#6b7280" }}>{c.label}</div>
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* Ranking & Actions Ribbons */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #e8f7f1 100%)", borderRadius: 12, padding: 18, border: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 40, height: 40, background: "#1a9e6e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><Award color="#fff" size={20} /></div>
+                    <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>Performance Rewards Active</div>
+                        <div style={{ fontSize: 11, color: "#15803d" }}>Top 10% eligible for quarterly performance bonus</div>
+                    </div>
+                </div>
+                <div style={{ background: "linear-gradient(135deg, #fff1f2 0%, #fff 100%)", borderRadius: 12, padding: 18, border: "1px solid #fecaca", display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 40, height: 40, background: "#ef4444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><AlertTriangle color="#fff" size={20} /></div>
+                    <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b" }}>PIP Mandatory Action</div>
+                        <div style={{ fontSize: 11, color: "#b91c1c" }}>Score < 2.8 requires Performance Improvement Plan</div>
+                    </div>
+                </div>
             </div>
 
             {/* Ranking Strip */}
@@ -596,7 +615,10 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                         padding: "14px 18px",
                         textAlign: "center",
                         border: `1px solid ${r.color}30`,
+                        position: "relative",
+                        overflow: "hidden"
                     }}>
+                        <div style={{ position: "absolute", right: -5, top: -5, opacity: 0.1 }}><Award size={40} color={r.color} /></div>
                         <div style={{ fontSize: 28, fontWeight: 800, color: r.color }}>
                             {rankDistrib[r.key] ?? 0}
                         </div>
@@ -1131,6 +1153,21 @@ function DrawerKRAKPI({
     const [newKRAWeight, setNewKRAWeight] = useState(25)
     const [addingKRA, setAddingKRA] = useState(false)
     const [showTemplateLoad, setShowTemplateLoad] = useState(false)
+    const [isSyncing, setIsSyncing] = useState(false)
+
+    const handleSync = async () => {
+        setIsSyncing(true)
+        try {
+            const res = await fetch(`/api/performance/${review.id}/sync`, { method: "POST" })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("KPI data synced from other modules")
+            onRefresh()
+        } catch (e) {
+            toast.error(String(e))
+        } finally {
+            setIsSyncing(false)
+        }
+    }
 
     const kras = review.kras ?? []
     const loosekpis = review.kpis?.filter(k => !k.kraId) ?? []
@@ -1238,6 +1275,19 @@ function DrawerKRAKPI({
                         }}
                     >
                         <Settings size={14} /> Load Template
+                    </button>
+                    <button
+                        onClick={handleSync}
+                        disabled={isSyncing}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
+                            background: "#fff", color: "#1a9e6e", border: "1px solid #1a9e6e",
+                            borderRadius: 7, fontSize: 13, cursor: isSyncing ? "not-allowed" : "pointer", fontWeight: 600,
+                            marginLeft: "auto"
+                        }}
+                    >
+                        {isSyncing ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={14} />}
+                        Sync Automation
                     </button>
                 </div>
             )}

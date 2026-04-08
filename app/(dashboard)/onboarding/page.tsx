@@ -44,6 +44,15 @@ type OnboardingRecord = {
         dateOfJoining?: string | null
         photo?: string | null
         branch: { name: string }
+        isKycVerified?: boolean
+        kycRejectionNote?: string | null
+        aadharNumber?: string | null
+        panNumber?: string | null
+        bankAccountNumber?: string | null
+        bankIFSC?: string | null
+        bankName?: string | null
+        documents?: any[]
+        employeeSalary?: any
     }
     tasks: OnboardingTask[]
 }
@@ -55,9 +64,10 @@ type UserOption = { id: string; name: string }
 
 const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
-const CATEGORIES = ["All Tasks", "Documents", "Welcome Kit", "Training", "Compliance", "IT Setup", "Orientation"]
+const CATEGORIES = ["All Tasks", "Verification", "Documents", "Welcome Kit", "Training", "Compliance", "IT Setup", "Orientation"]
 
 const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
+    "Verification": { bg: "#fef2f2", color: "#dc2626" },
     "Documents":    { bg: "#eff6ff", color: "#3b82f6" },
     "Welcome Kit":  { bg: "#fdf4ff", color: "#9333ea" },
     "Training":     { bg: "#fef3c7", color: "#d97706" },
@@ -394,7 +404,120 @@ function TaskRow({ task, onboardingId, onUpdated, onDelete }: {
     )
 }
 
-// ─── Onboarding Drawer ────────────────────────────────────────────────────────
+// ─── Verification Panel ───────────────────────────────────────────────────────
+
+function VerificationPanel({ record, onUpdated }: { record: OnboardingRecord, onUpdated: () => void }) {
+    const emp = record.employee
+    const [submitting, setSubmitting] = useState(false)
+    const [ctc, setCtc] = useState(emp.employeeSalary?.ctcAnnual?.toString() || "")
+    const [kycRejectNote, setKycRejectNote] = useState(emp.kycRejectionNote || "")
+
+    const handleKycStatus = async (status: "VERIFIED" | "REJECTED") => {
+        if (status === "REJECTED" && !kycRejectNote) return toast.error("Rejection reason required")
+        setSubmitting(true)
+        try {
+            const res = await fetch("/api/onboarding/verify", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: "KYC", employeeId: emp.id, status, rejectionReason: status === "REJECTED" ? kycRejectNote : null })
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(`KYC ${status}`)
+            onUpdated()
+        } catch (e: any) { toast.error(e.message) }
+        finally { setSubmitting(false) }
+    }
+
+    const handleDocStatus = async (docId: string, status: "VERIFIED" | "REJECTED") => {
+        try {
+            const res = await fetch("/api/onboarding/verify", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: "DOCUMENT", employeeId: emp.id, documentId: docId, status, rejectionReason: "Rejected by Admin" })
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(`Doc ${status}`)
+            onUpdated()
+        } catch (e: any) { toast.error(e.message) }
+    }
+
+    const handleSaveSalary = async () => {
+        if (!ctc) return toast.error("Enter CTC")
+        setSubmitting(true)
+        try {
+            const res = await fetch("/api/onboarding/verify", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: "SALARY", employeeId: emp.id, salaryData: { ctcAnnual: ctc } })
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Salary structure approved")
+            onUpdated()
+        } catch (e: any) { toast.error(e.message) }
+        finally { setSubmitting(false) }
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* KYC Card */}
+            <div className="bg-white border border-[var(--border)] p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-3 border-b border-[var(--border)] pb-2">
+                    <h3 className="text-[13px] font-semibold text-[var(--text)]">KYC Details</h3>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${emp.isKycVerified ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                        {emp.isKycVerified ? "Verified" : "Pending"}
+                    </span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-2 text-[12px]">
+                    <div><p className="text-[var(--text3)]">Aadhaar</p><p>{emp.aadharNumber || "---"}</p></div>
+                    <div><p className="text-[var(--text3)]">PAN</p><p>{emp.panNumber || "---"}</p></div>
+                    <div className="col-span-2"><p className="text-[var(--text3)]">Bank Account</p><p>{emp.bankName} - {emp.bankAccountNumber} ({emp.bankIFSC})</p></div>
+                </div>
+                {!emp.isKycVerified && (
+                    <div className="mt-3 flex flex-col gap-2 pt-3 border-t border-[var(--border)]">
+                        <input type="text" placeholder="Rejection Note (if rejecting)" value={kycRejectNote} onChange={e => setKycRejectNote(e.target.value)} className="w-full h-8 text-[12px] border rounded px-2 outline-none focus:border-[var(--accent)]" />
+                        <div className="flex justify-end gap-2">
+                            <button disabled={submitting} onClick={() => handleKycStatus("REJECTED")} className="px-3 py-1 bg-red-50 text-red-600 rounded border border-red-200 text-[11px] font-medium">Reject</button>
+                            <button disabled={submitting} onClick={() => handleKycStatus("VERIFIED")} className="px-3 py-1 bg-[#1a9e6e] text-white rounded text-[11px] font-medium">Verify KYC</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Docs */}
+            <div className="bg-white border border-[var(--border)] p-4 rounded-xl">
+                <h3 className="text-[13px] font-semibold text-[var(--text)] mb-3 border-b border-[var(--border)] pb-2">Uploaded Documents</h3>
+                <div className="space-y-2">
+                    {emp.documents && emp.documents.length > 0 ? emp.documents.map((doc: any) => (
+                        <div key={doc.id} className="flex flex-col gap-2 p-2 border border-[var(--border)] rounded-lg bg-[var(--surface2)]">
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="font-medium text-[var(--text)]">{doc.type}</span>
+                                <span className={doc.status === "VERIFIED" ? "text-green-600" : doc.status === "REJECTED" ? "text-red-500" : "text-yellow-600"}>{doc.status}</span>
+                            </div>
+                            {doc.status !== "VERIFIED" && (
+                                <div className="flex gap-1 justify-end mt-1">
+                                    <button onClick={() => handleDocStatus(doc.id, "REJECTED")} className="px-2 py-0.5 text-[10px] bg-red-100 text-red-600 rounded">Reject</button>
+                                    <button onClick={() => handleDocStatus(doc.id, "VERIFIED")} className="px-2 py-0.5 text-[10px] bg-green-100 text-green-700 rounded">Approve</button>
+                                </div>
+                            )}
+                        </div>
+                    )) : (
+                        <p className="text-[12px] text-[var(--text3)] text-center py-2">No documents uploaded.</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Salary */}
+            <div className="bg-white border border-[var(--border)] p-4 rounded-xl">
+                <h3 className="text-[13px] font-semibold text-[var(--text)] mb-3 border-b border-[var(--border)] pb-2">CTC & Salary Structure</h3>
+                <div className="space-y-3 pt-1">
+                    <div>
+                        <label className="text-[12px] text-[var(--text3)] block mb-1">Annual CTC (₹)</label>
+                        <input type="number" value={ctc} onChange={e => setCtc(e.target.value)} className="w-full h-8 px-2 text-[13px] border rounded outline-none focus:border-[var(--accent)]" />
+                    </div>
+                    {emp.employeeSalary?.status === "APPROVED" && <div className="p-2 bg-green-50 border border-green-100 rounded text-green-700 text-[11px] font-medium text-center">Salary Layout Approved</div>}
+                    <button disabled={submitting} onClick={handleSaveSalary} className="w-full h-8 bg-[var(--accent)] text-white text-[12px] font-medium rounded-lg">{emp.employeeSalary ? "Update Salary" : "Define CTC & Approve"}</button>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 function OnboardingDrawer({ record, onClose, onUpdated }: {
     record: OnboardingRecord
@@ -458,17 +581,17 @@ function OnboardingDrawer({ record, onClose, onUpdated }: {
     const handleMarkComplete = async () => {
         setMarkingComplete(true)
         try {
-            const res = await fetch(`/api/onboarding/${record.id}`, {
-                method: "PUT",
+            const res = await fetch(`/api/onboarding/verify`, {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "COMPLETED" }),
+                body: JSON.stringify({ type: "ACTIVATE", employeeId: record.employee.id }),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success("Onboarding marked as complete!")
+            toast.success("Employee finalized and activated!")
             onUpdated()
             onClose()
         } catch (err: unknown) {
-            toast.error(err instanceof Error ? err.message : "Failed to update")
+            toast.error(err instanceof Error ? err.message : "Failed to activate")
         } finally {
             setMarkingComplete(false)
         }
@@ -530,22 +653,28 @@ function OnboardingDrawer({ record, onClose, onUpdated }: {
                     </div>
                 </div>
 
-                {/* Task List */}
+                {/* Task List / Content View */}
                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-                    {filteredTasks.length === 0 ? (
-                        <div className="flex items-center justify-center py-10 text-[var(--text3)]">
-                            <p className="text-[13px]">No tasks in this category</p>
-                        </div>
+                    {activeTab === "Verification" ? (
+                        <VerificationPanel record={record} onUpdated={onUpdated} />
                     ) : (
-                        filteredTasks.map(task => (
-                            <TaskRow
-                                key={task.id}
-                                task={task}
-                                onboardingId={record.id}
-                                onUpdated={handleTaskUpdated}
-                                onDelete={handleTaskDeleted}
-                            />
-                        ))
+                        <>
+                            {filteredTasks.length === 0 ? (
+                                <div className="flex items-center justify-center py-10 text-[var(--text3)]">
+                                    <p className="text-[13px]">No tasks in this category</p>
+                                </div>
+                            ) : (
+                                filteredTasks.map(task => (
+                                    <TaskRow
+                                        key={task.id}
+                                        task={task}
+                                        onboardingId={record.id}
+                                        onUpdated={handleTaskUpdated}
+                                        onDelete={handleTaskDeleted}
+                                    />
+                                ))
+                            )}
+                        </>
                     )}
                 </div>
 
@@ -607,10 +736,10 @@ function OnboardingDrawer({ record, onClose, onUpdated }: {
                         <button
                             onClick={handleMarkComplete}
                             disabled={markingComplete}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a9e6e] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
                         >
                             {markingComplete ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                            Mark Onboarding Complete
+                            Finalize Employee & Activate
                         </button>
                     )}
                 </div>

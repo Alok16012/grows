@@ -87,6 +87,59 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     content: `Status changed: ${statusLabels[prev.status] ?? prev.status} → ${statusLabels[body.status] ?? body.status}`
                 }
             })
+
+            // TRIGGER ONBOARDING if JOINED
+            if (body.status === "JOINED") {
+                // Determine a safe branch to attach to
+                const branch = await prisma.branch.findFirst({ select: { id: true } })
+                
+                if (branch) {
+                    // Generate EMP-XXXX ID
+                    const lastEmployee = await prisma.employee.findFirst({
+                        orderBy: { createdAt: "desc" },
+                        select: { employeeId: true },
+                    })
+                    let nextNum = 1
+                    if (lastEmployee?.employeeId) {
+                        const match = lastEmployee.employeeId.match(/\d+$/)
+                        if (match) nextNum = parseInt(match[0]) + 1
+                    }
+                    const newEmployeeId = `EMP-${String(nextNum).padStart(4, "0")}`
+                    
+                    // Split name
+                    const nameParts = (body.candidateName || prev.candidateName || "Candidate").split(" ")
+                    const firstName = nameParts[0]
+                    const lastName = nameParts.slice(1).join(" ") || " "
+
+                    const token = crypto.randomUUID()
+
+                    const employee = await prisma.employee.create({
+                        data: {
+                            employeeId: newEmployeeId,
+                            firstName,
+                            lastName,
+                            phone: body.phone || prev.phone || "0000000000",
+                            email: body.email || prev.email || null,
+                            city: body.city || prev.city || null,
+                            designation: body.position || prev.position || null,
+                            branchId: branch.id,
+                            status: "INACTIVE", // Wait until onboarding verified
+                            onboardingToken: token,
+                        }
+                    })
+
+                    await prisma.onboardingRecord.create({
+                        data: {
+                            employeeId: employee.id,
+                            status: "IN_PROGRESS",
+                            notes: "Auto-generated from Recruitment"
+                        }
+                    })
+                    
+                    console.log(`[ONBOARDING TRIGGER] Link generated: /onboarding/${token}`)
+                    // NOTE: In production, trigger WhatsApp / Email API here using 'token' and candidate 'phone'
+                }
+            }
         }
 
         const lead = await prisma.lead.update({
