@@ -160,15 +160,100 @@ const EMPTY_FORM: ModalForm = {
     status: "ACTIVE", notes: ""
 }
 
+function AddBranchMini({ onCreated }: { onCreated: (b: Branch) => void }) {
+    const [open, setOpen] = useState(false)
+    const [name, setName] = useState("")
+    const [city, setCity] = useState("")
+    const [saving, setSaving] = useState(false)
+    const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+    const [companyId, setCompanyId] = useState("")
+
+    useEffect(() => {
+        if (open) {
+            fetch("/api/companies").then(r => r.json()).then(d => {
+                const list = Array.isArray(d) ? d : []
+                setCompanies(list)
+                if (list.length === 1) setCompanyId(list[0].id)
+            }).catch(() => {})
+        }
+    }, [open])
+
+    async function handleSave() {
+        if (!name.trim() || !companyId) { toast.error("Branch name and company required"); return }
+        setSaving(true)
+        try {
+            const r = await fetch("/api/branches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), city: city.trim(), companyId }) })
+            if (!r.ok) throw new Error()
+            const branch = await r.json()
+            toast.success(`Branch "${branch.name}" created`)
+            onCreated(branch)
+            setOpen(false); setName(""); setCity(""); setCompanyId("")
+        } catch { toast.error("Failed to create branch") }
+        finally { setSaving(false) }
+    }
+
+    return (
+        <>
+            <button type="button" onClick={() => setOpen(true)}
+                style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", textDecoration: "underline", whiteSpace: "nowrap" }}>
+                + New Branch
+            </button>
+            {open && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ background: "var(--surface)", borderRadius: 12, padding: 24, width: 360, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: "var(--text)" }}>Add New Branch</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            {companies.length > 1 && (
+                                <div>
+                                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>Company *</label>
+                                    <select value={companyId} onChange={e => setCompanyId(e.target.value)}
+                                        style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)" }}>
+                                        <option value="">Select Company</option>
+                                        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                            )}
+                            <div>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>Branch Name *</label>
+                                <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Mumbai Office"
+                                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>City</label>
+                                <input value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Mumbai"
+                                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
+                            </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
+                            <button type="button" onClick={() => setOpen(false)}
+                                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13 }}>
+                                Cancel
+                            </button>
+                            <button type="button" onClick={handleSave} disabled={saving}
+                                style={{ padding: "8px 16px", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                                {saving ? "Saving..." : "Create Branch"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    )
+}
+
 function EmployeeModal({
-    open, onClose, onSaved, branches, employee,
+    open, onClose, onSaved, branches: initialBranches, employee,
 }: {
     open: boolean; onClose: () => void; onSaved: () => void; branches: Branch[]; employee?: Employee | null
 }) {
     const [loading, setLoading] = useState(false)
+    const [branches, setBranches] = useState<Branch[]>(initialBranches)
     const [departments, setDepartments] = useState<Department[]>([])
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
+
+    // Keep branches in sync if parent list changes
+    useEffect(() => { setBranches(initialBranches) }, [initialBranches])
 
     useEffect(() => {
         if (!open) return
@@ -338,7 +423,13 @@ function EmployeeModal({
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={labelCls}>Branch *</label>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                        <label className={labelCls} style={{ margin: 0 }}>Branch *</label>
+                                        <AddBranchMini onCreated={b => {
+                                            setBranches(prev => [...prev, b])
+                                            setForm(f => ({ ...f, branchId: b.id, departmentId: "" }))
+                                        }} />
+                                    </div>
                                     <select value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value, departmentId: "" }))} className={inputCls} required>
                                         <option value="">Select Branch</option>
                                         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
