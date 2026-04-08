@@ -8,7 +8,8 @@ import {
     AlertTriangle, MoreVertical, X, Loader2,
     ExternalLink, Trash2, Edit2, Eye,
     TrendingUp, FileQuestion, Clock, Target, Users2,
-    Building2, MapPin, User, LayoutGrid
+    Building2, MapPin, User, LayoutGrid,
+    Calendar, Bell, Shield, Star, Send, UserCheck, FileText
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -1602,7 +1603,7 @@ export default function LMSPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
 
-    const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "enrollments" | "compliance">("dashboard")
+    const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "enrollments" | "compliance" | "ilt" | "policies" | "notifications">("dashboard")
     const [courses, setCourses] = useState<Course[]>([])
     const [enrollments, setEnrollments] = useState<Enrollment[]>([])
     const [loadingCourses, setLoadingCourses] = useState(true)
@@ -1757,22 +1758,26 @@ export default function LMSPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-[var(--border)] bg-[var(--surface)] rounded-t-[12px] px-4">
-                    {(["dashboard", "courses", "enrollments", "compliance"] as const).map(tab => (
+                <div className="flex border-b border-[var(--border)] bg-[var(--surface)] rounded-t-[12px] px-2 overflow-x-auto">
+                    {([
+                        { key: "dashboard", label: "Dashboard", icon: <TrendingUp size={14} /> },
+                        { key: "courses", label: "Courses", icon: <BookOpen size={14} /> },
+                        { key: "enrollments", label: "Enrollments", icon: <Users size={14} /> },
+                        { key: "ilt", label: "ILT Sessions", icon: <Calendar size={14} /> },
+                        { key: "policies", label: "Policies", icon: <Shield size={14} /> },
+                        { key: "compliance", label: "Compliance", icon: <AlertTriangle size={14} /> },
+                        { key: "notifications", label: "Alerts", icon: <Bell size={14} /> },
+                    ]).map(tab => (
                         <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-3 text-[13px] font-medium border-b-2 transition-colors capitalize flex items-center gap-1.5 ${
-                                activeTab === tab
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key as any)}
+                            className={`px-4 py-3 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+                                activeTab === tab.key
                                     ? "border-[var(--accent)] text-[var(--accent)]"
                                     : "border-transparent text-[var(--text3)] hover:text-[var(--text2)]"
                             }`}
                         >
-                            {tab === "dashboard" && <TrendingUp size={14} />}
-                            {tab === "courses" && <BookOpen size={14} />}
-                            {tab === "enrollments" && <Users size={14} />}
-                            {tab === "compliance" && <AlertTriangle size={14} />}
-                            {tab === "dashboard" ? "Dashboard" : tab === "courses" ? "Courses" : tab === "enrollments" ? "Enrollments" : "Compliance"}
+                            {tab.icon} {tab.label}
                         </button>
                     ))}
                 </div>
@@ -1976,6 +1981,21 @@ export default function LMSPage() {
                 {/* ── Compliance Tab ── */}
                 {activeTab === "compliance" && (
                     <ComplianceTab />
+                )}
+
+                {/* ── ILT Tab ── */}
+                {activeTab === "ilt" && (
+                    <ILTTab />
+                )}
+
+                {/* ── Policies Tab ── */}
+                {activeTab === "policies" && (
+                    <PoliciesTab />
+                )}
+
+                {/* ── Notifications Tab ── */}
+                {activeTab === "notifications" && (
+                    <NotificationsTab />
                 )}
 
                 {/* ── Enrollments Tab ── */}
@@ -2492,6 +2512,735 @@ function ComplianceTab() {
                     </div>
                 </div>
             )}
+        </div>
+    )
+}
+
+// ─── ILT Tab ──────────────────────────────────────────────────────────────────
+
+type ILTSessionType = {
+    id: string
+    title: string
+    description?: string
+    location?: string
+    startTime: string
+    endTime: string
+    maxSeats: number
+    status: string
+    seatsFilled: number
+}
+
+type ILTAttendeeRecord = {
+    id: string
+    employeeId: string
+    status: string
+    attendedAt?: string
+    employee: { id: string; firstName: string; lastName: string; employeeId: string; designation?: string; photo?: string }
+}
+
+const ILT_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
+    SCHEDULED:   { label: "Scheduled",  bg: "#dbeafe", text: "#1d4ed8", border: "#bfdbfe" },
+    IN_PROGRESS: { label: "In Progress",bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
+    COMPLETED:   { label: "Completed",  bg: "#d1fae5", text: "#065f46", border: "#a7f3d0" },
+    CANCELLED:   { label: "Cancelled",  bg: "#f3f4f6", text: "#6b7280", border: "#e5e7eb" },
+}
+
+const ATTENDANCE_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+    PENDING: { label: "Pending", bg: "#f3f4f6", text: "#6b7280" },
+    PRESENT: { label: "Present", bg: "#d1fae5", text: "#065f46" },
+    ABSENT:  { label: "Absent",  bg: "#fee2e2", text: "#991b1b" },
+    LATE:    { label: "Late",    bg: "#fef3c7", text: "#92400e" },
+}
+
+function ILTTab() {
+    const { data: session } = useSession()
+    const [sessions, setSessions] = useState<ILTSessionType[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showCreate, setShowCreate] = useState(false)
+    const [attendanceSession, setAttendanceSession] = useState<ILTSessionType | null>(null)
+    const [attendees, setAttendees] = useState<ILTAttendeeRecord[]>([])
+    const [loadingAttendance, setLoadingAttendance] = useState(false)
+    const [savingAttendance, setSavingAttendance] = useState(false)
+    const [form, setForm] = useState({ title: "", description: "", location: "", startTime: "", endTime: "", maxSeats: "20" })
+    const [saving, setSaving] = useState(false)
+    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+
+    const fetchSessions = useCallback(async () => {
+        setLoading(true)
+        try {
+            const res = await fetch("/api/lms/ilt")
+            const data = await res.json()
+            setSessions(Array.isArray(data) ? data : [])
+        } catch { toast.error("Failed to load sessions") }
+        finally { setLoading(false) }
+    }, [])
+
+    useEffect(() => { fetchSessions() }, [fetchSessions])
+
+    const fetchAttendance = async (sessionId: string) => {
+        setLoadingAttendance(true)
+        try {
+            const res = await fetch(`/api/lms/ilt/${sessionId}/attendance`)
+            const data = await res.json()
+            setAttendees(Array.isArray(data) ? data : [])
+        } catch { toast.error("Failed to load attendance") }
+        finally { setLoadingAttendance(false) }
+    }
+
+    const handleOpenAttendance = (sess: ILTSessionType) => {
+        setAttendanceSession(sess)
+        fetchAttendance(sess.id)
+    }
+
+    const handleMarkAttendance = async (employeeId: string, status: string) => {
+        if (!attendanceSession) return
+        setSavingAttendance(true)
+        try {
+            const res = await fetch(`/api/lms/ilt/${attendanceSession.id}/attendance`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ employeeIds: [employeeId], status }),
+            })
+            if (!res.ok) { toast.error("Failed"); return }
+            setAttendees(prev => prev.map(a => a.employee.id === employeeId ? { ...a, status } : a))
+            toast.success(`Marked ${status.toLowerCase()}`)
+        } catch { toast.error("Failed") }
+        finally { setSavingAttendance(false) }
+    }
+
+    const handleMarkAllPresent = async () => {
+        if (!attendanceSession) return
+        setSavingAttendance(true)
+        try {
+            await fetch(`/api/lms/ilt/${attendanceSession.id}/attendance`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "MARK_ALL_PRESENT" }),
+            })
+            await fetchAttendance(attendanceSession.id)
+            toast.success("All marked present")
+        } catch { toast.error("Failed") }
+        finally { setSavingAttendance(false) }
+    }
+
+    const handleCreate = async () => {
+        if (!form.title || !form.startTime || !form.endTime) { toast.error("Title, start time and end time are required"); return }
+        setSaving(true)
+        try {
+            const res = await fetch("/api/lms/ilt", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+            })
+            if (!res.ok) { toast.error(await res.text()); return }
+            toast.success("Session scheduled")
+            setShowCreate(false)
+            setForm({ title: "", description: "", location: "", startTime: "", endTime: "", maxSeats: "20" })
+            fetchSessions()
+        } catch { toast.error("Failed to create session") }
+        finally { setSaving(false) }
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-[16px] font-semibold text-[var(--text)]">Instructor-Led Training Sessions</h2>
+                {isAdmin && (
+                    <button onClick={() => setShowCreate(true)}
+                        className="h-9 px-4 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2">
+                        <Plus size={15} /> Schedule Session
+                    </button>
+                )}
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-[var(--accent)]" /></div>
+            ) : sessions.length === 0 ? (
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] py-16 text-center">
+                    <Calendar size={36} className="mx-auto text-[var(--text3)] mb-3" />
+                    <p className="text-[14px] font-medium text-[var(--text2)]">No sessions scheduled yet</p>
+                    <p className="text-[12px] text-[var(--text3)] mt-1">Create classroom training sessions to track attendance</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {sessions.map(sess => {
+                        const cfg = ILT_STATUS_CONFIG[sess.status] ?? ILT_STATUS_CONFIG.SCHEDULED
+                        const start = new Date(sess.startTime)
+                        const end = new Date(sess.endTime)
+                        const fillPct = Math.min(100, (sess.seatsFilled / sess.maxSeats) * 100)
+                        return (
+                            <div key={sess.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 hover:shadow-md transition-shadow">
+                                <div className="flex items-start justify-between gap-2 mb-3">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-[14px] font-semibold text-[var(--text)] line-clamp-1">{sess.title}</h3>
+                                        {sess.description && <p className="text-[12px] text-[var(--text3)] mt-0.5 line-clamp-2">{sess.description}</p>}
+                                    </div>
+                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium shrink-0"
+                                        style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
+                                        {cfg.label}
+                                    </span>
+                                </div>
+                                <div className="space-y-1.5 text-[12px] text-[var(--text2)] mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar size={12} className="text-[var(--text3)] shrink-0" />
+                                        <span>{format(start, "dd MMM yyyy")} · {format(start, "hh:mm a")} – {format(end, "hh:mm a")}</span>
+                                    </div>
+                                    {sess.location && (
+                                        <div className="flex items-center gap-2">
+                                            <MapPin size={12} className="text-[var(--text3)] shrink-0" />
+                                            <span>{sess.location}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <Users size={12} className="text-[var(--text3)] shrink-0" />
+                                        <span>{sess.seatsFilled} / {sess.maxSeats} registered</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="h-1.5 bg-[var(--surface2)] rounded-full overflow-hidden">
+                                        <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${fillPct}%` }} />
+                                    </div>
+                                    {isAdmin && (
+                                        <button onClick={() => handleOpenAttendance(sess)}
+                                            className="w-full h-8 text-[12px] border border-[var(--border)] rounded-[7px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center justify-center gap-1.5">
+                                            <UserCheck size={13} /> Manage Attendance
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Create Session Modal */}
+            {showCreate && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreate(false)} />
+                    <div className="relative bg-[var(--surface)] rounded-[16px] border border-[var(--border)] shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
+                            <h2 className="text-[16px] font-semibold text-[var(--text)]">Schedule ILT Session</h2>
+                            <button onClick={() => setShowCreate(false)} className="p-1.5 rounded-lg hover:bg-[var(--surface2)] text-[var(--text3)]"><X size={18} /></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Session Title *</label>
+                                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                                    placeholder="e.g. Fire Safety Awareness"
+                                    className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]" />
+                            </div>
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Description</label>
+                                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                                    placeholder="Session agenda and objectives..."
+                                    rows={2}
+                                    className="w-full px-3 py-2 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] resize-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Location / Venue</label>
+                                <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                                    placeholder="e.g. Conference Room A"
+                                    className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Start Date & Time *</label>
+                                    <input type="datetime-local" value={form.startTime} onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))}
+                                        className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]" />
+                                </div>
+                                <div>
+                                    <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">End Date & Time *</label>
+                                    <input type="datetime-local" value={form.endTime} onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))}
+                                        className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Max Seats</label>
+                                <input type="number" min={1} value={form.maxSeats} onChange={e => setForm(f => ({ ...f, maxSeats: e.target.value }))}
+                                    className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]" />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border)] shrink-0">
+                            <button onClick={() => setShowCreate(false)} className="h-9 px-4 text-[13px] border border-[var(--border)] rounded-[8px] text-[var(--text2)] hover:bg-[var(--surface2)]">Cancel</button>
+                            <button onClick={handleCreate} disabled={saving}
+                                className="h-9 px-5 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2 disabled:opacity-60">
+                                {saving && <Loader2 size={14} className="animate-spin" />} Schedule Session
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Attendance Modal */}
+            {attendanceSession && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setAttendanceSession(null)} />
+                    <div className="relative bg-[var(--surface)] rounded-[16px] border border-[var(--border)] shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
+                            <div>
+                                <h2 className="text-[16px] font-semibold text-[var(--text)]">{attendanceSession.title}</h2>
+                                <p className="text-[11px] text-[var(--text3)]">{format(new Date(attendanceSession.startTime), "dd MMM yyyy, hh:mm a")}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {attendees.length > 0 && (
+                                    <button onClick={handleMarkAllPresent} disabled={savingAttendance}
+                                        className="h-8 px-3 text-[12px] border border-green-300 rounded-[6px] text-green-700 hover:bg-green-50 flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                                        <UserCheck size={13} /> Mark All Present
+                                    </button>
+                                )}
+                                <button onClick={() => setAttendanceSession(null)} className="p-1.5 rounded-lg hover:bg-[var(--surface2)] text-[var(--text3)]"><X size={18} /></button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {loadingAttendance ? (
+                                <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-[var(--accent)]" /></div>
+                            ) : attendees.length === 0 ? (
+                                <div className="py-12 text-center">
+                                    <UserCheck size={32} className="mx-auto text-[var(--text3)] mb-2" />
+                                    <p className="text-[13px] text-[var(--text2)]">No attendees registered</p>
+                                    <p className="text-[11px] text-[var(--text3)] mt-1">Add employee IDs when creating the session to track attendance</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {attendees.map(a => {
+                                        const aCfg = ATTENDANCE_STATUS_CONFIG[a.status] ?? ATTENDANCE_STATUS_CONFIG.PENDING
+                                        return (
+                                            <div key={a.id} className="flex items-center gap-3 p-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)]">
+                                                <Avatar firstName={a.employee.firstName} lastName={a.employee.lastName} photo={a.employee.photo} size={36} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[13px] font-medium text-[var(--text)]">{a.employee.firstName} {a.employee.lastName}</p>
+                                                    <p className="text-[11px] text-[var(--text3)]">{a.employee.employeeId}{a.employee.designation ? ` · ${a.employee.designation}` : ""}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium" style={{ background: aCfg.bg, color: aCfg.text }}>{aCfg.label}</span>
+                                                    {a.status !== "PRESENT" && (
+                                                        <button onClick={() => handleMarkAttendance(a.employee.id, "PRESENT")} disabled={savingAttendance}
+                                                            className="h-7 px-2 text-[11px] bg-green-100 text-green-700 rounded-[5px] hover:bg-green-200 disabled:opacity-50">✓</button>
+                                                    )}
+                                                    {a.status !== "ABSENT" && (
+                                                        <button onClick={() => handleMarkAttendance(a.employee.id, "ABSENT")} disabled={savingAttendance}
+                                                            className="h-7 px-2 text-[11px] bg-red-100 text-red-700 rounded-[5px] hover:bg-red-200 disabled:opacity-50">✗</button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-6 py-4 border-t border-[var(--border)] shrink-0 flex items-center justify-between">
+                            <p className="text-[12px] text-[var(--text3)]">
+                                {attendees.filter(a => a.status === "PRESENT").length} present · {attendees.filter(a => a.status === "ABSENT").length} absent · {attendees.filter(a => a.status === "PENDING").length} pending
+                            </p>
+                            <button onClick={() => setAttendanceSession(null)} className="h-9 px-4 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium">Done</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── Policies Tab ─────────────────────────────────────────────────────────────
+
+type PolicyType = {
+    id: string
+    title: string
+    description?: string
+    category: string
+    fileUrl?: string
+    isRequired: boolean
+    isActive: boolean
+    createdAt: string
+    acknowledged: boolean
+    acknowledgedAt?: string
+}
+
+const POLICY_CAT_COLORS: Record<string, string> = {
+    Safety: "#f59e0b", HR: "#8b5cf6", Compliance: "#3b82f6",
+    Operations: "#10b981", IT: "#06b6d4", Finance: "#ec4899", Other: "#6b7280"
+}
+
+const POLICY_CATEGORIES = ["All", "Safety", "HR", "Compliance", "Operations", "IT", "Finance", "Other"]
+
+function PoliciesTab() {
+    const { data: session } = useSession()
+    const [policies, setPolicies] = useState<PolicyType[]>([])
+    const [loading, setLoading] = useState(true)
+    const [catFilter, setCatFilter] = useState("All")
+    const [showCreate, setShowCreate] = useState(false)
+    const [form, setForm] = useState({ title: "", description: "", category: "Safety", fileUrl: "", isRequired: true })
+    const [saving, setSaving] = useState(false)
+    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+
+    const fetchPolicies = useCallback(async () => {
+        setLoading(true)
+        try {
+            const res = await fetch("/api/lms/policies")
+            const data = await res.json()
+            setPolicies(Array.isArray(data) ? data : [])
+        } catch { toast.error("Failed to load policies") }
+        finally { setLoading(false) }
+    }, [])
+
+    useEffect(() => { fetchPolicies() }, [fetchPolicies])
+
+    const filteredPolicies = policies.filter(p => catFilter === "All" || p.category === catFilter)
+
+    const handleCreate = async () => {
+        if (!form.title || !form.category) { toast.error("Title and category are required"); return }
+        setSaving(true)
+        try {
+            const res = await fetch("/api/lms/policies", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+            })
+            if (!res.ok) { toast.error(await res.text()); return }
+            toast.success("Policy created")
+            setShowCreate(false)
+            setForm({ title: "", description: "", category: "Safety", fileUrl: "", isRequired: true })
+            fetchPolicies()
+        } catch { toast.error("Failed to create policy") }
+        finally { setSaving(false) }
+    }
+
+    const handleAcknowledge = async (policyId: string) => {
+        try {
+            const res = await fetch(`/api/lms/policies/${policyId}/acknowledge`, { method: "POST" })
+            if (!res.ok) { toast.error(await res.text()); return }
+            setPolicies(prev => prev.map(p => p.id === policyId ? { ...p, acknowledged: true, acknowledgedAt: new Date().toISOString() } : p))
+            toast.success("Policy acknowledged")
+        } catch { toast.error("Failed to acknowledge") }
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-[16px] font-semibold text-[var(--text)]">Document Policies & SOPs</h2>
+                {isAdmin && (
+                    <button onClick={() => setShowCreate(true)}
+                        className="h-9 px-4 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2">
+                        <Plus size={15} /> Create Policy
+                    </button>
+                )}
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+                {POLICY_CATEGORIES.map(cat => (
+                    <button key={cat} onClick={() => setCatFilter(cat)}
+                        className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
+                            catFilter === cat ? "bg-[var(--accent)] text-white" : "bg-[var(--surface2)] text-[var(--text2)] border border-[var(--border)] hover:border-[var(--accent)]"
+                        }`}>
+                        {cat}
+                    </button>
+                ))}
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-[var(--accent)]" /></div>
+            ) : filteredPolicies.length === 0 ? (
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] py-16 text-center">
+                    <FileText size={36} className="mx-auto text-[var(--text3)] mb-3" />
+                    <p className="text-[14px] font-medium text-[var(--text2)]">No policies found</p>
+                    {isAdmin && <p className="text-[12px] text-[var(--text3)] mt-1">Create company policies & SOPs for employees to acknowledge</p>}
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {filteredPolicies.map(policy => {
+                        const catColor = POLICY_CAT_COLORS[policy.category] ?? "#6b7280"
+                        return (
+                            <div key={policy.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
+                                <div className="h-1 w-full" style={{ background: catColor }} />
+                                <div className="p-4">
+                                    <div className="flex items-start gap-4">
+                                        <div className="h-10 w-10 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: catColor + "22" }}>
+                                            <FileText size={20} style={{ color: catColor }} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <h3 className="text-[14px] font-semibold text-[var(--text)]">{policy.title}</h3>
+                                                {policy.isRequired && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-600">Required</span>
+                                                )}
+                                            </div>
+                                            {policy.description && <p className="text-[12px] text-[var(--text3)] line-clamp-2">{policy.description}</p>}
+                                            <div className="flex items-center gap-3 mt-2">
+                                                <span className="text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: catColor + "22", color: catColor }}>{policy.category}</span>
+                                                <span className="text-[11px] text-[var(--text3)]">{format(new Date(policy.createdAt), "dd MMM yyyy")}</span>
+                                                {policy.fileUrl && (
+                                                    <a href={policy.fileUrl} target="_blank" rel="noopener noreferrer"
+                                                        className="text-[11px] text-[var(--accent)] flex items-center gap-1 hover:underline">
+                                                        <ExternalLink size={11} /> View Document
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                            {policy.acknowledged ? (
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-green-100 text-green-700">
+                                                    <CheckCircle size={14} />
+                                                    <span className="text-[12px] font-medium">Acknowledged</span>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => handleAcknowledge(policy.id)}
+                                                    className="h-8 px-3 text-[12px] bg-[var(--accent)] text-white rounded-[7px] font-medium flex items-center gap-1.5">
+                                                    <Shield size={13} /> Acknowledge
+                                                </button>
+                                            )}
+                                            {policy.acknowledgedAt && (
+                                                <p className="text-[10px] text-[var(--text3)] mt-1">{format(new Date(policy.acknowledgedAt), "dd MMM yy")}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Create Policy Modal */}
+            {showCreate && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreate(false)} />
+                    <div className="relative bg-[var(--surface)] rounded-[16px] border border-[var(--border)] shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
+                            <h2 className="text-[16px] font-semibold text-[var(--text)]">Create Policy / SOP</h2>
+                            <button onClick={() => setShowCreate(false)} className="p-1.5 rounded-lg hover:bg-[var(--surface2)] text-[var(--text3)]"><X size={18} /></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Policy Title *</label>
+                                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                                    placeholder="e.g. Employee Safety Guidelines"
+                                    className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]" />
+                            </div>
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Category *</label>
+                                <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                                    className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
+                                    {["Safety", "HR", "Compliance", "Operations", "IT", "Finance", "Other"].map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Description</label>
+                                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                                    placeholder="Brief description of the policy..."
+                                    rows={3}
+                                    className="w-full px-3 py-2 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] resize-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text2)] mb-1.5">Document URL (optional)</label>
+                                <input value={form.fileUrl} onChange={e => setForm(f => ({ ...f, fileUrl: e.target.value }))}
+                                    placeholder="https://drive.google.com/..."
+                                    className="w-full h-10 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]" />
+                            </div>
+                            <label className="flex items-center gap-3 p-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] cursor-pointer hover:border-[var(--accent)] transition-colors">
+                                <input type="checkbox" checked={form.isRequired} onChange={e => setForm(f => ({ ...f, isRequired: e.target.checked }))}
+                                    className="w-4 h-4 accent-[var(--accent)]" />
+                                <div>
+                                    <p className="text-[13px] font-medium text-[var(--text)]">Required Policy</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">All employees must acknowledge this policy</p>
+                                </div>
+                            </label>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border)] shrink-0">
+                            <button onClick={() => setShowCreate(false)} className="h-9 px-4 text-[13px] border border-[var(--border)] rounded-[8px] text-[var(--text2)] hover:bg-[var(--surface2)]">Cancel</button>
+                            <button onClick={handleCreate} disabled={saving}
+                                className="h-9 px-5 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2 disabled:opacity-60">
+                                {saving && <Loader2 size={14} className="animate-spin" />} Create Policy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── Notifications/Alerts Tab ─────────────────────────────────────────────────
+
+type NotificationStats = {
+    summary: { overdue: number; dueSoon: number; expiringCerts: number; unacknowledgedPolicies: number }
+    overdueEnrollments: { employeeName: string; employeeCode: string; courseTitle: string; dueDate: string }[]
+    dueSoonEnrollments: { employeeName: string; employeeCode: string; courseTitle: string; dueDate: string }[]
+    expiringCerts: { employeeName: string; employeeCode: string; courseTitle: string; daysLeft: number; expiryDate: string }[]
+    policies: { id: string; title: string; category: string; acknowledged: number; total: number; rate: number }[]
+}
+
+function NotificationsTab() {
+    const [data, setData] = useState<NotificationStats | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [sending, setSending] = useState(false)
+    const [activeSection, setActiveSection] = useState<"overdue" | "duesoon" | "expiring" | "policies">("overdue")
+
+    useEffect(() => {
+        fetch("/api/lms/notifications")
+            .then(r => r.json())
+            .then(d => { setData(d); setLoading(false) })
+            .catch(() => setLoading(false))
+    }, [])
+
+    const handleSendReminders = async () => {
+        setSending(true)
+        try {
+            const res = await fetch("/api/lms/notifications", { method: "POST" })
+            const result = await res.json()
+            toast.success(`${result.sent ?? 0} reminder${result.sent === 1 ? "" : "s"} sent`)
+        } catch { toast.error("Failed to send reminders") }
+        finally { setSending(false) }
+    }
+
+    if (loading) return <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-[var(--accent)]" /></div>
+    if (!data) return null
+
+    const sections = [
+        { key: "overdue" as const, label: "Overdue Training", count: data.summary.overdue, bg: "bg-red-50", border: "border-red-200", textColor: "text-red-700", iconColor: "text-red-500" },
+        { key: "duesoon" as const, label: "Due This Week", count: data.summary.dueSoon, bg: "bg-amber-50", border: "border-amber-200", textColor: "text-amber-700", iconColor: "text-amber-500" },
+        { key: "expiring" as const, label: "Expiring Certs", count: data.summary.expiringCerts, bg: "bg-violet-50", border: "border-violet-200", textColor: "text-violet-700", iconColor: "text-violet-500" },
+        { key: "policies" as const, label: "Pending Acks", count: data.summary.unacknowledgedPolicies, bg: "bg-sky-50", border: "border-sky-200", textColor: "text-sky-700", iconColor: "text-sky-500" },
+    ]
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h2 className="text-[16px] font-semibold text-[var(--text)]">Training Alerts & Reminders</h2>
+                <button onClick={handleSendReminders} disabled={sending}
+                    className="h-9 px-4 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2 disabled:opacity-60">
+                    {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    Send Reminders
+                </button>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {sections.map(s => (
+                    <button key={s.key} onClick={() => setActiveSection(s.key)}
+                        className={`p-4 rounded-[12px] border-2 text-left transition-all ${
+                            activeSection === s.key
+                                ? `${s.bg} ${s.border}`
+                                : "bg-[var(--surface)] border-[var(--border)] hover:border-[var(--text3)]"
+                        }`}>
+                        <p className={`text-[28px] font-bold ${activeSection === s.key ? s.textColor : "text-[var(--text)]"}`}>{s.count}</p>
+                        <p className={`text-[11px] mt-1 ${activeSection === s.key ? s.textColor : "text-[var(--text3)]"}`}>{s.label}</p>
+                    </button>
+                ))}
+            </div>
+
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[var(--border)] flex items-center gap-2">
+                    <Bell size={16} className="text-[var(--accent)]" />
+                    <h3 className="text-[14px] font-semibold text-[var(--text)]">
+                        {sections.find(s => s.key === activeSection)?.label}
+                    </h3>
+                    <span className="ml-auto text-[12px] text-[var(--text3)]">
+                        {activeSection === "overdue" ? data.overdueEnrollments.length :
+                         activeSection === "duesoon" ? data.dueSoonEnrollments.length :
+                         activeSection === "expiring" ? data.expiringCerts.length :
+                         data.policies.length} items
+                    </span>
+                </div>
+
+                {activeSection === "overdue" && (
+                    data.overdueEnrollments.length === 0 ? (
+                        <div className="py-12 text-center"><p className="text-[13px] text-green-600 font-medium">✓ No overdue training — excellent!</p></div>
+                    ) : (
+                        <div className="divide-y divide-[var(--border)]">
+                            {data.overdueEnrollments.map((e, i) => (
+                                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                                    <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center shrink-0"><AlertTriangle size={15} className="text-red-600" /></div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-medium text-[var(--text)]">{e.employeeName}</p>
+                                        <p className="text-[11px] text-[var(--text3)]">{e.courseTitle}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-[12px] font-semibold text-red-600">Overdue</p>
+                                        <p className="text-[10px] text-[var(--text3)]">{e.dueDate ? format(new Date(e.dueDate), "dd MMM yy") : "—"}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                )}
+
+                {activeSection === "duesoon" && (
+                    data.dueSoonEnrollments.length === 0 ? (
+                        <div className="py-12 text-center"><p className="text-[13px] text-green-600 font-medium">✓ No training due this week</p></div>
+                    ) : (
+                        <div className="divide-y divide-[var(--border)]">
+                            {data.dueSoonEnrollments.map((e, i) => (
+                                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                                    <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><Clock size={15} className="text-amber-600" /></div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-medium text-[var(--text)]">{e.employeeName}</p>
+                                        <p className="text-[11px] text-[var(--text3)]">{e.courseTitle}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-[12px] font-semibold text-amber-600">Due Soon</p>
+                                        <p className="text-[10px] text-[var(--text3)]">{e.dueDate ? format(new Date(e.dueDate), "dd MMM yy") : "—"}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                )}
+
+                {activeSection === "expiring" && (
+                    data.expiringCerts.length === 0 ? (
+                        <div className="py-12 text-center"><p className="text-[13px] text-green-600 font-medium">✓ No certificates expiring in next 30 days</p></div>
+                    ) : (
+                        <div className="divide-y divide-[var(--border)]">
+                            {data.expiringCerts.map((e, i) => (
+                                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                                    <div className="h-8 w-8 rounded-full bg-violet-100 flex items-center justify-center shrink-0"><Star size={15} className="text-violet-600" /></div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-medium text-[var(--text)]">{e.employeeName}</p>
+                                        <p className="text-[11px] text-[var(--text3)]">{e.courseTitle}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className={`text-[12px] font-semibold ${e.daysLeft <= 7 ? "text-red-600" : "text-violet-600"}`}>{e.daysLeft}d left</p>
+                                        <p className="text-[10px] text-[var(--text3)]">{format(new Date(e.expiryDate), "dd MMM yy")}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                )}
+
+                {activeSection === "policies" && (
+                    data.policies.length === 0 ? (
+                        <div className="py-12 text-center"><p className="text-[13px] text-green-600 font-medium">✓ All required policies acknowledged</p></div>
+                    ) : (
+                        <div className="divide-y divide-[var(--border)]">
+                            {data.policies.map((p, i) => (
+                                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                                    <div className="h-8 w-8 rounded-full bg-sky-100 flex items-center justify-center shrink-0"><FileText size={15} className="text-sky-600" /></div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-medium text-[var(--text)]">{p.title}</p>
+                                        <p className="text-[11px] text-[var(--text3)]">{p.category}</p>
+                                    </div>
+                                    <div className="text-right shrink-0 w-32">
+                                        <p className="text-[12px] font-medium text-[var(--text)]">{p.acknowledged}/{p.total} ack'd</p>
+                                        <div className="h-1.5 bg-[var(--surface2)] rounded-full mt-1 overflow-hidden">
+                                            <div className="h-full bg-sky-500 rounded-full" style={{ width: `${p.rate}%` }} />
+                                        </div>
+                                        <p className="text-[10px] text-[var(--text3)] mt-0.5">{p.rate}% done</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                )}
+            </div>
+
+            <div className="bg-[var(--surface2)] border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
+                <Bell size={16} className="text-[var(--accent)] shrink-0" />
+                <p className="text-[12px] text-[var(--text2)]">
+                    Click <strong>Send Reminders</strong> to push in-app notifications to all employees with overdue training, upcoming deadlines, and expiring certificates.
+                </p>
+            </div>
         </div>
     )
 }

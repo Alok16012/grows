@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import {
     GraduationCap, BookOpen, Clock, CheckCircle, PlayCircle,
     ChevronRight, Award, Target, AlertTriangle, X, Loader2,
-    ArrowLeft, RotateCcw
+    ArrowLeft, RotateCcw, Shield, FileText, ExternalLink, ChevronDown, ChevronUp
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -58,6 +58,133 @@ type QuizAttempt = {
     score: number
     passed: boolean
     submittedAt: string
+}
+
+
+type LearnPolicy = {
+    id: string
+    title: string
+    description?: string
+    category: string
+    fileUrl?: string
+    isRequired: boolean
+    acknowledged: boolean
+    acknowledgedAt?: string
+}
+
+const POLICY_CAT_COLORS_LEARN: Record<string, string> = {
+    Safety: "#f59e0b", HR: "#8b5cf6", Compliance: "#3b82f6",
+    Operations: "#10b981", IT: "#06b6d4", Finance: "#ec4899", Other: "#6b7280"
+}
+
+function PoliciesSection() {
+    const [policies, setPolicies] = useState<LearnPolicy[]>([])
+    const [loading, setLoading] = useState(true)
+    const [expanded, setExpanded] = useState(false)
+    const [acknowledging, setAcknowledging] = useState<string | null>(null)
+
+    const fetchPolicies = async () => {
+        try {
+            const res = await fetch("/api/lms/policies")
+            const data = await res.json()
+            setPolicies(Array.isArray(data) ? data : [])
+        } catch { /* silent */ }
+        finally { setLoading(false) }
+    }
+
+    useEffect(() => { fetchPolicies() }, [])
+
+    const handleAcknowledge = async (policyId: string) => {
+        setAcknowledging(policyId)
+        try {
+            const res = await fetch(`/api/lms/policies/${policyId}/acknowledge`, { method: "POST" })
+            if (!res.ok) { toast.error(await res.text()); return }
+            setPolicies(prev => prev.map(p => p.id === policyId ? { ...p, acknowledged: true, acknowledgedAt: new Date().toISOString() } : p))
+            toast.success("Policy acknowledged ✓")
+        } catch { toast.error("Failed to acknowledge") }
+        finally { setAcknowledging(null) }
+    }
+
+    if (loading) return null
+
+    const pending = policies.filter(p => !p.acknowledged && p.isRequired)
+    const allAcknowledged = policies.filter(p => p.acknowledged)
+
+    if (policies.length === 0) return null
+
+    return (
+        <div className={`rounded-[14px] border overflow-hidden ${pending.length > 0 ? "border-amber-300 bg-amber-50" : "border-[var(--border)] bg-[var(--surface)]"}`}>
+            <button
+                onClick={() => setExpanded(e => !e)}
+                className="w-full flex items-center gap-3 px-4 py-3"
+            >
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${pending.length > 0 ? "bg-amber-200 text-amber-700" : "bg-green-100 text-green-600"}`}>
+                    <Shield size={16} />
+                </div>
+                <div className="flex-1 text-left">
+                    <p className={`text-[13px] font-semibold ${pending.length > 0 ? "text-amber-800" : "text-[var(--text)]"}`}>
+                        Company Policies & SOPs
+                    </p>
+                    <p className={`text-[11px] ${pending.length > 0 ? "text-amber-600" : "text-[var(--text3)]"}`}>
+                        {pending.length > 0
+                            ? `${pending.length} policy${pending.length > 1 ? "s" : ""} pending your acknowledgment`
+                            : `All ${allAcknowledged.length} policies acknowledged ✓`}
+                    </p>
+                </div>
+                {pending.length > 0 && (
+                    <span className="h-5 min-w-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                        {pending.length}
+                    </span>
+                )}
+                {expanded ? <ChevronUp size={16} className="text-[var(--text3)] shrink-0" /> : <ChevronDown size={16} className="text-[var(--text3)] shrink-0" />}
+            </button>
+
+            {expanded && (
+                <div className="border-t border-amber-200 divide-y divide-amber-100">
+                    {policies.map(policy => {
+                        const catColor = POLICY_CAT_COLORS_LEARN[policy.category] ?? "#6b7280"
+                        return (
+                            <div key={policy.id} className="px-4 py-3 flex items-start gap-3">
+                                <div className="h-8 w-8 rounded-[8px] flex items-center justify-center shrink-0 mt-0.5" style={{ background: catColor + "22" }}>
+                                    <FileText size={15} style={{ color: catColor }} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <p className="text-[13px] font-medium text-[var(--text)]">{policy.title}</p>
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: catColor + "22", color: catColor }}>{policy.category}</span>
+                                    </div>
+                                    {policy.description && <p className="text-[11.5px] text-[var(--text3)] line-clamp-2">{policy.description}</p>}
+                                    {policy.fileUrl && (
+                                        <a href={policy.fileUrl} target="_blank" rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] text-[var(--accent)] mt-1 hover:underline">
+                                            <ExternalLink size={10} /> View Document
+                                        </a>
+                                    )}
+                                </div>
+                                <div className="shrink-0">
+                                    {policy.acknowledged ? (
+                                        <div className="flex items-center gap-1 text-green-600">
+                                            <CheckCircle size={14} />
+                                            <span className="text-[11px] font-medium">Done</span>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleAcknowledge(policy.id)}
+                                            disabled={acknowledging === policy.id}
+                                            className="h-8 px-3 text-[12px] bg-[var(--accent)] text-white rounded-[7px] font-medium flex items-center gap-1.5 disabled:opacity-60"
+                                        >
+                                            {acknowledging === policy.id ? <Loader2 size={12} className="animate-spin" /> : <Shield size={12} />}
+                                            Acknowledge
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+        </div>
+    )
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -640,6 +767,9 @@ export default function LearnPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Policies acknowledgment banner */}
+                <PoliciesSection />
+
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 text-center">
                         <p className="text-[24px] font-bold text-[var(--text)]">{stats.total}</p>
