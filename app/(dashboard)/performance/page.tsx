@@ -580,6 +580,25 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {/* Summary Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                {summaryCards.map(c => (
+                    <div key={c.label} style={{
+                        background: "#fff",
+                        border: "1px solid var(--border)",
+                        borderRadius: 12,
+                        padding: "18px 20px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                    }}>
+                        <div style={{
+                            width: 44, height: 44, borderRadius: "50%",
+                            background: c.bg, display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0,
+                        }}>
+                            <c.icon size={20} color={c.color} />
+                        </div>
                         <div>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{c.value}</div>
                             <div style={{ fontSize: 12, color: "#6b7280" }}>{c.label}</div>
@@ -601,7 +620,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                     <div style={{ width: 40, height: 40, background: "#ef4444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><AlertTriangle color="#fff" size={20} /></div>
                     <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b" }}>PIP Mandatory Action</div>
-                        <div style={{ fontSize: 11, color: "#b91c1c" }}>Score < 2.8 requires Performance Improvement Plan</div>
+                        <div style={{ fontSize: 11, color: "#b91c1c" }}>{"Score < 2.8 requires Performance Improvement Plan"}</div>
                     </div>
                 </div>
             </div>

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import bcrypt from "bcryptjs"
 
 export async function GET(req: Request) {
     try {
@@ -94,6 +95,31 @@ export async function POST(req: Request) {
             ? `EMP-${String(nextNum + 1).padStart(4, "0")}`
             : employeeId
 
+        // ── Auto-create User account ──────────────────────────────────────────
+        // Email: use provided email, else phone@cims.local
+        // Password: phone number (employee can change later)
+        // Role: INSPECTION_BOY by default
+        const userEmail = email || `${phone}@cims.local`
+        const passwordHash = await bcrypt.hash(phone, 10)
+
+        // Check if user already exists with this email
+        const existingUser = await prisma.user.findUnique({ where: { email: userEmail } })
+
+        let userId: string
+        if (existingUser) {
+            userId = existingUser.id
+        } else {
+            const newUser = await prisma.user.create({
+                data: {
+                    name: `${firstName} ${lastName}`,
+                    email: userEmail,
+                    password: passwordHash,
+                    role: "INSPECTION_BOY",
+                },
+            })
+            userId = newUser.id
+        }
+
         const employee = await prisma.employee.create({
             data: {
                 employeeId: finalId,
@@ -121,10 +147,16 @@ export async function POST(req: Request) {
                 status: status || "ACTIVE",
                 employmentType: employmentType || "Full-time",
                 basicSalary: basicSalary ? parseFloat(basicSalary) : 0,
+                userId,
             },
         })
 
-        return NextResponse.json(employee)
+        return NextResponse.json({
+            ...employee,
+            _userCreated: !existingUser,
+            _loginEmail: userEmail,
+            _loginPassword: phone,
+        })
     } catch (error) {
         console.error("[EMPLOYEES_POST]", error)
         return new NextResponse("Internal Error", { status: 500 })

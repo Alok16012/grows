@@ -33,6 +33,7 @@ model User {
   leadDocsUploaded         LeadDocument[]   @relation("LeadDocUploader")
   leadFollowUpsCreated     LeadFollowUp[]   @relation("LeadFollowUpCreator")
   hrApprovedReviews        PerformanceReview[] @relation("HRApprover")
+  employeeProfile          Employee?           @relation("EmployeeUser")
 }
 
 model Company {
@@ -471,9 +472,11 @@ model Employee {
   isKycVerified     Boolean            @default(false)
   kycRejectionNote  String?
   onboardingToken   String?            @unique
+  userId            String?            @unique
   createdBy         String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+  user              User?              @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
   branch            Branch             @relation(fields: [branchId], references: [id])
   department        Department?        @relation(fields: [departmentId], references: [id])
   deployments       Deployment[]

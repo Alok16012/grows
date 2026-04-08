@@ -59,11 +59,11 @@ export async function POST(
                 ...(kpis && Array.isArray(kpis) && kpis.length > 0
                     ? {
                           kpis: {
-                              create: kpis.map((k: { title: string; description?: string; target: string; weightage?: number }) => ({
+                              create: kpis.map((k: { title: string; description?: string; target: string | number; weightage?: number }) => ({
                                   reviewId: params.id,
                                   title: k.title,
                                   description: k.description || null,
-                                  target: k.target,
+                                  target: parseFloat(String(k.target)) || 0,
                                   weightage: k.weightage ?? 10,
                               })),
                           },

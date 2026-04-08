@@ -29,7 +29,7 @@ export default function OnboardingPortal() {
     })
 
     // Simulated local files (Just names for mock UI without real storage)
-    const [docs, setDocs] = useState<{ type: string; fileName: string; fileUrl: string }[]>([])
+    const [docs, setDocs] = useState<{ type: string; fileName: string; fileUrl: string; status?: string | null; rejectionReason?: string | null }[]>([])
     const DOC_TYPES = ["Aadhaar Card", "PAN Card", "Resume", "Educational Certificates", "Bank Proof", "Photo"]
 
     useEffect(() => {
