@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)

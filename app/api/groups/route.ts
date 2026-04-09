@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +14,10 @@ export async function GET(req: Request) {
     if (!session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
 
     const { user } = session
     if (user.role !== Role.ADMIN && user.role !== Role.MANAGER) {
@@ -142,6 +147,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const actorId = await resolveUserId(session)
+    if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
     try {
         const body = await req.json()
         const { name, companyId, managerIds, inspectorIds } = body
@@ -157,7 +165,7 @@ export async function POST(req: Request) {
                 data: {
                     name,
                     companyId,
-                    createdBy: session.user.id
+                    createdBy: actorId!
                 }
             })
 

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request) {
     try {
@@ -78,6 +79,10 @@ export async function POST(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        // Resolve real DB user ID
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
         const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
         if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
 
@@ -134,7 +139,7 @@ export async function POST(req: Request) {
                 totalAmount,
                 paidAmount: 0,
                 notes: notes || null,
-                createdBy: session.user.id,
+                createdBy: actorId!,
                 items: {
                     create: items.map((item: {
                         description: string

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET() {
     try {
@@ -11,6 +12,10 @@ export async function GET() {
         if (!session) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
+        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
 
         const companies = await prisma.company.findMany({
             include: {
@@ -43,6 +48,9 @@ export async function POST(req: Request) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
         const body = await req.json()
         const { name, address, contactPerson, contactPhone, logoUrl } = body
 
@@ -57,7 +65,7 @@ export async function POST(req: Request) {
                 contactPerson,
                 contactPhone,
                 logoUrl,
-                createdBy: session.user.id,
+                createdBy: actorId!,
             },
         })
 

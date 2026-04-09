@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request) {
     try {
@@ -56,6 +57,10 @@ export async function POST(req: Request) {
         if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
             return new NextResponse("Forbidden", { status: 403 })
         }
+        // Resolve real DB user ID
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
 
         const body = await req.json()
         const { employeeId, siteId, startDate, shift, role, notes } = body
@@ -85,7 +90,7 @@ export async function POST(req: Request) {
                 shift: shift || null,
                 role: role || null,
                 notes: notes || null,
-                createdBy: session.user.id,
+                createdBy: actorId!,
                 isActive: true,
             },
             include: {

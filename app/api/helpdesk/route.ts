@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request) {
     try {
@@ -79,6 +80,10 @@ export async function POST(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        // Resolve real DB user ID
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
         const body = await req.json()
         const { title, description, category, priority, employeeId, dueDate } = body
 
@@ -98,7 +103,7 @@ export async function POST(req: Request) {
                 category,
                 priority: priority || "MEDIUM",
                 status: "OPEN",
-                raisedBy: session.user.id,
+                raisedBy: actorId!,
                 employeeId: employeeId || null,
                 dueDate: dueDate ? new Date(dueDate) : null,
             },

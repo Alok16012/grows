@@ -3,12 +3,17 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role, LeadStatus } from "@prisma/client"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
     if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
 
     const lead = await prisma.lead.findUnique({
         where: { id: params.id },
@@ -31,6 +36,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const actorId = await resolveUserId(session)
+    if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
     try {
         const body = await req.json()
@@ -70,7 +78,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             await prisma.leadActivity.create({
                 data: {
                     leadId: params.id,
-                    userId: session.user.id,
+                    userId: actorId!,
                     type: "status_change",
                     content: `Status changed: ${statusLabels[prev.status] ?? prev.status} → ${statusLabels[body.status] ?? body.status}`
                 }

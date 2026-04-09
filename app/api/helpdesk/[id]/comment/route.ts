@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function POST(
     req: Request,
@@ -11,11 +12,14 @@ export async function POST(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
         const ticket = await prisma.ticket.findUnique({ where: { id: params.id } })
         if (!ticket) return new NextResponse("Not Found", { status: 404 })
 
         const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
-        if (!isPrivileged && ticket.raisedBy !== session.user.id) {
+        if (!isPrivileged && ticket.raisedBy !== actorId) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -32,7 +36,7 @@ export async function POST(
         const comment = await prisma.ticketComment.create({
             data: {
                 ticketId: params.id,
-                userId: session.user.id,
+                userId: actorId!,
                 content: content.trim(),
                 isInternal: internal,
             },

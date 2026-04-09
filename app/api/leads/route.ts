@@ -3,12 +3,17 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session)
+        if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
 
     const { searchParams } = new URL(req.url)
     const status = searchParams.get("status")
@@ -50,6 +55,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const actorId = await resolveUserId(session)
+    if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
     try {
         const body = await req.json()
         const {
@@ -80,7 +88,7 @@ export async function POST(req: Request) {
                 assignedTo: assignedTo || null,
                 notes: notes || null,
                 nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : null,
-                createdBy: session.user.id,
+                createdBy: actorId!,
             },
             include: {
                 assignee: { select: { id: true, name: true } },
@@ -91,7 +99,7 @@ export async function POST(req: Request) {
         await prisma.leadActivity.create({
             data: {
                 leadId: lead.id,
-                userId: session.user.id,
+                userId: actorId!,
                 type: "note",
                 content: `Candidate ${candidateName} added for ${position} position`
             }
