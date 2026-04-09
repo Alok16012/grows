@@ -58,7 +58,10 @@ export async function POST(req: Request) {
             candidateName, phone, email, city, position,
             experience, currentCompany, qualification, skills,
             expectedSalary, currentSalary, interviewDate, interviewMode,
-            source, priority, score, assignedTo, notes, nextFollowUp
+            source, priority, score, assignedTo, notes, nextFollowUp,
+            locality, gender, languages, age, course, specialization, collegeName,
+            courseStartYear, courseEndYear, previousDesignation, previousCompany,
+            resumeUrl, profileUrl, englishLevel, levelOfExperience
         } = body
 
         if (!candidateName || !phone || !position || !source) {
@@ -102,6 +105,21 @@ export async function POST(req: Request) {
                 notes: notes || null,
                 nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : null,
                 createdBy: creatorId,
+                locality: locality || null,
+                gender: gender || null,
+                languages: languages || null,
+                age: age ? parseInt(age) : null,
+                course: course || null,
+                specialization: specialization || null,
+                collegeName: collegeName || null,
+                courseStartYear: courseStartYear || null,
+                courseEndYear: courseEndYear || null,
+                previousDesignation: previousDesignation || null,
+                previousCompany: previousCompany || null,
+                resumeUrl: resumeUrl || null,
+                profileUrl: profileUrl || null,
+                englishLevel: englishLevel || null,
+                levelOfExperience: levelOfExperience || null,
             },
             include: {
                 assignee: { select: { id: true, name: true } },

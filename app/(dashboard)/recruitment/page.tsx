@@ -65,7 +65,7 @@ const POSITIONS = [
     "Data Entry Operator", "Other"
 ]
 
-const SOURCES = ["Walk-in", "LinkedIn", "Naukri", "Indeed", "Referral", "WhatsApp", "Agency", "Newspaper Ad", "Other"]
+const SOURCES = ["Walk-in", "LinkedIn", "Naukri", "Indeed", "WorkIndia", "Referral", "WhatsApp", "Agency", "Newspaper Ad", "Other"]
 const QUALIFICATIONS = ["8th Pass", "10th Pass", "12th Pass", "ITI", "Diploma", "Graduate", "Post Graduate", "Other"]
 const INTERVIEW_MODES = ["In-person", "Phone", "Video Call", "WhatsApp Video"]
 const DOC_TYPES = ["RESUME", "AADHAAR", "PAN", "CERTIFICATE", "OTHER"]
@@ -99,6 +99,21 @@ interface Lead {
     assignedTo?: string
     notes?: string
     nextFollowUp?: string
+    locality?: string
+    gender?: string
+    languages?: string
+    age?: number
+    course?: string
+    specialization?: string
+    collegeName?: string
+    courseStartYear?: string
+    courseEndYear?: string
+    previousDesignation?: string
+    previousCompany?: string
+    resumeUrl?: string
+    profileUrl?: string
+    englishLevel?: string
+    levelOfExperience?: string
     createdAt: string
     updatedAt: string
     assignee?: { id: string; name: string; email: string }
@@ -238,7 +253,12 @@ export default function RecruitmentPage() {
         position: "", experience: "", currentCompany: "", qualification: "",
         skills: "", expectedSalary: "", currentSalary: "",
         interviewDate: "", interviewMode: "", source: "", priority: "MEDIUM",
-        score: "WARM", assignedTo: "", notes: "", nextFollowUp: ""
+        score: "WARM", assignedTo: "", notes: "", nextFollowUp: "",
+        locality: "", gender: "", languages: "", age: "",
+        course: "", specialization: "", collegeName: "",
+        courseStartYear: "", courseEndYear: "",
+        previousDesignation: "", previousCompany: "",
+        resumeUrl: "", profileUrl: "", englishLevel: "", levelOfExperience: ""
     }
     const [form, setForm] = useState(emptyForm)
 
@@ -268,45 +288,37 @@ export default function RecruitmentPage() {
 
     function handleDownloadTemplate() {
         const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.aoa_to_sheet([["Candidate Name", "Phone", "Email", "City", "Position", "Source", "Experience", "Qualification", "Skills", "Notes"]])
+        const ws = XLSX.utils.aoa_to_sheet([[
+            "Candidate Name", "Phone", "Email", "City", "Locality", "Position", "Source",
+            "Experience", "Qualification", "Skills", "Notes",
+            "Gender", "Age", "English Level", "Level Of Experience", "Languages Known",
+            "Previous Designation", "Previous Company", "Course", "Specialization",
+            "College Name", "Course Start Year", "Course End Year",
+            "Current Salary", "Resume URL", "Profile URL"
+        ]])
         XLSX.utils.book_append_sheet(wb, ws, "Leads")
         XLSX.writeFile(wb, "recruitment_template.xlsx")
     }
 
-    function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
         if (!file) return
-        const reader = new FileReader()
-        reader.onload = (ev) => {
-            const arrayBuffer = ev.target?.result as ArrayBuffer
-            const wb = XLSX.read(arrayBuffer, { type: "array" })
+        try {
+            let wb: XLSX.WorkBook
+            if (file.name.endsWith(".csv")) {
+                const text = await file.text()
+                wb = XLSX.read(text, { type: "string" })
+            } else {
+                const ab = await file.arrayBuffer()
+                wb = XLSX.read(ab, { type: "array" })
+            }
             const ws = wb.Sheets[wb.SheetNames[0]]
             const rawRows = XLSX.utils.sheet_to_json(ws) as Record<string, unknown>[]
-            // Normalize keys
-            const normalized = rawRows.map(r => {
-                const entry: Record<string, unknown> = {}
-                for (const key of Object.keys(r)) {
-                    const val = r[key]
-                    const lk = key.toLowerCase().replace(/\s+/g, "")
-                    if (lk === "candidatename") entry.candidateName = val
-                    else if (lk === "phone") entry.phone = val
-                    else if (lk === "email") entry.email = val
-                    else if (lk === "city") entry.city = val
-                    else if (lk === "position") entry.position = val
-                    else if (lk === "source") entry.source = val
-                    else if (lk === "experience") entry.experience = val
-                    else if (lk === "qualification") entry.qualification = val
-                    else if (lk === "skills") entry.skills = val
-                    else if (lk === "notes") entry.notes = val
-                    else if (lk === "priority") entry.priority = val
-                    else if (lk === "score") entry.score = val
-                }
-                return entry
-            })
-            setImportRows(normalized)
+            setImportRows(rawRows)
             setImportResult(null)
+        } catch {
+            toast.error("Failed to read file")
         }
-        reader.readAsArrayBuffer(file)
     }
 
     async function handleImportSubmit() {
@@ -442,6 +454,21 @@ export default function RecruitmentPage() {
             assignedTo: lead.assignedTo ?? "",
             notes: lead.notes ?? "",
             nextFollowUp: lead.nextFollowUp ? lead.nextFollowUp.slice(0, 10) : "",
+            locality: lead.locality ?? "",
+            gender: lead.gender ?? "",
+            languages: lead.languages ?? "",
+            age: lead.age?.toString() ?? "",
+            course: lead.course ?? "",
+            specialization: lead.specialization ?? "",
+            collegeName: lead.collegeName ?? "",
+            courseStartYear: lead.courseStartYear ?? "",
+            courseEndYear: lead.courseEndYear ?? "",
+            previousDesignation: lead.previousDesignation ?? "",
+            previousCompany: lead.previousCompany ?? "",
+            resumeUrl: lead.resumeUrl ?? "",
+            profileUrl: lead.profileUrl ?? "",
+            englishLevel: lead.englishLevel ?? "",
+            levelOfExperience: lead.levelOfExperience ?? "",
         })
         setShowForm(true)
     }
@@ -822,6 +849,75 @@ export default function RecruitmentPage() {
                                         <option value="">Select mode</option>
                                         {INTERVIEW_MODES.map(m => <option key={m} value={m}>{m}</option>)}
                                     </select>
+                                </Field>
+                            </div>
+                        </div>
+
+                        {/* Education & Background */}
+                        <div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Education & Background</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <Field label="Gender">
+                                    <select value={form.gender} onChange={e => setForm(p => ({ ...p, gender: e.target.value }))} className={inputCls}>
+                                        <option value="">Select gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                        <option value="Not Specified">Not Specified</option>
+                                    </select>
+                                </Field>
+                                <Field label="Age">
+                                    <input type="number" min="16" max="80" value={form.age} onChange={e => setForm(p => ({ ...p, age: e.target.value }))}
+                                        placeholder="e.g. 28" className={inputCls} />
+                                </Field>
+                                <Field label="English Level">
+                                    <select value={form.englishLevel} onChange={e => setForm(p => ({ ...p, englishLevel: e.target.value }))} className={inputCls}>
+                                        <option value="">Select level</option>
+                                        <option value="Good English">Good English</option>
+                                        <option value="Basic English">Basic English</option>
+                                        <option value="No English">No English</option>
+                                    </select>
+                                </Field>
+                                <Field label="Level of Experience">
+                                    <select value={form.levelOfExperience} onChange={e => setForm(p => ({ ...p, levelOfExperience: e.target.value }))} className={inputCls}>
+                                        <option value="">Select level</option>
+                                        <option value="Fresher">Fresher</option>
+                                        <option value="Experienced">Experienced</option>
+                                    </select>
+                                </Field>
+                                <Field label="Languages Known">
+                                    <input value={form.languages} onChange={e => setForm(p => ({ ...p, languages: e.target.value }))}
+                                        placeholder="e.g. Hindi, English, Marathi" className={inputCls} />
+                                </Field>
+                                <Field label="Previous Designation">
+                                    <input value={form.previousDesignation} onChange={e => setForm(p => ({ ...p, previousDesignation: e.target.value }))}
+                                        placeholder="Last job title" className={inputCls} />
+                                </Field>
+                                <Field label="Previous Company">
+                                    <input value={form.previousCompany} onChange={e => setForm(p => ({ ...p, previousCompany: e.target.value }))}
+                                        placeholder="Last employer" className={inputCls} />
+                                </Field>
+                                <Field label="Course">
+                                    <input value={form.course} onChange={e => setForm(p => ({ ...p, course: e.target.value }))}
+                                        placeholder="BE / BTech / MBA / ITI" className={inputCls} />
+                                </Field>
+                                <Field label="Specialization">
+                                    <input value={form.specialization} onChange={e => setForm(p => ({ ...p, specialization: e.target.value }))}
+                                        placeholder="Mechanical / CS / HR" className={inputCls} />
+                                </Field>
+                                <Field label="College Name">
+                                    <input value={form.collegeName} onChange={e => setForm(p => ({ ...p, collegeName: e.target.value }))}
+                                        placeholder="College / University" className={inputCls} />
+                                </Field>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                                <Field label="Resume URL">
+                                    <input value={form.resumeUrl} onChange={e => setForm(p => ({ ...p, resumeUrl: e.target.value }))}
+                                        placeholder="Paste resume link" className={inputCls} />
+                                </Field>
+                                <Field label="Profile URL">
+                                    <input value={form.profileUrl} onChange={e => setForm(p => ({ ...p, profileUrl: e.target.value }))}
+                                        placeholder="WorkIndia / LinkedIn URL" className={inputCls} />
                                 </Field>
                             </div>
                         </div>
@@ -1566,14 +1662,41 @@ function DetailDrawer({
                     {/* OVERVIEW TAB */}
                     {drawerTab === "overview" && (
                         <div className="px-5 py-4">
+                            {/* Resume / Profile links */}
+                            {(lead.resumeUrl || lead.profileUrl) && (
+                                <div className="flex gap-2 mb-4 flex-wrap">
+                                    {lead.resumeUrl && (
+                                        <a href={lead.resumeUrl} target="_blank" rel="noopener noreferrer"
+                                            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", background: "var(--accent)", color: "#fff", borderRadius: "7px", fontSize: "12px", fontWeight: 600, textDecoration: "none" }}>
+                                            <FileText size={13} /> View Resume
+                                        </a>
+                                    )}
+                                    {lead.profileUrl && (
+                                        <a href={lead.profileUrl} target="_blank" rel="noopener noreferrer"
+                                            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "7px", fontSize: "12px", fontWeight: 600, textDecoration: "none" }}>
+                                            <Target size={13} /> View Profile
+                                        </a>
+                                    )}
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-y-3 gap-x-4">
                                 <InfoRow icon={Phone} label="Phone" value={lead.phone} />
                                 {lead.email && <InfoRow icon={Mail} label="Email" value={lead.email} />}
                                 {lead.city && <InfoRow icon={MapPin} label="City" value={lead.city} />}
+                                {lead.locality && <InfoRow icon={MapPin} label="Locality" value={lead.locality} />}
                                 {lead.experience != null && <InfoRow icon={Clock} label="Experience" value={`${lead.experience} years`} />}
+                                {lead.levelOfExperience && <InfoRow icon={TrendingUp} label="Level" value={lead.levelOfExperience} />}
                                 {lead.currentCompany && <InfoRow icon={Building2} label="Prev Company" value={lead.currentCompany} />}
+                                {lead.previousCompany && <InfoRow icon={Building2} label="Prev Company" value={lead.previousCompany} />}
+                                {lead.previousDesignation && <InfoRow icon={Briefcase} label="Prev Designation" value={lead.previousDesignation} />}
                                 {lead.qualification && <InfoRow icon={GraduationCap} label="Qualification" value={lead.qualification} />}
+                                {lead.course && <InfoRow icon={GraduationCap} label="Course" value={`${lead.course}${lead.specialization ? ` · ${lead.specialization}` : ""}`} />}
+                                {lead.collegeName && <InfoRow icon={GraduationCap} label="College" value={lead.collegeName} />}
                                 {lead.skills && <InfoRow icon={Wrench} label="Skills" value={lead.skills} />}
+                                {lead.gender && <InfoRow icon={Users} label="Gender" value={lead.gender} />}
+                                {lead.age != null && <InfoRow icon={Clock} label="Age" value={`${lead.age} years`} />}
+                                {lead.languages && <InfoRow icon={MessageSquare} label="Languages" value={lead.languages} />}
+                                {lead.englishLevel && <InfoRow icon={CheckSquare} label="English" value={lead.englishLevel} />}
                                 <InfoRow icon={Target} label="Source" value={lead.source} />
                                 {lead.currentSalary && <InfoRow icon={Banknote} label="Current CTC" value={fmtSalary(lead.currentSalary) ?? ""} />}
                                 {lead.expectedSalary && <InfoRow icon={Banknote} label="Expected CTC" value={fmtSalary(lead.expectedSalary) ?? ""} />}

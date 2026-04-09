@@ -55,12 +55,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             "currentCompany", "qualification", "skills", "interviewMode",
             "source", "priority", "score", "assignedTo", "notes", "nextFollowUp",
             "interviewerId", "interviewFeedback", "interviewResult",
+            "locality", "gender", "languages", "course", "specialization",
+            "collegeName", "courseStartYear", "courseEndYear", "previousDesignation",
+            "previousCompany", "resumeUrl", "profileUrl", "englishLevel", "levelOfExperience",
         ]
         allowedFields.forEach(f => {
             if (f in body) updateData[f] = body[f] ?? null
         })
 
         if (body.experience !== undefined) updateData.experience = body.experience ? parseFloat(body.experience) : null
+        if (body.age !== undefined) updateData.age = body.age ? parseInt(body.age) : null
         if (body.expectedSalary !== undefined) updateData.expectedSalary = body.expectedSalary ? parseFloat(body.expectedSalary) : null
         if (body.currentSalary !== undefined) updateData.currentSalary = body.currentSalary ? parseFloat(body.currentSalary) : null
         if (body.interviewDate !== undefined) updateData.interviewDate = body.interviewDate ? new Date(body.interviewDate) : null

@@ -250,6 +250,21 @@ model Lead {
   assignedTo        String?
   notes             String?
   nextFollowUp      DateTime?
+  locality          String?       // Area/locality within city (WorkIndia "Location")
+  gender            String?       // Male/Female/Other
+  languages         String?       // Known languages
+  age               Int?          // Candidate age
+  course            String?       // BE/BTech/MBA etc
+  specialization    String?       // Mechanical/CS/HR etc
+  collegeName       String?       // College/University name
+  courseStartYear   String?       // e.g. "2015-4"
+  courseEndYear     String?       // e.g. "2019-4"
+  previousDesignation String?     // Previous job title
+  previousCompany   String?       // Previous company name (separate from currentCompany)
+  resumeUrl         String?       // Direct resume download link
+  profileUrl        String?       // WorkIndia/LinkedIn profile URL
+  englishLevel      String?       // Good English / Basic English / No English
+  levelOfExperience String?       // Fresher / Experienced
   createdBy         String
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
