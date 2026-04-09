@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role, LeadStatus } from "@prisma/client"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
@@ -45,6 +46,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         const prev = await prisma.lead.findUnique({ where: { id: params.id } })
         if (!prev) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
+        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session)
+
         const updateData: any = {}
         const allowedFields = [
             "candidateName", "phone", "email", "city", "position",
@@ -79,14 +83,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 DROPPED: "Dropped",
             }
 
-            await prisma.leadActivity.create({
-                data: {
-                    leadId: params.id,
-                    userId: session.user.id,
-                    type: "status_change",
-                    content: `Status changed: ${statusLabels[prev.status] ?? prev.status} → ${statusLabels[body.status] ?? body.status}`
-                }
-            })
+            if (actorId) {
+                await prisma.leadActivity.create({
+                    data: {
+                        leadId: params.id,
+                        userId: actorId,
+                        type: "status_change",
+                        content: `Status changed: ${statusLabels[prev.status] ?? prev.status} → ${statusLabels[body.status] ?? body.status}`
+                    }
+                })
+            }
 
             // TRIGGER ONBOARDING if JOINED
             if (body.status === "JOINED") {

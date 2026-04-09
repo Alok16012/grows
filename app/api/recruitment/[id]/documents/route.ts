@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
@@ -33,13 +34,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const lead = await prisma.lead.findUnique({ where: { id: params.id } })
     if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
+    const uploaderId = await resolveUserId(session)
+    if (!uploaderId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
+
     const doc = await prisma.leadDocument.create({
         data: {
             leadId: params.id,
             docType,
             fileName,
             url,
-            uploadedBy: session.user.id,
+            uploadedBy: uploaderId,
         },
         include: { uploader: { select: { id: true, name: true } } }
     })
