@@ -4,6 +4,90 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 
+// ─── Growus Salary Formula (from Internal Calculation.xlsx) ───────────────────
+export function calcGrowusPayroll(sal: {
+    basic: number; da: number; washing: number; conveyance: number
+    leaveWithWages: number; otherAllowance: number
+    otRatePerHour: number; canteenRatePerDay: number
+}, att: {
+    monthDays: number; workedDays: number; otDays: number
+    canteenDays: number; penalty: number; advance: number
+    otherDeductions: number; productionIncentive: number; lwf: number
+}) {
+    const { basic, da, washing, conveyance, leaveWithWages, otherAllowance, otRatePerHour, canteenRatePerDay } = sal
+    const { monthDays, workedDays, otDays, canteenDays, penalty, advance, otherDeductions, productionIncentive, lwf } = att
+
+    // Full month components
+    const hraFull = (basic + da) * 0.05
+    const bonusFull = 7000 / 12
+
+    const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
+
+    // Prorated earned (ROUND to 0 decimal)
+    const r = (x: number) => Math.round(x / monthDays * workedDays)
+    const basicEarned   = r(basic)
+    const daEarned      = r(da)
+    const hraEarned     = r(hraFull)
+    const washingEarned = r(washing)
+    const convEarned    = r(conveyance)
+    const lwwEarned     = r(leaveWithWages)
+    const bonusEarned   = r(bonusFull)
+    const otherEarned   = r(otherAllowance)
+
+    // OT pay: ROUND(170 × OT_DAYS × 4, 0)
+    const otPay = Math.round(otRatePerHour * otDays * 4)
+
+    const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
+        lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)
+
+    // ─── Deductions ───────────────────────────────────────────────────────────
+    // PF: IF(workedDays>26, 1800, ROUND(15000/26*workedDays*12%, 0))
+    const pfEmployee = workedDays > 26
+        ? 1800
+        : Math.round((15000 / 26) * workedDays * 0.12)
+
+    // ESIC: ROUNDUP((grossEarned - washingEarned - bonusEarned) * 0.75%, 0)
+    const esiEmployee = Math.ceil((grossEarned - washingEarned - bonusEarned) * 0.0075)
+
+    // PT slab (Maharashtra)
+    const pt = grossEarned > 10000 ? 200 : (grossEarned > 7500 ? 175 : 0)
+
+    // Canteen
+    const canteen = canteenDays * canteenRatePerDay
+
+    const totalDeductions = pfEmployee + esiEmployee + pt + (lwf || 0) + (otherDeductions || 0) + canteen + (penalty || 0) + (advance || 0)
+    const netSalary = grossEarned - totalDeductions
+
+    // ─── Employer Contributions ───────────────────────────────────────────────
+    // Employer PF = 15000 * 13% = 1950 (fixed)
+    const pfEmployer = Math.round(15000 * 0.13)
+
+    // Employer ESIC: ROUNDUP((grossFullMonth - washing - bonusFull) * 3.25%, 0)
+    const esiEmployer = Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
+
+    // CTC = fullGross + empPF + empESIC
+    const ctc = grossFullMonth + pfEmployer + esiEmployer
+
+    return {
+        // Full month
+        basicFull: basic, daFull: da, hraFull, washingFull: washing,
+        conveyanceFull: conveyance, lwwFull: leaveWithWages, bonusFull,
+        otherFull: otherAllowance, grossFullMonth,
+        // Earned
+        basicSalary: basicEarned, da: daEarned, hra: hraEarned,
+        washing: washingEarned, conveyance: convEarned, lwwEarned,
+        bonus: bonusEarned, allowances: otherEarned,
+        otDays, overtimePay: otPay, productionIncentive: productionIncentive || 0,
+        grossSalary: grossEarned,
+        // Deductions
+        pfEmployee, esiEmployee, pfEmployer, esiEmployer,
+        pt, lwf: lwf || 0, canteenDays, canteen,
+        penalty: penalty || 0, advance: advance || 0,
+        otherDeductions: otherDeductions || 0,
+        totalDeductions, netSalary, ctc,
+    }
+}
+
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -12,235 +96,97 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { month, year, branchId } = body
+        const { month, year, branchId, attendance } = body
+        // attendance: Array<{ employeeId, monthDays, workedDays, otDays, canteenDays,
+        //                      penalty, advance, otherDeductions, productionIncentive, lwf }>
 
-        if (!month || !year) {
-            return new NextResponse("Month and Year required", { status: 400 })
+        if (!month || !year) return new NextResponse("Month and Year required", { status: 400 })
+
+        // Get or create payroll run
+        let run = await prisma.payrollRun.findUnique({ where: { month_year: { month, year } } })
+        if (run && run.status !== "DRAFT") {
+            return new NextResponse(`Payroll ${month}/${year} is ${run.status} — cannot recalculate.`, { status: 400 })
         }
-
-        // Check if run is locked
-        let existingRun = await prisma.payrollRun.findUnique({
-            where: { month_year: { month, year } }
-        })
-
-        if (existingRun && existingRun.status !== "DRAFT") {
-            return new NextResponse(`Payroll for ${month}/${year} is not in DRAFT state. It is ${existingRun.status}.`, { status: 400 })
-        }
-
-        if (!existingRun) {
-            existingRun = await prisma.payrollRun.create({
-                data: {
-                    month,
-                    year,
-                    processedBy: session.user.id,
-                    status: "DRAFT"
-                }
+        if (!run) {
+            run = await prisma.payrollRun.create({
+                data: { month, year, processedBy: session.user.id, status: "DRAFT" }
             })
         }
 
-        // Fetch Employees (ACTIVE)
-        const whereClause: any = { status: "ACTIVE" }
+        const whereClause: Record<string, unknown> = { status: "ACTIVE" }
         if (branchId) whereClause.branchId = branchId
 
         const employees = await prisma.employee.findMany({
             where: whereClause,
-            include: {
-                employeeSalary: true,
-                advances: {
-                    where: { monthToImpact: month, yearToImpact: year, status: "APPROVED" }
-                },
-                attendances: {
-                    where: {
-                        date: {
-                            gte: new Date(year, month - 1, 1),
-                            lt: new Date(year, month, 1)
-                        }
-                    }
-                }
-            }
+            include: { employeeSalary: true }
         })
 
-        if (employees.length === 0) {
-            return new NextResponse("No active employees found for this criteria.", { status: 404 })
-        }
+        if (!employees.length) return new NextResponse("No active employees found", { status: 404 })
 
-        const workingDays = new Date(year, month, 0).getDate() // days in month
+        const defaultMonthDays = new Date(year, month, 0).getDate()
+        let totalGross = 0, totalNet = 0, totalPfE = 0, totalEsiE = 0
 
-        let batchTotalGross = 0
-        let batchTotalNet = 0
-        let batchTotalPfE = 0
-        let batchTotalEsiE = 0
-        let batchTotalLwf = 0
-        let batchTotalTds = 0
-
-        const upsertPromises = employees.map(async emp => {
+        const upserts = employees.map(async emp => {
             const sal = emp.employeeSalary
-            if (!sal || sal.status !== "APPROVED") return null // Skip unapproved salaries
+            if (!sal || sal.status !== "APPROVED") return null
 
-            // 1. Calculate Attendance
-            // Assuming full days if missing, or exact. If attendance isn't meticulously tracked, we default to full.
-            // But we must check attendance length
-            let presentDays = 0
-            let leaveDays = 0
-            let otHrs = 0
-            
-            if (emp.attendances.length > 0) {
-                emp.attendances.forEach(a => {
-                    if (a.status === "PRESENT") presentDays += 1
-                    else if (a.status === "LEAVE") leaveDays += 1
-                    // half day logic etc
-                    if (a.overtimeHrs > 0) otHrs += a.overtimeHrs
-                })
-            } else {
-                // Default fallback if attendance not locked/mapped fully
-                presentDays = workingDays
+            const attInput = (attendance as any[])?.find((a: any) => a.employeeId === emp.id) ?? {}
+            const att = {
+                monthDays:           attInput.monthDays          ?? defaultMonthDays,
+                workedDays:          attInput.workedDays         ?? defaultMonthDays,
+                otDays:              Number(attInput.otDays)     || 0,
+                canteenDays:         Number(attInput.canteenDays)|| 0,
+                penalty:             Number(attInput.penalty)    || 0,
+                advance:             Number(attInput.advance)    || 0,
+                otherDeductions:     Number(attInput.otherDeductions) || 0,
+                productionIncentive: Number(attInput.productionIncentive) || 0,
+                lwf:                 Number(attInput.lwf)        || 0,
             }
 
-            // Days calculated (Payable)
-            const payableDays = Math.min(presentDays + leaveDays, workingDays) // Limit to working days
+            const calc = calcGrowusPayroll({
+                basic: sal.basic, da: sal.da, washing: sal.washing,
+                conveyance: sal.conveyance, leaveWithWages: sal.leaveWithWages,
+                otherAllowance: sal.otherAllowance, otRatePerHour: sal.otRatePerHour,
+                canteenRatePerDay: sal.canteenRatePerDay,
+            }, att)
 
-            // 2. Gross Earnings (Pro-Rata)
-            const basicPr_rate = (sal.basic / workingDays) * payableDays
-            const hraPr_rate = (sal.hra / workingDays) * payableDays
-            const allowPr_rate = (sal.specialAllowance / workingDays) * payableDays
+            totalGross += calc.grossSalary
+            totalNet   += calc.netSalary
+            totalPfE   += calc.pfEmployer
+            totalEsiE  += calc.esiEmployer
 
-            // Overtime Pay = (Basic / WorkingDays / 8 hrs) * 2 * OTHrs
-            const otHourlyRate = (sal.basic / workingDays / 8) * 2 
-            const otPay = otHourlyRate * otHrs
-
-            const computedGross = basicPr_rate + hraPr_rate + allowPr_rate + otPay
-
-            // 3. Statutory Deductions
-            let empPf = 0, emporPf = 0
-            if (sal.isPfEligible) {
-                empPf = basicPr_rate * 0.12
-                emporPf = basicPr_rate * 0.12
-            }
-
-            let empEsi = 0, emporEsi = 0
-            if (sal.isEsiEligible && computedGross <= 21000) {
-                empEsi = computedGross * 0.0075 // 0.75%
-                emporEsi = computedGross * 0.0325 // 3.25%
-            }
-
-            // PT & LWF (Mocks based on slabs, PT varies by state wildly. Setting flat mapping for demo)
-            let pt = 0
-            if (sal.isPtEligible) {
-                if (computedGross >= 15000) pt = 200
-            }
-            let lwf = sal.lwfState ? 25 : 0 // Flat 25 deduction if LWF state appended
-            
-            // TDS mapping (Manual for now, but we can hook in a field on EmployeeSalary)
-            let tds = 0
-
-            // Advances Deductions
-            let otherDeds = 0
-            emp.advances.forEach(adv => {
-                otherDeds += adv.amount
-            })
-
-            const totalDeds = empPf + empEsi + pt + lwf + tds + otherDeds
-            const netPay = computedGross - totalDeds
-
-            // Roll up totals for batch
-            batchTotalGross += computedGross
-            batchTotalNet += netPay
-            batchTotalPfE += emporPf
-            batchTotalEsiE += emporEsi
-            batchTotalLwf += lwf
-            batchTotalTds += tds
-
-            // 4. Save to Payroll model
             return prisma.payroll.upsert({
                 where: { employeeId_month_year: { employeeId: emp.id, month, year } },
                 create: {
-                    employeeId: emp.id,
-                    payrollRunId: existingRun.id,
-                    month,
-                    year,
-                    basicSalary: basicPr_rate,
-                    hra: hraPr_rate,
-                    allowances: allowPr_rate,
-                    overtimePay: otPay,
-                    grossSalary: computedGross,
-                    pfEmployee: empPf,
-                    pfEmployer: emporPf,
-                    esiEmployee: empEsi,
-                    esiEmployer: emporEsi,
-                    pt,
-                    lwf,
-                    tds,
-                    otherDeductions: otherDeds,
-                    totalDeductions: totalDeds,
-                    netSalary: netPay,
-                    workingDays,
-                    presentDays,
-                    leaveDays,
-                    lwpDays: workingDays - payableDays,
-                    overtimeHrs: otHrs,
-                    overtimeRate: otHourlyRate,
-                    bonus: sal.bonus || 0,
-                    siteId: emp.branchId, // Tagging with branchId as default site for now
-                    status: "DRAFT"
+                    employeeId: emp.id, payrollRunId: run.id, month, year,
+                    ...calc,
+                    workingDays: att.monthDays, presentDays: att.workedDays,
+                    lwpDays: att.monthDays - att.workedDays,
+                    overtimeHrs: att.otDays * 4,
+                    status: "DRAFT", processedBy: session.user.id,
                 },
                 update: {
-                    payrollRunId: existingRun.id,
-                    basicSalary: basicPr_rate,
-                    hra: hraPr_rate,
-                    allowances: allowPr_rate,
-                    overtimePay: otPay,
-                    grossSalary: computedGross,
-                    pfEmployee: empPf,
-                    pfEmployer: emporPf,
-                    esiEmployee: empEsi,
-                    esiEmployer: emporEsi,
-                    pt,
-                    lwf,
-                    tds,
-                    otherDeductions: otherDeds,
-                    totalDeductions: totalDeds,
-                    netSalary: netPay,
-                    workingDays,
-                    presentDays,
-                    leaveDays,
-                    lwpDays: workingDays - payableDays,
-                    overtimeHrs: otHrs,
-                    overtimeRate: otHourlyRate,
-                    bonus: sal.bonus || 0,
-                    siteId: emp.branchId,
+                    payrollRunId: run.id,
+                    ...calc,
+                    workingDays: att.monthDays, presentDays: att.workedDays,
+                    lwpDays: att.monthDays - att.workedDays,
+                    overtimeHrs: att.otDays * 4,
+                    processedBy: session.user.id,
                 }
             })
         })
 
-        const results = await Promise.all(upsertPromises)
-        const processedCount = results.filter(r => r !== null).length
+        const results = await Promise.all(upserts)
+        const processedCount = results.filter(Boolean).length
 
-        // Update Run Totals
         await prisma.payrollRun.update({
-            where: { id: existingRun.id },
-            data: {
-                totalGross: batchTotalGross,
-                totalNet: batchTotalNet,
-                totalPfEmployer: batchTotalPfE,
-                totalEsiEmployer: batchTotalEsiE,
-                totalLwf: batchTotalLwf,
-                totalTds: batchTotalTds
-            }
+            where: { id: run.id },
+            data: { totalGross, totalNet, totalPfEmployer: totalPfE, totalEsiEmployer: totalEsiE }
         })
 
-        // Also mark Advances as DEDUCTED
-        const advanceIdsToUpdate = employees.flatMap(e => e.advances.map(a => a.id))
-        if (advanceIdsToUpdate.length > 0) {
-            await prisma.advanceAndReimbursement.updateMany({
-                where: { id: { in: advanceIdsToUpdate } },
-                data: { status: "DEDUCTED" }
-            })
-        }
-
-        return NextResponse.json({ success: true, processedCount, runId: existingRun.id })
-
+        return NextResponse.json({ success: true, processedCount, runId: run.id })
     } catch (error) {
-        console.error("[PAYROLL_CALCULATE_ERROR]", error)
+        console.error("[PAYROLL_CALCULATE]", error)
         return new NextResponse("Internal Error", { status: 500 })
     }
 }

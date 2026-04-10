@@ -603,28 +603,32 @@ model EmployeeDocument {
 model EmployeeSalary {
   id                String   @id @default(uuid())
   employeeId        String   @unique
-  ctcAnnual         Float
-  ctcMonthly        Float
+  // Core salary components (monthly fixed)
   basic             Float    @default(0)
-  hra               Float    @default(0)
+  da                Float    @default(0)   // Dearness Allowance
+  washing           Float    @default(0)   // Washing Allowance
+  conveyance        Float    @default(0)   // Conveyance Allowance
+  leaveWithWages    Float    @default(0)   // Leave With Wages
+  otherAllowance    Float    @default(0)   // Other Allowance
+  otRatePerHour     Float    @default(170) // OT rate per calculation unit (₹170 default)
+  canteenRatePerDay Float    @default(55)  // Canteen rate per day (₹55 default)
+  // Legacy/kept fields
+  ctcAnnual         Float    @default(0)
+  ctcMonthly        Float    @default(0)
+  hra               Float    @default(0)   // Auto-calculated: (basic+da)*5%, kept for reference
   specialAllowance  Float    @default(0)
-  pfEmployer        Float    @default(0)
-  pfEmployee        Float    @default(0)
-  esiEmployer       Float    @default(0)
-  esiEmployee       Float    @default(0)
   isPfEligible      Boolean  @default(true)
   isEsiEligible     Boolean  @default(true)
   isPtEligible      Boolean  @default(true)
   lwfState          String?
-  serviceChargeRate Float    @default(0) // Client Margin %, e.g., 5.0 for 5%
-  bonus             Float    @default(0) // Annual/Monthly Bonus amount
-  status            String   @default("PROPOSED") // PROPOSED, APPROVED, REJECTED
-  proposedBy        String
+  serviceChargeRate Float    @default(0)
+  status            String   @default("APPROVED") // PROPOSED, APPROVED, REJECTED
+  proposedBy        String   @default("system")
   approvedBy        String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  
+
   @@index([status])
 }
 
@@ -718,11 +722,30 @@ model Payroll {
   payrollRunId    String?
   month           Int
   year            Int
-  basicSalary     Float
-  hra             Float         @default(0)
-  allowances      Float         @default(0)
-  overtimePay     Float         @default(0)
-  grossSalary     Float
+  // --- Full Month Earnings (Section 1) ---
+  basicFull       Float         @default(0)
+  daFull          Float         @default(0)
+  hraFull         Float         @default(0)
+  washingFull     Float         @default(0)
+  conveyanceFull  Float         @default(0)
+  lwwFull         Float         @default(0)
+  bonusFull       Float         @default(0)
+  otherFull       Float         @default(0)
+  grossFullMonth  Float         @default(0)  // Sum of all full-month components
+  // --- Earned/Prorated Earnings (Section 2) ---
+  basicSalary     Float         @default(0)  // basicEarned
+  da              Float         @default(0)  // daEarned
+  hra             Float         @default(0)  // hraEarned
+  washing         Float         @default(0)  // washingEarned
+  conveyance      Float         @default(0)  // conveyanceEarned
+  lwwEarned       Float         @default(0)
+  bonus           Float         @default(0)  // bonusEarned
+  allowances      Float         @default(0)  // otherEarned
+  otDays          Float         @default(0)
+  overtimePay     Float         @default(0)  // OT pay
+  productionIncentive Float     @default(0)
+  grossSalary     Float         @default(0)  // Total gross earned
+  // --- Deductions ---
   pfEmployee      Float         @default(0)
   pfEmployer      Float         @default(0)
   esiEmployee     Float         @default(0)
@@ -730,17 +753,23 @@ model Payroll {
   pt              Float         @default(0)
   lwf             Float         @default(0)
   tds             Float         @default(0)
+  canteenDays     Int           @default(0)
+  canteen         Float         @default(0)
+  penalty         Float         @default(0)
+  advance         Float         @default(0)
   otherDeductions Float         @default(0)
-  bonus           Float         @default(0)
   totalDeductions Float         @default(0)
-  netSalary       Float
+  // --- Net & CTC ---
+  netSalary       Float         @default(0)
+  ctc             Float         @default(0)  // CTC = fullGross + empPF + empESIC
+  // --- Attendance ---
   workingDays     Int           @default(26)
   presentDays     Int           @default(26)
   leaveDays       Float         @default(0)
   lwpDays         Float         @default(0)
   overtimeHrs     Float         @default(0)
   overtimeRate    Float         @default(0)
-  siteId          String?       // For Site-wise reporting
+  siteId          String?
   status          PayrollStatus @default(DRAFT)
   processedAt     DateTime?
   processedBy     String?
