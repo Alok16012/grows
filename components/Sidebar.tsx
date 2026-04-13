@@ -171,7 +171,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 overflow-y-auto pt-4 px-2 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto pt-4 px-2 scrollbar-thin" suppressHydrationWarning>
                 {navigation.map((section) => {
                     const currentRole = String(role || "")
                     const filteredLinks = section.links.filter(link =>

@@ -3,7 +3,7 @@ const nextConfig = {
     compress: true,
     poweredByHeader: false,
     experimental: {
-        optimizePackageImports: ["lucide-react", "@radix-ui/react-icons", "recharts"],
+        optimizePackageImports: ["@radix-ui/react-icons", "recharts"],
     },
     generateBuildId: async () => {
         return `build-${Date.now()}`;
