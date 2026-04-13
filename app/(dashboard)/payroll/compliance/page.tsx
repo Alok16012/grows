@@ -12,13 +12,6 @@ import { toast } from "sonner"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
-const INDIA_STATES = [
-    "All States","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh",
-    "Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala",
-    "Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha",
-    "Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
-    "Uttarakhand","West Bengal","Delhi","Jammu & Kashmir","Ladakh","Puducherry"
-]
 
 type StatsData = {
     totalEmployees: number
@@ -67,9 +60,25 @@ export default function ComplianceDownloadsPage() {
     const [year, setYear] = useState(now.getFullYear())
     const [state, setState] = useState("All States")
 
+    const [employeeStates, setEmployeeStates] = useState<string[]>([])
     const [stats, setStats] = useState<StatsData | null>(null)
     const [loading, setLoading] = useState(false)
     const [dataLoaded, setDataLoaded] = useState(false)
+
+    useEffect(() => {
+        // Fetch distinct employee states from DB
+        fetch("/api/employees")
+            .then(r => r.json())
+            .then((data: Array<{ state?: string }>) => {
+                const states = Array.from(new Set(
+                    (Array.isArray(data) ? data : (data as { data?: Array<{ state?: string }> }).data ?? [])
+                        .map((e) => e.state)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )).sort()
+                setEmployeeStates(states)
+            })
+            .catch(() => {})
+    }, [])
 
     const [downloading, setDownloading] = useState<string | null>(null)
 
@@ -239,18 +248,21 @@ export default function ComplianceDownloadsPage() {
                             ))}
                         </select>
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Location / State</label>
-                        <select
-                            value={state}
-                            onChange={e => setState(e.target.value)}
-                            className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 min-w-[160px]"
-                        >
-                            {INDIA_STATES.map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                    </div>
+                    {employeeStates.length > 0 && (
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">State (PT Filter)</label>
+                            <select
+                                value={state}
+                                onChange={e => setState(e.target.value)}
+                                className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 min-w-[160px]"
+                            >
+                                <option value="All States">All States</option>
+                                {employeeStates.map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <button
                         onClick={handleLoad}
                         disabled={loading}
