@@ -37,7 +37,9 @@ import {
     GraduationCap,
     Navigation,
     Shield,
-    Briefcase
+    Briefcase,
+    ShieldCheck,
+    Upload
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -94,8 +96,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "HR OPERATIONS",
             links: [
                 { name: "Attendance", href: "/attendance", icon: Clock, roles: ["ADMIN", "MANAGER"] },
+                { name: "Upload Attendance", href: "/attendance/upload", icon: Upload, roles: ["ADMIN", "MANAGER"] },
                 { name: "Leaves", href: "/leaves", icon: CalendarOff, roles: ["ADMIN", "MANAGER"] },
                 { name: "Payroll", href: "/payroll", icon: Wallet, roles: ["ADMIN", "MANAGER"] },
+                { name: "Compliance", href: "/payroll/compliance", icon: ShieldCheck, roles: ["ADMIN", "MANAGER"] },
                 { name: "Assets", href: "/assets", icon: Package, roles: ["ADMIN", "MANAGER"] },
                 { name: "Expenses", href: "/expenses", icon: CreditCard, roles: ["ADMIN", "MANAGER"] },
             ]
