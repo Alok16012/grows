@@ -40,7 +40,8 @@ import {
     Briefcase,
     ShieldCheck,
     Upload,
-    FileDown
+    FileDown,
+    FolderOpen
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -115,6 +116,13 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "LMS", href: "/lms", icon: GraduationCap, roles: ["ADMIN", "MANAGER"] },
                 { name: "My Learning", href: "/lms/learn", icon: GraduationCap, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"] },
                 { name: "My Profile", href: "/profile", icon: UserCheck, roles: ["INSPECTION_BOY"] },
+            ]
+        },
+        {
+            title: "DOCUMENTS",
+            links: [
+                { name: "Documents", href: "/documents", icon: FileText, roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"] },
+                { name: "Doc Types", href: "/documents/types", icon: FolderOpen, roles: ["ADMIN", "HR_MANAGER"] },
             ]
         },
         {

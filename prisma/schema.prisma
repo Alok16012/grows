@@ -595,6 +595,7 @@ model Employee {
   courseFeedbacks  CourseFeedback[]
   employeeSalary   EmployeeSalary?
   advances         AdvanceAndReimbursement[]
+  hrDocuments      HrDocument[]
 
   @@index([branchId])
   @@index([status])
@@ -1634,4 +1635,51 @@ model ContractRenewal {
   contract     ClientContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
   @@index([contractId])
+}
+
+model HrDocumentType {
+  id               String       @id @default(uuid())
+  name             String       @unique
+  description      String?
+  templateContent  String?      // HTML/text template with {{variables}}
+  autoGenerate     Boolean      @default(false)
+  requiresApproval Boolean      @default(true)
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  documents        HrDocument[]
+}
+
+enum HrDocStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ISSUED
+}
+
+model HrDocument {
+  id             String          @id @default(uuid())
+  docNumber      String          @unique // e.g. DOC-2026-0001
+  employeeId     String
+  typeId         String
+  effectiveDate  DateTime?
+  content        String          // Filled template content
+  status         HrDocStatus     @default(DRAFT)
+  remarks        String?
+  rejectionNote  String?
+  createdBy      String          // userId
+  approvedBy     String?         // userId
+  issuedBy       String?         // userId
+  approvedAt     DateTime?
+  issuedAt       DateTime?
+  acknowledged   Boolean         @default(false)
+  acknowledgedAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type           HrDocumentType  @relation(fields: [typeId], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
 }
