@@ -196,6 +196,7 @@ model AlertConfig {
 enum Role {
   ADMIN
   MANAGER
+  HR_MANAGER
   INSPECTION_BOY
   CLIENT
 }

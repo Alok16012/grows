@@ -15,6 +15,8 @@ export default withAuth(
                         return NextResponse.redirect(new URL("/admin", req.url))
                     case "MANAGER":
                         return NextResponse.redirect(new URL("/manager", req.url))
+                    case "HR_MANAGER":
+                        return NextResponse.redirect(new URL("/employees", req.url))
                     case "INSPECTION_BOY":
                         return NextResponse.redirect(new URL("/inspection", req.url))
                     case "CLIENT":
@@ -44,14 +46,15 @@ export default withAuth(
         // Better logic: Redirect to own dashboard if trying to access another's.
         // We can simplify:
 
-        const rolePaths = {
+        const rolePaths: Record<string, string> = {
             "ADMIN": "/admin",
             "MANAGER": "/manager",
+            "HR_MANAGER": "/employees",
             "INSPECTION_BOY": "/inspection",
             "CLIENT": "/client"
         }
 
-        const allowedPath = rolePaths[token.role] || "/"
+        const allowedPath = rolePaths[token.role as string] || "/"
 
         // If user is accessing a protected route that doesn't match their role
         if (
@@ -60,9 +63,7 @@ export default withAuth(
             (path.startsWith("/inspection") && token.role !== "INSPECTION_BOY" && token.role !== "ADMIN") ||
             (path.startsWith("/client") && token.role !== "CLIENT")
         ) {
-            // Special case for Inspection Boy path mapping
-            let target = rolePaths[token.role]
-            // If the map failed (shouldn't), fallback to home
+            const target = rolePaths[token.role as string]
             return NextResponse.redirect(new URL(target || "/", req.url))
         }
 

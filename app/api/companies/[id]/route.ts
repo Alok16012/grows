@@ -48,7 +48,7 @@ export async function PUT(
             return new NextResponse("Unauthorized", { status: 401 })
         }
 
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -90,7 +90,7 @@ export async function DELETE(
             return new NextResponse("Unauthorized", { status: 401 })
         }
 
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

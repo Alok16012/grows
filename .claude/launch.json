@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "cims-dev",
-      "runtimeExecutable": "/usr/local/bin/node",
-      "runtimeArgs": ["/Users/alokkumar/Desktop/grawssaps/cims/node_modules/.bin/next", "dev", "-p", "3002"],
-      "port": 3002
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
     }
   ]
 }

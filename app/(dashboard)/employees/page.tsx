@@ -285,12 +285,56 @@ function AddBranchMini({ onCreated }: { onCreated: (b: Branch) => void }) {
     )
 }
 
+function CredentialsModal({ email, password, onClose }: { email: string; password: string; onClose: () => void }) {
+    const [copied, setCopied] = useState(false)
+    const copy = () => {
+        navigator.clipboard.writeText(`Email: ${email}\nPassword: ${password}`)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+    return (
+        <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", padding: 16 }}>
+            <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <CheckCircle size={20} style={{ color: "#16a34a" }} />
+                    </div>
+                    <div>
+                        <p style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", margin: 0 }}>Employee Account Created</p>
+                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share these login credentials with the employee</p>
+                    </div>
+                </div>
+                <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                    <div style={{ marginBottom: 10 }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 3px" }}>Login Email / ID</p>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0, wordBreak: "break-all" }}>{email}</p>
+                    </div>
+                    <div>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 3px" }}>Password</p>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0, fontFamily: "monospace", letterSpacing: "1px" }}>{password}</p>
+                    </div>
+                </div>
+                <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>Password is set to the employee&apos;s phone number. Ask them to change it after first login.</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={copy} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                        {copied ? "Copied!" : "Copy Credentials"}
+                    </button>
+                    <button onClick={onClose} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function EmployeeModal({
     open, onClose, onSaved, branches: initialBranches, employee,
 }: {
     open: boolean; onClose: () => void; onSaved: () => void; branches: Branch[]; employee?: Employee | null
 }) {
     const [loading, setLoading] = useState(false)
+    const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
     const [branches, setBranches] = useState<Branch[]>(initialBranches)
     const [departments, setDepartments] = useState<Department[]>([])
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "compliance" | "safety">("personal")
@@ -396,9 +440,14 @@ function EmployeeModal({
                 body: JSON.stringify(form),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success(employee ? "Employee updated!" : "Employee added!")
+            const data = await res.json()
             onSaved()
-            onClose()
+            if (!employee && data._userCreated) {
+                setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
+            } else {
+                toast.success(employee ? "Employee updated!" : "Employee added!")
+                onClose()
+            }
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : "Failed to save")
         } finally {
@@ -407,6 +456,10 @@ function EmployeeModal({
     }
 
     if (!open) return null
+
+    if (newCredentials) {
+        return <CredentialsModal email={newCredentials.email} password={newCredentials.password} onClose={() => { setNewCredentials(null); onClose() }} />
+    }
 
     const setCheck = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
         setForm(f => ({ ...f, [key]: e.target.checked }))
@@ -1349,11 +1402,11 @@ export default function EmployeesPage() {
     const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
     const importFileRef = useRef<HTMLInputElement>(null)
 
-    const isAdmin = session?.user?.role === "ADMIN"
+    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "HR_MANAGER"
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER") {
+        if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER" && session?.user?.role !== "HR_MANAGER") {
             router.push("/")
         }
     }, [status, session, router])

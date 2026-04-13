@@ -28,6 +28,7 @@ export const authOptions: NextAuthOptions = {
                 const demoUsers: Record<string, { name: string, role: string }> = {
                     "admin@cims.com": { name: "Admin User", role: "ADMIN" },
                     "manager@cims.com": { name: "Manager User", role: "MANAGER" },
+                    "hr@cims.com": { name: "HR Manager", role: "HR_MANAGER" },
                     "inspector@cims.com": { name: "Inspection Boy", role: "INSPECTION_BOY" },
                     "client@cims.com": { name: "Client User", role: "CLIENT" }
                 }

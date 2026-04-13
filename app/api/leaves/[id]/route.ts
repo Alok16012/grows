@@ -31,7 +31,7 @@ export async function GET(
         if (!leave) return new NextResponse("Not found", { status: 404 })
 
         // Non-admin/manager can only view own employee's leave
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

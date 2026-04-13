@@ -7,7 +7,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -69,7 +69,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
