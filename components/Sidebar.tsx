@@ -35,7 +35,8 @@ import {
     CreditCard,
     FileSignature,
     GraduationCap,
-    Navigation
+    Navigation,
+    Shield
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -124,6 +125,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "CONFIGURATION",
             links: [
                 { name: "Users", href: "/admin/users", icon: Users, roles: ["ADMIN"] },
+                { name: "Roles", href: "/admin/roles", icon: Shield, roles: ["ADMIN"] },
                 { name: "Reports", href: "/reports", icon: BarChart2, roles: ["CLIENT"] },
             ]
         }

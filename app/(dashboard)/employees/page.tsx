@@ -171,6 +171,7 @@ type ModalForm = {
     dateOfBirth: string; gender: string; aadharNumber: string; panNumber: string
     designation: string; departmentId: string; branchId: string; managerId: string
     dateOfJoining: string; employmentType: string; salaryType: string; basicSalary: string
+    customRoleId: string
     address: string; city: string; state: string; pincode: string
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
     status: string; notes: string
@@ -190,6 +191,7 @@ const EMPTY_FORM: ModalForm = {
     dateOfBirth: "", gender: "", aadharNumber: "", panNumber: "",
     designation: "", departmentId: "", branchId: "", managerId: "",
     dateOfJoining: "", employmentType: "Full-time", salaryType: "Monthly", basicSalary: "",
+    customRoleId: "",
     address: "", city: "", state: "", pincode: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
     status: "ACTIVE", notes: "",
@@ -337,8 +339,13 @@ function EmployeeModal({
     const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
     const [branches, setBranches] = useState<Branch[]>(initialBranches)
     const [departments, setDepartments] = useState<Department[]>([])
+    const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "compliance" | "safety">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
+
+    useEffect(() => {
+        fetch("/api/admin/roles").then(r => r.ok ? r.json() : []).then(setCustomRoles).catch(() => {})
+    }, [])
 
     // Keep branches in sync if parent list changes
     useEffect(() => { setBranches(initialBranches) }, [initialBranches])
@@ -400,6 +407,7 @@ function EmployeeModal({
                 safetyJacket: employee.safetyJacket ?? false,
                 safetyEarMuffs: employee.safetyEarMuffs ?? false,
                 safetyShoes: employee.safetyShoes ?? false,
+                customRoleId: "",
             })
         } else {
             setForm(EMPTY_FORM)
@@ -564,6 +572,13 @@ function EmployeeModal({
                                 <div>
                                     <label className={labelCls}>Designation</label>
                                     <input value={form.designation} onChange={set("designation")} className={inputCls} placeholder="e.g. Security Guard" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>System Role <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>(Access Control)</span></label>
+                                    <select value={form.customRoleId} onChange={set("customRoleId")} className={inputCls}>
+                                        <option value="">No custom role</option>
+                                        {customRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className={labelCls}>Department</label>

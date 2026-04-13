@@ -20,10 +20,12 @@ model User {
   isActive                 Boolean          @default(true)
   createdAt                DateTime         @default(now())
   companyId                String?
+  customRoleId             String?
   assignmentsAsAssigner    Assignment[]     @relation("AssignmentAssigner")
   assignmentsAsInspector   Assignment[]     @relation("AssignmentInspector")
   inspections              Inspection[]
   company                  Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  customRole               CustomRole?      @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
   managedProjects          ProjectManager[] @relation("ProjectManagers")
   assignedProjects         ProjectManager[] @relation("ProjectManagerAssigner")
   notifications            Notification[]
@@ -34,6 +36,18 @@ model User {
   leadFollowUpsCreated     LeadFollowUp[]   @relation("LeadFollowUpCreator")
   hrApprovedReviews        PerformanceReview[] @relation("HRApprover")
   employeeProfile          Employee?           @relation("EmployeeUser")
+}
+
+model CustomRole {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions String[]
+  color       String   @default("#6366f1")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
 }
 
 model Company {

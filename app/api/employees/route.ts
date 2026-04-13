@@ -71,6 +71,7 @@ export async function POST(req: Request) {
             aadharNumber, panNumber, bankAccountNumber, bankIFSC, bankName,
             photo, designation, departmentId, branchId,
             dateOfJoining, status, employmentType, basicSalary, notes,
+            customRoleId,
             // New fields
             middleName, nameAsPerAadhar, fathersName, bloodGroup, maritalStatus, marriageDate, nationality, religion, caste,
             uan, pfNumber, esiNumber, labourCardNo, labourCardExpDate,
@@ -119,6 +120,10 @@ export async function POST(req: Request) {
         let userId: string
         if (existingUser) {
             userId = existingUser.id
+            // Update customRoleId if provided
+            if (customRoleId) {
+                await prisma.user.update({ where: { id: existingUser.id }, data: { customRoleId } })
+            }
         } else {
             const newUser = await prisma.user.create({
                 data: {
@@ -126,6 +131,7 @@ export async function POST(req: Request) {
                     email: userEmail,
                     password: passwordHash,
                     role: "INSPECTION_BOY",
+                    customRoleId: customRoleId || null,
                 },
             })
             userId = newUser.id
