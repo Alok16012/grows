@@ -808,6 +808,8 @@ function EmployeeDrawer({
     const [showUploadForm, setShowUploadForm] = useState(false)
     const [uploadForm, setUploadForm] = useState({ type: "RESUME", fileName: "", fileUrl: "" })
     const [uploadSaving, setUploadSaving] = useState(false)
+    const [fileUploading, setFileUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
 
     const fetchDocuments = async (empId: string) => {
@@ -851,6 +853,32 @@ function EmployeeDrawer({
         finally { setActionLoading(null) }
     }
 
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !employee) return
+        setFileUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const r = await fetch(`/api/employees/${employee.id}/documents/upload`, {
+                method: "POST",
+                body: fd,
+            })
+            if (r.ok) {
+                const data = await r.json()
+                setUploadForm(f => ({
+                    ...f,
+                    fileUrl: data.url,
+                    fileName: f.fileName || data.fileName,
+                }))
+                toast.success("File uploaded — fill in details and save")
+            } else {
+                toast.error(await r.text())
+            }
+        } catch { toast.error("Upload failed") }
+        finally { setFileUploading(false) }
+    }
+
     const handleUpload = async () => {
         if (!employee) return
         if (!uploadForm.fileName.trim() || !uploadForm.fileUrl.trim()) {
@@ -868,6 +896,7 @@ function EmployeeDrawer({
                 toast.success("Document uploaded")
                 setShowUploadForm(false)
                 setUploadForm({ type: "RESUME", fileName: "", fileUrl: "" })
+                if (fileInputRef.current) fileInputRef.current.value = ""
                 fetchDocuments(employee.id)
             } else {
                 toast.error(await r.text())
@@ -1078,18 +1107,40 @@ function EmployeeDrawer({
                                         />
                                     </div>
                                     <div>
-                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>File URL</label>
+                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>File</label>
+                                        {/* Direct upload */}
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                                            style={{ display: "none" }}
+                                            onChange={handleFileSelect}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={fileUploading}
+                                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", cursor: fileUploading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, opacity: fileUploading ? 0.6 : 1, marginBottom: 8 }}
+                                        >
+                                            <Upload size={13} />
+                                            {fileUploading ? "Uploading…" : uploadForm.fileUrl ? "Replace File" : "Choose File"}
+                                        </button>
+                                        {uploadForm.fileUrl && (
+                                            <p style={{ fontSize: 11, color: "var(--accent)", marginTop: 0, marginBottom: 6, wordBreak: "break-all" }}>
+                                                ✓ File ready
+                                            </p>
+                                        )}
+                                        {/* Manual URL fallback */}
                                         <input
                                             value={uploadForm.fileUrl}
                                             onChange={e => setUploadForm(f => ({ ...f, fileUrl: e.target.value }))}
-                                            placeholder="https://..."
+                                            placeholder="or paste URL manually…"
                                             style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }}
                                         />
-                                        <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>Tip: Upload file to Supabase Storage and paste URL here</p>
                                     </div>
                                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                                         <button
-                                            onClick={() => { setShowUploadForm(false); setUploadForm({ type: "RESUME", fileName: "", fileUrl: "" }) }}
+                                            onClick={() => { setShowUploadForm(false); setUploadForm({ type: "RESUME", fileName: "", fileUrl: "" }); if (fileInputRef.current) fileInputRef.current.value = "" }}
                                             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 12, color: "var(--text)" }}
                                         >
                                             Cancel
