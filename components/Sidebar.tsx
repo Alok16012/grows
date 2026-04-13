@@ -36,13 +36,14 @@ import {
     FileSignature,
     GraduationCap,
     Navigation,
-    Shield
+    Shield,
+    Briefcase
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const pathname = usePathname()
     const { data: session } = useSession()
-    const role = session?.user?.role
+    const role = session?.user?.role as string | undefined
 
     const [pendingCount, setPendingCount] = useState(0)
 
@@ -75,11 +76,13 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "MANAGEMENT",
             links: [
                 { name: "Companies", href: "/companies", icon: Building2, roles: ["ADMIN", "MANAGER"] },
+                { name: "Branches", href: "/branches", icon: MapPin, roles: ["ADMIN", "MANAGER"] },
+                { name: "Departments", href: "/departments", icon: Briefcase, roles: ["ADMIN", "MANAGER"] },
                 { name: "Projects", href: "/projects", icon: Folder, roles: [] },
                 { name: "Assignments", href: "/assignments", icon: HardHat, roles: ["ADMIN", "MANAGER"] },
                 { name: "Groups", href: "/groups", icon: Users2, roles: ["ADMIN", "MANAGER"] },
                 { name: "Recruitment", href: "/recruitment", icon: Target, roles: ["ADMIN", "MANAGER"] },
-                { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER"] },
+                { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER", "HR_MANAGER"] },
                 { name: "Sites", href: "/sites", icon: MapPin, roles: ["ADMIN", "MANAGER"] },
                 { name: "Field", href: "/field", icon: Navigation, roles: ["ADMIN", "MANAGER"] },
                 { name: "Billing", href: "/billing", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
@@ -156,8 +159,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             {/* Navigation */}
             <div className="flex-1 overflow-y-auto pt-4 px-2 scrollbar-thin">
                 {navigation.map((section) => {
+                    const currentRole = String(role || "")
                     const filteredLinks = section.links.filter(link =>
-                        role ? link.roles.includes(role) : link.roles.includes("ADMIN")
+                        currentRole ? link.roles.includes(currentRole) : link.roles.includes("ADMIN")
                     )
                     if (filteredLinks.length === 0) return null
 

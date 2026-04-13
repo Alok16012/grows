@@ -138,7 +138,7 @@ export default function DepartmentsPage() {
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER") {
+        if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER" && session?.user?.role !== "HR_MANAGER") {
             router.push("/")
         }
     }, [status, session, router])
