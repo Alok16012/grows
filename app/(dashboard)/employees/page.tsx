@@ -911,7 +911,7 @@ function EmployeeModal({
 
                 <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between">
                     <div className="flex gap-1">
-                        {(["personal", "employment", "bank", "compliance", "safety"] as const).map((t) => (
+                        {(["personal", "employment", "salary", "bank", "compliance", "safety"] as const).map((t) => (
                             <div
                                 key={t}
                                 onClick={() => setActiveTab(t)}
@@ -993,11 +993,54 @@ function EmployeeDrawer({
     onStatusChange: (id: string, status: string) => void
     isAdmin: boolean
 }) {
-    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents">("personal")
+    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "documents">("personal")
     const [detail, setDetail] = useState<Record<string, unknown> | null>(null)
     const [loadingDetail, setLoadingDetail] = useState(false)
     const [statusMenuOpen, setStatusMenuOpen] = useState(false)
     const statusRef = useRef<HTMLDivElement>(null)
+
+    // Salary structure state
+    type SalaryData = { basic: number; da: number; washing: number; conveyance: number; leaveWithWages: number; otherAllowance: number; otRatePerHour: number; canteenRatePerDay: number; complianceType: string; status: string; hra?: number; ctcMonthly?: number }
+    const [salaryData, setSalaryData] = useState<SalaryData | null>(null)
+    const [salaryLoading, setSalaryLoading] = useState(false)
+    const [salaryEditing, setSalaryEditing] = useState(false)
+    const [salaryForm, setSalaryForm] = useState<SalaryData>({ basic: 0, da: 0, washing: 0, conveyance: 0, leaveWithWages: 0, otherAllowance: 0, otRatePerHour: 170, canteenRatePerDay: 55, complianceType: "OR", status: "APPROVED" })
+    const [salarySaving, setSalarySaving] = useState(false)
+
+    const fetchSalary = async (empId: string) => {
+        setSalaryLoading(true)
+        try {
+            const r = await fetch(`/api/payroll/salary-structure/${empId}`)
+            if (r.ok) {
+                const data = await r.json()
+                if (data) {
+                    setSalaryData(data)
+                    setSalaryForm(data)
+                }
+            }
+        } catch { /* ignore */ }
+        finally { setSalaryLoading(false) }
+    }
+
+    const saveSalary = async () => {
+        if (!employee) return
+        setSalarySaving(true)
+        try {
+            const r = await fetch(`/api/payroll/salary-structure/${employee.id}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(salaryForm),
+            })
+            if (r.ok) {
+                const data = await r.json()
+                setSalaryData(data)
+                setSalaryForm(data)
+                setSalaryEditing(false)
+                toast.success("Salary structure saved!")
+            } else toast.error("Failed to save salary structure")
+        } catch { toast.error("Failed to save") }
+        finally { setSalarySaving(false) }
+    }
 
     // Documents tab state
     const [documents, setDocuments] = useState<EmployeeDocument[]>([])
@@ -1135,11 +1178,14 @@ function EmployeeDrawer({
             setDetail(null)
             setDocuments([])
             setShowUploadForm(false)
+            setSalaryData(null)
+            setSalaryEditing(false)
             fetch(`/api/employees/${employee.id}`)
                 .then(r => r.json())
                 .then(setDetail)
                 .catch(() => setDetail(null))
                 .finally(() => setLoadingDetail(false))
+            fetchSalary(employee.id)
         }
     }, [employee])
 
@@ -1211,14 +1257,14 @@ function EmployeeDrawer({
 
                 {/* Tabs */}
                 <div className="flex border-b border-[var(--border)] px-5 overflow-x-auto">
-                    {(["personal", "employment", "bank", "documents"] as const).map(t => (
+                    {(["personal", "employment", "salary", "bank", "documents"] as const).map(t => (
                         <button key={t} onClick={() => {
                             setActiveTab(t)
                             if (t === "documents" && employee && documents.length === 0 && !docsLoading) {
                                 fetchDocuments(employee.id)
                             }
                         }} className={tabCls(t)}>
-                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "bank" ? "Bank" : "Documents"}
+                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : "Documents"}
                         </button>
                     ))}
                 </div>
@@ -1266,6 +1312,121 @@ function EmployeeDrawer({
                                 <div className="p-3 rounded-[10px] bg-[var(--surface2)]/40 border border-[var(--border)]">
                                     <p className="text-[10.5px] text-[var(--text3)] font-medium uppercase tracking-[0.4px] mb-1">Notes</p>
                                     <p className="text-[13px] text-[var(--text)]">{emp.notes}</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : activeTab === "salary" ? (
+                        <div className="space-y-3">
+                            {salaryLoading ? (
+                                <div className="flex items-center justify-center py-8"><Loader2 size={20} className="animate-spin text-[var(--accent)]" /></div>
+                            ) : !salaryData && !salaryEditing ? (
+                                <div className="text-center py-8">
+                                    <IndianRupee size={32} className="mx-auto text-[var(--text3)] mb-3" />
+                                    <p className="text-[13px] text-[var(--text3)] mb-3">No salary structure set</p>
+                                    <button onClick={() => setSalaryEditing(true)}
+                                        className="inline-flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2 rounded-[8px] text-[13px] font-medium hover:opacity-90">
+                                        <Plus size={14} /> Setup Salary Structure
+                                    </button>
+                                </div>
+                            ) : salaryEditing ? (
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        {([
+                                            { key: "basic", label: "Basic (₹)" },
+                                            { key: "da", label: "DA (₹)" },
+                                            { key: "washing", label: "Washing (₹)" },
+                                            { key: "conveyance", label: "Conveyance (₹)" },
+                                            { key: "leaveWithWages", label: "Leave With Wages (₹)" },
+                                            { key: "otherAllowance", label: "Other Allowance (₹)" },
+                                            { key: "otRatePerHour", label: "OT Rate/Hr (₹)" },
+                                            { key: "canteenRatePerDay", label: "Canteen/Day (₹)" },
+                                        ] as { key: keyof SalaryData; label: string }[]).map(f => (
+                                            <div key={f.key}>
+                                                <label className="block text-[11px] text-[var(--text3)] mb-1">{f.label}</label>
+                                                <input type="number" value={salaryForm[f.key] as number} min="0"
+                                                    onChange={e => setSalaryForm(p => ({ ...p, [f.key]: Number(e.target.value) || 0 }))}
+                                                    className="w-full h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] text-[var(--text3)] mb-1.5">Compliance Type</label>
+                                        <div className="flex gap-3">
+                                            <label className="flex items-center gap-2 text-[12px] cursor-pointer">
+                                                <input type="radio" checked={salaryForm.complianceType === "OR"} onChange={() => setSalaryForm(p => ({ ...p, complianceType: "OR" }))} className="accent-emerald-600" />
+                                                <span><b>OR</b> — PF + ESIC</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 text-[12px] cursor-pointer">
+                                                <input type="radio" checked={salaryForm.complianceType === "CALL"} onChange={() => setSalaryForm(p => ({ ...p, complianceType: "CALL" }))} className="accent-orange-500" />
+                                                <span><b>CALL</b> — No PF/ESIC</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {/* Live CTC preview */}
+                                    {(() => {
+                                        const sf = salaryForm
+                                        const hra = (sf.basic + sf.da) * 0.05
+                                        const gross = sf.basic + sf.da + hra + sf.washing + sf.conveyance + sf.leaveWithWages + (7000/12) + sf.otherAllowance
+                                        const isC = sf.complianceType === "CALL"
+                                        const pf = isC ? 0 : Math.round(15000 * 0.13)
+                                        const esic = (isC || gross > 21000) ? 0 : Math.ceil((gross - sf.washing - 7000/12) * 0.0325)
+                                        const ctc = gross + pf + esic
+                                        return (
+                                            <div className="bg-[#f0fdf4] border border-emerald-200 rounded-[8px] p-3 space-y-1 text-[12px]">
+                                                <div className="flex justify-between"><span className="text-[var(--text3)]">HRA (5%)</span><span>₹{Math.round(hra).toLocaleString("en-IN")}</span></div>
+                                                <div className="flex justify-between"><span className="text-[var(--text3)]">Bonus (₹7000/12)</span><span>₹{Math.round(7000/12).toLocaleString("en-IN")}</span></div>
+                                                <div className="flex justify-between font-medium"><span>Full Gross</span><span>₹{Math.round(gross).toLocaleString("en-IN")}</span></div>
+                                                <div className="flex justify-between text-[var(--text3)]"><span>Employer PF</span><span>₹{pf.toLocaleString("en-IN")}</span></div>
+                                                <div className="flex justify-between text-[var(--text3)]"><span>Employer ESIC</span><span>₹{esic.toLocaleString("en-IN")}</span></div>
+                                                <div className="flex justify-between font-bold text-purple-700 border-t border-emerald-200 pt-1"><span>CTC / Month</span><span>₹{Math.round(ctc).toLocaleString("en-IN")}</span></div>
+                                            </div>
+                                        )
+                                    })()}
+                                    <div className="flex gap-2 pt-1">
+                                        <button onClick={() => { setSalaryEditing(false); if (salaryData) setSalaryForm(salaryData) }}
+                                            className="flex-1 h-9 border border-[var(--border)] rounded-[8px] text-[13px] text-[var(--text2)] hover:bg-[var(--surface2)]">Cancel</button>
+                                        <button onClick={saveSalary} disabled={salarySaving}
+                                            className="flex-1 h-9 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2">
+                                            {salarySaving && <Loader2 size={13} className="animate-spin" />} Save
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${salaryData?.complianceType === "CALL" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                                            {salaryData?.complianceType || "OR"} Compliance
+                                        </span>
+                                        {isAdmin && (
+                                            <button onClick={() => setSalaryEditing(true)}
+                                                className="text-[12px] text-[var(--accent)] hover:underline font-medium flex items-center gap-1">
+                                                <Edit2 size={11} /> Edit
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <InfoItem label="Basic" value={fmtRupee(salaryData?.basic ?? 0)} icon={<IndianRupee size={13} />} />
+                                        <InfoItem label="DA" value={fmtRupee(salaryData?.da ?? 0)} icon={<IndianRupee size={13} />} />
+                                        <InfoItem label="Washing" value={fmtRupee(salaryData?.washing ?? 0)} />
+                                        <InfoItem label="Conveyance" value={fmtRupee(salaryData?.conveyance ?? 0)} />
+                                        <InfoItem label="Leave With Wages" value={fmtRupee(salaryData?.leaveWithWages ?? 0)} />
+                                        <InfoItem label="Other Allowance" value={fmtRupee(salaryData?.otherAllowance ?? 0)} />
+                                        <InfoItem label="OT Rate/Hr" value={fmtRupee(salaryData?.otRatePerHour ?? 170)} />
+                                        <InfoItem label="Canteen/Day" value={fmtRupee(salaryData?.canteenRatePerDay ?? 55)} />
+                                    </div>
+                                    {salaryData && (() => {
+                                        const s = salaryData
+                                        const hra = (s.basic + s.da) * 0.05
+                                        const gross = s.basic + s.da + hra + s.washing + s.conveyance + s.leaveWithWages + (7000/12) + s.otherAllowance
+                                        const isC = s.complianceType === "CALL"
+                                        const ctc = gross + (isC ? 0 : Math.round(15000 * 0.13)) + ((isC || gross > 21000) ? 0 : Math.ceil((gross - s.washing - 7000/12) * 0.0325))
+                                        return (
+                                            <div className="bg-[#f5f3ff] border border-purple-200 rounded-[8px] p-3 flex justify-between items-center">
+                                                <span className="text-[12px] text-purple-700 font-medium">CTC / Month</span>
+                                                <span className="text-[16px] font-bold text-purple-700">₹{Math.round(ctc).toLocaleString("en-IN")}</span>
+                                            </div>
+                                        )
+                                    })()}
                                 </div>
                             )}
                         </div>
