@@ -28,9 +28,14 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
 
     // Auto-calculate HRA for reference
     const hra = (Number(basic) + Number(da)) * 0.05
-    const ctcMonthly = Number(basic) + Number(da) + hra + Number(washing) + Number(conveyance) +
-        Number(leaveWithWages) + Number(otherAllowance) + (7000 / 12) +
-        Math.round(15000 * 0.13) + Math.ceil(((Number(basic) + Number(da) + hra + Number(washing) + Number(conveyance) + Number(leaveWithWages) + Number(otherAllowance) + (7000 / 12)) - Number(washing) - (7000 / 12)) * 0.0325)
+    const isCALL = complianceType === "CALL"
+    const grossFull = Number(basic) + Number(da) + hra + Number(washing) + Number(conveyance) +
+        Number(leaveWithWages) + Number(otherAllowance) + (7000 / 12)
+    // Employer PF: only for OR compliance
+    const empPF = isCALL ? 0 : Math.round(15000 * 0.13)
+    // Employer ESIC: only for OR compliance AND gross ≤ 21000
+    const empESIC = (isCALL || grossFull > 21000) ? 0 : Math.ceil((grossFull - Number(washing) - (7000 / 12)) * 0.0325)
+    const ctcMonthly = grossFull + empPF + empESIC
 
     const sal = await prisma.employeeSalary.upsert({
         where: { employeeId: params.employeeId },

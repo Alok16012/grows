@@ -65,6 +65,7 @@ export async function PUT(
             safetyHelmet, safetyHelmetDate, safetyMask, safetyMaskDate,
             safetyJacket, safetyJacketDate, safetyEarMuffs, safetyEarMuffsDate,
             safetyShoes, safetyShoesDate, bankBranch,
+            systemRole, customRoleId,
         } = body
 
         const updateData: Record<string, unknown> = {}
@@ -151,6 +152,23 @@ export async function PUT(
             where: { id: params.id },
             data: updateData,
         })
+
+        // Update linked User account role if systemRole is provided
+        const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY", "CLIENT"]
+        if (systemRole || customRoleId !== undefined) {
+            const empWithUser = await prisma.employee.findUnique({
+                where: { id: params.id },
+                select: { userId: true },
+            })
+            if (empWithUser?.userId) {
+                const userUpdate: Record<string, unknown> = {}
+                if (systemRole && VALID_ROLES.includes(systemRole)) userUpdate.role = systemRole
+                if (customRoleId !== undefined) userUpdate.customRoleId = customRoleId || null
+                if (Object.keys(userUpdate).length > 0) {
+                    await prisma.user.update({ where: { id: empWithUser.userId }, data: userUpdate })
+                }
+            }
+        }
 
         return NextResponse.json(employee)
     } catch (error) {

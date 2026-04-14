@@ -358,6 +358,30 @@ function EmployeeModal({
     // Keep branches in sync if parent list changes
     useEffect(() => { setBranches(initialBranches) }, [initialBranches])
 
+    // Load existing salary structure when editing
+    useEffect(() => {
+        if (!open || !employee) return
+        fetch(`/api/payroll/salary-structure/${employee.id}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(sal => {
+                if (sal) {
+                    setForm(f => ({
+                        ...f,
+                        basicSalary: String(sal.basic || f.basicSalary),
+                        salDA: String(sal.da || ""),
+                        salWashing: String(sal.washing || ""),
+                        salConveyance: String(sal.conveyance || ""),
+                        salLeaveWithWages: String(sal.leaveWithWages || ""),
+                        salOtherAllowance: String(sal.otherAllowance || ""),
+                        salOtRatePerHour: String(sal.otRatePerHour || "170"),
+                        salCanteenRatePerDay: String(sal.canteenRatePerDay || "55"),
+                        salComplianceType: sal.complianceType || "OR",
+                    }))
+                }
+            })
+            .catch(() => {})
+    }, [open, employee])
+
     useEffect(() => {
         if (!open) return
         setActiveTab("personal")

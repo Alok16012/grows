@@ -681,13 +681,19 @@ export default function PayrollPage() {
                         <tbody className="divide-y divide-[var(--border)]">
                             {employees.map(emp => {
                                 const s = emp.salary
+                                const isCALL = s?.complianceType === "CALL"
                                 const hra   = s ? (s.basic + s.da) * 0.05 : 0
                                 const gross = s ? s.basic + s.da + hra + s.washing + s.conveyance + s.leaveWithWages + (7000/12) + s.otherAllowance : 0
-                                const ctc   = s ? gross + 1950 + Math.ceil((gross - s.washing - 7000/12) * 0.0325) : 0
+                                const empPF = (s && !isCALL) ? Math.round(15000 * 0.13) : 0
+                                const empESIC = (s && !isCALL && gross <= 21000) ? Math.ceil((gross - (s?.washing ?? 0) - 7000/12) * 0.0325) : 0
+                                const ctc   = s ? gross + empPF + empESIC : 0
                                 return (
                                     <tr key={emp.id} className="hover:bg-[var(--surface)]">
                                         <td className="px-4 py-3">
-                                            <div className="font-medium text-[var(--text)]">{emp.name}</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-[var(--text)]">{emp.name}</span>
+                                                {s && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isCALL ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{s.complianceType || "OR"}</span>}
+                                            </div>
                                             <div className="text-[10px] text-[var(--text3)]">{emp.employeeId} · {emp.branch}</div>
                                         </td>
                                         <td className="px-4 py-3 text-right">{s ? fmt(s.basic) : <span className="text-[var(--text3)]">—</span>}</td>
