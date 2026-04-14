@@ -348,8 +348,14 @@ function EmployeeModal({
     const [branches, setBranches] = useState<Branch[]>(initialBranches)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
-    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety">("personal")
+    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
+    // Pending documents to upload after employee creation
+    type PendingDoc = { type: string; fileName: string; fileUrl: string }
+    const [pendingDocs, setPendingDocs] = useState<PendingDoc[]>([])
+    const [docUploading, setDocUploading] = useState(false)
+    const docFileRef = useRef<HTMLInputElement>(null)
+    const [docType, setDocType] = useState("AADHAAR")
 
     useEffect(() => {
         fetch("/api/admin/roles").then(r => r.ok ? r.json() : []).then(setCustomRoles).catch(() => {})
@@ -511,6 +517,20 @@ function EmployeeModal({
                 } catch { /* salary structure save failed silently */ }
             }
 
+            // Upload pending documents
+            if (empId && pendingDocs.length > 0) {
+                for (const doc of pendingDocs) {
+                    try {
+                        await fetch(`/api/employees/${empId}/documents`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(doc),
+                        })
+                    } catch { /* doc upload failed silently */ }
+                }
+                setPendingDocs([])
+            }
+
             onSaved()
             if (!employee && data._userCreated) {
                 setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
@@ -557,9 +577,9 @@ function EmployeeModal({
 
                 {/* Tabs */}
                 <div className="flex border-b border-[var(--border)] px-6 overflow-x-auto">
-                    {(["personal", "employment", "salary", "bank", "compliance", "safety"] as const).map(t => (
+                    {(["personal", "employment", "salary", "bank", "compliance", "safety", "documents"] as const).map(t => (
                         <button key={t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
-                            {t === "personal" ? "Personal Info" : t === "employment" ? "Employment" : t === "salary" ? "Salary Structure" : t === "bank" ? "Bank & Address" : t === "compliance" ? "Compliance" : "Safety"}
+                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
                         </button>
                     ))}
                 </div>
@@ -907,11 +927,107 @@ function EmployeeModal({
                             ))}
                         </div>
                     )}
+
+                    {/* Documents Tab */}
+                    {activeTab === "documents" && (
+                        <div className="space-y-4">
+                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
+                                <span className="text-[12px] text-blue-700">
+                                    Upload Aadhaar, PAN, Photo and other documents. {employee ? "Files are uploaded immediately." : "Files will be uploaded when you save the employee."}
+                                </span>
+                            </div>
+
+                            {/* Upload area */}
+                            <div className="border-2 border-dashed border-[var(--border)] rounded-[10px] p-4 text-center hover:border-[var(--accent)] transition-colors">
+                                <div className="flex items-center gap-3 justify-center mb-3">
+                                    <select value={docType} onChange={e => setDocType(e.target.value)}
+                                        className="h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[12px] bg-white text-[var(--text)] outline-none focus:border-[var(--accent)]">
+                                        <option value="AADHAAR">Aadhaar</option>
+                                        <option value="PAN">PAN Card</option>
+                                        <option value="PHOTO">Photo</option>
+                                        <option value="RESUME">Resume</option>
+                                        <option value="CERTIFICATE">Certificate</option>
+                                        <option value="OFFER_LETTER">Offer Letter</option>
+                                        <option value="OTHER">Other</option>
+                                    </select>
+                                    <button type="button" onClick={() => docFileRef.current?.click()} disabled={docUploading}
+                                        className="inline-flex items-center gap-1.5 bg-[var(--accent)] text-white px-3 py-1.5 rounded-[6px] text-[12px] font-medium hover:opacity-90 disabled:opacity-60">
+                                        {docUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                                        {docUploading ? "Uploading…" : "Choose File"}
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-[var(--text3)]">JPG, PNG, PDF — Max 5MB per file</p>
+                                <input ref={docFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                                    onChange={async (ev) => {
+                                        const file = ev.target.files?.[0]
+                                        if (!file) return
+                                        if (file.size > 5 * 1024 * 1024) { toast.error("File too large (max 5MB)"); return }
+                                        setDocUploading(true)
+                                        try {
+                                            const url = await new Promise<string>((resolve, reject) => {
+                                                const reader = new FileReader()
+                                                reader.onload = () => resolve(reader.result as string)
+                                                reader.onerror = reject
+                                                reader.readAsDataURL(file)
+                                            })
+                                            const newDoc = { type: docType, fileName: file.name, fileUrl: url }
+                                            if (employee) {
+                                                // Editing: upload immediately
+                                                const r = await fetch(`/api/employees/${employee.id}/documents`, {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify(newDoc),
+                                                })
+                                                if (r.ok) toast.success("Document uploaded!")
+                                                else toast.error("Upload failed")
+                                            } else {
+                                                // Creating: queue for upload after save
+                                                setPendingDocs(prev => [...prev, newDoc])
+                                                toast.success(`${file.name} queued — will upload on save`)
+                                            }
+                                        } catch { toast.error("Failed to read file") }
+                                        finally {
+                                            setDocUploading(false)
+                                            if (docFileRef.current) docFileRef.current.value = ""
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            {/* Pending docs list */}
+                            {pendingDocs.length > 0 && (
+                                <div>
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-2">Queued Documents ({pendingDocs.length})</p>
+                                    <div className="space-y-1.5">
+                                        {pendingDocs.map((doc, i) => (
+                                            <div key={i} className="flex items-center justify-between p-2.5 bg-[var(--surface2)] rounded-[8px] border border-[var(--border)]">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <FileText size={14} className="text-[var(--accent)] shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <p className="text-[12px] text-[var(--text)] truncate">{doc.fileName}</p>
+                                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-blue-700 bg-blue-100">{doc.type}</span>
+                                                    </div>
+                                                </div>
+                                                <button type="button" onClick={() => setPendingDocs(prev => prev.filter((_, j) => j !== i))}
+                                                    className="text-red-400 hover:text-red-600 p-1 shrink-0">
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {!employee && pendingDocs.length === 0 && (
+                                <p className="text-center text-[12px] text-[var(--text3)] py-4">No documents added yet. Upload documents above.</p>
+                            )}
+                        </div>
+                    )}
                 </form>
 
                 <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between">
                     <div className="flex gap-1">
-                        {(["personal", "employment", "salary", "bank", "compliance", "safety"] as const).map((t) => (
+                        {(["personal", "employment", "salary", "bank", "compliance", "safety", "documents"] as const).map((t) => (
                             <div
                                 key={t}
                                 onClick={() => setActiveTab(t)}
@@ -923,11 +1039,11 @@ function EmployeeModal({
                         <button onClick={onClose} type="button" className="px-4 py-2 text-[13px] font-medium text-[var(--text2)] hover:text-[var(--text)] rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
                             Cancel
                         </button>
-                        {activeTab !== "safety" ? (
+                        {activeTab !== "documents" ? (
                             <button
                                 type="button"
                                 onClick={() => {
-                                    const order = ["personal", "employment", "salary", "bank", "compliance", "safety"] as const
+                                    const order = ["personal", "employment", "salary", "bank", "compliance", "safety", "documents"] as const
                                     const idx = order.indexOf(activeTab as typeof order[number])
                                     if (idx < order.length - 1) setActiveTab(order[idx + 1])
                                 }}
