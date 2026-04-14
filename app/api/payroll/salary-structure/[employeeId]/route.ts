@@ -22,7 +22,8 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     const body = await req.json()
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
-        otRatePerHour, canteenRatePerDay, status
+        otRatePerHour, canteenRatePerDay, status,
+        complianceType,   // "CALL" | "OR"
     } = body
 
     // Auto-calculate HRA for reference
@@ -47,6 +48,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             ctcMonthly,
             ctcAnnual: ctcMonthly * 12,
             status: status || "APPROVED",
+            complianceType: complianceType === "CALL" ? "CALL" : "OR",
             proposedBy: session.user.id,
             approvedBy: session.user.id,
         },
@@ -63,6 +65,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             ctcMonthly,
             ctcAnnual: ctcMonthly * 12,
             status: status || "APPROVED",
+            complianceType: complianceType === "CALL" ? "CALL" : "OR",
         }
     })
 

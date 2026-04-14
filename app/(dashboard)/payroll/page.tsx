@@ -14,6 +14,7 @@ type SalarySalary = {
     basic: number; da: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number
     otRatePerHour: number; canteenRatePerDay: number; status: string
+    complianceType: string   // "CALL" | "OR"
 }
 
 type AttInput = {
@@ -47,9 +48,11 @@ function fmt(n: number) {
 }
 
 // ─── Growus formula (client-side preview) ────────────────────────────────────
-function calcPreview(sal: SalarySalary, att: AttInput): CalcResult {
-    const { basic, da, washing, conveyance, leaveWithWages, otherAllowance, otRatePerHour, canteenRatePerDay } = sal
+function calcPreview(sal: SalarySalary, att: AttInput, gender = "Male"): CalcResult {
+    const { basic, da, washing, conveyance, leaveWithWages, otherAllowance, otRatePerHour, canteenRatePerDay, complianceType } = sal
     const { monthDays, workedDays, otDays, canteenDays, penalty, advance, otherDeductions, productionIncentive, lwf } = att
+    const isCALL = complianceType === "CALL"
+    const isFemale = gender?.toLowerCase() === "female"
     const hraFull = (basic + da) * 0.05
     const bonusFull = 7000 / 12
     const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
@@ -59,14 +62,14 @@ function calcPreview(sal: SalarySalary, att: AttInput): CalcResult {
     const bonusE = r(bonusFull), otherE = r(otherAllowance)
     const otPay = Math.round(otRatePerHour * otDays * 4)
     const grossSalary = basicSalary + daE + hraE + washingE + convE + lwwE + bonusE + otherE + otPay + (productionIncentive || 0)
-    const pfEmployee = workedDays > 26 ? 1800 : Math.round((15000 / 26) * workedDays * 0.12)
-    const esiEmployee = Math.ceil((grossSalary - washingE - bonusE) * 0.0075)
-    const pt = grossSalary > 10000 ? 200 : (grossSalary > 7500 ? 175 : 0)
+    const pfEmployee = isCALL ? 0 : (workedDays > 26 ? 1800 : Math.round((15000 / 26) * workedDays * 0.12))
+    const esiEmployee = (isCALL || grossSalary > 21000) ? 0 : Math.ceil((grossSalary - washingE - bonusE) * 0.0075)
+    const pt = isFemale ? 0 : 200
     const canteen = canteenDays * canteenRatePerDay
     const totalDeductions = pfEmployee + esiEmployee + pt + (lwf||0) + (otherDeductions||0) + canteen + (penalty||0) + (advance||0)
     const netSalary = grossSalary - totalDeductions
-    const pfEmployer = Math.round(15000 * 0.13)
-    const esiEmployer = Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
+    const pfEmployer = isCALL ? 0 : Math.round(15000 * 0.13)
+    const esiEmployer = (isCALL || grossSalary > 21000) ? 0 : Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
     const ctc = grossFullMonth + pfEmployer + esiEmployer
     return {
         basicFull: basic, daFull: da, hraFull, washingFull: washing, conveyanceFull: conveyance,
@@ -86,7 +89,8 @@ function SalaryModal({ emp, onClose, onSaved }: {
 }) {
     const [form, setForm] = useState<SalarySalary>(emp.salary ?? {
         basic: 0, da: 0, washing: 0, conveyance: 0, leaveWithWages: 0,
-        otherAllowance: 0, otRatePerHour: 170, canteenRatePerDay: 55, status: "APPROVED"
+        otherAllowance: 0, otRatePerHour: 170, canteenRatePerDay: 55,
+        status: "APPROVED", complianceType: "OR"
     })
     const [saving, setSaving] = useState(false)
 
@@ -124,6 +128,42 @@ function SalaryModal({ emp, onClose, onSaved }: {
                     <button onClick={onClose}><X size={18} /></button>
                 </div>
                 <div className="p-6 space-y-4">
+
+                    {/* Compliance Type Selector */}
+                    <div>
+                        <label className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide block mb-2">
+                            Compliance Type <span className="text-red-500">*</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            {([
+                                { value: "OR", label: "OR — With Compliance", desc: "PF + ESIC + PT", color: "#1a9e6e", bg: "#e8f7f1", border: "#86efac" },
+                                { value: "CALL", label: "CALL — Without Compliance", desc: "PT only (No PF / ESIC)", color: "#d97706", bg: "#fffbeb", border: "#fcd34d" },
+                            ] as const).map(opt => (
+                                <button key={opt.value} type="button"
+                                    onClick={() => setForm(f => ({ ...f, complianceType: opt.value }))}
+                                    className="text-left p-3 rounded-xl border-2 transition-all"
+                                    style={{
+                                        borderColor: form.complianceType === opt.value ? opt.border : "var(--border)",
+                                        background: form.complianceType === opt.value ? opt.bg : "white",
+                                    }}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0"
+                                            style={{ borderColor: opt.color }}>
+                                            {form.complianceType === opt.value && (
+                                                <div className="w-2 h-2 rounded-full" style={{ background: opt.color }} />
+                                            )}
+                                        </div>
+                                        <span className="text-[12px] font-semibold" style={{ color: opt.color }}>{opt.label}</span>
+                                    </div>
+                                    <p className="text-[11px] text-[var(--text3)] ml-5">{opt.desc}</p>
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[11px] text-[var(--text3)] mt-1.5 px-1">
+                            PT = ₹200/month (Male) · ₹0 (Female) — auto-applied in both modes
+                        </p>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         {([
                             ["basic","BASIC",true],["da","DA (Dearness Allowance)",true],
@@ -149,6 +189,19 @@ function SalaryModal({ emp, onClose, onSaved }: {
                         <div className="flex justify-between border-t border-[var(--border)] pt-1 mt-1">
                             <span className="font-semibold">Full Month GROSS</span>
                             <span className="font-bold text-[var(--accent)]">₹{Math.round(gross).toLocaleString()}</span>
+                        </div>
+                        {/* Compliance preview */}
+                        <div className="border-t border-[var(--border)] pt-2 mt-1 space-y-1">
+                            <div className="text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-1">Deductions (approx. for Male)</div>
+                            {form.complianceType === "OR" ? (
+                                <>
+                                    <div className="flex justify-between"><span className="text-[var(--text3)]">PF (Employee 12%)</span><span className="text-red-600">-₹1,800</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text3)]">ESIC {gross > 21000 ? "(gross > ₹21k, N/A)" : "(0.75%)"}</span><span className="text-red-600">{gross > 21000 ? "₹0" : `-₹${Math.ceil((gross - 0) * 0.0075).toLocaleString()}`}</span></div>
+                                </>
+                            ) : (
+                                <div className="flex justify-between text-amber-700"><span>PF & ESIC</span><span className="font-semibold">Not Applicable</span></div>
+                            )}
+                            <div className="flex justify-between"><span className="text-[var(--text3)]">PT (Male)</span><span className="text-red-600">-₹200</span></div>
                         </div>
                     </div>
                 </div>

@@ -633,6 +633,7 @@ model EmployeeSalary {
   ctcMonthly        Float    @default(0)
   hra               Float    @default(0)   // Auto-calculated: (basic+da)*5%, kept for reference
   specialAllowance  Float    @default(0)
+  complianceType    String   @default("OR")  // CALL (no PF/ESIC) or OR (full compliance)
   isPfEligible      Boolean  @default(true)
   isEsiEligible     Boolean  @default(true)
   isPtEligible      Boolean  @default(true)

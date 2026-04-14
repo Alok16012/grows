@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
         const employees = await prisma.employee.findMany({
             where: whereClause,
-            include: { employeeSalary: true }
+            include: { employeeSalary: true },
         })
 
         if (!employees.length) return new NextResponse("No active employees found", { status: 404 })
@@ -65,7 +65,11 @@ export async function POST(req: Request) {
                 conveyance: sal.conveyance, leaveWithWages: sal.leaveWithWages,
                 otherAllowance: sal.otherAllowance, otRatePerHour: sal.otRatePerHour,
                 canteenRatePerDay: sal.canteenRatePerDay,
-            }, att)
+                complianceType: sal.complianceType ?? "OR",
+            }, {
+                ...att,
+                gender: emp.gender ?? "Male",
+            })
 
             totalGross += calc.grossSalary
             totalNet   += calc.netSalary
