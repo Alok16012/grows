@@ -117,10 +117,24 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger }) {
             if (user) {
                 token.id = user.id
                 token.role = user.role
+            }
+            // Re-fetch role from DB on each token refresh so role changes take effect immediately
+            if (token.id && !user) {
+                try {
+                    const dbUser = await prisma.user.findUnique({
+                        where: { id: token.id as string },
+                        select: { role: true, isActive: true }
+                    })
+                    if (dbUser) {
+                        token.role = dbUser.role
+                    }
+                } catch {
+                    // Keep existing token if DB is unreachable
+                }
             }
             return token
         },

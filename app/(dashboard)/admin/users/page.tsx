@@ -276,6 +276,7 @@ export default function UserManagementPage() {
         switch (role) {
             case "ADMIN": return <Badge className="bg-red-50 text-red-600 hover:bg-red-50 border-red-100 px-2 py-0 h-5 text-[10px] font-bold">ADMIN</Badge>
             case "MANAGER": return <Badge className="bg-blue-50 text-blue-600 hover:bg-blue-50 border-blue-100 px-2 py-0 h-5 text-[10px] font-bold">MANAGER</Badge>
+            case "HR_MANAGER": return <Badge className="bg-teal-50 text-teal-600 hover:bg-teal-50 border-teal-100 px-2 py-0 h-5 text-[10px] font-bold">HR MANAGER</Badge>
             case "INSPECTION_BOY": return <Badge className="bg-amber-50 text-amber-600 hover:bg-amber-50 border-amber-100 px-2 py-0 h-5 text-[10px] font-bold">INSPECTOR</Badge>
             case "CLIENT": return <Badge className="bg-purple-50 text-purple-600 hover:bg-purple-50 border-purple-100 px-2 py-0 h-5 text-[10px] font-bold">CLIENT</Badge>
             default: return <Badge variant="outline" className="px-2 py-0 h-5 text-[10px] font-bold">{role}</Badge>
@@ -331,6 +332,7 @@ export default function UserManagementPage() {
                     <option value="ALL">All Roles</option>
                     <option value="ADMIN">Admin</option>
                     <option value="MANAGER">Manager</option>
+                    <option value="HR_MANAGER">HR Manager</option>
                     <option value="INSPECTION_BOY">Inspector</option>
                     <option value="CLIENT">Client</option>
                 </select>
@@ -467,6 +469,7 @@ export default function UserManagementPage() {
                             >
                                 <option value="ADMIN">Administrator</option>
                                 <option value="MANAGER">Manager</option>
+                                <option value="HR_MANAGER">HR Manager</option>
                                 <option value="INSPECTION_BOY">Inspector</option>
                                 <option value="CLIENT">Client Portal User</option>
                             </select>
@@ -604,6 +607,7 @@ export default function UserManagementPage() {
                             >
                                 <option value="ADMIN">Administrator</option>
                                 <option value="MANAGER">Manager</option>
+                                <option value="HR_MANAGER">HR Manager</option>
                                 <option value="INSPECTION_BOY">Inspector</option>
                                 <option value="CLIENT">Client Portal User</option>
                             </select>
