@@ -41,7 +41,10 @@ import {
     ShieldCheck,
     Upload,
     FileDown,
-    FolderOpen
+    FolderOpen,
+    BookOpen,
+    Files,
+    IndianRupee
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -92,6 +95,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Groups", href: "/groups", icon: Users2, roles: ["ADMIN", "MANAGER"] },
                 { name: "Recruitment", href: "/recruitment", icon: Target, roles: ["ADMIN", "MANAGER"] },
                 { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER", "HR_MANAGER"] },
+                { name: "Master Documents", href: "/employees/documents", icon: Files, roles: ["ADMIN", "MANAGER", "HR_MANAGER"] },
                 { name: "Sites", href: "/sites", icon: MapPin, roles: ["ADMIN", "MANAGER"] },
                 { name: "Field", href: "/field", icon: Navigation, roles: ["ADMIN", "MANAGER"] },
                 { name: "Billing", href: "/billing", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
@@ -106,6 +110,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Leaves", href: "/leaves", icon: CalendarOff, roles: ["ADMIN", "MANAGER"] },
                 { name: "Payroll", href: "/payroll", icon: Wallet, roles: ["ADMIN", "MANAGER"] },
                 { name: "Upload Attendance", href: "/attendance/upload", icon: Upload, roles: ["ADMIN", "MANAGER"] },
+                { name: "Salary Slips", href: "/payroll/salary-slips", icon: IndianRupee, roles: ["ADMIN", "MANAGER", "HR_MANAGER"] },
                 { name: "Compliance", href: "/payroll/compliance", icon: ShieldCheck, roles: ["ADMIN", "MANAGER"] },
                 { name: "Reports & Downloads", href: "/payroll/reports", icon: FileDown, roles: ["ADMIN", "MANAGER"] },
                 { name: "Assets", href: "/assets", icon: Package, roles: ["ADMIN", "MANAGER"] },
