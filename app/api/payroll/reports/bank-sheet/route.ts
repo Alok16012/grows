@@ -20,8 +20,9 @@ export async function GET(req: Request) {
             return new NextResponse("Month and Year required", { status: 400 })
         }
 
-        const where: any = { month, year, status: "PROCESSED" } // Only processed/approved for banking
-        if (siteId) where.siteId = siteId
+        // Include DRAFT, PROCESSED, and PAID payrolls for bank transfer
+        const where: any = { month, year, status: { in: ["DRAFT", "PROCESSED", "PAID"] } }
+        if (siteId) where.employee = { branchId: siteId }
 
         const payrolls = await prisma.payroll.findMany({
             where,
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
         })
 
         if (payrolls.length === 0) {
-            return new NextResponse("No processed payroll data found for bank transfer.", { status: 404 })
+            return new NextResponse("No payroll data found for this period. Please calculate payroll first.", { status: 404 })
         }
 
         const data = payrolls.map(p => ({

@@ -127,9 +127,6 @@ export default function ReportsDownloadsPage() {
     }
 
     const handleDownloadWage = async () => {
-        if (wageFormat === "pdf") {
-            toast.info("PDF format coming soon — downloading Excel instead.")
-        }
         setDownloadingWage(true)
         try {
             const siteParam = downloadOption === "site-wise" && selectedSite !== "all"
@@ -147,13 +144,44 @@ export default function ReportsDownloadsPage() {
                 return
             }
 
-            const wb = XLSX.utils.book_new()
-            const ws = XLSX.utils.json_to_sheet(data)
-            const cols = Object.keys(data[0] || {})
-            ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
-            XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
-            const fileName = `Wage_Sheet_${MONTHS[month - 1]}_${year}.xlsx`
-            XLSX.writeFile(wb, fileName)
+            if (wageFormat === "pdf") {
+                // Generate printable PDF via print window
+                const cols = Object.keys(data[0] || {})
+                const tableRows = data.map((row: Record<string, unknown>) =>
+                    `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join("")}</tr>`
+                ).join("")
+                const html = `<!DOCTYPE html><html><head><title>Wage Sheet - ${MONTHS[month - 1]} ${year}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 9px; margin: 10mm; }
+  h2 { font-size: 13px; text-align: center; margin-bottom: 4px; }
+  p.sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #1e3a5f; color: #fff; padding: 4px 5px; text-align: left; font-size: 8px; white-space: nowrap; }
+  td { border: 1px solid #ddd; padding: 3px 5px; white-space: nowrap; }
+  tr:nth-child(even) td { background: #f5f7fa; }
+  @media print { @page { size: A3 landscape; margin: 8mm; } }
+</style></head><body>
+<h2>GROWUS — WAGE SHEET</h2>
+<p class="sub">${MONTHS[month - 1]} ${year} &nbsp;|&nbsp; ${siteName}</p>
+<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table>
+</body></html>`
+                const w = window.open("", "_blank")
+                if (w) {
+                    w.document.write(html)
+                    w.document.close()
+                    setTimeout(() => w.print(), 500)
+                }
+                toast.success("Wage Sheet PDF ready — print dialog opened")
+            } else {
+                const wb = XLSX.utils.book_new()
+                const ws = XLSX.utils.json_to_sheet(data)
+                const cols = Object.keys(data[0] || {})
+                ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
+                XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
+                const fileName = `Wage_Sheet_${MONTHS[month - 1]}_${year}.xlsx`
+                XLSX.writeFile(wb, fileName)
+                toast.success(`Downloaded: ${fileName}`)
+            }
 
             const updated = saveHistory({
                 reportType: "Wage Sheet",
@@ -164,7 +192,6 @@ export default function ReportsDownloadsPage() {
                 downloadedOn: new Date().toLocaleString("en-IN"),
             })
             setHistory(updated)
-            toast.success(`Downloaded: ${fileName}`)
         } catch (err) {
             console.error(err)
             toast.error("Download failed.")

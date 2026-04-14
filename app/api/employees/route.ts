@@ -71,7 +71,7 @@ export async function POST(req: Request) {
             aadharNumber, panNumber, bankAccountNumber, bankIFSC, bankName,
             photo, designation, departmentId, branchId,
             dateOfJoining, status, employmentType, basicSalary, notes,
-            customRoleId,
+            customRoleId, systemRole,
             // New fields
             middleName, nameAsPerAadhar, fathersName, bloodGroup, maritalStatus, marriageDate, nationality, religion, caste,
             uan, pfNumber, esiNumber, labourCardNo, labourCardExpDate,
@@ -117,12 +117,19 @@ export async function POST(req: Request) {
         // Check if user already exists with this email
         const existingUser = await prisma.user.findUnique({ where: { email: userEmail } })
 
+        // Validate system role — only allow valid role values
+        const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY", "CLIENT"]
+        const assignedRole = (systemRole && VALID_ROLES.includes(systemRole)) ? systemRole : "INSPECTION_BOY"
+
         let userId: string
         if (existingUser) {
             userId = existingUser.id
-            // Update customRoleId if provided
-            if (customRoleId) {
-                await prisma.user.update({ where: { id: existingUser.id }, data: { customRoleId } })
+            // Update role and customRoleId if provided
+            const updatePayload: Record<string, unknown> = {}
+            if (systemRole && VALID_ROLES.includes(systemRole)) updatePayload.role = assignedRole
+            if (customRoleId) updatePayload.customRoleId = customRoleId
+            if (Object.keys(updatePayload).length > 0) {
+                await prisma.user.update({ where: { id: existingUser.id }, data: updatePayload })
             }
         } else {
             const newUser = await prisma.user.create({
@@ -130,7 +137,7 @@ export async function POST(req: Request) {
                     name: `${firstName} ${lastName}`,
                     email: userEmail,
                     password: passwordHash,
-                    role: "INSPECTION_BOY",
+                    role: assignedRole,
                     customRoleId: customRoleId || null,
                 },
             })

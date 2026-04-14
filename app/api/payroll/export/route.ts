@@ -12,11 +12,15 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const month = parseInt(searchParams.get("month") ?? "")
     const year  = parseInt(searchParams.get("year")  ?? "")
+    const siteId = searchParams.get("siteId")
 
     if (!month || !year) return new NextResponse("month and year required", { status: 400 })
 
+    const where: Record<string, unknown> = { month, year }
+    if (siteId) where.employee = { branchId: siteId }
+
     const payrolls = await prisma.payroll.findMany({
-        where: { month, year },
+        where,
         include: {
             employee: {
                 select: {

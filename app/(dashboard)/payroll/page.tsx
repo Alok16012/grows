@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     Calculator, Download, Loader2, Settings, CheckCircle2,
-    IndianRupee, Users, ChevronDown, ChevronUp, Edit2, Save, X, FileSpreadsheet
+    IndianRupee, Users, ChevronDown, ChevronUp, Edit2, Save, X, FileSpreadsheet,
+    Upload, FileDown
 } from "lucide-react"
 import * as XLSX from "xlsx"
 
@@ -231,6 +232,8 @@ export default function PayrollPage() {
     const [tab, setTab] = useState<"payroll"|"setup">("payroll")
     // Attendance inputs per employee
     const [attInputs, setAttInputs] = useState<Record<string, AttInput>>({})
+    // Bulk upload salary state
+    const [bulkUploading, setBulkUploading] = useState(false)
 
     const defaultAtt = useCallback((): AttInput => ({
         monthDays: new Date(year, month, 0).getDate(),
@@ -328,6 +331,64 @@ export default function PayrollPage() {
             XLSX.writeFile(wb, `Growus_Payroll_${MONTHS[month-1]}_${year}.xlsx`)
             toast.success("Excel downloaded!")
         } catch (e: any) { toast.error(e.message) }
+    }
+
+    const downloadSalaryTemplate = () => {
+        const headers = [["Employee ID", "Basic", "DA", "Washing", "Conveyance", "Leave With Wages", "Other Allowance", "OT Rate/Hour", "Canteen Rate/Day", "Compliance Type (OR/CALL)"]]
+        const sampleRows = employees.slice(0, 3).map(e => [e.employeeId, e.salary?.basic ?? 0, e.salary?.da ?? 0, e.salary?.washing ?? 0, e.salary?.conveyance ?? 0, e.salary?.leaveWithWages ?? 0, e.salary?.otherAllowance ?? 0, e.salary?.otRatePerHour ?? 170, e.salary?.canteenRatePerDay ?? 55, e.salary?.complianceType ?? "OR"])
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleRows])
+        ws["!cols"] = headers[0].map(h => ({ wch: Math.max(h.length + 2, 14) }))
+        XLSX.utils.book_append_sheet(wb, ws, "Salary Template")
+        XLSX.writeFile(wb, "Salary_Structure_Template.xlsx")
+        toast.success("Template downloaded! Fill and re-upload.")
+    }
+
+    const handleBulkSalaryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setBulkUploading(true)
+        try {
+            const ab = await file.arrayBuffer()
+            const wb = XLSX.read(ab)
+            const ws = wb.Sheets[wb.SheetNames[0]]
+            const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws)
+            if (!rows.length) { toast.error("No data found in file."); return }
+
+            let success = 0, failed = 0
+            for (const row of rows) {
+                const empId = String(row["Employee ID"] ?? "").trim()
+                if (!empId) { failed++; continue }
+                // Find employee by employeeId
+                const emp = employees.find(e => e.employeeId === empId)
+                if (!emp) { failed++; continue }
+                try {
+                    const res = await fetch(`/api/payroll/salary-structure/${emp.id}`, {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            basic: Number(row["Basic"]) || 0,
+                            da: Number(row["DA"]) || 0,
+                            washing: Number(row["Washing"]) || 0,
+                            conveyance: Number(row["Conveyance"]) || 0,
+                            leaveWithWages: Number(row["Leave With Wages"]) || 0,
+                            otherAllowance: Number(row["Other Allowance"]) || 0,
+                            otRatePerHour: Number(row["OT Rate/Hour"]) || 170,
+                            canteenRatePerDay: Number(row["Canteen Rate/Day"]) || 55,
+                            complianceType: String(row["Compliance Type (OR/CALL)"] ?? "OR").trim() === "CALL" ? "CALL" : "OR",
+                            status: "APPROVED",
+                        }),
+                    })
+                    if (res.ok) success++; else failed++
+                } catch { failed++ }
+            }
+            toast.success(`Bulk upload done: ${success} updated, ${failed} failed.`)
+            await loadData()
+        } catch {
+            toast.error("Failed to read file.")
+        } finally {
+            setBulkUploading(false)
+            e.target.value = ""
+        }
     }
 
     if (status === "loading" || loading) {
@@ -583,14 +644,25 @@ export default function PayrollPage() {
             {/* ── TAB: SALARY SETUP ── */}
             {tab === "setup" && (
                 <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
-                    <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+                    <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between flex-wrap gap-3">
                         <div>
                             <h2 className="text-[14px] font-semibold">Salary Structure Setup</h2>
                             <p className="text-[12px] text-[var(--text3)]">Set BASIC, DA, allowances per employee. HRA & Bonus auto-calculated.</p>
                         </div>
-                        <div className="flex items-center gap-2 text-[12px] text-[var(--text3)]">
-                            <CheckCircle2 size={14} className="text-green-500" />{withSalary.length} set
-                            <Users size={14} className="text-amber-500 ml-2" />{noSalary.length} pending
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 text-[12px] text-[var(--text3)]">
+                                <CheckCircle2 size={14} className="text-green-500" />{withSalary.length} set
+                                <Users size={14} className="text-amber-500 ml-2" />{noSalary.length} pending
+                            </div>
+                            <button onClick={downloadSalaryTemplate}
+                                className="flex items-center gap-1.5 text-[12px] font-medium border border-[var(--border)] px-3 py-1.5 rounded-lg hover:bg-[var(--surface)] transition-colors">
+                                <FileDown size={13} /> Download Template
+                            </button>
+                            <label className={`flex items-center gap-1.5 text-[12px] font-medium border border-[var(--accent)] text-[var(--accent)] px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors ${bulkUploading ? "opacity-60 pointer-events-none" : ""}`}>
+                                {bulkUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                                {bulkUploading ? "Uploading..." : "Bulk Upload (.xlsx)"}
+                                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handleBulkSalaryUpload} disabled={bulkUploading} />
+                            </label>
                         </div>
                     </div>
                     <table className="w-full text-[12px]">

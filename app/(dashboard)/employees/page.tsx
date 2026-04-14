@@ -171,7 +171,7 @@ type ModalForm = {
     dateOfBirth: string; gender: string; aadharNumber: string; panNumber: string
     designation: string; departmentId: string; branchId: string; managerId: string
     dateOfJoining: string; employmentType: string; salaryType: string; basicSalary: string
-    customRoleId: string
+    customRoleId: string; systemRole: string
     address: string; city: string; state: string; pincode: string
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
     status: string; notes: string
@@ -184,6 +184,10 @@ type ModalForm = {
     // Safety
     safetyGoggles: boolean; safetyGloves: boolean; safetyHelmet: boolean
     safetyMask: boolean; safetyJacket: boolean; safetyEarMuffs: boolean; safetyShoes: boolean
+    // Salary Structure
+    salDA: string; salWashing: string; salConveyance: string; salLeaveWithWages: string
+    salOtherAllowance: string; salOtRatePerHour: string; salCanteenRatePerDay: string
+    salComplianceType: string
 }
 
 const EMPTY_FORM: ModalForm = {
@@ -191,7 +195,7 @@ const EMPTY_FORM: ModalForm = {
     dateOfBirth: "", gender: "", aadharNumber: "", panNumber: "",
     designation: "", departmentId: "", branchId: "", managerId: "",
     dateOfJoining: "", employmentType: "Full-time", salaryType: "Monthly", basicSalary: "",
-    customRoleId: "",
+    customRoleId: "", systemRole: "INSPECTION_BOY",
     address: "", city: "", state: "", pincode: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
     status: "ACTIVE", notes: "",
@@ -204,6 +208,10 @@ const EMPTY_FORM: ModalForm = {
     // Safety
     safetyGoggles: false, safetyGloves: false, safetyHelmet: false,
     safetyMask: false, safetyJacket: false, safetyEarMuffs: false, safetyShoes: false,
+    // Salary Structure
+    salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
+    salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
+    salComplianceType: "OR",
 }
 
 function AddBranchMini({ onCreated }: { onCreated: (b: Branch) => void }) {
@@ -340,7 +348,7 @@ function EmployeeModal({
     const [branches, setBranches] = useState<Branch[]>(initialBranches)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
-    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "compliance" | "safety">("personal")
+    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
 
     useEffect(() => {
@@ -408,6 +416,11 @@ function EmployeeModal({
                 safetyEarMuffs: employee.safetyEarMuffs ?? false,
                 safetyShoes: employee.safetyShoes ?? false,
                 customRoleId: "",
+                systemRole: "INSPECTION_BOY",
+                // Salary Structure (cleared - will be loaded separately if needed)
+                salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
+                salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
+                salComplianceType: "OR",
             })
         } else {
             setForm(EMPTY_FORM)
@@ -449,6 +462,31 @@ function EmployeeModal({
             })
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
+            const empId = data.id || employee?.id
+
+            // Save salary structure if any salary fields are filled
+            const hasSalary = form.basicSalary || form.salDA || form.salWashing || form.salConveyance
+            if (empId && hasSalary) {
+                try {
+                    await fetch(`/api/payroll/salary-structure/${empId}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            basic: Number(form.basicSalary) || 0,
+                            da: Number(form.salDA) || 0,
+                            washing: Number(form.salWashing) || 0,
+                            conveyance: Number(form.salConveyance) || 0,
+                            leaveWithWages: Number(form.salLeaveWithWages) || 0,
+                            otherAllowance: Number(form.salOtherAllowance) || 0,
+                            otRatePerHour: Number(form.salOtRatePerHour) || 170,
+                            canteenRatePerDay: Number(form.salCanteenRatePerDay) || 55,
+                            complianceType: form.salComplianceType || "OR",
+                            status: "APPROVED",
+                        }),
+                    })
+                } catch { /* salary structure save failed silently */ }
+            }
+
             onSaved()
             if (!employee && data._userCreated) {
                 setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
@@ -495,9 +533,9 @@ function EmployeeModal({
 
                 {/* Tabs */}
                 <div className="flex border-b border-[var(--border)] px-6 overflow-x-auto">
-                    {(["personal", "employment", "bank", "compliance", "safety"] as const).map(t => (
+                    {(["personal", "employment", "salary", "bank", "compliance", "safety"] as const).map(t => (
                         <button key={t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
-                            {t === "personal" ? "Personal Info" : t === "employment" ? "Employment" : t === "bank" ? "Bank & Address" : t === "compliance" ? "Compliance" : "Safety"}
+                            {t === "personal" ? "Personal Info" : t === "employment" ? "Employment" : t === "salary" ? "Salary Structure" : t === "bank" ? "Bank & Address" : t === "compliance" ? "Compliance" : "Safety"}
                         </button>
                     ))}
                 </div>
@@ -574,7 +612,16 @@ function EmployeeModal({
                                     <input value={form.designation} onChange={set("designation")} className={inputCls} placeholder="e.g. Security Guard" />
                                 </div>
                                 <div>
-                                    <label className={labelCls}>System Role <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>(Access Control)</span></label>
+                                    <label className={labelCls}>System Access Level <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>(Login Permission)</span></label>
+                                    <select value={form.systemRole} onChange={set("systemRole")} className={inputCls}>
+                                        <option value="INSPECTION_BOY">Employee (Default)</option>
+                                        <option value="HR_MANAGER">HR Manager</option>
+                                        <option value="MANAGER">Manager</option>
+                                        <option value="ADMIN">Admin</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Custom Job Role <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>(Optional)</span></label>
                                     <select value={form.customRoleId} onChange={set("customRoleId")} className={inputCls}>
                                         <option value="">No custom role</option>
                                         {customRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -621,6 +668,64 @@ function EmployeeModal({
                             <div>
                                 <label className={labelCls}>Notes</label>
                                 <textarea value={form.notes} onChange={set("notes")} className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none" rows={3} placeholder="Additional notes..." />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Salary Structure Tab */}
+                    {activeTab === "salary" && (
+                        <div className="space-y-4">
+                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
+                                <span className="text-[12px] text-blue-700">Set the detailed salary structure for payroll calculation. Basic Salary from Employment tab is used as the base.</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className={labelCls}>Basic Salary (₹)</label>
+                                    <input type="number" value={form.basicSalary} onChange={set("basicSalary")} className={inputCls} placeholder="0" min="0" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>DA — Dearness Allowance (₹)</label>
+                                    <input type="number" value={form.salDA} onChange={set("salDA")} className={inputCls} placeholder="0" min="0" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Washing Allowance (₹)</label>
+                                    <input type="number" value={form.salWashing} onChange={set("salWashing")} className={inputCls} placeholder="0" min="0" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Conveyance Allowance (₹)</label>
+                                    <input type="number" value={form.salConveyance} onChange={set("salConveyance")} className={inputCls} placeholder="0" min="0" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Leave With Wages (₹)</label>
+                                    <input type="number" value={form.salLeaveWithWages} onChange={set("salLeaveWithWages")} className={inputCls} placeholder="0" min="0" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Other Allowance (₹)</label>
+                                    <input type="number" value={form.salOtherAllowance} onChange={set("salOtherAllowance")} className={inputCls} placeholder="0" min="0" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>OT Rate / Hour (₹)</label>
+                                    <input type="number" value={form.salOtRatePerHour} onChange={set("salOtRatePerHour")} className={inputCls} placeholder="170" min="0" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Canteen Rate / Day (₹)</label>
+                                    <input type="number" value={form.salCanteenRatePerDay} onChange={set("salCanteenRatePerDay")} className={inputCls} placeholder="55" min="0" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={labelCls}>Compliance Type</label>
+                                <div className="flex gap-4 mt-1">
+                                    <label className="flex items-center gap-2 cursor-pointer text-[13px] text-[var(--text2)]">
+                                        <input type="radio" name="salComplianceType" value="OR" checked={form.salComplianceType === "OR"}
+                                            onChange={() => setForm(f => ({ ...f, salComplianceType: "OR" }))} className="accent-[var(--accent)]" />
+                                        <span><strong>OR</strong> — PF + ESIC apply (full-time)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer text-[13px] text-[var(--text2)]">
+                                        <input type="radio" name="salComplianceType" value="CALL" checked={form.salComplianceType === "CALL"}
+                                            onChange={() => setForm(f => ({ ...f, salComplianceType: "CALL" }))} className="accent-orange-500" />
+                                        <span><strong>CALL</strong> — No PF / ESIC (contract)</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -798,7 +903,7 @@ function EmployeeModal({
                             <button
                                 type="button"
                                 onClick={() => {
-                                    const order = ["personal", "employment", "bank", "compliance", "safety"] as const
+                                    const order = ["personal", "employment", "salary", "bank", "compliance", "safety"] as const
                                     const idx = order.indexOf(activeTab as typeof order[number])
                                     if (idx < order.length - 1) setActiveTab(order[idx + 1])
                                 }}
