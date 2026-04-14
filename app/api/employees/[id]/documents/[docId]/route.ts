@@ -50,3 +50,27 @@ export async function PATCH(
         return new NextResponse("Internal Error", { status: 500 })
     }
 }
+
+export async function DELETE(
+    req: Request,
+    { params }: { params: { id: string; docId: string } }
+) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+
+        const existing = await prisma.employeeDocument.findFirst({
+            where: { id: params.docId, employeeId: params.id },
+        })
+        if (!existing) return new NextResponse("Document not found", { status: 404 })
+
+        await prisma.employeeDocument.delete({ where: { id: params.docId } })
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error("[EMPLOYEE_DOC_DELETE]", error)
+        return new NextResponse("Internal Error", { status: 500 })
+    }
+}

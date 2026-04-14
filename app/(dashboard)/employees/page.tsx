@@ -874,11 +874,14 @@ function EmployeeDrawer({
     const [documents, setDocuments] = useState<EmployeeDocument[]>([])
     const [docsLoading, setDocsLoading] = useState(false)
     const [showUploadForm, setShowUploadForm] = useState(false)
-    const [uploadForm, setUploadForm] = useState({ type: "RESUME", fileName: "", fileUrl: "" })
+    const [uploadForm, setUploadForm] = useState({ type: "AADHAAR", fileName: "", fileUrl: "" })
     const [uploadSaving, setUploadSaving] = useState(false)
     const [fileUploading, setFileUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [rejectingDocId, setRejectingDocId] = useState<string | null>(null)
+    const [rejectReason, setRejectReason] = useState("")
 
     const fetchDocuments = async (empId: string) => {
         setDocsLoading(true)
@@ -905,19 +908,32 @@ function EmployeeDrawer({
     }
 
     const handleReject = async (docId: string) => {
-        if (!employee) return
-        const reason = prompt("Rejection reason (required):")
-        if (!reason?.trim()) return
+        if (!employee || !rejectReason.trim()) return
         setActionLoading(docId + "_reject")
         try {
             const r = await fetch(`/api/employees/${employee.id}/documents/${docId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "REJECTED", rejectionReason: reason.trim() }),
+                body: JSON.stringify({ status: "REJECTED", rejectionReason: rejectReason.trim() }),
             })
-            if (r.ok) { toast.success("Document rejected"); fetchDocuments(employee.id) }
-            else toast.error("Failed to reject")
+            if (r.ok) {
+                toast.success("Document rejected")
+                setRejectingDocId(null)
+                setRejectReason("")
+                fetchDocuments(employee.id)
+            } else toast.error("Failed to reject")
         } catch { toast.error("Failed to reject") }
+        finally { setActionLoading(null) }
+    }
+
+    const handleDelete = async (docId: string) => {
+        if (!employee) return
+        setActionLoading(docId + "_delete")
+        try {
+            const r = await fetch(`/api/employees/${employee.id}/documents/${docId}`, { method: "DELETE" })
+            if (r.ok) { toast.success("Document deleted"); fetchDocuments(employee.id) }
+            else toast.error("Failed to delete")
+        } catch { toast.error("Failed to delete") }
         finally { setActionLoading(null) }
     }
 
@@ -1138,14 +1154,37 @@ function EmployeeDrawer({
                     ) : (
                         /* Documents Tab */
                         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+                            {/* KYC Checklist */}
+                            <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
+                                <p style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" }}>KYC Status</p>
+                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                    {(["AADHAAR", "PAN", "PHOTO"] as const).map(type => {
+                                        const uploaded = documents.filter(d => d.type === type)
+                                        const verified = uploaded.find(d => d.status === "VERIFIED")
+                                        const pending = uploaded.find(d => d.status === "PENDING")
+                                        const conf = DOC_TYPE_CONFIG[type]
+                                        let statusColor = "#991b1b"; let statusBg = "#fef2f2"; let statusText = "Missing"
+                                        if (verified) { statusColor = "#14532d"; statusBg = "#dcfce7"; statusText = "Verified" }
+                                        else if (pending) { statusColor = "#92400e"; statusBg = "#fffbeb"; statusText = "Pending" }
+                                        return (
+                                            <div key={type} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: statusBg, border: `1px solid ${statusColor}22` }}>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: conf.color }}>{conf.label}</span>
+                                                <span style={{ fontSize: 10, fontWeight: 600, color: statusColor }}>{statusText}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
                             {/* Upload button */}
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px" }}>Documents</p>
+                                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: 0 }}>All Documents</p>
                                 <button
-                                    onClick={() => setShowUploadForm(v => !v)}
+                                    onClick={() => { setShowUploadForm(v => !v); setUploadForm({ type: "AADHAAR", fileName: "", fileUrl: "" }) }}
                                     style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                                 >
-                                    <Plus size={13} /> Upload Document
+                                    <Plus size={13} /> Upload
                                 </button>
                             </div>
 
@@ -1166,21 +1205,20 @@ function EmployeeDrawer({
                                         </select>
                                     </div>
                                     <div>
-                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>File Name</label>
+                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>Label / File Name</label>
                                         <input
                                             value={uploadForm.fileName}
                                             onChange={e => setUploadForm(f => ({ ...f, fileName: e.target.value }))}
-                                            placeholder="e.g. Aadhaar Card"
+                                            placeholder="e.g. Aadhaar Front"
                                             style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }}
                                         />
                                     </div>
                                     <div>
-                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>File</label>
-                                        {/* Direct upload */}
+                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>File (PDF / JPG / PNG)</label>
                                         <input
                                             ref={fileInputRef}
                                             type="file"
-                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                                            accept=".pdf,.jpg,.jpeg,.png,.webp"
                                             style={{ display: "none" }}
                                             onChange={handleFileSelect}
                                         />
@@ -1188,37 +1226,28 @@ function EmployeeDrawer({
                                             type="button"
                                             onClick={() => fileInputRef.current?.click()}
                                             disabled={fileUploading}
-                                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", cursor: fileUploading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, opacity: fileUploading ? 0.6 : 1, marginBottom: 8 }}
+                                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", cursor: fileUploading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, opacity: fileUploading ? 0.6 : 1, marginBottom: 6 }}
                                         >
                                             <Upload size={13} />
                                             {fileUploading ? "Uploading…" : uploadForm.fileUrl ? "Replace File" : "Choose File"}
                                         </button>
                                         {uploadForm.fileUrl && (
-                                            <p style={{ fontSize: 11, color: "var(--accent)", marginTop: 0, marginBottom: 6, wordBreak: "break-all" }}>
+                                            <p style={{ fontSize: 11, color: "#14532d", background: "#dcfce7", padding: "3px 8px", borderRadius: 6, margin: 0, display: "inline-block" }}>
                                                 ✓ File ready
                                             </p>
                                         )}
-                                        {/* Manual URL fallback */}
-                                        <input
-                                            value={uploadForm.fileUrl}
-                                            onChange={e => setUploadForm(f => ({ ...f, fileUrl: e.target.value }))}
-                                            placeholder="or paste URL manually…"
-                                            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }}
-                                        />
                                     </div>
                                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                                         <button
-                                            onClick={() => { setShowUploadForm(false); setUploadForm({ type: "RESUME", fileName: "", fileUrl: "" }); if (fileInputRef.current) fileInputRef.current.value = "" }}
+                                            onClick={() => { setShowUploadForm(false); setUploadForm({ type: "AADHAAR", fileName: "", fileUrl: "" }); if (fileInputRef.current) fileInputRef.current.value = "" }}
                                             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 12, color: "var(--text)" }}
-                                        >
-                                            Cancel
-                                        </button>
+                                        >Cancel</button>
                                         <button
                                             onClick={handleUpload}
-                                            disabled={uploadSaving}
-                                            style={{ padding: "7px 14px", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, opacity: uploadSaving ? 0.6 : 1 }}
+                                            disabled={uploadSaving || !uploadForm.fileUrl || !uploadForm.fileName.trim()}
+                                            style={{ padding: "7px 14px", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, opacity: (uploadSaving || !uploadForm.fileUrl || !uploadForm.fileName.trim()) ? 0.5 : 1 }}
                                         >
-                                            {uploadSaving ? "Saving..." : "Save"}
+                                            {uploadSaving ? "Saving..." : "Save Document"}
                                         </button>
                                     </div>
                                 </div>
@@ -1230,60 +1259,108 @@ function EmployeeDrawer({
                                     <Loader2 size={22} className="animate-spin" style={{ color: "var(--accent)" }} />
                                 </div>
                             ) : documents.length === 0 ? (
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 0", gap: 8 }}>
-                                    <FileText size={32} style={{ color: "var(--text3)" }} />
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: 8 }}>
+                                    <FileText size={28} style={{ color: "var(--text3)" }} />
                                     <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>No documents uploaded yet</p>
+                                    <p style={{ fontSize: 11, color: "var(--text3)", margin: 0 }}>Upload Aadhaar, PAN, Photo etc.</p>
                                 </div>
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                     {documents.map(doc => {
                                         const typeConf = DOC_TYPE_CONFIG[doc.type] || DOC_TYPE_CONFIG.OTHER
                                         const statusConf = DOC_STATUS_CONFIG[doc.status] || DOC_STATUS_CONFIG.PENDING
+                                        const isImage = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(doc.fileUrl)
+                                        const isPdf = /\.pdf(\?|$)/i.test(doc.fileUrl)
+                                        const isRejecting = rejectingDocId === doc.id
                                         return (
-                                            <div key={doc.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", background: "var(--surface)", display: "flex", flexDirection: "column", gap: 8 }}>
-                                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                                        <span style={{ fontSize: 11, fontWeight: 600, color: typeConf.color, background: typeConf.bg, padding: "2px 8px", borderRadius: 20 }}>
-                                                            {typeConf.label}
-                                                        </span>
-                                                        <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{doc.fileName}</span>
-                                                    </div>
-                                                    <span style={{ fontSize: 11, fontWeight: 600, color: statusConf.color, background: statusConf.bg, border: `1px solid ${statusConf.border}`, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", flexShrink: 0 }}>
-                                                        {statusConf.label}
-                                                    </span>
-                                                </div>
-                                                {doc.rejectionReason && (
-                                                    <p style={{ fontSize: 11, color: "#991b1b", margin: 0, background: "#fef2f2", padding: "4px 8px", borderRadius: 6 }}>
-                                                        Reason: {doc.rejectionReason}
-                                                    </p>
-                                                )}
-                                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                                    <a
-                                                        href={doc.fileUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        style={{ fontSize: 12, color: "var(--accent)", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 4 }}
+                                            <div key={doc.id} style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", background: "var(--surface)" }}>
+                                                {/* Image preview for Aadhaar/PAN/Photo */}
+                                                {isImage && (
+                                                    <div
+                                                        style={{ width: "100%", height: 100, overflow: "hidden", cursor: "pointer", background: "#f1f5f9", position: "relative" }}
+                                                        onClick={() => setPreviewUrl(doc.fileUrl)}
                                                     >
-                                                        <FileText size={12} /> Download
-                                                    </a>
-                                                    {isAdmin && doc.status !== "VERIFIED" && (
-                                                        <button
-                                                            onClick={() => handleVerify(doc.id)}
-                                                            disabled={actionLoading === doc.id + "_verify"}
-                                                            style={{ fontSize: 11, fontWeight: 600, color: "#14532d", background: "#dcfce7", border: "1px solid #86efac", padding: "3px 10px", borderRadius: 6, cursor: "pointer", opacity: actionLoading === doc.id + "_verify" ? 0.6 : 1 }}
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img src={doc.fileUrl} alt={doc.fileName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.18)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }}
+                                                            onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+                                                            onMouseLeave={e => (e.currentTarget.style.opacity = "0")}
                                                         >
-                                                            {actionLoading === doc.id + "_verify" ? "..." : "Verify"}
-                                                        </button>
+                                                            <Eye size={22} style={{ color: "#fff" }} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                            <span style={{ fontSize: 11, fontWeight: 700, color: typeConf.color, background: typeConf.bg, padding: "2px 7px", borderRadius: 20 }}>
+                                                                {typeConf.label}
+                                                            </span>
+                                                            <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 500 }}>{doc.fileName}</span>
+                                                        </div>
+                                                        <span style={{ fontSize: 10.5, fontWeight: 600, color: statusConf.color, background: statusConf.bg, border: `1px solid ${statusConf.border}`, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>
+                                                            {statusConf.label}
+                                                        </span>
+                                                    </div>
+                                                    {doc.rejectionReason && (
+                                                        <p style={{ fontSize: 11, color: "#991b1b", margin: 0, background: "#fef2f2", padding: "4px 8px", borderRadius: 6 }}>
+                                                            ✗ {doc.rejectionReason}
+                                                        </p>
                                                     )}
-                                                    {isAdmin && doc.status !== "REJECTED" && (
-                                                        <button
-                                                            onClick={() => handleReject(doc.id)}
-                                                            disabled={actionLoading === doc.id + "_reject"}
-                                                            style={{ fontSize: 11, fontWeight: 600, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "3px 10px", borderRadius: 6, cursor: "pointer", opacity: actionLoading === doc.id + "_reject" ? 0.6 : 1 }}
-                                                        >
-                                                            {actionLoading === doc.id + "_reject" ? "..." : "Reject"}
-                                                        </button>
+                                                    {/* Inline rejection form */}
+                                                    {isRejecting && (
+                                                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                                            <input
+                                                                value={rejectReason}
+                                                                onChange={e => setRejectReason(e.target.value)}
+                                                                placeholder="Rejection reason…"
+                                                                autoFocus
+                                                                style={{ flex: 1, padding: "5px 8px", borderRadius: 7, border: "1px solid #fca5a5", fontSize: 12, background: "#fef2f2", color: "#991b1b", outline: "none" }}
+                                                            />
+                                                            <button
+                                                                onClick={() => handleReject(doc.id)}
+                                                                disabled={!rejectReason.trim() || actionLoading === doc.id + "_reject"}
+                                                                style={{ padding: "5px 10px", borderRadius: 7, background: "#dc2626", color: "#fff", border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !rejectReason.trim() ? 0.5 : 1 }}
+                                                            >Reject</button>
+                                                            <button
+                                                                onClick={() => { setRejectingDocId(null); setRejectReason("") }}
+                                                                style={{ padding: "5px 10px", borderRadius: 7, background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", fontSize: 11, cursor: "pointer" }}
+                                                            >✕</button>
+                                                        </div>
                                                     )}
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                                        {isImage ? (
+                                                            <button
+                                                                onClick={() => setPreviewUrl(doc.fileUrl)}
+                                                                style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, padding: 0, fontWeight: 600 }}
+                                                            ><Eye size={12} /> Preview</button>
+                                                        ) : (
+                                                            <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
+                                                                style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}
+                                                            ><Download size={12} />{isPdf ? "View PDF" : "Download"}</a>
+                                                        )}
+                                                        {isAdmin && doc.status !== "VERIFIED" && !isRejecting && (
+                                                            <button
+                                                                onClick={() => handleVerify(doc.id)}
+                                                                disabled={!!actionLoading}
+                                                                style={{ fontSize: 11, fontWeight: 600, color: "#14532d", background: "#dcfce7", border: "1px solid #86efac", padding: "3px 9px", borderRadius: 6, cursor: "pointer", opacity: actionLoading ? 0.6 : 1 }}
+                                                            >{actionLoading === doc.id + "_verify" ? "…" : "✓ Verify"}</button>
+                                                        )}
+                                                        {isAdmin && doc.status !== "REJECTED" && !isRejecting && (
+                                                            <button
+                                                                onClick={() => { setRejectingDocId(doc.id); setRejectReason("") }}
+                                                                style={{ fontSize: 11, fontWeight: 600, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "3px 9px", borderRadius: 6, cursor: "pointer" }}
+                                                            >✗ Reject</button>
+                                                        )}
+                                                        {isAdmin && (
+                                                            <button
+                                                                onClick={() => handleDelete(doc.id)}
+                                                                disabled={actionLoading === doc.id + "_delete"}
+                                                                style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", background: "none", border: "none", padding: "3px 6px", cursor: "pointer", marginLeft: "auto", opacity: actionLoading === doc.id + "_delete" ? 0.5 : 1 }}
+                                                                title="Delete document"
+                                                            ><Trash2 size={12} /></button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )
@@ -1293,6 +1370,31 @@ function EmployeeDrawer({
                         </div>
                     )}
                 </div>
+
+                {/* Image Preview Lightbox */}
+                {previewUrl && (
+                    <div
+                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                        onClick={() => setPreviewUrl(null)}
+                    >
+                        <div style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={previewUrl} alt="Document preview" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 10, objectFit: "contain", display: "block" }} />
+                            <button
+                                onClick={() => setPreviewUrl(null)}
+                                style={{ position: "absolute", top: -12, right: -12, width: 30, height: 30, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}
+                            >✕</button>
+                            <a
+                                href={previewUrl}
+                                download
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                style={{ position: "absolute", bottom: -36, left: "50%", transform: "translateX(-50%)", fontSize: 12, color: "#fff", background: "rgba(255,255,255,0.15)", padding: "5px 14px", borderRadius: 20, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
+                            ><Download size={12} /> Download</a>
+                        </div>
+                    </div>
+                )}
 
                 {/* Action Footer */}
                 <div className="px-5 py-4 border-t border-[var(--border)] flex items-center gap-2">
