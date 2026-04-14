@@ -19,6 +19,9 @@ export async function GET() {
                         employeeId: true,
                         firstName: true,
                         lastName: true,
+                        phone: true,
+                        email: true,
+                        designation: true,
                         branch: { select: { name: true } },
                         department: { select: { name: true } },
                     }
