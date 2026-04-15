@@ -26,6 +26,7 @@ const DOC_COLS = [
     { key: "AADHAAR",      label: "Aadhaar",      color: "#1d4ed8", bg: "#dbeafe" },
     { key: "PAN",          label: "PAN",          color: "#b45309", bg: "#fef3c7" },
     { key: "PHOTO",        label: "Photo",        color: "#15803d", bg: "#dcfce7" },
+    { key: "BANK_DETAILS", label: "Bank Details", color: "#0369a1", bg: "#e0f2fe" },
     { key: "CERTIFICATE",  label: "Certificate",  color: "#0f766e", bg: "#ccfbf1" },
     { key: "RESUME",       label: "Resume",       color: "#7c3aed", bg: "#ede9fe" },
     { key: "OFFER_LETTER", label: "Offer Letter", color: "#9333ea", bg: "#f3e8ff" },

@@ -958,6 +958,7 @@ function EmployeeModal({
                             { key: "AADHAAR", label: "Aadhaar Card" },
                             { key: "PAN", label: "PAN Card" },
                             { key: "PHOTO", label: "Photo" },
+                            { key: "BANK_DETAILS", label: "Bank Details" },
                             { key: "CERTIFICATE", label: "Certificate" },
                             { key: "RESUME", label: "Resume" },
                             { key: "OFFER_LETTER", label: "Offer Letter" },
