@@ -6,7 +6,8 @@ import { toast } from "sonner"
 import {
     Plus, Loader2, X, Search, Users,
     CheckCircle2, Clock, AlertCircle, PauseCircle,
-    ChevronDown, Trash2, CalendarDays, Upload, Eye
+    ChevronDown, Trash2, CalendarDays, Upload, Eye,
+    LayoutGrid, Table as TableIcon
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { format } from "date-fns"
@@ -1094,9 +1095,9 @@ function OnboardingDrawer({ record, onClose, onUpdated, onView }: {
 // ─── Onboarding Card ─────────────────────────────────────────────────────────
 
 function OnboardingCard({ record, onClick }: { record: OnboardingRecord; onClick: () => void }) {
-    const { total, completed, pct } = getTaskProgress(record.tasks)
     const statusCfg = STATUS_CONFIG[record.status]
     const joiningDate = fmtDate(record.employee.dateOfJoining)
+    const isKycVerified = record.employee.isKycVerified
 
     return (
         <div
@@ -1116,27 +1117,23 @@ function OnboardingCard({ record, onClick }: { record: OnboardingRecord; onClick
                 </span>
             </div>
 
-            {(record.employee.designation || joiningDate) && (
-                <div className="flex items-center gap-3 text-[11.5px] text-[var(--text3)] mb-3">
-                    {record.employee.designation && <span>{record.employee.designation}</span>}
-                    {joiningDate && <span>Joined {joiningDate}</span>}
-                </div>
-            )}
-
-            {/* Progress */}
-            <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                    <span className="text-[11.5px] text-[var(--text3)]">{completed}/{total} tasks</span>
-                    <span className="text-[11.5px] font-semibold" style={{ color: pct === 100 ? "#1a9e6e" : pct >= 50 ? "#f59e0b" : "#3b82f6" }}>{pct}%</span>
-                </div>
-                <ProgressBar value={pct} height={5} />
+            <div className="flex items-center gap-3 text-[11.5px] text-[var(--text3)] mb-3 flex-wrap">
+                {record.employee.designation && <span className="truncate">{record.employee.designation}</span>}
+                {record.employee.branch?.name && <span className="truncate">{record.employee.branch.name}</span>}
+                {joiningDate && <span>Joined {joiningDate}</span>}
             </div>
 
-            <CategoryBreakdown tasks={record.tasks} />
-
-            <button className="mt-3 w-full text-center text-[12px] font-medium text-[var(--accent)] border border-[var(--accent)] rounded-[7px] py-1.5 hover:bg-[var(--accent-light)] transition-colors">
-                View Checklist
-            </button>
+            {/* KYC Status */}
+            <div className="flex items-center justify-between">
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
+                    background: isKycVerified ? "#dcfce7" : "#fef3c7",
+                    color: isKycVerified ? "#16a34a" : "#d97706" }}>
+                    {isKycVerified ? "✓ KYC Verified" : "⏳ KYC Pending"}
+                </span>
+                <button className="text-[12px] font-medium text-[var(--accent)] border border-[var(--accent)] rounded-[7px] px-3 py-1 hover:bg-blue-50 transition-colors">
+                    Verify →
+                </button>
+            </div>
         </div>
     )
 }
@@ -1382,6 +1379,7 @@ export default function OnboardingPage() {
     const [statusFilter, setStatusFilter] = useState<string>("ALL")
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState<string>("")
+    const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -1465,33 +1463,35 @@ export default function OnboardingPage() {
                 <StatCard label="On Hold"     value={onHoldCount}     color="#ef4444" bg="#fef2f2" icon={<PauseCircle size={18} />} />
             </div>
 
-            {/* Filters */}
+            {/* Filters + View toggle */}
             <div className="bg-white border border-[var(--border)] rounded-[12px] p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                {/* Status pills */}
                 <div className="flex flex-wrap gap-1.5">
                     {STATUS_PILLS.map(pill => (
-                        <button
-                            key={pill.value}
-                            onClick={() => setStatusFilter(pill.value)}
-                            className={`px-3 py-1.5 text-[12px] font-medium rounded-full border transition-colors ${statusFilter === pill.value ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"}`}
-                        >
+                        <button key={pill.value} onClick={() => setStatusFilter(pill.value)}
+                            className={`px-3 py-1.5 text-[12px] font-medium rounded-full border transition-colors ${statusFilter === pill.value ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"}`}>
                             {pill.label}
                         </button>
                     ))}
                 </div>
-                {/* Search */}
-                <div className="relative sm:ml-auto w-full sm:w-64">
+                <div className="relative sm:ml-auto w-full sm:w-56">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
-                    <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Search by name or ID..."
-                        className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                    />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or ID..."
+                        className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
+                </div>
+                {/* View toggle */}
+                <div className="flex items-center border border-[var(--border)] rounded-[8px] overflow-hidden shrink-0">
+                    <button onClick={() => setViewMode("kanban")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium transition-colors ${viewMode === "kanban" ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
+                        <LayoutGrid size={13} /> Kanban
+                    </button>
+                    <button onClick={() => setViewMode("table")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium transition-colors ${viewMode === "table" ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
+                        <TableIcon size={13} /> Table
+                    </button>
                 </div>
             </div>
 
-            {/* Cards Grid */}
+            {/* Content */}
             {loading ? (
                 <div className="flex items-center justify-center py-16">
                     <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
@@ -1502,15 +1502,78 @@ export default function OnboardingPage() {
                     <p className="text-[14px] font-semibold text-[var(--text)]">No onboarding records</p>
                     <p className="text-[13px] text-[var(--text3)] mt-1">Start onboarding for a new employee</p>
                 </div>
+            ) : viewMode === "kanban" ? (
+                /* ── Kanban view ── */
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {(["NOT_STARTED","IN_PROGRESS","COMPLETED","ON_HOLD"] as const).map(col => {
+                        const colRecords = records.filter(r => r.status === col)
+                        const cfg = STATUS_CONFIG[col]
+                        return (
+                            <div key={col}>
+                                <div className="flex items-center gap-2 mb-2 px-1">
+                                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.color, display: "inline-block", flexShrink: 0 }} />
+                                    <span className="text-[12px] font-semibold text-[var(--text2)]">{cfg.label}</span>
+                                    <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{colRecords.length}</span>
+                                </div>
+                                <div className="flex flex-col gap-2 min-h-[80px] p-2 rounded-[10px] bg-[var(--surface2)]/40 border border-[var(--border)]">
+                                    {colRecords.length === 0 ? (
+                                        <p className="text-[11px] text-[var(--text3)] text-center py-4">No records</p>
+                                    ) : colRecords.map(record => (
+                                        <OnboardingCard key={record.id} record={record} onClick={() => setSelectedRecord(record)} />
+                                    ))}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {records.map(record => (
-                        <OnboardingCard
-                            key={record.id}
-                            record={record}
-                            onClick={() => setSelectedRecord(record)}
-                        />
-                    ))}
+                /* ── Table view ── */
+                <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
+                    <table className="w-full text-[12px]">
+                        <thead>
+                            <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                                {["#","Employee","ID","Branch","Designation","Joining Date","Status","KYC","Action"].map(h => (
+                                    <th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {records.map((record, idx) => {
+                                const cfg = STATUS_CONFIG[record.status]
+                                const joiningDate = fmtDate(record.employee.dateOfJoining)
+                                const isKyc = record.employee.isKycVerified
+                                return (
+                                    <tr key={record.id} className={`border-b border-[var(--border)] last:border-0 hover:bg-blue-50/40 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-[var(--surface2)]/30"}`}>
+                                        <td className="px-3 py-2.5 text-[var(--text3)] font-medium">{idx + 1}</td>
+                                        <td className="px-3 py-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <Avatar firstName={record.employee.firstName} lastName={record.employee.lastName} photo={record.employee.photo} size={28} />
+                                                <span className="font-semibold text-[var(--text)] whitespace-nowrap">{record.employee.firstName} {record.employee.lastName}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap">{record.employee.employeeId}</td>
+                                        <td className="px-3 py-2.5 text-[var(--text)] whitespace-nowrap">{record.employee.branch?.name || "—"}</td>
+                                        <td className="px-3 py-2.5 text-[var(--text)] whitespace-nowrap">{record.employee.designation || "—"}</td>
+                                        <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap">{joiningDate || "—"}</td>
+                                        <td className="px-3 py-2.5">
+                                            <span style={{ background: cfg.bg, color: cfg.color }} className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">{cfg.label}</span>
+                                        </td>
+                                        <td className="px-3 py-2.5">
+                                            <span style={{ background: isKyc ? "#dcfce7" : "#fef3c7", color: isKyc ? "#16a34a" : "#d97706" }} className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                                                {isKyc ? "✓ Verified" : "Pending"}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2.5">
+                                            <button onClick={() => setSelectedRecord(record)}
+                                                className="text-[11px] font-medium text-[var(--accent)] border border-[var(--accent)] rounded-[6px] px-2.5 py-1 hover:bg-blue-50 transition-colors whitespace-nowrap">
+                                                Verify →
+                                            </button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
