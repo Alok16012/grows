@@ -44,7 +44,8 @@ import {
     FolderOpen,
     BookOpen,
     Files,
-    IndianRupee
+    IndianRupee,
+    TableProperties
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -97,6 +98,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Groups", href: "/groups", icon: Users2, roles: ["ADMIN", "MANAGER"] },
                 { name: "Recruitment", href: "/recruitment", icon: Target, roles: ["ADMIN", "MANAGER"], permission: "recruitment.view" },
                 { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
+                { name: "Employee Master", href: "/employees/master", icon: TableProperties, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
                 { name: "Master Documents", href: "/employees/documents", icon: Files, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
                 { name: "Sites", href: "/sites", icon: MapPin, roles: ["ADMIN", "MANAGER"] },
                 { name: "Field", href: "/field", icon: Navigation, roles: ["ADMIN", "MANAGER"] },
