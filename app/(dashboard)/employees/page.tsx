@@ -952,192 +952,153 @@ function EmployeeModal({
                         </div>
                     )}
 
-                    {/* Documents Tab */}
-                    {activeTab === "documents" && (
-                        <div className="space-y-3">
-                            {/* Upload Row */}
-                            <div className="flex items-center gap-2 p-3 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px]">
-                                <select value={docType} onChange={e => setDocType(e.target.value)}
-                                    className="h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[12px] bg-white text-[var(--text)] outline-none focus:border-[var(--accent)] flex-1 min-w-0">
-                                    <option value="AADHAAR">Aadhaar</option>
-                                    <option value="PAN">PAN Card</option>
-                                    <option value="PHOTO">Photo</option>
-                                    <option value="RESUME">Resume</option>
-                                    <option value="CERTIFICATE">Certificate</option>
-                                    <option value="OFFER_LETTER">Offer Letter</option>
-                                    <option value="OTHER">Other</option>
-                                </select>
-                                <button type="button" onClick={() => docFileRef.current?.click()} disabled={docUploading}
-                                    className="inline-flex items-center gap-1.5 bg-[var(--accent)] text-white px-3 py-1.5 rounded-[6px] text-[12px] font-medium hover:opacity-90 disabled:opacity-60 shrink-0 whitespace-nowrap">
-                                    {docUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                                    {docUploading ? "Uploading…" : "Upload File"}
-                                </button>
-                                <input ref={docFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
-                                    onChange={async (ev) => {
-                                        const file = ev.target.files?.[0]
-                                        if (!file) return
-                                        if (file.size > 5 * 1024 * 1024) { toast.error("File too large (max 5MB)"); return }
-                                        setDocUploading(true)
-                                        try {
-                                            const url = await new Promise<string>((resolve, reject) => {
-                                                const reader = new FileReader()
-                                                reader.onload = () => resolve(reader.result as string)
-                                                reader.onerror = reject
-                                                reader.readAsDataURL(file)
-                                            })
-                                            const newDoc = { type: docType, fileName: file.name, fileUrl: url }
-                                            if (employee) {
-                                                const r = await fetch(`/api/employees/${employee.id}/documents`, {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify(newDoc),
-                                                })
-                                                if (r.ok) { toast.success("Document uploaded!"); fetchExistingDocs(employee.id) }
-                                                else toast.error("Upload failed")
-                                            } else {
-                                                setPendingDocs(prev => [...prev, newDoc])
-                                                toast.success(`${file.name} queued — will upload on save`)
-                                            }
-                                        } catch { toast.error("Failed to read file") }
-                                        finally {
-                                            setDocUploading(false)
-                                            if (docFileRef.current) docFileRef.current.value = ""
-                                        }
-                                    }}
-                                />
-                            </div>
+                    {/* Documents Tab — per-type matrix */}
+                    {activeTab === "documents" && (() => {
+                        const DOC_TYPES = [
+                            { key: "AADHAAR", label: "Aadhaar Card" },
+                            { key: "PAN", label: "PAN Card" },
+                            { key: "PHOTO", label: "Photo" },
+                            { key: "CERTIFICATE", label: "Certificate" },
+                            { key: "RESUME", label: "Resume" },
+                            { key: "OFFER_LETTER", label: "Offer Letter" },
+                            { key: "OTHER", label: "Other" },
+                        ]
+                        // build map: docType -> first matching doc
+                        const docByType: Record<string, ExistingDoc> = {}
+                        existingDocs.forEach(d => { if (!docByType[d.type]) docByType[d.type] = d })
+                        // also factor in pending docs (new employee)
+                        const pendingByType: Record<string, PendingDoc> = {}
+                        pendingDocs.forEach(d => { if (!pendingByType[d.type]) pendingByType[d.type] = d })
 
-                            {/* Uploaded Documents Table */}
-                            {employee && (
-                                existingDocs.length === 0 ? (
-                                    <div className="text-center py-8 text-[12px] text-[var(--text3)]">
-                                        <FileText size={28} className="mx-auto mb-2 text-[var(--border)]" />
-                                        Koi document upload nahi hua abhi tak
-                                    </div>
-                                ) : (
-                                    <div className="border border-[var(--border)] rounded-[10px] overflow-hidden">
-                                        <table className="w-full text-[12px]">
-                                            <thead>
-                                                <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
-                                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Document</th>
-                                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">File Name</th>
-                                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Status</th>
-                                                    <th className="px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide text-right">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {existingDocs.map((doc, i) => {
-                                                    const isPdf = doc.fileName.toLowerCase().endsWith(".pdf")
-                                                    const docLabel: Record<string, string> = { AADHAAR: "Aadhaar", PAN: "PAN Card", PHOTO: "Photo", RESUME: "Resume", CERTIFICATE: "Certificate", OFFER_LETTER: "Offer Letter", OTHER: "Other" }
-                                                    const statusColor: Record<string, string> = { PENDING: "bg-amber-100 text-amber-700", VERIFIED: "bg-green-100 text-green-700", REJECTED: "bg-red-100 text-red-700" }
-                                                    return (
-                                                        <tr key={doc.id} className={`border-b border-[var(--border)] last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-[var(--surface2)]/40"}`}>
-                                                            <td className="px-3 py-2.5">
-                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
-                                                                    {docLabel[doc.type] || doc.type}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-3 py-2.5 text-[var(--text)] truncate max-w-[140px]" title={doc.fileName}>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <FileText size={12} className="text-[var(--text3)] shrink-0" />
-                                                                    <span className="truncate">{doc.fileName}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-3 py-2.5">
-                                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor[doc.status] || "bg-gray-100 text-gray-600"}`}>
-                                                                    {doc.status}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-3 py-2.5">
-                                                                <div className="flex items-center justify-end gap-1">
-                                                                    {/* View */}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setPreviewUrl(doc.fileUrl)
-                                                                            setPreviewName(doc.fileName)
-                                                                        }}
-                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                                                                        title="View">
-                                                                        <Eye size={12} /> View
-                                                                    </button>
-                                                                    {/* Download */}
-                                                                    <a href={doc.fileUrl} download={doc.fileName}
-                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                                                                        title="Download">
-                                                                        <Download size={12} /> Download
-                                                                    </a>
-                                                                    {/* Delete */}
-                                                                    <button type="button" disabled={docDeleting === doc.id}
-                                                                        onClick={async () => {
-                                                                            if (!confirm(`"${doc.fileName}" delete karna chahte hain?`)) return
-                                                                            setDocDeleting(doc.id)
-                                                                            try {
-                                                                                const r = await fetch(`/api/employees/${employee.id}/documents/${doc.id}`, { method: "DELETE" })
-                                                                                if (r.ok) { toast.success("Document deleted"); fetchExistingDocs(employee.id) }
-                                                                                else toast.error("Delete failed")
-                                                                            } catch { toast.error("Delete failed") }
-                                                                            finally { setDocDeleting(null) }
-                                                                        }}
-                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
-                                                                        title="Delete">
-                                                                        {docDeleting === doc.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                                                                        Delete
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    )
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )
-                            )}
-
-                            {/* New employee: pending docs queue */}
-                            {!employee && pendingDocs.length > 0 && (
-                                <div className="border border-[var(--border)] rounded-[10px] overflow-hidden">
-                                    <table className="w-full text-[12px]">
-                                        <thead>
-                                            <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
-                                                <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Document</th>
-                                                <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">File Name</th>
-                                                <th className="px-3 py-2 text-right"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {pendingDocs.map((doc, i) => (
-                                                <tr key={i} className="border-b border-[var(--border)] last:border-0">
+                        return (
+                            <div className="border border-[var(--border)] rounded-[10px] overflow-hidden">
+                                <table className="w-full text-[12px]">
+                                    <thead>
+                                        <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                                            <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide w-[130px]">Document</th>
+                                            <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Status / File</th>
+                                            <th className="px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {DOC_TYPES.map(({ key, label }) => {
+                                            const uploaded = docByType[key]
+                                            const pending = pendingByType[key]
+                                            const uploading = docUploading && docType === key
+                                            const fileInputId = `doc-upload-${key}`
+                                            const statusColor: Record<string, string> = { PENDING: "bg-amber-100 text-amber-700", VERIFIED: "bg-green-100 text-green-700", REJECTED: "bg-red-100 text-red-700" }
+                                            return (
+                                                <tr key={key} className="border-b border-[var(--border)] last:border-0">
+                                                    <td className="px-3 py-2.5 font-medium text-[var(--text)]">{label}</td>
                                                     <td className="px-3 py-2.5">
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
-                                                            {doc.type}
-                                                        </span>
+                                                        {uploaded ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                                                                <span className="truncate max-w-[140px] text-[var(--text)]" title={uploaded.fileName}>{uploaded.fileName}</span>
+                                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusColor[uploaded.status] || "bg-gray-100 text-gray-600"}`}>{uploaded.status}</span>
+                                                            </div>
+                                                        ) : pending ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                                                                <span className="truncate max-w-[160px] text-[var(--text)]">{pending.fileName}</span>
+                                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">Queued</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                                                                <span className="text-red-500 text-[11px] font-medium">Not Uploaded</span>
+                                                            </div>
+                                                        )}
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-[var(--text)] truncate max-w-[200px]">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <FileText size={12} className="text-[var(--text3)] shrink-0" />
-                                                            <span className="truncate">{doc.fileName}</span>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center justify-end gap-1 flex-wrap">
+                                                            {uploaded ? (
+                                                                <>
+                                                                    <button type="button"
+                                                                        onClick={() => { setPreviewUrl(uploaded.fileUrl); setPreviewName(uploaded.fileName) }}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                                                                        <Eye size={11} /> View
+                                                                    </button>
+                                                                    <a href={uploaded.fileUrl} download={uploaded.fileName}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+                                                                        <Download size={11} /> Download
+                                                                    </a>
+                                                                    {employee && (
+                                                                        <button type="button" disabled={docDeleting === uploaded.id}
+                                                                            onClick={async () => {
+                                                                                if (!confirm(`"${uploaded.fileName}" delete karna chahte hain?`)) return
+                                                                                setDocDeleting(uploaded.id)
+                                                                                try {
+                                                                                    const r = await fetch(`/api/employees/${employee.id}/documents/${uploaded.id}`, { method: "DELETE" })
+                                                                                    if (r.ok) { toast.success("Document deleted"); fetchExistingDocs(employee.id) }
+                                                                                    else toast.error("Delete failed")
+                                                                                } catch { toast.error("Delete failed") }
+                                                                                finally { setDocDeleting(null) }
+                                                                            }}
+                                                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50">
+                                                                            {docDeleting === uploaded.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                                                                            Delete
+                                                                        </button>
+                                                                    )}
+                                                                </>
+                                                            ) : pending ? (
+                                                                <button type="button" onClick={() => setPendingDocs(prev => prev.filter(d => d.type !== key))}
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                                                                    <X size={11} /> Remove
+                                                                </button>
+                                                            ) : (
+                                                                <>
+                                                                    <button type="button" disabled={uploading}
+                                                                        onClick={() => { setDocType(key); document.getElementById(fileInputId)?.click() }}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-60">
+                                                                        {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                                                                        {uploading ? "Uploading…" : "Upload"}
+                                                                    </button>
+                                                                    <input id={fileInputId} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                                                                        onChange={async (ev) => {
+                                                                            const file = ev.target.files?.[0]
+                                                                            if (!file) return
+                                                                            if (file.size > 5 * 1024 * 1024) { toast.error("File too large (max 5MB)"); return }
+                                                                            setDocUploading(true)
+                                                                            try {
+                                                                                const url = await new Promise<string>((resolve, reject) => {
+                                                                                    const reader = new FileReader()
+                                                                                    reader.onload = () => resolve(reader.result as string)
+                                                                                    reader.onerror = reject
+                                                                                    reader.readAsDataURL(file)
+                                                                                })
+                                                                                const newDoc = { type: key, fileName: file.name, fileUrl: url }
+                                                                                if (employee) {
+                                                                                    const r = await fetch(`/api/employees/${employee.id}/documents`, {
+                                                                                        method: "POST",
+                                                                                        headers: { "Content-Type": "application/json" },
+                                                                                        body: JSON.stringify(newDoc),
+                                                                                    })
+                                                                                    if (r.ok) { toast.success("Document uploaded!"); fetchExistingDocs(employee.id) }
+                                                                                    else toast.error("Upload failed")
+                                                                                } else {
+                                                                                    setPendingDocs(prev => [...prev, newDoc])
+                                                                                    toast.success(`${file.name} queued`)
+                                                                                }
+                                                                            } catch { toast.error("Failed to read file") }
+                                                                            finally {
+                                                                                setDocUploading(false)
+                                                                                ev.target.value = ""
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-right">
-                                                        <button type="button" onClick={() => setPendingDocs(prev => prev.filter((_, j) => j !== i))}
-                                                            className="text-red-400 hover:text-red-600 p-1">
-                                                            <X size={14} />
-                                                        </button>
-                                                    </td>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {!employee && pendingDocs.length === 0 && (
-                                <p className="text-center text-[12px] text-[var(--text3)] py-6">Koi document nahi — upar se select karke upload karein</p>
-                            )}
-                        </div>
-                    )}
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    })()}
                 </form>
 
                 <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between">

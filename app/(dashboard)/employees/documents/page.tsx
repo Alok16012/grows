@@ -1,325 +1,370 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import {
-    FileText, Search, Download, Trash2,
-    CheckCircle2, Clock, XCircle, Loader2, Eye, Users
-} from "lucide-react"
+import { Search, Download, Trash2, Loader2, Eye, Upload, Users, FileText, CheckCircle2, AlertCircle, Filter } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type Doc = {
-    id: string
-    type: string
-    fileName: string
-    fileUrl: string
-    status: string
-    rejectionReason?: string | null
-    uploadedAt: string
+    id: string; type: string; fileName: string; fileUrl: string
+    status: string; uploadedAt: string
     employee: {
-        id: string
-        employeeId: string
-        firstName: string
-        lastName: string
-        phone?: string
-        email?: string
-        designation?: string
-        branch: { name: string }
-        department?: { name: string } | null
+        id: string; employeeId: string; firstName: string; lastName: string
+        designation?: string; branch: { name: string }; department?: { name: string } | null
     }
 }
 
-const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    AADHAAR:      { label: "Aadhaar",      color: "#1d4ed8", bg: "#dbeafe" },
-    PAN:          { label: "PAN",          color: "#b45309", bg: "#fef3c7" },
-    RESUME:       { label: "Resume",       color: "#7c3aed", bg: "#ede9fe" },
-    PHOTO:        { label: "Photo",        color: "#15803d", bg: "#dcfce7" },
-    CERTIFICATE:  { label: "Certificate",  color: "#0f766e", bg: "#ccfbf1" },
-    OFFER_LETTER: { label: "Offer Letter", color: "#9333ea", bg: "#f3e8ff" },
-    OTHER:        { label: "Other",        color: "#6b7280", bg: "#f3f4f6" },
+type Employee = {
+    id: string; employeeId: string; firstName: string; lastName: string
+    designation?: string; branch: { name: string }; department?: { name: string } | null
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-    PENDING:  { label: "Pending",  color: "#92400e", bg: "#fffbeb", icon: <Clock size={10} /> },
-    VERIFIED: { label: "Verified", color: "#14532d", bg: "#dcfce7", icon: <CheckCircle2 size={10} /> },
-    REJECTED: { label: "Rejected", color: "#991b1b", bg: "#fef2f2", icon: <XCircle size={10} /> },
+// ─── Document columns shown in the table ─────────────────────────────────────
+const DOC_COLS = [
+    { key: "AADHAAR",      label: "Aadhaar",      color: "#1d4ed8", bg: "#dbeafe" },
+    { key: "PAN",          label: "PAN",          color: "#b45309", bg: "#fef3c7" },
+    { key: "PHOTO",        label: "Photo",        color: "#15803d", bg: "#dcfce7" },
+    { key: "CERTIFICATE",  label: "Certificate",  color: "#0f766e", bg: "#ccfbf1" },
+    { key: "RESUME",       label: "Resume",       color: "#7c3aed", bg: "#ede9fe" },
+    { key: "OFFER_LETTER", label: "Offer Letter", color: "#9333ea", bg: "#f3e8ff" },
+    { key: "OTHER",        label: "Other",        color: "#6b7280", bg: "#f3f4f6" },
+]
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const AVATAR_COLORS = ["#1a9e6e","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#06b6d4","#f97316"]
+function avatarColor(name: string) {
+    return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
 }
 
+// ─── Doc Cell ─────────────────────────────────────────────────────────────────
+function DocCell({
+    doc, empId, docType, onView, onDelete, onUploaded, isAdmin,
+}: {
+    doc: Doc | undefined; empId: string; docType: string
+    onView: (url: string, name: string) => void
+    onDelete: (empId: string, docId: string) => void
+    onUploaded: () => void
+    isAdmin: boolean
+}) {
+    const [uploading, setUploading] = useState(false)
+    const [deleting, setDeleting]   = useState(false)
+    const fileRef = useRef<HTMLInputElement>(null)
+
+    const handleUpload = async (ev: React.ChangeEvent<HTMLInputElement>) => {
+        const file = ev.target.files?.[0]
+        if (!file) return
+        if (file.size > 5 * 1024 * 1024) { toast.error("Max 5MB"); return }
+        setUploading(true)
+        try {
+            const url = await new Promise<string>((res, rej) => {
+                const r = new FileReader()
+                r.onload = () => res(r.result as string)
+                r.onerror = rej
+                r.readAsDataURL(file)
+            })
+            const resp = await fetch(`/api/employees/${empId}/documents`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: docType, fileName: file.name, fileUrl: url }),
+            })
+            if (resp.ok) { toast.success("Uploaded!"); onUploaded() }
+            else toast.error("Upload failed")
+        } catch { toast.error("Upload error") }
+        finally { setUploading(false); if (fileRef.current) fileRef.current.value = "" }
+    }
+
+    const handleDelete = async () => {
+        if (!doc) return
+        if (!confirm("Delete this document?")) return
+        setDeleting(true)
+        try {
+            const r = await fetch(`/api/employees/${empId}/documents/${doc.id}`, { method: "DELETE" })
+            if (r.ok) { toast.success("Deleted"); onDelete(empId, doc.id) }
+            else toast.error("Delete failed")
+        } catch { toast.error("Delete error") }
+        finally { setDeleting(false) }
+    }
+
+    // ── Not uploaded ──────────────────────────────────────────────────────────
+    if (!doc) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-1.5 h-full min-h-[64px] px-2">
+                <div className="flex items-center gap-1 text-[10px] font-semibold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                    <AlertCircle size={9} /> Not Uploaded
+                </div>
+                {isAdmin && (
+                    <>
+                        <button
+                            onClick={() => fileRef.current?.click()}
+                            disabled={uploading}
+                            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-[4px] bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50"
+                        >
+                            {uploading ? <Loader2 size={9} className="animate-spin" /> : <Upload size={9} />}
+                            Upload
+                        </button>
+                        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleUpload} />
+                    </>
+                )}
+            </div>
+        )
+    }
+
+    // ── Uploaded ──────────────────────────────────────────────────────────────
+    const statusColor = doc.status === "VERIFIED" ? "#14532d" : doc.status === "REJECTED" ? "#991b1b" : "#92400e"
+    const statusBg    = doc.status === "VERIFIED" ? "#dcfce7" : doc.status === "REJECTED" ? "#fef2f2" : "#fffbeb"
+
+    return (
+        <div className="flex flex-col gap-1 px-2 py-1.5 min-h-[64px]">
+            {/* filename + status */}
+            <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ color: statusColor, background: statusBg }}>
+                    {doc.status === "VERIFIED" ? "✓" : doc.status === "REJECTED" ? "✗" : "●"} {doc.status}
+                </span>
+            </div>
+            <p className="text-[11px] text-[#1a1a18] truncate max-w-[120px]" title={doc.fileName}>{doc.fileName}</p>
+            {/* actions */}
+            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                <button onClick={() => onView(doc.fileUrl, doc.fileName)}
+                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-blue-50 text-blue-600 hover:bg-blue-100">
+                    <Eye size={9} /> View
+                </button>
+                <a href={doc.fileUrl} download={doc.fileName}
+                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-green-50 text-green-700 hover:bg-green-100">
+                    <Download size={9} /> Download
+                </a>
+                {isAdmin && (
+                    <button onClick={handleDelete} disabled={deleting}
+                        className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">
+                        {deleting ? <Loader2 size={9} className="animate-spin" /> : <Trash2 size={9} />} Delete
+                    </button>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function MasterDocumentsPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
-    const [docs, setDocs]               = useState<Doc[]>([])
-    const [loading, setLoading]         = useState(true)
-    const [search, setSearch]           = useState("")
-    const [typeFilter, setTypeFilter]   = useState("ALL")
-    const [statusFilter, setStatusFilter] = useState("ALL")
-    const [actionLoading, setActionLoading] = useState<string | null>(null)
-    const [previewUrl, setPreviewUrl]   = useState<string | null>(null)
-    const [previewName, setPreviewName] = useState<string>("")
 
-    useEffect(() => {
-        if (status === "unauthenticated") router.push("/login")
-    }, [status, router])
+    const [employees, setEmployees] = useState<Employee[]>([])
+    const [docs, setDocs]           = useState<Doc[]>([])
+    const [loading, setLoading]     = useState(true)
+    const [search, setSearch]       = useState("")
+    const [branchFilter, setBranchFilter] = useState("ALL")
+    const [statusFilter, setStatusFilter] = useState("ALL") // ALL | COMPLETE | MISSING
+    const [viewer, setViewer]       = useState<{ url: string; name: string } | null>(null)
 
-    const fetchDocs = async () => {
+    useEffect(() => { if (status === "unauthenticated") router.push("/login") }, [status, router])
+
+    const fetchAll = async () => {
         setLoading(true)
         try {
-            const res = await fetch("/api/employees/all-documents")
-            if (res.ok) setDocs(await res.json())
-        } catch { toast.error("Failed to load documents") }
+            const [eRes, dRes] = await Promise.all([
+                fetch("/api/employees"),
+                fetch("/api/employees/all-documents"),
+            ])
+            if (eRes.ok) setEmployees(await eRes.json())
+            if (dRes.ok) setDocs(await dRes.json())
+        } catch { toast.error("Failed to load") }
         finally { setLoading(false) }
     }
 
-    useEffect(() => { fetchDocs() }, [])
+    useEffect(() => { fetchAll() }, [])
 
-    const handleVerify = async (empId: string, docId: string) => {
-        setActionLoading(docId + "_verify")
-        try {
-            const r = await fetch(`/api/employees/${empId}/documents/${docId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "VERIFIED" }),
-            })
-            if (r.ok) { toast.success("Verified"); fetchDocs() }
-            else toast.error("Failed")
-        } catch { toast.error("Failed") }
-        finally { setActionLoading(null) }
+    const handleDeleteLocal = (empId: string, docId: string) => {
+        setDocs(prev => prev.filter(d => d.id !== docId))
     }
 
-    const handleDelete = async (empId: string, docId: string) => {
-        if (!confirm("Delete this document?")) return
-        setActionLoading(docId + "_delete")
-        try {
-            const r = await fetch(`/api/employees/${empId}/documents/${docId}`, { method: "DELETE" })
-            if (r.ok) { toast.success("Deleted"); setDocs(d => d.filter(x => x.id !== docId)) }
-            else toast.error("Failed")
-        } catch { toast.error("Failed") }
-        finally { setActionLoading(null) }
-    }
-
-    // Group by employee, apply filters per-doc
-    type GroupedEmp = {
-        id: string; employeeId: string; firstName: string; lastName: string
-        branch: string; designation?: string; docs: Doc[]
-    }
-    const grouped: GroupedEmp[] = (() => {
-        const map = new Map<string, GroupedEmp>()
-        for (const doc of docs) {
-            const matchType   = typeFilter   === "ALL" || doc.type   === typeFilter
-            const matchStatus = statusFilter === "ALL" || doc.status === statusFilter
-            if (!matchType || !matchStatus) continue
-            const e = doc.employee
-            if (!map.has(e.id)) {
-                map.set(e.id, {
-                    id: e.id, employeeId: e.employeeId,
-                    firstName: e.firstName, lastName: e.lastName,
-                    branch: e.branch.name, designation: e.designation,
-                    docs: [],
-                })
-            }
-            map.get(e.id)!.docs.push(doc)
+    // Build doc map: empId → { docType → Doc }
+    const docMap = new Map<string, Map<string, Doc>>()
+    for (const doc of docs) {
+        const eid = doc.employee.id
+        if (!docMap.has(eid)) docMap.set(eid, new Map())
+        // Keep latest per type
+        const existing = docMap.get(eid)!.get(doc.type)
+        if (!existing || new Date(doc.uploadedAt) > new Date(existing.uploadedAt)) {
+            docMap.get(eid)!.set(doc.type, doc)
         }
-        return Array.from(map.values())
-            .filter(emp => {
-                if (!emp.docs.length) return false
-                if (!search) return true
-                const q = search.toLowerCase()
-                return (
-                    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(q) ||
-                    emp.employeeId.toLowerCase().includes(q) ||
-                    emp.branch.toLowerCase().includes(q) ||
-                    emp.docs.some(d => d.fileName.toLowerCase().includes(q))
-                )
-            })
-            .sort((a, b) => a.firstName.localeCompare(b.firstName))
-    })()
+    }
 
-    // Summary counts
-    const totalDocs      = docs.length
-    const totalEmployees = new Set(docs.map(d => d.employee.id)).size
-    const verified       = docs.filter(d => d.status === "VERIFIED").length
-    const pending        = docs.filter(d => d.status === "PENDING").length
+    // Unique branches for filter
+    const branches = ["ALL", ...Array.from(new Set(employees.map(e => e.branch.name))).sort()]
 
-    const isAdmin = session?.user?.role === "ADMIN" ||
-                    session?.user?.role === "HR_MANAGER" ||
-                    session?.user?.role === "MANAGER"
+    // Summary
+    const totalEmployees = employees.length
+    const totalDocs = docs.length
+    const fullyVerified = employees.filter(e => {
+        const empDocs = docMap.get(e.id)
+        return empDocs && DOC_COLS.every(c => empDocs.has(c.key))
+    }).length
+    const missingAny = totalEmployees - fullyVerified
+
+    // Filtered rows
+    const filtered = employees.filter(emp => {
+        if (branchFilter !== "ALL" && emp.branch.name !== branchFilter) return false
+        if (search) {
+            const q = search.toLowerCase()
+            if (!`${emp.firstName} ${emp.lastName}`.toLowerCase().includes(q) &&
+                !emp.employeeId.toLowerCase().includes(q) &&
+                !emp.branch.name.toLowerCase().includes(q)) return false
+        }
+        if (statusFilter === "COMPLETE") {
+            const empDocs = docMap.get(emp.id)
+            if (!empDocs || !DOC_COLS.every(c => empDocs.has(c.key))) return false
+        }
+        if (statusFilter === "MISSING") {
+            const empDocs = docMap.get(emp.id)
+            if (empDocs && DOC_COLS.every(c => empDocs.has(c.key))) return false
+        }
+        return true
+    })
+
+    const isAdmin = ["ADMIN", "MANAGER", "HR_MANAGER"].includes(session?.user?.role || "")
 
     return (
-        <div className="p-6 lg:p-7 max-w-screen-xl mx-auto">
+        <div className="p-4 lg:p-6 max-w-full mx-auto">
             {/* Header */}
-            <div className="mb-6 flex items-center gap-3">
+            <div className="mb-5 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-[10px] bg-[#e8f7f1] flex items-center justify-center shrink-0">
                     <FileText size={20} className="text-[#1a9e6e]" />
                 </div>
                 <div>
-                    <h1 className="text-[22px] font-semibold tracking-tight text-[#1a1a18]">Document Management</h1>
-                    <p className="text-[13px] text-[#6b6860]">All employee documents — grouped by employee and download option</p>
+                    <h1 className="text-[20px] font-semibold text-[#1a1a18]">Document Management</h1>
+                    <p className="text-[12px] text-[#6b6860]">All employee documents — manage, upload and verify</p>
                 </div>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                 {[
-                    { label: "Employees",        value: totalEmployees, color: "#3b82f6", bg: "#eff6ff", icon: <Users size={16} /> },
-                    { label: "Total Documents",  value: totalDocs,      color: "#1a9e6e", bg: "#e8f7f1", icon: <FileText size={16} /> },
-                    { label: "Verified",         value: verified,       color: "#14532d", bg: "#dcfce7", icon: <CheckCircle2 size={16} /> },
-                    { label: "Pending",          value: pending,        color: "#92400e", bg: "#fffbeb", icon: <Clock size={16} /> },
+                    { label: "Total Employees", value: totalEmployees, color: "#3b82f6", bg: "#eff6ff",  icon: <Users size={15} /> },
+                    { label: "Total Documents", value: totalDocs,      color: "#1a9e6e", bg: "#e8f7f1",  icon: <FileText size={15} /> },
+                    { label: "All Docs Present", value: fullyVerified,  color: "#14532d", bg: "#dcfce7",  icon: <CheckCircle2 size={15} /> },
+                    { label: "Missing Docs",     value: missingAny,     color: "#dc2626", bg: "#fef2f2",  icon: <AlertCircle size={15} /> },
                 ].map(s => (
-                    <div key={s.label} className="bg-white border border-[#e8e6e1] rounded-[12px] p-4 flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-[8px] flex items-center justify-center shrink-0"
-                            style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                    <div key={s.label} className="bg-white border border-[#e8e6e1] rounded-[12px] p-3 flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-[7px] flex items-center justify-center shrink-0" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
                         <div>
-                            <p className="text-[11px] text-[#6b6860]">{s.label}</p>
-                            <p className="text-[20px] font-bold" style={{ color: s.color }}>{s.value}</p>
+                            <p className="text-[10px] text-[#6b6860]">{s.label}</p>
+                            <p className="text-[18px] font-bold leading-tight" style={{ color: s.color }}>{s.value}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-3 mb-4 items-center">
-                <div className="relative flex-1 min-w-[200px] max-w-[360px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95]" />
-                    <input
-                        placeholder="Search employee name, ID, file…"
-                        className="w-full pl-9 pr-4 py-[9px] bg-white border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:outline-none focus:border-[#1a9e6e]"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                    />
+            <div className="flex flex-wrap gap-2 mb-4 items-center">
+                <div className="relative flex-1 min-w-[180px] max-w-[300px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[#9e9b95]" />
+                    <input placeholder="Search employee, ID…"
+                        className="w-full pl-8 pr-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] placeholder:text-[#9e9b95] outline-none focus:border-[#1a9e6e]"
+                        value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-                    className="px-3 py-[9px] bg-white border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#6b6860] focus:outline-none cursor-pointer">
-                    <option value="ALL">All Types</option>
-                    {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+                    className="px-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] text-[#6b6860] outline-none cursor-pointer">
+                    {branches.map(b => <option key={b} value={b}>{b === "ALL" ? "All Sites" : b}</option>)}
                 </select>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                    className="px-3 py-[9px] bg-white border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#6b6860] focus:outline-none cursor-pointer">
+                    className="px-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] text-[#6b6860] outline-none cursor-pointer">
                     <option value="ALL">All Status</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="VERIFIED">Verified</option>
-                    <option value="REJECTED">Rejected</option>
+                    <option value="COMPLETE">All Docs Present</option>
+                    <option value="MISSING">Missing Docs</option>
                 </select>
-                <span className="text-[12px] text-[#9e9b95] ml-auto">{grouped.length} employees</span>
+                <span className="text-[11px] text-[#9e9b95] ml-auto flex items-center gap-1">
+                    <Filter size={11} /> {filtered.length} employees
+                </span>
             </div>
 
             {/* Table */}
             {loading ? (
                 <div className="flex items-center justify-center py-16">
-                    <Loader2 className="animate-spin text-[#1a9e6e]" size={28} />
+                    <Loader2 className="animate-spin text-[#1a9e6e]" size={26} />
                 </div>
-            ) : grouped.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 bg-white border border-[#e8e6e1] rounded-[14px]">
-                    <FileText size={36} className="text-[#c8c5bf]" />
-                    <p className="text-[13px] text-[#9e9b95]">No documents found</p>
+            ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 gap-3 bg-white border border-[#e8e6e1] rounded-[14px]">
+                    <FileText size={32} className="text-[#c8c5bf]" />
+                    <p className="text-[13px] text-[#9e9b95]">No employees found</p>
                 </div>
             ) : (
-                <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden">
-                    {/* Header */}
-                    <div className="grid text-[10.5px] font-semibold text-[#9e9b95] uppercase tracking-wider px-5 py-3 bg-[#f9f8f5] border-b border-[#e8e6e1]"
-                        style={{ gridTemplateColumns: "110px 180px 1fr 200px" }}>
-                        <span>Emp ID</span>
-                        <span>Employee Name</span>
-                        <span>Document</span>
-                        <span className="text-right">Actions</span>
-                    </div>
-
-                    {/* One row per employee */}
-                    {grouped.map((emp, i) => (
-                        <div
-                            key={emp.id}
-                            className="grid border-b border-[#f0efec] last:border-0 hover:bg-[#f7fdf9] transition-colors"
-                            style={{
-                                gridTemplateColumns: "110px 180px 1fr 200px",
-                                background: i % 2 === 0 ? "#ffffff" : "#fafaf8",
-                            }}
-                        >
-                            {/* Emp ID — vertically centered, spans all docs */}
-                            <div className="flex items-start pt-3 px-5 pb-3">
-                                <span className="font-mono text-[11px] text-[#6b6860] bg-[#f3f4f6] px-2 py-0.5 rounded whitespace-nowrap">
-                                    {emp.employeeId}
-                                </span>
-                            </div>
-
-                            {/* Employee Name — vertically centered */}
-                            <div className="flex flex-col justify-start pt-3 px-2 pb-3">
-                                <p className="text-[13px] font-semibold text-[#1a1a18] truncate">
-                                    {emp.firstName} {emp.lastName}
-                                </p>
-                                <p className="text-[11px] text-[#9e9b95] truncate">{emp.branch}</p>
-                            </div>
-
-                            {/* Documents — stacked, one per line */}
-                            <div className="flex flex-col divide-y divide-[#f0efec] border-l border-[#f0efec]">
-                                {emp.docs.map(doc => {
-                                    const typeConf = TYPE_CONFIG[doc.type] || TYPE_CONFIG.OTHER
-                                    const statConf = STATUS_CONFIG[doc.status] || STATUS_CONFIG.PENDING
-                                    return (
-                                        <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 min-h-[44px]">
-                                            {/* Type badge */}
-                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                                                style={{ color: typeConf.color, background: typeConf.bg }}>
-                                                {typeConf.label}
+                <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-x-auto">
+                    <table className="w-full min-w-[900px] border-collapse text-[12px]">
+                        <thead>
+                            <tr className="bg-[#f9f8f5] border-b border-[#e8e6e1]">
+                                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#9e9b95] uppercase tracking-wider w-[100px]">Emp ID</th>
+                                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#9e9b95] uppercase tracking-wider w-[160px]">Employee Name</th>
+                                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#9e9b95] uppercase tracking-wider w-[100px]">Site</th>
+                                {DOC_COLS.map(col => (
+                                    <th key={col.key} className="text-center px-2 py-3 text-[10px] font-semibold uppercase tracking-wider min-w-[130px]"
+                                        style={{ color: col.color }}>
+                                        {col.label}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map((emp, i) => {
+                                const empDocs = docMap.get(emp.id)
+                                const hasAll  = empDocs && DOC_COLS.every(c => empDocs.has(c.key))
+                                const ac      = avatarColor(emp.firstName)
+                                return (
+                                    <tr key={emp.id}
+                                        className={`border-b border-[#f0efec] last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-[#fafaf8]"} hover:bg-[#f7fdf9] transition-colors`}>
+                                        {/* Emp ID */}
+                                        <td className="px-4 py-2 align-top pt-3">
+                                            <span className="font-mono text-[11px] text-[#6b6860] bg-[#f3f4f6] px-2 py-0.5 rounded whitespace-nowrap">
+                                                {emp.employeeId}
                                             </span>
-                                            {/* File name */}
-                                            <span className="text-[12px] text-[#1a1a18] truncate flex-1" title={doc.fileName}>
-                                                {doc.fileName}
-                                            </span>
-                                            {/* Status */}
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                                                style={{ color: statConf.color, background: statConf.bg }}>
-                                                {statConf.icon} {statConf.label}
-                                            </span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-
-                            {/* Actions — stacked, aligned to each doc row */}
-                            <div className="flex flex-col divide-y divide-[#f0efec] border-l border-[#f0efec]">
-                                {emp.docs.map(doc => {
-                                    const isImage = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(doc.fileUrl)
-                                    return (
-                                        <div key={doc.id} className="flex items-center justify-end gap-1.5 px-4 py-2.5 min-h-[44px]">
-                                            {/* View */}
-                                            <button 
-                                                onClick={() => {
-                                                    setPreviewUrl(doc.fileUrl)
-                                                    setPreviewName(doc.fileName)
-                                                }}
-                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe] transition-colors"
-                                            >
-                                                <Eye size={11} /> View
-                                            </button>
-                                            {/* Download */}
-                                            <a href={doc.fileUrl} download={doc.fileName} target="_blank" rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[#e8f7f1] text-[#1a9e6e] hover:bg-[#d1fae5] transition-colors">
-                                                <Download size={11} /> Download
-                                            </a>
-                                            {/* Delete */}
-                                            {isAdmin && (
-                                                <button onClick={() => handleDelete(emp.id, doc.id)}
-                                                    disabled={actionLoading === doc.id + "_delete"}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[#fef2f2] text-[#dc2626] hover:bg-[#fecaca] disabled:opacity-50 transition-colors">
-                                                    {actionLoading === doc.id + "_delete"
-                                                        ? <Loader2 size={11} className="animate-spin" />
-                                                        : <Trash2 size={11} />}
-                                                    Delete
-                                                </button>
-                                            )}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    ))}
+                                        </td>
+                                        {/* Name */}
+                                        <td className="px-4 py-2 align-top pt-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                                                    style={{ background: ac }}>
+                                                    {emp.firstName[0]}{emp.lastName[0]}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-[#1a1a18] whitespace-nowrap">{emp.firstName} {emp.lastName}</p>
+                                                    {emp.designation && <p className="text-[10px] text-[#9e9b95]">{emp.designation}</p>}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        {/* Branch */}
+                                        <td className="px-4 py-2 align-top pt-3 text-[11px] text-[#6b6860] whitespace-nowrap">{emp.branch.name}</td>
+                                        {/* Doc columns */}
+                                        {DOC_COLS.map(col => {
+                                            const doc = empDocs?.get(col.key)
+                                            return (
+                                                <td key={col.key}
+                                                    className={`px-1 py-1 align-top border-l border-[#f0efec] ${doc ? "bg-[#f0fdf4]/40" : "bg-[#fff5f5]/60"}`}>
+                                                    <DocCell
+                                                        doc={doc}
+                                                        empId={emp.id}
+                                                        docType={col.key}
+                                                        onView={(url, name) => setViewer({ url, name })}
+                                                        onDelete={handleDeleteLocal}
+                                                        onUploaded={fetchAll}
+                                                        isAdmin={isAdmin}
+                                                    />
+                                                </td>
+                                            )
+                                        })}
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
-            <DocumentViewer 
-                url={previewUrl} 
-                fileName={previewName} 
-                onClose={() => setPreviewUrl(null)} 
+            {/* Document Viewer */}
+            <DocumentViewer
+                url={viewer?.url ?? null}
+                fileName={viewer?.name}
+                onClose={() => setViewer(null)}
             />
         </div>
     )
