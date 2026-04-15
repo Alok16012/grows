@@ -76,7 +76,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         }
     }, [role])
 
-    const navigation = [
+    const userPermissions: string[] = (session?.user as any)?.permissions || []
+
+    const navigation: { title: string; links: { name: string; href: string; icon: any; roles: string[]; permission?: string; badge?: boolean }[] }[] = [
         {
             title: "MAIN",
             links: [
@@ -93,9 +95,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Projects", href: "/projects", icon: Folder, roles: [] },
                 { name: "Assignments", href: "/assignments", icon: HardHat, roles: ["ADMIN", "MANAGER"] },
                 { name: "Groups", href: "/groups", icon: Users2, roles: ["ADMIN", "MANAGER"] },
-                { name: "Recruitment", href: "/recruitment", icon: Target, roles: ["ADMIN", "MANAGER"] },
-                { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER", "HR_MANAGER"] },
-                { name: "Master Documents", href: "/employees/documents", icon: Files, roles: ["ADMIN", "MANAGER", "HR_MANAGER"] },
+                { name: "Recruitment", href: "/recruitment", icon: Target, roles: ["ADMIN", "MANAGER"], permission: "recruitment.view" },
+                { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
+                { name: "Master Documents", href: "/employees/documents", icon: Files, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
                 { name: "Sites", href: "/sites", icon: MapPin, roles: ["ADMIN", "MANAGER"] },
                 { name: "Field", href: "/field", icon: Navigation, roles: ["ADMIN", "MANAGER"] },
                 { name: "Billing", href: "/billing", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
@@ -106,46 +108,46 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "HR OPERATIONS",
             links: [
-                { name: "Attendance", href: "/attendance", icon: Clock, roles: ["ADMIN", "MANAGER"] },
-                { name: "Leaves", href: "/leaves", icon: CalendarOff, roles: ["ADMIN", "MANAGER"] },
-                { name: "Payroll", href: "/payroll", icon: Wallet, roles: ["ADMIN", "MANAGER"] },
-                { name: "Upload Attendance", href: "/attendance/upload", icon: Upload, roles: ["ADMIN", "MANAGER"] },
-                { name: "Salary Slips", href: "/payroll/salary-slips", icon: IndianRupee, roles: ["ADMIN", "MANAGER", "HR_MANAGER"] },
-                { name: "Compliance", href: "/payroll/compliance", icon: ShieldCheck, roles: ["ADMIN", "MANAGER"] },
-                { name: "Reports & Downloads", href: "/payroll/reports", icon: FileDown, roles: ["ADMIN", "MANAGER"] },
-                { name: "Assets", href: "/assets", icon: Package, roles: ["ADMIN", "MANAGER"] },
+                { name: "Attendance", href: "/attendance", icon: Clock, roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
+                { name: "Leaves", href: "/leaves", icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view" },
+                { name: "Payroll", href: "/payroll", icon: Wallet, roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
+                { name: "Upload Attendance", href: "/attendance/upload", icon: Upload, roles: ["ADMIN", "MANAGER"], permission: "attendance.manage" },
+                { name: "Salary Slips", href: "/payroll/salary-slips", icon: IndianRupee, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "payroll.view" },
+                { name: "Compliance", href: "/payroll/compliance", icon: ShieldCheck, roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
+                { name: "Reports & Downloads", href: "/payroll/reports", icon: FileDown, roles: ["ADMIN", "MANAGER"], permission: "reports.view" },
+                { name: "Assets", href: "/assets", icon: Package, roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
                 { name: "Expenses", href: "/expenses", icon: CreditCard, roles: ["ADMIN", "MANAGER"] },
             ]
         },
         {
             title: "PEOPLE OPS",
             links: [
-                { name: "Onboarding", href: "/onboarding", icon: ClipboardList, roles: ["ADMIN", "MANAGER"] },
-                { name: "Performance", href: "/performance", icon: Star, roles: ["ADMIN", "MANAGER"] },
+                { name: "Onboarding", href: "/onboarding", icon: ClipboardList, roles: ["ADMIN", "MANAGER"], permission: "onboarding.view" },
+                { name: "Performance", href: "/performance", icon: Star, roles: ["ADMIN", "MANAGER"], permission: "performance.view" },
                 { name: "Exit", href: "/exit", icon: LogOut, roles: ["ADMIN", "MANAGER"] },
-                { name: "LMS", href: "/lms", icon: GraduationCap, roles: ["ADMIN", "MANAGER"] },
-                { name: "My Learning", href: "/lms/learn", icon: GraduationCap, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"] },
+                { name: "LMS", href: "/lms", icon: GraduationCap, roles: ["ADMIN", "MANAGER"], permission: "lms.manage" },
+                { name: "My Learning", href: "/lms/learn", icon: GraduationCap, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"], permission: "lms.view" },
                 { name: "My Profile", href: "/profile", icon: UserCheck, roles: ["INSPECTION_BOY"] },
             ]
         },
         {
             title: "DOCUMENTS",
             links: [
-                { name: "Documents", href: "/documents", icon: FileText, roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"] },
-                { name: "Doc Types", href: "/documents/types", icon: FolderOpen, roles: ["ADMIN", "HR_MANAGER"] },
+                { name: "Documents", href: "/documents", icon: FileText, roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"], permission: "documents.view" },
+                { name: "Doc Types", href: "/documents/types", icon: FolderOpen, roles: ["ADMIN", "HR_MANAGER"], permission: "documents.view" },
             ]
         },
         {
             title: "SUPPORT",
             links: [
-                { name: "Helpdesk", href: "/helpdesk", icon: Headphones, roles: ["ADMIN", "MANAGER"] },
+                { name: "Helpdesk", href: "/helpdesk", icon: Headphones, roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
             ]
         },
         {
             title: "ANALYTICS",
             links: [
-                { name: "Analytics", href: "/manager/analytics", icon: TrendingUp, roles: ["ADMIN", "MANAGER"] },
-                { name: "Reports", href: "/reports", icon: BarChart2, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"] },
+                { name: "Analytics", href: "/manager/analytics", icon: TrendingUp, roles: ["ADMIN", "MANAGER"], permission: "reports.view" },
+                { name: "Reports", href: "/reports", icon: BarChart2, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"], permission: "reports.view" },
             ]
         },
         {
@@ -184,9 +186,18 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             <div className="flex-1 overflow-y-auto pt-4 px-2 scrollbar-thin">
                 {mounted && navigation.map((section) => {
                     const currentRole = String(role || "")
-                    const filteredLinks = section.links.filter(link =>
-                        currentRole ? link.roles.includes(currentRole) : link.roles.includes("ADMIN")
-                    )
+                    const filteredLinks = section.links.filter(link => {
+                        // ADMIN sees everything
+                        if (currentRole === "ADMIN") return true
+                        // If user has a custom role AND the link has a permission key:
+                        // use ONLY the custom permissions — no system role fallback
+                        // This ensures "Quality Engineer" (4 perms) sees less than "HR RECRUITER" (18 perms)
+                        if (link.permission && userPermissions.length > 0) {
+                            return userPermissions.includes(link.permission)
+                        }
+                        // No custom role (or link has no permission key): use system role
+                        return link.roles.includes(currentRole)
+                    })
                     if (filteredLinks.length === 0) return null
 
                     return (

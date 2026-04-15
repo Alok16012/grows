@@ -352,10 +352,20 @@ function EmployeeModal({
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
     // Pending documents to upload after employee creation
     type PendingDoc = { type: string; fileName: string; fileUrl: string }
+    type ExistingDoc = { id: string; type: string; fileName: string; fileUrl: string; status: string; uploadedAt: string }
     const [pendingDocs, setPendingDocs] = useState<PendingDoc[]>([])
+    const [existingDocs, setExistingDocs] = useState<ExistingDoc[]>([])
     const [docUploading, setDocUploading] = useState(false)
+    const [docDeleting, setDocDeleting] = useState<string | null>(null)
     const docFileRef = useRef<HTMLInputElement>(null)
     const [docType, setDocType] = useState("AADHAAR")
+
+    const fetchExistingDocs = async (empId: string) => {
+        try {
+            const r = await fetch(`/api/employees/${empId}/documents`)
+            if (r.ok) setExistingDocs(await r.json())
+        } catch { /* ignore */ }
+    }
 
     useEffect(() => {
         fetch("/api/admin/roles").then(r => r.ok ? r.json() : []).then(setCustomRoles).catch(() => {})
@@ -363,6 +373,13 @@ function EmployeeModal({
 
     // Keep branches in sync if parent list changes
     useEffect(() => { setBranches(initialBranches) }, [initialBranches])
+
+    // Fetch existing docs when documents tab is opened for an existing employee
+    useEffect(() => {
+        if (activeTab === "documents" && employee) {
+            fetchExistingDocs(employee.id)
+        }
+    }, [activeTab, employee])
 
     // Load existing salary structure when editing
     useEffect(() => {
@@ -722,40 +739,6 @@ function EmployeeModal({
                             <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
                                 <span className="text-[12px] text-blue-700">Set the detailed salary structure for payroll calculation. Basic Salary from Employment tab is used as the base.</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className={labelCls}>Basic Salary (₹)</label>
-                                    <input type="number" value={form.basicSalary} onChange={set("basicSalary")} className={inputCls} placeholder="0" min="0" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>DA — Dearness Allowance (₹)</label>
-                                    <input type="number" value={form.salDA} onChange={set("salDA")} className={inputCls} placeholder="0" min="0" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Washing Allowance (₹)</label>
-                                    <input type="number" value={form.salWashing} onChange={set("salWashing")} className={inputCls} placeholder="0" min="0" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Conveyance Allowance (₹)</label>
-                                    <input type="number" value={form.salConveyance} onChange={set("salConveyance")} className={inputCls} placeholder="0" min="0" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Leave With Wages (₹)</label>
-                                    <input type="number" value={form.salLeaveWithWages} onChange={set("salLeaveWithWages")} className={inputCls} placeholder="0" min="0" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Other Allowance (₹)</label>
-                                    <input type="number" value={form.salOtherAllowance} onChange={set("salOtherAllowance")} className={inputCls} placeholder="0" min="0" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>OT Rate / Hour (₹)</label>
-                                    <input type="number" value={form.salOtRatePerHour} onChange={set("salOtRatePerHour")} className={inputCls} placeholder="170" min="0" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Canteen Rate / Day (₹)</label>
-                                    <input type="number" value={form.salCanteenRatePerDay} onChange={set("salCanteenRatePerDay")} className={inputCls} placeholder="55" min="0" />
-                                </div>
-                            </div>
                             <div>
                                 <label className={labelCls}>Compliance Type</label>
                                 <div className="flex gap-4 mt-1">
@@ -771,32 +754,51 @@ function EmployeeModal({
                                     </label>
                                 </div>
                             </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className={labelCls}>Basic Salary (₹)</label>
+                                    <input type="number" value={form.basicSalary} onChange={set("basicSalary")} className={inputCls} placeholder="0" min="0" />
+                                </div>
+                                {form.salComplianceType !== "CALL" && (
+                                    <>
+                                        <div>
+                                            <label className={labelCls}>DA — Dearness Allowance (₹)</label>
+                                            <input type="number" value={form.salDA} onChange={set("salDA")} className={inputCls} placeholder="0" min="0" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Washing Allowance (₹)</label>
+                                            <input type="number" value={form.salWashing} onChange={set("salWashing")} className={inputCls} placeholder="0" min="0" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Conveyance Allowance (₹)</label>
+                                            <input type="number" value={form.salConveyance} onChange={set("salConveyance")} className={inputCls} placeholder="0" min="0" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Leave With Wages (₹)</label>
+                                            <input type="number" value={form.salLeaveWithWages} onChange={set("salLeaveWithWages")} className={inputCls} placeholder="0" min="0" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Other Allowance (₹)</label>
+                                            <input type="number" value={form.salOtherAllowance} onChange={set("salOtherAllowance")} className={inputCls} placeholder="0" min="0" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>OT Rate / Hour (₹)</label>
+                                            <input type="number" value={form.salOtRatePerHour} onChange={set("salOtRatePerHour")} className={inputCls} placeholder="170" min="0" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Canteen Rate / Day (₹)</label>
+                                            <input type="number" value={form.salCanteenRatePerDay} onChange={set("salCanteenRatePerDay")} className={inputCls} placeholder="55" min="0" />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     )}
 
                     {/* Bank & Address Tab */}
                     {activeTab === "bank" && (
                         <div className="space-y-4">
-                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Address</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="col-span-2">
-                                    <label className={labelCls}>Address</label>
-                                    <input value={form.address} onChange={set("address")} className={inputCls} placeholder="Street address" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>City</label>
-                                    <input value={form.city} onChange={set("city")} className={inputCls} placeholder="City" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>State</label>
-                                    <input value={form.state} onChange={set("state")} className={inputCls} placeholder="State" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Pincode</label>
-                                    <input value={form.pincode} onChange={set("pincode")} className={inputCls} placeholder="Pincode" />
-                                </div>
-                            </div>
-                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Bank Details</p>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Bank Details</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelCls}>Bank Name</label>
@@ -813,6 +815,25 @@ function EmployeeModal({
                                 <div className="col-span-2">
                                     <label className={labelCls}>Account Number</label>
                                     <input value={form.bankAccountNumber} onChange={set("bankAccountNumber")} className={inputCls} placeholder="Account number" />
+                                </div>
+                            </div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Address</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2">
+                                    <label className={labelCls}>Address</label>
+                                    <input value={form.address} onChange={set("address")} className={inputCls} placeholder="Street address" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>City</label>
+                                    <input value={form.city} onChange={set("city")} className={inputCls} placeholder="City" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>State</label>
+                                    <input value={form.state} onChange={set("state")} className={inputCls} placeholder="State" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Pincode</label>
+                                    <input value={form.pincode} onChange={set("pincode")} className={inputCls} placeholder="Pincode" />
                                 </div>
                             </div>
                         </div>
@@ -866,8 +887,8 @@ function EmployeeModal({
                                     <input value={form.pfNumber} onChange={set("pfNumber")} className={inputCls} placeholder="PF number" />
                                 </div>
                                 <div>
-                                    <label className={labelCls}>ESI Number</label>
-                                    <input value={form.esiNumber} onChange={set("esiNumber")} className={inputCls} placeholder="ESI number" />
+                                    <label className={labelCls}>ESIC Number</label>
+                                    <input value={form.esiNumber} onChange={set("esiNumber")} className={inputCls} placeholder="ESIC number" />
                                 </div>
                                 <div>
                                     <label className={labelCls}>Labour Card No.</label>
@@ -930,33 +951,24 @@ function EmployeeModal({
 
                     {/* Documents Tab */}
                     {activeTab === "documents" && (
-                        <div className="space-y-4">
-                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
-                                <span className="text-[12px] text-blue-700">
-                                    Upload Aadhaar, PAN, Photo and other documents. {employee ? "Files are uploaded immediately." : "Files will be uploaded when you save the employee."}
-                                </span>
-                            </div>
-
-                            {/* Upload area */}
-                            <div className="border-2 border-dashed border-[var(--border)] rounded-[10px] p-4 text-center hover:border-[var(--accent)] transition-colors">
-                                <div className="flex items-center gap-3 justify-center mb-3">
-                                    <select value={docType} onChange={e => setDocType(e.target.value)}
-                                        className="h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[12px] bg-white text-[var(--text)] outline-none focus:border-[var(--accent)]">
-                                        <option value="AADHAAR">Aadhaar</option>
-                                        <option value="PAN">PAN Card</option>
-                                        <option value="PHOTO">Photo</option>
-                                        <option value="RESUME">Resume</option>
-                                        <option value="CERTIFICATE">Certificate</option>
-                                        <option value="OFFER_LETTER">Offer Letter</option>
-                                        <option value="OTHER">Other</option>
-                                    </select>
-                                    <button type="button" onClick={() => docFileRef.current?.click()} disabled={docUploading}
-                                        className="inline-flex items-center gap-1.5 bg-[var(--accent)] text-white px-3 py-1.5 rounded-[6px] text-[12px] font-medium hover:opacity-90 disabled:opacity-60">
-                                        {docUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                                        {docUploading ? "Uploading…" : "Choose File"}
-                                    </button>
-                                </div>
-                                <p className="text-[11px] text-[var(--text3)]">JPG, PNG, PDF — Max 5MB per file</p>
+                        <div className="space-y-3">
+                            {/* Upload Row */}
+                            <div className="flex items-center gap-2 p-3 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px]">
+                                <select value={docType} onChange={e => setDocType(e.target.value)}
+                                    className="h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[12px] bg-white text-[var(--text)] outline-none focus:border-[var(--accent)] flex-1 min-w-0">
+                                    <option value="AADHAAR">Aadhaar</option>
+                                    <option value="PAN">PAN Card</option>
+                                    <option value="PHOTO">Photo</option>
+                                    <option value="RESUME">Resume</option>
+                                    <option value="CERTIFICATE">Certificate</option>
+                                    <option value="OFFER_LETTER">Offer Letter</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                                <button type="button" onClick={() => docFileRef.current?.click()} disabled={docUploading}
+                                    className="inline-flex items-center gap-1.5 bg-[var(--accent)] text-white px-3 py-1.5 rounded-[6px] text-[12px] font-medium hover:opacity-90 disabled:opacity-60 shrink-0 whitespace-nowrap">
+                                    {docUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                                    {docUploading ? "Uploading…" : "Upload File"}
+                                </button>
                                 <input ref={docFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
                                     onChange={async (ev) => {
                                         const file = ev.target.files?.[0]
@@ -972,16 +984,14 @@ function EmployeeModal({
                                             })
                                             const newDoc = { type: docType, fileName: file.name, fileUrl: url }
                                             if (employee) {
-                                                // Editing: upload immediately
                                                 const r = await fetch(`/api/employees/${employee.id}/documents`, {
                                                     method: "POST",
                                                     headers: { "Content-Type": "application/json" },
                                                     body: JSON.stringify(newDoc),
                                                 })
-                                                if (r.ok) toast.success("Document uploaded!")
+                                                if (r.ok) { toast.success("Document uploaded!"); fetchExistingDocs(employee.id) }
                                                 else toast.error("Upload failed")
                                             } else {
-                                                // Creating: queue for upload after save
                                                 setPendingDocs(prev => [...prev, newDoc])
                                                 toast.success(`${file.name} queued — will upload on save`)
                                             }
@@ -994,32 +1004,129 @@ function EmployeeModal({
                                 />
                             </div>
 
-                            {/* Pending docs list */}
-                            {pendingDocs.length > 0 && (
-                                <div>
-                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-2">Queued Documents ({pendingDocs.length})</p>
-                                    <div className="space-y-1.5">
-                                        {pendingDocs.map((doc, i) => (
-                                            <div key={i} className="flex items-center justify-between p-2.5 bg-[var(--surface2)] rounded-[8px] border border-[var(--border)]">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <FileText size={14} className="text-[var(--accent)] shrink-0" />
-                                                    <div className="min-w-0">
-                                                        <p className="text-[12px] text-[var(--text)] truncate">{doc.fileName}</p>
-                                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-blue-700 bg-blue-100">{doc.type}</span>
-                                                    </div>
-                                                </div>
-                                                <button type="button" onClick={() => setPendingDocs(prev => prev.filter((_, j) => j !== i))}
-                                                    className="text-red-400 hover:text-red-600 p-1 shrink-0">
-                                                    <X size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
+                            {/* Uploaded Documents Table */}
+                            {employee && (
+                                existingDocs.length === 0 ? (
+                                    <div className="text-center py-8 text-[12px] text-[var(--text3)]">
+                                        <FileText size={28} className="mx-auto mb-2 text-[var(--border)]" />
+                                        Koi document upload nahi hua abhi tak
                                     </div>
+                                ) : (
+                                    <div className="border border-[var(--border)] rounded-[10px] overflow-hidden">
+                                        <table className="w-full text-[12px]">
+                                            <thead>
+                                                <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Document</th>
+                                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">File Name</th>
+                                                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Status</th>
+                                                    <th className="px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {existingDocs.map((doc, i) => {
+                                                    const isPdf = doc.fileName.toLowerCase().endsWith(".pdf")
+                                                    const docLabel: Record<string, string> = { AADHAAR: "Aadhaar", PAN: "PAN Card", PHOTO: "Photo", RESUME: "Resume", CERTIFICATE: "Certificate", OFFER_LETTER: "Offer Letter", OTHER: "Other" }
+                                                    const statusColor: Record<string, string> = { PENDING: "bg-amber-100 text-amber-700", VERIFIED: "bg-green-100 text-green-700", REJECTED: "bg-red-100 text-red-700" }
+                                                    return (
+                                                        <tr key={doc.id} className={`border-b border-[var(--border)] last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-[var(--surface2)]/40"}`}>
+                                                            <td className="px-3 py-2.5">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
+                                                                    {docLabel[doc.type] || doc.type}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 py-2.5 text-[var(--text)] truncate max-w-[140px]" title={doc.fileName}>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <FileText size={12} className="text-[var(--text3)] shrink-0" />
+                                                                    <span className="truncate">{doc.fileName}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-2.5">
+                                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor[doc.status] || "bg-gray-100 text-gray-600"}`}>
+                                                                    {doc.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 py-2.5">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    {/* View */}
+                                                                    <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                                                        title="View">
+                                                                        <Eye size={12} /> View
+                                                                    </a>
+                                                                    {/* Download */}
+                                                                    <a href={doc.fileUrl} download={doc.fileName}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                                                                        title="Download">
+                                                                        <Download size={12} /> Download
+                                                                    </a>
+                                                                    {/* Delete */}
+                                                                    <button type="button" disabled={docDeleting === doc.id}
+                                                                        onClick={async () => {
+                                                                            if (!confirm(`"${doc.fileName}" delete karna chahte hain?`)) return
+                                                                            setDocDeleting(doc.id)
+                                                                            try {
+                                                                                const r = await fetch(`/api/employees/${employee.id}/documents/${doc.id}`, { method: "DELETE" })
+                                                                                if (r.ok) { toast.success("Document deleted"); fetchExistingDocs(employee.id) }
+                                                                                else toast.error("Delete failed")
+                                                                            } catch { toast.error("Delete failed") }
+                                                                            finally { setDocDeleting(null) }
+                                                                        }}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
+                                                                        title="Delete">
+                                                                        {docDeleting === doc.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            )}
+
+                            {/* New employee: pending docs queue */}
+                            {!employee && pendingDocs.length > 0 && (
+                                <div className="border border-[var(--border)] rounded-[10px] overflow-hidden">
+                                    <table className="w-full text-[12px]">
+                                        <thead>
+                                            <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                                                <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Document</th>
+                                                <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">File Name</th>
+                                                <th className="px-3 py-2 text-right"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {pendingDocs.map((doc, i) => (
+                                                <tr key={i} className="border-b border-[var(--border)] last:border-0">
+                                                    <td className="px-3 py-2.5">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+                                                            {doc.type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-[var(--text)] truncate max-w-[200px]">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <FileText size={12} className="text-[var(--text3)] shrink-0" />
+                                                            <span className="truncate">{doc.fileName}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <button type="button" onClick={() => setPendingDocs(prev => prev.filter((_, j) => j !== i))}
+                                                            className="text-red-400 hover:text-red-600 p-1">
+                                                            <X size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
 
                             {!employee && pendingDocs.length === 0 && (
-                                <p className="text-center text-[12px] text-[var(--text3)] py-4">No documents added yet. Upload documents above.</p>
+                                <p className="text-center text-[12px] text-[var(--text3)] py-6">Koi document nahi — upar se select karke upload karein</p>
                             )}
                         </div>
                     )}
@@ -1446,25 +1553,6 @@ function EmployeeDrawer({
                                 </div>
                             ) : salaryEditing ? (
                                 <div className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-2.5">
-                                        {([
-                                            { key: "basic", label: "Basic (₹)" },
-                                            { key: "da", label: "DA (₹)" },
-                                            { key: "washing", label: "Washing (₹)" },
-                                            { key: "conveyance", label: "Conveyance (₹)" },
-                                            { key: "leaveWithWages", label: "Leave With Wages (₹)" },
-                                            { key: "otherAllowance", label: "Other Allowance (₹)" },
-                                            { key: "otRatePerHour", label: "OT Rate/Hr (₹)" },
-                                            { key: "canteenRatePerDay", label: "Canteen/Day (₹)" },
-                                        ] as { key: keyof SalaryData; label: string }[]).map(f => (
-                                            <div key={f.key}>
-                                                <label className="block text-[11px] text-[var(--text3)] mb-1">{f.label}</label>
-                                                <input type="number" value={salaryForm[f.key] as number} min="0"
-                                                    onChange={e => setSalaryForm(p => ({ ...p, [f.key]: Number(e.target.value) || 0 }))}
-                                                    className="w-full h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
-                                            </div>
-                                        ))}
-                                    </div>
                                     <div>
                                         <label className="block text-[11px] text-[var(--text3)] mb-1.5">Compliance Type</label>
                                         <div className="flex gap-3">
@@ -1477,6 +1565,34 @@ function EmployeeDrawer({
                                                 <span><b>CALL</b> — No PF/ESIC</span>
                                             </label>
                                         </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <div>
+                                            <label className="block text-[11px] text-[var(--text3)] mb-1">Basic (₹)</label>
+                                            <input type="number" value={salaryForm.basic} min="0"
+                                                onChange={e => setSalaryForm(p => ({ ...p, basic: Number(e.target.value) || 0 }))}
+                                                className="w-full h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                                        </div>
+                                        {salaryForm.complianceType !== "CALL" && (
+                                            <>
+                                                {([
+                                                    { key: "da", label: "DA (₹)" },
+                                                    { key: "washing", label: "Washing (₹)" },
+                                                    { key: "conveyance", label: "Conveyance (₹)" },
+                                                    { key: "leaveWithWages", label: "Leave With Wages (₹)" },
+                                                    { key: "otherAllowance", label: "Other Allowance (₹)" },
+                                                    { key: "otRatePerHour", label: "OT Rate/Hr (₹)" },
+                                                    { key: "canteenRatePerDay", label: "Canteen/Day (₹)" },
+                                                ] as { key: keyof SalaryData; label: string }[]).map(f => (
+                                                    <div key={f.key}>
+                                                        <label className="block text-[11px] text-[var(--text3)] mb-1">{f.label}</label>
+                                                        <input type="number" value={salaryForm[f.key] as number} min="0"
+                                                            onChange={e => setSalaryForm(p => ({ ...p, [f.key]: Number(e.target.value) || 0 }))}
+                                                            className="w-full h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
                                     </div>
                                     {/* Live CTC preview */}
                                     {(() => {
@@ -1929,8 +2045,14 @@ export default function EmployeesPage() {
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER" && session?.user?.role !== "HR_MANAGER") {
-            router.push("/")
+        if (status === "authenticated") {
+            const userPerms: string[] = (session?.user as any)?.permissions || []
+            const hasAccess =
+                session?.user?.role === "ADMIN" ||
+                session?.user?.role === "MANAGER" ||
+                session?.user?.role === "HR_MANAGER" ||
+                userPerms.includes("employees.view")
+            if (!hasAccess) router.push("/")
         }
     }, [status, session, router])
 

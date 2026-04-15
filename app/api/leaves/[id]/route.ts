@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(
     req: Request,
@@ -31,7 +32,7 @@ export async function GET(
         if (!leave) return new NextResponse("Not found", { status: 404 })
 
         // Non-admin/manager can only view own employee's leave
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -56,7 +57,7 @@ export async function PUT(
         const existing = await prisma.leave.findUnique({ where: { id: params.id } })
         if (!existing) return new NextResponse("Not found", { status: 404 })
 
-        const isAdminOrManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isAdminOrManager = checkAccess(session, ["MANAGER"], "leaves.view")
 
         if (!isAdminOrManager) {
             // Owner can only cancel their own PENDING leave
@@ -144,7 +145,7 @@ export async function DELETE(
         const existing = await prisma.leave.findUnique({ where: { id: params.id } })
         if (!existing) return new NextResponse("Not found", { status: 404 })
 
-        const isAdminOrManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isAdminOrManager = checkAccess(session, ["MANAGER"], "leaves.view")
 
         // Only admin/manager or leave creator (PENDING only)
         if (!isAdminOrManager) {

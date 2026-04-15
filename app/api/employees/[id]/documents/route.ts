@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 const VALID_TYPES = ["RESUME", "AADHAAR", "PAN", "PHOTO", "CERTIFICATE", "OFFER_LETTER", "OTHER"]
 
@@ -12,7 +13,7 @@ export async function GET(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -35,7 +36,7 @@ export async function POST(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

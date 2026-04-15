@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 function calcWorkingHrs(checkIn?: string | null, checkOut?: string | null): number {
     if (!checkIn || !checkOut) return 0
@@ -17,7 +18,7 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "attendance.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -65,7 +66,7 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN") {
+        if (!checkAccess(session, [], "attendance.view")) {
             return new NextResponse("Forbidden — ADMIN only", { status: 403 })
         }
 

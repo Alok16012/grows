@@ -610,28 +610,163 @@ function VerificationPanel({ record, onUpdated }: { record: OnboardingRecord, on
         finally { setSubmitting(false) }
     }
 
+    const [showDetails, setShowDetails] = useState(false)
+
     return (
         <div className="space-y-4">
-            {/* KYC Card */}
-            <div className="bg-white border border-[var(--border)] p-4 rounded-xl">
-                <div className="flex items-center justify-between mb-3 border-b border-[var(--border)] pb-2">
-                    <h3 className="text-[13px] font-semibold text-[var(--text)]">KYC Details</h3>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${emp.isKycVerified ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                        {emp.isKycVerified ? "Verified" : "Pending"}
-                    </span>
+            {/* Employee Details Card */}
+            <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-[13px] font-semibold text-[var(--text)]">Employee Details</h3>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${emp.isKycVerified ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                            {emp.isKycVerified ? "✓ Verified" : "Pending"}
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => setShowDetails(v => !v)}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-[6px] border border-[var(--border)] bg-white hover:bg-[var(--surface2)] text-[var(--text2)] transition-colors"
+                    >
+                        {showDetails ? "Hide Details" : "View Details"}
+                        <ChevronDown size={12} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
+                    </button>
                 </div>
-                <div className="grid grid-cols-2 gap-y-2 text-[12px]">
-                    <div><p className="text-[var(--text3)]">Aadhaar</p><p>{emp.aadharNumber || "---"}</p></div>
-                    <div><p className="text-[var(--text3)]">PAN</p><p>{emp.panNumber || "---"}</p></div>
-                    <div className="col-span-2"><p className="text-[var(--text3)]">Bank Account</p><p>{emp.bankName} - {emp.bankAccountNumber} ({emp.bankIFSC})</p></div>
-                </div>
-                {!emp.isKycVerified && (
-                    <div className="mt-3 flex flex-col gap-2 pt-3 border-t border-[var(--border)]">
-                        <input type="text" placeholder="Rejection Note (if rejecting)" value={kycRejectNote} onChange={e => setKycRejectNote(e.target.value)} className="w-full h-8 text-[12px] border rounded px-2 outline-none focus:border-[var(--accent)]" />
-                        <div className="flex justify-end gap-2">
-                            <button disabled={submitting} onClick={() => handleKycStatus("REJECTED")} className="px-3 py-1 bg-red-50 text-red-600 rounded border border-red-200 text-[11px] font-medium">Reject</button>
-                            <button disabled={submitting} onClick={() => handleKycStatus("VERIFIED")} className="px-3 py-1 bg-[#1a9e6e] text-white rounded text-[11px] font-medium">Verify KYC</button>
+
+                {/* Collapsible Details */}
+                {showDetails && (
+                    <div className="p-4 space-y-4 text-[12px]">
+                        {/* Personal */}
+                        <div>
+                            <p className="text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-2">Personal Info</p>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                {[
+                                    ["Full Name", `${emp.firstName} ${emp.middleName || ""} ${emp.lastName}`.trim()],
+                                    ["Name on Aadhaar", emp.nameAsPerAadhar],
+                                    ["Father's Name", emp.fathersName],
+                                    ["Date of Birth", emp.dateOfBirth],
+                                    ["Gender", emp.gender],
+                                    ["Blood Group", emp.bloodGroup],
+                                    ["Marital Status", emp.maritalStatus],
+                                    ["Nationality", emp.nationality],
+                                    ["Religion", emp.religion],
+                                    ["Caste", emp.caste],
+                                ].map(([label, val]) => val ? (
+                                    <div key={label as string}>
+                                        <p className="text-[var(--text3)] text-[10.5px]">{label}</p>
+                                        <p className="text-[var(--text)] font-medium">{val}</p>
+                                    </div>
+                                ) : null)}
+                            </div>
                         </div>
+
+                        {/* Contact */}
+                        <div>
+                            <p className="text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-2">Contact</p>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                {[
+                                    ["Phone", emp.phone],
+                                    ["Alt. Phone", emp.alternatePhone],
+                                    ["Email", emp.email],
+                                    ["Emergency 1", emp.emergencyContact1Name ? `${emp.emergencyContact1Name} — ${emp.emergencyContact1Phone}` : null],
+                                    ["Emergency 2", emp.emergencyContact2Name ? `${emp.emergencyContact2Name} — ${emp.emergencyContact2Phone}` : null],
+                                ].map(([label, val]) => val ? (
+                                    <div key={label as string}>
+                                        <p className="text-[var(--text3)] text-[10.5px]">{label}</p>
+                                        <p className="text-[var(--text)] font-medium">{val}</p>
+                                    </div>
+                                ) : null)}
+                            </div>
+                        </div>
+
+                        {/* Address */}
+                        {(emp.address || emp.city) && (
+                            <div>
+                                <p className="text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-2">Address</p>
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                    {[
+                                        ["Address", emp.address],
+                                        ["City", emp.city],
+                                        ["State", emp.state],
+                                        ["Pincode", emp.pincode],
+                                    ].map(([label, val]) => val ? (
+                                        <div key={label as string}>
+                                            <p className="text-[var(--text3)] text-[10.5px]">{label}</p>
+                                            <p className="text-[var(--text)] font-medium">{val}</p>
+                                        </div>
+                                    ) : null)}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Statutory */}
+                        <div>
+                            <p className="text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-2">Statutory</p>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                {[
+                                    ["Aadhaar", emp.aadharNumber],
+                                    ["PAN", emp.panNumber],
+                                    ["UAN", emp.uan],
+                                    ["PF Number", emp.pfNumber],
+                                    ["ESIC Number", emp.esiNumber],
+                                    ["Labour Card No", emp.labourCardNo],
+                                ].map(([label, val]) => val ? (
+                                    <div key={label as string}>
+                                        <p className="text-[var(--text3)] text-[10.5px]">{label}</p>
+                                        <p className="text-[var(--text)] font-medium font-mono">{val}</p>
+                                    </div>
+                                ) : null)}
+                            </div>
+                        </div>
+
+                        {/* Bank */}
+                        {(emp.bankAccountNumber || emp.bankName) && (
+                            <div>
+                                <p className="text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-2">Bank Details</p>
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                    {[
+                                        ["Bank Name", emp.bankName],
+                                        ["Account No.", emp.bankAccountNumber],
+                                        ["IFSC", emp.bankIFSC],
+                                        ["Branch", emp.bankBranch],
+                                    ].map(([label, val]) => val ? (
+                                        <div key={label as string}>
+                                            <p className="text-[var(--text3)] text-[10.5px]">{label}</p>
+                                            <p className="text-[var(--text)] font-medium font-mono">{val}</p>
+                                        </div>
+                                    ) : null)}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Verify / Reject Actions */}
+                {!emp.isKycVerified && (
+                    <div className="px-4 py-3 bg-[var(--surface2)] border-t border-[var(--border)] flex flex-col gap-2">
+                        <input
+                            type="text"
+                            placeholder="Rejection note (required if rejecting)"
+                            value={kycRejectNote}
+                            onChange={e => setKycRejectNote(e.target.value)}
+                            className="w-full h-8 text-[12px] border border-[var(--border)] rounded-[6px] px-2.5 outline-none focus:border-[var(--accent)] bg-white"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button disabled={submitting} onClick={() => handleKycStatus("REJECTED")}
+                                className="px-3 py-1.5 bg-red-50 text-red-600 rounded-[6px] border border-red-200 text-[11px] font-medium hover:bg-red-100 transition-colors disabled:opacity-50">
+                                ✗ Reject
+                            </button>
+                            <button disabled={submitting} onClick={() => handleKycStatus("VERIFIED")}
+                                className="px-4 py-1.5 bg-[#1a9e6e] text-white rounded-[6px] text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-1.5">
+                                {submitting ? <Loader2 size={11} className="animate-spin" /> : null}
+                                ✓ Verified
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {emp.isKycVerified && (
+                    <div className="px-4 py-2.5 bg-green-50 border-t border-green-100 text-[11px] text-green-700 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 size={13} /> Employee details verified
                     </div>
                 )}
             </div>
@@ -798,10 +933,10 @@ function VerificationPanel({ record, onUpdated }: { record: OnboardingRecord, on
                                             style={{
                                                 fontSize: 11, padding: "3px 10px", borderRadius: 5,
                                                 border: "1px solid #bbf7d0", color: "#16a34a",
-                                                background: "#f0fdf4", cursor: "pointer", fontWeight: 500,
+                                                background: "#f0fdf4", cursor: "pointer", fontWeight: 600,
                                             }}
                                         >
-                                            ✓ Verify
+                                            ✓ Verified
                                         </button>
                                     )}
                                     {!isRejected && (

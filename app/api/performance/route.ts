@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     try {
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
         const employeeId = searchParams.get("employeeId")
         const search = searchParams.get("search")
 
-        const isAdminOrManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isAdminOrManager = checkAccess(session, ["MANAGER"], "performance.view")
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: Record<string, any> = {}
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

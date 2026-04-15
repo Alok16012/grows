@@ -39,7 +39,8 @@ export const authOptions: NextAuthOptions = {
                     try {
                         // Fetch real user from DB to get the actual ID
                         const realUser = await prisma.user.findUnique({
-                            where: { email: credentials.email }
+                            where: { email: credentials.email },
+                            include: { customRole: { select: { permissions: true, isActive: true } } }
                         })
 
                         if (realUser) {
@@ -49,6 +50,7 @@ export const authOptions: NextAuthOptions = {
                                 name: realUser.name,
                                 email: realUser.email,
                                 role: realUser.role,
+                                permissions: realUser.customRole?.isActive ? realUser.customRole.permissions : [],
                             }
                         }
                     } catch (dbError) {
@@ -75,6 +77,7 @@ export const authOptions: NextAuthOptions = {
                         where: {
                             email: credentials.email,
                         },
+                        include: { customRole: { select: { permissions: true, isActive: true } } }
                     })
 
                     if (!user) {
@@ -108,6 +111,7 @@ export const authOptions: NextAuthOptions = {
                         name: user.name,
                         email: user.email,
                         role: user.role,
+                        permissions: user.customRole?.isActive ? user.customRole.permissions : [],
                     }
                 } catch (error) {
                     console.error("Auth error details:", error)
@@ -121,16 +125,18 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 token.id = user.id
                 token.role = user.role
+                token.permissions = (user as any).permissions || []
             }
-            // Re-fetch role from DB on each token refresh so role changes take effect immediately
+            // Re-fetch role + permissions from DB on each token refresh so changes take effect immediately
             if (token.id && !user) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: token.id as string },
-                        select: { role: true, isActive: true }
+                        select: { role: true, isActive: true, customRole: { select: { permissions: true, isActive: true } } }
                     })
                     if (dbUser) {
                         token.role = dbUser.role
+                        token.permissions = dbUser.customRole?.isActive ? dbUser.customRole.permissions : []
                     }
                 } catch {
                     // Keep existing token if DB is unreachable
@@ -142,6 +148,7 @@ export const authOptions: NextAuthOptions = {
             if (token) {
                 session.user.id = token.id
                 session.user.role = token.role as Role
+                session.user.permissions = (token.permissions as string[]) || []
             }
             return session
         },

@@ -344,8 +344,8 @@ export default function PayrollPage() {
         toast.success("Template downloaded! Fill and re-upload.")
     }
 
-    const handleBulkSalaryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
+    const handleBulkSalaryUpload = async (ev: React.ChangeEvent<HTMLInputElement>) => {
+        const file = ev.target.files?.[0]
         if (!file) return
         setBulkUploading(true)
         try {
@@ -353,16 +353,15 @@ export default function PayrollPage() {
             const wb = XLSX.read(ab)
             const ws = wb.Sheets[wb.SheetNames[0]]
             const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws)
-            if (!rows.length) { toast.error("No data found in file."); return }
+            if (!rows.length) { toast.error("File mein koi data nahi mila."); return }
 
-            let success = 0, failed = 0
-            for (const row of rows) {
-                const empId = String(row["Employee ID"] ?? "").trim()
-                if (!empId) { failed++; continue }
-                // Find employee by employeeId
-                const emp = employees.find(e => e.employeeId === empId)
-                if (!emp) { failed++; continue }
-                try {
+            // Process all rows in parallel (faster than sequential)
+            const results = await Promise.allSettled(
+                rows.map(async (row) => {
+                    const empId = String(row["Employee ID"] ?? "").trim()
+                    if (!empId) throw new Error("No Employee ID")
+                    const emp = employees.find(e => e.employeeId === empId)
+                    if (!emp) throw new Error(`Employee not found: ${empId}`)
                     const res = await fetch(`/api/payroll/salary-structure/${emp.id}`, {
                         method: "POST", headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -378,16 +377,19 @@ export default function PayrollPage() {
                             status: "APPROVED",
                         }),
                     })
-                    if (res.ok) success++; else failed++
-                } catch { failed++ }
-            }
-            toast.success(`Bulk upload done: ${success} updated, ${failed} failed.`)
+                    if (!res.ok) throw new Error(`API error: ${res.status}`)
+                })
+            )
+            const success = results.filter(r => r.status === "fulfilled").length
+            const failed  = results.filter(r => r.status === "rejected").length
+            if (success > 0) toast.success(`${success} employees ka salary set ho gaya${failed > 0 ? `, ${failed} fail hue` : ""}!`)
+            else toast.error(`Sabhi ${failed} rows fail ho gayi — Employee ID check karein.`)
             await loadData()
-        } catch {
-            toast.error("Failed to read file.")
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "File read karne mein error.")
         } finally {
             setBulkUploading(false)
-            e.target.value = ""
+            ev.target.value = ""
         }
     }
 
