@@ -2874,6 +2874,8 @@ function PoliciesTab() {
     const [showCreate, setShowCreate] = useState(false)
     const [form, setForm] = useState({ title: "", description: "", category: "Safety", fileUrl: "", isRequired: true })
     const [saving, setSaving] = useState(false)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
     const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
 
     const fetchPolicies = useCallback(async () => {
@@ -3066,6 +3068,11 @@ function PoliciesTab() {
                     </div>
                 </div>
             )}
+            <DocumentViewer
+                url={previewUrl}
+                fileName={previewName}
+                onClose={() => setPreviewUrl(null)}
+            />
         </div>
     )
 }
@@ -3085,6 +3092,8 @@ function NotificationsTab() {
     const [loading, setLoading] = useState(true)
     const [sending, setSending] = useState(false)
     const [activeSection, setActiveSection] = useState<"overdue" | "duesoon" | "expiring" | "policies">("overdue")
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         fetch("/api/lms/notifications")
