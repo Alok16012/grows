@@ -511,7 +511,7 @@ function TaskRow({ task, onboardingId, onUpdated, onDelete }: {
 
 // ─── Verification Panel ───────────────────────────────────────────────────────
 
-function VerificationPanel({ record, onUpdated }: { record: OnboardingRecord, onUpdated: () => void }) {
+function VerificationPanel({ record, onUpdated, onView }: { record: OnboardingRecord, onUpdated: () => void, onView: (url: string, name: string) => void }) {
     const emp = record.employee
     const [submitting, setSubmitting] = useState(false)
     const [ctc, setCtc] = useState(emp.employeeSalary?.ctcAnnual?.toString() || "")
