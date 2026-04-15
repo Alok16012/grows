@@ -511,38 +511,25 @@ function TaskRow({ task, onboardingId, onUpdated, onDelete }: {
 
 // ─── Verification Panel ───────────────────────────────────────────────────────
 
-function VerificationPanel({ record, onUpdated, onView }: { record: OnboardingRecord, onUpdated: () => void, onView: (url: string, name: string) => void }) {
+function VerificationPanel({ record, onUpdated, onView, docs, docsLoading, onDocsRefresh }: {
+    record: OnboardingRecord
+    onUpdated: () => void
+    onView: (url: string, name: string) => void
+    docs: EmployeeDocument[]
+    docsLoading: boolean
+    onDocsRefresh: () => void
+}) {
     const emp = record.employee
     const [submitting, setSubmitting] = useState(false)
     const [ctc, setCtc] = useState(emp.employeeSalary?.ctcAnnual?.toString() || "")
     const [kycRejectNote, setKycRejectNote] = useState(emp.kycRejectionNote || "")
 
     // Documents state
-    const [docs, setDocs] = useState<EmployeeDocument[]>([])
-    const [docsLoading, setDocsLoading] = useState(false)
     const [showAddDoc, setShowAddDoc] = useState(false)
     const [addingDoc, setAddingDoc] = useState(false)
     const [docType, setDocType] = useState<DocType>("RESUME")
     const [docFileName, setDocFileName] = useState("")
     const [docFileUrl, setDocFileUrl] = useState("")
-
-    const fetchDocs = useCallback(async () => {
-        setDocsLoading(true)
-        try {
-            const res = await fetch(`/api/onboarding/${record.id}/documents`)
-            if (!res.ok) throw new Error(await res.text())
-            const data = await res.json()
-            setDocs(Array.isArray(data) ? data : [])
-        } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : "Failed to load documents")
-        } finally {
-            setDocsLoading(false)
-        }
-    }, [record.id])
-
-    useEffect(() => {
-        fetchDocs()
-    }, [fetchDocs])
 
     const handleKycStatus = async (status: "VERIFIED" | "REJECTED") => {
         if (status === "REJECTED" && !kycRejectNote) return toast.error("Rejection reason required")
@@ -568,7 +555,7 @@ function VerificationPanel({ record, onUpdated, onView }: { record: OnboardingRe
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(`Document ${status === "VERIFIED" ? "verified" : "rejected"}`)
-            fetchDocs()
+            onDocsRefresh()
         } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Failed") }
     }
 
@@ -588,7 +575,7 @@ function VerificationPanel({ record, onUpdated, onView }: { record: OnboardingRe
             setDocFileName("")
             setDocFileUrl("")
             setDocType("RESUME")
-            fetchDocs()
+            onDocsRefresh()
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Failed to add document")
         } finally {
@@ -991,59 +978,33 @@ function OnboardingDrawer({ record, onClose, onUpdated, onView }: {
     onUpdated: () => void
     onView: (url: string, name: string) => void
 }) {
-    const [tasks, setTasks] = useState<OnboardingTask[]>(record.tasks)
-    const [activeTab, setActiveTab] = useState("All Tasks")
     const [markingComplete, setMarkingComplete] = useState(false)
+    const [docs, setDocs] = useState<EmployeeDocument[]>([])
+    const [docsLoading, setDocsLoading] = useState(false)
 
-    // Add custom task form
-    const [addTitle, setAddTitle] = useState("")
-    const [addCategory, setAddCategory] = useState("Documents")
-    const [addDueDate, setAddDueDate] = useState("")
-    const [addingTask, setAddingTask] = useState(false)
-    const [showAddForm, setShowAddForm] = useState(false)
-
-    const { total, completed, pct } = getTaskProgress(tasks)
-
-    const requiredTasks = tasks.filter(t => t.isRequired)
-    const allRequiredDone = requiredTasks.length > 0 && requiredTasks.every(t => t.status === "COMPLETED" || t.status === "SKIPPED")
-    const isAlreadyComplete = record.status === "COMPLETED"
-
-    const filteredTasks = activeTab === "All Tasks" ? tasks : tasks.filter(t => t.category === activeTab)
-
-    const handleTaskUpdated = (updated: OnboardingTask) => {
-        setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))
-        onUpdated()
-    }
-
-    const handleTaskDeleted = (id: string) => {
-        setTasks(prev => prev.filter(t => t.id !== id))
-        onUpdated()
-    }
-
-    const handleAddTask = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!addTitle) return
-        setAddingTask(true)
+    const fetchDocs = useCallback(async () => {
+        setDocsLoading(true)
         try {
-            const res = await fetch(`/api/onboarding/${record.id}/tasks`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title: addTitle, category: addCategory, dueDate: addDueDate || undefined }),
-            })
-            if (!res.ok) throw new Error(await res.text())
-            const newTask: OnboardingTask = await res.json()
-            setTasks(prev => [...prev, newTask])
-            setAddTitle("")
-            setAddDueDate("")
-            setShowAddForm(false)
-            toast.success("Task added")
-            onUpdated()
-        } catch (err: unknown) {
-            toast.error(err instanceof Error ? err.message : "Failed to add task")
-        } finally {
-            setAddingTask(false)
-        }
-    }
+            const res = await fetch(`/api/onboarding/${record.id}/documents`)
+            if (!res.ok) throw new Error()
+            const data = await res.json()
+            setDocs(Array.isArray(data) ? data : [])
+        } catch { /* ignore */ }
+        finally { setDocsLoading(false) }
+    }, [record.id])
+
+    useEffect(() => { fetchDocs() }, [fetchDocs])
+
+    // Progress = KYC (1 item) + each uploaded doc
+    const kycVerified = record.employee.isKycVerified ? 1 : 0
+    const docsVerified = docs.filter(d => d.status === "VERIFIED").length
+    const totalItems = 1 + docs.length
+    const verifiedItems = kycVerified + docsVerified
+    const pct = totalItems > 0 ? Math.round((verifiedItems / totalItems) * 100) : 0
+
+    const isAlreadyComplete = record.status === "COMPLETED"
+    const statusCfg = STATUS_CONFIG[record.status]
+    const joiningDate = fmtDate(record.employee.dateOfJoining)
 
     const handleMarkComplete = async () => {
         setMarkingComplete(true)
@@ -1063,12 +1024,6 @@ function OnboardingDrawer({ record, onClose, onUpdated, onView }: {
             setMarkingComplete(false)
         }
     }
-
-    const statusCfg = STATUS_CONFIG[record.status]
-    const joiningDate = fmtDate(record.employee.dateOfJoining)
-
-    const inpCls = "flex-1 h-8 rounded-[7px] border border-[var(--border)] bg-white px-2.5 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-    const selCls = "h-8 rounded-[7px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-end">
@@ -1093,115 +1048,34 @@ function OnboardingDrawer({ record, onClose, onUpdated, onView }: {
                     </div>
                 </div>
 
-                {/* Progress */}
+                {/* Progress bar — based on KYC + docs verification */}
                 <div className="px-5 py-3 border-b border-[var(--border)] shrink-0">
                     <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[12px] text-[var(--text2)]">{completed}/{total} tasks done</span>
+                        <span className="text-[12px] text-[var(--text2)]">{verifiedItems}/{totalItems} verified</span>
                         <span className="text-[13px] font-bold" style={{ color: pct === 100 ? "#1a9e6e" : pct >= 50 ? "#f59e0b" : "#3b82f6" }}>{pct}%</span>
                     </div>
                     <ProgressBar value={pct} height={7} />
                 </div>
 
-                {/* Tabs */}
-                <div className="px-4 pt-3 pb-0 border-b border-[var(--border)] shrink-0 overflow-x-auto">
-                    <div className="flex gap-0.5 min-w-max">
-                        {CATEGORIES.map(cat => {
-                            const count = cat === "All Tasks" ? tasks.length : tasks.filter(t => t.category === cat).length
-                            return (
-                                <button
-                                    key={cat}
-                                    onClick={() => setActiveTab(cat)}
-                                    className={`px-3 py-2 text-[12px] font-medium rounded-t-[6px] border-b-2 transition-colors whitespace-nowrap ${activeTab === cat ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text3)] hover:text-[var(--text2)]"}`}
-                                >
-                                    {cat} {count > 0 && <span className="ml-0.5 text-[10px] opacity-70">({count})</span>}
-                                </button>
-                            )
-                        })}
-                    </div>
-                </div>
-
-                {/* Task List / Content View */}
-                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-                    {activeTab === "Employee Details" ? (
-                        <EmployeeDetailsPanel emp={record.employee} />
-                    ) : activeTab === "Verification" ? (
-                        <VerificationPanel record={record} onUpdated={onUpdated} onView={onView} />
-                    ) : (
-                        <>
-                            {filteredTasks.length === 0 ? (
-                                <div className="flex items-center justify-center py-10 text-[var(--text3)]">
-                                    <p className="text-[13px]">No tasks in this category</p>
-                                </div>
-                            ) : (
-                                filteredTasks.map(task => (
-                                    <TaskRow
-                                        key={task.id}
-                                        task={task}
-                                        onboardingId={record.id}
-                                        onUpdated={handleTaskUpdated}
-                                        onDelete={handleTaskDeleted}
-                                    />
-                                ))
-                            )}
-                        </>
-                    )}
-                </div>
-
-                {/* Add Custom Task */}
-                <div className="px-4 py-3 border-t border-[var(--border)] shrink-0">
-                    {!showAddForm ? (
-                        <button
-                            onClick={() => setShowAddForm(true)}
-                            className="flex items-center gap-2 text-[12px] text-[var(--text3)] hover:text-[var(--accent)] transition-colors"
-                        >
-                            <Plus size={14} />
-                            Add Custom Task
-                        </button>
-                    ) : (
-                        <form onSubmit={handleAddTask} className="space-y-2">
-                            <p className="text-[12px] font-medium text-[var(--text)]">Add Custom Task</p>
-                            <div className="flex gap-2">
-                                <input
-                                    value={addTitle}
-                                    onChange={e => setAddTitle(e.target.value)}
-                                    placeholder="Task title..."
-                                    className={inpCls}
-                                    required
-                                />
-                                <select value={addCategory} onChange={e => setAddCategory(e.target.value)} className={selCls}>
-                                    {CATEGORIES.filter(c => c !== "All Tasks").map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                            <div className="flex gap-2 items-center">
-                                <input
-                                    type="date"
-                                    value={addDueDate}
-                                    onChange={e => setAddDueDate(e.target.value)}
-                                    className={`${inpCls} max-w-[140px]`}
-                                />
-                                <div className="flex gap-1.5 ml-auto">
-                                    <button type="button" onClick={() => { setShowAddForm(false); setAddTitle(""); setAddDueDate("") }}
-                                        className="px-3 py-1.5 text-[12px] text-[var(--text2)] hover:bg-[var(--surface2)] rounded-[6px] transition-colors">
-                                        Cancel
-                                    </button>
-                                    <button type="submit" disabled={addingTask || !addTitle}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)] text-white rounded-[6px] text-[12px] font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
-                                        {addingTask && <Loader2 size={11} className="animate-spin" />}
-                                        Add
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    )}
+                {/* Verification Panel — only content */}
+                <div className="flex-1 overflow-y-auto px-4 py-3">
+                    <VerificationPanel
+                        record={record}
+                        onUpdated={onUpdated}
+                        onView={onView}
+                        docs={docs}
+                        docsLoading={docsLoading}
+                        onDocsRefresh={fetchDocs}
+                    />
                 </div>
 
                 {/* Footer */}
                 <div className="px-4 py-3 border-t border-[var(--border)] shrink-0 bg-[var(--surface2)]/30 flex items-center justify-between gap-3">
                     <div>
-                        <p className="text-[12px] text-[var(--text3)]">Overall Completion</p>
+                        <p className="text-[12px] text-[var(--text3)]">Verification Progress</p>
                         <p className="text-[20px] font-bold text-[var(--text)] leading-tight">{pct}%</p>
                     </div>
-                    {!isAlreadyComplete && allRequiredDone && (
+                    {!isAlreadyComplete && record.employee.isKycVerified && (
                         <button
                             onClick={handleMarkComplete}
                             disabled={markingComplete}
