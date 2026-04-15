@@ -9,6 +9,7 @@ import {
     ArrowLeft, RotateCcw, Shield, FileText, ExternalLink, ChevronDown, ChevronUp
 } from "lucide-react"
 import { format } from "date-fns"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 type Enrollment = {
     id: string
@@ -77,7 +78,7 @@ const POLICY_CAT_COLORS_LEARN: Record<string, string> = {
     Operations: "#10b981", IT: "#06b6d4", Finance: "#ec4899", Other: "#6b7280"
 }
 
-function PoliciesSection() {
+function PoliciesSection({ onUrlPreview }: { onUrlPreview: (url: string, name: string) => void }) {
     const [policies, setPolicies] = useState<LearnPolicy[]>([])
     const [loading, setLoading] = useState(true)
     const [expanded, setExpanded] = useState(false)
@@ -155,10 +156,13 @@ function PoliciesSection() {
                                     </div>
                                     {policy.description && <p className="text-[11.5px] text-[var(--text3)] line-clamp-2">{policy.description}</p>}
                                     {policy.fileUrl && (
-                                        <a href={policy.fileUrl} target="_blank" rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[11px] text-[var(--accent)] mt-1 hover:underline">
+                                        <button 
+                                            type="button"
+                                            onClick={() => onUrlPreview(policy.fileUrl!, policy.title)}
+                                            className="inline-flex items-center gap-1 text-[11px] text-[var(--accent)] mt-1 hover:underline"
+                                        >
                                             <ExternalLink size={10} /> View Document
-                                        </a>
+                                        </button>
                                     )}
                                 </div>
                                 <div className="shrink-0">
@@ -633,10 +637,11 @@ function CertificateModal({ certificate, courseName, employeeName, onClose }: {
     )
 }
 
-function CourseDetailView({ enrollment, onBack, onComplete }: {
+function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
     enrollment: Enrollment
     onBack: () => void
     onComplete: () => void
+    onUrlPreview: (url: string, name: string) => void
 }) {
     const [activeView, setActiveView] = useState<"modules" | "quiz">("modules")
     const [showQuiz, setShowQuiz] = useState(false)
@@ -737,9 +742,13 @@ function CourseDetailView({ enrollment, onBack, onComplete }: {
                                         <h3 className="text-[14px] font-medium text-[var(--text)]">{mod.title}</h3>
                                         {mod.content && <p className="text-[12px] text-[var(--text3)] mt-1">{mod.content}</p>}
                                         {mod.videoUrl && (
-                                            <a href={mod.videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] mt-2 hover:underline">
-                                                <PlayCircle size={14} /> Watch Video
-                                            </a>
+                                            <button 
+                                                type="button"
+                                                onClick={() => onUrlPreview(mod.videoUrl!, mod.title)}
+                                                className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] mt-2 hover:underline"
+                                            >
+                                                <PlayCircle size={14} /> Watch Content
+                                            </button>
                                         )}
                                     </div>
                                     {!isComplete && (
@@ -849,6 +858,8 @@ export default function LearnPage() {
     const [enrollments, setEnrollments] = useState<Enrollment[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         if (status === "unauthenticated") router.replace("/login")
@@ -886,6 +897,7 @@ export default function LearnPage() {
                         enrollment={selectedEnrollment}
                         onBack={() => { setSelectedEnrollment(null); fetchEnrollments() }}
                         onComplete={() => { fetchEnrollments(); setSelectedEnrollment(null) }}
+                        onUrlPreview={(url, name) => { setPreviewUrl(url); setPreviewName(name) }}
                     />
                 </div>
             </div>
@@ -908,7 +920,7 @@ export default function LearnPage() {
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Policies acknowledgment banner */}
-                <PoliciesSection />
+                <PoliciesSection onUrlPreview={(url, name) => { setPreviewUrl(url); setPreviewName(name) }} />
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 text-center">
@@ -951,6 +963,11 @@ export default function LearnPage() {
                     </div>
                 )}
             </div>
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }

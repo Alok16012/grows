@@ -11,8 +11,9 @@ import {
     UserCheck, Banknote, Building2, Wrench,
     FileText, GraduationCap, Award, BarChart2,
     Flame, Droplet, Thermometer, CheckSquare, AlertCircle,
-    TrendingUp, Download, Upload
+    TrendingUp, Download, Upload, Eye
 } from "lucide-react"
+import { DocumentViewer } from "@/components/DocumentViewer"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
 import * as XLSX from "xlsx"
 import {
@@ -247,6 +248,8 @@ export default function RecruitmentPage() {
     const [importLoading, setImportLoading] = useState(false)
     const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
     const importFileRef = useRef<HTMLInputElement>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     const emptyForm = {
         candidateName: "", phone: "", email: "", city: "",
@@ -748,7 +751,14 @@ export default function RecruitmentPage() {
             {/* ── DOCUMENTS TAB ── */}
             {activeTab === "documents" && (
                 <div className="px-4 lg:px-0 pb-6">
-                    <DocumentsTabView leads={leads} onLeadClick={openDetail} />
+                    <DocumentsTabView 
+                        leads={leads} 
+                        onLeadClick={openDetail} 
+                        onView={(url, name) => {
+                            setPreviewUrl(url)
+                            setPreviewName(name)
+                        }}
+                    />
                 </div>
             )}
 
@@ -996,8 +1006,18 @@ export default function RecruitmentPage() {
                         setDetailLead(updated)
                         setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))
                     }}
+                    onView={(url, name) => {
+                        setPreviewUrl(url)
+                        setPreviewName(name)
+                    }}
                 />
             )}
+
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
 
             {/* ── Import Modal ── */}
             {showImportModal && (
@@ -1391,7 +1411,7 @@ function AnalyticsView({ data }: { data: AnalyticsData }) {
 }
 
 // ─── Documents Tab View ───────────────────────────────────────────────────────
-function DocumentsTabView({ leads, onLeadClick }: { leads: Lead[]; onLeadClick: (l: Lead) => void }) {
+function DocumentsTabView({ leads, onLeadClick, onView }: { leads: Lead[]; onLeadClick: (l: Lead) => void; onView: (url: string, name: string) => void }) {
     const allDocs = leads.flatMap(l => (l.documents ?? []).map(d => ({ ...d, leadName: l.candidateName, lead: l })))
 
     const verifiedColor: Record<string, string> = {
@@ -1432,10 +1452,15 @@ function DocumentsTabView({ leads, onLeadClick }: { leads: Lead[]; onLeadClick: 
                             style={{ color: verifiedColor[doc.verified] ?? "#6b7280", borderColor: verifiedColor[doc.verified] ?? "#6b7280", background: (verifiedColor[doc.verified] ?? "#6b7280") + "15" }}>
                             {doc.verified}
                         </span>
-                        <a href={doc.url} target="_blank" rel="noopener noreferrer"
-                            className="text-[12px] text-[var(--accent)] hover:underline" onClick={e => e.stopPropagation()}>
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onView(doc.url, doc.fileName)
+                            }}
+                            className="text-[12px] text-[var(--accent)] hover:underline"
+                        >
                             View
-                        </a>
+                        </button>
                     </div>
                 </div>
             ))}
@@ -1447,7 +1472,7 @@ function DocumentsTabView({ leads, onLeadClick }: { leads: Lead[]; onLeadClick: 
 function DetailDrawer({
     lead, session, users, activityContent, activityType, savingActivity,
     onClose, onEdit, onDelete, onStatusChange, onActivityTypeChange, onActivityContentChange, onAddActivity,
-    onLeadUpdate
+    onLeadUpdate, onView
 }: {
     lead: Lead
     session: any
@@ -1463,6 +1488,7 @@ function DetailDrawer({
     onActivityContentChange: (c: string) => void
     onAddActivity: () => void
     onLeadUpdate: (l: Lead) => void
+    onView: (url: string, name: string) => void
 }) {
     const [drawerTab, setDrawerTab] = useState<"overview" | "activities" | "interview" | "documents" | "followups">("overview")
     const [interviewForm, setInterviewForm] = useState({
@@ -1666,10 +1692,12 @@ function DetailDrawer({
                             {(lead.resumeUrl || lead.profileUrl) && (
                                 <div className="flex gap-2 mb-4 flex-wrap">
                                     {lead.resumeUrl && (
-                                        <a href={lead.resumeUrl} target="_blank" rel="noopener noreferrer"
-                                            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", background: "var(--accent)", color: "#fff", borderRadius: "7px", fontSize: "12px", fontWeight: 600, textDecoration: "none" }}>
+                                        <button 
+                                            onClick={() => onView(lead.resumeUrl!, "Resume_" + lead.candidateName)}
+                                            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", background: "var(--accent)", color: "#fff", borderRadius: "7px", fontSize: "12px", fontWeight: 600, border: "none" }}
+                                        >
                                             <FileText size={13} /> View Resume
-                                        </a>
+                                        </button>
                                     )}
                                     {lead.profileUrl && (
                                         <a href={lead.profileUrl} target="_blank" rel="noopener noreferrer"
@@ -1896,10 +1924,15 @@ function DetailDrawer({
                                                 <option value="APPROVED">Approved</option>
                                                 <option value="REJECTED">Rejected</option>
                                             </select>
-                                            <a href={doc.url} target="_blank" rel="noopener noreferrer"
-                                                className="text-[12px] text-[var(--accent)] hover:underline" onClick={e => e.stopPropagation()}>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onView(doc.url, doc.fileName)
+                                                }}
+                                                className="text-[12px] text-[var(--accent)] hover:underline"
+                                            >
                                                 View
-                                            </a>
+                                            </button>
                                         </div>
                                     </div>
                                 ))}

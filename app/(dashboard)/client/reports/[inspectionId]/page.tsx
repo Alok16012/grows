@@ -23,6 +23,7 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { pdf } from '@react-pdf/renderer'
 import { InspectionPDF } from "@/components/InspectionPDF"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 export default function ClientReportDetailPage() {
     const params = useParams()
@@ -30,6 +31,8 @@ export default function ClientReportDetailPage() {
     const [report, setReport] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [downloading, setDownloading] = useState(false)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         const fetchReport = async () => {
@@ -212,19 +215,31 @@ export default function ClientReportDetailPage() {
                                                         className="w-full h-auto max-h-48 object-cover transition-transform group-hover:scale-105"
                                                     />
                                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <Button variant="secondary" size="sm" asChild>
-                                                            <a href={resp.value} target="_blank" rel="noopener noreferrer">
-                                                                <ExternalLink className="h-4 w-4 mr-2" /> View Full
-                                                            </a>
+                                                        <Button 
+                                                            variant="secondary" 
+                                                            size="sm" 
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setPreviewUrl(resp.value)
+                                                                setPreviewName(resp.field.fieldLabel)
+                                                            }}
+                                                        >
+                                                            <ExternalLink className="h-4 w-4 mr-2" /> View Full
                                                         </Button>
                                                     </div>
                                                 </div>
                                             ) : resp.value ? (
-                                                <Button variant="outline" className="w-full justify-start gap-2" asChild>
-                                                    <a href={resp.value} target="_blank" rel="noopener noreferrer">
-                                                        <Download className="h-4 w-4" />
-                                                        Download Attachment
-                                                    </a>
+                                                <Button 
+                                                    variant="outline" 
+                                                    className="w-full justify-start gap-2" 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPreviewUrl(resp.value)
+                                                        setPreviewName(resp.field.fieldLabel)
+                                                    }}
+                                                >
+                                                    <ExternalLink className="h-4 w-4" />
+                                                    View Attachment
                                                 </Button>
                                             ) : (
                                                 <p className="text-sm text-muted-foreground italic">No file uploaded</p>
@@ -240,6 +255,11 @@ export default function ClientReportDetailPage() {
                         ))}
                 </div>
             </div>
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }

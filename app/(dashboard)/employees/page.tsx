@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import * as XLSX from "xlsx"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -359,6 +360,8 @@ function EmployeeModal({
     const [docDeleting, setDocDeleting] = useState<string | null>(null)
     const docFileRef = useRef<HTMLInputElement>(null)
     const [docType, setDocType] = useState("AADHAAR")
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     const fetchExistingDocs = async (empId: string) => {
         try {
@@ -1048,11 +1051,16 @@ function EmployeeModal({
                                                             <td className="px-3 py-2.5">
                                                                 <div className="flex items-center justify-end gap-1">
                                                                     {/* View */}
-                                                                    <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setPreviewUrl(doc.fileUrl)
+                                                                            setPreviewName(doc.fileName)
+                                                                        }}
                                                                         className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                                                                         title="View">
                                                                         <Eye size={12} /> View
-                                                                    </a>
+                                                                    </button>
                                                                     {/* Download */}
                                                                     <a href={doc.fileUrl} download={doc.fileName}
                                                                         className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
@@ -1171,6 +1179,12 @@ function EmployeeModal({
                     </div>
                 </div>
             </div>
+
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }
@@ -1275,6 +1289,7 @@ function EmployeeDrawer({
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
     const [rejectingDocId, setRejectingDocId] = useState<string | null>(null)
     const [rejectReason, setRejectReason] = useState("")
 
@@ -1800,7 +1815,10 @@ function EmployeeDrawer({
                                                 {isImage && (
                                                     <div
                                                         style={{ width: "100%", height: 100, overflow: "hidden", cursor: "pointer", background: "#f1f5f9", position: "relative" }}
-                                                        onClick={() => setPreviewUrl(doc.fileUrl)}
+                                                        onClick={() => {
+                                                            setPreviewUrl(doc.fileUrl)
+                                                            setPreviewName(doc.fileName)
+                                                        }}
                                                     >
                                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                                         <img src={doc.fileUrl} alt={doc.fileName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1853,13 +1871,20 @@ function EmployeeDrawer({
                                                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                                                         {isImage ? (
                                                             <button
-                                                                onClick={() => setPreviewUrl(doc.fileUrl)}
+                                                                onClick={() => {
+                                                                    setPreviewUrl(doc.fileUrl)
+                                                                    setPreviewName(doc.fileName)
+                                                                }}
                                                                 style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, padding: 0, fontWeight: 600 }}
                                                             ><Eye size={12} /> Preview</button>
                                                         ) : (
-                                                            <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
-                                                                style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}
-                                                            ><Download size={12} />{isPdf ? "View PDF" : "Download"}</a>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPreviewUrl(doc.fileUrl)
+                                                                    setPreviewName(doc.fileName)
+                                                                }}
+                                                                style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}
+                                                            ><Eye size={12} /> {isPdf ? "View PDF" : "View File"}</button>
                                                         )}
                                                         {isAdmin && doc.status !== "VERIFIED" && !isRejecting && (
                                                             <button
@@ -1893,30 +1918,11 @@ function EmployeeDrawer({
                     )}
                 </div>
 
-                {/* Image Preview Lightbox */}
-                {previewUrl && (
-                    <div
-                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-                        onClick={() => setPreviewUrl(null)}
-                    >
-                        <div style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={previewUrl} alt="Document preview" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 10, objectFit: "contain", display: "block" }} />
-                            <button
-                                onClick={() => setPreviewUrl(null)}
-                                style={{ position: "absolute", top: -12, right: -12, width: 30, height: 30, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}
-                            >✕</button>
-                            <a
-                                href={previewUrl}
-                                download
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={e => e.stopPropagation()}
-                                style={{ position: "absolute", bottom: -36, left: "50%", transform: "translateX(-50%)", fontSize: 12, color: "#fff", background: "rgba(255,255,255,0.15)", padding: "5px 14px", borderRadius: 20, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
-                            ><Download size={12} /> Download</a>
-                        </div>
-                    </div>
-                )}
+                <DocumentViewer 
+                    url={previewUrl} 
+                    fileName={previewName} 
+                    onClose={() => setPreviewUrl(null)} 
+                />
 
                 {/* Action Footer */}
                 <div className="px-5 py-4 border-t border-[var(--border)] flex items-center gap-2">

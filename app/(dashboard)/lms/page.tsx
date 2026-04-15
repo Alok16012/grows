@@ -12,6 +12,7 @@ import {
     Calendar, Bell, Shield, Star, Send, UserCheck, FileText
 } from "lucide-react"
 import { format } from "date-fns"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1627,6 +1628,8 @@ export default function LMSPage() {
     const [enrollCourseId, setEnrollCourseId] = useState<string | undefined>()
     const [drawerCourseId, setDrawerCourseId] = useState<string | null>(null)
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         if (status !== "unauthenticated") return
@@ -2969,10 +2972,16 @@ function PoliciesTab() {
                                                 <span className="text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: catColor + "22", color: catColor }}>{policy.category}</span>
                                                 <span className="text-[11px] text-[var(--text3)]">{format(new Date(policy.createdAt), "dd MMM yyyy")}</span>
                                                 {policy.fileUrl && (
-                                                    <a href={policy.fileUrl} target="_blank" rel="noopener noreferrer"
-                                                        className="text-[11px] text-[var(--accent)] flex items-center gap-1 hover:underline">
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPreviewUrl(policy.fileUrl!)
+                                                            setPreviewName(policy.title)
+                                                        }}
+                                                        className="text-[11px] text-[var(--accent)] flex items-center gap-1 hover:underline"
+                                                    >
                                                         <ExternalLink size={11} /> View Document
-                                                    </a>
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
@@ -3241,6 +3250,12 @@ function NotificationsTab() {
                     Click <strong>Send Reminders</strong> to push in-app notifications to all employees with overdue training, upcoming deadlines, and expiring certificates.
                 </p>
             </div>
+            
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }

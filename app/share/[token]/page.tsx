@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { Loader2, CheckCircle2, AlertCircle, Building2, Calendar, User, Eye, Download } from "lucide-react"
 import dynamic from "next/dynamic"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 const PDFDownloadLink = dynamic(
     () => import("@react-pdf/renderer").then(mod => mod.PDFDownloadLink),
@@ -20,6 +21,8 @@ export default function SharePage() {
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         fetch(`/api/share/${token}`)
@@ -136,17 +139,40 @@ export default function SharePage() {
                             <div key={resp.id} className="px-5 py-4">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9e9b95] mb-1">{resp.field.fieldLabel}</p>
                                 {resp.field.fieldType === "file" ? (
-                                    resp.value?.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                                        <img src={resp.value} alt={resp.field.fieldLabel} className="max-h-40 rounded-lg border" />
+                                    resp.value?.match(/\.(jpg|jpeg|png|gif|pdf)(\?|$)|data:image|data:application\/pdf/i) ? (
+                                        <div className="space-y-2">
+                                            {resp.value.match(/\.(jpg|jpeg|png|gif)(\?|$)|data:image/i) && (
+                                                <img 
+                                                    src={resp.value} 
+                                                    alt={resp.field.fieldLabel} 
+                                                    className="max-h-40 rounded-lg border cursor-pointer hover:opacity-90 transition-opacity" 
+                                                    onClick={() => {
+                                                        setPreviewUrl(resp.value)
+                                                        setPreviewName(resp.field.fieldLabel)
+                                                    }}
+                                                />
+                                            )}
+                                            <button 
+                                                onClick={() => {
+                                                    setPreviewUrl(resp.value)
+                                                    setPreviewName(resp.field.fieldLabel)
+                                                }}
+                                                className="flex items-center gap-1.5 text-[12px] text-[#1a9e6e] font-medium hover:underline"
+                                            >
+                                                <Eye size={14} /> View Document
+                                            </button>
+                                        </div>
                                     ) : (
-                                        <span className="text-[13px] text-[#6b6860] italic">(File attachment)</span>
+                                        <span className="text-[13px] text-[#6b6860] italic">(No valid attachment)</span>
                                     )
-                                ) : resp.field.fieldType === "checkbox" ? (
-                                    <span className={`inline-block text-[12px] px-3 py-0.5 rounded-full font-medium ${resp.value === "true" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                                        {resp.value === "true" ? "Yes" : "No"}
-                                    </span>
                                 ) : (
-                                    <p className="text-[13px] text-[#1a1a18] whitespace-pre-wrap">{resp.value || <span className="text-[#9e9b95] italic">Not recorded</span>}</p>
+                                    resp.field.fieldType === "checkbox" ? (
+                                        <span className={`inline-block text-[12px] px-3 py-0.5 rounded-full font-medium ${resp.value === "true" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                                            {resp.value === "true" ? "Yes" : "No"}
+                                        </span>
+                                    ) : (
+                                        <p className="text-[13px] text-[#1a1a18] whitespace-pre-wrap">{resp.value || <span className="text-[#9e9b95] italic">Not recorded</span>}</p>
+                                    )
                                 )}
                             </div>
                         ))}
@@ -167,6 +193,12 @@ export default function SharePage() {
                     <p className="mt-0.5">Shared on {new Date(data.createdAt).toLocaleDateString("en-IN")}</p>
                 </div>
             </div>
+            
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }

@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 export default function ReviewInspectionPage() {
     const { data: session, status: authStatus } = useSession()
@@ -28,6 +29,8 @@ export default function ReviewInspectionPage() {
     const [sharing, setSharing] = useState(false)
     const [showSignature, setShowSignature] = useState(false)
     const [hasSig, setHasSig] = useState(false)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         if (authStatus === "unauthenticated") router.push("/login")
@@ -197,9 +200,16 @@ export default function ReviewInspectionPage() {
                             <FileText className="h-6 w-6 text-[#d4d1ca]" />
                         </div>
                     )}
-                    <a href={value} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#1a9e6e] hover:underline">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setPreviewUrl(value)
+                            setPreviewName(field.fieldLabel)
+                        }}
+                        className="inline-flex items-center gap-1 text-[12px] text-[#1a9e6e] hover:underline"
+                    >
                         <ExternalLink className="h-3 w-3" /> View File
-                    </a>
+                    </button>
                 </div>
             )
         }
@@ -565,6 +575,11 @@ export default function ReviewInspectionPage() {
                     </div>
                 </div>
             </div>
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }

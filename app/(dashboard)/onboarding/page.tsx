@@ -6,8 +6,9 @@ import { toast } from "sonner"
 import {
     Plus, Loader2, X, Search, Users,
     CheckCircle2, Clock, AlertCircle, PauseCircle,
-    ChevronDown, Trash2, CalendarDays, Upload
+    ChevronDown, Trash2, CalendarDays, Upload, Eye
 } from "lucide-react"
+import { DocumentViewer } from "@/components/DocumentViewer"
 import { format } from "date-fns"
 import * as XLSX from "xlsx"
 
@@ -913,18 +914,17 @@ function VerificationPanel({ record, onUpdated }: { record: OnboardingRecord, on
 
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                     {/* View button */}
-                                    <a
-                                        href={doc.fileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
+                                        onClick={() => onView(doc.fileUrl, doc.fileName)}
                                         style={{
                                             fontSize: 11, padding: "3px 10px", borderRadius: 5,
                                             border: "1px solid var(--border)", color: "var(--text2)",
                                             background: "white", textDecoration: "none", fontWeight: 500,
+                                            cursor: "pointer"
                                         }}
                                     >
                                         View
-                                    </a>
+                                    </button>
 
                                     {/* Admin verify/reject buttons */}
                                     {!isVerified && (
@@ -985,10 +985,11 @@ function VerificationPanel({ record, onUpdated }: { record: OnboardingRecord, on
     )
 }
 
-function OnboardingDrawer({ record, onClose, onUpdated }: {
+function OnboardingDrawer({ record, onClose, onUpdated, onView }: {
     record: OnboardingRecord
     onClose: () => void
     onUpdated: () => void
+    onView: (url: string, name: string) => void
 }) {
     const [tasks, setTasks] = useState<OnboardingTask[]>(record.tasks)
     const [activeTab, setActiveTab] = useState("All Tasks")
@@ -1124,7 +1125,7 @@ function OnboardingDrawer({ record, onClose, onUpdated }: {
                     {activeTab === "Employee Details" ? (
                         <EmployeeDetailsPanel emp={record.employee} />
                     ) : activeTab === "Verification" ? (
-                        <VerificationPanel record={record} onUpdated={onUpdated} />
+                        <VerificationPanel record={record} onUpdated={onUpdated} onView={onView} />
                     ) : (
                         <>
                             {filteredTasks.length === 0 ? (
@@ -1505,6 +1506,8 @@ export default function OnboardingPage() {
     const [selectedRecord, setSelectedRecord] = useState<OnboardingRecord | null>(null)
     const [search, setSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState<string>("ALL")
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -1654,8 +1657,18 @@ export default function OnboardingPage() {
                     record={selectedRecord}
                     onClose={() => { setSelectedRecord(null); fetchData() }}
                     onUpdated={handleRefresh}
+                    onView={(url, name) => {
+                        setPreviewUrl(url)
+                        setPreviewName(name)
+                    }}
                 />
             )}
+
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }

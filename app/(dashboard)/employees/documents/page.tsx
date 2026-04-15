@@ -7,6 +7,7 @@ import {
     FileText, Search, Download, Trash2,
     CheckCircle2, Clock, XCircle, Loader2, Eye, Users
 } from "lucide-react"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 type Doc = {
     id: string
@@ -55,6 +56,7 @@ export default function MasterDocumentsPage() {
     const [statusFilter, setStatusFilter] = useState("ALL")
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const [previewUrl, setPreviewUrl]   = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -280,17 +282,15 @@ export default function MasterDocumentsPage() {
                                     return (
                                         <div key={doc.id} className="flex items-center justify-end gap-1.5 px-4 py-2.5 min-h-[44px]">
                                             {/* View */}
-                                            {isImage ? (
-                                                <button onClick={() => setPreviewUrl(doc.fileUrl)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe] transition-colors">
-                                                    <Eye size={11} /> View
-                                                </button>
-                                            ) : (
-                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe] transition-colors">
-                                                    <Eye size={11} /> View
-                                                </a>
-                                            )}
+                                            <button 
+                                                onClick={() => {
+                                                    setPreviewUrl(doc.fileUrl)
+                                                    setPreviewName(doc.fileName)
+                                                }}
+                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe] transition-colors"
+                                            >
+                                                <Eye size={11} /> View
+                                            </button>
                                             {/* Download */}
                                             <a href={doc.fileUrl} download={doc.fileName} target="_blank" rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[#e8f7f1] text-[#1a9e6e] hover:bg-[#d1fae5] transition-colors">
@@ -316,25 +316,11 @@ export default function MasterDocumentsPage() {
                 </div>
             )}
 
-            {/* Image lightbox */}
-            {previewUrl && (
-                <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-                    onClick={() => setPreviewUrl(null)}>
-                    <div className="relative" onClick={e => e.stopPropagation()}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={previewUrl} alt="Preview"
-                            className="max-w-[90vw] max-h-[85vh] rounded-xl object-contain" />
-                        <button onClick={() => setPreviewUrl(null)}
-                            className="absolute -top-3 -right-3 w-7 h-7 bg-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
-                            ✕
-                        </button>
-                        <a href={previewUrl} download target="_blank" rel="noopener noreferrer"
-                            className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white text-[#1a1a18] px-4 py-1.5 rounded-full text-[12px] font-medium shadow-lg hover:bg-[#f5f5f5]">
-                            <Download size={12} /> Download
-                        </a>
-                    </div>
-                </div>
-            )}
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }

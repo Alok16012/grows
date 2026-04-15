@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import CameraCapture from "@/components/CameraCapture"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 export default function InspectionFormPage() {
     const { data: session, status: authStatus } = useSession()
@@ -28,6 +29,8 @@ export default function InspectionFormPage() {
     const [inspection, setInspection] = useState<any>(null)
     const [responses, setResponses] = useState<Record<string, string>>({})
     const [errors, setErrors] = useState<Record<string, string>>({})
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState<string>("")
 
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -634,9 +637,16 @@ export default function InspectionFormPage() {
                             <div className="flex-1 text-center sm:text-left">
                                 <p className="text-[13px] font-[600] text-[#1a1a18] mb-[4px]">Paper form uploaded</p>
                                 <div className="flex gap-[8px] justify-center sm:justify-start mt-[10px]">
-                                    <a href={responses["paperFormPhoto"]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center bg-[#f9f8f5] border border-[#e8e6e1] text-[#6b6860] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white">
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setPreviewUrl(responses["paperFormPhoto"])
+                                            setPreviewName("Paper Form Photo")
+                                        }}
+                                        className="inline-flex items-center justify-center bg-[#f9f8f5] border border-[#e8e6e1] text-[#6b6860] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white"
+                                    >
                                         <ExternalLink size={12} className="mr-[6px]" /> View Image
-                                    </a>
+                                    </button>
                                     {canEdit && (
                                         <button type="button" onClick={() => handleFieldChange("paperFormPhoto", "")} className="inline-flex items-center justify-center bg-[#fef2f2] border border-[#e8e6e1] text-[#dc2626] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white border-transparent">
                                             Remove
@@ -753,6 +763,11 @@ export default function InspectionFormPage() {
                     onClose={() => setCameraFieldId(null)}
                 />
             )}
+            <DocumentViewer 
+                url={previewUrl} 
+                fileName={previewName} 
+                onClose={() => setPreviewUrl(null)} 
+            />
         </div>
     )
 }
