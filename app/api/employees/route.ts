@@ -47,6 +47,13 @@ export async function GET(req: Request) {
                 department: { select: { id: true, name: true } },
                 _count: { select: { attendances: true, leaves: true } },
                 employeeSalary: true,
+                user: { select: { role: true, customRole: { select: { name: true } } } },
+                deployments: {
+                    where: { isActive: true },
+                    include: { site: { select: { name: true } } },
+                    take: 1,
+                    orderBy: { startDate: "desc" },
+                },
             },
             orderBy: { createdAt: "desc" },
         })

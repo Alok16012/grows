@@ -79,6 +79,8 @@ type Employee = {
     branch: { id: string; name: string }
     department?: { id: string; name: string } | null
     employeeSalary?: { ctcAnnual?: number; basicSalary?: number } | null
+    user?: { role: string; customRole?: { name: string } | null } | null
+    deployments?: { site: { name: string }; role?: string | null }[]
 }
 
 // ─── Column groups ────────────────────────────────────────────────────────────
@@ -95,6 +97,8 @@ const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
             { key: "designation",   label: "Designation",   get: e => e.designation || "" },
             { key: "branch",        label: "Branch",        get: e => e.branch?.name || "" },
             { key: "department",    label: "Department",    get: e => e.department?.name || "" },
+            { key: "role",          label: "Role",          get: e => e.user?.customRole?.name || e.user?.role || "" },
+            { key: "assignment",    label: "Assignment",    get: e => e.deployments?.[0]?.site?.name || "" },
             { key: "dateOfJoining", label: "Joining Date",  get: e => e.dateOfJoining ? new Date(e.dateOfJoining).toLocaleDateString("en-IN") : "" },
             { key: "dateOfLeaving", label: "Leaving Date",  get: e => e.dateOfLeaving ? new Date(e.dateOfLeaving).toLocaleDateString("en-IN") : "" },
         ]
