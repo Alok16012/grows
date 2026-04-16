@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Search, Loader2, RefreshCw, FileSpreadsheet, Filter, Pencil, X, Save } from "lucide-react"
+import { Search, Loader2, RefreshCw, FileSpreadsheet, Filter, Pencil, X, Save, Trash2, CheckSquare } from "lucide-react"
 import * as XLSX from "xlsx"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -591,6 +591,9 @@ export default function EmployeeMasterPage() {
     )
     const [colFilters, setColFilters] = useState<Record<string, string>>({})
     const [editEmp, setEditEmp] = useState<Employee | null>(null)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [deleting, setDeleting] = useState(false)
+    const [confirmDelete, setConfirmDelete] = useState(false)
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -645,6 +648,72 @@ export default function EmployeeMasterPage() {
     }, [employees, colFilters])
 
     const activeFilterCount = Object.values(colFilters).filter(v => v.trim()).length
+
+    // ── Selection helpers ─────────────────────────────────────────────────────
+    const allSelected = filteredEmployees.length > 0 && filteredEmployees.every(e => selectedIds.has(e.id))
+    const someSelected = !allSelected && filteredEmployees.some(e => selectedIds.has(e.id))
+
+    const toggleAll = () => {
+        if (allSelected) {
+            setSelectedIds(prev => {
+                const next = new Set(prev)
+                filteredEmployees.forEach(e => next.delete(e.id))
+                return next
+            })
+        } else {
+            setSelectedIds(prev => {
+                const next = new Set(prev)
+                filteredEmployees.forEach(e => next.add(e.id))
+                return next
+            })
+        }
+    }
+
+    const toggleOne = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev)
+            next.has(id) ? next.delete(id) : next.add(id)
+            return next
+        })
+    }
+
+    // ── Bulk download selected ────────────────────────────────────────────────
+    const handleDownloadSelected = () => {
+        const selected = filteredEmployees.filter(e => selectedIds.has(e.id))
+        if (!selected.length) return
+        try {
+            const headers = ALL_COLS.map(c => c.label)
+            const rows = selected.map(emp => ALL_COLS.map(c => c.get(emp)))
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+            ws["!cols"] = headers.map((h, i) => ({
+                wch: Math.max(h.length, ...rows.map(r => String(r[i] || "").length), 10)
+            }))
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, "Selected Employees")
+            XLSX.writeFile(wb, `Selected_Employees_${new Date().toISOString().slice(0,10)}.xlsx`)
+            toast.success(`Downloaded ${selected.length} employees`)
+        } catch {
+            toast.error("Download failed")
+        }
+    }
+
+    // ── Bulk delete selected ──────────────────────────────────────────────────
+    const handleBulkDelete = async () => {
+        if (!confirmDelete) { setConfirmDelete(true); return }
+        setDeleting(true)
+        setConfirmDelete(false)
+        const ids = Array.from(selectedIds)
+        const results = await Promise.allSettled(
+            ids.map(id => fetch(`/api/employees/${id}`, { method: "DELETE" }))
+        )
+        const succeeded = results.filter(r => r.status === "fulfilled").length
+        const failed    = results.filter(r => r.status === "rejected").length
+        setDeleting(false)
+        setSelectedIds(new Set())
+        if (succeeded > 0) toast.success(`${succeeded} employee${succeeded > 1 ? "s" : ""} deleted`)
+        if (failed    > 0) toast.error(`${failed} deletion${failed > 1 ? "s" : ""} failed`)
+        fetchEmployees()
+    }
 
     // ── Excel export ──────────────────────────────────────────────────────────
     const handleExport = () => {
@@ -806,9 +875,9 @@ export default function EmployeeMasterPage() {
                 ) : (
                     <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12 }}>
                         <thead>
-                            {/* Group header row */}
+                            {/* Group header row — colSpan 3 covers checkbox + SL + edit */}
                             <tr style={{ background: "#f8fafc" }}>
-                                <th colSpan={2} style={{ position: "sticky", left: 0, zIndex: 3, background: "#f8fafc", padding: "6px 10px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>
+                                <th colSpan={3} style={{ position: "sticky", left: 0, zIndex: 3, background: "#f8fafc", padding: "6px 10px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>
                                     Actions
                                 </th>
                                 {COLUMN_GROUPS.filter(g => visibleGroups.has(g.group)).map(g => (
@@ -822,10 +891,15 @@ export default function EmployeeMasterPage() {
                             </tr>
                             {/* Column labels row */}
                             <tr style={{ background: "#f1f5f9" }}>
-                                <th style={{ position: "sticky", left: 0, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 32 }}>
+                                {/* Checkbox — select all */}
+                                <th style={{ position: "sticky", left: 0, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap", minWidth: 36 }}>
+                                    <input type="checkbox" checked={allSelected} ref={el => { if (el) el.indeterminate = someSelected }} onChange={toggleAll}
+                                        style={{ width: 14, height: 14, cursor: "pointer", accentColor: "var(--accent)" }} />
+                                </th>
+                                <th style={{ position: "sticky", left: 36, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 32 }}>
                                     SL
                                 </th>
-                                <th style={{ position: "sticky", left: 32, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 42 }}>
+                                <th style={{ position: "sticky", left: 68, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 42 }}>
                                     Edit
                                 </th>
                                 {visibleCols.map(col => (
@@ -836,7 +910,7 @@ export default function EmployeeMasterPage() {
                             </tr>
                             {/* Column filter row */}
                             <tr style={{ background: "#fff", borderBottom: "2px solid var(--border)" }}>
-                                <td colSpan={2} style={{ position: "sticky", left: 0, zIndex: 3, background: "#fff", borderRight: "2px solid var(--border)", padding: "4px 6px" }} />
+                                <td colSpan={3} style={{ position: "sticky", left: 0, zIndex: 3, background: "#fff", borderRight: "2px solid var(--border)", padding: "4px 6px" }} />
                                 {visibleCols.map(col => (
                                     <td key={col.key} style={{ padding: "3px 6px", borderRight: "1px solid #e2e8f0" }}>
                                         <input
@@ -852,16 +926,22 @@ export default function EmployeeMasterPage() {
                         <tbody>
                             {filteredEmployees.map((emp, idx) => {
                                 const sc = STATUS_COLOR[emp.status] || { bg: "#f3f4f6", color: "#6b7280" }
+                                const isChecked = selectedIds.has(emp.id)
                                 return (
-                                    <tr key={emp.id} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid var(--border)" }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
-                                        onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc")}>
+                                    <tr key={emp.id} style={{ background: isChecked ? "#eff6ff" : idx % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid var(--border)" }}
+                                        onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = "#f0f9ff" }}
+                                        onMouseLeave={e => { if (!isChecked) e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
+                                        {/* Checkbox */}
+                                        <td style={{ position: "sticky", left: 0, zIndex: 2, background: "inherit", padding: "6px 8px", borderRight: "1px solid var(--border)", textAlign: "center", minWidth: 36 }}>
+                                            <input type="checkbox" checked={isChecked} onChange={() => toggleOne(emp.id)}
+                                                style={{ width: 14, height: 14, cursor: "pointer", accentColor: "var(--accent)" }} />
+                                        </td>
                                         {/* SL */}
-                                        <td style={{ position: "sticky", left: 0, zIndex: 2, background: "inherit", padding: "6px 8px", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, color: "var(--text3)", fontWeight: 600, whiteSpace: "nowrap", minWidth: 32 }}>
+                                        <td style={{ position: "sticky", left: 36, zIndex: 2, background: "inherit", padding: "6px 8px", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, color: "var(--text3)", fontWeight: 600, whiteSpace: "nowrap", minWidth: 32 }}>
                                             {idx + 1}
                                         </td>
                                         {/* Edit button */}
-                                        <td style={{ position: "sticky", left: 32, zIndex: 2, background: "inherit", padding: "4px 6px", borderRight: "2px solid var(--border)", textAlign: "center" }}>
+                                        <td style={{ position: "sticky", left: 68, zIndex: 2, background: "inherit", padding: "4px 6px", borderRight: "2px solid var(--border)", textAlign: "center" }}>
                                             <button onClick={() => setEditEmp(emp)}
                                                 title="Edit employee"
                                                 style={{ padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", color: "var(--accent)", display: "inline-flex", alignItems: "center" }}>
@@ -905,6 +985,48 @@ export default function EmployeeMasterPage() {
                 <span>{visibleCols.length} columns visible</span>
             </div>
         </div>
+
+        {/* ── Bulk action bar ─────────────────────────────────────────────────── */}
+        {selectedIds.size > 0 && (
+            <div style={{
+                position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+                background: "#1e293b", color: "#fff", borderRadius: 14, padding: "10px 16px",
+                display: "flex", alignItems: "center", gap: 10, zIndex: 60,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.28)", minWidth: 340
+            }}>
+                <CheckSquare size={15} style={{ color: "#60a5fa", flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
+                    {selectedIds.size} employee{selectedIds.size > 1 ? "s" : ""} selected
+                </span>
+                <button onClick={() => setSelectedIds(new Set())}
+                    style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #475569", background: "transparent", color: "#94a3b8", fontSize: 11, cursor: "pointer" }}>
+                    Deselect
+                </button>
+                <button onClick={handleDownloadSelected}
+                    style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                    <FileSpreadsheet size={12} /> Download
+                </button>
+                {confirmDelete ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 11, color: "#fca5a5" }}>Sure? This cannot be undone.</span>
+                        <button onClick={handleBulkDelete} disabled={deleting}
+                            style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                            {deleting ? "Deleting…" : "Confirm Delete"}
+                        </button>
+                        <button onClick={() => setConfirmDelete(false)}
+                            style={{ padding: "5px 8px", borderRadius: 8, border: "1px solid #475569", background: "transparent", color: "#94a3b8", fontSize: 11, cursor: "pointer" }}>
+                            Cancel
+                        </button>
+                    </div>
+                ) : (
+                    <button onClick={() => setConfirmDelete(true)}
+                        style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                        <Trash2 size={11} /> Delete
+                    </button>
+                )}
+            </div>
+        )}
 
         {/* Edit Drawer */}
         {editEmp && (
