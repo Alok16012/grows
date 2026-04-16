@@ -1,9 +1,9 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Search, Download, Loader2, RefreshCw, FileSpreadsheet, Filter } from "lucide-react"
+import { Search, Loader2, RefreshCw, FileSpreadsheet, Filter, Pencil, X, Save } from "lucide-react"
 import * as XLSX from "xlsx"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -81,6 +81,75 @@ type Employee = {
     employeeSalary?: { ctcAnnual?: number; basicSalary?: number } | null
     user?: { role: string; customRole?: { name: string } | null } | null
     deployments?: { site: { name: string }; role?: string | null }[]
+}
+
+type EditForm = {
+    firstName: string; middleName: string; lastName: string
+    email: string; phone: string; alternatePhone: string
+    dateOfBirth: string; gender: string; bloodGroup: string
+    maritalStatus: string; nationality: string; religion: string; caste: string
+    fathersName: string; nameAsPerAadhar: string
+    address: string; city: string; state: string; pincode: string
+    permanentAddress: string; permanentCity: string; permanentState: string; permanentPincode: string
+    aadharNumber: string; panNumber: string; uan: string; pfNumber: string; esiNumber: string
+    labourCardNo: string; labourCardExpDate: string
+    bankAccountNumber: string; bankIFSC: string; bankName: string; bankBranch: string
+    designation: string; status: string; employmentType: string; basicSalary: string
+    dateOfJoining: string; dateOfLeaving: string; notes: string
+    workSkill: string; natureOfWork: string; contractorCode: string
+    workOrderNumber: string; workOrderFrom: string; workOrderTo: string
+    contractFrom: string; contractPeriodDays: string
+    emergencyContact1Name: string; emergencyContact1Phone: string
+    emergencyContact2Name: string; emergencyContact2Phone: string
+    isBackgroundChecked: boolean; backgroundCheckRemark: string
+    isMedicalDone: boolean; medicalRemark: string
+    safetyGoggles: boolean; safetyGloves: boolean; safetyHelmet: boolean
+    safetyMask: boolean; safetyJacket: boolean; safetyEarMuffs: boolean; safetyShoes: boolean
+}
+
+function toDateInput(val?: string | null): string {
+    if (!val) return ""
+    try { return new Date(val).toISOString().slice(0, 10) } catch { return "" }
+}
+
+function empToForm(emp: Employee): EditForm {
+    return {
+        firstName: emp.firstName || "", middleName: emp.middleName || "", lastName: emp.lastName || "",
+        email: emp.email || "", phone: emp.phone || "", alternatePhone: emp.alternatePhone || "",
+        dateOfBirth: toDateInput(emp.dateOfBirth), gender: emp.gender || "",
+        bloodGroup: emp.bloodGroup || "", maritalStatus: emp.maritalStatus || "",
+        nationality: emp.nationality || "", religion: emp.religion || "", caste: emp.caste || "",
+        fathersName: emp.fathersName || "", nameAsPerAadhar: emp.nameAsPerAadhar || "",
+        address: emp.address || "", city: emp.city || "", state: emp.state || "", pincode: emp.pincode || "",
+        permanentAddress: emp.permanentAddress || "", permanentCity: emp.permanentCity || "",
+        permanentState: emp.permanentState || "", permanentPincode: emp.permanentPincode || "",
+        aadharNumber: emp.aadharNumber || "", panNumber: emp.panNumber || "",
+        uan: emp.uan || "", pfNumber: emp.pfNumber || "", esiNumber: emp.esiNumber || "",
+        labourCardNo: emp.labourCardNo || "", labourCardExpDate: toDateInput(emp.labourCardExpDate),
+        bankAccountNumber: emp.bankAccountNumber || "", bankIFSC: emp.bankIFSC || "",
+        bankName: emp.bankName || "", bankBranch: emp.bankBranch || "",
+        designation: emp.designation || "", status: emp.status || "ACTIVE",
+        employmentType: emp.employmentType || "Full-time",
+        basicSalary: emp.basicSalary ? String(emp.basicSalary) : "0",
+        dateOfJoining: toDateInput(emp.dateOfJoining), dateOfLeaving: toDateInput(emp.dateOfLeaving),
+        notes: emp.notes || "",
+        workSkill: emp.workSkill || "", natureOfWork: emp.natureOfWork || "",
+        contractorCode: emp.contractorCode || "", workOrderNumber: emp.workOrderNumber || "",
+        workOrderFrom: toDateInput(emp.workOrderFrom), workOrderTo: toDateInput(emp.workOrderTo),
+        contractFrom: toDateInput(emp.contractFrom),
+        contractPeriodDays: emp.contractPeriodDays ? String(emp.contractPeriodDays) : "",
+        emergencyContact1Name: emp.emergencyContact1Name || "",
+        emergencyContact1Phone: emp.emergencyContact1Phone || "",
+        emergencyContact2Name: emp.emergencyContact2Name || "",
+        emergencyContact2Phone: emp.emergencyContact2Phone || "",
+        isBackgroundChecked: emp.isBackgroundChecked ?? false,
+        backgroundCheckRemark: emp.backgroundCheckRemark || "",
+        isMedicalDone: emp.isMedicalDone ?? false, medicalRemark: emp.medicalRemark || "",
+        safetyGoggles: emp.safetyGoggles ?? false, safetyGloves: emp.safetyGloves ?? false,
+        safetyHelmet: emp.safetyHelmet ?? false, safetyMask: emp.safetyMask ?? false,
+        safetyJacket: emp.safetyJacket ?? false, safetyEarMuffs: emp.safetyEarMuffs ?? false,
+        safetyShoes: emp.safetyShoes ?? false,
+    }
 }
 
 // ─── Column groups ────────────────────────────────────────────────────────────
@@ -220,6 +289,292 @@ const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
     RESIGNED:   { bg: "#ede9fe", color: "#7c3aed" },
 }
 
+// ─── Field helpers ────────────────────────────────────────────────────────────
+const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "6px 9px", borderRadius: 7, border: "1px solid var(--border)",
+    fontSize: 12, outline: "none", background: "var(--surface)", color: "var(--text)", boxSizing: "border-box"
+}
+const labelStyle: React.CSSProperties = {
+    fontSize: 11, fontWeight: 600, color: "var(--text3)", marginBottom: 3, display: "block"
+}
+const sectionHeadStyle = (color: string): React.CSSProperties => ({
+    fontSize: 11, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.6px",
+    padding: "8px 0 6px", borderBottom: `1px solid ${color}30`, marginBottom: 10
+})
+
+function Field({ label, value, onChange, type = "text", options }: {
+    label: string; value: string; onChange: (v: string) => void
+    type?: "text" | "date" | "number" | "email" | "tel" | "select" | "textarea"
+    options?: string[]
+}) {
+    return (
+        <div style={{ marginBottom: 10 }}>
+            <label style={labelStyle}>{label}</label>
+            {type === "select" && options ? (
+                <select value={value} onChange={e => onChange(e.target.value)} style={inputStyle}>
+                    <option value="">— Select —</option>
+                    {options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+            ) : type === "textarea" ? (
+                <textarea value={value} onChange={e => onChange(e.target.value)}
+                    style={{ ...inputStyle, resize: "vertical", minHeight: 56 }} />
+            ) : (
+                <input type={type} value={value} onChange={e => onChange(e.target.value)} style={inputStyle} />
+            )}
+        </div>
+    )
+}
+
+function CheckField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--text)", cursor: "pointer", marginBottom: 8 }}>
+            <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+                style={{ width: 14, height: 14, accentColor: "var(--accent)" }} />
+            {label}
+        </label>
+    )
+}
+
+// ─── Edit Drawer ──────────────────────────────────────────────────────────────
+function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => void; onSaved: () => void }) {
+    const [form, setForm] = useState<EditForm>(() => empToForm(emp))
+    const [saving, setSaving] = useState(false)
+    const [section, setSection] = useState("basic")
+
+    const set = (key: keyof EditForm) => (val: string | boolean) =>
+        setForm(prev => ({ ...prev, [key]: val }))
+
+    const save = async () => {
+        setSaving(true)
+        try {
+            const res = await fetch(`/api/employees/${emp.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...form,
+                    basicSalary: parseFloat(form.basicSalary) || 0,
+                    contractPeriodDays: form.contractPeriodDays ? parseInt(form.contractPeriodDays) : null,
+                })
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Employee updated")
+            onSaved()
+            onClose()
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Save failed")
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const sections = [
+        { id: "basic",    label: "Basic Info",         color: "#3b82f6" },
+        { id: "personal", label: "Personal",           color: "#8b5cf6" },
+        { id: "contact",  label: "Contact & Address",  color: "#0891b2" },
+        { id: "statutory",label: "Statutory / Bank",   color: "#dc2626" },
+        { id: "contract", label: "Contract / Work",    color: "#7c3aed" },
+        { id: "safety",   label: "Safety & Medical",   color: "#f59e0b" },
+    ]
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 50 }} />
+
+            {/* Drawer */}
+            <div style={{
+                position: "fixed", top: 0, right: 0, bottom: 0, width: "min(560px, 96vw)",
+                background: "var(--surface)", boxShadow: "-4px 0 32px rgba(0,0,0,0.18)",
+                zIndex: 51, display: "flex", flexDirection: "column"
+            }}>
+                {/* Header */}
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexShrink: 0 }}>
+                    <div>
+                        <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>
+                            Edit Employee
+                        </p>
+                        <p style={{ fontSize: 11, color: "var(--text3)", margin: "2px 0 0 0" }}>
+                            {emp.employeeId} · {emp.firstName} {emp.lastName}
+                        </p>
+                    </div>
+                    <button onClick={onClose} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", color: "var(--text3)", display: "flex" }}>
+                        <X size={16} />
+                    </button>
+                </div>
+
+                {/* Section tabs */}
+                <div style={{ display: "flex", gap: 4, padding: "8px 12px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0 }}>
+                    {sections.map(s => (
+                        <button key={s.id} onClick={() => setSection(s.id)}
+                            style={{ padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                border: `1px solid ${s.color}40`,
+                                background: section === s.id ? s.color + "22" : "transparent",
+                                color: section === s.id ? s.color : "var(--text3)",
+                                transition: "all 0.12s" }}>
+                            {s.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Body */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px" }}>
+
+                    {section === "basic" && (
+                        <>
+                            <p style={sectionHeadStyle("#3b82f6")}>Basic Info</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <Field label="First Name"     value={form.firstName}     onChange={set("firstName")} />
+                                <Field label="Middle Name"    value={form.middleName}    onChange={set("middleName")} />
+                                <Field label="Last Name"      value={form.lastName}      onChange={set("lastName")} />
+                                <Field label="Designation"    value={form.designation}   onChange={set("designation")} />
+                                <Field label="Status" type="select" value={form.status} onChange={set("status")}
+                                    options={["ACTIVE","INACTIVE","ON_LEAVE","TERMINATED","RESIGNED"]} />
+                                <Field label="Employment Type" type="select" value={form.employmentType} onChange={set("employmentType")}
+                                    options={["Full-time","Part-time","Contract","Intern","Temporary"]} />
+                                <Field label="Basic Salary"   type="number" value={form.basicSalary}  onChange={set("basicSalary")} />
+                                <Field label="Date of Joining" type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")} />
+                                <Field label="Date of Leaving" type="date" value={form.dateOfLeaving} onChange={set("dateOfLeaving")} />
+                            </div>
+                            <Field label="Notes" type="textarea" value={form.notes} onChange={set("notes")} />
+                        </>
+                    )}
+
+                    {section === "personal" && (
+                        <>
+                            <p style={sectionHeadStyle("#8b5cf6")}>Personal</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <Field label="Date of Birth"   type="date" value={form.dateOfBirth}     onChange={set("dateOfBirth")} />
+                                <Field label="Gender" type="select" value={form.gender} onChange={set("gender")}
+                                    options={["Male","Female","Other"]} />
+                                <Field label="Blood Group"     value={form.bloodGroup}     onChange={set("bloodGroup")} />
+                                <Field label="Marital Status" type="select" value={form.maritalStatus} onChange={set("maritalStatus")}
+                                    options={["Single","Married","Divorced","Widowed"]} />
+                                <Field label="Nationality"     value={form.nationality}    onChange={set("nationality")} />
+                                <Field label="Religion"        value={form.religion}       onChange={set("religion")} />
+                                <Field label="Caste"           value={form.caste}          onChange={set("caste")} />
+                                <Field label="Father's Name"   value={form.fathersName}    onChange={set("fathersName")} />
+                                <div style={{ gridColumn: "1/-1" }}>
+                                    <Field label="Name as per Aadhaar" value={form.nameAsPerAadhar} onChange={set("nameAsPerAadhar")} />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {section === "contact" && (
+                        <>
+                            <p style={sectionHeadStyle("#0891b2")}>Contact</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <Field label="Phone"       type="tel"   value={form.phone}          onChange={set("phone")} />
+                                <Field label="Alt Phone"   type="tel"   value={form.alternatePhone} onChange={set("alternatePhone")} />
+                                <div style={{ gridColumn: "1/-1" }}>
+                                    <Field label="Email"   type="email" value={form.email}          onChange={set("email")} />
+                                </div>
+                                <Field label="Emergency 1 Name"  value={form.emergencyContact1Name}  onChange={set("emergencyContact1Name")} />
+                                <Field label="Emergency 1 Phone" type="tel" value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} />
+                                <Field label="Emergency 2 Name"  value={form.emergencyContact2Name}  onChange={set("emergencyContact2Name")} />
+                                <Field label="Emergency 2 Phone" type="tel" value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} />
+                            </div>
+                            <p style={{ ...sectionHeadStyle("#059669"), marginTop: 12 }}>Current Address</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <div style={{ gridColumn: "1/-1" }}>
+                                    <Field label="Address" value={form.address}  onChange={set("address")} />
+                                </div>
+                                <Field label="City"    value={form.city}     onChange={set("city")} />
+                                <Field label="State"   value={form.state}    onChange={set("state")} />
+                                <Field label="Pincode" value={form.pincode}  onChange={set("pincode")} />
+                            </div>
+                            <p style={{ ...sectionHeadStyle("#d97706"), marginTop: 12 }}>Permanent Address</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <div style={{ gridColumn: "1/-1" }}>
+                                    <Field label="Address" value={form.permanentAddress}  onChange={set("permanentAddress")} />
+                                </div>
+                                <Field label="City"    value={form.permanentCity}     onChange={set("permanentCity")} />
+                                <Field label="State"   value={form.permanentState}    onChange={set("permanentState")} />
+                                <Field label="Pincode" value={form.permanentPincode}  onChange={set("permanentPincode")} />
+                            </div>
+                        </>
+                    )}
+
+                    {section === "statutory" && (
+                        <>
+                            <p style={sectionHeadStyle("#dc2626")}>Statutory / KYC</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <Field label="Aadhaar No."    value={form.aadharNumber}     onChange={set("aadharNumber")} />
+                                <Field label="PAN No."        value={form.panNumber}        onChange={set("panNumber")} />
+                                <Field label="UAN"            value={form.uan}              onChange={set("uan")} />
+                                <Field label="PF Number"      value={form.pfNumber}         onChange={set("pfNumber")} />
+                                <Field label="ESIC Number"    value={form.esiNumber}        onChange={set("esiNumber")} />
+                                <Field label="Labour Card No." value={form.labourCardNo}    onChange={set("labourCardNo")} />
+                                <Field label="Labour Card Exp" type="date" value={form.labourCardExpDate} onChange={set("labourCardExpDate")} />
+                            </div>
+                            <p style={{ ...sectionHeadStyle("#0369a1"), marginTop: 12 }}>Bank Details</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <div style={{ gridColumn: "1/-1" }}>
+                                    <Field label="Account Number" value={form.bankAccountNumber} onChange={set("bankAccountNumber")} />
+                                </div>
+                                <Field label="IFSC Code"   value={form.bankIFSC}    onChange={set("bankIFSC")} />
+                                <Field label="Bank Name"   value={form.bankName}    onChange={set("bankName")} />
+                                <div style={{ gridColumn: "1/-1" }}>
+                                    <Field label="Bank Branch" value={form.bankBranch} onChange={set("bankBranch")} />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {section === "contract" && (
+                        <>
+                            <p style={sectionHeadStyle("#7c3aed")}>Contract / Work</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                <Field label="Work Skill"       value={form.workSkill}       onChange={set("workSkill")} />
+                                <Field label="Nature of Work"   value={form.natureOfWork}    onChange={set("natureOfWork")} />
+                                <Field label="Contractor Code"  value={form.contractorCode}  onChange={set("contractorCode")} />
+                                <Field label="Work Order No."   value={form.workOrderNumber} onChange={set("workOrderNumber")} />
+                                <Field label="Work Order From"  type="date" value={form.workOrderFrom} onChange={set("workOrderFrom")} />
+                                <Field label="Work Order To"    type="date" value={form.workOrderTo}   onChange={set("workOrderTo")} />
+                                <Field label="Contract From"    type="date" value={form.contractFrom}  onChange={set("contractFrom")} />
+                                <Field label="Contract Period (days)" type="number" value={form.contractPeriodDays} onChange={set("contractPeriodDays")} />
+                            </div>
+                        </>
+                    )}
+
+                    {section === "safety" && (
+                        <>
+                            <p style={sectionHeadStyle("#f59e0b")}>Safety Equipment</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                                <CheckField label="Goggles"   checked={form.safetyGoggles}  onChange={set("safetyGoggles") as (v: boolean) => void} />
+                                <CheckField label="Gloves"    checked={form.safetyGloves}   onChange={set("safetyGloves") as (v: boolean) => void} />
+                                <CheckField label="Helmet"    checked={form.safetyHelmet}   onChange={set("safetyHelmet") as (v: boolean) => void} />
+                                <CheckField label="Mask"      checked={form.safetyMask}     onChange={set("safetyMask") as (v: boolean) => void} />
+                                <CheckField label="Jacket"    checked={form.safetyJacket}   onChange={set("safetyJacket") as (v: boolean) => void} />
+                                <CheckField label="Ear Muffs" checked={form.safetyEarMuffs} onChange={set("safetyEarMuffs") as (v: boolean) => void} />
+                                <CheckField label="Shoes"     checked={form.safetyShoes}    onChange={set("safetyShoes") as (v: boolean) => void} />
+                            </div>
+                            <p style={{ ...sectionHeadStyle("#6b7280"), marginTop: 14 }}>Background &amp; Medical</p>
+                            <CheckField label="Background Check Done" checked={form.isBackgroundChecked} onChange={set("isBackgroundChecked") as (v: boolean) => void} />
+                            <Field label="BG Remark" type="textarea" value={form.backgroundCheckRemark} onChange={set("backgroundCheckRemark")} />
+                            <CheckField label="Medical Done" checked={form.isMedicalDone} onChange={set("isMedicalDone") as (v: boolean) => void} />
+                            <Field label="Medical Remark" type="textarea" value={form.medicalRemark} onChange={set("medicalRemark")} />
+                        </>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", display: "flex", gap: 8, justifyContent: "flex-end", flexShrink: 0 }}>
+                    <button onClick={onClose} disabled={saving}
+                        style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
+                        Cancel
+                    </button>
+                    <button onClick={save} disabled={saving}
+                        style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, opacity: saving ? 0.7 : 1 }}>
+                        {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                        {saving ? "Saving…" : "Save Changes"}
+                    </button>
+                </div>
+            </div>
+        </>
+    )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function EmployeeMasterPage() {
     const { data: session, status } = useSession()
@@ -234,6 +589,8 @@ export default function EmployeeMasterPage() {
     const [visibleGroups, setVisibleGroups] = useState<Set<string>>(
         new Set(COLUMN_GROUPS.map(g => g.group))
     )
+    const [colFilters, setColFilters] = useState<Record<string, string>>({})
+    const [editEmp, setEditEmp] = useState<Employee | null>(null)
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -260,7 +617,6 @@ export default function EmployeeMasterPage() {
         if (status !== "unauthenticated") fetchEmployees()
     }, [status, fetchEmployees])
 
-    // Unique branches for filter
     const branches = Array.from(new Map(employees.map(e => [e.branch.id, e.branch])).values())
 
     const toggleGroup = (group: string) => {
@@ -271,52 +627,62 @@ export default function EmployeeMasterPage() {
         })
     }
 
+    const setColFilter = (key: string, val: string) =>
+        setColFilters(prev => ({ ...prev, [key]: val }))
+
+    // Client-side column filtering
+    const filteredEmployees = useMemo(() => {
+        const activeColFilters = Object.entries(colFilters).filter(([, v]) => v.trim())
+        if (activeColFilters.length === 0) return employees
+        return employees.filter(emp => {
+            for (const [key, val] of activeColFilters) {
+                const col = ALL_COLS.find(c => c.key === key)
+                if (!col) continue
+                if (!col.get(emp).toLowerCase().includes(val.toLowerCase())) return false
+            }
+            return true
+        })
+    }, [employees, colFilters])
+
+    const activeFilterCount = Object.values(colFilters).filter(v => v.trim()).length
+
     // ── Excel export ──────────────────────────────────────────────────────────
     const handleExport = () => {
         setExporting(true)
         try {
             const headers = ALL_COLS.map(c => c.label)
-            const rows = employees.map(emp => ALL_COLS.map(c => c.get(emp)))
-
+            const rows = filteredEmployees.map(emp => ALL_COLS.map(c => c.get(emp)))
             const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-
-            // Column widths
             ws["!cols"] = headers.map((h, i) => ({
                 wch: Math.max(h.length, ...rows.map(r => String(r[i] || "").length), 10)
             }))
-
-            // Header style (bold)
             headers.forEach((_, i) => {
                 const cellRef = XLSX.utils.encode_cell({ r: 0, c: i })
-                if (ws[cellRef]) {
-                    ws[cellRef].s = { font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } }
-                }
+                if (ws[cellRef]) ws[cellRef].s = { font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } }
             })
-
             const wb = XLSX.utils.book_new()
             XLSX.utils.book_append_sheet(wb, ws, "Employee Master")
 
-            // Second sheet: group-wise summary
-            const summaryData: string[][] = [["Category", "Total", "Active", "Inactive", "Terminated"]]
+            // Branch summary
+            const summaryData: string[][] = [["Branch", "Total", "Active", "Inactive", "Terminated"]]
             const byBranch = new Map<string, Employee[]>()
-            employees.forEach(e => {
+            filteredEmployees.forEach(e => {
                 const key = e.branch.name
                 if (!byBranch.has(key)) byBranch.set(key, [])
                 byBranch.get(key)!.push(e)
             })
             byBranch.forEach((emps, branch) => {
                 summaryData.push([
-                    branch,
-                    String(emps.length),
+                    branch, String(emps.length),
                     String(emps.filter(e => e.status === "ACTIVE").length),
                     String(emps.filter(e => e.status === "INACTIVE").length),
                     String(emps.filter(e => e.status === "TERMINATED").length),
                 ])
             })
-            summaryData.push(["TOTAL", String(employees.length),
-                String(employees.filter(e => e.status === "ACTIVE").length),
-                String(employees.filter(e => e.status === "INACTIVE").length),
-                String(employees.filter(e => e.status === "TERMINATED").length),
+            summaryData.push(["TOTAL", String(filteredEmployees.length),
+                String(filteredEmployees.filter(e => e.status === "ACTIVE").length),
+                String(filteredEmployees.filter(e => e.status === "INACTIVE").length),
+                String(filteredEmployees.filter(e => e.status === "TERMINATED").length),
             ])
             const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
             wsSummary["!cols"] = [{ wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }]
@@ -324,7 +690,7 @@ export default function EmployeeMasterPage() {
 
             const date = new Date().toISOString().slice(0, 10)
             XLSX.writeFile(wb, `Employee_Master_${date}.xlsx`)
-            toast.success(`Exported ${employees.length} employees`)
+            toast.success(`Exported ${filteredEmployees.length} employees`)
         } catch {
             toast.error("Export failed")
         } finally {
@@ -332,7 +698,6 @@ export default function EmployeeMasterPage() {
         }
     }
 
-    // Visible cols based on toggled groups
     const visibleCols = COLUMN_GROUPS
         .filter(g => visibleGroups.has(g.group))
         .flatMap(g => g.cols.map(c => ({ ...c, groupColor: g.color, groupName: g.group })))
@@ -340,12 +705,11 @@ export default function EmployeeMasterPage() {
     const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER" || session?.user?.role === "HR_MANAGER"
 
     if (!isAdmin) return (
-        <div className="flex items-center justify-center h-64 text-[var(--text3)] text-[13px]">
-            Access denied
-        </div>
+        <div className="flex items-center justify-center h-64 text-[var(--text3)] text-[13px]">Access denied</div>
     )
 
     return (
+        <>
         <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", minHeight: 0 }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -356,14 +720,20 @@ export default function EmployeeMasterPage() {
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {activeFilterCount > 0 && (
+                        <button onClick={() => setColFilters({})}
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 8, border: "1px solid #f59e0b40", background: "#fef9c3", fontSize: 11, color: "#92400e", cursor: "pointer", fontWeight: 600 }}>
+                            <X size={11} /> Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+                        </button>
+                    )}
                     <button onClick={fetchEmployees} disabled={loading}
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
-                    <button onClick={handleExport} disabled={exporting || employees.length === 0}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: (exporting || employees.length === 0) ? 0.6 : 1 }}>
+                    <button onClick={handleExport} disabled={exporting || filteredEmployees.length === 0}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1 }}>
                         {exporting ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
-                        {exporting ? "Exporting…" : `Download Excel (${employees.length})`}
+                        {exporting ? "Exporting…" : `Download Excel (${filteredEmployees.length})`}
                     </button>
                 </div>
             </div>
@@ -371,11 +741,11 @@ export default function EmployeeMasterPage() {
             {/* Stats */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {[
-                    { label: "Total", value: employees.length, color: "#3b82f6" },
-                    { label: "Active", value: employees.filter(e => e.status === "ACTIVE").length, color: "#16a34a" },
-                    { label: "Inactive", value: employees.filter(e => e.status === "INACTIVE").length, color: "#6b7280" },
-                    { label: "On Leave", value: employees.filter(e => e.status === "ON_LEAVE").length, color: "#f59e0b" },
-                    { label: "Terminated", value: employees.filter(e => e.status === "TERMINATED").length, color: "#dc2626" },
+                    { label: "Total",      value: filteredEmployees.length,                                          color: "#3b82f6" },
+                    { label: "Active",     value: filteredEmployees.filter(e => e.status === "ACTIVE").length,      color: "#16a34a" },
+                    { label: "Inactive",   value: filteredEmployees.filter(e => e.status === "INACTIVE").length,    color: "#6b7280" },
+                    { label: "On Leave",   value: filteredEmployees.filter(e => e.status === "ON_LEAVE").length,    color: "#f59e0b" },
+                    { label: "Terminated", value: filteredEmployees.filter(e => e.status === "TERMINATED").length,  color: "#dc2626" },
                 ].map(s => (
                     <div key={s.label} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", minWidth: 90 }}>
                         <p style={{ fontSize: 10, color: "var(--text3)", margin: 0, fontWeight: 600, textTransform: "uppercase" }}>{s.label}</p>
@@ -424,17 +794,22 @@ export default function EmployeeMasterPage() {
                         <Loader2 size={22} className="animate-spin" style={{ color: "var(--accent)" }} />
                         <span style={{ fontSize: 13, color: "var(--text3)" }}>Loading employees…</span>
                     </div>
-                ) : employees.length === 0 ? (
+                ) : filteredEmployees.length === 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, gap: 8 }}>
                         <span style={{ fontSize: 13, color: "var(--text3)" }}>No employees found</span>
+                        {activeFilterCount > 0 && (
+                            <button onClick={() => setColFilters({})} style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                                Clear column filters
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12 }}>
                         <thead>
                             {/* Group header row */}
                             <tr style={{ background: "#f8fafc" }}>
-                                <th style={{ position: "sticky", left: 0, zIndex: 3, background: "#f8fafc", padding: "6px 12px", borderBottom: "2px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "left", fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>
-                                    #
+                                <th colSpan={2} style={{ position: "sticky", left: 0, zIndex: 3, background: "#f8fafc", padding: "6px 10px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>
+                                    Actions
                                 </th>
                                 {COLUMN_GROUPS.filter(g => visibleGroups.has(g.group)).map(g => (
                                     <th key={g.group} colSpan={g.cols.length}
@@ -447,31 +822,59 @@ export default function EmployeeMasterPage() {
                             </tr>
                             {/* Column labels row */}
                             <tr style={{ background: "#f1f5f9" }}>
-                                <th style={{ position: "sticky", left: 0, zIndex: 3, background: "#f1f5f9", padding: "5px 10px", borderBottom: "2px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>
+                                <th style={{ position: "sticky", left: 0, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 32 }}>
                                     SL
                                 </th>
+                                <th style={{ position: "sticky", left: 32, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 42 }}>
+                                    Edit
+                                </th>
                                 {visibleCols.map(col => (
-                                    <th key={col.key} style={{ padding: "5px 10px", borderBottom: "2px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 90 }}>
+                                    <th key={col.key} style={{ padding: "5px 10px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 90 }}>
                                         {col.label}
                                     </th>
                                 ))}
                             </tr>
+                            {/* Column filter row */}
+                            <tr style={{ background: "#fff", borderBottom: "2px solid var(--border)" }}>
+                                <td colSpan={2} style={{ position: "sticky", left: 0, zIndex: 3, background: "#fff", borderRight: "2px solid var(--border)", padding: "4px 6px" }} />
+                                {visibleCols.map(col => (
+                                    <td key={col.key} style={{ padding: "3px 6px", borderRight: "1px solid #e2e8f0" }}>
+                                        <input
+                                            value={colFilters[col.key] || ""}
+                                            onChange={e => setColFilter(col.key, e.target.value)}
+                                            placeholder="Filter…"
+                                            style={{ width: "100%", padding: "3px 6px", borderRadius: 5, border: `1px solid ${colFilters[col.key] ? col.groupColor + "80" : "var(--border)"}`, fontSize: 10, outline: "none", background: colFilters[col.key] ? col.groupColor + "10" : "#fafafa", color: "var(--text)", minWidth: 70, boxSizing: "border-box" }}
+                                        />
+                                    </td>
+                                ))}
+                            </tr>
                         </thead>
                         <tbody>
-                            {employees.map((emp, idx) => {
+                            {filteredEmployees.map((emp, idx) => {
                                 const sc = STATUS_COLOR[emp.status] || { bg: "#f3f4f6", color: "#6b7280" }
                                 return (
                                     <tr key={emp.id} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid var(--border)" }}
                                         onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
                                         onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc")}>
-                                        <td style={{ position: "sticky", left: 0, zIndex: 2, background: "inherit", padding: "6px 10px", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 11, color: "var(--text3)", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                        {/* SL */}
+                                        <td style={{ position: "sticky", left: 0, zIndex: 2, background: "inherit", padding: "6px 8px", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, color: "var(--text3)", fontWeight: 600, whiteSpace: "nowrap", minWidth: 32 }}>
                                             {idx + 1}
+                                        </td>
+                                        {/* Edit button */}
+                                        <td style={{ position: "sticky", left: 32, zIndex: 2, background: "inherit", padding: "4px 6px", borderRight: "2px solid var(--border)", textAlign: "center" }}>
+                                            <button onClick={() => setEditEmp(emp)}
+                                                title="Edit employee"
+                                                style={{ padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", color: "var(--accent)", display: "inline-flex", alignItems: "center" }}>
+                                                <Pencil size={12} />
+                                            </button>
                                         </td>
                                         {visibleCols.map(col => {
                                             const val = col.get(emp)
                                             const isStatus = col.key === "status"
+                                            const filterVal = colFilters[col.key]
+                                            const highlighted = filterVal && val.toLowerCase().includes(filterVal.toLowerCase())
                                             return (
-                                                <td key={col.key} style={{ padding: "6px 10px", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", color: "var(--text)" }}
+                                                <td key={col.key} style={{ padding: "6px 10px", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", color: "var(--text)", background: highlighted ? col.groupColor + "15" : undefined }}
                                                     title={val}>
                                                     {isStatus ? (
                                                         <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color }}>
@@ -495,9 +898,22 @@ export default function EmployeeMasterPage() {
 
             {/* Footer */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "var(--text3)" }}>
-                <span>Showing {employees.length} employee{employees.length !== 1 ? "s" : ""}</span>
+                <span>
+                    Showing {filteredEmployees.length} of {employees.length} employee{employees.length !== 1 ? "s" : ""}
+                    {activeFilterCount > 0 && <span style={{ color: "#f59e0b", fontWeight: 600 }}> ({activeFilterCount} column filter{activeFilterCount > 1 ? "s" : ""} active)</span>}
+                </span>
                 <span>{visibleCols.length} columns visible</span>
             </div>
         </div>
+
+        {/* Edit Drawer */}
+        {editEmp && (
+            <EditDrawer
+                emp={editEmp}
+                onClose={() => setEditEmp(null)}
+                onSaved={fetchEmployees}
+            />
+        )}
+        </>
     )
 }
