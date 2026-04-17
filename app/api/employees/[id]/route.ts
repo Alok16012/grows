@@ -185,46 +185,33 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, [], "employees.delete")) {
+        
+        // Use a more inclusive check for deletion permissions
+        if (!checkAccess(session, ["ADMIN", "MANAGER", "HR_MANAGER"], "employees.delete")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
-        // Check if employee has any associated records
         const employee = await prisma.employee.findUnique({
-            where: { id: params.id },
-            include: {
-                _count: {
-                    select: {
-                        attendances: true,
-                        leaves: true,
-                        payrolls: true,
-                        deployments: true,
-                    },
-                },
-            },
+            where: { id: params.id }
         })
 
         if (!employee) return new NextResponse("Not Found", { status: 404 })
 
-        const hasRecords =
-            employee._count.attendances > 0 ||
-            employee._count.leaves > 0 ||
-            employee._count.payrolls > 0 ||
-            employee._count.deployments > 0
+        // Hard delete: Clean up relations without onDelete: Cascade first in a transaction
+        await prisma.$transaction([
+            prisma.attendance.deleteMany({ where: { employeeId: params.id } }),
+            prisma.leave.deleteMany({ where: { employeeId: params.id } }),
+            prisma.payroll.deleteMany({ where: { employeeId: params.id } }),
+            prisma.advanceAndReimbursement.deleteMany({ where: { employeeId: params.id } }),
+            prisma.quizAttempt.deleteMany({ where: { employeeId: params.id } }),
+            prisma.employee.delete({ where: { id: params.id } })
+        ])
 
-        if (hasRecords) {
-            // Soft delete: set status to TERMINATED
-            const updated = await prisma.employee.update({
-                where: { id: params.id },
-                data: { status: "TERMINATED" },
-            })
-            return NextResponse.json({ success: true, softDeleted: true, employee: updated })
-        }
 
-        await prisma.employee.delete({ where: { id: params.id } })
-        return NextResponse.json({ success: true, softDeleted: false })
+        return NextResponse.json({ success: true, message: "Employee and all associated records deleted successfully" })
     } catch (error) {
         console.error("[EMPLOYEE_DELETE]", error)
         return new NextResponse("Internal Error", { status: 500 })
     }
 }
+

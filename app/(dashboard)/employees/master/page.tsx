@@ -585,6 +585,8 @@ export default function EmployeeMasterPage() {
     const [search, setSearch] = useState("")
     const [branchFilter, setBranchFilter] = useState("")
     const [statusFilter, setStatusFilter] = useState("")
+    const [siteFilter, setSiteFilter] = useState("")
+    const [sites, setSites] = useState<{id: string, name: string}[]>([])
     const [exporting, setExporting] = useState(false)
     const [visibleGroups, setVisibleGroups] = useState<Set<string>>(
         new Set(COLUMN_GROUPS.map(g => g.group))
@@ -605,6 +607,7 @@ export default function EmployeeMasterPage() {
             const params = new URLSearchParams()
             if (branchFilter) params.set("branchId", branchFilter)
             if (statusFilter) params.set("status", statusFilter)
+            if (siteFilter) params.set("siteId", siteFilter)
             if (search) params.set("search", search)
             const res = await fetch(`/api/employees?${params.toString()}`)
             const data = await res.json()
@@ -614,11 +617,26 @@ export default function EmployeeMasterPage() {
         } finally {
             setLoading(false)
         }
-    }, [branchFilter, statusFilter, search])
+    }, [branchFilter, statusFilter, siteFilter, search])
 
     useEffect(() => {
-        if (status !== "unauthenticated") fetchEmployees()
+        if (status !== "unauthenticated") {
+            fetchEmployees()
+        }
     }, [status, fetchEmployees])
+
+    useEffect(() => {
+        const fetchSites = async () => {
+            try {
+                const res = await fetch("/api/sites")
+                const data = await res.json()
+                if (Array.isArray(data)) setSites(data)
+            } catch (error) {
+                console.error("Failed to fetch sites", error)
+            }
+        }
+        if (status === "authenticated") fetchSites()
+    }, [status])
 
     const branches = Array.from(new Map(employees.map(e => [e.branch.id, e.branch])).values())
 
@@ -840,6 +858,18 @@ export default function EmployeeMasterPage() {
                     <option value="">All Status</option>
                     {["ACTIVE","INACTIVE","ON_LEAVE","TERMINATED","RESIGNED"].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
+                    <option value="">All Sites</option>
+                    {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+
+                {(branchFilter || statusFilter || siteFilter || search) && (
+                    <button onClick={() => { setBranchFilter(""); setStatusFilter(""); setSiteFilter(""); setSearch(""); }}
+                        style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        <X size={12} /> Clear
+                    </button>
+                )}
 
                 {/* Column group toggles */}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>

@@ -16,12 +16,13 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url)
         const branchId = searchParams.get("branchId")
         const departmentId = searchParams.get("departmentId")
+        const siteId = searchParams.get("siteId")
         const status = searchParams.get("status")
         const search = searchParams.get("search")
         const employmentType = searchParams.get("employmentType")
         const companyId = searchParams.get("companyId")
 
-        const where: Record<string, unknown> = {}
+        const where: Record<string, any> = {}
         if (branchId) where.branchId = branchId
         if (departmentId) where.departmentId = departmentId
         if (status) where.status = status
@@ -30,6 +31,15 @@ export async function GET(req: Request) {
             // filter via branch -> company
             where.branch = { companyId }
         }
+        if (siteId) {
+            where.deployments = {
+                some: {
+                    siteId,
+                    isActive: true
+                }
+            }
+        }
+
         if (search) {
             where.OR = [
                 { firstName: { contains: search, mode: "insensitive" } },

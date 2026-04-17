@@ -6,11 +6,26 @@ import { promises as fs } from "fs"
 import path from "path"
 import { v4 as uuidv4 } from "uuid"
 
+import prisma from "@/lib/prisma"
+
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    
+    // Check for onboarding token in headers if no session
+    const onboardingToken = req.headers.get("x-onboarding-token")
+    let isAuthorized = !!session
+
+    if (!isAuthorized && onboardingToken) {
+        const employee = await prisma.employee.findUnique({
+            where: { onboardingToken }
+        })
+        if (employee) isAuthorized = true
+    }
+
+    if (!isAuthorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     try {
+
         // Since Next.js 13+ App Router handles Request object differently,
         // using formidable with standard Request requires conversion or specific handling.
         // For simplicity in App Router, we can use the web standard FormData if possible,

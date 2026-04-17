@@ -28,8 +28,9 @@ export default function OnboardingPortal() {
         bankName: ""
     })
 
-    // Simulated local files (Just names for mock UI without real storage)
+    // State tracking
     const [docs, setDocs] = useState<{ type: string; fileName: string; fileUrl: string; status?: string | null; rejectionReason?: string | null }[]>([])
+    const [uploadingDocs, setUploadingDocs] = useState<Record<string, boolean>>({})
     const DOC_TYPES = ["Aadhaar Card", "PAN Card", "Resume", "Educational Certificates", "Bank Proof", "Photo"]
 
     useEffect(() => {
@@ -66,15 +67,34 @@ export default function OnboardingPortal() {
         const file = e.target.files?.[0]
         if (!file) return
 
-        // MOCK UPLOAD - In production use AWS S3 / Supabase Storage
-        // Here we just use a mocked URL string for demo purposes
-        const mockUrl = `https://mock-storage.com/${file.name.replace(/\s+/g, "_")}`
+        setUploadingDocs(prev => ({ ...prev, [type]: true }))
         
-        setDocs(prev => {
-            const existing = prev.filter(d => d.type !== type)
-            return [...existing, { type, fileName: file.name, fileUrl: mockUrl }]
-        })
-        toast.success(`${type} selected`)
+        try {
+            const formData = new FormData()
+            formData.append("file", file)
+
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                headers: {
+                    "x-onboarding-token": token
+                },
+                body: formData
+            })
+
+            if (!res.ok) throw new Error(await res.text())
+            const data = await res.json()
+
+            setDocs(prev => {
+                const existing = prev.filter(d => d.type !== type)
+                return [...existing, { type, fileName: file.name, fileUrl: data.url }]
+            })
+            toast.success(`${type} uploaded`)
+        } catch (error) {
+            console.error("Upload failed", error)
+            toast.error(`Failed to upload ${type}`)
+        } finally {
+            setUploadingDocs(prev => ({ ...prev, [type]: false }))
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -258,10 +278,17 @@ export default function OnboardingPortal() {
                                             </div>
                                         </div>
                                         <label className="shrink-0">
-                                            <div className="px-4 py-2 border border-[var(--border)] rounded-lg text-[12px] cursor-pointer hover:border-[var(--accent)] transition-colors inline-block text-center w-full md:w-auto bg-[var(--surface)]">
-                                                {exist ? "Re-upload" : "Browse File"}
+                                            <div className={`px-4 py-2 border border-[var(--border)] rounded-lg text-[12px] cursor-pointer transition-colors inline-block text-center w-full md:w-auto bg-[var(--surface)] ${uploadingDocs[type] ? 'opacity-50 cursor-not-allowed' : 'hover:border-[var(--accent)]'}`}>
+                                                {uploadingDocs[type] ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <Loader2 size={12} className="animate-spin" />
+                                                        Uploading...
+                                                    </div>
+                                                ) : (
+                                                    exist ? "Re-upload" : "Browse File"
+                                                )}
                                             </div>
-                                            <input type="file" className="hidden" onChange={(e) => handleFileChange(e, type)} />
+                                            <input type="file" className="hidden" disabled={uploadingDocs[type]} onChange={(e) => handleFileChange(e, type)} />
                                         </label>
                                     </div>
                                 )
