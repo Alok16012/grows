@@ -4,42 +4,40 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-    Plus, X, Loader2, Building2, Users, Briefcase, Search
+    Plus, X, Loader2, Users, Briefcase, Search
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type Branch = { id: string; name: string; companyId?: string }
 
 type Department = {
     id: string
     name: string
     description?: string
-    branchId: string
+    branchId?: string | null
     isActive: boolean
     createdAt: string
-    branch: { id: string; name: string }
+    branch?: { id: string; name: string } | null
     _count: { employees: number }
 }
 
 // ─── Add Department Modal ─────────────────────────────────────────────────────
 
 function DeptModal({
-    open, onClose, onSaved, branches
+    open, onClose, onSaved
 }: {
-    open: boolean; onClose: () => void; onSaved: () => void; branches: Branch[]
+    open: boolean; onClose: () => void; onSaved: () => void
 }) {
     const [loading, setLoading] = useState(false)
-    const [form, setForm] = useState({ name: "", branchId: "", description: "" })
+    const [form, setForm] = useState({ name: "", description: "" })
 
     useEffect(() => {
-        if (open) setForm({ name: "", branchId: "", description: "" })
+        if (open) setForm({ name: "", description: "" })
     }, [open])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!form.name.trim() || !form.branchId) {
-            toast.error("Name and branch are required")
+        if (!form.name.trim()) {
+            toast.error("Department name is required")
             return
         }
         setLoading(true)
@@ -47,7 +45,7 @@ function DeptModal({
             const res = await fetch("/api/departments", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify({ name: form.name, description: form.description }),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success("Department created!")
@@ -85,18 +83,6 @@ function DeptModal({
                         />
                     </div>
                     <div>
-                        <label className="block text-[12px] text-[var(--text2)] mb-1">Branch *</label>
-                        <select
-                            value={form.branchId}
-                            onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))}
-                            className={inputCls}
-                            required
-                        >
-                            <option value="">Select Branch</option>
-                            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                        </select>
-                    </div>
-                    <div>
                         <label className="block text-[12px] text-[var(--text2)] mb-1">Description</label>
                         <textarea
                             value={form.description}
@@ -131,7 +117,6 @@ export default function DepartmentsPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
     const [departments, setDepartments] = useState<Department[]>([])
-    const [branches, setBranches] = useState<Branch[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [showModal, setShowModal] = useState(false)
@@ -159,14 +144,12 @@ export default function DepartmentsPage() {
     useEffect(() => {
         if (status === "authenticated") {
             fetchDepartments()
-            fetch("/api/branches").then(r => r.json()).then(data => setBranches(Array.isArray(data) ? data : [])).catch(() => {})
         }
     }, [status, fetchDepartments])
 
     const filtered = departments.filter(d =>
         !search ||
-        d.name.toLowerCase().includes(search.toLowerCase()) ||
-        d.branch.name.toLowerCase().includes(search.toLowerCase())
+        d.name.toLowerCase().includes(search.toLowerCase())
     )
 
     const totalEmployees = departments.reduce((sum, d) => sum + d._count.employees, 0)
@@ -253,10 +236,6 @@ export default function DepartmentsPage() {
 
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 text-[13px] text-[var(--text2)]">
-                                    <Building2 size={14} className="text-[var(--text3)] shrink-0" />
-                                    <span className="truncate">{dept.branch.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-[13px] text-[var(--text2)]">
                                     <Users size={14} className="text-[var(--text3)] shrink-0" />
                                     <span>{dept._count.employees} employee{dept._count.employees !== 1 ? "s" : ""}</span>
                                 </div>
@@ -270,7 +249,6 @@ export default function DepartmentsPage() {
                 open={showModal}
                 onClose={() => setShowModal(false)}
                 onSaved={fetchDepartments}
-                branches={branches}
             />
         </div>
     )

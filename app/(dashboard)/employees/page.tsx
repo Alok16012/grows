@@ -93,6 +93,21 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 
 const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Daily Wage"]
 const SALARY_TYPES = ["Monthly", "Daily", "Hourly"]
+const ROLE_OPTIONS = [
+    "Security Guard",
+    "Supervisor",
+    "Manager",
+    "Housekeeping",
+    "Operator",
+    "Receptionist",
+    "Electrician",
+    "Plumber",
+    "Gardener",
+    "Driver",
+    "Admin Staff",
+    "HR Staff",
+    "Other",
+]
 
 const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
@@ -172,7 +187,7 @@ type ModalForm = {
     dateOfBirth: string; gender: string; aadharNumber: string; panNumber: string
     designation: string; departmentId: string; branchId: string; managerId: string
     dateOfJoining: string; employmentType: string; salaryType: string; basicSalary: string
-    customRoleId: string; systemRole: string
+    customRoleId: string; systemRole: string; role: string
     address: string; city: string; state: string; pincode: string
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
     status: string; notes: string
@@ -194,9 +209,9 @@ type ModalForm = {
 const EMPTY_FORM: ModalForm = {
     firstName: "", lastName: "", email: "", phone: "", alternatePhone: "",
     dateOfBirth: "", gender: "", aadharNumber: "", panNumber: "",
-    designation: "", departmentId: "", branchId: "", managerId: "",
+    designation: "Security Guard", departmentId: "", branchId: "", managerId: "",
     dateOfJoining: "", employmentType: "Full-time", salaryType: "Monthly", basicSalary: "",
-    customRoleId: "", systemRole: "INSPECTION_BOY",
+    customRoleId: "", systemRole: "INSPECTION_BOY", role: "Security Guard",
     address: "", city: "", state: "", pincode: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
     status: "ACTIVE", notes: "",
@@ -450,7 +465,7 @@ function EmployeeModal({
                 religion: employee.religion || "",
                 caste: employee.caste || "",
                 uan: employee.uan || "",
-                pfNumber: employee.pfNumber || "",
+                pfNumber: employee.panNumber || "",
                 esiNumber: employee.esiNumber || "",
                 labourCardNo: employee.labourCardNo || "",
                 emergencyContact1Name: employee.emergencyContact1Name || "",
@@ -467,6 +482,7 @@ function EmployeeModal({
                 safetyShoes: employee.safetyShoes ?? false,
                 customRoleId: "",
                 systemRole: "INSPECTION_BOY",
+                role: employee.designation || "Security Guard",
                 // Salary Structure (cleared - will be loaded separately if needed)
                 salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
                 salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
@@ -497,9 +513,8 @@ function EmployeeModal({
             toast.error("First name, last name and phone are required")
             return
         }
-        if (!form.branchId) {
-            toast.error("Branch is required")
-            return
+        if (!form.branchId && branches.length > 0) {
+            setForm(f => ({ ...f, branchId: branches[0].id }))
         }
         setLoading(true)
         try {
@@ -508,7 +523,11 @@ function EmployeeModal({
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify({
+                    ...form,
+                    designation: form.role,
+                    branchId: form.branchId || (branches[0]?.id ?? ""),
+                }),
             })
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
@@ -659,21 +678,11 @@ function EmployeeModal({
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                                        <label className={labelCls} style={{ margin: 0 }}>Branch *</label>
-                                        <AddBranchMini onCreated={b => {
-                                            setBranches(prev => [...prev, b])
-                                            setForm(f => ({ ...f, branchId: b.id, departmentId: "" }))
-                                        }} />
-                                    </div>
-                                    <select value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value, departmentId: "" }))} className={inputCls} required>
-                                        <option value="">Select Branch</option>
-                                        {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                    <label className={labelCls}>Role *</label>
+                                    <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value, designation: e.target.value }))} className={inputCls} required>
+                                        <option value="">Select Role</option>
+                                        {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Designation</label>
-                                    <input value={form.designation} onChange={set("designation")} className={inputCls} placeholder="e.g. Security Guard" />
                                 </div>
                                 <div>
                                     <label className={labelCls}>System Access Level <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>(Login Permission)</span></label>

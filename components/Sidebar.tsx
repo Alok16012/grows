@@ -91,7 +91,6 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "MANAGEMENT",
             links: [
                 { name: "Companies", href: "/companies", icon: Building2, roles: ["ADMIN", "MANAGER"] },
-                { name: "Branches", href: "/branches", icon: MapPin, roles: ["ADMIN", "MANAGER"] },
                 { name: "Departments", href: "/departments", icon: Briefcase, roles: ["ADMIN", "MANAGER"] },
                 { name: "Projects", href: "/projects", icon: Folder, roles: [] },
                 { name: "Assignments", href: "/assignments", icon: HardHat, roles: ["ADMIN", "MANAGER"] },

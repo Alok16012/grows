@@ -38,14 +38,14 @@ export async function POST(req: Request) {
         const body = await req.json()
         const { name, branchId, description, headId } = body
 
-        if (!name || !branchId) {
-            return new NextResponse("Name and branchId are required", { status: 400 })
+        if (!name) {
+            return new NextResponse("Name is required", { status: 400 })
         }
 
         const department = await prisma.department.create({
             data: {
                 name,
-                branchId,
+                branchId: branchId || null,
                 description: description || null,
                 headId: headId || null,
             },
