@@ -204,6 +204,8 @@ type ModalForm = {
     salDA: string; salWashing: string; salConveyance: string; salLeaveWithWages: string
     salOtherAllowance: string; salOtRatePerHour: string; salCanteenRatePerDay: string
     salComplianceType: string
+    // Site Deployment
+    siteId: string; deployShift: string; deployRole: string; deployStartDate: string
 }
 
 const EMPTY_FORM: ModalForm = {
@@ -228,6 +230,8 @@ const EMPTY_FORM: ModalForm = {
     salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
     salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
     salComplianceType: "OR",
+    // Site Deployment
+    siteId: "", deployShift: "", deployRole: "", deployStartDate: "",
 }
 
 function AddBranchMini({ onCreated }: { onCreated: (b: Branch) => void }) {
@@ -364,6 +368,7 @@ function EmployeeModal({
     const [branches, setBranches] = useState<Branch[]>(initialBranches)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
+    const [sites, setSites] = useState<{ id: string; name: string; branchId: string }[]>([])
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
     // Pending documents to upload after employee creation
@@ -391,6 +396,18 @@ function EmployeeModal({
 
     // Keep branches in sync if parent list changes
     useEffect(() => { setBranches(initialBranches) }, [initialBranches])
+
+    // Fetch sites for deployment assignment
+    useEffect(() => {
+        if (!open) return
+        fetch("/api/sites?isActive=true")
+            .then(r => r.ok ? r.json() : [])
+            .then(data => {
+                const siteList = Array.isArray(data) ? data.map((s: { id: string; name: string; branchId: string }) => ({ id: s.id, name: s.name, branchId: s.branchId })) : []
+                setSites(siteList)
+            })
+            .catch(() => setSites([]))
+    }, [open])
 
     // Fetch existing docs when documents tab is opened for an existing employee
     useEffect(() => {
@@ -487,6 +504,8 @@ function EmployeeModal({
                 salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
                 salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
                 salComplianceType: "OR",
+                // Site Deployment (cleared - can be edited from site page)
+                siteId: "", deployShift: "", deployRole: "", deployStartDate: "",
             })
         } else {
             setForm(EMPTY_FORM)
@@ -568,6 +587,23 @@ function EmployeeModal({
                     } catch { /* doc upload failed silently */ }
                 }
                 setPendingDocs([])
+            }
+
+            // Create site deployment if site is selected
+            if (empId && form.siteId && !employee) {
+                try {
+                    await fetch("/api/deployments", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            employeeId: empId,
+                            siteId: form.siteId,
+                            startDate: form.deployStartDate || new Date().toISOString().split("T")[0],
+                            shift: form.deployShift || null,
+                            role: form.deployRole || null,
+                        }),
+                    })
+                } catch { /* deployment creation failed silently */ }
             }
 
             onSaved()
@@ -738,6 +774,52 @@ function EmployeeModal({
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Site Assignment Section */}
+                            <div className="border border-[var(--accent)]/30 bg-[var(--accent-light)]/30 rounded-[10px] p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <MapPin size={14} className="text-[var(--accent)]" />
+                                    <label className="text-[13px] font-semibold text-[var(--accent)]">Site Assignment</label>
+                                </div>
+                                <p className="text-[11px] text-[var(--text3)] mb-3">Assign this employee to a site immediately upon creation</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2">
+                                        <label className={labelCls}>Select Site</label>
+                                        <select value={form.siteId} onChange={set("siteId")} className={inputCls} disabled={!!employee}>
+                                            <option value="">-- No Site (Assign Later) --</option>
+                                            {sites.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                        {employee && (
+                                            <p className="text-[10px] text-[var(--text3)] mt-1">Site assignment can be changed from Sites page</p>
+                                        )}
+                                    </div>
+                                    {form.siteId && (
+                                        <>
+                                            <div>
+                                                <label className={labelCls}>Deployment Role</label>
+                                                <input value={form.deployRole} onChange={set("deployRole")} className={inputCls} placeholder="e.g. Security Guard" />
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>Shift</label>
+                                                <select value={form.deployShift} onChange={set("deployShift")} className={inputCls}>
+                                                    <option value="">Select Shift</option>
+                                                    <option value="Morning">Morning</option>
+                                                    <option value="Evening">Evening</option>
+                                                    <option value="Night">Night</option>
+                                                    <option value="Rotating">Rotating</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>Deployment Start Date</label>
+                                                <input type="date" value={form.deployStartDate || new Date().toISOString().split("T")[0]} onChange={set("deployStartDate")} className={inputCls} />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
                             <div>
                                 <label className={labelCls}>Notes</label>
                                 <textarea value={form.notes} onChange={set("notes")} className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none" rows={3} placeholder="Additional notes..." />
