@@ -57,7 +57,7 @@ type ExitRequest = {
     photo?: string | null
     basicSalary?: number
     department?: { name: string } | null
-    branch?: { name: string }
+    deployments?: { site: { name: string } }[]
   }
   clearanceTasks: ClearanceTask[]
 }

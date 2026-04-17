@@ -19,11 +19,13 @@ export async function GET(req: Request) {
         const month = searchParams.get("month")?.includes("-") ? searchParams.get("month")!.split("-")[1] : searchParams.get("month")
         const year = searchParams.get("month")?.includes("-") ? searchParams.get("month")!.split("-")[0] : searchParams.get("year")
         const branchId = searchParams.get("branchId")
+        const siteId = searchParams.get("siteId")
         const status = searchParams.get("status")
         const search = searchParams.get("search")
 
         const where: Record<string, unknown> = {}
         if (employeeId) where.employeeId = employeeId
+        if (siteId) where.siteId = siteId
         if (status) where.status = status
 
         if (dateStr) {

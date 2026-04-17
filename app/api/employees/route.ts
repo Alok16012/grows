@@ -53,14 +53,13 @@ export async function GET(req: Request) {
         const employees = await prisma.employee.findMany({
             where,
             include: {
-                branch: { select: { id: true, name: true } },
                 department: { select: { id: true, name: true } },
                 _count: { select: { attendances: true, leaves: true } },
                 employeeSalary: true,
                 user: { select: { role: true, customRole: { select: { name: true } } } },
                 deployments: {
                     where: { isActive: true },
-                    include: { site: { select: { name: true } } },
+                    include: { site: { select: { id: true, name: true, code: true } } },
                     take: 1,
                     orderBy: { startDate: "desc" },
                 },
@@ -104,8 +103,14 @@ export async function POST(req: Request) {
             safetyShoes, safetyShoesDate, bankBranch,
         } = body
 
-        if (!firstName || !lastName || !phone || !branchId) {
-            return new NextResponse("firstName, lastName, phone and branchId are required", { status: 400 })
+        let finalBranchId = branchId
+        if (!finalBranchId) {
+            const firstBranch = await prisma.branch.findFirst({ select: { id: true } })
+            finalBranchId = firstBranch?.id
+        }
+
+        if (!firstName || !lastName || !phone) {
+            return new NextResponse("firstName, lastName and phone are required", { status: 400 })
         }
 
         // Auto-generate employeeId as EMP-NNNN
@@ -185,7 +190,7 @@ export async function POST(req: Request) {
                 photo,
                 designation,
                 departmentId: departmentId || null,
-                branchId,
+                branchId: finalBranchId,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
                 status: status || "ACTIVE",
                 employmentType: employmentType || "Full-time",

@@ -58,7 +58,11 @@ export async function GET(req: Request) {
                         designation: true,
                         dateOfJoining: true,
                         photo: true,
-                        branch: { select: { name: true } },
+                        deployments: {
+                            where: { isActive: true },
+                            include: { site: { select: { name: true } } },
+                            take: 1,
+                        },
                         isKycVerified: true,
                         aadharNumber: true,
                         panNumber: true,

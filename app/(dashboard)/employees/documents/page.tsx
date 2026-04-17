@@ -12,13 +12,15 @@ type Doc = {
     status: string; uploadedAt: string
     employee: {
         id: string; employeeId: string; firstName: string; lastName: string
-        designation?: string; branch: { name: string }; department?: { name: string } | null
+        designation?: string; department?: { name: string } | null
+        deployments?: { site: { name: string } }[]
     }
 }
 
 type Employee = {
     id: string; employeeId: string; firstName: string; lastName: string
-    designation?: string; branch: { name: string }; department?: { name: string } | null
+    designation?: string; department?: { name: string } | null
+    deployments?: { site: { name: string } }[]
 }
 
 // ─── Document columns shown in the table ─────────────────────────────────────
@@ -155,7 +157,7 @@ export default function MasterDocumentsPage() {
     const [docs, setDocs]           = useState<Doc[]>([])
     const [loading, setLoading]     = useState(true)
     const [search, setSearch]       = useState("")
-    const [branchFilter, setBranchFilter] = useState("ALL")
+    const [siteFilter, setSiteFilter] = useState("ALL")
     const [statusFilter, setStatusFilter] = useState("ALL") // ALL | COMPLETE | MISSING
     const [viewer, setViewer]       = useState<{ url: string; name: string } | null>(null)
 
@@ -192,8 +194,8 @@ export default function MasterDocumentsPage() {
         }
     }
 
-    // Unique branches for filter
-    const branches = ["ALL", ...Array.from(new Set(employees.map(e => e.branch.name))).sort()]
+    // Unique sites for filter
+    const sites = ["ALL", ...Array.from(new Set(employees.map(e => e.deployments?.[0]?.site?.name).filter(Boolean) as string[])).sort()]
 
     // Summary
     const totalEmployees = employees.length
@@ -206,12 +208,13 @@ export default function MasterDocumentsPage() {
 
     // Filtered rows
     const filtered = employees.filter(emp => {
-        if (branchFilter !== "ALL" && emp.branch.name !== branchFilter) return false
+        const siteName = emp.deployments?.[0]?.site?.name || "Unassigned"
+        if (siteFilter !== "ALL" && siteName !== siteFilter) return false
         if (search) {
             const q = search.toLowerCase()
             if (!`${emp.firstName} ${emp.lastName}`.toLowerCase().includes(q) &&
                 !emp.employeeId.toLowerCase().includes(q) &&
-                !emp.branch.name.toLowerCase().includes(q)) return false
+                !siteName.toLowerCase().includes(q)) return false
         }
         if (statusFilter === "COMPLETE") {
             const empDocs = docMap.get(emp.id)
@@ -265,9 +268,9 @@ export default function MasterDocumentsPage() {
                         className="w-full pl-8 pr-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] placeholder:text-[#9e9b95] outline-none focus:border-[#1a9e6e]"
                         value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+                <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
                     className="px-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] text-[#6b6860] outline-none cursor-pointer">
-                    {branches.map(b => <option key={b} value={b}>{b === "ALL" ? "All Sites" : b}</option>)}
+                    {sites.map(s => <option key={s} value={s}>{s === "ALL" ? "All Sites" : s}</option>)}
                 </select>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                     className="px-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] text-[#6b6860] outline-none cursor-pointer">
@@ -333,8 +336,8 @@ export default function MasterDocumentsPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        {/* Branch */}
-                                        <td className="px-4 py-2 align-top pt-3 text-[11px] text-[#6b6860] whitespace-nowrap">{emp.branch.name}</td>
+                                        {/* Site */}
+                                        <td className="px-4 py-2 align-top pt-3 text-[11px] text-[#6b6860] whitespace-nowrap">{emp.deployments?.[0]?.site?.name || "Unassigned"}</td>
                                         {/* Doc columns */}
                                         {DOC_COLS.map(col => {
                                             const doc = empDocs?.get(col.key)

@@ -88,7 +88,7 @@ type PerformanceReview = {
         employeeId: string
         designation?: string | null
         photo?: string | null
-        branch: { name: string }
+        deployments?: { site: { name: string } }[]
     }
     kpis: KPI[]
     kras: KRA[]
@@ -1017,7 +1017,7 @@ function DrawerOverview({ review }: { review: PerformanceReview }) {
 
     const rows: [string, React.ReactNode][] = [
         ["Employee ID", emp.employeeId],
-        ["Branch", emp.branch.name],
+        ["Site", emp.deployments?.[0]?.site?.name || "—"],
         ["Designation", emp.designation || "—"],
         ["Review Cycle", CYCLE_CONFIG[review.cycle]?.label],
         ["Period", `${fmtDateFull(review.periodStart)} — ${fmtDateFull(review.periodEnd)}`],

@@ -38,7 +38,7 @@ type CalcResult = {
 }
 
 type EmpRow = {
-    id: string; employeeId: string; name: string; designation: string; branch: string
+    id: string; employeeId: string; name: string; designation: string; site: string
     salary: SalarySalary | null; payroll: CalcResult | null; payrollId: string | null
 }
 
@@ -258,7 +258,7 @@ export default function PayrollPage() {
                     id: e.id, employeeId: e.employeeId,
                     name: `${e.firstName} ${e.lastName}`,
                     designation: e.designation ?? "-",
-                    branch: e.branch?.name ?? "-",
+                    site: e.deployments?.[0]?.site?.name ?? "-",
                     salary: e.employeeSalary ?? null,
                     payroll: pay ?? null,
                     payrollId: pay?.id ?? null,
@@ -696,7 +696,7 @@ export default function PayrollPage() {
                                                 <span className="font-medium text-[var(--text)]">{emp.name}</span>
                                                 {s && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isCALL ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{s.complianceType || "OR"}</span>}
                                             </div>
-                                            <div className="text-[10px] text-[var(--text3)]">{emp.employeeId} · {emp.branch}</div>
+                                            <div className="text-[10px] text-[var(--text3)]">{emp.employeeId} · {emp.site}</div>
                                         </td>
                                         <td className="px-4 py-3 text-right">{s ? fmt(s.basic) : <span className="text-[var(--text3)]">—</span>}</td>
                                         <td className="px-4 py-3 text-right">{s ? fmt(s.da) : "—"}</td>

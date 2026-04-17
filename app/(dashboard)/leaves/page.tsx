@@ -33,7 +33,7 @@ type Leave = {
         employeeId: string
         designation?: string
         photo?: string
-        branch: { name: string }
+        deployments?: { site: { name: string } }[]
     }
 }
 
@@ -305,7 +305,7 @@ function LeaveDrawer({ leave, onClose, onUpdated, isAdminOrManager }: {
                                 <div>
                                     <p className="text-[14px] font-semibold text-[var(--text)]">{leave.employee.firstName} {leave.employee.lastName}</p>
                                     <p className="text-[12px] text-[var(--text3)]">{leave.employee.employeeId} · {leave.employee.designation || "—"}</p>
-                                    <p className="text-[12px] text-[var(--text3)]">{leave.employee.branch.name}</p>
+                                    <p className="text-[12px] text-[var(--text3)]">{leave.employee.deployments?.[0]?.site?.name || "—"}</p>
                                 </div>
                             </div>
 

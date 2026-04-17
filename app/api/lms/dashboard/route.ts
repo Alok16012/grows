@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url)
         const courseId = searchParams.get("courseId")
-        const branchId = searchParams.get("branchId")
+        const siteId = searchParams.get("siteId")
         const period = searchParams.get("period") || "all"
 
         const now = new Date()
@@ -32,14 +32,18 @@ export async function GET(req: Request) {
         if (dateFilter) enrollWhere.enrolledAt = dateFilter
 
         const employeeWhere: Record<string, unknown> = {}
-        if (branchId) employeeWhere.branchId = branchId
+        if (siteId) {
+            employeeWhere.deployments = {
+                some: { siteId, isActive: true }
+            }
+        }
 
         const [
             totalEmployees,
             totalCourses,
             enrollmentStats,
             courseStats,
-            branchStats,
+            siteStats,
             monthlyStats,
             expiringCerts,
             topCourses,
@@ -60,7 +64,15 @@ export async function GET(req: Request) {
             prisma.courseEnrollment.findMany({
                 where: enrollWhere,
                 include: {
-                    employee: { select: { branchId: true, branch: { select: { name: true } } } },
+                    employee: {
+                        select: {
+                            deployments: {
+                                where: { isActive: true },
+                                include: { site: { select: { name: true } } },
+                                take: 1
+                            }
+                        }
+                    },
                 },
             }),
             prisma.courseEnrollment.findMany({
@@ -97,15 +109,15 @@ export async function GET(req: Request) {
         const failedCount = courseStats.find(s => s.status === "FAILED")?._count || 0
         const passRate = totalCourses > 0 ? Math.round((completedCount / Math.max(1, enrollmentStats._count)) * 100) : 0
 
-        const branchCompletion: Record<string, { enrolled: number; completed: number }> = {}
-        for (const e of branchStats) {
-            const branchName = e.employee.branch?.name || "Unknown"
-            if (!branchCompletion[branchName]) {
-                branchCompletion[branchName] = { enrolled: 0, completed: 0 }
+        const siteCompletion: Record<string, { enrolled: number; completed: number }> = {}
+        for (const e of siteStats) {
+            const siteName = (e.employee as any).deployments?.[0]?.site?.name || "Unassigned"
+            if (!siteCompletion[siteName]) {
+                siteCompletion[siteName] = { enrolled: 0, completed: 0 }
             }
-            branchCompletion[branchName].enrolled++
+            siteCompletion[siteName].enrolled++
             if (e.status === "COMPLETED") {
-                branchCompletion[branchName].completed++
+                siteCompletion[siteName].completed++
             }
         }
 
@@ -172,8 +184,8 @@ export async function GET(req: Request) {
                 overdueTraining: pendingTraining,
                 expiringCertificates: expiringCertificates.length,
             },
-            branchStats: Object.entries(branchCompletion).map(([branch, stats]) => ({
-                branch,
+            siteStats: Object.entries(siteCompletion).map(([site, stats]) => ({
+                site,
                 enrolled: stats.enrolled,
                 completed: stats.completed,
                 completionRate: stats.enrolled > 0 ? Math.round((stats.completed / stats.enrolled) * 100) : 0,

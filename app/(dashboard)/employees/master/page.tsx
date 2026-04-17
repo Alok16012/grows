@@ -76,7 +76,7 @@ type Employee = {
     safetyShoes?: boolean
     notes?: string
     createdAt: string
-    branch: { id: string; name: string }
+    branch?: { id: string; name: string }
     department?: { id: string; name: string } | null
     employeeSalary?: { ctcAnnual?: number; basicSalary?: number } | null
     user?: { role: string; customRole?: { name: string } | null } | null
@@ -164,7 +164,6 @@ const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
             { key: "status",        label: "Status",        get: e => e.status },
             { key: "employmentType",label: "Emp Type",      get: e => e.employmentType },
             { key: "designation",   label: "Designation",   get: e => e.designation || "" },
-            { key: "branch",        label: "Branch",        get: e => e.branch?.name || "" },
             { key: "department",    label: "Department",    get: e => e.department?.name || "" },
             { key: "role",          label: "Role",          get: e => e.user?.customRole?.name || e.user?.role || "" },
             { key: "assignment",    label: "Assignment",    get: e => e.deployments?.[0]?.site?.name || "" },
@@ -583,7 +582,6 @@ export default function EmployeeMasterPage() {
     const [employees, setEmployees] = useState<Employee[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
-    const [branchFilter, setBranchFilter] = useState("")
     const [statusFilter, setStatusFilter] = useState("")
     const [siteFilter, setSiteFilter] = useState("")
     const [sites, setSites] = useState<{id: string, name: string}[]>([])
@@ -605,7 +603,6 @@ export default function EmployeeMasterPage() {
         setLoading(true)
         try {
             const params = new URLSearchParams()
-            if (branchFilter) params.set("branchId", branchFilter)
             if (statusFilter) params.set("status", statusFilter)
             if (siteFilter) params.set("siteId", siteFilter)
             if (search) params.set("search", search)
@@ -617,7 +614,7 @@ export default function EmployeeMasterPage() {
         } finally {
             setLoading(false)
         }
-    }, [branchFilter, statusFilter, siteFilter, search])
+    }, [statusFilter, siteFilter, search])
 
     useEffect(() => {
         if (status !== "unauthenticated") {
@@ -638,7 +635,7 @@ export default function EmployeeMasterPage() {
         if (status === "authenticated") fetchSites()
     }, [status])
 
-    const branches = Array.from(new Map(employees.map(e => [e.branch.id, e.branch])).values())
+    // Removed branches derivation
 
     const toggleGroup = (group: string) => {
         setVisibleGroups(prev => {
@@ -750,30 +747,7 @@ export default function EmployeeMasterPage() {
             const wb = XLSX.utils.book_new()
             XLSX.utils.book_append_sheet(wb, ws, "Employee Master")
 
-            // Branch summary
-            const summaryData: string[][] = [["Branch", "Total", "Active", "Inactive", "Terminated"]]
-            const byBranch = new Map<string, Employee[]>()
-            filteredEmployees.forEach(e => {
-                const key = e.branch.name
-                if (!byBranch.has(key)) byBranch.set(key, [])
-                byBranch.get(key)!.push(e)
-            })
-            byBranch.forEach((emps, branch) => {
-                summaryData.push([
-                    branch, String(emps.length),
-                    String(emps.filter(e => e.status === "ACTIVE").length),
-                    String(emps.filter(e => e.status === "INACTIVE").length),
-                    String(emps.filter(e => e.status === "TERMINATED").length),
-                ])
-            })
-            summaryData.push(["TOTAL", String(filteredEmployees.length),
-                String(filteredEmployees.filter(e => e.status === "ACTIVE").length),
-                String(filteredEmployees.filter(e => e.status === "INACTIVE").length),
-                String(filteredEmployees.filter(e => e.status === "TERMINATED").length),
-            ])
-            const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
-            wsSummary["!cols"] = [{ wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }]
-            XLSX.utils.book_append_sheet(wb, wsSummary, "Branch Summary")
+            // Removed branch summary
 
             const date = new Date().toISOString().slice(0, 10)
             XLSX.writeFile(wb, `Employee_Master_${date}.xlsx`)
@@ -848,11 +822,6 @@ export default function EmployeeMasterPage() {
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, ID, phone…"
                         style={{ width: "100%", padding: "6px 10px 6px 28px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, outline: "none", background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
                 </div>
-                <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
-                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
-                    <option value="">All Branches</option>
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                     style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
                     <option value="">All Status</option>
@@ -864,8 +833,8 @@ export default function EmployeeMasterPage() {
                     {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
 
-                {(branchFilter || statusFilter || siteFilter || search) && (
-                    <button onClick={() => { setBranchFilter(""); setStatusFilter(""); setSiteFilter(""); setSearch(""); }}
+                {(statusFilter || siteFilter || search) && (
+                    <button onClick={() => { setStatusFilter(""); setSiteFilter(""); setSearch(""); }}
                         style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                         <X size={12} /> Clear
                     </button>

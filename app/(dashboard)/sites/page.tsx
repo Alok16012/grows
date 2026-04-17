@@ -46,7 +46,7 @@ type Site = {
     state?: string
     pincode?: string
     clientName?: string
-    branchId: string
+    branchId?: string
     latitude?: number
     longitude?: number
     radius: number
@@ -57,7 +57,6 @@ type Site = {
     shift?: string
     isActive: boolean
     createdAt: string
-    branch: { id: string; name: string }
     deployments?: Deployment[]
     _count: { deployments: number; attendances: number }
 }
@@ -71,7 +70,6 @@ type Employee = {
     photo?: string
 }
 
-type Branch = { id: string; name: string }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -169,16 +167,16 @@ const selectCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-whi
 // ─── Add Site Modal ───────────────────────────────────────────────────────────
 
 function AddSiteModal({
-    open, onClose, onSaved, branches, site,
+    open, onClose, onSaved, site,
 }: {
-    open: boolean; onClose: () => void; onSaved: () => void; branches: Branch[]; site?: Site | null
+    open: boolean; onClose: () => void; onSaved: () => void; site?: Site | null
 }) {
     const [tab, setTab] = useState<"info" | "geo">("info")
     const [loading, setLoading] = useState(false)
     const [form, setForm] = useState({
         name: "", address: "", city: "", state: "", pincode: "",
         clientName: "", contactPerson: "", contactPhone: "",
-        branchId: "", siteType: "", shift: "", manpowerRequired: "1",
+        siteType: "", shift: "", manpowerRequired: "1",
         latitude: "", longitude: "", radius: "100",
     })
 
@@ -194,7 +192,6 @@ function AddSiteModal({
                 clientName: site.clientName || "",
                 contactPerson: site.contactPerson || "",
                 contactPhone: site.contactPhone || "",
-                branchId: site.branchId,
                 siteType: site.siteType || "",
                 shift: site.shift || "",
                 manpowerRequired: site.manpowerRequired?.toString() || "1",
@@ -206,19 +203,19 @@ function AddSiteModal({
             setForm({
                 name: "", address: "", city: "", state: "", pincode: "",
                 clientName: "", contactPerson: "", contactPhone: "",
-                branchId: branches[0]?.id || "", siteType: "", shift: "", manpowerRequired: "1",
+                siteType: "", shift: "", manpowerRequired: "1",
                 latitude: "", longitude: "", radius: "100",
             })
         }
         setTab("info")
-    }, [open, site, branches])
+    }, [open, site])
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!form.name || !form.address || !form.branchId) {
-            toast.error("Site Name, Address and Branch are required")
+        if (!form.name || !form.address) {
+            toast.error("Site Name and Address are required")
             return
         }
         setLoading(true)
@@ -299,7 +296,6 @@ function AddSiteModal({
                                         <input value={form.pincode} onChange={e => set("pincode", e.target.value)}
                                             className={inputCls} placeholder="Pincode" />
                                     </Field>
-                                    {/* Branch field removed as per user request to simplify site creation */}
                                     <Field label="Site Type">
                                         <select value={form.siteType} onChange={e => set("siteType", e.target.value)} className={selectCls}>
                                             <option value="">Select Type</option>
@@ -588,9 +584,7 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
 
             {/* Footer */}
             <div className="border-t border-[var(--border)] px-5 py-3 flex items-center justify-between bg-[var(--surface2)]/30">
-                <span className="text-[11px] text-[var(--text3)]">
-                    {/* Branch name hidden as per simplified view request */}
-                </span>
+                <span className="text-[11px] text-[var(--text3)]" />
                 <button onClick={onView}
                     className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent)] hover:opacity-80 transition-opacity">
                     View Details <ChevronDown size={13} className="-rotate-90" />
@@ -990,7 +984,6 @@ export default function SitesPage() {
     const role = session?.user?.role
 
     const [sites, setSites] = useState<Site[]>([])
-    const [branches, setBranches] = useState<Branch[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState<"" | "true" | "false">("")
@@ -1004,12 +997,6 @@ export default function SitesPage() {
         router.push("/login")
     }, [status, router])
 
-    useEffect(() => {
-        fetch("/api/branches")
-            .then(r => r.json())
-            .then(d => setBranches(Array.isArray(d) ? d : []))
-            .catch(() => {})
-    }, [])
 
     const fetchSites = useCallback(async () => {
         setLoading(true)
@@ -1178,7 +1165,6 @@ export default function SitesPage() {
                 open={showModal}
                 onClose={() => { setShowModal(false); setEditSite(null) }}
                 onSaved={fetchSites}
-                branches={branches}
                 site={editSite}
             />
 

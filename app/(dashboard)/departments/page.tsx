@@ -13,10 +13,8 @@ type Department = {
     id: string
     name: string
     description?: string
-    branchId?: string | null
     isActive: boolean
     createdAt: string
-    branch?: { id: string; name: string } | null
     _count: { employees: number }
 }
 
@@ -187,7 +185,7 @@ export default function DepartmentsPage() {
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search departments or branches..."
+                        placeholder="Search departments..."
                         className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                     />
                 </div>

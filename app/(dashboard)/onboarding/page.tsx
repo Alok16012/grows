@@ -61,7 +61,7 @@ type OnboardingRecord = {
         designation?: string | null
         dateOfJoining?: string | null
         photo?: string | null
-        branch: { name: string }
+        deployments?: { site: { name: string } }[]
         isKycVerified?: boolean
         kycRejectionNote?: string | null
         // Identity
@@ -1119,7 +1119,12 @@ function OnboardingCard({ record, onClick }: { record: OnboardingRecord; onClick
 
             <div className="flex items-center gap-3 text-[11.5px] text-[var(--text3)] mb-3 flex-wrap">
                 {record.employee.designation && <span className="truncate">{record.employee.designation}</span>}
-                {record.employee.branch?.name && <span className="truncate">{record.employee.branch.name}</span>}
+                {record.employee.deployments?.[0]?.site?.name && (
+                    <span className="truncate flex items-center gap-1">
+                        <MapPin size={11} className="text-[var(--text3)]" />
+                        {record.employee.deployments[0].site.name}
+                    </span>
+                )}
                 {joiningDate && <span>Joined {joiningDate}</span>}
             </div>
 
@@ -1532,7 +1537,7 @@ export default function OnboardingPage() {
                     <table className="w-full text-[12px]">
                         <thead>
                             <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
-                                {["#","Employee","ID","Branch","Designation","Joining Date","Status","KYC","Action"].map(h => (
+                                {["#","Employee","ID","Site","Designation","Joining Date","Status","KYC","Action"].map(h => (
                                     <th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
@@ -1552,7 +1557,7 @@ export default function OnboardingPage() {
                                             </div>
                                         </td>
                                         <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap">{record.employee.employeeId}</td>
-                                        <td className="px-3 py-2.5 text-[var(--text)] whitespace-nowrap">{record.employee.branch?.name || "—"}</td>
+                                        <td className="px-3 py-2.5 text-[var(--text)] whitespace-nowrap">{record.employee.deployments?.[0]?.site?.name || "—"}</td>
                                         <td className="px-3 py-2.5 text-[var(--text)] whitespace-nowrap">{record.employee.designation || "—"}</td>
                                         <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap">{joiningDate || "—"}</td>
                                         <td className="px-3 py-2.5">

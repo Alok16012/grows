@@ -72,7 +72,13 @@ export async function POST(req: Request) {
             manpowerRequired, contactPerson, contactPhone, siteType, shift,
         } = body
 
-        if (!name || !address || !branchId) {
+        let finalBranchId = branchId
+        if (!finalBranchId) {
+            const firstBranch = await prisma.branch.findFirst({ select: { id: true } })
+            finalBranchId = firstBranch?.id
+        }
+
+        if (!name || !address || !finalBranchId) {
             return new NextResponse("Name, address and branchId are required", { status: 400 })
         }
 
@@ -101,7 +107,7 @@ export async function POST(req: Request) {
                 pincode: pincode || null,
                 clientName: clientName || null,
                 clientId: clientId || null,
-                branchId,
+                branchId: finalBranchId,
                 latitude: latitude ? parseFloat(latitude) : null,
                 longitude: longitude ? parseFloat(longitude) : null,
                 radius: radius ? parseFloat(radius) : 100,

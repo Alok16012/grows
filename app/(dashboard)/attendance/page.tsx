@@ -41,10 +41,10 @@ type Employee = {
     designation?: string
     status: string
     photo?: string
-    branch: { id: string; name: string }
+    deployments?: { site: { name: string } }[]
 }
 
-type Branch = { id: string; name: string }
+type Site = { id: string; name: string }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -395,8 +395,8 @@ export default function AttendancePage() {
     const [employees, setEmployees] = useState<Employee[]>([])
     const [attendances, setAttendances] = useState<AttendanceRecord[]>([])
     const [monthlyAttendances, setMonthlyAttendances] = useState<AttendanceRecord[]>([])
-    const [branches, setBranches] = useState<Branch[]>([])
-    const [branchFilter, setBranchFilter] = useState("")
+    const [sites, setSites] = useState<Site[]>([])
+    const [siteFilter, setSiteFilter] = useState("")
     const [search, setSearch] = useState("")
     const [loading, setLoading] = useState(true)
     const [markModal, setMarkModal] = useState(false)
@@ -410,24 +410,24 @@ export default function AttendancePage() {
     }, [status, router])
 
     useEffect(() => {
-        fetch("/api/branches").then(r => r.json()).then(d => setBranches(Array.isArray(d) ? d : [])).catch(() => {})
+        fetch("/api/sites").then(r => r.json()).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {})
     }, [])
 
     const fetchEmployees = useCallback(async () => {
         try {
             const params = new URLSearchParams({ status: "ACTIVE" })
-            if (branchFilter) params.set("branchId", branchFilter)
+            if (siteFilter) params.set("siteId", siteFilter)
             const res = await fetch(`/api/employees?${params}`)
             const data = await res.json()
             setEmployees(Array.isArray(data) ? data : [])
         } catch { setEmployees([]) }
-    }, [branchFilter])
+    }, [siteFilter])
 
     const fetchAttendances = useCallback(async () => {
         setLoading(true)
         try {
             const params = new URLSearchParams({ date: format(selectedDate, "yyyy-MM-dd") })
-            if (branchFilter) params.set("branchId", branchFilter)
+            if (siteFilter) params.set("siteId", siteFilter)
             if (search) params.set("search", search)
             const res = await fetch(`/api/attendance?${params}`)
             const data = await res.json()
@@ -437,13 +437,13 @@ export default function AttendancePage() {
         } finally {
             setLoading(false)
         }
-    }, [selectedDate, branchFilter, search])
+    }, [selectedDate, siteFilter, search])
 
     const fetchMonthlyAttendances = useCallback(async () => {
         setLoading(true)
         try {
             const params = new URLSearchParams({ month: selectedMonth })
-            if (branchFilter) params.set("branchId", branchFilter)
+            if (siteFilter) params.set("siteId", siteFilter)
             const res = await fetch(`/api/attendance?${params}`)
             const data = await res.json()
             setMonthlyAttendances(Array.isArray(data) ? data : [])
@@ -452,7 +452,7 @@ export default function AttendancePage() {
         } finally {
             setLoading(false)
         }
-    }, [selectedMonth, branchFilter])
+    }, [selectedMonth, siteFilter])
 
     useEffect(() => {
         if (status !== "authenticated") return
@@ -540,10 +540,10 @@ export default function AttendancePage() {
                             <button onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n })}
                                 className="p-0.5 text-[var(--text3)] hover:text-[var(--text)] transition-colors"><ChevronRight size={16} /></button>
                         </div>
-                        <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+                        <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
                             className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
-                            <option value="">All Branches</option>
-                            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            <option value="">All Sites</option>
+                            {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                         <div className="relative flex-1 min-w-[200px]">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
@@ -645,10 +645,10 @@ export default function AttendancePage() {
                     <div className="flex flex-wrap items-center gap-3">
                         <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
                             className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
-                        <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+                        <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
                             className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
-                            <option value="">All Branches</option>
-                            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            <option value="">All Sites</option>
+                            {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                     </div>
 

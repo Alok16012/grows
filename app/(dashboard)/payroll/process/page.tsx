@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -12,11 +12,21 @@ export default function PayrollProcessWizard() {
 
     const [month, setMonth] = useState(new Date().getMonth() + 1)
     const [year, setYear] = useState(new Date().getFullYear())
-    const [branchId, setBranchId] = useState("")
+    const [siteId, setSiteId] = useState("")
+    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
 
     const [processing, setProcessing] = useState(false)
     const [result, setResult] = useState<any>(null)
     const [billingResult, setBillingResult] = useState<any>(null)
+
+    useEffect(() => {
+        fetch("/api/sites")
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) setSites(data)
+            })
+            .catch(err => console.error("Failed to fetch sites:", err))
+    }, [])
 
     const handleCalculate = async () => {
         setProcessing(true)
@@ -24,7 +34,7 @@ export default function PayrollProcessWizard() {
             const res = await fetch("/api/payroll/calculate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ month, year, branchId: branchId || undefined })
+                body: JSON.stringify({ month, year, siteId: siteId || undefined })
             })
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
@@ -35,7 +45,7 @@ export default function PayrollProcessWizard() {
             const billRes = await fetch("/api/payroll/billing/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ payrollRunId: data.runId, branchId: branchId || undefined })
+                body: JSON.stringify({ payrollRunId: data.runId, siteId: siteId || undefined })
             })
             if (billRes.ok) {
                 const billData = await billRes.json()
@@ -77,8 +87,17 @@ export default function PayrollProcessWizard() {
                             <input type="number" min={2020} max={2030} value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-full h-9 border border-[var(--border)] rounded-lg px-3 outline-none focus:border-[var(--accent)]" />
                         </div>
                         <div>
-                            <label className="text-[var(--text3)] block mb-1">Filter by Branch (Optional)</label>
-                            <input type="text" placeholder="Branch ID..." value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full h-9 border border-[var(--border)] rounded-lg px-3 outline-none focus:border-[var(--accent)]" />
+                            <label className="text-[var(--text3)] block mb-1">Filter by Site (Optional)</label>
+                            <select 
+                                value={siteId} 
+                                onChange={(e) => setSiteId(e.target.value)} 
+                                className="w-full h-9 border border-[var(--border)] rounded-lg px-3 outline-none focus:border-[var(--accent)] bg-white"
+                            >
+                                <option value="">All Sites</option>
+                                {sites.map(site => (
+                                    <option key={site.id} value={site.id}>{site.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
                     <div className="pt-4 flex justify-end">

@@ -44,7 +44,7 @@ type PayrollRecord = {
         firstName: string
         lastName: string
         designation: string
-        branch: { name: string }
+        deployments?: { site: { name: string } }[]
         department?: { name: string } | null
     }
 }
@@ -131,8 +131,8 @@ export default function SalarySlipsPage() {
 </style></head><body>
 <div class="header">
   <div><h1>${p.employee.firstName} ${p.employee.lastName}</h1>
-  <p>${p.employee.employeeId} · ${p.employee.designation ?? ""}</p>
-  <p>${p.employee.branch?.name ?? ""}</p></div>
+  <p style="font-size:11px;opacity:0.85">${p.employee.employeeId} · ${p.employee.designation ?? ""}</p>
+  <p style="font-size:11px;opacity:0.85">${p.employee.deployments?.[0]?.site?.name ?? ""}</p></div>
   <div style="text-align:right"><p style="font-size:13px;font-weight:700">Pay Period</p>
   <p style="font-size:17px;font-weight:800">${MONTHS[p.month-1]} ${p.year}</p>
   <p style="font-size:10px;margin-top:4px">Status: ${p.status}</p></div>
@@ -221,7 +221,7 @@ export default function SalarySlipsPage() {
                             >
                                 <div>
                                     <p className="text-[13px] font-medium text-[#1a1a18]">{r.employee.firstName} {r.employee.lastName}</p>
-                                    <p className="text-[11px] text-[#9e9b95]">{r.employee.employeeId} · {r.employee.branch?.name}</p>
+                                    <p className="text-[11px] text-[#9e9b95]">{r.employee.employeeId} · {r.employee.deployments?.[0]?.site?.name || "—"}</p>
                                 </div>
                                 <span className="text-[13px] font-semibold text-[#1a1a18]">₹{Math.round(r.netSalary).toLocaleString("en-IN")}</span>
                                 <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full w-fit"

@@ -46,7 +46,11 @@ export async function GET(req: Request) {
                         employeeId: true,
                         designation: true,
                         photo: true,
-                        branch: { select: { name: true } },
+                        deployments: {
+                            where: { isActive: true },
+                            include: { site: { select: { name: true } } },
+                            take: 1,
+                        },
                         department: { select: { name: true } },
                     },
                 },

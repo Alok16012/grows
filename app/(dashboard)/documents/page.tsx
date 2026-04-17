@@ -26,7 +26,7 @@ type Employee = {
     firstName: string
     lastName: string
     designation?: string
-    branch?: { name: string }
+    deployments?: { site: { name: string } }[]
 }
 type HrDoc = {
     id: string
@@ -43,7 +43,7 @@ type HrDoc = {
         firstName: string
         lastName: string
         designation?: string
-        branch?: { name: string }
+        deployments?: { site: { name: string } }[]
     }
     type: { id: string; name: string; requiresApproval: boolean }
 }

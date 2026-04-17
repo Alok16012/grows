@@ -14,7 +14,6 @@ export async function GET(req: Request) {
         const departments = await prisma.department.findMany({
             where: branchId ? { branchId } : undefined,
             include: {
-                branch: { select: { id: true, name: true } },
                 _count: { select: { employees: true } },
             },
             orderBy: { name: "asc" },
@@ -42,15 +41,20 @@ export async function POST(req: Request) {
             return new NextResponse("Name is required", { status: 400 })
         }
 
+        let finalBranchId = branchId
+        if (!finalBranchId) {
+            const firstBranch = await prisma.branch.findFirst({ select: { id: true } })
+            finalBranchId = firstBranch?.id
+        }
+
         const department = await prisma.department.create({
             data: {
                 name,
-                branchId: branchId || null,
+                branchId: finalBranchId,
                 description: description || null,
                 headId: headId || null,
             },
             include: {
-                branch: { select: { id: true, name: true } },
                 _count: { select: { employees: true } },
             },
         })

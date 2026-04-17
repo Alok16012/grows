@@ -50,7 +50,7 @@ type Employee = {
     notes?: string
     photo?: string
     createdAt: string
-    branch: { id: string; name: string }
+    deployments?: { site: { id: string; name: string } }[]
     department?: { id: string; name: string }
     _count: { attendances: number; leaves: number }
     // New fields
@@ -78,8 +78,8 @@ type Employee = {
     safetyShoes?: boolean
 }
 
-type Branch = { id: string; name: string; companyId?: string }
-type Department = { id: string; name: string; branchId: string }
+type Site = { id: string; name: string; code?: string }
+type Department = { id: string; name: string }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -234,86 +234,6 @@ const EMPTY_FORM: ModalForm = {
     siteId: "", deployShift: "", deployRole: "", deployStartDate: "",
 }
 
-function AddBranchMini({ onCreated }: { onCreated: (b: Branch) => void }) {
-    const [open, setOpen] = useState(false)
-    const [name, setName] = useState("")
-    const [city, setCity] = useState("")
-    const [saving, setSaving] = useState(false)
-    const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
-    const [companyId, setCompanyId] = useState("")
-
-    useEffect(() => {
-        if (open) {
-            fetch("/api/companies").then(r => r.json()).then(d => {
-                const list = Array.isArray(d) ? d : []
-                setCompanies(list)
-                if (list.length === 1) setCompanyId(list[0].id)
-            }).catch(() => {})
-        }
-    }, [open])
-
-    async function handleSave() {
-        if (!name.trim() || !companyId) { toast.error("Branch name and company required"); return }
-        setSaving(true)
-        try {
-            const r = await fetch("/api/branches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), city: city.trim(), companyId }) })
-            if (!r.ok) throw new Error()
-            const branch = await r.json()
-            toast.success(`Branch "${branch.name}" created`)
-            onCreated(branch)
-            setOpen(false); setName(""); setCity(""); setCompanyId("")
-        } catch { toast.error("Failed to create branch") }
-        finally { setSaving(false) }
-    }
-
-    return (
-        <>
-            <button type="button" onClick={() => setOpen(true)}
-                style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", textDecoration: "underline", whiteSpace: "nowrap" }}>
-                + New Branch
-            </button>
-            {open && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ background: "var(--surface)", borderRadius: 12, padding: 24, width: 360, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
-                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: "var(--text)" }}>Add New Branch</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            {companies.length > 1 && (
-                                <div>
-                                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>Company *</label>
-                                    <select value={companyId} onChange={e => setCompanyId(e.target.value)}
-                                        style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)" }}>
-                                        <option value="">Select Company</option>
-                                        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
-                                </div>
-                            )}
-                            <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>Branch Name *</label>
-                                <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Mumbai Office"
-                                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 4 }}>City</label>
-                                <input value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Mumbai"
-                                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
-                            </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
-                            <button type="button" onClick={() => setOpen(false)}
-                                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13 }}>
-                                Cancel
-                            </button>
-                            <button type="button" onClick={handleSave} disabled={saving}
-                                style={{ padding: "8px 16px", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                                {saving ? "Saving..." : "Create Branch"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    )
-}
 
 function CredentialsModal({ email, password, onClose }: { email: string; password: string; onClose: () => void }) {
     const [copied, setCopied] = useState(false)
@@ -359,16 +279,15 @@ function CredentialsModal({ email, password, onClose }: { email: string; passwor
 }
 
 function EmployeeModal({
-    open, onClose, onSaved, branches: initialBranches, employee,
+    open, onClose, onSaved, employee,
 }: {
-    open: boolean; onClose: () => void; onSaved: () => void; branches: Branch[]; employee?: Employee | null
+    open: boolean; onClose: () => void; onSaved: () => void; employee?: Employee | null
 }) {
     const [loading, setLoading] = useState(false)
     const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
-    const [branches, setBranches] = useState<Branch[]>(initialBranches)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
-    const [sites, setSites] = useState<{ id: string; name: string; branchId: string }[]>([])
+    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
     // Pending documents to upload after employee creation
@@ -394,8 +313,7 @@ function EmployeeModal({
         fetch("/api/admin/roles").then(r => r.ok ? r.json() : []).then(setCustomRoles).catch(() => {})
     }, [])
 
-    // Keep branches in sync if parent list changes
-    useEffect(() => { setBranches(initialBranches) }, [initialBranches])
+    // Branches derivation removed
 
     // Fetch sites for deployment assignment
     useEffect(() => {
@@ -403,7 +321,7 @@ function EmployeeModal({
         fetch("/api/sites?isActive=true")
             .then(r => r.ok ? r.json() : [])
             .then(data => {
-                const siteList = Array.isArray(data) ? data.map((s: { id: string; name: string; branchId: string }) => ({ id: s.id, name: s.name, branchId: s.branchId })) : []
+                const siteList = Array.isArray(data) ? data.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })) : []
                 setSites(siteList)
             })
             .catch(() => setSites([]))
@@ -456,7 +374,7 @@ function EmployeeModal({
                 panNumber: employee.panNumber || "",
                 designation: employee.designation || "",
                 departmentId: employee.departmentId || "",
-                branchId: employee.branchId,
+                branchId: employee.branchId || "",
                 managerId: employee.managerId || "",
                 dateOfJoining: employee.dateOfJoining ? employee.dateOfJoining.split("T")[0] : "",
                 employmentType: employee.employmentType,
@@ -513,15 +431,11 @@ function EmployeeModal({
     }, [employee, open])
 
     useEffect(() => {
-        if (form.branchId) {
-            fetch(`/api/departments?branchId=${form.branchId}`)
-                .then(r => r.json())
-                .then(data => setDepartments(Array.isArray(data) ? data : []))
-                .catch(() => setDepartments([]))
-        } else {
-            setDepartments([])
-        }
-    }, [form.branchId])
+        fetch(`/api/departments`)
+            .then(r => r.json())
+            .then(data => setDepartments(Array.isArray(data) ? data : []))
+            .catch(() => setDepartments([]))
+    }, [])
 
     const set = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setForm(f => ({ ...f, [key]: e.target.value }))
@@ -531,9 +445,6 @@ function EmployeeModal({
         if (!form.firstName.trim() || !form.lastName.trim() || !form.phone.trim()) {
             toast.error("First name, last name and phone are required")
             return
-        }
-        if (!form.branchId && branches.length > 0) {
-            setForm(f => ({ ...f, branchId: branches[0].id }))
         }
         setLoading(true)
         try {
@@ -545,7 +456,6 @@ function EmployeeModal({
                 body: JSON.stringify({
                     ...form,
                     designation: form.role,
-                    branchId: form.branchId || (branches[0]?.id ?? ""),
                 }),
             })
             if (!res.ok) throw new Error(await res.text())
@@ -1597,7 +1507,7 @@ function EmployeeDrawer({
                                     value={emp.dateOfJoining ? format(new Date(emp.dateOfJoining), "dd MMM yyyy") : "—"}
                                     icon={<Calendar size={13} />}
                                 />
-                                <InfoItem label="Branch" value={employee.branch.name} icon={<Building2 size={13} />} />
+                                <InfoItem label="Primary Site" value={employee.deployments?.[0]?.site?.name || "—"} icon={<MapPin size={13} />} />
                             </div>
                             {emp.notes && (
                                 <div className="p-3 rounded-[10px] bg-[var(--surface2)]/40 border border-[var(--border)]">
@@ -2084,12 +1994,14 @@ export default function EmployeesPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
     const [employees, setEmployees] = useState<Employee[]>([])
-    const [branches, setBranches] = useState<Branch[]>([])
+    const [sitesForFilter, setSitesForFilter] = useState<Site[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState("")
     const [deptFilter, setDeptFilter] = useState("")
     const [empTypeFilter, setEmpTypeFilter] = useState("")
+    const [siteFilter, setSiteFilter] = useState("")
+    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
     const [allDepts, setAllDepts] = useState<Department[]>([])
     const [showModal, setShowModal] = useState(false)
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
@@ -2122,6 +2034,7 @@ export default function EmployeesPage() {
             if (statusFilter) params.set("status", statusFilter)
             if (deptFilter) params.set("departmentId", deptFilter)
             if (empTypeFilter) params.set("employmentType", empTypeFilter)
+            if (siteFilter) params.set("siteId", siteFilter)
             if (search) params.set("search", search)
             const res = await fetch(`/api/employees?${params}`)
             const data = await res.json()
@@ -2131,15 +2044,15 @@ export default function EmployeesPage() {
         } finally {
             setLoading(false)
         }
-    }, [statusFilter, deptFilter, empTypeFilter, search])
+    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search])
 
     useEffect(() => {
         if (status !== "unauthenticated") fetchEmployees()
     }, [status, fetchEmployees])
 
     useEffect(() => {
-        fetch("/api/branches").then(r => r.json()).then(data => setBranches(Array.isArray(data) ? data : [])).catch(() => {})
         fetch("/api/departments").then(r => r.json()).then(data => setAllDepts(Array.isArray(data) ? data : [])).catch(() => {})
+        fetch("/api/sites?isActive=true").then(r => r.json()).then(data => setSites(Array.isArray(data) ? data : [])).catch(() => {})
     }, [])
 
     async function handleExport() {
@@ -2162,7 +2075,7 @@ export default function EmployeesPage() {
 
     function handleDownloadTemplate() {
         const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.aoa_to_sheet([["First Name", "Last Name", "Phone", "Email", "Designation", "Branch Name", "Employment Type", "Basic Salary", "City", "Date of Joining (YYYY-MM-DD)"]])
+        const ws = XLSX.utils.aoa_to_sheet([["First Name", "Last Name", "Phone", "Email", "Designation", "Site Name", "Employment Type", "Basic Salary", "City", "Date of Joining (YYYY-MM-DD)"]])
         XLSX.utils.book_append_sheet(wb, ws, "Employees")
         XLSX.writeFile(wb, "employees_template.xlsx")
     }
@@ -2186,7 +2099,7 @@ export default function EmployeesPage() {
                     else if (lk === "phone") entry.phone = val
                     else if (lk === "email") entry.email = val
                     else if (lk === "designation") entry.designation = val
-                    else if (lk === "branchname") entry.branchName = val
+                    else if (lk === "sitename") entry.siteName = val
                     else if (lk === "employmenttype") entry.employmentType = val
                     else if (lk === "basicsalary") entry.basicSalary = val
                     else if (lk === "city") entry.city = val
@@ -2358,6 +2271,14 @@ export default function EmployeesPage() {
                         {allDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                     <select
+                        value={siteFilter}
+                        onChange={e => setSiteFilter(e.target.value)}
+                        className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                    >
+                        <option value="">All Sites</option>
+                        {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    <select
                         value={empTypeFilter}
                         onChange={e => setEmpTypeFilter(e.target.value)}
                         className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
@@ -2472,7 +2393,6 @@ export default function EmployeesPage() {
                 open={showModal}
                 onClose={() => { setShowModal(false); setEditEmployee(null) }}
                 onSaved={fetchEmployees}
-                branches={branches}
                 employee={editEmployee}
             />
             <EmployeeDrawer
@@ -2507,7 +2427,7 @@ export default function EmployeesPage() {
                                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                                         <thead>
                                             <tr style={{ background: "var(--surface)" }}>
-                                                {["First Name", "Last Name", "Phone", "Branch Name", "Designation"].map(h => (
+                                                {["First Name", "Last Name", "Phone", "Site Name", "Designation"].map(h => (
                                                     <th key={h} style={{ padding: "6px 10px", textAlign: "left", borderBottom: "1px solid var(--border)", color: "var(--text3)", fontWeight: 600 }}>{h}</th>
                                                 ))}
                                             </tr>
@@ -2518,7 +2438,7 @@ export default function EmployeesPage() {
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.firstName ?? "")}</td>
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.lastName ?? "")}</td>
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.phone ?? "")}</td>
-                                                    <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.branchName ?? "")}</td>
+                                                    <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.siteName ?? "")}</td>
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.designation ?? "")}</td>
                                                 </tr>
                                             ))}

@@ -119,7 +119,7 @@ type Quiz = {
 type AssignmentRule = {
     id: string
     courseId: string
-    assignTo: "ROLE" | "DESIGNATION" | "SITE" | "CLIENT" | "BRANCH" | "ALL"
+    assignTo: "ROLE" | "DESIGNATION" | "SITE" | "CLIENT" | "ALL"
     value: string
     dueDays?: number
     isActive: boolean
@@ -289,7 +289,6 @@ function CourseModal({ open, onClose, onSaved, course }: {
     const [loadingRules, setLoadingRules] = useState(false)
     const [showRuleForm, setShowRuleForm] = useState(false)
     const [ruleForm, setRuleForm] = useState({ assignTo: "ALL", value: "", dueDays: "" })
-    const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
     const [sites, setSites] = useState<{ id: string; name: string; clientName?: string }[]>([])
 
     useEffect(() => {
@@ -324,7 +323,7 @@ function CourseModal({ open, onClose, onSaved, course }: {
         setQuestionForm(EMPTY_QUESTION_FORM)
         setShowRuleForm(false)
         setRuleForm({ assignTo: "ALL", value: "", dueDays: "" })
-        fetchBranchesAndSites()
+        fetchSitesList()
     }, [course, open])
 
     const fetchQuiz = async (courseId: string) => {
@@ -368,16 +367,11 @@ function CourseModal({ open, onClose, onSaved, course }: {
         }
     }
 
-    const fetchBranchesAndSites = async () => {
+    const fetchSitesList = async () => {
         try {
-            const [bRes, sRes] = await Promise.all([
-                fetch("/api/branches").then(r => r.json()),
-                fetch("/api/sites").then(r => r.json()),
-            ])
-            setBranches(Array.isArray(bRes) ? bRes.map((b: any) => ({ id: b.id, name: b.name })) : [])
-            setSites(Array.isArray(sRes) ? sRes.map((s: any) => ({ id: s.id, name: s.name, clientName: s.clientName })) : [])
+            const res = await fetch("/api/sites").then(r => r.json())
+            setSites(Array.isArray(res) ? res.map((s: any) => ({ id: s.id, name: s.name, clientName: s.clientName })) : [])
         } catch {
-            setBranches([])
             setSites([])
         }
     }
@@ -1020,7 +1014,6 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                                         {rule.assignTo === "DESIGNATION" && <User size={16} className="text-orange-500" />}
                                                         {rule.assignTo === "SITE" && <MapPin size={16} className="text-green-500" />}
                                                         {rule.assignTo === "CLIENT" && <Building2 size={16} className="text-cyan-500" />}
-                                                        {rule.assignTo === "BRANCH" && <Building2 size={16} className="text-pink-500" />}
                                                         <div>
                                                             <p className="text-[13px] font-medium text-[var(--text)]">
                                                                 {rule.assignTo === "ALL" ? "All Employees" : `${rule.assignTo}: ${rule.value}`}
@@ -1070,7 +1063,6 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                                         <option value="ALL">All Employees</option>
                                                         <option value="ROLE">By Role</option>
                                                         <option value="DESIGNATION">By Designation</option>
-                                                        <option value="BRANCH">By Branch</option>
                                                         <option value="SITE">By Site</option>
                                                         <option value="CLIENT">By Client</option>
                                                     </select>
@@ -1078,7 +1070,6 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                                 <div>
                                                     <label className="block text-[11px] font-medium text-[var(--text2)] mb-1">
                                                         {ruleForm.assignTo === "ALL" ? "Value (N/A)" : 
-                                                         ruleForm.assignTo === "BRANCH" ? "Select Branch" :
                                                          ruleForm.assignTo === "SITE" ? "Select Site" : "Value"}
                                                     </label>
                                                     {ruleForm.assignTo === "ALL" ? (
@@ -1087,17 +1078,6 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                                             disabled
                                                             className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[12px] text-[var(--text3)]"
                                                         />
-                                                    ) : ruleForm.assignTo === "BRANCH" ? (
-                                                        <select
-                                                            value={ruleForm.value}
-                                                            onChange={e => setRuleForm(f => ({ ...f, value: e.target.value }))}
-                                                            className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
-                                                        >
-                                                            <option value="">Select Branch</option>
-                                                            {branches.map(b => (
-                                                                <option key={b.id} value={b.id}>{b.name}</option>
-                                                            ))}
-                                                        </select>
                                                     ) : ruleForm.assignTo === "SITE" ? (
                                                         <select
                                                             value={ruleForm.value}
@@ -2182,7 +2162,7 @@ type DashboardData = {
         overdueTraining: number
         expiringCertificates: number
     }
-    branchStats: { branch: string; enrolled: number; completed: number; completionRate: number }[]
+    siteStats: { site: string; enrolled: number; completed: number; completionRate: number }[]
     monthlyStats: { month: string; enrolled: number; completed: number }[]
     topCourses: { id: string; title: string; courseCode: string; completions: number }[]
     expiringCertificates: { employeeName: string; courseName: string; expiresAt: string; daysLeft: number }[]
@@ -2268,19 +2248,19 @@ function DashboardTab() {
                 </div>
             </div>
 
-            {data.branchStats.length > 0 && (
+            {data.siteStats.length > 0 && (
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
                     <div className="px-4 py-3 border-b border-[var(--border)]">
-                        <h3 className="text-[14px] font-semibold text-[var(--text)]">Branch-wise Completion</h3>
+                        <h3 className="text-[14px] font-semibold text-[var(--text)]">Site-wise Completion</h3>
                     </div>
                     <div className="p-4 space-y-3">
-                        {data.branchStats.map(bs => (
-                            <div key={bs.branch} className="flex items-center gap-4">
-                                <div className="w-32 text-[12px] text-[var(--text2)] truncate">{bs.branch}</div>
+                        {data.siteStats.map(ss => (
+                            <div key={ss.site} className="flex items-center gap-4">
+                                <div className="w-32 text-[12px] text-[var(--text2)] truncate">{ss.site}</div>
                                 <div className="flex-1 h-2 bg-[var(--surface2)] rounded-full overflow-hidden">
-                                    <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${bs.completionRate}%` }} />
+                                    <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${ss.completionRate}%` }} />
                                 </div>
-                                <div className="w-20 text-right text-[12px] text-[var(--text2)]">{bs.completionRate}% ({bs.completed}/{bs.enrolled})</div>
+                                <div className="w-20 text-right text-[12px] text-[var(--text2)]">{ss.completionRate}% ({ss.completed}/{ss.enrolled})</div>
                             </div>
                         ))}
                     </div>
@@ -2346,7 +2326,7 @@ type ComplianceData = {
         employeeName: string
         employeeCode: string
         designation: string
-        branch: string
+        site: string
         sites: { id: string; name: string; client: string | null }[]
         mandatoryCourses: number
         compliantCourses: number
@@ -2465,7 +2445,7 @@ function ComplianceTab() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[13px] font-medium text-[var(--text)]">{emp.employeeName}</p>
-                                        <p className="text-[11px] text-[var(--text3)]">{emp.branch} · {emp.designation}</p>
+                                        <p className="text-[11px] text-[var(--text3)]">{emp.site} · {emp.designation}</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-[13px] font-medium text-[var(--text)]">{emp.compliantCourses}/{emp.mandatoryCourses}</p>
