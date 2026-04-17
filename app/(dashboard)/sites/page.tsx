@@ -299,12 +299,7 @@ function AddSiteModal({
                                         <input value={form.pincode} onChange={e => set("pincode", e.target.value)}
                                             className={inputCls} placeholder="Pincode" />
                                     </Field>
-                                    <Field label="Branch" required>
-                                        <select value={form.branchId} onChange={e => set("branchId", e.target.value)} className={selectCls} required>
-                                            <option value="">Select Branch</option>
-                                            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                        </select>
-                                    </Field>
+                                    {/* Branch field removed as per user request to simplify site creation */}
                                     <Field label="Site Type">
                                         <select value={form.siteType} onChange={e => set("siteType", e.target.value)} className={selectCls}>
                                             <option value="">Select Type</option>
@@ -594,7 +589,7 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
             {/* Footer */}
             <div className="border-t border-[var(--border)] px-5 py-3 flex items-center justify-between bg-[var(--surface2)]/30">
                 <span className="text-[11px] text-[var(--text3)]">
-                    {site.branch.name}
+                    {/* Branch name hidden as per simplified view request */}
                 </span>
                 <button onClick={onView}
                     className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent)] hover:opacity-80 transition-opacity">
@@ -826,7 +821,6 @@ function SiteDrawer({ site, onClose, onRefresh, role }: {
                                 { label: "Phone", value: s.contactPhone || "—" },
                                 { label: "Manpower Req.", value: `${required} employees` },
                                 { label: "Shift", value: s.shift || "—" },
-                                { label: "Branch", value: s.branch.name },
                                 { label: "Geofence", value: hasGeo ? `${s.radius}m radius` : "Not configured" },
                             ].map(({ label, value }) => (
                                 <div key={label} className="bg-[var(--surface2)]/50 border border-[var(--border)] rounded-[9px] p-2.5">
