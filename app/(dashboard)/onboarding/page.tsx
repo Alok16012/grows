@@ -7,7 +7,7 @@ import {
     Plus, Loader2, X, Search, Users,
     CheckCircle2, Clock, AlertCircle, PauseCircle,
     ChevronDown, Trash2, CalendarDays, Upload, Eye,
-    LayoutGrid, Table as TableIcon
+    LayoutGrid, Table as TableIcon, MapPin
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { format } from "date-fns"
