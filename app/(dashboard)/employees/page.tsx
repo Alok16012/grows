@@ -628,6 +628,55 @@ function EmployeeModal({
                                     <input value={form.panNumber} onChange={set("panNumber")} className={inputCls} placeholder="XXXXX0000X" />
                                 </div>
                             </div>
+
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Current Address</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2">
+                                    <label className={labelCls}>Address</label>
+                                    <input value={form.address} onChange={set("address")} className={inputCls} placeholder="Street address" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>City</label>
+                                    <input value={form.city} onChange={set("city")} className={inputCls} placeholder="City" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>State</label>
+                                    <input value={form.state} onChange={set("state")} className={inputCls} placeholder="State" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Pincode</label>
+                                    <input value={form.pincode} onChange={set("pincode")} className={inputCls} placeholder="Pincode" />
+                                </div>
+                            </div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Permanent Address</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2 flex items-center gap-2">
+                                    <input type="checkbox" id="sameAsCurrent" checked={sameAsCurrent} onChange={e => {
+                                        const checked = e.target.checked
+                                        if (checked) {
+                                            setForm(f => ({ ...f, permanentAddress: f.address, permanentCity: f.city, permanentState: f.state, permanentPincode: f.pincode }))
+                                        }
+                                        setSameAsCurrent(checked)
+                                    }} className="w-4 h-4" />
+                                    <label htmlFor="sameAsCurrent" className="text-sm text-[var(--text2)] cursor-pointer">Same as current address</label>
+                                </div>
+                                <div className="col-span-2">
+                                    <label className={labelCls}>Address</label>
+                                    <input value={form.permanentAddress} onChange={set("permanentAddress")} className={inputCls} placeholder="Street address" disabled={sameAsCurrent} />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>City</label>
+                                    <input value={form.permanentCity} onChange={set("permanentCity")} className={inputCls} placeholder="City" disabled={sameAsCurrent} />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>State</label>
+                                    <input value={form.permanentState} onChange={set("permanentState")} className={inputCls} placeholder="State" disabled={sameAsCurrent} />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Pincode</label>
+                                    <input value={form.permanentPincode} onChange={set("permanentPincode")} className={inputCls} placeholder="Pincode" disabled={sameAsCurrent} />
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -827,54 +876,6 @@ function EmployeeModal({
                                 <div className="col-span-2">
                                     <label className={labelCls}>Account Number</label>
                                     <input value={form.bankAccountNumber} onChange={set("bankAccountNumber")} className={inputCls} placeholder="Account number" />
-                                </div>
-                            </div>
-                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Current Address</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="col-span-2">
-                                    <label className={labelCls}>Address</label>
-                                    <input value={form.address} onChange={set("address")} className={inputCls} placeholder="Street address" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>City</label>
-                                    <input value={form.city} onChange={set("city")} className={inputCls} placeholder="City" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>State</label>
-                                    <input value={form.state} onChange={set("state")} className={inputCls} placeholder="State" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Pincode</label>
-                                    <input value={form.pincode} onChange={set("pincode")} className={inputCls} placeholder="Pincode" />
-                                </div>
-                            </div>
-                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Permanent Address</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="col-span-2 flex items-center gap-2">
-                                    <input type="checkbox" id="sameAsCurrent" checked={sameAsCurrent} onChange={e => {
-                                        const checked = e.target.checked
-                                        if (checked) {
-                                            setForm(f => ({ ...f, permanentAddress: f.address, permanentCity: f.city, permanentState: f.state, permanentPincode: f.pincode }))
-                                        }
-                                        setSameAsCurrent(checked)
-                                    }} className="w-4 h-4" />
-                                    <label htmlFor="sameAsCurrent" className="text-sm text-[var(--text2)] cursor-pointer">Same as current address</label>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className={labelCls}>Address</label>
-                                    <input value={form.permanentAddress} onChange={set("permanentAddress")} className={inputCls} placeholder="Street address" disabled={sameAsCurrent} />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>City</label>
-                                    <input value={form.permanentCity} onChange={set("permanentCity")} className={inputCls} placeholder="City" disabled={sameAsCurrent} />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>State</label>
-                                    <input value={form.permanentState} onChange={set("permanentState")} className={inputCls} placeholder="State" disabled={sameAsCurrent} />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Pincode</label>
-                                    <input value={form.permanentPincode} onChange={set("permanentPincode")} className={inputCls} placeholder="Pincode" disabled={sameAsCurrent} />
                                 </div>
                             </div>
                         </div>
