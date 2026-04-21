@@ -79,7 +79,7 @@ export async function GET(req: Request) {
         "CO CONTRI ESIC": p.esiEmployer,
         CTC: Math.round(p.ctc),
         DESIGNATION: p.employee.designation ?? "",
-        BRANCH: p.employee.branch.name,
+        BRANCH: p.employee.branch?.name ?? "",
     }))
 
     return NextResponse.json(rows)

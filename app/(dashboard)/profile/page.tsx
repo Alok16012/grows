@@ -5,8 +5,191 @@ import { toast } from "sonner"
 import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
-    IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download
+    IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
+    UserCircle2, MapPin, CreditCard, Contact, IdCard
 } from "lucide-react"
+
+// ─── Self-service Details Tab ────────────────────────────────────────────────
+const DETAILS_FIELDS = [
+    "firstName", "middleName", "lastName", "nameAsPerAadhar", "fathersName",
+    "dateOfBirth", "gender", "bloodGroup", "maritalStatus", "marriageDate",
+    "nationality", "religion", "caste", "phone", "alternatePhone", "email",
+    "address", "city", "state", "pincode",
+    "permanentAddress", "permanentCity", "permanentState", "permanentPincode",
+    "aadharNumber", "panNumber", "uan", "pfNumber", "esiNumber", "labourCardNo",
+    "bankAccountNumber", "bankIFSC", "bankName", "bankBranch",
+    "emergencyContact1Name", "emergencyContact1Phone",
+    "emergencyContact2Name", "emergencyContact2Phone",
+] as const
+type DetailsKey = typeof DETAILS_FIELDS[number]
+
+function Section({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+    return (
+        <div className="bg-white border border-[var(--border)] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+                <Icon size={16} className="text-[var(--accent)]" />
+                <h3 className="text-[14px] font-semibold text-[var(--text)]">{title}</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
+        </div>
+    )
+}
+
+function Field({ label, value, onChange, type = "text", placeholder, colSpan = 1 }: {
+    label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; colSpan?: 1 | 2
+}) {
+    return (
+        <div className={colSpan === 2 ? "sm:col-span-2" : ""}>
+            <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide block mb-1">{label}</label>
+            <input type={type} value={value ?? ""} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-[13px] outline-none focus:border-[var(--accent)]" />
+        </div>
+    )
+}
+
+function SelectField({ label, value, onChange, options }: {
+    label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]
+}) {
+    return (
+        <div>
+            <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide block mb-1">{label}</label>
+            <select value={value ?? ""} onChange={e => onChange(e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-[13px] outline-none focus:border-[var(--accent)] bg-white">
+                <option value="">— Select —</option>
+                {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+        </div>
+    )
+}
+
+function MyDetailsTab() {
+    const [data, setData] = useState<Partial<Record<DetailsKey, string>>>({})
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        fetch("/api/me/employee").then(r => r.json()).then(d => {
+            if (!d) { setLoading(false); return }
+            const normalized: Partial<Record<DetailsKey, string>> = {}
+            for (const k of DETAILS_FIELDS) {
+                const v = d[k]
+                if (v == null) continue
+                if (k === "dateOfBirth" || k === "marriageDate") {
+                    normalized[k] = String(v).split("T")[0]
+                } else {
+                    normalized[k] = String(v)
+                }
+            }
+            setData(normalized)
+        }).finally(() => setLoading(false))
+    }, [])
+
+    const set = (k: DetailsKey) => (v: string) => setData(d => ({ ...d, [k]: v }))
+
+    const save = async () => {
+        setSaving(true)
+        try {
+            const res = await fetch("/api/me/employee", {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Details saved!")
+        } catch (e) {
+            toast.error((e as Error).message || "Save failed")
+        } finally { setSaving(false) }
+    }
+
+    const filledCount = DETAILS_FIELDS.filter(k => data[k] && String(data[k]).trim()).length
+    const pct = Math.round((filledCount / DETAILS_FIELDS.length) * 100)
+
+    if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-[var(--accent)]" /></div>
+
+    return (
+        <div className="space-y-4">
+            {/* Completion bar */}
+            <div className="bg-white border border-[var(--border)] rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[13px] font-medium text-[var(--text)]">Profile completion</span>
+                    <span className="text-[13px] font-semibold text-[var(--accent)]">{pct}%</span>
+                </div>
+                <div className="w-full h-2 bg-[var(--surface)] rounded-full overflow-hidden">
+                    <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-[11px] text-[var(--text3)] mt-2">
+                    {filledCount} of {DETAILS_FIELDS.length} fields filled. Complete your profile for HR verification.
+                </p>
+            </div>
+
+            <Section title="Personal Information" icon={UserCircle2}>
+                <Field label="First Name" value={data.firstName ?? ""} onChange={set("firstName")} />
+                <Field label="Middle Name" value={data.middleName ?? ""} onChange={set("middleName")} />
+                <Field label="Last Name" value={data.lastName ?? ""} onChange={set("lastName")} />
+                <Field label="Name (as per Aadhaar)" value={data.nameAsPerAadhar ?? ""} onChange={set("nameAsPerAadhar")} />
+                <Field label="Father's Name" value={data.fathersName ?? ""} onChange={set("fathersName")} />
+                <Field label="Date of Birth" type="date" value={data.dateOfBirth ?? ""} onChange={set("dateOfBirth")} />
+                <SelectField label="Gender" value={data.gender ?? ""} onChange={set("gender")}
+                    options={[{ value: "MALE", label: "Male" }, { value: "FEMALE", label: "Female" }, { value: "OTHER", label: "Other" }]} />
+                <SelectField label="Blood Group" value={data.bloodGroup ?? ""} onChange={set("bloodGroup")}
+                    options={["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(v => ({ value: v, label: v }))} />
+                <SelectField label="Marital Status" value={data.maritalStatus ?? ""} onChange={set("maritalStatus")}
+                    options={[{ value: "SINGLE", label: "Single" }, { value: "MARRIED", label: "Married" }, { value: "DIVORCED", label: "Divorced" }, { value: "WIDOWED", label: "Widowed" }]} />
+                <Field label="Marriage Date" type="date" value={data.marriageDate ?? ""} onChange={set("marriageDate")} />
+                <Field label="Nationality" value={data.nationality ?? ""} onChange={set("nationality")} placeholder="Indian" />
+                <Field label="Religion" value={data.religion ?? ""} onChange={set("religion")} />
+                <Field label="Caste" value={data.caste ?? ""} onChange={set("caste")} />
+                <Field label="Phone" value={data.phone ?? ""} onChange={set("phone")} />
+                <Field label="Alternate Phone" value={data.alternatePhone ?? ""} onChange={set("alternatePhone")} />
+                <Field label="Email" type="email" value={data.email ?? ""} onChange={set("email")} colSpan={2} />
+            </Section>
+
+            <Section title="Current Address" icon={MapPin}>
+                <Field label="Address Line" value={data.address ?? ""} onChange={set("address")} colSpan={2} />
+                <Field label="City" value={data.city ?? ""} onChange={set("city")} />
+                <Field label="State" value={data.state ?? ""} onChange={set("state")} />
+                <Field label="Pincode" value={data.pincode ?? ""} onChange={set("pincode")} />
+            </Section>
+
+            <Section title="Permanent Address" icon={MapPin}>
+                <Field label="Address Line" value={data.permanentAddress ?? ""} onChange={set("permanentAddress")} colSpan={2} />
+                <Field label="City" value={data.permanentCity ?? ""} onChange={set("permanentCity")} />
+                <Field label="State" value={data.permanentState ?? ""} onChange={set("permanentState")} />
+                <Field label="Pincode" value={data.permanentPincode ?? ""} onChange={set("permanentPincode")} />
+            </Section>
+
+            <Section title="Identity & Employment IDs" icon={IdCard}>
+                <Field label="Aadhaar Number" value={data.aadharNumber ?? ""} onChange={set("aadharNumber")} />
+                <Field label="PAN Number" value={data.panNumber ?? ""} onChange={set("panNumber")} />
+                <Field label="UAN" value={data.uan ?? ""} onChange={set("uan")} />
+                <Field label="PF Number" value={data.pfNumber ?? ""} onChange={set("pfNumber")} />
+                <Field label="ESI Number" value={data.esiNumber ?? ""} onChange={set("esiNumber")} />
+                <Field label="Labour Card No." value={data.labourCardNo ?? ""} onChange={set("labourCardNo")} />
+            </Section>
+
+            <Section title="Bank Details" icon={CreditCard}>
+                <Field label="Account Number" value={data.bankAccountNumber ?? ""} onChange={set("bankAccountNumber")} />
+                <Field label="IFSC Code" value={data.bankIFSC ?? ""} onChange={set("bankIFSC")} />
+                <Field label="Bank Name" value={data.bankName ?? ""} onChange={set("bankName")} />
+                <Field label="Branch" value={data.bankBranch ?? ""} onChange={set("bankBranch")} />
+            </Section>
+
+            <Section title="Emergency Contacts" icon={Contact}>
+                <Field label="Contact 1 – Name" value={data.emergencyContact1Name ?? ""} onChange={set("emergencyContact1Name")} />
+                <Field label="Contact 1 – Phone" value={data.emergencyContact1Phone ?? ""} onChange={set("emergencyContact1Phone")} />
+                <Field label="Contact 2 – Name" value={data.emergencyContact2Name ?? ""} onChange={set("emergencyContact2Name")} />
+                <Field label="Contact 2 – Phone" value={data.emergencyContact2Phone ?? ""} onChange={set("emergencyContact2Phone")} />
+            </Section>
+
+            <div className="sticky bottom-4 flex justify-end">
+                <button onClick={save} disabled={saving}
+                    className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-60 shadow-md">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    Save All Details
+                </button>
+            </div>
+        </div>
+    )
+}
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 const DOC_TYPES = ["AADHAAR","PAN","RESUME","PHOTO","CERTIFICATE","BANK_PROOF","OFFER_LETTER","OTHER"]

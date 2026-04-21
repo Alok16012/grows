@@ -103,12 +103,6 @@ export async function POST(req: Request) {
             safetyShoes, safetyShoesDate, bankBranch,
         } = body
 
-        let finalBranchId = branchId
-        if (!finalBranchId) {
-            const firstBranch = await prisma.branch.findFirst({ select: { id: true } })
-            finalBranchId = firstBranch?.id
-        }
-
         if (!firstName || !lastName || !phone) {
             return new NextResponse("firstName, lastName and phone are required", { status: 400 })
         }
@@ -190,7 +184,7 @@ export async function POST(req: Request) {
                 photo,
                 designation,
                 departmentId: departmentId || null,
-                branchId: finalBranchId,
+                branchId: branchId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
                 status: status || "ACTIVE",
                 employmentType: employmentType || "Full-time",

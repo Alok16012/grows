@@ -43,18 +43,17 @@ export async function POST(req: Request) {
         const phone = String(row.phone ?? "").trim()
         const branchName = String(row.branchName ?? "").trim()
 
-        if (!firstName || !lastName || !phone || !branchName) {
-            errors.push({ row: rowNum, reason: "Missing required fields (First Name, Last Name, Phone, Branch Name)" })
+        if (!firstName || !lastName || !phone) {
+            errors.push({ row: rowNum, reason: "Missing required fields (First Name, Last Name, Phone)" })
             skipped++
             continue
         }
 
-        // Case-insensitive branch lookup
-        const branch = allBranches.find(b => b.name.toLowerCase() === branchName.toLowerCase())
-        if (!branch) {
-            errors.push({ row: rowNum, reason: `Branch not found: "${branchName}"` })
-            skipped++
-            continue
+        // Optional branch lookup (only if provided)
+        let branchId: string | null = null
+        if (branchName) {
+            const branch = allBranches.find(b => b.name.toLowerCase() === branchName.toLowerCase())
+            if (branch) branchId = branch.id
         }
 
         try {
@@ -102,7 +101,7 @@ export async function POST(req: Request) {
                     phone,
                     email: row.email ? String(row.email).trim() : null,
                     designation: row.designation ? String(row.designation).trim() : null,
-                    branchId: branch.id,
+                    branchId,
                     employmentType: row.employmentType ? String(row.employmentType).trim() : "Full-time",
                     basicSalary: salaryVal,
                     city: row.city ? String(row.city).trim() : null,

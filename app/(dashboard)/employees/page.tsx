@@ -2113,7 +2113,7 @@ export default function EmployeesPage() {
 
     function handleDownloadTemplate() {
         const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.aoa_to_sheet([["First Name", "Last Name", "Phone", "Email", "Designation", "Site Name", "Employment Type", "Basic Salary", "City", "Date of Joining (YYYY-MM-DD)"]])
+        const ws = XLSX.utils.aoa_to_sheet([["First Name", "Last Name", "Phone", "Email", "Designation", "Employment Type", "Basic Salary", "City", "Date of Joining (YYYY-MM-DD)"]])
         XLSX.utils.book_append_sheet(wb, ws, "Employees")
         XLSX.writeFile(wb, "employees_template.xlsx")
     }
@@ -2137,7 +2137,6 @@ export default function EmployeesPage() {
                     else if (lk === "phone") entry.phone = val
                     else if (lk === "email") entry.email = val
                     else if (lk === "designation") entry.designation = val
-                    else if (lk === "sitename") entry.siteName = val
                     else if (lk === "employmenttype") entry.employmentType = val
                     else if (lk === "basicsalary") entry.basicSalary = val
                     else if (lk === "city") entry.city = val
@@ -2465,7 +2464,7 @@ export default function EmployeesPage() {
                                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                                         <thead>
                                             <tr style={{ background: "var(--surface)" }}>
-                                                {["First Name", "Last Name", "Phone", "Site Name", "Designation"].map(h => (
+                                                {["First Name", "Last Name", "Phone", "Email", "Designation"].map(h => (
                                                     <th key={h} style={{ padding: "6px 10px", textAlign: "left", borderBottom: "1px solid var(--border)", color: "var(--text3)", fontWeight: 600 }}>{h}</th>
                                                 ))}
                                             </tr>
@@ -2476,7 +2475,7 @@ export default function EmployeesPage() {
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.firstName ?? "")}</td>
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.lastName ?? "")}</td>
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.phone ?? "")}</td>
-                                                    <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.siteName ?? "")}</td>
+                                                    <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.email ?? "")}</td>
                                                     <td style={{ padding: "6px 10px", color: "var(--text)" }}>{String(r.designation ?? "")}</td>
                                                 </tr>
                                             ))}

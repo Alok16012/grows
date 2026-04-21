@@ -490,7 +490,7 @@ model Employee {
   photo             String?
   designation       String?
   departmentId      String?
-  branchId          String
+  branchId          String?
   dateOfJoining     DateTime?
   dateOfLeaving     DateTime?
   status            EmployeeStatus     @default(ACTIVE)
@@ -574,7 +574,7 @@ model Employee {
   // Bank extra
   bankBranch            String?
   user              User?              @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
-  branch            Branch             @relation(fields: [branchId], references: [id])
+  branch            Branch?            @relation(fields: [branchId], references: [id])
   department        Department?        @relation(fields: [departmentId], references: [id])
   deployments       Deployment[]
   attendances       Attendance[]
