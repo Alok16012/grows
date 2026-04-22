@@ -67,5 +67,6 @@
   body {
     background-color: var(--bg);
     color: var(--text);
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   }
 }
