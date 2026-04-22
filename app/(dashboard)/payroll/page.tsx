@@ -38,147 +38,180 @@ export default function PayrollDashboard() {
     const router = useRouter()
     const [search, setSearch] = useState("")
     const [activeTab, setActiveTab] = useState("progress")
+    const [loading, setLoading] = useState(false)
+    const [data, setData] = useState<any[]>([])
 
-    // In a real app, we'd fetch this data based on the tab
-    const currentData = MOCK_DATA[activeTab as keyof typeof MOCK_DATA] || []
+    // --- Fetch Data ---
+    const fetchData = async () => {
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/payroll/payments?status=${activeTab}&search=${search}`)
+            if (res.ok) {
+                const result = await res.json()
+                setData(result.data || [])
+            }
+        } catch (err) {
+            console.error("Failed to fetch payments", err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchData()
+    }, [activeTab])
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault()
+        fetchData()
+    }
 
     return (
         <div className="space-y-6 max-w-screen-2xl mx-auto pb-12">
             {/* Breadcrumb & Header */}
             <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-[11px] text-[var(--text3)] uppercase tracking-wider font-medium">
+                <div className="flex items-center gap-2 text-[10.5px] text-[var(--text3)] uppercase tracking-[0.8px] font-bold">
                     <span>Payroll</span>
-                    <ChevronRight size={12} />
+                    <ChevronRight size={12} className="text-[var(--text3)] opacity-40" />
                     <span>Payments Dashboard</span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
-                            <FileText size={20} />
+                    <div className="flex items-center gap-4">
+                        <div className="h-11 w-11 bg-[var(--accent-light)] text-[var(--accent)] rounded-2xl flex items-center justify-center shadow-sm border border-[var(--accent)]/10">
+                            <FileText size={22} />
                         </div>
-                        <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">Payments</h1>
+                        <div>
+                            <h1 className="text-[24px] font-black tracking-tight text-[var(--text)]">Payments</h1>
+                            <p className="text-[13px] text-[var(--text3)] font-medium">Monitor and manage all payroll disbursement cycles.</p>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="bg-white border-[var(--border)] text-[12px] h-9 gap-2">
-                            <ArrowRightLeft size={14} className="text-blue-600" /> Transfer
+                    <div className="flex items-center gap-3">
+                        <Button variant="outline" size="sm" className="bg-white border-[var(--border)] text-[12.5px] h-10 px-4 gap-2 rounded-xl font-bold shadow-sm hover:bg-[var(--surface2)]">
+                            <ArrowRightLeft size={14} className="text-[var(--accent)]" /> Quick Transfer
                         </Button>
-                        <Button variant="outline" size="sm" className="bg-white border-[var(--border)] text-[12px] h-9 gap-2">
-                            Initiate <MoreHorizontal size={14} />
-                        </Button>
-                        <Button variant="outline" size="sm" className="bg-white border-[var(--border)] text-[12px] h-9 gap-2">
-                            View <MoreHorizontal size={14} />
+                        <Button variant="outline" size="sm" className="bg-white border-[var(--border)] text-[12.5px] h-10 px-4 gap-2 rounded-xl font-bold shadow-sm hover:bg-[var(--surface2)]">
+                            Batch Actions <MoreHorizontal size={14} />
                         </Button>
                     </div>
                 </div>
             </div>
 
             {/* Main Tabs Container */}
-            <div className="bg-white border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-[var(--border)] rounded-[20px] overflow-hidden shadow-sm border-b-4 border-b-[var(--accent)]/10">
                 <Tabs defaultValue="progress" className="w-full" onValueChange={setActiveTab}>
-                    <div className="px-6 border-b border-[var(--border)] bg-gray-50/30">
-                        <TabsList className="bg-transparent h-14 p-0 gap-8 justify-start">
-                            <TabsTrigger value="progress" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-0 h-full text-[13px] font-medium border-b-2 border-transparent transition-all">
+                    <div className="px-8 border-b border-[var(--border)] bg-gray-50/20">
+                        <TabsList className="bg-transparent h-16 p-0 gap-10 justify-start">
+                            <TabsTrigger value="progress" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[var(--accent)] data-[state=active]:text-[var(--accent-text)] rounded-none px-0 h-full text-[13.5px] font-bold border-b-2 border-transparent transition-all tracking-tight opacity-70 data-[state=active]:opacity-100">
                                 Transfers in Progress
                             </TabsTrigger>
-                            <TabsTrigger value="fla" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-0 h-full text-[13px] font-medium border-b-2 border-transparent transition-all">
-                                Files in Progress-FLA
+                            <TabsTrigger value="fla" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[var(--accent)] data-[state=active]:text-[var(--accent-text)] rounded-none px-0 h-full text-[13.5px] font-bold border-b-2 border-transparent transition-all tracking-tight opacity-70 data-[state=active]:opacity-100">
+                                Files Progress-FLA
                             </TabsTrigger>
-                            <TabsTrigger value="tla" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-0 h-full text-[13px] font-medium border-b-2 border-transparent transition-all">
-                                Files in Progress-TLA
+                            <TabsTrigger value="tla" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[var(--accent)] data-[state=active]:text-[var(--accent-text)] rounded-none px-0 h-full text-[13.5px] font-bold border-b-2 border-transparent transition-all tracking-tight opacity-70 data-[state=active]:opacity-100">
+                                Files Progress-TLA
                             </TabsTrigger>
-                            <TabsTrigger value="bank" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-0 h-full text-[13px] font-medium border-b-2 border-transparent transition-all">
+                            <TabsTrigger value="bank" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[var(--accent)] data-[state=active]:text-[var(--accent-text)] rounded-none px-0 h-full text-[13.5px] font-bold border-b-2 border-transparent transition-all tracking-tight opacity-70 data-[state=active]:opacity-100">
                                 Sent to Bank
                             </TabsTrigger>
                         </TabsList>
                     </div>
 
-                    <div className="p-6">
+                    <div className="p-8">
                         {/* Filters Row */}
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 bg-[var(--surface)] p-1 rounded-lg border border-[var(--border)]">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 bg-white shadow-sm"><TableIcon size={14} /></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7"><LayoutGrid size={14} /></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7"><RefreshCw size={14} /></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-[var(--text3)]"><MoreHorizontal size={14} /></Button>
+                        <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-8 gap-4">
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <div className="flex items-center gap-2 bg-[var(--surface2)] p-1.5 rounded-xl border border-[var(--border)] shadow-inner">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 bg-white shadow-sm ring-1 ring-black/5"><TableIcon size={15} /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--text3)]"><LayoutGrid size={15} /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--accent)]" onClick={fetchData}><RefreshCw size={15} /></Button>
                                 </div>
                                 <div className="h-8 w-px bg-[var(--border)] mx-1" />
                                 <div className="flex items-center gap-2">
-                                    <select className="bg-white border border-[var(--border)] rounded-lg px-3 py-1.5 text-[12px] h-9 outline-none">
+                                    <select className="bg-white border border-[var(--border)] rounded-xl px-4 py-1.5 text-[12.5px] font-bold h-10 outline-none focus:border-[var(--accent)] shadow-sm">
                                         <option>View by Status</option>
                                     </select>
-                                    <select className="bg-white border border-[var(--border)] rounded-lg px-3 py-1.5 text-[12px] h-9 outline-none">
-                                        <option>All Status</option>
+                                    <select className="bg-white border border-[var(--border)] rounded-xl px-4 py-1.5 text-[12.5px] font-bold h-10 outline-none focus:border-[var(--accent)] shadow-sm">
+                                        <option>All Dates</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                <span className="text-[11px] text-[var(--text3)] italic">Last 4 Days data displayed. Use Advance Filter for more data.</span>
-                                <div className="relative w-64">
-                                    <Search className="absolute left-3 top-2.5 text-[var(--text3)]" size={14} />
+                            <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-4">
+                                <div className="relative w-80">
+                                    <Search className="absolute left-4 top-3 text-[var(--text3)]" size={15} />
                                     <Input 
-                                        placeholder="Reference number / Search..." 
-                                        className="pl-9 text-[12px] h-9 bg-white border-[var(--border)]"
+                                        placeholder="Beneficiary or Ref No..." 
+                                        className="pl-11 pr-4 text-[13px] font-medium h-10 bg-white border-[var(--border)] rounded-xl shadow-sm focus:border-[var(--accent)] transition-all"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                     />
                                 </div>
-                                <Button variant="outline" size="icon" className="h-9 w-9 bg-blue-50 border-blue-100 text-blue-600">
-                                    <Filter size={14} />
+                                <Button type="submit" variant="outline" className="h-10 px-5 gap-2 bg-[var(--accent-light)] border-[var(--accent)]/20 text-[var(--accent-text)] rounded-xl font-bold hover:bg-[var(--accent)] hover:text-white transition-all shadow-sm">
+                                    <Filter size={15} /> Advanced
                                 </Button>
-                            </div>
+                                <Button variant="outline" className="h-10 px-5 gap-2 bg-white text-[var(--text2)] border-[var(--border)] rounded-xl font-bold hover:bg-[var(--surface2)] shadow-sm">
+                                    <Download size={15} /> Export
+                                </Button>
+                            </form>
                         </div>
 
                         {/* Table */}
-                        <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-                            <table className="w-full text-left text-[13px] border-collapse">
-                                <thead className="bg-gray-50/50 border-b border-[var(--border)]">
-                                    <tr className="uppercase text-[10px] font-bold tracking-wider text-[var(--text3)]">
-                                        <th className="px-5 py-4 flex items-center gap-2">Beneficiary Account No. <ArrowRightLeft size={10} className="rotate-90" /></th>
-                                        <th className="px-5 py-4 gap-2">Beneficiary Name</th>
-                                        <th className="px-5 py-4 text-center">No. Of Txn.</th>
-                                        <th className="px-5 py-4 text-right">Amount (₹)</th>
-                                        <th className="px-5 py-4 text-center">Status</th>
-                                        <th className="px-5 py-4">File Name</th>
-                                        <th className="px-5 py-4 text-right">Created On</th>
-                                        <th className="px-5 py-4 w-10"></th>
+                        <div className="border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm relative border-b-4 border-b-gray-100">
+                            {loading && (
+                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                                    <Loader2 className="animate-spin text-[var(--accent)]" size={24} />
+                                </div>
+                            )}
+                            <table className="w-full text-left text-[13.5px] border-collapse lg:table-fixed">
+                                <thead className="bg-[#fcfcfd] border-b border-[var(--border)]">
+                                    <tr className="uppercase text-[10px] font-extrabold tracking-[1.2px] text-[var(--text3)]">
+                                        <th className="px-6 py-5 flex items-center gap-2">Beneficiary Account <ArrowRightLeft size={10} className="rotate-90 opacity-40" /></th>
+                                        <th className="px-6 py-5">Beneficiary Name</th>
+                                        <th className="px-6 py-5 text-center w-32">Txns</th>
+                                        <th className="px-6 py-5 text-right w-40">Amount (₹)</th>
+                                        <th className="px-6 py-5 text-center w-36">Status</th>
+                                        <th className="px-6 py-5">Remarks</th>
+                                        <th className="px-6 py-5 text-right w-44 tracking-tight">Timestamp</th>
+                                        <th className="px-6 py-5 w-14"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-[var(--border)] bg-gray-50/5">
-                                    {currentData.length > 0 ? (
-                                        currentData.map((row) => (
-                                            <tr key={row.id} className="hover:bg-gray-50/30 transition-colors group">
-                                                <td className="px-5 py-4 font-mono text-[12px] text-blue-600">{row.account}</td>
-                                                <td className="px-5 py-4 font-medium">{row.name}</td>
-                                                <td className="px-5 py-4 text-center">{row.txn}</td>
-                                                <td className="px-5 py-4 text-right font-semibold">₹{row.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                                                <td className="px-5 py-4 text-center">
+                                <tbody className="divide-y divide-[var(--border)] bg-white">
+                                    {data.length > 0 ? (
+                                        data.map((row) => (
+                                            <tr key={row.id} className="hover:bg-blue-50/10 transition-colors group">
+                                                <td className="px-6 py-5 font-bold font-mono text-[13px] text-blue-600 tracking-tight">{row.account}</td>
+                                                <td className="px-6 py-5 font-black text-[var(--text)]">{row.name}</td>
+                                                <td className="px-6 py-5 text-center font-bold text-[var(--text2)]">{row.txn}</td>
+                                                <td className="px-6 py-5 text-right font-black text-[var(--text)] tracking-tight">₹{row.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                                                <td className="px-6 py-5 text-center">
                                                     <span className={cn(
-                                                        "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider",
-                                                        row.status === "Processed" ? "bg-green-100 text-green-700 border border-green-200" :
-                                                        row.status === "Completed" ? "bg-emerald-100 text-emerald-700 border border-emerald-200" :
-                                                        row.status === "Processing" ? "bg-amber-100 text-amber-700 border border-amber-200 animate-pulse" :
-                                                        "bg-gray-100 text-gray-700"
+                                                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm border",
+                                                        row.status === "PROCESSED" || row.status === "Processed" ? "bg-emerald-50 text-[#1a9e6e] border-emerald-100" :
+                                                        row.status === "PAID" || row.status === "Completed" ? "bg-blue-50 text-blue-700 border-blue-100" :
+                                                        row.status === "DRAFT" || row.status === "Processing" ? "bg-amber-50 text-amber-700 border-amber-100" :
+                                                        "bg-gray-50 text-gray-700 border-gray-100"
                                                     )}>
                                                         {row.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-5 py-4 text-[12px] text-[var(--text3)] italic">{row.file}</td>
-                                                <td className="px-5 py-4 text-right text-[12px] text-[var(--text3)]">{row.date}</td>
-                                                <td className="px-5 py-4 text-right">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--text3)] hover:text-[var(--text)]">
-                                                        <MoreVertical size={14} />
+                                                <td className="px-6 py-5 text-[12.5px] text-[var(--text3)] font-medium italic break-words">{row.file}</td>
+                                                <td className="px-6 py-5 text-right text-[12px] text-[var(--text3)] font-bold">{row.date}</td>
+                                                <td className="px-6 py-5 text-right">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--text3)] hover:text-[var(--text)] rounded-lg hover:bg-[var(--surface2)]">
+                                                        <MoreVertical size={16} />
                                                     </Button>
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={8} className="px-5 py-12 text-center text-[var(--text3)]">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <Clock size={32} className="opacity-20" />
-                                                    <span>No records found for the selected view.</span>
+                                            <td colSpan={8} className="px-6 py-24 text-center text-[var(--text3)]">
+                                                <div className="flex flex-col items-center gap-4">
+                                                    <Clock size={40} className="opacity-10" />
+                                                    <div className="space-y-1">
+                                                        <p className="font-bold text-[15px] text-[var(--text2)]">No disbursements found</p>
+                                                        <p className="text-[13px] font-medium italic">Adjust filters or search criteria to view records.</p>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -188,24 +221,43 @@ export default function PayrollDashboard() {
                         </div>
 
                         {/* Footer / Pagination */}
-                        <div className="flex items-center justify-between mt-6">
-                            <span className="text-[12px] text-[var(--text3)] font-medium">Total Records: {currentData.length}</span>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[12px] text-[var(--text3)]">10 / page</span>
+                        <div className="flex flex-col md:flex-row items-center justify-between mt-10 gap-4">
+                            <div className="flex items-center gap-10">
+                                <span className="text-[12.5px] text-[var(--text3)] font-bold uppercase tracking-widest">Total Records: {data.length}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-[12.5px] font-bold text-[var(--text2)]">10 / Session</span>
                                     <ChevronDown size={14} className="text-[var(--text3)]" />
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <Button variant="outline" size="icon" className="h-8 w-8 border-[var(--border)]"><ChevronLeft size={14} /></Button>
-                                    <Button variant="default" size="icon" className="h-8 w-8 bg-blue-600">1</Button>
-                                    <Button variant="outline" size="icon" className="h-8 w-8 border-[var(--border)]"><ChevronRight size={14} /></Button>
-                                </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 p-1.5 bg-gray-50 rounded-2xl shadow-inner border border-[var(--border)]">
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-[var(--text3)] hover:bg-white hover:text-[var(--text)] shadow-sm transition-all"><ChevronLeft size={16} /></Button>
+                                <Button variant="ghost" className="h-9 min-w-[36px] bg-white text-[var(--accent)] font-black text-[13px] shadow-sm ring-1 ring-black/5 rounded-xl">1</Button>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-[var(--text3)] hover:bg-white hover:text-[var(--text)] shadow-sm transition-all"><ChevronRight size={16} /></Button>
                             </div>
                         </div>
                     </div>
                 </Tabs>
             </div>
         </div>
+    )
+}
+
+function Loader2(props: any) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
     )
 }
 
