@@ -9,7 +9,10 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")) {
+        
+        const hasAccess = checkAccess(session, ["MANAGER", "HR_MANAGER", "ADMIN"], "employees.view")
+        if (!hasAccess) {
+            console.log("Access denied for employee GET. Session role:", session.user.role, "Permissions:", session.user.permissions)
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -78,7 +81,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.create")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -103,8 +106,8 @@ export async function POST(req: Request) {
             safetyShoes, safetyShoesDate, bankBranch,
         } = body
 
-        if (!firstName || !lastName || !phone) {
-            return new NextResponse("firstName, lastName and phone are required", { status: 400 })
+        if (!firstName) {
+            return new NextResponse("firstName is required", { status: 400 })
         }
 
         // Auto-generate employeeId as EMP-NNNN
@@ -129,8 +132,8 @@ export async function POST(req: Request) {
         // Email: use provided email, else phone@cims.local
         // Password: phone number (employee can change later)
         // Role: INSPECTION_BOY by default
-        const userEmail = email || `${phone}@cims.local`
-        const passwordHash = await bcrypt.hash(phone, 10)
+        const userEmail = email || (phone ? `${phone}@cims.local` : `temp_${Date.now()}@cims.local`)
+        const passwordHash = await bcrypt.hash(phone || "123456", 10)
 
         // Check if user already exists with this email
         const existingUser = await prisma.user.findUnique({ where: { email: userEmail } })
@@ -166,9 +169,9 @@ export async function POST(req: Request) {
             data: {
                 employeeId: finalId,
                 firstName,
-                lastName,
+                lastName: lastName || "",
                 email,
-                phone,
+                phone: phone || "",
                 alternatePhone,
                 dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
                 gender,
@@ -249,7 +252,7 @@ export async function POST(req: Request) {
             ...employee,
             _userCreated: !existingUser,
             _loginEmail: userEmail,
-            _loginPassword: phone,
+            _loginPassword: phone || "123456",
         })
     } catch (error) {
         console.error("[EMPLOYEES_POST]", error)

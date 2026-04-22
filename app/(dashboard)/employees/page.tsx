@@ -454,8 +454,8 @@ function EmployeeModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!form.firstName.trim() || !form.lastName.trim() || !form.phone.trim()) {
-            toast.error("First name, last name and phone are required")
+        if (!form.firstName.trim()) {
+            toast.error("First name is required")
             return
         }
         setLoading(true)
@@ -591,12 +591,12 @@ function EmployeeModal({
                                     <input value={form.firstName} onChange={set("firstName")} className={inputCls} placeholder="First name" required />
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Last Name *</label>
-                                    <input value={form.lastName} onChange={set("lastName")} className={inputCls} placeholder="Last name" required />
+                                    <label className={labelCls}>Last Name</label>
+                                    <input value={form.lastName} onChange={set("lastName")} className={inputCls} placeholder="Last name" />
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Phone *</label>
-                                    <input value={form.phone} onChange={set("phone")} className={inputCls} placeholder="Phone number" required />
+                                    <label className={labelCls}>Phone</label>
+                                    <input value={form.phone} onChange={set("phone")} className={inputCls} placeholder="Phone number" />
                                 </div>
                                 <div>
                                     <label className={labelCls}>Email</label>

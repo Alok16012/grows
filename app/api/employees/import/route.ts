@@ -49,9 +49,11 @@ export async function POST(req: Request) {
 
         // Pre-fetch existing records to drastically reduce DB queries and prevent Vercel Timeouts (504)
         const allPhones = rows.map(r => String(r.phone ?? "").trim()).filter(Boolean)
-        const allEmails = rows.map(r => {
+        const allEmails = rows.map((r, idx) => {
             const p = String(r.phone ?? "").trim()
-            return r.email ? String(r.email).trim() : `${p}@cims.local`
+            if (r.email) return String(r.email).trim()
+            if (p) return `${p}@cims.local`
+            return `temp_${idx}_${Date.now()}@cims.local`
         }).filter(Boolean)
 
         const existingPhones = await prisma.employee.findMany({
@@ -74,19 +76,22 @@ export async function POST(req: Request) {
             const phone = String(row.phone ?? "").trim()
             const branchName = String(row.branchName ?? "").trim()
 
-            if (!firstName || !lastName || !phone) {
-                errors.push({ row: rowNum, reason: "Missing required fields (First Name, Last Name, Phone)" })
+            if (!firstName) {
+                errors.push({ row: rowNum, reason: "Missing required field (First Name)" })
                 skipped++
                 continue
             }
 
-            if (existingPhones.has(phone)) {
+            if (phone && existingPhones.has(phone)) {
                 errors.push({ row: rowNum, reason: `Duplicate: Employee with phone ${phone} already exists` })
                 skipped++
                 continue
             }
 
-            const userEmail = row.email ? String(row.email).trim() : `${phone}@cims.local`
+            let userEmail = row.email ? String(row.email).trim() : "";
+            if (!userEmail) {
+                userEmail = phone ? `${phone}@cims.local` : `temp_${i}_${Date.now()}@cims.local`;
+            }
             const userEmailLower = userEmail.toLowerCase()
             
             const existingUser = userMap.get(userEmailLower)
@@ -121,10 +126,11 @@ export async function POST(req: Request) {
                 if (existingUser) {
                     userId = existingUser.id
                 } else {
-                    const passwordHash = await bcrypt.hash(phone, 10)
+                    const defaultPassword = phone || "123456"
+                    const passwordHash = await bcrypt.hash(defaultPassword, 10)
                     const newUser = await prisma.user.create({
                         data: {
-                            name: `${firstName} ${lastName}`,
+                            name: `${firstName} ${lastName}`.trim(),
                             email: userEmail,
                             password: passwordHash,
                             role: "INSPECTION_BOY",
@@ -139,8 +145,8 @@ export async function POST(req: Request) {
                     data: {
                         employeeId: finalId,
                         firstName,
-                        lastName,
-                        phone,
+                        lastName: lastName || "",
+                        phone: phone || "",
                         email: row.email ? String(row.email).trim() : null,
                         designation: row.designation ? String(row.designation).trim() : null,
                         branchId,
@@ -154,7 +160,9 @@ export async function POST(req: Request) {
                 })
                 
                 // To prevent duplicates inside the same batch upload
-                existingPhones.add(phone)
+                if (phone) {
+                    existingPhones.add(phone)
+                }
                 userMap.set(userEmailLower, { id: userId, email: userEmailLower, employeeProfile: { id: "new" } })
                 
                 imported++
