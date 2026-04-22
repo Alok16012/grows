@@ -6,7 +6,7 @@ import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
-    UserCircle2, MapPin, CreditCard, Contact, IdCard
+    UserCircle2, MapPin, CreditCard, Contact
 } from "lucide-react"
 
 // ─── Self-service Details Tab ────────────────────────────────────────────────
@@ -157,7 +157,7 @@ function MyDetailsTab() {
                 <Field label="Pincode" value={data.permanentPincode ?? ""} onChange={set("permanentPincode")} />
             </Section>
 
-            <Section title="Identity & Employment IDs" icon={IdCard}>
+            <Section title="Identity & Employment IDs" icon={Contact}>
                 <Field label="Aadhaar Number" value={data.aadharNumber ?? ""} onChange={set("aadharNumber")} />
                 <Field label="PAN Number" value={data.panNumber ?? ""} onChange={set("panNumber")} />
                 <Field label="UAN" value={data.uan ?? ""} onChange={set("uan")} />
