@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 export default function SiteWageSheetPage() {
     const { data: session } = useSession()
@@ -206,6 +207,4 @@ export default function SiteWageSheetPage() {
     )
 }
 
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(" ")
-}
+

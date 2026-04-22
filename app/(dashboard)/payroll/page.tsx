@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 // --- Mock Data ---
 const MOCK_DATA = {
@@ -227,8 +228,4 @@ function ChevronLeft({ size }: { size: number }) {
 
 function ChevronDown({ size, className }: { size: number, className?: string }) {
     return <ChevronRight size={size} className={cn("rotate-90", className)} />
-}
-
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(" ")
 }

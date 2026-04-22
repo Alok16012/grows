@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 
 export default function FinalPayrollReviewPage() {
     const { data: session } = useSession()
@@ -296,10 +297,6 @@ function ChevronLeft({ size }: { size: number }) {
 
 function ChevronDown({ size, className }: { size: number, className?: string }) {
     return <ChevronRight size={size} className={cn("rotate-90", className)} />
-}
-
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(" ")
 }
 
 function Users({ size }: { size: number }) {
