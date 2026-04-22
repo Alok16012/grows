@@ -219,6 +219,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                 {section.title}
                             </h3>
                             <nav className="space-y-0.5">
+                                {filteredLinks.map((link) => {
+                                    const Icon = link.icon
                                     const hasSubLinks = !!link.subLinks && link.subLinks.length > 0
                                     const isSubActive = hasSubLinks && link.subLinks!.some(sub => pathname === sub.href || (sub.href !== "/" && pathname.startsWith(sub.href)))
                                     const isItemActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href))
