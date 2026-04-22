@@ -111,11 +111,23 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             links: [
                 { name: "Attendance", href: "/attendance", icon: Clock, roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
                 { name: "Leaves", href: "/leaves", icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view" },
-                { name: "Payroll", href: "/payroll", icon: Wallet, roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
+                { 
+                    name: "Payroll", 
+                    href: "/payroll", 
+                    icon: Wallet, 
+                    roles: ["ADMIN", "MANAGER"], 
+                    permission: "payroll.view",
+                    subLinks: [
+                        { name: "Payments Dashboard", href: "/payroll" },
+                        { name: "Process Payroll", href: "/payroll/process" },
+                        { name: "Site Wise Wage Sheet", href: "/payroll/wagesheet" },
+                        { name: "Select Sites (Multi)", href: "/payroll/select-sites" },
+                        { name: "Final Payroll (Multi Site)", href: "/payroll/final" },
+                        { name: "Payslip Generation", href: "/payroll/salary-slips" },
+                        { name: "Compliance Reports", href: "/payroll/compliance" },
+                    ]
+                },
                 { name: "Upload Attendance", href: "/attendance/upload", icon: Upload, roles: ["ADMIN", "MANAGER"], permission: "attendance.manage" },
-                { name: "Salary Slips", href: "/payroll/salary-slips", icon: IndianRupee, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "payroll.view" },
-                { name: "Compliance", href: "/payroll/compliance", icon: ShieldCheck, roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
-                { name: "Reports & Downloads", href: "/payroll/reports", icon: FileDown, roles: ["ADMIN", "MANAGER"], permission: "reports.view" },
                 { name: "Assets", href: "/assets", icon: Package, roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
                 { name: "Expenses", href: "/expenses", icon: CreditCard, roles: ["ADMIN", "MANAGER"] },
             ]
@@ -207,32 +219,65 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                 {section.title}
                             </h3>
                             <nav className="space-y-0.5">
-                                {filteredLinks.map((link) => {
-                                    const Icon = link.icon
-                                    const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href))
+                                    const hasSubLinks = !!link.subLinks && link.subLinks.length > 0
+                                    const isSubActive = hasSubLinks && link.subLinks!.some(sub => pathname === sub.href || (sub.href !== "/" && pathname.startsWith(sub.href)))
+                                    const isItemActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href))
+                                    const showSub = isSubActive || isItemActive
 
                                     return (
-                                        <Link
-                                            key={link.href}
-                                            href={link.href}
-                                            onClick={onMobileClose}
-                                            className={cn(
-                                                "flex items-center justify-between rounded-[8px] px-[10px] py-[8px] text-[13px] transition-all group",
-                                                isActive
-                                                    ? "bg-[var(--accent-light)] text-[var(--accent-text)] font-medium"
-                                                    : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <Icon size={18} className={cn(isActive ? "text-[var(--accent-text)]" : "text-[var(--text3)] group-hover:text-[var(--text2)]")} />
-                                                {link.name}
-                                            </div>
-                                            {link.badge && pendingCount > 0 && (
-                                                <div className="h-[18px] min-w-[18px] rounded-full bg-[var(--red)] text-white text-[10px] font-bold flex items-center justify-center px-1">
-                                                    {pendingCount}
+                                        <div key={link.href} className="flex flex-col gap-0.5">
+                                            <Link
+                                                href={link.href}
+                                                onClick={onMobileClose}
+                                                className={cn(
+                                                    "flex items-center justify-between rounded-[8px] px-[10px] py-[8px] text-[13px] transition-all group",
+                                                    isItemActive && !hasSubLinks
+                                                        ? "bg-[var(--accent-light)] text-[var(--accent-text)] font-medium"
+                                                        : (isSubActive || isItemActive)
+                                                            ? "bg-[var(--surface2)] text-[var(--text)] font-medium"
+                                                            : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <Icon size={18} className={cn(isItemActive || isSubActive ? "text-[var(--accent-text)]" : "text-[var(--text3)] group-hover:text-[var(--text2)]")} />
+                                                    {link.name}
+                                                </div>
+                                                {hasSubLinks && (
+                                                    <ChevronRight 
+                                                        size={14} 
+                                                        className={cn("transition-transform text-[var(--text3)]", showSub && "rotate-90")} 
+                                                    />
+                                                )}
+                                                {link.badge && pendingCount > 0 && (
+                                                    <div className="h-[18px] min-w-[18px] rounded-full bg-[var(--red)] text-white text-[10px] font-bold flex items-center justify-center px-1">
+                                                        {pendingCount}
+                                                    </div>
+                                                )}
+                                            </Link>
+                                            
+                                            {hasSubLinks && showSub && (
+                                                <div className="flex flex-col gap-0.5 ml-4 border-l border-[var(--border)] pl-3 my-0.5">
+                                                    {link.subLinks!.map(sub => {
+                                                        const isSubLinkActive = pathname === sub.href
+                                                        return (
+                                                            <Link
+                                                                key={sub.href}
+                                                                href={sub.href}
+                                                                onClick={onMobileClose}
+                                                                className={cn(
+                                                                    "rounded-[6px] px-[10px] py-[6px] text-[12px] transition-all",
+                                                                    isSubLinkActive
+                                                                        ? "bg-[var(--accent-light)] text-[var(--accent-text)] font-medium"
+                                                                        : "text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)]"
+                                                                )}
+                                                            >
+                                                                {sub.name}
+                                                            </Link>
+                                                        )
+                                                    })}
                                                 </div>
                                             )}
-                                        </Link>
+                                        </div>
                                     )
                                 })}
                             </nav>
