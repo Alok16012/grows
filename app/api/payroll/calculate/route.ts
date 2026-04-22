@@ -15,7 +15,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { branchId, attendance } = body
+        const { branchId, siteId, attendance } = body
         // Parse month/year as integers always
         const month = parseInt(String(body.month))
         const year  = parseInt(String(body.year))
@@ -37,8 +37,20 @@ export async function POST(req: Request) {
             runId = created.id
         }
 
+        // Build employee list — site-wise takes priority over branch-wise
+        let employeeIds: string[] | null = null
+        if (siteId) {
+            const deployments = await prisma.deployment.findMany({
+                where: { siteId, isActive: true },
+                select: { employeeId: true },
+            })
+            employeeIds = deployments.map(d => d.employeeId)
+            if (!employeeIds.length) return new NextResponse("No active deployments found for this site", { status: 404 })
+        }
+
         const whereClause: Record<string, unknown> = { status: "ACTIVE" }
-        if (branchId) whereClause.branchId = branchId
+        if (employeeIds) whereClause.id = { in: employeeIds }
+        else if (branchId) whereClause.branchId = branchId
 
         const employees = await prisma.employee.findMany({
             where: whereClause,
@@ -92,8 +104,9 @@ export async function POST(req: Request) {
                     where:  { employeeId_month_year: { employeeId: emp.id, month, year } },
                     create: {
                         employeeId: emp.id, payrollRunId: runId, month, year,
+                        siteId: siteId ?? null,
                         ...calc,
-                        canteenDays: att.canteenDays,   // ensure Int
+                        canteenDays: att.canteenDays,
                         workingDays: att.monthDays,
                         presentDays: att.workedDays,
                         lwpDays:     att.monthDays - att.workedDays,
@@ -103,8 +116,9 @@ export async function POST(req: Request) {
                     },
                     update: {
                         payrollRunId: runId,
+                        siteId: siteId ?? null,
                         ...calc,
-                        canteenDays: att.canteenDays,   // ensure Int
+                        canteenDays: att.canteenDays,
                         workingDays: att.monthDays,
                         presentDays: att.workedDays,
                         lwpDays:     att.monthDays - att.workedDays,
