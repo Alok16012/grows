@@ -225,7 +225,7 @@ function ChevronLeft({ size }: { size: number }) {
     return <ChevronRight size={size} className="rotate-180" />
 }
 
-function ChevronDown({ size }: { size: number, className?: string }) {
+function ChevronDown({ size, className }: { size: number, className?: string }) {
     return <ChevronRight size={size} className={cn("rotate-90", className)} />
 }
 
