@@ -8,7 +8,7 @@ import {
     Search, Filter, Download, FileSpreadsheet, 
     Eye, ChevronRight, RefreshCw, Layers, 
     FileText, CheckCircle2, AlertTriangle,
-    ArrowRight, Printer, Lock
+    ArrowRight, Printer, Lock, Wallet
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
