@@ -79,7 +79,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
 
-    const navigation: { title: string; links: { name: string; href: string; icon: any; roles: string[]; permission?: string; badge?: boolean }[] }[] = [
+    const navigation: { title: string; links: { name: string; href: string; icon: any; roles: string[]; permission?: string; badge?: boolean; subLinks?: { name: string; href: string }[] }[] }[] = [
         {
             title: "MAIN",
             links: [
