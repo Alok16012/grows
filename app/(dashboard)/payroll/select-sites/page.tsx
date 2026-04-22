@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { 
     Search, Filter, CheckCircle2, ChevronRight, 
-    Building2, Wallet, 
+    Building2, Users, Wallet, 
     ArrowRight, Info
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
