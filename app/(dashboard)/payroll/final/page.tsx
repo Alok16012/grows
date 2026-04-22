@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -39,9 +39,9 @@ export default function FinalPayrollReviewPage() {
         }
     }
 
-    useState(() => {
+    useEffect(() => {
         fetchData()
-    })
+    }, [month, year])
 
     const handleFinalLock = async () => {
         setLoading(true)
