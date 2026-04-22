@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-    Plus, X, Loader2, Users, Briefcase, Search
+    Plus, X, Loader2, Users, Briefcase, Search, Pencil, Trash2
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,19 +18,24 @@ type Department = {
     _count: { employees: number }
 }
 
-// ─── Add Department Modal ─────────────────────────────────────────────────────
+// ─── Add/Edit Department Modal ────────────────────────────────────────────────
 
 function DeptModal({
-    open, onClose, onSaved
+    open, onClose, onSaved, editDept
 }: {
-    open: boolean; onClose: () => void; onSaved: () => void
+    open: boolean; onClose: () => void; onSaved: () => void; editDept?: Department | null
 }) {
     const [loading, setLoading] = useState(false)
     const [form, setForm] = useState({ name: "", description: "" })
 
     useEffect(() => {
-        if (open) setForm({ name: "", description: "" })
-    }, [open])
+        if (open) {
+            setForm({
+                name: editDept?.name ?? "",
+                description: editDept?.description ?? "",
+            })
+        }
+    }, [open, editDept])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -40,17 +45,19 @@ function DeptModal({
         }
         setLoading(true)
         try {
-            const res = await fetch("/api/departments", {
-                method: "POST",
+            const url = editDept ? `/api/departments/${editDept.id}` : "/api/departments"
+            const method = editDept ? "PUT" : "POST"
+            const res = await fetch(url, {
+                method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: form.name, description: form.description }),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success("Department created!")
+            toast.success(editDept ? "Department updated!" : "Department created!")
             onSaved()
             onClose()
         } catch (err: unknown) {
-            toast.error(err instanceof Error ? err.message : "Failed to create")
+            toast.error(err instanceof Error ? err.message : "Failed to save")
         } finally {
             setLoading(false)
         }
@@ -64,7 +71,9 @@ function DeptModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-md shadow-xl">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-                    <h2 className="text-[16px] font-semibold text-[var(--text)]">Add Department</h2>
+                    <h2 className="text-[16px] font-semibold text-[var(--text)]">
+                        {editDept ? "Edit Department" : "Add Department"}
+                    </h2>
                     <button onClick={onClose} className="text-[var(--text3)] hover:text-[var(--text)] p-1 rounded-md hover:bg-[var(--surface2)] transition-colors">
                         <X size={18} />
                     </button>
@@ -101,7 +110,69 @@ function DeptModal({
                         className="inline-flex items-center gap-2 px-5 py-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
                         {loading && <Loader2 size={14} className="animate-spin" />}
-                        Create Department
+                        {editDept ? "Save Changes" : "Create Department"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+
+function DeleteConfirmModal({
+    dept, onClose, onDeleted
+}: {
+    dept: Department; onClose: () => void; onDeleted: () => void
+}) {
+    const [loading, setLoading] = useState(false)
+
+    const handleDelete = async () => {
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/departments/${dept.id}`, { method: "DELETE" })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Department deleted!")
+            onDeleted()
+            onClose()
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Failed to delete")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-sm shadow-xl p-6">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                        <Trash2 size={18} className="text-red-600" />
+                    </div>
+                    <div>
+                        <p className="text-[15px] font-semibold text-[var(--text)]">Delete Department</p>
+                        <p className="text-[12px] text-[var(--text3)]">This action cannot be undone</p>
+                    </div>
+                </div>
+                <p className="text-[13px] text-[var(--text2)] mb-5">
+                    Are you sure you want to delete <strong>{dept.name}</strong>?
+                    {dept._count.employees > 0 && (
+                        <span className="block mt-1 text-red-600 font-medium">
+                            ⚠ This department has {dept._count.employees} employee(s). Move them first.
+                        </span>
+                    )}
+                </p>
+                <div className="flex gap-2 justify-end">
+                    <button onClick={onClose} className="px-4 py-2 text-[13px] font-medium text-[var(--text2)] hover:text-[var(--text)] rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleDelete}
+                        disabled={loading || dept._count.employees > 0}
+                        className="inline-flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                    >
+                        {loading && <Loader2 size={14} className="animate-spin" />}
+                        Delete
                     </button>
                 </div>
             </div>
@@ -118,6 +189,8 @@ export default function DepartmentsPage() {
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [showModal, setShowModal] = useState(false)
+    const [editDept, setEditDept] = useState<Department | null>(null)
+    const [deleteDept, setDeleteDept] = useState<Department | null>(null)
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -171,7 +244,7 @@ export default function DepartmentsPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => setShowModal(true)}
+                    onClick={() => { setEditDept(null); setShowModal(true) }}
                     className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
                 >
                     <Plus size={16} /> Add Department
@@ -202,7 +275,7 @@ export default function DepartmentsPage() {
                     <h3 className="text-[15px] font-semibold text-[var(--text)]">No departments found</h3>
                     <p className="text-[13px] text-[var(--text3)] mt-1">Create your first department to get started.</p>
                     <button
-                        onClick={() => setShowModal(true)}
+                        onClick={() => { setEditDept(null); setShowModal(true) }}
                         className="mt-4 inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
                     >
                         <Plus size={16} /> Add Department
@@ -232,10 +305,28 @@ export default function DepartmentsPage() {
                                 )}
                             </div>
 
-                            <div className="space-y-2">
+                            <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-[13px] text-[var(--text2)]">
                                     <Users size={14} className="text-[var(--text3)] shrink-0" />
                                     <span>{dept._count.employees} employee{dept._count.employees !== 1 ? "s" : ""}</span>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => { setEditDept(dept); setShowModal(true) }}
+                                        title="Edit"
+                                        className="p-1.5 rounded-[7px] text-[var(--text3)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors"
+                                    >
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button
+                                        onClick={() => setDeleteDept(dept)}
+                                        title="Delete"
+                                        className="p-1.5 rounded-[7px] text-[var(--text3)] hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -243,11 +334,22 @@ export default function DepartmentsPage() {
                 </div>
             )}
 
+            {/* Add/Edit Modal */}
             <DeptModal
                 open={showModal}
-                onClose={() => setShowModal(false)}
+                onClose={() => { setShowModal(false); setEditDept(null) }}
                 onSaved={fetchDepartments}
+                editDept={editDept}
             />
+
+            {/* Delete Confirm Modal */}
+            {deleteDept && (
+                <DeleteConfirmModal
+                    dept={deleteDept}
+                    onClose={() => setDeleteDept(null)}
+                    onDeleted={fetchDepartments}
+                />
+            )}
         </div>
     )
 }
