@@ -1,4 +1,5 @@
 "use client"
+import { Suspense } from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
@@ -30,7 +31,7 @@ type AttRow = {
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const fmt = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
 
-export default function ProcessPayrollPage() {
+function ProcessPayrollPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
@@ -542,4 +543,12 @@ const td: React.CSSProperties = {
 const attInput: React.CSSProperties = {
     width: 50, padding: "3px 4px", borderRadius: 5, border: "1px solid var(--border)",
     textAlign: "center", fontSize: 11, outline: "none", background: "var(--surface)", color: "var(--text)"
+}
+
+export default function ProcessPayrollPageWrapper() {
+    return (
+        <Suspense>
+            <ProcessPayrollPage />
+        </Suspense>
+    )
 }
