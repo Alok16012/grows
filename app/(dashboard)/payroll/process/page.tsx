@@ -110,12 +110,11 @@ function ProcessPayrollPage() {
 
     const handleProcess = async () => {
         if (!selectedSiteId) { toast.error("Select a site"); return }
-        const eligible = employees.filter(e => e.employeeSalary?.status === "APPROVED")
-        if (!eligible.length) { toast.error("No employees have approved salary structures"); return }
+        if (!employees.length) { toast.error("No employees found for this site"); return }
 
         setProcessing(true)
         try {
-            const attendance = eligible.map(emp => {
+            const attendance = employees.map(emp => {
                 const a = attRows[emp.id] ?? {}
                 return {
                     employeeId:          emp.id,
@@ -155,7 +154,10 @@ function ProcessPayrollPage() {
     const approvedCount  = employees.filter(e => e.employeeSalary?.status === "APPROVED").length
     const totalGrossEst  = employees.reduce((s, e) => {
         const sal = e.employeeSalary
-        return sal ? s + sal.basic + sal.da + sal.washing + sal.conveyance + sal.leaveWithWages + sal.otherAllowance : s
+        const basic = sal?.status === "APPROVED" ? sal.basic : (e as any).basicSalary ?? 0
+        return s + (sal?.status === "APPROVED"
+            ? sal.basic + sal.da + sal.washing + sal.conveyance + sal.leaveWithWages + sal.otherAllowance
+            : basic)
     }, 0)
     const processedSites = siteStatus.filter(s => (s.processedCount ?? 0) > 0).length
 
@@ -501,19 +503,19 @@ function ProcessPayrollPage() {
                             </div>
 
                             {/* Banners */}
-                            {fetched && employees.some(e => !e.employeeSalary || e.employeeSalary.status !== "APPROVED") && (
+                            {fetched && approvedCount < employees.length && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047" }}>
                                     <AlertCircle size={13} style={{ color: "#a16207", flexShrink: 0 }} />
                                     <span style={{ fontSize: 11, color: "#a16207" }}>
-                                        {employees.filter(e => !e.employeeSalary || e.employeeSalary.status !== "APPROVED").length} employee(s) have no approved salary and will be skipped.
+                                        {employees.length - approvedCount} employee(s) have no approved salary structure — basic salary will be used as fallback.
                                     </span>
                                 </div>
                             )}
-                            {fetched && approvedCount > 0 && (
+                            {fetched && employees.length > 0 && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 8, background: "#dcfce7", border: "1px solid #86efac" }}>
                                     <CheckCircle2 size={13} style={{ color: "#15803d", flexShrink: 0 }} />
                                     <span style={{ fontSize: 11, color: "#15803d" }}>
-                                        {approvedCount} employees ready. Attendance defaults to {defaultDays} days — edit inline above if needed, then click <b>Process Payroll</b>.
+                                        {employees.length} employees ready. Attendance defaults to {defaultDays} days — edit inline above if needed, then click <b>Process Payroll</b>.
                                     </span>
                                 </div>
                             )}
