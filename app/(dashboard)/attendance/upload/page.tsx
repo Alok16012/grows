@@ -38,15 +38,18 @@ const TEMPLATE_SAMPLE = [
     ["EMP-0003","Amit Singh",    26, 1, 200, 10, 26, 100, 500,  0],
 ]
 
-function downloadTemplate(siteName?: string) {
+function downloadTemplate(siteName: string, employees: Employee[]) {
     const wb = XLSX.utils.book_new()
-    const sheetName = siteName ? `${siteName.slice(0,20)} Attendance` : "Attendance Template"
-    const header = siteName ? [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", ""] : ["", "", "", "", "", "", "", "", "", ""]
-    const wsData = [header, TEMPLATE_COLS, ...TEMPLATE_SAMPLE]
+    const sheetName = `${siteName.slice(0, 20)} Attendance`
+    const header = [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", ""]
+    const empRows = employees.length > 0
+        ? employees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 0, 0, 10, 0, 0, 0, 0])
+        : TEMPLATE_SAMPLE
+    const wsData = [header, TEMPLATE_COLS, ...empRows]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
     ws["!cols"] = TEMPLATE_COLS.map((_, i) => ({ wch: i <= 1 ? 22 : 16 }))
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
-    XLSX.writeFile(wb, `Attendance_Template${siteName ? `_${siteName.replace(/\s+/g,"_")}` : ""}.xlsx`)
+    XLSX.writeFile(wb, `Attendance_${siteName.replace(/\s+/g, "_")}.xlsx`)
 }
 
 // ─── Shared Styles ────────────────────────────────────────────────────────────
@@ -89,7 +92,16 @@ export default function AttendanceUploadPage() {
     const [parsing, setParsing] = useState(false)
     const [matched, setMatched] = useState<MatchedRow[] | null>(null)
     const [processing, setProcessing] = useState(false)
+    const [siteEmployees, setSiteEmployees] = useState<Employee[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        if (!siteId) { setSiteEmployees([]); return }
+        fetch(`/api/employees?siteId=${siteId}&status=ACTIVE`)
+            .then(r => r.json())
+            .then(d => setSiteEmployees(Array.isArray(d) ? d : []))
+            .catch(() => setSiteEmployees([]))
+    }, [siteId])
 
     useEffect(() => {
         fetch("/api/sites?isActive=true")
@@ -304,7 +316,7 @@ export default function AttendanceUploadPage() {
                             </p>
                         </div>
                     </div>
-                    <button onClick={() => downloadTemplate(selectedSite?.name)} disabled={!siteId}
+                    <button onClick={() => downloadTemplate(selectedSite!.name, siteEmployees)} disabled={!siteId}
                         style={{ ...btnPrimary, background: "#16a34a", opacity: !siteId ? 0.5 : 1 }}>
                         <Download size={14} /> Download Template{selectedSite ? ` — ${selectedSite.name}` : ""}
                     </button>
@@ -321,8 +333,11 @@ export default function AttendanceUploadPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {TEMPLATE_SAMPLE.map((row, i) => (
-                                <tr key={i} style={{ borderBottom: i < TEMPLATE_SAMPLE.length - 1 ? "1px solid var(--border)" : "none" }}>
+                            {(siteEmployees.length > 0
+                                ? siteEmployees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 0, 0, 10, 0, 0, 0, 0])
+                                : TEMPLATE_SAMPLE
+                            ).map((row, i, arr) => (
+                                <tr key={i} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>
                                     {row.map((cell, j) => (
                                         <td key={j} style={{ padding: "6px 10px", color: "var(--text2)", whiteSpace: "nowrap" }}>{String(cell)}</td>
                                     ))}
