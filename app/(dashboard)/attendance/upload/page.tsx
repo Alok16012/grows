@@ -120,12 +120,28 @@ export default function AttendanceUploadPage() {
             const buf = await file.arrayBuffer()
             const wb  = XLSX.read(buf, { type: "array" })
             const ws  = wb.Sheets[wb.SheetNames[0]]
-            const allRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" })
 
-            // Skip header rows that start with "SITE:" or are the template col row
-            const rows = allRows.filter(r => {
-                const first = String(Object.values(r)[0] ?? "").trim()
-                return !first.startsWith("SITE:") && first !== "Employee ID"
+            // Get raw rows as arrays to find the actual header row
+            const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" })
+
+            // Find the row that contains "Employee ID" — that's the real header
+            const headerIdx = rawRows.findIndex(row =>
+                Array.isArray(row) && row.some(cell => String(cell).trim() === "Employee ID")
+            )
+            if (headerIdx === -1) {
+                toast.error("Could not find header row with 'Employee ID' column")
+                setParsing(false)
+                return
+            }
+            const headers = (rawRows[headerIdx] as unknown[]).map(h => String(h).trim())
+            const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
+                Array.isArray(row) && row.some(cell => String(cell).trim() !== "")
+            )
+
+            const rows: Record<string, unknown>[] = dataRows.map(row => {
+                const obj: Record<string, unknown> = {}
+                headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? "" })
+                return obj
             })
 
             if (rows.length === 0) { toast.error("No data rows found in file"); setParsing(false); return }

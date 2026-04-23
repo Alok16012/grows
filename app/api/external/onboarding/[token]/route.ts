@@ -37,8 +37,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
         const body = await req.json()
         const {
-            dateOfBirth, gender, address, city, state, pincode,
-            aadharNumber, panNumber, bankAccountNumber, bankIFSC, bankName, photo,
+            dateOfBirth, gender, bloodGroup, fathersName, maritalStatus, photo,
+            address, city, state, pincode,
+            permanentAddress, permanentCity, permanentState, permanentPincode,
+            emergencyContact1Name, emergencyContact1Phone,
+            emergencyContact2Name, emergencyContact2Phone,
+            aadharNumber, panNumber,
+            bankAccountNumber, bankIFSC, bankName, bankBranch,
             uploadedDocs // array of { type, fileName, fileUrl }
         } = body
 
@@ -48,16 +53,28 @@ export async function POST(req: Request, { params }: { params: { token: string }
             data: {
                 dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : existing.dateOfBirth,
                 gender: gender ?? existing.gender,
+                bloodGroup: bloodGroup || existing.bloodGroup,
+                fathersName: fathersName || existing.fathersName,
+                maritalStatus: maritalStatus || existing.maritalStatus,
+                photo: photo || existing.photo,
                 address: address ?? existing.address,
                 city: city ?? existing.city,
                 state: state ?? existing.state,
                 pincode: pincode ?? existing.pincode,
+                permanentAddress: permanentAddress || existing.permanentAddress,
+                permanentCity: permanentCity || existing.permanentCity,
+                permanentState: permanentState || existing.permanentState,
+                permanentPincode: permanentPincode || existing.permanentPincode,
+                emergencyContact1Name: emergencyContact1Name || existing.emergencyContact1Name,
+                emergencyContact1Phone: emergencyContact1Phone || existing.emergencyContact1Phone,
+                emergencyContact2Name: emergencyContact2Name || existing.emergencyContact2Name,
+                emergencyContact2Phone: emergencyContact2Phone || existing.emergencyContact2Phone,
                 aadharNumber: aadharNumber ?? existing.aadharNumber,
                 panNumber: panNumber ?? existing.panNumber,
                 bankAccountNumber: bankAccountNumber ?? existing.bankAccountNumber,
                 bankIFSC: bankIFSC ?? existing.bankIFSC,
                 bankName: bankName ?? existing.bankName,
-                photo: photo ?? existing.photo,
+                bankBranch: bankBranch || existing.bankBranch,
                 kycRejectionNote: null, // Clear any previous notes upon resubmission
             }
         })

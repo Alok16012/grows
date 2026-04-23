@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
+import crypto from "crypto"
 
 export async function GET(req: Request) {
     try {
@@ -165,9 +166,12 @@ export async function POST(req: Request) {
             userId = newUser.id
         }
 
+        const onboardingToken = crypto.randomUUID().replace(/-/g, "")
+
         const employee = await prisma.employee.create({
             data: {
                 employeeId: finalId,
+                onboardingToken,
                 firstName,
                 lastName: lastName || "",
                 email,
@@ -253,6 +257,7 @@ export async function POST(req: Request) {
             _userCreated: !existingUser,
             _loginEmail: userEmail,
             _loginPassword: phone || "123456",
+            _onboardingLink: `/onboarding/${onboardingToken}`,
         })
     } catch (error) {
         console.error("[EMPLOYEES_POST]", error)

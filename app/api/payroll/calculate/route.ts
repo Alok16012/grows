@@ -10,7 +10,7 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const role = session.user.role
-        if (role !== "ADMIN" && role !== "MANAGER") {
+        if (role !== "ADMIN" && role !== "MANAGER" && role !== "HR_MANAGER") {
             return new NextResponse("Unauthorized", { status: 401 })
         }
 
@@ -64,8 +64,10 @@ export async function POST(req: Request) {
 
         const results = await Promise.allSettled(
             employees.map(async emp => {
+                // Use approved salary structure if available, else fall back to employee basic salary
                 const sal = emp.employeeSalary
-                if (!sal || sal.status !== "APPROVED") return null
+                const salBasic = (sal?.status === "APPROVED" ? sal.basic : null) ?? emp.basicSalary ?? 0
+                const salData = sal?.status === "APPROVED" ? sal : null
 
                 const attInput = (attendance as any[])?.find((a: any) => a.employeeId === emp.id) ?? {}
                 const att = {
@@ -81,15 +83,15 @@ export async function POST(req: Request) {
                 }
 
                 const calc = calcGrowusPayroll({
-                    basic:            sal.basic,
-                    da:               sal.da,
-                    washing:          sal.washing,
-                    conveyance:       sal.conveyance,
-                    leaveWithWages:   sal.leaveWithWages,
-                    otherAllowance:   sal.otherAllowance,
-                    otRatePerHour:    sal.otRatePerHour,
-                    canteenRatePerDay:sal.canteenRatePerDay,
-                    complianceType:   sal.complianceType ?? "OR",
+                    basic:            salBasic,
+                    da:               salData?.da               ?? 0,
+                    washing:          salData?.washing          ?? 0,
+                    conveyance:       salData?.conveyance       ?? 0,
+                    leaveWithWages:   salData?.leaveWithWages   ?? 0,
+                    otherAllowance:   salData?.otherAllowance   ?? 0,
+                    otRatePerHour:    salData?.otRatePerHour    ?? 170,
+                    canteenRatePerDay:salData?.canteenRatePerDay?? 55,
+                    complianceType:   salData?.complianceType   ?? "OR",
                 }, {
                     ...att,
                     gender: emp.gender ?? "Male",

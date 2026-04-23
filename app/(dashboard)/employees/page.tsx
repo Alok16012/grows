@@ -241,26 +241,38 @@ const EMPTY_FORM: ModalForm = {
 }
 
 
-function CredentialsModal({ email, password, onClose }: { email: string; password: string; onClose: () => void }) {
-    const [copied, setCopied] = useState(false)
-    const copy = () => {
+function CredentialsModal({ email, password, onboardingLink, onClose }: { email: string; password: string; onboardingLink?: string; onClose: () => void }) {
+    const [copiedCreds, setCopiedCreds] = useState(false)
+    const [copiedLink, setCopiedLink] = useState(false)
+
+    const fullLink = onboardingLink ? `${window.location.origin}${onboardingLink}` : ""
+
+    const copyCreds = () => {
         navigator.clipboard.writeText(`Email: ${email}\nPassword: ${password}`)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
+        setCopiedCreds(true)
+        setTimeout(() => setCopiedCreds(false), 2000)
     }
+    const copyLink = () => {
+        navigator.clipboard.writeText(fullLink)
+        setCopiedLink(true)
+        setTimeout(() => setCopiedLink(false), 2000)
+    }
+
     return (
         <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", padding: 16 }}>
-            <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <CheckCircle size={20} style={{ color: "#16a34a" }} />
                     </div>
                     <div>
                         <p style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", margin: 0 }}>Employee Account Created</p>
-                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share these login credentials with the employee</p>
+                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share credentials and onboarding link with the employee</p>
                     </div>
                 </div>
-                <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+
+                {/* Login Credentials */}
+                <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
                     <div style={{ marginBottom: 10 }}>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 3px" }}>Login Email / ID</p>
                         <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0, wordBreak: "break-all" }}>{email}</p>
@@ -270,10 +282,23 @@ function CredentialsModal({ email, password, onClose }: { email: string; passwor
                         <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0, fontFamily: "monospace", letterSpacing: "1px" }}>{password}</p>
                     </div>
                 </div>
-                <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>Password is set to the employee&apos;s phone number. Ask them to change it after first login.</p>
+                <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Password is set to the employee&apos;s phone number. Ask them to change it after first login.</p>
+
+                {/* Onboarding Link */}
+                {onboardingLink && (
+                    <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 6px" }}>Self-Onboarding Link</p>
+                        <p style={{ fontSize: 12, color: "#1e40af", margin: "0 0 8px", wordBreak: "break-all", fontFamily: "monospace" }}>{fullLink}</p>
+                        <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 8px" }}>Share this link with the employee. They can fill in all their personal details, KYC, bank info, and upload documents themselves.</p>
+                        <button onClick={copyLink} style={{ width: "100%", padding: "7px 0", borderRadius: 7, border: "1px solid #93c5fd", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#2563eb" }}>
+                            {copiedLink ? "Link Copied!" : "Copy Onboarding Link"}
+                        </button>
+                    </div>
+                )}
+
                 <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={copy} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
-                        {copied ? "Copied!" : "Copy Credentials"}
+                    <button onClick={copyCreds} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                        {copiedCreds ? "Copied!" : "Copy Credentials"}
                     </button>
                     <button onClick={onClose} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                         Done
@@ -290,7 +315,7 @@ function EmployeeModal({
     open: boolean; onClose: () => void; onSaved: () => void; employee?: Employee | null
 }) {
     const [loading, setLoading] = useState(false)
-    const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
+    const [newCredentials, setNewCredentials] = useState<{ email: string; password: string; onboardingLink?: string } | null>(null)
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
@@ -530,7 +555,7 @@ function EmployeeModal({
 
             onSaved()
             if (!employee && data._userCreated) {
-                setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
+                setNewCredentials({ email: data._loginEmail, password: data._loginPassword, onboardingLink: data._onboardingLink })
             } else {
                 toast.success(employee ? "Employee updated!" : "Employee added!")
                 onClose()
@@ -545,7 +570,7 @@ function EmployeeModal({
     if (!open) return null
 
     if (newCredentials) {
-        return <CredentialsModal email={newCredentials.email} password={newCredentials.password} onClose={() => { setNewCredentials(null); onClose() }} />
+        return <CredentialsModal email={newCredentials.email} password={newCredentials.password} onboardingLink={newCredentials.onboardingLink} onClose={() => { setNewCredentials(null); onClose() }} />
     }
 
     const setCheck = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
