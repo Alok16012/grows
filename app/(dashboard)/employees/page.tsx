@@ -55,7 +55,7 @@ type Employee = {
     notes?: string
     photo?: string
     createdAt: string
-    deployments?: { site: { id: string; name: string } }[]
+    deployments?: { id: string; site: { id: string; name: string } }[]
     department?: { id: string; name: string }
     _count: { attendances: number; leaves: number }
     // New fields
@@ -430,8 +430,8 @@ function EmployeeModal({
                 salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
                 salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
                 salComplianceType: "OR",
-                // Site Deployment (cleared - can be edited from site page)
-                siteId: "", deployShift: "", deployRole: "", deployStartDate: "",
+                // Site Deployment
+                siteId: employee.deployments?.[0]?.site?.id || "", deployShift: "", deployRole: "", deployStartDate: "",
             })
         } else {
             setForm(EMPTY_FORM)
@@ -507,21 +507,33 @@ function EmployeeModal({
                 setPendingDocs([])
             }
 
-            // Create site deployment if site is selected
-            if (empId && form.siteId && !employee) {
+            // Create or update site deployment if site is selected
+            if (empId && form.siteId) {
                 try {
-                    await fetch("/api/deployments", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            employeeId: empId,
-                            siteId: form.siteId,
-                            startDate: form.deployStartDate || new Date().toISOString().split("T")[0],
-                            shift: form.deployShift || null,
-                            role: form.deployRole || null,
-                        }),
-                    })
-                } catch { /* deployment creation failed silently */ }
+                    const currentDeployment = employee?.deployments?.[0]
+                    const currentSiteId = currentDeployment?.site?.id
+                    if (currentSiteId !== form.siteId) {
+                        // Relieve existing deployment before creating a new one
+                        if (currentDeployment?.id) {
+                            await fetch(`/api/deployments/${currentDeployment.id}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ relievedAt: new Date().toISOString() }),
+                            })
+                        }
+                        await fetch("/api/deployments", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                employeeId: empId,
+                                siteId: form.siteId,
+                                startDate: form.deployStartDate || new Date().toISOString().split("T")[0],
+                                shift: form.deployShift || null,
+                                role: form.deployRole || null,
+                            }),
+                        })
+                    }
+                } catch { /* deployment update failed silently */ }
             }
 
             onSaved()
@@ -752,15 +764,12 @@ function EmployeeModal({
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="col-span-2">
                                         <label className={labelCls}>Select Site</label>
-                                        <select value={form.siteId} onChange={set("siteId")} className={inputCls} disabled={!!employee}>
+                                        <select value={form.siteId} onChange={set("siteId")} className={inputCls}>
                                             <option value="">-- No Site (Assign Later) --</option>
                                             {sites.map(s => (
                                                 <option key={s.id} value={s.id}>{s.name}</option>
                                             ))}
                                         </select>
-                                        {employee && (
-                                            <p className="text-[10px] text-[var(--text3)] mt-1">Site assignment can be changed from Sites page</p>
-                                        )}
                                     </div>
                                     {form.siteId && (
                                         <>
