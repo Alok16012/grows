@@ -1,361 +1,288 @@
 "use client"
-
-import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
+import { Suspense, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import * as XLSX from "xlsx"
-import {
-    Download, Loader2, ShieldCheck, Users, IndianRupee,
-    RefreshCw, ArrowLeft, LayoutDashboard, AlertCircle
-} from "lucide-react"
 import { toast } from "sonner"
+import { Loader2, Download, RefreshCw, ChevronRight, MapPin, Building2, ShieldCheck, AlertCircle } from "lucide-react"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 
+type Site       = { id: string; name: string; code?: string }
+type SiteStatus = { siteId: string | null; processedCount: number }
+type StatsData  = { totalEmployees: number; grossPay: number; totalDeduction: number; netPay: number }
+type ReportItem = { id: string; label: string; type: string }
 
-type StatsData = {
-    totalEmployees: number
-    grossPay: number
-    totalDeduction: number
-    netPay: number
-}
-
-type ReportItem = {
-    id: string
-    label: string
-    type: string
-    badge?: string
-}
-
-const PF_REPORTS: ReportItem[] = [
-    { id: "pf-deduction", label: "PF Deduction Report", type: "pf-deduction" },
-    { id: "pf-summary", label: "PF Summary", type: "pf-summary" },
-    { id: "pf-challan", label: "PF Challan", type: "pf-challan" },
-    { id: "pf-ecr", label: "PF ECR File (For EPFO)", type: "pf-ecr" },
-    { id: "pf-register", label: "PF Register (UAN Wise)", type: "pf-register" },
+const PF_REPORTS: ReportItem[]   = [
+    { id: "pf-deduction", label: "PF Deduction Report",   type: "pf-deduction" },
+    { id: "pf-summary",   label: "PF Summary",            type: "pf-summary"   },
+    { id: "pf-challan",   label: "PF Challan",            type: "pf-challan"   },
+    { id: "pf-ecr",       label: "PF ECR File (EPFO)",    type: "pf-ecr"       },
+    { id: "pf-register",  label: "PF Register (UAN Wise)",type: "pf-register"  },
 ]
-
 const ESIC_REPORTS: ReportItem[] = [
     { id: "esic-deduction", label: "ESIC Deduction Report", type: "esic-deduction" },
-    { id: "esic-summary", label: "ESIC Summary", type: "esic-summary" },
-    { id: "esic-challan", label: "ESIC Challan", type: "esic-challan" },
+    { id: "esic-summary",   label: "ESIC Summary",          type: "esic-summary"   },
+    { id: "esic-challan",   label: "ESIC Challan",          type: "esic-challan"   },
 ]
-
-const PT_REPORTS: ReportItem[] = [
+const PT_REPORTS: ReportItem[]   = [
     { id: "pt-deduction", label: "PT Deduction Report", type: "pt-deduction" },
-    { id: "pt-summary", label: "PT Summary", type: "pt-summary" },
-    { id: "pt-challan", label: "PT Challan", type: "pt-challan" },
+    { id: "pt-summary",   label: "PT Summary",          type: "pt-summary"   },
+    { id: "pt-challan",   label: "PT Challan",          type: "pt-challan"   },
 ]
 
-function fmt(n: number) {
-    return "₹" + Math.round(n).toLocaleString("en-IN")
-}
-
-export default function ComplianceDownloadsPage() {
-    const { data: session } = useSession()
+function ComplianceInner() {
     const router = useRouter()
-
-    const now = new Date()
-    const [month, setMonth] = useState(now.getMonth() + 1)
-    const [year, setYear] = useState(now.getFullYear())
-    const [state, setState] = useState("All States")
-
-    const [employeeStates, setEmployeeStates] = useState<string[]>([])
-    const [stats, setStats] = useState<StatsData | null>(null)
-    const [loading, setLoading] = useState(false)
+    const [month,      setMonth]      = useState(new Date().getMonth() + 1)
+    const [year,       setYear]       = useState(new Date().getFullYear())
+    const [sites,      setSites]      = useState<Site[]>([])
+    const [status,     setStatus]     = useState<SiteStatus[]>([])
+    const [selSiteId,  setSelSiteId]  = useState("")
+    const [stats,      setStats]      = useState<StatsData | null>(null)
+    const [loading,    setLoading]    = useState(false)
     const [dataLoaded, setDataLoaded] = useState(false)
+    const [dlLoading,  setDlLoading]  = useState<string | null>(null)
+    const [ldSites,    setLdSites]    = useState(true)
 
     useEffect(() => {
-        // Fetch distinct employee states from DB
-        fetch("/api/employees")
-            .then(r => r.json())
-            .then((data: Array<{ state?: string }>) => {
-                const states = Array.from(new Set(
-                    (Array.isArray(data) ? data : (data as { data?: Array<{ state?: string }> }).data ?? [])
-                        .map((e) => e.state)
-                        .filter((s): s is string => !!s && s.trim() !== "")
-                )).sort()
-                setEmployeeStates(states)
-            })
-            .catch(() => {})
+        fetch("/api/sites?isActive=true").then(r => r.json())
+            .then(d => { if (Array.isArray(d)) setSites(d) })
+            .finally(() => setLdSites(false))
     }, [])
 
-    const [downloading, setDownloading] = useState<string | null>(null)
+    const fetchStatus = useCallback(async () => {
+        try {
+            const r = await fetch(`/api/payroll/sites-status?month=${month}&year=${year}`)
+            if (r.ok) { const d = await r.json(); if (Array.isArray(d)) setStatus(d) }
+        } catch {}
+    }, [month, year])
 
-    const role = session?.user?.role as string | undefined
-    if (role && role !== "ADMIN" && role !== "MANAGER") {
-        return <div className="p-8 text-[var(--text2)]">Access denied.</div>
+    useEffect(() => { fetchStatus() }, [fetchStatus])
+
+    const selectSite = (id: string) => {
+        setSelSiteId(id)
+        setStats(null)
+        setDataLoaded(false)
     }
 
     const handleLoad = async () => {
-        setLoading(true)
-        setDataLoaded(false)
-        setStats(null)
+        setLoading(true); setDataLoaded(false); setStats(null)
         try {
-            const stateParam = state !== "All States" ? `&state=${encodeURIComponent(state)}` : ""
-            const res = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-summary${stateParam}`)
-            if (!res.ok) {
-                const msg = await res.text()
-                toast.error(msg || "No payroll data found for this period.")
-                setLoading(false)
-                return
-            }
-            const data = await res.json()
-            // Compute stats from the data
-            const s: StatsData = {
+            const siteParam = selSiteId ? `&siteId=${selSiteId}` : ""
+            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-summary${siteParam}`)
+            if (!r.ok) { toast.error(await r.text() || "No payroll data found"); return }
+            const data = await r.json()
+            setStats({
                 totalEmployees: data.length,
-                grossPay: data.reduce((acc: number, r: Record<string, number>) => acc + (r.grossSalary || 0), 0),
-                totalDeduction: data.reduce((acc: number, r: Record<string, number>) => acc + (r.totalDeductions || 0), 0),
-                netPay: data.reduce((acc: number, r: Record<string, number>) => acc + (r.netSalary || 0), 0),
-            }
-            setStats(s)
+                grossPay:       data.reduce((a: number, r: Record<string,number>) => a + (r.grossSalary || 0), 0),
+                totalDeduction: data.reduce((a: number, r: Record<string,number>) => a + (r.totalDeductions || 0), 0),
+                netPay:         data.reduce((a: number, r: Record<string,number>) => a + (r.netSalary || 0), 0),
+            })
             setDataLoaded(true)
-            toast.success(`Loaded compliance data for ${MONTHS[month - 1]} ${year}.`)
-        } catch (err) {
-            console.error(err)
-            toast.error("Failed to load compliance data.")
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleReset = () => {
-        setStats(null)
-        setDataLoaded(false)
-        setMonth(now.getMonth() + 1)
-        setYear(now.getFullYear())
-        setState("All States")
+            toast.success(`Loaded compliance data for ${MONTHS[month-1]} ${year}${selSiteId ? ` — ${sites.find(s=>s.id===selSiteId)?.name}` : ""}`)
+        } catch { toast.error("Failed to load compliance data") }
+        finally { setLoading(false) }
     }
 
     const handleDownload = async (item: ReportItem) => {
-        setDownloading(item.id)
+        setDlLoading(item.id)
         try {
-            const stateParam = state !== "All States" ? `&state=${encodeURIComponent(state)}` : ""
-            const res = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}${stateParam}`)
-            if (!res.ok) {
-                const msg = await res.text()
-                toast.error(msg || "No data found.")
-                return
-            }
-            const data = await res.json()
-            if (!data || data.length === 0) {
-                toast.error("No data to download for this report.")
-                return
-            }
-
+            const siteParam = selSiteId ? `&siteId=${selSiteId}` : ""
+            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}${siteParam}`)
+            if (!r.ok) { toast.error(await r.text() || "No data found"); return }
+            const data = await r.json()
+            if (!data?.length) { toast.error("No data to download"); return }
             const wb = XLSX.utils.book_new()
             const ws = XLSX.utils.json_to_sheet(data)
-
-            // Auto column widths
             const cols = Object.keys(data[0] || {})
             ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
-
             XLSX.utils.book_append_sheet(wb, ws, item.label.substring(0, 31))
-            const fileName = `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g, "_")}_${MONTHS[month - 1]}_${year}.xlsx`
-            XLSX.writeFile(wb, fileName)
-            toast.success(`Downloaded: ${fileName}`)
-        } catch (err) {
-            console.error(err)
-            toast.error("Download failed.")
-        } finally {
-            setDownloading(null)
-        }
+            const siteName = selSiteId ? `_${sites.find(s=>s.id===selSiteId)?.name?.replace(/\s+/g,"_") ?? ""}` : ""
+            XLSX.writeFile(wb, `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g,"_")}${siteName}_${MONTHS[month-1]}_${year}.xlsx`)
+            toast.success(`Downloaded: ${item.label}`)
+        } catch { toast.error("Download failed") }
+        finally { setDlLoading(null) }
     }
 
-    const StatCard = ({ label, value, color }: { label: string; value: string; color: string }) => (
-        <div className={`flex-1 min-w-[150px] bg-white border border-[var(--border)] rounded-[12px] p-4 ${color}`}>
-            <p className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide mb-1">{label}</p>
-            <p className="text-[18px] font-bold text-[var(--text)]">{value}</p>
-        </div>
-    )
-
-    const SectionHeader = ({ icon, title, count }: { icon: React.ReactNode; title: string; count: number }) => (
-        <div className="flex items-center gap-3 mb-4">
-            <div className="h-8 w-8 rounded-[8px] bg-[var(--accent-light)] flex items-center justify-center">
-                {icon}
-            </div>
-            <h3 className="text-[14px] font-semibold text-[var(--text)]">{title}</h3>
-            <span className="ml-auto text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent-light)] px-2.5 py-1 rounded-full">
-                {count} Downloads
-            </span>
-        </div>
-    )
-
-    const ReportRow = ({ item }: { item: ReportItem }) => (
-        <div className="flex items-center justify-between py-2.5 px-3 rounded-[8px] hover:bg-[var(--surface2)] transition-colors group">
-            <span className="text-[13px] text-[var(--text2)] group-hover:text-[var(--text)]">{item.label}</span>
-            <button
-                onClick={() => handleDownload(item)}
-                disabled={!dataLoaded || downloading === item.id}
-                title={!dataLoaded ? "Load compliance data first" : `Download ${item.label}`}
-                className="h-8 w-8 rounded-[8px] flex items-center justify-center border border-[var(--border)] bg-white hover:bg-[var(--accent)] hover:text-white hover:border-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[var(--text3)]"
-            >
-                {downloading === item.id
-                    ? <Loader2 size={13} className="animate-spin" />
-                    : <Download size={13} />
-                }
-            </button>
-        </div>
-    )
+    const getSt  = (id: string) => status.find(s => s.siteId === id)
+    const done   = status.filter(s => (s.processedCount ?? 0) > 0).length
+    const selSite = sites.find(s => s.id === selSiteId)
 
     return (
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => router.push("/payroll")}
-                        className="p-2 rounded-[8px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors"
-                    >
-                        <ArrowLeft size={18} />
-                    </button>
-                    <div>
-                        <h1 className="text-[20px] font-semibold text-[var(--text)] flex items-center gap-2">
-                            <ShieldCheck size={20} className="text-[var(--accent)]" />
-                            Compliance Downloads
-                        </h1>
-                        <p className="text-[13px] text-[var(--text2)] mt-0.5">
-                            Download PF, ESIC and Professional Tax compliance reports
-                        </p>
-                    </div>
-                </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
+            {/* Breadcrumb */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
+                <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>
+                <ChevronRight size={11} />
+                <span style={{ fontWeight: 600, color: "var(--text2)" }}>Compliance Reports</span>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                <div className="flex flex-wrap gap-3 items-end">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Month</label>
-                        <select
-                            value={month}
-                            onChange={e => setMonth(Number(e.target.value))}
-                            className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                        >
-                            {MONTHS.map((m, i) => (
-                                <option key={m} value={i + 1}>{m}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Year</label>
-                        <select
-                            value={year}
-                            onChange={e => setYear(Number(e.target.value))}
-                            className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                        >
-                            {[2024, 2025, 2026, 2027].map(y => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
-                    </div>
-                    {employeeStates.length > 0 && (
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">State (PT Filter)</label>
-                            <select
-                                value={state}
-                                onChange={e => setState(e.target.value)}
-                                className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 min-w-[160px]"
-                            >
-                                <option value="All States">All States</option>
-                                {employeeStates.map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <ShieldCheck size={20} style={{ color: "var(--accent)" }} />
+                    <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Compliance Reports</h1>
+                </div>
+                <span style={{ fontSize: 11, color: "var(--text3)" }}>{done}/{sites.length} sites processed</span>
+            </div>
+
+            {/* Stepper */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4, overflowX: "auto", whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
+                {["Upload Attendance","Process Payroll","Wage Sheet","Compliance","Lock Payroll"].map((s, i) => (
+                    <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 7,
+                            background: i === 3 ? "var(--accent-light)" : "transparent",
+                            color: i === 3 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 3 ? 700 : 400 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i === 3 ? "var(--accent)" : "var(--border)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: i === 3 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i+1}</div>
+                            {s}
                         </div>
-                    )}
-                    <button
-                        onClick={handleLoad}
-                        disabled={loading}
-                        className="flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 disabled:opacity-60 text-white rounded-[10px] text-[13px] font-medium px-4 py-2 transition-all h-9"
-                    >
-                        {loading ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                        {loading ? "Loading..." : "Load Compliance Data"}
-                    </button>
-                    <button
-                        onClick={handleReset}
-                        className="flex items-center gap-2 border border-[var(--border)] hover:bg-[var(--surface2)] text-[var(--text2)] rounded-[10px] text-[13px] font-medium px-4 py-2 transition-colors h-9"
-                    >
-                        <RefreshCw size={14} />
-                        Reset
-                    </button>
-                </div>
+                        {i < 4 && <ChevronRight size={11} style={{ color: "var(--text3)", opacity: 0.3 }} />}
+                    </div>
+                ))}
             </div>
 
-            {/* Stats Row */}
-            {stats && (
-                <div className="flex flex-wrap gap-3">
-                    <StatCard label="Total Employees" value={String(stats.totalEmployees)} color="border-l-4 border-l-blue-400" />
-                    <StatCard label="Gross Pay" value={fmt(stats.grossPay)} color="border-l-4 border-l-emerald-400" />
-                    <StatCard label="Total Deduction" value={fmt(stats.totalDeduction)} color="border-l-4 border-l-red-400" />
-                    <StatCard label="Net Pay" value={fmt(stats.netPay)} color="border-l-4 border-l-violet-400" />
+            {/* Two-panel */}
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                {/* LEFT: Site list */}
+                <div style={{ width: 220, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Site Filter</span>
+                        <button onClick={fetchStatus} style={{ display: "flex", padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "none", cursor: "pointer" }}>
+                            <RefreshCw size={11} style={{ color: "var(--text3)" }} />
+                        </button>
+                    </div>
+                    <div style={{ overflowY: "auto", maxHeight: 480 }}>
+                        {ldSites ? <div style={{ padding: 20, textAlign: "center" }}><Loader2 size={14} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} /></div> : (
+                            <>
+                                <div onClick={() => selectSite("")}
+                                    style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)",
+                                        background: !selSiteId ? "var(--accent-light)" : "transparent",
+                                        borderLeft: !selSiteId ? "3px solid var(--accent)" : "3px solid transparent" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        <Building2 size={12} style={{ color: !selSiteId ? "var(--accent)" : "var(--text3)" }} />
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: !selSiteId ? "var(--accent)" : "var(--text2)" }}>All Sites</span>
+                                    </div>
+                                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 18 }}>{done}/{sites.length} processed</div>
+                                </div>
+                                {sites.map(site => {
+                                    const st = getSt(site.id); const isDone = (st?.processedCount ?? 0) > 0; const isSel = selSiteId === site.id
+                                    return (
+                                        <div key={site.id} onClick={() => selectSite(site.id)}
+                                            style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)",
+                                                background: isSel ? "var(--accent-light)" : "transparent",
+                                                borderLeft: isSel ? "3px solid var(--accent)" : "3px solid transparent" }}>
+                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                                    <MapPin size={11} style={{ color: isSel ? "var(--accent)" : "var(--text3)", flexShrink: 0 }} />
+                                                    <span style={{ fontSize: 11, fontWeight: 600, color: isSel ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{site.name}</span>
+                                                </div>
+                                                {isDone && <span style={{ fontSize: 9, color: "#16a34a", fontWeight: 700 }}>✓</span>}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </>
+                        )}
+                    </div>
                 </div>
-            )}
 
-            {!dataLoaded && !loading && (
-                <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-200 rounded-[10px] text-[13px] text-amber-700">
-                    <AlertCircle size={15} className="shrink-0" />
-                    Select a payroll month and click "Load Compliance Data" to enable downloads.
+                {/* RIGHT: Compliance downloads */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                    {/* Controls */}
+                    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            {selSite && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: "var(--accent-light)", border: "1px solid var(--accent)", fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>
+                                    <MapPin size={11} /> {selSite.name}
+                                </div>
+                            )}
+                            <span style={lbl}>Month</span>
+                            <select value={month} onChange={e => { setMonth(Number(e.target.value)); setDataLoaded(false); setStats(null) }} style={sel}>
+                                {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+                            </select>
+                            <span style={lbl}>Year</span>
+                            <select value={year} onChange={e => { setYear(Number(e.target.value)); setDataLoaded(false); setStats(null) }} style={sel}>
+                                {[2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                            <button onClick={handleLoad} disabled={loading}
+                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
+                                {loading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+                                {loading ? "Loading…" : "Load Data"}
+                            </button>
+                        </div>
+
+                        {/* Stats row */}
+                        {stats && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 12 }}>
+                                {[
+                                    { label: "Employees",       value: String(stats.totalEmployees), color: "#3b82f6" },
+                                    { label: "Gross Pay",       value: fmt(stats.grossPay),           color: "#0369a1" },
+                                    { label: "Total Deduction", value: fmt(stats.totalDeduction),     color: "#dc2626" },
+                                    { label: "Net Pay",         value: fmt(stats.netPay),             color: "#16a34a" },
+                                ].map(s => (
+                                    <div key={s.label} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)" }}>
+                                        <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px", margin: 0 }}>{s.label}</p>
+                                        <p style={{ fontSize: 14, fontWeight: 700, color: s.color, margin: "2px 0 0 0" }}>{s.value}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {!dataLoaded && !loading && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047", fontSize: 12, color: "#854d0e" }}>
+                                <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                                Select a period{selSiteId ? "" : " and optionally a site"} then click "Load Data" to enable downloads.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Report sections */}
+                    {[
+                        { title: "Provident Fund (PF)", badge: "PF", items: PF_REPORTS, color: "#1d4ed8" },
+                        { title: "ESIC",                badge: "ESI", items: ESIC_REPORTS, color: "#0369a1" },
+                        { title: "Professional Tax (PT)", badge: "PT", items: PT_REPORTS, color: "#7c3aed" },
+                    ].map(section => (
+                        <div key={section.title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--accent-light)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: "var(--accent)" }}>{section.badge}</span>
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{section.title}</span>
+                                <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: "var(--accent)", background: "var(--accent-light)", padding: "2px 8px", borderRadius: 20 }}>
+                                    {section.items.length} reports
+                                </span>
+                            </div>
+                            <div style={{ padding: "4px 8px" }}>
+                                {section.items.map(item => (
+                                    <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px", borderRadius: 8 }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = "var(--surface2)")}
+                                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                        <span style={{ fontSize: 13, color: "var(--text2)" }}>{item.label}</span>
+                                        <button onClick={() => handleDownload(item)} disabled={!dataLoaded || dlLoading === item.id}
+                                            style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: dataLoaded ? "pointer" : "not-allowed", opacity: !dataLoaded ? 0.4 : 1, color: "var(--text3)", transition: "all 0.15s" }}
+                                            onMouseEnter={e => { if (dataLoaded) { (e.currentTarget as HTMLButtonElement).style.background = "var(--accent)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)" } }}
+                                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--surface)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text3)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)" }}>
+                                            {dlLoading === item.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+
+                    <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
+                        Reports are generated from processed payroll data.{selSiteId ? ` Filtered to ${selSite?.name}.` : " Showing all sites."}
+                    </p>
                 </div>
-            )}
-
-            {/* PF Section */}
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                <SectionHeader
-                    icon={<span className="text-[11px] font-bold text-[var(--accent)]">PF</span>}
-                    title="Provident Fund (PF)"
-                    count={PF_REPORTS.length}
-                />
-                <div className="space-y-0.5">
-                    {PF_REPORTS.map(item => <ReportRow key={item.id} item={item} />)}
-                </div>
-            </div>
-
-            {/* ESIC Section */}
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                <SectionHeader
-                    icon={<span className="text-[10px] font-bold text-[var(--accent)]">ESI</span>}
-                    title="ESIC"
-                    count={ESIC_REPORTS.length}
-                />
-                <div className="space-y-0.5">
-                    {ESIC_REPORTS.map(item => <ReportRow key={item.id} item={item} />)}
-                </div>
-            </div>
-
-            {/* PT Section */}
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                <SectionHeader
-                    icon={<span className="text-[10px] font-bold text-[var(--accent)]">PT</span>}
-                    title="Professional Tax (PT)"
-                    count={PT_REPORTS.length}
-                />
-                <div className="space-y-0.5">
-                    {PT_REPORTS.map(item => <ReportRow key={item.id} item={item} />)}
-                </div>
-            </div>
-
-            {/* Note */}
-            <p className="text-[12px] text-[var(--text3)] text-center px-4">
-                Compliance documents will be generated based on processed payroll data.
-            </p>
-
-            {/* Footer Buttons */}
-            <div className="flex flex-wrap gap-3 justify-center pb-4">
-                <button
-                    onClick={() => router.push("/payroll")}
-                    className="flex items-center gap-2 border border-[var(--border)] hover:bg-[var(--surface2)] text-[var(--text2)] rounded-[10px] text-[13px] font-medium px-5 py-2.5 transition-colors"
-                >
-                    <ArrowLeft size={14} />
-                    Back to Payroll Processing
-                </button>
-                <button
-                    onClick={() => router.push("/admin")}
-                    className="flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 text-white rounded-[10px] text-[13px] font-medium px-5 py-2.5 transition-all"
-                >
-                    <LayoutDashboard size={14} />
-                    Go to Dashboard
-                </button>
             </div>
         </div>
     )
 }
+
+export default function CompliancePage() {
+    return <Suspense><ComplianceInner /></Suspense>
+}
+
+const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }
+const sel: React.CSSProperties = { padding: "6px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }

@@ -19,11 +19,14 @@ export async function GET(req: Request) {
         const employeeId = searchParams.get("employeeId")
         const search = searchParams.get("search")
 
+        const siteId = searchParams.get("siteId")
+
         const where: Record<string, unknown> = {}
         if (month) where.month = parseInt(month)
         if (year) where.year = parseInt(year)
         if (status) where.status = status
         if (employeeId) where.employeeId = employeeId
+        if (siteId) where.siteId = siteId
 
         if (search) {
             where.employee = {
