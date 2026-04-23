@@ -693,13 +693,6 @@ function EmployeeModal({
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={labelCls}>Role *</label>
-                                    <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value, designation: e.target.value }))} className={inputCls} required>
-                                        <option value="">Select Role</option>
-                                        {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                                    </select>
-                                </div>
-                                <div>
                                     <label className={labelCls}>Role</label>
                                     <select value={form.customRoleId} onChange={set("customRoleId")} className={inputCls}>
                                         <option value="">No custom role</option>
