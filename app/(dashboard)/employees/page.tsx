@@ -292,16 +292,17 @@ function CredentialsModal({ email, password, onClose }: { email: string; passwor
 }
 
 function EmployeeModal({
-    open, onClose, onSaved, employee,
+    open, onClose, onSaved, employee, allSites,
 }: {
     open: boolean; onClose: () => void; onSaved: () => void; employee?: Employee | null
+    allSites: { id: string; name: string }[]
 }) {
     const [loading, setLoading] = useState(false)
     const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
-    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
+    const sites = allSites
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
     // Pending documents to upload after employee creation
@@ -328,18 +329,6 @@ function EmployeeModal({
     }, [])
 
     // Branches derivation removed
-
-    // Fetch sites for deployment assignment
-    useEffect(() => {
-        if (!open) return
-        fetch("/api/sites?isActive=true")
-            .then(r => r.ok ? r.json() : [])
-            .then(data => {
-                const siteList = Array.isArray(data) ? data.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })) : []
-                setSites(siteList)
-            })
-            .catch(() => setSites([]))
-    }, [open])
 
     // Fetch existing docs when documents tab is opened for an existing employee
     useEffect(() => {
@@ -2469,6 +2458,7 @@ export default function EmployeesPage() {
                 onClose={() => { setShowModal(false); setEditEmployee(null) }}
                 onSaved={fetchEmployees}
                 employee={editEmployee}
+                allSites={sites}
             />
             <EmployeeDrawer
                 employee={drawerEmployee}
