@@ -1,80 +1,89 @@
 "use client"
-
-import { useState, useRef, useCallback } from "react"
-import { useSession } from "next-auth/react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import * as XLSX from "xlsx"
 import {
     Upload, Download, CheckCircle2, XCircle, Loader2,
-    FileSpreadsheet, ArrowLeft, AlertCircle, Users
+    FileSpreadsheet, AlertCircle, Users, MapPin, ChevronRight, RefreshCw
 } from "lucide-react"
 import { toast } from "sonner"
 
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-
-// Excel columns expected
-const TEMPLATE_COLS = [
-    "Employee ID",
-    "Employee Name",
-    "DAYS",
-    "OT DAYS",
-    "OTHER DEDUCTION",
-    "LWF",
-    "CANTEEN DAYS",
-    "CANTEEN",
-    "PENALTY",
-    "ADVANCE",
-]
-
-const TEMPLATE_SAMPLE = [
-    ["EMP001","John Doe",26,2,150,10,24,1200,50,1000],
-    ["EMP002","Jane Smith",25,0,0,10,20,1000,0,0],
-]
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Site = { id: string; name: string; code?: string; city?: string }
 
 type ParsedRow = {
     rowIndex: number
     rawEmployeeId: string
     rawName: string
-    days: number
-    otDays: number
-    otherDeduction: number
-    lwf: number
-    canteenDays: number
-    canteen: number
-    penalty: number
-    advance: number
+    days: number; otDays: number; otherDeduction: number; lwf: number
+    canteenDays: number; penalty: number; advance: number
+    productionIncentive: number
 }
-
 type MatchedRow = ParsedRow & {
-    matched: boolean
-    employeeId?: string // DB uuid
-    dbName?: string
+    matched: boolean; employeeId?: string; dbName?: string; designation?: string
 }
-
 type Employee = {
-    id: string
-    employeeId: string
-    firstName: string
-    lastName: string
+    id: string; employeeId: string; firstName: string; lastName: string; designation?: string
 }
 
-function downloadTemplate() {
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+
+const TEMPLATE_COLS = [
+    "Employee ID","Employee Name","DAYS","OT DAYS","OTHER DEDUCTION",
+    "LWF","CANTEEN DAYS","PENALTY","ADVANCE","PRODUCTION INCENTIVE"
+]
+const TEMPLATE_SAMPLE = [
+    ["EMP-0001","Rahul Kumar",   26, 2, 150, 10, 24, 50,  1000, 0],
+    ["EMP-0002","Priya Sharma",  25, 0, 0,   10, 20, 0,   0,    500],
+    ["EMP-0003","Amit Singh",    26, 1, 200, 10, 26, 100, 500,  0],
+]
+
+function downloadTemplate(siteName?: string) {
     const wb = XLSX.utils.book_new()
-    const wsData = [TEMPLATE_COLS, ...TEMPLATE_SAMPLE]
+    const sheetName = siteName ? `${siteName.slice(0,20)} Attendance` : "Attendance Template"
+    const header = siteName ? [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", ""] : ["", "", "", "", "", "", "", "", "", ""]
+    const wsData = [header, TEMPLATE_COLS, ...TEMPLATE_SAMPLE]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
-    // Column widths
-    ws["!cols"] = TEMPLATE_COLS.map((_, i) => ({ wch: i === 1 ? 24 : 16 }))
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance Template")
-    XLSX.writeFile(wb, "Attendance_Template.xlsx")
+    ws["!cols"] = TEMPLATE_COLS.map((_, i) => ({ wch: i <= 1 ? 22 : 16 }))
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+    XLSX.writeFile(wb, `Attendance_Template${siteName ? `_${siteName.replace(/\s+/g,"_")}` : ""}.xlsx`)
+}
+
+// ─── Shared Styles ────────────────────────────────────────────────────────────
+const card: React.CSSProperties = {
+    background: "var(--surface)", border: "1px solid var(--border)",
+    borderRadius: 12, padding: "18px 20px"
+}
+const stepBadge: React.CSSProperties = {
+    width: 24, height: 24, borderRadius: "50%", background: "var(--accent)",
+    color: "#fff", fontSize: 11, fontWeight: 700, display: "flex",
+    alignItems: "center", justifyContent: "center", flexShrink: 0
+}
+const inputSt: React.CSSProperties = {
+    padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)",
+    fontSize: 13, background: "var(--surface)", color: "var(--text)",
+    outline: "none", fontWeight: 600
+}
+const btnPrimary: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 6, padding: "8px 16px",
+    borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff",
+    fontSize: 13, fontWeight: 600, cursor: "pointer"
+}
+const btnOutline: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
+    borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)",
+    color: "var(--text2)", fontSize: 13, fontWeight: 500, cursor: "pointer"
 }
 
 export default function AttendanceUploadPage() {
-    const { data: session } = useSession()
     const router = useRouter()
 
     const now = new Date()
     const [month, setMonth] = useState(now.getMonth() + 1)
-    const [year, setYear] = useState(now.getFullYear())
+    const [year,  setYear]  = useState(now.getFullYear())
+    const [siteId, setSiteId] = useState("")
+    const [sites,  setSites]  = useState<Site[]>([])
+    const [sitesLoading, setSitesLoading] = useState(true)
 
     const [file, setFile] = useState<File | null>(null)
     const [parsing, setParsing] = useState(false)
@@ -82,219 +91,224 @@ export default function AttendanceUploadPage() {
     const [processing, setProcessing] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const role = session?.user?.role as string | undefined
-    if (role && role !== "ADMIN" && role !== "MANAGER") {
-        return <div className="p-8 text-[var(--text2)]">Access denied.</div>
-    }
+    useEffect(() => {
+        fetch("/api/sites?isActive=true")
+            .then(r => r.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setSites(data)
+                    if (data.length > 0) setSiteId(data[0].id)
+                }
+            })
+            .catch(() => toast.error("Failed to load sites"))
+            .finally(() => setSitesLoading(false))
+    }, [])
+
+    const selectedSite = sites.find(s => s.id === siteId)
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files?.[0] ?? null
-        setFile(f)
+        setFile(e.target.files?.[0] ?? null)
         setMatched(null)
     }
 
     const handleValidate = useCallback(async () => {
-        if (!file) { toast.error("Please choose a file first."); return }
+        if (!siteId) { toast.error("Select a site first"); return }
+        if (!file)   { toast.error("Choose an Excel file first"); return }
         setParsing(true)
         setMatched(null)
-
         try {
-            // 1. Parse Excel
             const buf = await file.arrayBuffer()
-            const wb = XLSX.read(buf, { type: "array" })
-            const ws = wb.Sheets[wb.SheetNames[0]]
-            const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" })
+            const wb  = XLSX.read(buf, { type: "array" })
+            const ws  = wb.Sheets[wb.SheetNames[0]]
+            const allRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" })
 
-            if (rows.length === 0) {
-                toast.error("File is empty or has no data rows.")
-                setParsing(false)
-                return
-            }
+            // Skip header rows that start with "SITE:" or are the template col row
+            const rows = allRows.filter(r => {
+                const first = String(Object.values(r)[0] ?? "").trim()
+                return !first.startsWith("SITE:") && first !== "Employee ID"
+            })
+
+            if (rows.length === 0) { toast.error("No data rows found in file"); setParsing(false); return }
 
             const parsed: ParsedRow[] = rows.map((row, i) => ({
                 rowIndex: i + 2,
-                rawEmployeeId: String(row["Employee ID"] ?? row["employee id"] ?? row["EMP ID"] ?? "").trim(),
-                rawName: String(row["Employee Name"] ?? row["employee name"] ?? row["Name"] ?? "").trim(),
-                days: Number(row["DAYS"] ?? row["Days"] ?? row["days"] ?? 26),
-                otDays: Number(row["OT DAYS"] ?? row["OT Days"] ?? row["otDays"] ?? 0),
-                otherDeduction: Number(row["OTHER DEDUCTION"] ?? row["Other Deduction"] ?? row["otherDeduction"] ?? 0),
-                lwf: Number(row["LWF"] ?? row["lwf"] ?? 0),
-                canteenDays: Number(row["CANTEEN DAYS"] ?? row["Canteen Days"] ?? row["canteenDays"] ?? 0),
-                canteen: Number(row["CANTEEN"] ?? row["Canteen"] ?? row["canteen"] ?? 0),
-                penalty: Number(row["PENALTY"] ?? row["Penalty"] ?? row["penalty"] ?? 0),
-                advance: Number(row["ADVANCE"] ?? row["Advance"] ?? row["advance"] ?? 0),
-            })).filter(r => r.rawEmployeeId !== "")
+                rawEmployeeId: String(row["Employee ID"] ?? row["EMP ID"] ?? row["employee id"] ?? "").trim(),
+                rawName: String(row["Employee Name"] ?? row["Name"] ?? row["employee name"] ?? "").trim(),
+                days:                Number(row["DAYS"]                 ?? row["Days"]                 ?? 26),
+                otDays:              Number(row["OT DAYS"]              ?? row["OT Days"]              ?? 0),
+                otherDeduction:      Number(row["OTHER DEDUCTION"]      ?? row["Other Deduction"]      ?? 0),
+                lwf:                 Number(row["LWF"]                  ?? row["lwf"]                  ?? 0),
+                canteenDays:         Number(row["CANTEEN DAYS"]         ?? row["Canteen Days"]         ?? 0),
+                penalty:             Number(row["PENALTY"]              ?? row["Penalty"]              ?? 0),
+                advance:             Number(row["ADVANCE"]              ?? row["Advance"]              ?? 0),
+                productionIncentive: Number(row["PRODUCTION INCENTIVE"] ?? row["Production Incentive"] ?? 0),
+            })).filter(r => r.rawEmployeeId)
 
-            if (parsed.length === 0) {
-                toast.error("No valid rows found. Ensure 'Employee ID' column exists.")
-                setParsing(false)
-                return
-            }
+            if (!parsed.length) { toast.error("No valid Employee ID rows found"); setParsing(false); return }
 
-            // 2. Fetch all employees
-            const empRes = await fetch("/api/employees?limit=10000")
-            if (!empRes.ok) { toast.error("Failed to load employees."); setParsing(false); return }
+            // Fetch employees for this site
+            const empRes = await fetch(`/api/employees?siteId=${siteId}&status=ACTIVE`)
             const empData = await empRes.json()
-            const employees: Employee[] = (empData.employees ?? empData) as Employee[]
+            const employees: Employee[] = Array.isArray(empData) ? empData : (empData.employees ?? [])
 
-            // 3. Match
-            const empMap = new Map<string, Employee>()
-            employees.forEach(e => empMap.set(e.employeeId.toUpperCase(), e))
+            const empMap = new Map(employees.map(e => [e.employeeId.toUpperCase(), e]))
 
             const matchedRows: MatchedRow[] = parsed.map(r => {
                 const emp = empMap.get(r.rawEmployeeId.toUpperCase())
                 return {
-                    ...r,
-                    matched: !!emp,
-                    employeeId: emp?.id,
-                    dbName: emp ? `${emp.firstName} ${emp.lastName}` : undefined,
+                    ...r, matched: !!emp,
+                    employeeId:  emp?.id,
+                    dbName:      emp ? `${emp.firstName} ${emp.lastName}` : undefined,
+                    designation: emp?.designation,
                 }
             })
 
             setMatched(matchedRows)
-            const foundCount = matchedRows.filter(r => r.matched).length
-            toast.success(`Validated: ${foundCount}/${matchedRows.length} employees matched.`)
+            const found = matchedRows.filter(r => r.matched).length
+            toast.success(`${found} of ${matchedRows.length} employees matched at ${selectedSite?.name}`)
         } catch (err) {
             console.error(err)
-            toast.error("Failed to parse file. Ensure it is a valid .xlsx or .xls file.")
+            toast.error("Failed to parse file")
         } finally {
             setParsing(false)
         }
-    }, [file])
+    }, [file, siteId, selectedSite])
 
     const handleProcess = async () => {
-        if (!matched) return
-        const validRows = matched.filter(r => r.matched && r.employeeId)
-        if (validRows.length === 0) { toast.error("No matched employees to process."); return }
-
+        if (!matched || !siteId) return
+        const valid = matched.filter(r => r.matched && r.employeeId)
+        if (!valid.length) { toast.error("No matched employees to process"); return }
         setProcessing(true)
         try {
-            const attendance = validRows.map(r => ({
-                employeeId: r.employeeId!,
-                monthDays: r.days,
-                workedDays: r.days,
-                otDays: r.otDays,
-                otherDeductions: r.otherDeduction,
-                lwf: r.lwf,
-                canteenDays: r.canteenDays,
-                canteen: r.canteen,
-                penalty: r.penalty,
-                advance: r.advance,
+            const attendance = valid.map(r => ({
+                employeeId:          r.employeeId!,
+                monthDays:           r.days,
+                workedDays:          r.days,
+                otDays:              r.otDays,
+                otherDeductions:     r.otherDeduction,
+                lwf:                 r.lwf,
+                canteenDays:         r.canteenDays,
+                penalty:             r.penalty,
+                advance:             r.advance,
+                productionIncentive: r.productionIncentive,
             }))
-
             const res = await fetch("/api/payroll/calculate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ month, year, attendance }),
+                body: JSON.stringify({ siteId, month, year, attendance }),
             })
-
-            if (!res.ok) {
-                const msg = await res.text()
-                toast.error(msg || "Payroll calculation failed.")
-                return
-            }
-
+            if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
-            toast.success(`Payroll processed for ${data.processedCount} employees.`)
+            toast.success(`Payroll processed for ${data.processedCount} employees at ${selectedSite?.name}`)
             router.push("/payroll")
-        } catch (err) {
-            console.error(err)
-            toast.error("An error occurred while processing payroll.")
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Processing failed")
         } finally {
             setProcessing(false)
         }
     }
 
-    const matchedCount = matched ? matched.filter(r => r.matched).length : 0
-    const unmatchedCount = matched ? matched.filter(r => !r.matched).length : 0
+    const matchedCount   = matched?.filter(r => r.matched).length  ?? 0
+    const unmatchedCount = matched?.filter(r => !r.matched).length  ?? 0
 
     return (
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 1100, paddingBottom: 32 }}>
             {/* Header */}
-            <div className="flex items-center gap-3 mb-2">
-                <button
-                    onClick={() => router.push("/attendance")}
-                    className="p-2 rounded-[8px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors"
-                >
-                    <ArrowLeft size={18} />
-                </button>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                 <div>
-                    <h1 className="text-[20px] font-semibold text-[var(--text)]">Upload Attendance</h1>
-                    <p className="text-[13px] text-[var(--text2)] mt-0.5">Import attendance data from Excel to process payroll</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>
+                        <span style={{ cursor: "pointer" }} onClick={() => router.push("/payroll")}>Payroll</span>
+                        <ChevronRight size={10} />
+                        <span style={{ fontWeight: 600, color: "var(--text2)" }}>Upload Attendance</span>
+                    </div>
+                    <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Upload Attendance</h1>
+                    <p style={{ fontSize: 12, color: "var(--text3)", margin: "3px 0 0 0" }}>
+                        Site-wise bulk attendance upload for payroll processing
+                    </p>
                 </div>
             </div>
 
-            {/* Month / Year selector */}
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                <h2 className="text-[14px] font-semibold text-[var(--text)] mb-4">Payroll Month</h2>
-                <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Month</label>
-                        <select
-                            value={month}
-                            onChange={e => setMonth(Number(e.target.value))}
-                            className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                        >
-                            {MONTHS.map((m, i) => (
-                                <option key={m} value={i + 1}>{m}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Year</label>
-                        <select
-                            value={year}
-                            onChange={e => setYear(Number(e.target.value))}
-                            className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                        >
-                            {[2024, 2025, 2026, 2027].map(y => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
-                    </div>
+            {/* Step 0: Select Site + Month/Year */}
+            <div style={card}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <div style={stepBadge}>1</div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>Select Site & Month</p>
                 </div>
-            </div>
-
-            {/* Step 1: Download Template */}
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                <div className="flex items-start justify-between gap-4">
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12 }}>
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="h-6 w-6 rounded-full bg-[var(--accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">1</span>
-                            <h2 className="text-[14px] font-semibold text-[var(--text)]">Download Template</h2>
-                        </div>
-                        <p className="text-[12px] text-[var(--text2)] ml-8">
-                            Download the Excel template, fill in attendance data, then upload it below.
-                        </p>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 5 }}>Site *</label>
+                        {sitesLoading ? (
+                            <div style={{ height: 36, display: "flex", alignItems: "center", gap: 6, color: "var(--text3)", fontSize: 12 }}>
+                                <Loader2 size={14} className="animate-spin" /> Loading sites…
+                            </div>
+                        ) : (
+                            <select value={siteId} onChange={e => { setSiteId(e.target.value); setMatched(null) }}
+                                style={{ ...inputSt, width: "100%" }}>
+                                <option value="">— Select Site —</option>
+                                {sites.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}{s.city ? ` — ${s.city}` : ""}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
-                    <button
-                        onClick={downloadTemplate}
-                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-[13px] font-medium px-4 py-2 transition-colors shrink-0"
-                    >
-                        <Download size={15} />
-                        Download Template
+                    <div>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 5 }}>Month *</label>
+                        <select value={month} onChange={e => setMonth(Number(e.target.value))}
+                            style={{ ...inputSt, width: "100%" }}>
+                            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 5 }}>Year *</label>
+                        <select value={year} onChange={e => setYear(Number(e.target.value))}
+                            style={{ ...inputSt, width: "100%" }}>
+                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+                </div>
+                {selectedSite && (
+                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, background: "var(--accent-light)", border: "1px solid var(--accent)30" }}>
+                        <MapPin size={13} style={{ color: "var(--accent)" }} />
+                        <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>
+                            {selectedSite.name}{selectedSite.city ? ` · ${selectedSite.city}` : ""} — {MONTHS[month - 1]} {year}
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Step 2: Download Template */}
+            <div style={card}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={stepBadge}>2</div>
+                        <div>
+                            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>Download Template</p>
+                            <p style={{ fontSize: 12, color: "var(--text3)", margin: "2px 0 0 0" }}>
+                                Fill in the Excel template with attendance data for this site and month
+                            </p>
+                        </div>
+                    </div>
+                    <button onClick={() => downloadTemplate(selectedSite?.name)} disabled={!siteId}
+                        style={{ ...btnPrimary, background: "#16a34a", opacity: !siteId ? 0.5 : 1 }}>
+                        <Download size={14} /> Download Template{selectedSite ? ` — ${selectedSite.name}` : ""}
                     </button>
                 </div>
 
-                {/* Template preview */}
-                <div className="mt-4 overflow-x-auto rounded-[8px] border border-[var(--border)]">
-                    <table className="w-full text-[12px]">
+                {/* Column guide */}
+                <div style={{ marginTop: 14, overflowX: "auto", borderRadius: 8, border: "1px solid var(--border)" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                         <thead>
-                            <tr className="bg-[var(--surface2)]">
-                                {TEMPLATE_COLS.map(col => (
-                                    <th key={col} className="px-3 py-2 text-left font-semibold text-[var(--text)] whitespace-nowrap border-b border-[var(--border)]">
-                                        {col}
-                                    </th>
+                            <tr style={{ background: "var(--surface2)" }}>
+                                {TEMPLATE_COLS.map(c => (
+                                    <th key={c} style={{ padding: "7px 10px", textAlign: "left", fontWeight: 700, color: "var(--text3)", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>{c}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
                             {TEMPLATE_SAMPLE.map((row, i) => (
-                                <tr key={i} className="border-b border-[var(--border)] last:border-0">
+                                <tr key={i} style={{ borderBottom: i < TEMPLATE_SAMPLE.length - 1 ? "1px solid var(--border)" : "none" }}>
                                     {row.map((cell, j) => (
-                                        <td key={j} className="px-3 py-2 text-[var(--text2)] whitespace-nowrap">
-                                            {String(cell)}
-                                        </td>
+                                        <td key={j} style={{ padding: "6px 10px", color: "var(--text2)", whiteSpace: "nowrap" }}>{String(cell)}</td>
                                     ))}
                                 </tr>
                             ))}
@@ -303,135 +317,135 @@ export default function AttendanceUploadPage() {
                 </div>
             </div>
 
-            {/* Step 2: Upload */}
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                <div className="flex items-center gap-2 mb-4">
-                    <span className="h-6 w-6 rounded-full bg-[var(--accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">2</span>
-                    <h2 className="text-[14px] font-semibold text-[var(--text)]">Upload Excel File</h2>
+            {/* Step 3: Upload */}
+            <div style={card}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <div style={stepBadge}>3</div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>Upload & Validate Excel</p>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={handleFileChange}
-                        className="hidden"
-                    />
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 border border-[var(--border)] hover:bg-[var(--surface2)] text-[var(--text)] rounded-[10px] text-[13px] font-medium px-4 py-2 transition-colors"
-                    >
-                        <FileSpreadsheet size={15} />
-                        {file ? file.name : "Choose File"}
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} style={{ display: "none" }} />
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <button onClick={() => fileInputRef.current?.click()} style={btnOutline}>
+                        <FileSpreadsheet size={14} style={{ color: "#16a34a" }} />
+                        {file ? file.name : "Choose Excel File"}
                     </button>
                     {file && (
-                        <button
-                            onClick={handleValidate}
-                            disabled={parsing}
-                            className="flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 disabled:opacity-60 text-white rounded-[10px] text-[13px] font-medium px-4 py-2 transition-all"
-                        >
-                            {parsing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                            {parsing ? "Validating..." : "Upload & Validate"}
+                        <button onClick={handleValidate} disabled={parsing || !siteId}
+                            style={{ ...btnPrimary, opacity: (!siteId || parsing) ? 0.6 : 1 }}>
+                            {parsing ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                            {parsing ? "Validating…" : "Upload & Validate"}
+                        </button>
+                    )}
+                    {matched && (
+                        <button onClick={() => { setFile(null); setMatched(null); if (fileInputRef.current) fileInputRef.current.value = "" }}
+                            style={btnOutline}>
+                            <RefreshCw size={13} /> Clear
                         </button>
                     )}
                 </div>
-
                 {file && (
-                    <p className="text-[11px] text-[var(--text3)] mt-2 ml-1">
-                        Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                    <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>
+                        {file.name} — {(file.size / 1024).toFixed(1)} KB
                     </p>
                 )}
             </div>
 
-            {/* Step 3: Validation Results */}
-            {matched !== null && (
-                <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="h-6 w-6 rounded-full bg-[var(--accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">3</span>
-                        <h2 className="text-[14px] font-semibold text-[var(--text)]">Validation Results</h2>
+            {/* Step 4: Validation Results */}
+            {matched && (
+                <div style={card}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                        <div style={stepBadge}>4</div>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>
+                            Validation Results — {selectedSite?.name}
+                        </p>
                     </div>
 
                     {/* Stats */}
-                    <div className="flex flex-wrap gap-3 mb-4">
-                        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-[8px]">
-                            <CheckCircle2 size={15} className="text-emerald-600" />
-                            <span className="text-[12px] font-medium text-emerald-700">{matchedCount} Matched</span>
-                        </div>
-                        {unmatchedCount > 0 && (
-                            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-[8px]">
-                                <XCircle size={15} className="text-red-500" />
-                                <span className="text-[12px] font-medium text-red-600">{unmatchedCount} Not Found</span>
+                    <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                        {[
+                            { label: "Total Rows",  value: matched.length,   color: "#6b7280", bg: "var(--surface2)", border: "var(--border)" },
+                            { label: "Matched",     value: matchedCount,     color: "#15803d", bg: "#dcfce7",         border: "#86efac" },
+                            { label: "Not Found",   value: unmatchedCount,   color: "#dc2626", bg: "#fee2e2",         border: "#fca5a5" },
+                        ].map(s => (
+                            <div key={s.label} style={{ padding: "8px 16px", borderRadius: 8, background: s.bg, border: `1px solid ${s.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+                                <Users size={14} style={{ color: s.color }} />
+                                <span style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{s.value} {s.label}</span>
                             </div>
-                        )}
-                        <div className="flex items-center gap-2 px-3 py-2 bg-[var(--surface2)] border border-[var(--border)] rounded-[8px]">
-                            <Users size={15} className="text-[var(--text3)]" />
-                            <span className="text-[12px] font-medium text-[var(--text2)]">{matched.length} Total Rows</span>
-                        </div>
+                        ))}
                     </div>
 
                     {unmatchedCount > 0 && (
-                        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-[8px] mb-4 text-[12px] text-amber-700">
-                            <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                            <span>Some Employee IDs were not found in the system. Only matched employees will be processed.</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047", marginBottom: 12, fontSize: 12, color: "#a16207" }}>
+                            <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                            {unmatchedCount} employee ID(s) not found in the system or not deployed to {selectedSite?.name}. They will be skipped.
                         </div>
                     )}
 
                     {/* Table */}
-                    <div className="overflow-x-auto rounded-[8px] border border-[var(--border)]">
-                        <table className="w-full text-[12px]">
+                    <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid var(--border)" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                             <thead>
-                                <tr className="bg-[var(--surface2)]">
-                                    <th className="px-3 py-2 text-left font-semibold text-[var(--text)] border-b border-[var(--border)]">Status</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-[var(--text)] border-b border-[var(--border)]">Emp ID</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-[var(--text)] border-b border-[var(--border)]">Name (File)</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-[var(--text)] border-b border-[var(--border)]">Name (DB)</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">Days</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">OT Days</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">Other Ded.</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">LWF</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">Canteen Days</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">Canteen</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">Penalty</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-[var(--text)] border-b border-[var(--border)]">Advance</th>
+                                <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                                    {["","Emp ID","Name (File)","Name (DB)","Designation","Days","OT Days","Other Ded.","LWF","Canteen Days","Penalty","Advance","Prod. Inc."].map(h => (
+                                        <th key={h} style={{ padding: "8px 10px", textAlign: h === "" ? "center" : "left", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                                    ))}
                                 </tr>
                             </thead>
                             <tbody>
                                 {matched.map((r, i) => (
-                                    <tr key={i} className={`border-b border-[var(--border)] last:border-0 ${!r.matched ? "bg-red-50/50" : ""}`}>
-                                        <td className="px-3 py-2">
+                                    <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: r.matched ? (i % 2 === 0 ? "var(--surface)" : "var(--surface2)") : "#fff5f5" }}>
+                                        <td style={{ padding: "7px 10px", textAlign: "center" }}>
                                             {r.matched
-                                                ? <CheckCircle2 size={14} className="text-emerald-500" />
-                                                : <XCircle size={14} className="text-red-400" />
-                                            }
+                                                ? <CheckCircle2 size={14} style={{ color: "#16a34a" }} />
+                                                : <XCircle     size={14} style={{ color: "#dc2626" }} />}
                                         </td>
-                                        <td className="px-3 py-2 font-mono text-[var(--text)]">{r.rawEmployeeId}</td>
-                                        <td className="px-3 py-2 text-[var(--text2)]">{r.rawName || "—"}</td>
-                                        <td className="px-3 py-2 text-[var(--text2)]">{r.dbName || <span className="text-red-400 italic">not found</span>}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.days}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.otDays}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.otherDeduction}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.lwf}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.canteenDays}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.canteen}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.penalty}</td>
-                                        <td className="px-3 py-2 text-right text-[var(--text2)]">{r.advance}</td>
+                                        <td style={{ padding: "7px 10px", fontFamily: "monospace", color: "var(--accent)", fontWeight: 700 }}>{r.rawEmployeeId}</td>
+                                        <td style={{ padding: "7px 10px", color: "var(--text2)" }}>{r.rawName || "—"}</td>
+                                        <td style={{ padding: "7px 10px", color: r.matched ? "var(--text)" : "#dc2626", fontWeight: r.matched ? 600 : 400, fontStyle: r.matched ? "normal" : "italic" }}>
+                                            {r.dbName ?? "not found"}
+                                        </td>
+                                        <td style={{ padding: "7px 10px", color: "var(--text3)" }}>{r.designation || "—"}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700 }}>{r.days}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.otDays}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.otherDeduction || "—"}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.lwf || "—"}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.canteenDays || "—"}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.penalty || "—"}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.advance || "—"}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.productionIncentive || "—"}</td>
                                     </tr>
                                 ))}
                             </tbody>
+                            {matchedCount > 0 && (
+                                <tfoot>
+                                    <tr style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
+                                        <td colSpan={5} style={{ padding: "8px 10px", fontSize: 11, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                                            Total ({matchedCount} employees)
+                                        </td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--text)" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.days,0)}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--text)" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.otDays,0)}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.otherDeduction,0) || "—"}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.lwf,0) || "—"}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.canteenDays,0) || "—"}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.penalty,0) || "—"}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.advance,0) || "—"}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.productionIncentive,0) || "—"}</td>
+                                    </tr>
+                                </tfoot>
+                            )}
                         </table>
                     </div>
 
                     {/* Process Button */}
                     {matchedCount > 0 && (
-                        <div className="mt-4 flex justify-end">
-                            <button
-                                onClick={handleProcess}
-                                disabled={processing}
-                                className="flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 disabled:opacity-60 text-white rounded-[10px] text-[13px] font-medium px-5 py-2.5 transition-all"
-                            >
+                        <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                            <button onClick={() => { setFile(null); setMatched(null) }} style={btnOutline}>
+                                Upload Another Site
+                            </button>
+                            <button onClick={handleProcess} disabled={processing}
+                                style={{ ...btnPrimary, background: "#16a34a", opacity: processing ? 0.7 : 1, fontSize: 13, padding: "9px 20px" }}>
                                 {processing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                {processing ? "Processing..." : `Process Payroll for ${matchedCount} Employee${matchedCount !== 1 ? "s" : ""}`}
+                                {processing ? "Processing…" : `Process Payroll — ${matchedCount} Employees at ${selectedSite?.name}`}
                             </button>
                         </div>
                     )}
