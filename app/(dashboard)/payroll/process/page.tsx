@@ -151,6 +151,7 @@ function ProcessPayrollPage() {
     const filtered       = employees.filter(e => !search || `${e.firstName} ${e.lastName} ${e.employeeId}`.toLowerCase().includes(search.toLowerCase()))
     const selectedSite   = sites.find(s => s.id === selectedSiteId)
     const getStatus      = (siteId: string) => siteStatus.find(s => s.siteId === siteId)
+    const activeSites    = sites.filter(s => (getStatus(s.id)?.processedCount ?? 0) > 0)
     const approvedCount  = employees.filter(e => e.employeeSalary?.status === "APPROVED").length
     const totalGrossEst  = employees.reduce((s, e) => {
         const sal = e.employeeSalary
@@ -222,7 +223,7 @@ function ProcessPayrollPage() {
                 <div style={{ width: 256, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Sites</span>
-                        <span style={{ fontSize: 10, color: "var(--text3)", background: "var(--surface2)", borderRadius: 10, padding: "2px 7px" }}>{sites.length}</span>
+                        <span style={{ fontSize: 10, color: "var(--text3)", background: "var(--surface2)", borderRadius: 10, padding: "2px 7px" }}>{activeSites.length}</span>
                     </div>
 
                     <div style={{ overflowY: "auto", maxHeight: 560 }}>
@@ -242,12 +243,12 @@ function ProcessPayrollPage() {
                                         <span style={{ fontSize: 12, fontWeight: 700, color: !selectedSiteId ? "var(--accent)" : "var(--text2)" }}>All Sites</span>
                                     </div>
                                     <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 20 }}>
-                                        {processedSites} / {sites.length} processed
+                                        {processedSites} / {activeSites.length} processed
                                     </div>
                                 </div>
 
                                 {/* Individual sites */}
-                                {sites.map(site => {
+                                {activeSites.map(site => {
                                     const st      = getStatus(site.id)
                                     const isDone  = (st?.processedCount ?? 0) > 0
                                     const isSel   = selectedSiteId === site.id
@@ -297,14 +298,14 @@ function ProcessPayrollPage() {
                                 </p>
                             </div>
 
-                            {sites.length === 0 && !loadingSites ? (
+                            {activeSites.length === 0 && !loadingSites ? (
                                 <div style={{ padding: 40, textAlign: "center", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
                                     <MapPin size={28} style={{ color: "var(--text3)", opacity: 0.3, margin: "0 auto 8px" }} />
-                                    <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>No active sites found</p>
+                                    <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>No attendance uploaded yet for this period</p>
                                 </div>
                             ) : (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
-                                    {sites.map(site => {
+                                    {activeSites.map(site => {
                                         const st     = getStatus(site.id)
                                         const isDone = (st?.processedCount ?? 0) > 0
                                         return (

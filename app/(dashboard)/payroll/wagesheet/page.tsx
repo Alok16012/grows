@@ -2,7 +2,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, Download, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet } from "lucide-react"
+import { Loader2, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet } from "lucide-react"
 import * as XLSX from "xlsx"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -100,11 +100,12 @@ function WageSheetInner() {
         XLSX.writeFile(wb, `WageSheet_${site?.name ?? "Site"}_${MONTHS[parseInt(month)-1]}_${year}.xlsx`)
     }
 
-    const filtered = data.filter(p => !search ||
+    const filtered      = data.filter(p => !search ||
         `${p.employee.firstName} ${p.employee.lastName} ${p.employee.employeeId}`.toLowerCase().includes(search.toLowerCase()))
-    const selSite  = sites.find(s => s.id === selId)
-    const getSt    = (id: string) => status.find(s => s.siteId === id)
-    const done     = status.filter(s => (s.processedCount ?? 0) > 0).length
+    const selSite       = sites.find(s => s.id === selId)
+    const getSt         = (id: string) => status.find(s => s.siteId === id)
+    const done          = status.filter(s => (s.processedCount ?? 0) > 0).length
+    const processedSites = sites.filter(s => (getSt(s.id)?.processedCount ?? 0) > 0)
 
     const totals = {
         gross: data.reduce((s, p) => s + p.grossSalary, 0),
@@ -167,7 +168,7 @@ function WageSheetInner() {
                 <div style={{ width: 256, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Sites</span>
-                        <span style={{ fontSize: 10, color: "var(--text3)", background: "var(--surface2)", borderRadius: 10, padding: "2px 7px" }}>{sites.length}</span>
+                        <span style={{ fontSize: 10, color: "var(--text3)", background: "var(--surface2)", borderRadius: 10, padding: "2px 7px" }}>{processedSites.length}</span>
                     </div>
                     <div style={{ overflowY: "auto", maxHeight: 520 }}>
                         {ldSites ? <div style={{ padding: 24, textAlign: "center" }}><Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} /></div> : (
@@ -180,9 +181,9 @@ function WageSheetInner() {
                                         <Building2 size={13} style={{ color: !selId ? "var(--accent)" : "var(--text3)" }} />
                                         <span style={{ fontSize: 12, fontWeight: 700, color: !selId ? "var(--accent)" : "var(--text2)" }}>All Sites</span>
                                     </div>
-                                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 20 }}>{done}/{sites.length} processed</div>
+                                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 20 }}>{done}/{processedSites.length} processed</div>
                                 </div>
-                                {sites.map(site => {
+                                {processedSites.map(site => {
                                     const st = getSt(site.id); const isDone = (st?.processedCount ?? 0) > 0; const isSel = selId === site.id
                                     return (
                                         <div key={site.id} onClick={() => selectSite(site.id)}
@@ -216,8 +217,14 @@ function WageSheetInner() {
                                 <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: "0 0 3px 0" }}>{MONTHS[parseInt(month)-1]} {year} — Wage Sheet Overview</p>
                                 <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Select a site to view its wage sheet and export to Excel.</p>
                             </div>
+                            {processedSites.length === 0 ? (
+                                <div style={{ padding: 40, textAlign: "center", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                                    <MapPin size={28} style={{ color: "var(--text3)", opacity: 0.3, margin: "0 auto 8px" }} />
+                                    <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>No payroll processed for this period yet</p>
+                                </div>
+                            ) : (
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-                                {sites.map(site => {
+                                {processedSites.map(site => {
                                     const st = getSt(site.id); const isDone = (st?.processedCount ?? 0) > 0
                                     return (
                                         <div key={site.id} onClick={() => selectSite(site.id)}
@@ -242,6 +249,7 @@ function WageSheetInner() {
                                     )
                                 })}
                             </div>
+                            )}
                         </>
                     ) : (
                         <>
