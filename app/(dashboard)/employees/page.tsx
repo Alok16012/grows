@@ -700,16 +700,7 @@ function EmployeeModal({
                                     </select>
                                 </div>
                                 <div>
-                                    <label className={labelCls}>System Access Level <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>(Login Permission)</span></label>
-                                    <select value={form.systemRole} onChange={set("systemRole")} className={inputCls}>
-                                        <option value="INSPECTION_BOY">Employee (Default)</option>
-                                        <option value="HR_MANAGER">HR Manager</option>
-                                        <option value="MANAGER">Manager</option>
-                                        <option value="ADMIN">Admin</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Custom Job Role <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>(Optional)</span></label>
+                                    <label className={labelCls}>Role</label>
                                     <select value={form.customRoleId} onChange={set("customRoleId")} className={inputCls}>
                                         <option value="">No custom role</option>
                                         {customRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
