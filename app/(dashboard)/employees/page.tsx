@@ -243,37 +243,25 @@ const EMPTY_FORM: ModalForm = {
 }
 
 
-function CredentialsModal({ email, password, onboardingLink, onClose }: { email: string; password: string; onboardingLink?: string; onClose: () => void }) {
-    const [copiedCreds, setCopiedCreds] = useState(false)
-    const [copiedLink, setCopiedLink] = useState(false)
-
-    const fullLink = onboardingLink ? `${window.location.origin}${onboardingLink}` : ""
-
-    const copyCreds = () => {
+function CredentialsModal({ email, password, onClose }: { email: string; password: string; onClose: () => void }) {
+    const [copied, setCopied] = useState(false)
+    const copy = () => {
         navigator.clipboard.writeText(`Email: ${email}\nPassword: ${password}`)
-        setCopiedCreds(true)
-        setTimeout(() => setCopiedCreds(false), 2000)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
     }
-    const copyLink = () => {
-        navigator.clipboard.writeText(fullLink)
-        setCopiedLink(true)
-        setTimeout(() => setCopiedLink(false), 2000)
-    }
-
     return (
         <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", padding: 16 }}>
-            <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <CheckCircle size={20} style={{ color: "#16a34a" }} />
                     </div>
                     <div>
                         <p style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", margin: 0 }}>Employee Account Created</p>
-                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share credentials and onboarding link with the employee</p>
+                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share these login credentials with the employee</p>
                     </div>
                 </div>
-
-                {/* Login Credentials */}
                 <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
                     <div style={{ marginBottom: 10 }}>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 3px" }}>Login Email / ID</p>
@@ -284,23 +272,15 @@ function CredentialsModal({ email, password, onboardingLink, onClose }: { email:
                         <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0, fontFamily: "monospace", letterSpacing: "1px" }}>{password}</p>
                     </div>
                 </div>
-                <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Password is set to the employee&apos;s phone number. Ask them to change it after first login.</p>
-
-                {/* Onboarding Link */}
-                {onboardingLink && (
-                    <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 6px" }}>Self-Onboarding Link</p>
-                        <p style={{ fontSize: 12, color: "#1e40af", margin: "0 0 8px", wordBreak: "break-all", fontFamily: "monospace" }}>{fullLink}</p>
-                        <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 8px" }}>Share this link with the employee. They can fill in all their personal details, KYC, bank info, and upload documents themselves.</p>
-                        <button onClick={copyLink} style={{ width: "100%", padding: "7px 0", borderRadius: 7, border: "1px solid #93c5fd", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#2563eb" }}>
-                            {copiedLink ? "Link Copied!" : "Copy Onboarding Link"}
-                        </button>
-                    </div>
-                )}
-
+                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <User size={14} style={{ color: "#16a34a", flexShrink: 0, marginTop: 1 }} />
+                    <p style={{ fontSize: 12, color: "#15803d", margin: 0 }}>
+                        Employee can log in and go to <b>My Profile</b> to fill in all remaining details — personal info, KYC, bank, emergency contacts and documents.
+                    </p>
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={copyCreds} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
-                        {copiedCreds ? "Copied!" : "Copy Credentials"}
+                    <button onClick={copy} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                        {copied ? "Copied!" : "Copy Credentials"}
                     </button>
                     <button onClick={onClose} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                         Done
@@ -317,7 +297,7 @@ function EmployeeModal({
     open: boolean; onClose: () => void; onSaved: () => void; employee?: Employee | null
 }) {
     const [loading, setLoading] = useState(false)
-    const [newCredentials, setNewCredentials] = useState<{ email: string; password: string; onboardingLink?: string } | null>(null)
+    const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
@@ -557,7 +537,7 @@ function EmployeeModal({
 
             onSaved()
             if (!employee && data._userCreated) {
-                setNewCredentials({ email: data._loginEmail, password: data._loginPassword, onboardingLink: data._onboardingLink })
+                setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
             } else {
                 toast.success(employee ? "Employee updated!" : "Employee added!")
                 onClose()
@@ -572,7 +552,7 @@ function EmployeeModal({
     if (!open) return null
 
     if (newCredentials) {
-        return <CredentialsModal email={newCredentials.email} password={newCredentials.password} onboardingLink={newCredentials.onboardingLink} onClose={() => { setNewCredentials(null); onClose() }} />
+        return <CredentialsModal email={newCredentials.email} password={newCredentials.password} onClose={() => { setNewCredentials(null); onClose() }} />
     }
 
     const setCheck = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -1247,74 +1227,32 @@ type EmployeeDocument = {
     uploadedAt: string
 }
 
-// ─── Onboarding Card ──────────────────────────────────────────────────────────
+// ─── Profile Completion Card ───────────────────────────────────────────────────
 
 function OnboardingCard({ employee }: { employee: Employee }) {
-    const [copied, setCopied] = useState(false)
-    const [regenerating, setRegenerating] = useState(false)
-    const [token, setToken] = useState(employee.onboardingToken)
-
-    const fullLink = token ? `${window.location.origin}/onboarding/${token}` : ""
-
-    const copyLink = () => {
-        if (!fullLink) return
-        navigator.clipboard.writeText(fullLink)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-    }
-
-    const regenerate = async () => {
-        setRegenerating(true)
-        try {
-            const r = await fetch(`/api/employees/${employee.id}/regenerate-token`, { method: "POST" })
-            if (!r.ok) throw new Error(await r.text())
-            const data = await r.json()
-            setToken(data.onboardingToken)
-            toast.success("New onboarding link generated")
-        } catch {
-            toast.error("Failed to regenerate link")
-        } finally {
-            setRegenerating(false)
-        }
-    }
-
-    // Completion status — inferred from key fields being filled
-    const isComplete = !!(employee.aadharNumber && employee.bankAccountNumber)
-    const isPending = !isComplete
+    const fields = [
+        employee.dateOfBirth, employee.gender, employee.aadharNumber, employee.panNumber,
+        employee.bankAccountNumber, employee.bankIFSC, employee.address,
+        employee.emergencyContact1Phone, employee.fathersName, employee.bloodGroup,
+    ]
+    const filled = fields.filter(Boolean).length
+    const pct = Math.round((filled / fields.length) * 100)
+    const isComplete = pct === 100
 
     return (
-        <div style={{ borderRadius: 10, border: `1px solid ${isComplete ? "#86efac" : "#bfdbfe"}`, background: isComplete ? "#f0fdf4" : "#eff6ff", padding: "12px 14px", marginTop: 4 }}>
+        <div style={{ borderRadius: 10, border: `1px solid ${isComplete ? "#86efac" : "#e5e7eb"}`, background: isComplete ? "#f0fdf4" : "#fafafa", padding: "12px 14px", marginTop: 4 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Link2 size={13} style={{ color: isComplete ? "#16a34a" : "#3b82f6" }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isComplete ? "#15803d" : "#1d4ed8" }}>Self-Onboarding</span>
-                </div>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: isComplete ? "#dcfce7" : "#dbeafe", color: isComplete ? "#15803d" : "#2563eb", border: `1px solid ${isComplete ? "#86efac" : "#93c5fd"}` }}>
-                    {isComplete ? "Completed" : "Pending"}
-                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isComplete ? "#15803d" : "var(--text2)" }}>Profile Completion</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: isComplete ? "#16a34a" : "var(--accent)" }}>{pct}%</span>
             </div>
-
-            {token ? (
-                <>
-                    <p style={{ fontSize: 11, color: "#4b5563", marginBottom: 8, wordBreak: "break-all", fontFamily: "monospace", background: "rgba(0,0,0,0.04)", borderRadius: 6, padding: "6px 8px" }}>
-                        {fullLink}
-                    </p>
-                    <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={copyLink} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "6px 10px", borderRadius: 7, border: "1px solid #93c5fd", background: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#2563eb" }}>
-                            <Copy size={11} /> {copied ? "Copied!" : "Copy Link"}
-                        </button>
-                        <button onClick={regenerate} disabled={regenerating} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", cursor: regenerating ? "not-allowed" : "pointer", fontSize: 11, color: "#6b7280", opacity: regenerating ? 0.6 : 1 }}>
-                            {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-                            {regenerating ? "" : "New Link"}
-                        </button>
-                    </div>
-                </>
-            ) : (
-                <button onClick={regenerate} disabled={regenerating} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 0", borderRadius: 7, border: "1px solid #bfdbfe", background: "#fff", cursor: regenerating ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, color: "#2563eb" }}>
-                    {regenerating ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
-                    {regenerating ? "Generating…" : "Generate Onboarding Link"}
-                </button>
-            )}
+            <div style={{ height: 5, background: "#e5e7eb", borderRadius: 999, marginBottom: 8, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: isComplete ? "#22c55e" : "var(--accent)", borderRadius: 999, transition: "width 0.3s" }} />
+            </div>
+            <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+                {isComplete
+                    ? "All key details filled."
+                    : `${filled}/${fields.length} key fields filled. Employee should log in and go to My Profile to complete.`}
+            </p>
         </div>
     )
 }
