@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import {
     Loader2, Search, ChevronRight, Download, Upload,
-    Edit2, Check, X, RefreshCw, IndianRupee, FileSpreadsheet
+    Edit2, Check, X, RefreshCw, IndianRupee
 } from "lucide-react"
 
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
@@ -61,6 +61,9 @@ export default function SalaryMasterPage() {
     const [saving,     setSaving]     = useState(false)
     const [uploading,  setUploading]  = useState(false)
     const [filterNone, setFilterNone] = useState(false)
+    // Quick-change compliance type without entering full edit mode
+    const [typeOverride, setTypeOverride] = useState<Record<string, string>>({})
+    const [savingType,   setSavingType]   = useState<string | null>(null)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -82,6 +85,35 @@ export default function SalaryMasterPage() {
             complianceType: s.complianceType,
         } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
         setEditId(emp.id)
+    }
+
+    const handleQuickTypeChange = async (emp: EmpSalary, newType: string) => {
+        if (!emp.employeeSalary) return
+        setTypeOverride(prev => ({ ...prev, [emp.id]: newType }))
+        setSavingType(emp.id)
+        const s = emp.employeeSalary
+        try {
+            const res = await fetch("/api/payroll/salary-structure", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rows: [{
+                    employeeId: emp.id,
+                    basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
+                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+                    otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
+                    complianceType: newType,
+                }] }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(`Compliance type updated to ${newType}`)
+            await load()
+        } catch (e) {
+            toast.error((e as Error).message)
+            setTypeOverride(prev => { const n = { ...prev }; delete n[emp.id]; return n })
+        } finally {
+            setSavingType(null)
+            setTypeOverride(prev => { const n = { ...prev }; delete n[emp.id]; return n })
+        }
     }
 
     const saveEdit = async (emp: EmpSalary) => {
@@ -301,7 +333,9 @@ export default function SalaryMasterPage() {
                                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                                     complianceType: s.complianceType,
                                 } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
-                                const { hra, bonus, gross, empPF, empESI, ctc } = calc(row)
+                                const effectiveType = typeOverride[emp.id] ?? row.complianceType
+                                const displayRow = { ...row, complianceType: effectiveType }
+                                const { hra, bonus, gross, empPF, empESI, ctc } = calc(displayRow)
 
                                 const numIn = (field: keyof EditForm, bg = "transparent") => (
                                     <input
@@ -363,12 +397,24 @@ export default function SalaryMasterPage() {
                                                     <option value="OR">OR</option>
                                                     <option value="CALL">CALL</option>
                                                 </select>
+                                            ) : s ? (
+                                                <select
+                                                    value={effectiveType}
+                                                    disabled={savingType === emp.id}
+                                                    onChange={e => handleQuickTypeChange(emp, e.target.value)}
+                                                    style={{
+                                                        padding: "3px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700,
+                                                        border: "none", cursor: "pointer", outline: "none",
+                                                        background: effectiveType === "CALL" ? "#fef3c7" : "#eff6ff",
+                                                        color: effectiveType === "CALL" ? "#b45309" : "#1d4ed8",
+                                                        appearance: "auto",
+                                                        opacity: savingType === emp.id ? 0.5 : 1,
+                                                    }}>
+                                                    <option value="OR">OR</option>
+                                                    <option value="CALL">CALL</option>
+                                                </select>
                                             ) : (
-                                                <span style={{ padding: "2px 7px", borderRadius: 10, fontSize: 10, fontWeight: 700,
-                                                    background: s?.complianceType === "CALL" ? "#fef3c7" : "#eff6ff",
-                                                    color: s?.complianceType === "CALL" ? "#b45309" : "#1d4ed8" }}>
-                                                    {s?.complianceType || "—"}
-                                                </span>
+                                                <span style={{ color: "var(--text3)", fontSize: 11 }}>—</span>
                                             )}
                                         </td>
                                         {/* Action */}
