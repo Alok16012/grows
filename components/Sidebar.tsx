@@ -119,6 +119,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     permission: "payroll.view",
                     subLinks: [
                         { name: "Payments Dashboard", href: "/payroll" },
+                        { name: "Salary Structure", href: "/payroll/salary-master" },
                         { name: "Process Payroll", href: "/payroll/process" },
                         { name: "Site Wise Wage Sheet", href: "/payroll/wagesheet" },
                         { name: "Select Sites (Multi)", href: "/payroll/select-sites" },
