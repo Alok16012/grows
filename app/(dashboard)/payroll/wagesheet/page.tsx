@@ -36,8 +36,9 @@ function WageSheetInner() {
     const [search,     setSearch]     = useState("")
     const [ldSites,    setLdSites]    = useState(true)
     const [ldData,     setLdData]     = useState(false)
-    const [activeView, setActiveView] = useState<"wagesheet" | "neft">("wagesheet")
-    const [neftEmail,  setNeftEmail]  = useState("")
+    const [activeView,   setActiveView]   = useState<"wagesheet" | "neft">("wagesheet")
+    const [neftEmail,    setNeftEmail]    = useState("")
+    const [selectedIds,  setSelectedIds]  = useState<Set<string>>(new Set())
 
     useEffect(() => {
         fetch("/api/sites?isActive=true").then(r => r.json())
@@ -66,12 +67,19 @@ function WageSheetInner() {
     }, [month, year])
 
     const selectSite = (id: string) => {
-        setSelId(id); setSearch("")
+        setSelId(id); setSearch(""); setSelectedIds(new Set())
         if (id) fetchData(id); else setData([])
     }
 
+    const toggleSelect = (id: string) =>
+        setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+
+    const toggleAll = (rows: Payroll[]) =>
+        setSelectedIds(prev => prev.size === rows.length ? new Set() : new Set(rows.map(p => p.id)))
+
     const handleNEFT = () => {
-        if (!data.length) return
+        const exportRows = selectedIds.size > 0 ? data.filter(p => selectedIds.has(p.id)) : data
+        if (!exportRows.length) return
         const site = sites.find(s => s.id === selId)
         const siteShort = (site?.code || site?.name || "SITE").toUpperCase().replace(/\s+/g, "").slice(0, 8)
         const m = parseInt(month); const y = parseInt(year)
@@ -79,7 +87,7 @@ function WageSheetInner() {
         const today = new Date()
         const payDate = `${String(today.getDate()).padStart(2,"0")}/${String(today.getMonth()+1).padStart(2,"0")}/${today.getFullYear()}`
 
-        const rows = data.map(p => [
+        const rows = exportRows.map(p => [
             "N",                                                    // 1 Transaction Type
             "",                                                     // 2 Blank
             p.employee.bankAccountNumber || "",                     // 3 Account Number
@@ -105,8 +113,9 @@ function WageSheetInner() {
     }
 
     const handleExport = () => {
-        if (!data.length) return
-        const rows = data.map((p, i) => ({
+        const exportRows = selectedIds.size > 0 ? data.filter(p => selectedIds.has(p.id)) : data
+        if (!exportRows.length) return
+        const rows = exportRows.map((p, i) => ({
             "SL": i + 1,
             "Emp ID": p.employee.employeeId,
             "Name": `${p.employee.firstName} ${p.employee.lastName}`,
@@ -139,6 +148,7 @@ function WageSheetInner() {
         XLSX.writeFile(wb, `WageSheet_${site?.name ?? "Site"}_${MONTHS[parseInt(month)-1]}_${year}.xlsx`)
     }
 
+    const selectedCount = selectedIds.size
     const filtered      = data.filter(p => !search ||
         `${p.employee.firstName} ${p.employee.lastName} ${p.employee.employeeId}`.toLowerCase().includes(search.toLowerCase()))
     const selSite       = sites.find(s => s.id === selId)
@@ -318,12 +328,14 @@ function WageSheetInner() {
                                     {activeView === "wagesheet" ? (
                                         <button onClick={handleExport} disabled={!data.length}
                                             style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
-                                            <FileSpreadsheet size={13} /> Download Excel
+                                            <FileSpreadsheet size={13} />
+                                            {selectedCount > 0 ? `Download (${selectedCount} selected)` : "Download Excel"}
                                         </button>
                                     ) : (
                                         <button onClick={handleNEFT} disabled={!data.length}
                                             style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#0369a1", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
-                                            <FileDown size={13} /> Download NEFT
+                                            <FileDown size={13} />
+                                            {selectedCount > 0 ? `Download NEFT (${selectedCount})` : "Download NEFT"}
                                         </button>
                                     )}
                                 </div>
@@ -419,12 +431,23 @@ function WageSheetInner() {
                                     <Search size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
                                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search employees…"
                                         style={{ flex: 1, border: "none", outline: "none", fontSize: 12, background: "transparent", color: "var(--text)" }} />
+                                    {selectedCount > 0 && (
+                                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", whiteSpace: "nowrap", background: "var(--accent-light)", padding: "2px 8px", borderRadius: 20 }}>
+                                            {selectedCount} selected
+                                        </span>
+                                    )}
                                     <span style={{ fontSize: 11, color: "var(--text3)", whiteSpace: "nowrap" }}>{filtered.length}/{data.length}</span>
                                 </div>
                                 <div style={{ overflowX: "auto" }}>
                                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                                         <thead>
                                             <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                                                <th style={th} rowSpan={2}>
+                                                    <input type="checkbox"
+                                                        checked={filtered.length > 0 && filtered.every(p => selectedIds.has(p.id))}
+                                                        onChange={() => toggleAll(filtered)}
+                                                        style={{ cursor: "pointer", accentColor: "var(--accent)" }} />
+                                                </th>
                                                 <th style={th} rowSpan={2}>#</th>
                                                 <th style={th} rowSpan={2}>Emp ID</th>
                                                 <th style={{ ...th, textAlign: "left" }} rowSpan={2}>Name</th>
@@ -435,21 +458,28 @@ function WageSheetInner() {
                                                 <th style={{ ...th, background: "#f0fdf4", color: "#16a34a" }} rowSpan={2}>Net Pay</th>
                                             </tr>
                                             <tr style={{ background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
+                                                <th style={th} />
                                                 {["Basic","DA","Wash","Conv.","OT","Gross"].map(h => <th key={h} style={{ ...th, background: "#eff6ff" }}>{h}</th>)}
                                                 {["PF","ESI","PT","LWF","Canteen","Penalty","Adv."].map(h => <th key={h} style={{ ...th, background: "#fef2f2" }}>{h}</th>)}
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {ldData ? (
-                                                <tr><td colSpan={19} style={{ padding: "40px 0", textAlign: "center" }}>
+                                                <tr><td colSpan={20} style={{ padding: "40px 0", textAlign: "center" }}>
                                                     <Loader2 size={20} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} />
                                                 </td></tr>
                                             ) : filtered.length === 0 ? (
-                                                <tr><td colSpan={19} style={{ padding: "30px", textAlign: "center", color: "var(--text3)", fontSize: 12 }}>
+                                                <tr><td colSpan={20} style={{ padding: "30px", textAlign: "center", color: "var(--text3)", fontSize: 12 }}>
                                                     {data.length === 0 ? "No processed payroll records found for this site and period" : "No results match your search"}
                                                 </td></tr>
                                             ) : filtered.map((p, i) => (
-                                                <tr key={p.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>
+                                                <tr key={p.id} onClick={() => toggleSelect(p.id)}
+                                                    style={{ borderBottom: "1px solid var(--border)", cursor: "pointer",
+                                                        background: selectedIds.has(p.id) ? "var(--accent-light)" : i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>
+                                                    <td style={td} onClick={e => e.stopPropagation()}>
+                                                        <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)}
+                                                            style={{ cursor: "pointer", accentColor: "var(--accent)" }} />
+                                                    </td>
                                                     <td style={td}>{i+1}</td>
                                                     <td style={{ ...td, color: "var(--accent)", fontWeight: 700 }}>{p.employee.employeeId}</td>
                                                     <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{p.employee.firstName} {p.employee.lastName}</td>
@@ -475,7 +505,7 @@ function WageSheetInner() {
                                         {data.length > 0 && (
                                             <tfoot>
                                                 <tr style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
-                                                    <td colSpan={5} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({data.length})</td>
+                                                    <td colSpan={6} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({selectedCount > 0 ? `${selectedCount} selected` : data.length})</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.basicSalary,0))}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.da,0))}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.washing,0))}</td>
