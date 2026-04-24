@@ -49,6 +49,8 @@ export async function GET(req: Request) {
                         employeeId: true,
                         designation: true,
                         photo: true,
+                        bankAccountNumber: true,
+                        bankIFSC: true,
                         deployments: {
                             where: { isActive: true },
                             include: { site: { select: { name: true } } },

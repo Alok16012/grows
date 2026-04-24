@@ -2,7 +2,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet } from "lucide-react"
+import { Loader2, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet, FileDown } from "lucide-react"
 import * as XLSX from "xlsx"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -19,7 +19,10 @@ type Payroll = {
     canteen: number; penalty: number; advance: number; otherDeductions: number
     totalDeductions: number; netSalary: number
     workingDays: number | null; presentDays: number | null
-    employee: { employeeId: string; firstName: string; lastName: string; designation: string | null }
+    employee: {
+        employeeId: string; firstName: string; lastName: string; designation: string | null
+        bankAccountNumber?: string | null; bankIFSC?: string | null
+    }
 }
 
 function WageSheetInner() {
@@ -28,11 +31,13 @@ function WageSheetInner() {
     const [year,    setYear]    = useState(String(new Date().getFullYear()))
     const [sites,   setSites]   = useState<Site[]>([])
     const [status,  setStatus]  = useState<SiteStatus[]>([])
-    const [selId,   setSelId]   = useState("")
-    const [data,    setData]    = useState<Payroll[]>([])
-    const [search,  setSearch]  = useState("")
-    const [ldSites, setLdSites] = useState(true)
-    const [ldData,  setLdData]  = useState(false)
+    const [selId,      setSelId]      = useState("")
+    const [data,       setData]       = useState<Payroll[]>([])
+    const [search,     setSearch]     = useState("")
+    const [ldSites,    setLdSites]    = useState(true)
+    const [ldData,     setLdData]     = useState(false)
+    const [activeView, setActiveView] = useState<"wagesheet" | "neft">("wagesheet")
+    const [neftEmail,  setNeftEmail]  = useState("")
 
     useEffect(() => {
         fetch("/api/sites?isActive=true").then(r => r.json())
@@ -63,6 +68,40 @@ function WageSheetInner() {
     const selectSite = (id: string) => {
         setSelId(id); setSearch("")
         if (id) fetchData(id); else setData([])
+    }
+
+    const handleNEFT = () => {
+        if (!data.length) return
+        const site = sites.find(s => s.id === selId)
+        const siteShort = (site?.code || site?.name || "SITE").toUpperCase().replace(/\s+/g, "").slice(0, 8)
+        const m = parseInt(month); const y = parseInt(year)
+        const caption = `Salary ${MONTHS[m - 1].slice(0, 3)} ${String(y).slice(-2)}`
+        const today = new Date()
+        const payDate = `${String(today.getDate()).padStart(2,"0")}/${String(today.getMonth()+1).padStart(2,"0")}/${today.getFullYear()}`
+
+        const rows = data.map(p => [
+            "N",                                                    // 1 Transaction Type
+            "",                                                     // 2 Blank
+            p.employee.bankAccountNumber || "",                     // 3 Account Number
+            Math.round(p.netSalary),                               // 4 Net Salary
+            `${p.employee.firstName} ${p.employee.lastName}`.toUpperCase(), // 5 Name (CAPS)
+            "", "", "", "", "", "",                                 // 6-11 Blank (6)
+            caption,                                               // 12 Caption 1
+            caption,                                               // 13 Caption 2
+            siteShort,                                             // 14 Site Name
+            "", "", "", "", "", "",                                 // 15-20 Blank (6)
+            payDate,                                               // 21 Payment Date
+            "",                                                    // 22 Blank
+            p.employee.bankIFSC || "",                             // 23 IFSC
+            "", "",                                                // 24-25 Blank (2)
+            neftEmail,                                             // 26 Email
+        ])
+
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet(rows)
+        ws["!cols"] = Array(26).fill({ wch: 20 })
+        XLSX.utils.book_append_sheet(wb, ws, "NEFT")
+        XLSX.writeFile(wb, `NEFT_${site?.name ?? "Site"}_${MONTHS[m-1]}_${y}.xlsx`)
     }
 
     const handleExport = () => {
@@ -254,23 +293,52 @@ function WageSheetInner() {
                     ) : (
                         <>
                             {/* Site header */}
-                            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                     <MapPin size={15} style={{ color: "var(--accent)" }} />
                                     <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{selSite?.name}</span>
                                     {selSite?.code && <span style={{ fontSize: 11, color: "var(--text3)" }}>{selSite.code}</span>}
+                                </div>
+                                {/* View tabs */}
+                                <div style={{ display: "flex", background: "var(--surface2)", borderRadius: 8, padding: 3, gap: 2 }}>
+                                    {(["wagesheet", "neft"] as const).map(v => (
+                                        <button key={v} onClick={() => setActiveView(v)}
+                                            style={{ padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                                                background: activeView === v ? "var(--accent)" : "transparent",
+                                                color: activeView === v ? "#fff" : "var(--text3)" }}>
+                                            {v === "wagesheet" ? "Wage Sheet" : "NEFT File"}
+                                        </button>
+                                    ))}
                                 </div>
                                 <div style={{ display: "flex", gap: 8 }}>
                                     <button onClick={() => fetchData(selId)} disabled={ldData}
                                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={12} className={ldData ? "animate-spin" : ""} /> Refresh
                                     </button>
-                                    <button onClick={handleExport} disabled={!data.length}
-                                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
-                                        <FileSpreadsheet size={13} /> Export Excel
-                                    </button>
+                                    {activeView === "wagesheet" ? (
+                                        <button onClick={handleExport} disabled={!data.length}
+                                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
+                                            <FileSpreadsheet size={13} /> Download Excel
+                                        </button>
+                                    ) : (
+                                        <button onClick={handleNEFT} disabled={!data.length}
+                                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#0369a1", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
+                                            <FileDown size={13} /> Download NEFT
+                                        </button>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* NEFT email input */}
+                            {activeView === "neft" && (
+                                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", whiteSpace: "nowrap" }}>Authorized Email (col 26)</span>
+                                    <input value={neftEmail} onChange={e => setNeftEmail(e.target.value)}
+                                        placeholder="accounts@yourcompany.com"
+                                        style={{ flex: 1, minWidth: 220, padding: "6px 10px", borderRadius: 7, border: "1px solid #93c5fd", fontSize: 12, outline: "none", background: "#fff", color: "var(--text)" }} />
+                                    <span style={{ fontSize: 11, color: "#3b82f6" }}>Site short name: <b>{(selSite?.code || selSite?.name || "").toUpperCase().replace(/\s+/g,"").slice(0,8)}</b></span>
+                                </div>
+                            )}
 
                             {/* Stat cards */}
                             {data.length > 0 && (
@@ -289,8 +357,64 @@ function WageSheetInner() {
                                 </div>
                             )}
 
-                            {/* Table */}
-                            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                            {/* NEFT Preview Table */}
+                            {activeView === "neft" && (
+                                <div style={{ background: "var(--surface)", border: "1px solid #bfdbfe", borderRadius: 12, overflow: "hidden" }}>
+                                    <div style={{ padding: "9px 14px", borderBottom: "1px solid #bfdbfe", background: "#eff6ff", display: "flex", alignItems: "center", gap: 8 }}>
+                                        <FileDown size={13} style={{ color: "#1d4ed8" }} />
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8" }}>NEFT File Preview — {data.length} rows</span>
+                                        <span style={{ fontSize: 11, color: "#3b82f6", marginLeft: "auto" }}>26 columns as per bank format</span>
+                                    </div>
+                                    <div style={{ overflowX: "auto" }}>
+                                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                                            <thead>
+                                                <tr style={{ background: "#dbeafe", borderBottom: "1px solid #bfdbfe" }}>
+                                                    {["#","Type","Blank","Acct No","Net Salary","Name (CAPS)","[6-11]","Caption 1","Caption 2","Site","[15-20]","Pay Date","Blank","IFSC","[24-25]","Email"].map(h => (
+                                                        <th key={h} style={{ padding: "6px 10px", fontWeight: 700, color: "#1e40af", whiteSpace: "nowrap", textAlign: "center", fontSize: 10 }}>{h}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {data.slice(0, 5).map((p, i) => {
+                                                    const siteShort = (selSite?.code || selSite?.name || "SITE").toUpperCase().replace(/\s+/g,"").slice(0,8)
+                                                    const m = parseInt(month)
+                                                    const caption = `Salary ${MONTHS[m-1].slice(0,3)} ${String(parseInt(year)).slice(-2)}`
+                                                    const today = new Date()
+                                                    const payDate = `${String(today.getDate()).padStart(2,"0")}/${String(today.getMonth()+1).padStart(2,"0")}/${today.getFullYear()}`
+                                                    return (
+                                                        <tr key={p.id} style={{ borderBottom: "1px solid #e0f2fe", background: i%2===0?"#fff":"#f0f9ff" }}>
+                                                            <td style={{ ...td, fontSize: 10 }}>{i+1}</td>
+                                                            <td style={{ ...td, fontWeight: 700, color: "#0369a1" }}>N</td>
+                                                            <td style={td}></td>
+                                                            <td style={{ ...td, color: "#0369a1" }}>{p.employee.bankAccountNumber || <span style={{color:"#f59e0b"}}>Missing</span>}</td>
+                                                            <td style={{ ...td, fontWeight: 700 }}>{Math.round(p.netSalary)}</td>
+                                                            <td style={{ ...td, textAlign: "left" }}>{`${p.employee.firstName} ${p.employee.lastName}`.toUpperCase()}</td>
+                                                            <td style={{ ...td, color: "var(--text3)", fontSize: 9 }}>——</td>
+                                                            <td style={td}>{caption}</td>
+                                                            <td style={td}>{caption}</td>
+                                                            <td style={{ ...td, fontWeight: 700, color: "#0369a1" }}>{siteShort}</td>
+                                                            <td style={{ ...td, color: "var(--text3)", fontSize: 9 }}>——</td>
+                                                            <td style={td}>{payDate}</td>
+                                                            <td style={td}></td>
+                                                            <td style={{ ...td, color: "#0369a1" }}>{p.employee.bankIFSC || <span style={{color:"#f59e0b"}}>Missing</span>}</td>
+                                                            <td style={{ ...td, color: "var(--text3)", fontSize: 9 }}>——</td>
+                                                            <td style={{ ...td, color: "#6b7280" }}>{neftEmail || "—"}</td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                                {data.length > 5 && (
+                                                    <tr><td colSpan={16} style={{ padding: "8px 14px", textAlign: "center", fontSize: 11, color: "var(--text3)", background: "#f0f9ff" }}>
+                                                        + {data.length - 5} more rows in downloaded file
+                                                    </td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Wage Sheet Table */}
+                            {activeView === "wagesheet" && <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                                 <div style={{ padding: "9px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
                                     <Search size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
                                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search employees…"
@@ -371,7 +495,7 @@ function WageSheetInner() {
                                         )}
                                     </table>
                                 </div>
-                            </div>
+                            </div>}
                         </>
                     )}
                 </div>
