@@ -82,6 +82,12 @@ type Employee = {
     safetyEarMuffs?: boolean
     safetyShoes?: boolean
     onboardingToken?: string
+    employeeSalary?: {
+        basic: number; da: number; washing: number; conveyance: number
+        leaveWithWages: number; otherAllowance: number
+        otRatePerHour: number; canteenRatePerDay: number
+        complianceType?: string; status?: string
+    } | null
 }
 
 type Site = { id: string; name: string; code?: string }
@@ -337,29 +343,6 @@ function EmployeeModal({
         }
     }, [activeTab, employee])
 
-    // Load existing salary structure when editing
-    useEffect(() => {
-        if (!open || !employee) return
-        fetch(`/api/payroll/salary-structure/${employee.id}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(sal => {
-                if (sal) {
-                    setForm(f => ({
-                        ...f,
-                        basicSalary: String(sal.basic || f.basicSalary),
-                        salDA: String(sal.da || ""),
-                        salWashing: String(sal.washing || ""),
-                        salConveyance: String(sal.conveyance || ""),
-                        salLeaveWithWages: String(sal.leaveWithWages || ""),
-                        salOtherAllowance: String(sal.otherAllowance || ""),
-                        salOtRatePerHour: String(sal.otRatePerHour || "170"),
-                        salCanteenRatePerDay: String(sal.canteenRatePerDay || "55"),
-                        salComplianceType: sal.complianceType || "OR",
-                    }))
-                }
-            })
-            .catch(() => {})
-    }, [open, employee])
 
     useEffect(() => {
         if (!open) return
@@ -383,7 +366,7 @@ function EmployeeModal({
                 dateOfJoining: employee.dateOfJoining ? employee.dateOfJoining.split("T")[0] : "",
                 employmentType: employee.employmentType,
                 salaryType: employee.salaryType || "Monthly",
-                basicSalary: employee.basicSalary.toString(),
+                basicSalary: String(employee.employeeSalary?.basic ?? employee.basicSalary),
                 address: employee.address || "",
                 city: employee.city || "",
                 state: employee.state || "",
@@ -426,10 +409,15 @@ function EmployeeModal({
                 customRoleId: "",
                 systemRole: "INSPECTION_BOY",
                 role: employee.designation || "Security Guard",
-                // Salary Structure (cleared - will be loaded separately if needed)
-                salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
-                salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
-                salComplianceType: "OR",
+                // Salary Structure — pre-fill from existing record
+                salDA:                String(employee.employeeSalary?.da               ?? ""),
+                salWashing:           String(employee.employeeSalary?.washing          ?? ""),
+                salConveyance:        String(employee.employeeSalary?.conveyance       ?? ""),
+                salLeaveWithWages:    String(employee.employeeSalary?.leaveWithWages   ?? ""),
+                salOtherAllowance:    String(employee.employeeSalary?.otherAllowance   ?? ""),
+                salOtRatePerHour:     String(employee.employeeSalary?.otRatePerHour    ?? "170"),
+                salCanteenRatePerDay: String(employee.employeeSalary?.canteenRatePerDay ?? "55"),
+                salComplianceType:    employee.employeeSalary?.complianceType          ?? "OR",
                 // Site Deployment
                 siteId: employee.deployments?.[0]?.site?.id || "", deployShift: "", deployRole: "", deployStartDate: "",
             })
