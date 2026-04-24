@@ -458,29 +458,27 @@ function EmployeeModal({
             const data = await res.json()
             const empId = data.id || employee?.id
 
-            // Save salary structure if any salary fields are filled
-            const hasSalary = form.basicSalary || form.salDA || form.salWashing || form.salConveyance
-            if (empId && hasSalary) {
+            // Save salary structure if basic salary is filled
+            if (empId && form.basicSalary) {
                 try {
-                    await fetch("/api/payroll/salary-structure", {
+                    const salRes = await fetch(`/api/payroll/salary-structure/${empId}`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            rows: [{
-                                employeeId:       empId,
-                                basic:            Number(form.basicSalary) || 0,
-                                da:               Number(form.salDA) || 0,
-                                washing:          Number(form.salWashing) || 0,
-                                conveyance:       Number(form.salConveyance) || 0,
-                                leaveWithWages:   Number(form.salLeaveWithWages) || 0,
-                                otherAllowance:   Number(form.salOtherAllowance) || 0,
-                                otRatePerHour:    Number(form.salOtRatePerHour) || 170,
-                                canteenRatePerDay: Number(form.salCanteenRatePerDay) || 55,
-                                complianceType:   form.salComplianceType || "OR",
-                            }],
+                            basic:            Number(form.basicSalary) || 0,
+                            da:               Number(form.salDA) || 0,
+                            washing:          Number(form.salWashing) || 0,
+                            conveyance:       Number(form.salConveyance) || 0,
+                            leaveWithWages:   Number(form.salLeaveWithWages) || 0,
+                            otherAllowance:   Number(form.salOtherAllowance) || 0,
+                            otRatePerHour:    Number(form.salOtRatePerHour) || 170,
+                            canteenRatePerDay: Number(form.salCanteenRatePerDay) || 55,
+                            complianceType:   form.salComplianceType || "OR",
+                            status:           "APPROVED",
                         }),
                     })
-                } catch { /* salary structure save failed silently */ }
+                    if (!salRes.ok) toast.error("Salary structure save failed: " + await salRes.text())
+                } catch (e) { toast.error("Salary structure save error: " + (e as Error).message) }
             }
 
             // Upload pending documents
