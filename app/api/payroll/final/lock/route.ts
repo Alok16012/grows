@@ -9,19 +9,22 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { month, year, siteIds } = body
+        const { month, year, siteIds, payrollIds } = body
 
         if (!month || !year) return new NextResponse("Month and Year required", { status: 400 })
 
-        // Update Payroll status for matching sites/month/year
-        const updated = await prisma.payroll.updateMany({
-            where: {
+        // Lock specific payroll records by ID (from wage sheet selection)
+        const where = payrollIds?.length
+            ? { id: { in: payrollIds as string[] }, status: "DRAFT" as const }
+            : {
                 month,
                 year,
-                status: "DRAFT",
-                // If siteIds provided, filter by them
+                status: "DRAFT" as const,
                 ...(siteIds?.length ? { siteId: { in: siteIds } } : {})
-            },
+            }
+
+        const updated = await prisma.payroll.updateMany({
+            where,
             data: {
                 status: "PROCESSED",
                 processedAt: new Date(),

@@ -391,7 +391,7 @@ function EmployeeModal({
                 religion: employee.religion || "",
                 caste: employee.caste || "",
                 uan: employee.uan || "",
-                pfNumber: employee.panNumber || "",
+                pfNumber: employee.pfNumber || "",
                 esiNumber: employee.esiNumber || "",
                 labourCardNo: employee.labourCardNo || "",
                 emergencyContact1Name: employee.emergencyContact1Name || "",
@@ -2120,10 +2120,103 @@ export default function EmployeesPage() {
     }
 
     function handleDownloadTemplate() {
+        const headers = [
+            // ── Required ──────────────────────────────────────────────────────
+            "First Name*", "Last Name", "Phone*", "Email",
+            // ── Employment ────────────────────────────────────────────────────
+            "Designation", "Employment Type", "Status", "Date Of Joining",
+            "Date Of Leaving", "Department", "Branch",
+            // ── Salary ────────────────────────────────────────────────────────
+            "Basic Salary", "DA", "Washing Allowance", "Conveyance Allowance",
+            "Leave With Wages", "Other Allowance", "OT Rate Per Hour",
+            "Canteen Rate Per Day", "Compliance Type",
+            // ── Personal ──────────────────────────────────────────────────────
+            "Middle Name", "Name As Per Aadhar", "Fathers Name",
+            "Date Of Birth", "Gender", "Blood Group", "Marital Status",
+            "Nationality", "Religion", "Caste",
+            // ── Address ───────────────────────────────────────────────────────
+            "Address", "City", "State", "Pincode",
+            "Permanent Address", "Permanent City", "Permanent State", "Permanent Pincode",
+            // ── Identity / Statutory ──────────────────────────────────────────
+            "Aadhar Number", "PAN Number", "UAN", "PF Number",
+            "ESI Number", "Labour Card No",
+            // ── Bank ──────────────────────────────────────────────────────────
+            "Bank Name", "Bank Branch", "Bank Account Number", "Bank IFSC",
+            // ── Contact ───────────────────────────────────────────────────────
+            "Alternate Phone",
+            "Emergency Contact 1 Name", "Emergency Contact 1 Phone",
+            "Emergency Contact 2 Name", "Emergency Contact 2 Phone",
+            // ── Work Details ──────────────────────────────────────────────────
+            "Work Skill", "Nature Of Work", "Notes",
+        ]
+
+        const sample = [
+            "Ramesh", "Kumar", "9876543210", "ramesh@example.com",
+            "Security Guard", "Full-time", "ACTIVE", "2024-01-15",
+            "", "Security", "Main Site",
+            "12000", "1000", "500", "500",
+            "0", "0", "170",
+            "55", "OR",
+            "", "", "Suresh Kumar",
+            "1990-05-20", "Male", "O+", "Single",
+            "Indian", "Hindu", "General",
+            "123 MG Road", "Mumbai", "Maharashtra", "400001",
+            "", "", "", "",
+            "123456789012", "ABCDE1234F", "", "",
+            "", "",
+            "State Bank of India", "Andheri Branch", "00112233445566", "SBIN0001234",
+            "",
+            "Sita Devi", "9811223344",
+            "", "",
+            "Security", "Guarding", "",
+        ]
+
+        const instructions = [
+            ["Field", "Required", "Valid Values / Format", "Example"],
+            ["First Name*",        "Yes",  "Any text",                             "Ramesh"],
+            ["Last Name",          "No",   "Any text",                             "Kumar"],
+            ["Phone*",             "Yes",  "10-digit mobile number",               "9876543210"],
+            ["Email",              "No",   "Valid email",                          "ramesh@example.com"],
+            ["Designation",        "No",   "Any text",                             "Security Guard"],
+            ["Employment Type",    "No",   "Full-time / Part-time / Contract / Daily Wage", "Full-time"],
+            ["Status",             "No",   "ACTIVE / INACTIVE",                    "ACTIVE"],
+            ["Date Of Joining",    "No",   "YYYY-MM-DD",                           "2024-01-15"],
+            ["Date Of Leaving",    "No",   "YYYY-MM-DD (leave blank if active)",   ""],
+            ["Department",         "No",   "Must match existing department name",  "Security"],
+            ["Branch",             "No",   "Must match existing branch name",      "Head Office"],
+            ["Basic Salary",       "No",   "Number (monthly)",                     "12000"],
+            ["DA",                 "No",   "Number",                               "1000"],
+            ["Washing Allowance",  "No",   "Number",                               "500"],
+            ["Conveyance Allowance","No",  "Number",                               "500"],
+            ["Leave With Wages",   "No",   "Number",                               "0"],
+            ["Other Allowance",    "No",   "Number",                               "0"],
+            ["OT Rate Per Hour",   "No",   "Number (default 170)",                 "170"],
+            ["Canteen Rate Per Day","No",  "Number (default 55)",                  "55"],
+            ["Compliance Type",    "No",   "OR (full PF/ESI) / CALL (no PF/ESI)", "OR"],
+            ["Gender",             "No",   "Male / Female / Other",                "Male"],
+            ["Blood Group",        "No",   "A+ / A- / B+ / B- / O+ / O- / AB+ / AB-", "O+"],
+            ["Marital Status",     "No",   "Single / Married / Divorced / Widowed","Single"],
+            ["Date Of Birth",      "No",   "YYYY-MM-DD",                           "1990-05-20"],
+            ["Bank Account Number","No",   "Full account number (no spaces)",      "00112233445566"],
+            ["Bank IFSC",          "No",   "11-character IFSC code",               "SBIN0001234"],
+            ["Aadhar Number",      "No",   "12-digit number",                      "123456789012"],
+            ["PAN Number",         "No",   "10-character PAN",                     "ABCDE1234F"],
+        ]
+
         const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.aoa_to_sheet([["First Name", "Last Name", "Phone", "Email", "Designation", "Employment Type", "Basic Salary", "City", "Date of Joining (YYYY-MM-DD)"]])
+
+        // Sheet 1: Data
+        const ws = XLSX.utils.aoa_to_sheet([headers, sample])
+        ws["!cols"] = headers.map(() => ({ wch: 22 }))
         XLSX.utils.book_append_sheet(wb, ws, "Employees")
-        XLSX.writeFile(wb, "employees_template.xlsx")
+
+        // Sheet 2: Instructions
+        const wi = XLSX.utils.aoa_to_sheet(instructions)
+        wi["!cols"] = [{ wch: 26 }, { wch: 10 }, { wch: 48 }, { wch: 22 }]
+        XLSX.utils.book_append_sheet(wb, wi, "Instructions")
+
+        XLSX.writeFile(wb, "employees_bulk_template.xlsx")
+        toast.success("Template downloaded — fill Sheet 1 and re-import")
     }
 
     function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -2139,16 +2232,71 @@ export default function EmployeesPage() {
                 const entry: Record<string, unknown> = {}
                 for (const key of Object.keys(r)) {
                     const val = r[key]
-                    const lk = key.toLowerCase().replace(/[\s()/-]/g, "")
-                    if (lk === "firstname") entry.firstName = val
-                    else if (lk === "lastname") entry.lastName = val
-                    else if (lk === "phone") entry.phone = val
-                    else if (lk === "email") entry.email = val
-                    else if (lk === "designation") entry.designation = val
-                    else if (lk === "employmenttype") entry.employmentType = val
-                    else if (lk === "basicsalary") entry.basicSalary = val
-                    else if (lk === "city") entry.city = val
-                    else if (lk === "dateofjoiningyyyymmdd" || lk === "dateofjoining") entry.dateOfJoining = val
+                    // Normalize: lowercase, strip spaces/parens/slashes/dashes/asterisks/apostrophes
+                    const lk = key.toLowerCase().replace(/[\s()/\-*']/g, "")
+                    if      (lk === "firstname")               entry.firstName = val
+                    else if (lk === "lastname")                entry.lastName = val
+                    else if (lk === "phone")                   entry.phone = val
+                    else if (lk === "email")                   entry.email = val
+                    else if (lk === "designation")             entry.designation = val
+                    else if (lk === "employmenttype")          entry.employmentType = val
+                    else if (lk === "status")                  entry.status = val
+                    else if (lk === "dateofjoining")           entry.dateOfJoining = val
+                    else if (lk === "dateofleaving")           entry.dateOfLeaving = val
+                    else if (lk === "department")              entry.department = val
+                    else if (lk === "branch")                  entry.branch = val
+                    // Salary
+                    else if (lk === "basicsalary")             entry.basicSalary = val
+                    else if (lk === "da")                      entry.da = val
+                    else if (lk === "washingallowance")        entry.washing = val
+                    else if (lk === "conveyanceallowance")     entry.conveyance = val
+                    else if (lk === "leavewithwages")          entry.leaveWithWages = val
+                    else if (lk === "otherallowance")          entry.otherAllowance = val
+                    else if (lk === "otrateperhour")           entry.otRatePerHour = val
+                    else if (lk === "canteenrateperday")       entry.canteenRatePerDay = val
+                    else if (lk === "compliancetype")          entry.complianceType = val
+                    // Personal
+                    else if (lk === "middlename")              entry.middleName = val
+                    else if (lk === "nameasperaadhar")         entry.nameAsPerAadhar = val
+                    else if (lk === "fathersname")             entry.fathersName = val
+                    else if (lk === "dateofbirth")             entry.dateOfBirth = val
+                    else if (lk === "gender")                  entry.gender = val
+                    else if (lk === "bloodgroup")              entry.bloodGroup = val
+                    else if (lk === "maritalstatus")           entry.maritalStatus = val
+                    else if (lk === "nationality")             entry.nationality = val
+                    else if (lk === "religion")                entry.religion = val
+                    else if (lk === "caste")                   entry.caste = val
+                    // Address
+                    else if (lk === "address")                 entry.address = val
+                    else if (lk === "city")                    entry.city = val
+                    else if (lk === "state")                   entry.state = val
+                    else if (lk === "pincode")                 entry.pincode = val
+                    else if (lk === "permanentaddress")        entry.permanentAddress = val
+                    else if (lk === "permanentcity")           entry.permanentCity = val
+                    else if (lk === "permanentstate")          entry.permanentState = val
+                    else if (lk === "permanentpincode")        entry.permanentPincode = val
+                    // Identity
+                    else if (lk === "aadharnumber")            entry.aadharNumber = val
+                    else if (lk === "pannumber")               entry.panNumber = val
+                    else if (lk === "uan")                     entry.uan = val
+                    else if (lk === "pfnumber")                entry.pfNumber = val
+                    else if (lk === "esinumber")               entry.esiNumber = val
+                    else if (lk === "labourcardno")            entry.labourCardNo = val
+                    // Bank
+                    else if (lk === "bankname")                entry.bankName = val
+                    else if (lk === "bankbranch")              entry.bankBranch = val
+                    else if (lk === "bankaccountnumber")       entry.bankAccountNumber = val
+                    else if (lk === "bankifsc")                entry.bankIFSC = val
+                    // Contact
+                    else if (lk === "alternatephone")          entry.alternatePhone = val
+                    else if (lk === "emergencycontact1name")   entry.emergencyContact1Name = val
+                    else if (lk === "emergencycontact1phone")  entry.emergencyContact1Phone = val
+                    else if (lk === "emergencycontact2name")   entry.emergencyContact2Name = val
+                    else if (lk === "emergencycontact2phone")  entry.emergencyContact2Phone = val
+                    // Work
+                    else if (lk === "workskill")               entry.workSkill = val
+                    else if (lk === "natureofwork")            entry.natureOfWork = val
+                    else if (lk === "notes")                   entry.notes = val
                 }
                 return entry
             })

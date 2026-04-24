@@ -89,7 +89,7 @@ export async function PUT(
         if (photo !== undefined) updateData.photo = photo
         if (designation !== undefined) updateData.designation = designation
         if (departmentId !== undefined) updateData.departmentId = departmentId || null
-        if (branchId !== undefined) updateData.branchId = branchId
+        if (branchId !== undefined) updateData.branchId = branchId || null
         if (dateOfJoining !== undefined) updateData.dateOfJoining = dateOfJoining ? new Date(dateOfJoining) : null
         if (dateOfLeaving !== undefined) updateData.dateOfLeaving = dateOfLeaving ? new Date(dateOfLeaving) : null
         if (status !== undefined) updateData.status = status

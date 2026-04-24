@@ -1,17 +1,16 @@
 "use client"
 import { Suspense, useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import * as XLSX from "xlsx"
 import { toast } from "sonner"
-import { Loader2, Download, RefreshCw, ChevronRight, MapPin, Building2, ShieldCheck, AlertCircle } from "lucide-react"
+import { Loader2, Download, RefreshCw, ChevronRight, ShieldCheck, AlertCircle, Users, Lock } from "lucide-react"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 
-type Site       = { id: string; name: string; code?: string }
-type SiteStatus = { siteId: string | null; processedCount: number }
 type StatsData  = { totalEmployees: number; grossPay: number; totalDeduction: number; netPay: number }
 type ReportItem = { id: string; label: string; type: string }
+type LockedEmp  = { id: string; netSalary: number; grossSalary: number; siteId: string | null; employee: { employeeId: string; firstName: string; lastName: string; designation: string | null } }
 
 const PF_REPORTS: ReportItem[]   = [
     { id: "pf-deduction", label: "PF Deduction Report",   type: "pf-deduction" },
@@ -32,44 +31,32 @@ const PT_REPORTS: ReportItem[]   = [
 ]
 
 function ComplianceInner() {
-    const router = useRouter()
-    const [month,      setMonth]      = useState(new Date().getMonth() + 1)
-    const [year,       setYear]       = useState(new Date().getFullYear())
-    const [sites,      setSites]      = useState<Site[]>([])
-    const [status,     setStatus]     = useState<SiteStatus[]>([])
-    const [selSiteId,  setSelSiteId]  = useState("")
+    const router     = useRouter()
+    const params     = useSearchParams()
+    const [month,      setMonth]      = useState(Number(params.get("month")) || new Date().getMonth() + 1)
+    const [year,       setYear]       = useState(Number(params.get("year"))  || new Date().getFullYear())
     const [stats,      setStats]      = useState<StatsData | null>(null)
     const [loading,    setLoading]    = useState(false)
     const [dataLoaded, setDataLoaded] = useState(false)
     const [dlLoading,  setDlLoading]  = useState<string | null>(null)
-    const [ldSites,    setLdSites]    = useState(true)
+    const [lockedEmps, setLockedEmps] = useState<LockedEmp[]>([])
+    const [ldLocked,   setLdLocked]   = useState(false)
 
-    useEffect(() => {
-        fetch("/api/sites?isActive=true").then(r => r.json())
-            .then(d => { if (Array.isArray(d)) setSites(d) })
-            .finally(() => setLdSites(false))
-    }, [])
-
-    const fetchStatus = useCallback(async () => {
+    const fetchLockedEmps = useCallback(async () => {
+        setLdLocked(true)
         try {
-            const r = await fetch(`/api/payroll/sites-status?month=${month}&year=${year}`)
-            if (r.ok) { const d = await r.json(); if (Array.isArray(d)) setStatus(d) }
+            const r = await fetch(`/api/payroll?month=${month}&year=${year}&status=PROCESSED`)
+            if (r.ok) { const d = await r.json(); setLockedEmps(Array.isArray(d) ? d : []) }
         } catch {}
+        finally { setLdLocked(false) }
     }, [month, year])
 
-    useEffect(() => { fetchStatus() }, [fetchStatus])
-
-    const selectSite = (id: string) => {
-        setSelSiteId(id)
-        setStats(null)
-        setDataLoaded(false)
-    }
+    useEffect(() => { fetchLockedEmps() }, [fetchLockedEmps])
 
     const handleLoad = async () => {
         setLoading(true); setDataLoaded(false); setStats(null)
         try {
-            const siteParam = selSiteId ? `&siteId=${selSiteId}` : ""
-            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-summary${siteParam}`)
+            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-summary`)
             if (!r.ok) { toast.error(await r.text() || "No payroll data found"); return }
             const data = await r.json()
             setStats({
@@ -79,7 +66,7 @@ function ComplianceInner() {
                 netPay:         data.reduce((a: number, r: Record<string,number>) => a + (r.netSalary || 0), 0),
             })
             setDataLoaded(true)
-            toast.success(`Loaded compliance data for ${MONTHS[month-1]} ${year}${selSiteId ? ` — ${sites.find(s=>s.id===selSiteId)?.name}` : ""}`)
+            toast.success(`Loaded compliance data for ${MONTHS[month-1]} ${year}`)
         } catch { toast.error("Failed to load compliance data") }
         finally { setLoading(false) }
     }
@@ -87,8 +74,7 @@ function ComplianceInner() {
     const handleDownload = async (item: ReportItem) => {
         setDlLoading(item.id)
         try {
-            const siteParam = selSiteId ? `&siteId=${selSiteId}` : ""
-            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}${siteParam}`)
+            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}`)
             if (!r.ok) { toast.error(await r.text() || "No data found"); return }
             const data = await r.json()
             if (!data?.length) { toast.error("No data to download"); return }
@@ -97,16 +83,11 @@ function ComplianceInner() {
             const cols = Object.keys(data[0] || {})
             ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
             XLSX.utils.book_append_sheet(wb, ws, item.label.substring(0, 31))
-            const siteName = selSiteId ? `_${sites.find(s=>s.id===selSiteId)?.name?.replace(/\s+/g,"_") ?? ""}` : ""
-            XLSX.writeFile(wb, `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g,"_")}${siteName}_${MONTHS[month-1]}_${year}.xlsx`)
+            XLSX.writeFile(wb, `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)
             toast.success(`Downloaded: ${item.label}`)
         } catch { toast.error("Download failed") }
         finally { setDlLoading(null) }
     }
-
-    const getSt  = (id: string) => status.find(s => s.siteId === id)
-    const done   = status.filter(s => (s.processedCount ?? 0) > 0).length
-    const selSite = sites.find(s => s.id === selSiteId)
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
@@ -122,7 +103,7 @@ function ComplianceInner() {
                     <ShieldCheck size={20} style={{ color: "var(--accent)" }} />
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Compliance Reports</h1>
                 </div>
-                <span style={{ fontSize: 11, color: "var(--text3)" }}>{done}/{sites.length} sites processed</span>
+                <span style={{ fontSize: 11, color: "var(--text3)" }}>{lockedEmps.length} employees locked</span>
             </div>
 
             {/* Stepper */}
@@ -144,47 +125,80 @@ function ComplianceInner() {
 
             {/* Two-panel */}
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                {/* LEFT: Site list */}
-                <div style={{ width: 220, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                {/* LEFT: Locked Employees */}
+                <div style={{ width: 240, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Site Filter</span>
-                        <button onClick={fetchStatus} style={{ display: "flex", padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "none", cursor: "pointer" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <Lock size={12} style={{ color: "var(--accent)" }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Locked Employees</span>
+                        </div>
+                        <button onClick={fetchLockedEmps} style={{ display: "flex", padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "none", cursor: "pointer" }}>
                             <RefreshCw size={11} style={{ color: "var(--text3)" }} />
                         </button>
                     </div>
-                    <div style={{ overflowY: "auto", maxHeight: 480 }}>
-                        {ldSites ? <div style={{ padding: 20, textAlign: "center" }}><Loader2 size={14} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} /></div> : (
-                            <>
-                                <div onClick={() => selectSite("")}
-                                    style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)",
-                                        background: !selSiteId ? "var(--accent-light)" : "transparent",
-                                        borderLeft: !selSiteId ? "3px solid var(--accent)" : "3px solid transparent" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <Building2 size={12} style={{ color: !selSiteId ? "var(--accent)" : "var(--text3)" }} />
-                                        <span style={{ fontSize: 12, fontWeight: 700, color: !selSiteId ? "var(--accent)" : "var(--text2)" }}>All Sites</span>
-                                    </div>
-                                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 18 }}>{done}/{sites.length} processed</div>
-                                </div>
-                                {sites.map(site => {
-                                    const st = getSt(site.id); const isDone = (st?.processedCount ?? 0) > 0; const isSel = selSiteId === site.id
-                                    return (
-                                        <div key={site.id} onClick={() => selectSite(site.id)}
-                                            style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)",
-                                                background: isSel ? "var(--accent-light)" : "transparent",
-                                                borderLeft: isSel ? "3px solid var(--accent)" : "3px solid transparent" }}>
-                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                                    <MapPin size={11} style={{ color: isSel ? "var(--accent)" : "var(--text3)", flexShrink: 0 }} />
-                                                    <span style={{ fontSize: 11, fontWeight: 600, color: isSel ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{site.name}</span>
-                                                </div>
-                                                {isDone && <span style={{ fontSize: 9, color: "#16a34a", fontWeight: 700 }}>✓</span>}
-                                            </div>
+
+                    {/* Summary badge */}
+                    <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <Users size={11} style={{ color: "var(--text3)" }} />
+                            <span style={{ fontSize: 11, color: "var(--text3)" }}>{MONTHS[month-1]} {year}</span>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "2px 8px", borderRadius: 20 }}>
+                            {lockedEmps.length} locked
+                        </span>
+                    </div>
+
+                    <div style={{ overflowY: "auto", maxHeight: 460 }}>
+                        {ldLocked ? (
+                            <div style={{ padding: 20, textAlign: "center" }}>
+                                <Loader2 size={14} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} />
+                            </div>
+                        ) : lockedEmps.length === 0 ? (
+                            <div style={{ padding: "24px 14px", textAlign: "center" }}>
+                                <Lock size={20} style={{ color: "var(--text3)", margin: "0 auto 8px" }} />
+                                <p style={{ fontSize: 11, color: "var(--text3)", margin: 0 }}>No locked employees</p>
+                                <p style={{ fontSize: 10, color: "var(--text3)", margin: "4px 0 0 0", opacity: 0.7 }}>Lock employees from wage sheet first</p>
+                            </div>
+                        ) : (
+                            lockedEmps.map(emp => (
+                                <div key={emp.id} style={{ padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                                        <div style={{ minWidth: 0 }}>
+                                            <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {emp.employee.firstName} {emp.employee.lastName}
+                                            </p>
+                                            <p style={{ fontSize: 10, color: "var(--text3)", margin: "1px 0 0 0" }}>{emp.employee.employeeId}</p>
                                         </div>
-                                    )
-                                })}
-                            </>
+                                        <span style={{ fontSize: 10, fontWeight: 700, color: "#16a34a", whiteSpace: "nowrap" }}>
+                                            {fmt(emp.netSalary)}
+                                        </span>
+                                    </div>
+                                    {emp.employee.designation && (
+                                        <p style={{ fontSize: 9, color: "var(--text3)", margin: "3px 0 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {emp.employee.designation}
+                                        </p>
+                                    )}
+                                </div>
+                            ))
                         )}
                     </div>
+
+                    {lockedEmps.length > 0 && (
+                        <div style={{ padding: "9px 14px", borderTop: "1px solid var(--border)", background: "var(--surface2)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                <span style={{ fontSize: 10, color: "var(--text3)" }}>Total Net Pay</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "#16a34a" }}>
+                                    {fmt(lockedEmps.reduce((s, e) => s + e.netSalary, 0))}
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: 10, color: "var(--text3)" }}>Total Gross Pay</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text2)" }}>
+                                    {fmt(lockedEmps.reduce((s, e) => s + e.grossSalary, 0))}
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* RIGHT: Compliance downloads */}
@@ -192,11 +206,6 @@ function ComplianceInner() {
                     {/* Controls */}
                     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                            {selSite && (
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: "var(--accent-light)", border: "1px solid var(--accent)", fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>
-                                    <MapPin size={11} /> {selSite.name}
-                                </div>
-                            )}
                             <span style={lbl}>Month</span>
                             <select value={month} onChange={e => { setMonth(Number(e.target.value)); setDataLoaded(false); setStats(null) }} style={sel}>
                                 {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
@@ -232,16 +241,16 @@ function ComplianceInner() {
                         {!dataLoaded && !loading && (
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047", fontSize: 12, color: "#854d0e" }}>
                                 <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                                Select a period{selSiteId ? "" : " and optionally a site"} then click "Load Data" to enable downloads.
+                                Select a period then click &quot;Load Data&quot; to enable downloads.
                             </div>
                         )}
                     </div>
 
                     {/* Report sections */}
                     {[
-                        { title: "Provident Fund (PF)", badge: "PF", items: PF_REPORTS, color: "#1d4ed8" },
+                        { title: "Provident Fund (PF)", badge: "PF",  items: PF_REPORTS,   color: "#1d4ed8" },
                         { title: "ESIC",                badge: "ESI", items: ESIC_REPORTS, color: "#0369a1" },
-                        { title: "Professional Tax (PT)", badge: "PT", items: PT_REPORTS, color: "#7c3aed" },
+                        { title: "Professional Tax (PT)", badge: "PT", items: PT_REPORTS,  color: "#7c3aed" },
                     ].map(section => (
                         <div key={section.title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
@@ -272,7 +281,7 @@ function ComplianceInner() {
                     ))}
 
                     <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                        Reports are generated from processed payroll data.{selSiteId ? ` Filtered to ${selSite?.name}.` : " Showing all sites."}
+                        Reports are generated from all locked (processed) payroll data.
                     </p>
                 </div>
             </div>

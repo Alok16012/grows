@@ -2,7 +2,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet, FileDown } from "lucide-react"
+import { Loader2, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet, FileDown, Lock } from "lucide-react"
 import * as XLSX from "xlsx"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -36,9 +36,12 @@ function WageSheetInner() {
     const [search,     setSearch]     = useState("")
     const [ldSites,    setLdSites]    = useState(true)
     const [ldData,     setLdData]     = useState(false)
-    const [activeView,   setActiveView]   = useState<"wagesheet" | "neft">("wagesheet")
-    const [neftEmail,    setNeftEmail]    = useState("")
-    const [selectedIds,  setSelectedIds]  = useState<Set<string>>(new Set())
+    const [activeView,       setActiveView]       = useState<"wagesheet" | "neft">("wagesheet")
+    const [neftEmail,        setNeftEmail]        = useState("")
+    const [selectedIds,      setSelectedIds]      = useState<Set<string>>(new Set())
+    const [locking,          setLocking]          = useState(false)
+    const [selectedSiteIds,  setSelectedSiteIds]  = useState<Set<string>>(new Set())
+    const [lockingSites,     setLockingSites]     = useState(false)
 
     useEffect(() => {
         fetch("/api/sites?isActive=true").then(r => r.json())
@@ -76,6 +79,58 @@ function WageSheetInner() {
 
     const toggleAll = (rows: Payroll[]) =>
         setSelectedIds(prev => prev.size === rows.length ? new Set() : new Set(rows.map(p => p.id)))
+
+    const handleLock = async () => {
+        if (!selectedIds.size) { toast.error("Select employees to lock"); return }
+        setLocking(true)
+        try {
+            const res = await fetch("/api/payroll/final/lock", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    month: parseInt(month), year: parseInt(year),
+                    payrollIds: [...selectedIds],
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            const d = await res.json()
+            toast.success(`${d.count} employee(s) locked — sending to Compliance`)
+            setSelectedIds(new Set())
+            await fetchData(selId)
+            router.push(`/payroll/compliance?month=${month}&year=${year}`)
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Lock failed")
+        } finally { setLocking(false) }
+    }
+
+    const toggleSiteSelect = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setSelectedSiteIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+    }
+
+    const handleLockSites = async () => {
+        if (!selectedSiteIds.size) return
+        setLockingSites(true)
+        try {
+            const res = await fetch("/api/payroll/final/lock", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    month: parseInt(month), year: parseInt(year),
+                    siteIds: [...selectedSiteIds],
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            const d = await res.json()
+            toast.success(`${d.count} employee(s) locked from ${selectedSiteIds.size} site(s) — sending to Compliance`)
+            setSelectedSiteIds(new Set())
+            if (selId) await fetchData(selId)
+            await fetchStatus()
+            router.push(`/payroll/compliance?month=${month}&year=${year}`)
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Lock failed")
+        } finally { setLockingSites(false) }
+    }
 
     const handleNEFT = () => {
         const exportRows = selectedIds.size > 0 ? data.filter(p => selectedIds.has(p.id)) : data
@@ -214,12 +269,18 @@ function WageSheetInner() {
             {/* Two-panel */}
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 {/* LEFT */}
-                <div style={{ width: 256, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ width: 256, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Sites</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <input type="checkbox"
+                                checked={processedSites.length > 0 && processedSites.every(s => selectedSiteIds.has(s.id))}
+                                onChange={e => setSelectedSiteIds(e.target.checked ? new Set(processedSites.map(s => s.id)) : new Set())}
+                                style={{ cursor: "pointer", accentColor: "var(--accent)" }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Sites</span>
+                        </div>
                         <span style={{ fontSize: 10, color: "var(--text3)", background: "var(--surface2)", borderRadius: 10, padding: "2px 7px" }}>{processedSites.length}</span>
                     </div>
-                    <div style={{ overflowY: "auto", maxHeight: 520 }}>
+                    <div style={{ overflowY: "auto", flex: 1, maxHeight: 460 }}>
                         {ldSites ? <div style={{ padding: 24, textAlign: "center" }}><Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} /></div> : (
                             <>
                                 <div onClick={() => selectSite("")}
@@ -233,29 +294,49 @@ function WageSheetInner() {
                                     <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 20 }}>{done}/{processedSites.length} processed</div>
                                 </div>
                                 {processedSites.map(site => {
-                                    const st = getSt(site.id); const isDone = (st?.processedCount ?? 0) > 0; const isSel = selId === site.id
+                                    const st = getSt(site.id); const isDone = (st?.processedCount ?? 0) > 0
+                                    const isSel = selId === site.id; const isSiteChecked = selectedSiteIds.has(site.id)
                                     return (
                                         <div key={site.id} onClick={() => selectSite(site.id)}
                                             style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)",
-                                                background: isSel ? "var(--accent-light)" : "transparent",
-                                                borderLeft: isSel ? "3px solid var(--accent)" : "3px solid transparent" }}>
+                                                background: isSiteChecked ? "#f5f3ff" : isSel ? "var(--accent-light)" : "transparent",
+                                                borderLeft: isSiteChecked ? "3px solid #7c3aed" : isSel ? "3px solid var(--accent)" : "3px solid transparent" }}>
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                                    <MapPin size={12} style={{ color: isSel ? "var(--accent)" : "var(--text3)", flexShrink: 0 }} />
-                                                    <span style={{ fontSize: 12, fontWeight: 600, color: isSel ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{site.name}</span>
+                                                    <input type="checkbox" checked={isSiteChecked}
+                                                        onClick={e => toggleSiteSelect(site.id, e)}
+                                                        onChange={() => {}}
+                                                        style={{ cursor: "pointer", accentColor: "#7c3aed", flexShrink: 0 }} />
+                                                    <span style={{ fontSize: 12, fontWeight: 600, color: isSiteChecked ? "#7c3aed" : isSel ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{site.name}</span>
                                                 </div>
                                                 <span style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, whiteSpace: "nowrap",
                                                     background: isDone ? "#dcfce7" : "#fef9c3", color: isDone ? "#15803d" : "#854d0e" }}>
-                                                    {isDone ? "✓" : "—"}
+                                                    {isDone ? `${st!.processedCount}` : "—"}
                                                 </span>
                                             </div>
-                                            {site.code && <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 18 }}>{site.code}</div>}
+                                            {site.code && <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, marginLeft: 22 }}>{site.code}</div>}
                                         </div>
                                     )
                                 })}
                             </>
                         )}
                     </div>
+                    {/* Lock selected sites footer */}
+                    {selectedSiteIds.size > 0 && (
+                        <div style={{ padding: "10px 14px", borderTop: "2px solid #7c3aed", background: "#f5f3ff" }}>
+                            <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700, marginBottom: 8 }}>
+                                {selectedSiteIds.size} site{selectedSiteIds.size > 1 ? "s" : ""} selected
+                            </div>
+                            <button onClick={handleLockSites} disabled={lockingSites}
+                                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                    padding: "8px 12px", borderRadius: 8, border: "none",
+                                    background: lockingSites ? "#a78bfa" : "#7c3aed", color: "#fff",
+                                    fontSize: 12, fontWeight: 700, cursor: lockingSites ? "not-allowed" : "pointer" }}>
+                                {lockingSites ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
+                                {lockingSites ? "Locking…" : "Lock & Send to Compliance"}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* RIGHT */}
@@ -336,6 +417,13 @@ function WageSheetInner() {
                                             style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#0369a1", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
                                             <FileDown size={13} />
                                             {selectedCount > 0 ? `Download NEFT (${selectedCount})` : "Download NEFT"}
+                                        </button>
+                                    )}
+                                    {selectedCount > 0 && (
+                                        <button onClick={handleLock} disabled={locking}
+                                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: locking ? 0.6 : 1 }}>
+                                            {locking ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
+                                            Lock & Send to Compliance ({selectedCount})
                                         </button>
                                     )}
                                 </div>
