@@ -845,35 +845,40 @@ function EmployeeModal({
 
                             {/* Live Salary Breakdown */}
                             {(() => {
-                                const basic  = Number(form.basicSalary) || 0
-                                const da     = Number(form.salDA) || 0
-                                const wash   = Number(form.salWashing) || 0
-                                const conv   = Number(form.salConveyance) || 0
-                                const lww    = Number(form.salLeaveWithWages) || 0
-                                const other  = Number(form.salOtherAllowance) || 0
-                                const hra    = Math.round((basic + da) * 0.05)
-                                const bonus  = Math.round(7000 / 12)
-                                const gross  = basic + da + hra + wash + conv + lww + bonus + other
-                                const isCALL = form.salComplianceType === "CALL"
-                                const empPF  = isCALL ? 0 : 1950
-                                const taxableGross = gross - wash - bonus
-                                const empESI = (!isCALL && taxableGross <= 21000) ? Math.ceil(taxableGross * 0.0325) : 0
-                                const ctc    = gross + empPF + empESI
-                                const fmt    = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
+                                const basic   = Number(form.basicSalary) || 0
+                                const da      = Number(form.salDA) || 0
+                                const wash    = Number(form.salWashing) || 0
+                                const conv    = Number(form.salConveyance) || 0
+                                const lww     = Number(form.salLeaveWithWages) || 0
+                                const other   = Number(form.salOtherAllowance) || 0
+                                const otRate  = Number(form.salOtRatePerHour) || 170
+                                const canteen = Number(form.salCanteenRatePerDay) || 55
+                                const hra     = Math.round((basic + da) * 0.05)
+                                const bonus   = Math.round(7000 / 12)
+                                const gross   = basic + da + hra + wash + conv + lww + bonus + other
+                                const isCALL  = form.salComplianceType === "CALL"
+                                const empPF   = isCALL ? 0 : 1950
+                                const taxable = gross - wash - bonus
+                                const empESI  = (!isCALL && taxable <= 21000) ? Math.ceil(taxable * 0.0325) : 0
+                                const ctc     = gross + empPF + empESI
+                                const fmt     = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
                                 if (!basic) return null
                                 return (
                                     <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px", marginTop: 4 }}>
                                         <p style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 10px 0" }}>Live Salary Breakdown</p>
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 12px" }}>
+                                        {/* Earnings grid */}
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px 12px" }}>
                                             {[
-                                                { label: "Basic",     value: fmt(basic),  color: "#1d4ed8" },
-                                                { label: "DA",        value: fmt(da),     color: "#1d4ed8" },
-                                                { label: "HRA (auto)",value: fmt(hra),    color: "#6366f1" },
-                                                { label: "Washing",   value: fmt(wash),   color: "#1d4ed8" },
-                                                { label: "Conv.",     value: fmt(conv),   color: "#1d4ed8" },
-                                                { label: "LWW",       value: fmt(lww),    color: "#1d4ed8" },
-                                                { label: "Bonus (auto)",value: fmt(bonus),color: "#6366f1" },
-                                                { label: "Other",     value: fmt(other),  color: "#1d4ed8" },
+                                                { label: "Basic",       value: fmt(basic),  color: "#1d4ed8" },
+                                                { label: "DA",          value: fmt(da),     color: "#1d4ed8" },
+                                                { label: "HRA (auto)",  value: fmt(hra),    color: "#6366f1" },
+                                                { label: "Washing",     value: fmt(wash),   color: "#1d4ed8" },
+                                                { label: "Conv.",       value: fmt(conv),   color: "#1d4ed8" },
+                                                { label: "LWW",         value: fmt(lww),    color: "#1d4ed8" },
+                                                { label: "Bonus (auto)",value: fmt(bonus),  color: "#6366f1" },
+                                                { label: "Other",       value: fmt(other),  color: "#1d4ed8" },
+                                                { label: "OT Rate/Hr",  value: fmt(otRate), color: "#64748b" },
+                                                { label: "Canteen/Day", value: fmt(canteen),color: "#64748b" },
                                             ].map(r => (
                                                 <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
                                                     <span style={{ fontSize: 10, color: "#94a3b8" }}>{r.label}</span>
@@ -882,7 +887,8 @@ function EmployeeModal({
                                             ))}
                                         </div>
                                         <div style={{ borderTop: "1px dashed #cbd5e1", margin: "8px 0" }} />
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 12px" }}>
+                                        {/* Derived totals */}
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px 12px" }}>
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                 <span style={{ fontSize: 10, color: "#94a3b8" }}>Gross</span>
                                                 <span style={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>{fmt(gross)}</span>
@@ -896,9 +902,16 @@ function EmployeeModal({
                                                 <span style={{ fontSize: 11, fontWeight: 700, color: empESI === 0 ? "#94a3b8" : "#dc2626" }}>{isCALL ? "N/A" : fmt(empESI)}</span>
                                             </div>
                                         </div>
-                                        <div style={{ background: "#dcfce7", borderRadius: 7, padding: "6px 10px", marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                            <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d" }}>CTC / Month</span>
-                                            <span style={{ fontSize: 14, fontWeight: 800, color: "#15803d" }}>{fmt(ctc)}</span>
+                                        {/* CTC row */}
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                                            <div style={{ background: "#dcfce7", borderRadius: 7, padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <span style={{ fontSize: 10, fontWeight: 700, color: "#15803d" }}>CTC / Month</span>
+                                                <span style={{ fontSize: 13, fontWeight: 800, color: "#15803d" }}>{fmt(ctc)}</span>
+                                            </div>
+                                            <div style={{ background: "#eff6ff", borderRadius: 7, padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <span style={{ fontSize: 10, fontWeight: 700, color: "#1d4ed8" }}>CTC / Year</span>
+                                                <span style={{ fontSize: 13, fontWeight: 800, color: "#1d4ed8" }}>{fmt(ctc * 12)}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 )
