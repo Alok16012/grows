@@ -587,8 +587,16 @@ function EmployeeModal({
                                     <input value={form.firstName} onChange={set("firstName")} className={inputCls} placeholder="First name" required />
                                 </div>
                                 <div>
+                                    <label className={labelCls}>Middle Name</label>
+                                    <input value={form.middleName} onChange={set("middleName")} className={inputCls} placeholder="Middle name" />
+                                </div>
+                                <div>
                                     <label className={labelCls}>Last Name</label>
                                     <input value={form.lastName} onChange={set("lastName")} className={inputCls} placeholder="Last name" />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Father&apos;s Name</label>
+                                    <input value={form.fathersName} onChange={set("fathersName")} className={inputCls} placeholder="Father's full name" />
                                 </div>
                                 <div>
                                     <label className={labelCls}>Phone</label>
@@ -2122,18 +2130,17 @@ export default function EmployeesPage() {
     function handleDownloadTemplate() {
         const headers = [
             // ── Required ──────────────────────────────────────────────────────
-            "First Name*", "Last Name", "Phone*", "Email",
+            "First Name*", "Middle Name", "Last Name", "Fathers Name", "Phone*", "Email",
             // ── Employment ────────────────────────────────────────────────────
             "Designation", "Employment Type", "Status", "Date Of Joining",
-            "Date Of Leaving", "Department", "Branch",
+            "Date Of Leaving", "Department", "Site",
             // ── Salary ────────────────────────────────────────────────────────
             "Basic Salary", "DA", "Washing Allowance", "Conveyance Allowance",
             "Leave With Wages", "Other Allowance", "OT Rate Per Hour",
             "Canteen Rate Per Day", "Compliance Type",
             // ── Personal ──────────────────────────────────────────────────────
-            "Middle Name", "Name As Per Aadhar", "Fathers Name",
-            "Date Of Birth", "Gender", "Blood Group", "Marital Status",
-            "Nationality", "Religion", "Caste",
+            "Name As Per Aadhar", "Date Of Birth", "Gender", "Blood Group",
+            "Marital Status", "Nationality", "Religion", "Caste",
             // ── Address ───────────────────────────────────────────────────────
             "Address", "City", "State", "Pincode",
             "Permanent Address", "Permanent City", "Permanent State", "Permanent Pincode",
@@ -2151,15 +2158,14 @@ export default function EmployeesPage() {
         ]
 
         const sample = [
-            "Ramesh", "Kumar", "9876543210", "ramesh@example.com",
+            "Ramesh", "", "Kumar", "Suresh Kumar", "9876543210", "ramesh@example.com",
             "Security Guard", "Full-time", "ACTIVE", "2024-01-15",
-            "", "Security", "Main Site",
+            "", "Security", "Site Name Here",
             "12000", "1000", "500", "500",
             "0", "0", "170",
             "55", "OR",
-            "", "", "Suresh Kumar",
-            "1990-05-20", "Male", "O+", "Single",
-            "Indian", "Hindu", "General",
+            "", "1990-05-20", "Male", "O+",
+            "Single", "Indian", "Hindu", "General",
             "123 MG Road", "Mumbai", "Maharashtra", "400001",
             "", "", "", "",
             "123456789012", "ABCDE1234F", "", "",
@@ -2174,7 +2180,9 @@ export default function EmployeesPage() {
         const instructions = [
             ["Field", "Required", "Valid Values / Format", "Example"],
             ["First Name*",        "Yes",  "Any text",                             "Ramesh"],
+            ["Middle Name",        "No",   "Any text",                             ""],
             ["Last Name",          "No",   "Any text",                             "Kumar"],
+            ["Fathers Name",       "No",   "Father's full name",                   "Suresh Kumar"],
             ["Phone*",             "Yes",  "10-digit mobile number",               "9876543210"],
             ["Email",              "No",   "Valid email",                          "ramesh@example.com"],
             ["Designation",        "No",   "Any text",                             "Security Guard"],
@@ -2183,7 +2191,7 @@ export default function EmployeesPage() {
             ["Date Of Joining",    "No",   "YYYY-MM-DD",                           "2024-01-15"],
             ["Date Of Leaving",    "No",   "YYYY-MM-DD (leave blank if active)",   ""],
             ["Department",         "No",   "Must match existing department name",  "Security"],
-            ["Branch",             "No",   "Must match existing branch name",      "Head Office"],
+            ["Site",               "No",   "Must match existing site name exactly","Main Site"],
             ["Basic Salary",       "No",   "Number (monthly)",                     "12000"],
             ["DA",                 "No",   "Number",                               "1000"],
             ["Washing Allowance",  "No",   "Number",                               "500"],
@@ -2244,7 +2252,7 @@ export default function EmployeesPage() {
                     else if (lk === "dateofjoining")           entry.dateOfJoining = val
                     else if (lk === "dateofleaving")           entry.dateOfLeaving = val
                     else if (lk === "department")              entry.department = val
-                    else if (lk === "branch")                  entry.branch = val
+                    else if (lk === "site")                    entry.site = val
                     // Salary
                     else if (lk === "basicsalary")             entry.basicSalary = val
                     else if (lk === "da")                      entry.da = val

@@ -10,7 +10,7 @@ interface ImportRow {
     firstName?: Sv; lastName?: Sv; phone?: Sv; email?: Sv
     designation?: Sv; employmentType?: Sv; status?: Sv
     dateOfJoining?: Sv; dateOfLeaving?: Sv
-    department?: Sv; branch?: Sv
+    department?: Sv; site?: Sv
     // Salary
     basicSalary?: Sv; da?: Sv; washing?: Sv; conveyance?: Sv
     leaveWithWages?: Sv; otherAllowance?: Sv
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
     try {
         // Pre-load lookup tables
-        const allBranches    = await prisma.branch.findMany({ select: { id: true, name: true } })
+        const allSites       = await prisma.site.findMany({ select: { id: true, name: true } })
         const allDepartments = await prisma.department.findMany({ select: { id: true, name: true } })
 
         const lastEmployee = await prisma.employee.findFirst({
@@ -114,9 +114,9 @@ export async function POST(req: Request) {
             }
 
             // Lookups
-            const branchName = str(row.branch)
-            const branchId   = branchName
-                ? (allBranches.find(b => b.name.toLowerCase() === branchName.toLowerCase())?.id ?? null)
+            const siteName = str(row.site)
+            const siteId   = siteName
+                ? (allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase())?.id ?? null)
                 : null
 
             const deptName     = str(row.department)
@@ -175,7 +175,7 @@ export async function POST(req: Request) {
                         dateOfJoining: dt(row.dateOfJoining),
                         dateOfLeaving: dt(row.dateOfLeaving),
                         basicSalary:   num(row.basicSalary),
-                        branchId,
+                        branchId:      null,
                         departmentId,
                         // Personal
                         middleName:       strN(row.middleName),
@@ -222,8 +222,13 @@ export async function POST(req: Request) {
                     },
                 })
 
+                // Fetch the created employee's UUID (needed for salary + deployment)
+                const newEmp = await prisma.employee.findFirst({
+                    where: { employeeId: finalId }, select: { id: true }
+                })
+
                 // Create salary structure if any salary field provided
-                if (hasSalary) {
+                if (hasSalary && newEmp) {
                     const basic      = num(row.basicSalary)
                     const da         = num(row.da)
                     const washing    = num(row.washing)
@@ -235,28 +240,33 @@ export async function POST(req: Request) {
                     const cType      = str(row.complianceType).toUpperCase() === "CALL" ? "CALL" : "OR"
                     const hra        = (basic + da) * 0.05
                     const ctcM       = basic + da + hra + washing + conveyance + lww + other
-
-                    // Use the employee ID we just created — fetch it
-                    const newEmp = await prisma.employee.findFirst({
-                        where: { employeeId: finalId }, select: { id: true }
+                    await prisma.employeeSalary.create({
+                        data: {
+                            employeeId:       newEmp.id,
+                            basic, da, washing, conveyance,
+                            leaveWithWages:   lww,
+                            otherAllowance:   other,
+                            otRatePerHour:    otRate,
+                            canteenRatePerDay: canteen,
+                            hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
+                            complianceType:   cType,
+                            status:           "APPROVED",
+                            proposedBy:       session.user.id,
+                            approvedBy:       session.user.id,
+                        },
                     })
-                    if (newEmp) {
-                        await prisma.employeeSalary.create({
-                            data: {
-                                employeeId:       newEmp.id,
-                                basic, da, washing, conveyance,
-                                leaveWithWages:   lww,
-                                otherAllowance:   other,
-                                otRatePerHour:    otRate,
-                                canteenRatePerDay: canteen,
-                                hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
-                                complianceType:   cType,
-                                status:           "APPROVED",
-                                proposedBy:       session.user.id,
-                                approvedBy:       session.user.id,
-                            },
-                        })
-                    }
+                }
+
+                // Create site deployment if site was provided
+                if (siteId && newEmp) {
+                    await prisma.deployment.create({
+                        data: {
+                            employeeId: newEmp.id,
+                            siteId,
+                            startDate:  dt(row.dateOfJoining) ?? new Date(),
+                            isActive:   true,
+                        },
+                    })
                 }
 
                 if (phone) existingPhones.add(phone)
