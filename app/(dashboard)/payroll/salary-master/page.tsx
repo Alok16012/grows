@@ -25,8 +25,7 @@ function calc(s: SalaryRow) {
     const gross  = basic + da + hra + wash + conv + lww + bonus + other
     const isCALL = s.complianceType === "CALL"
     const empPF  = isCALL ? 0 : 1950
-    const empESI = (!isCALL && (gross - wash - bonus) * 1 <= 21000)
-        ? Math.ceil((gross - wash - bonus) * 0.0325) : 0
+    const empESI = isCALL ? 0 : Math.ceil((gross - wash - bonus) * 0.0325)
     const ctc    = gross + empPF + empESI
     return { hra, bonus, gross, empPF, empESI, ctc }
 }
@@ -481,7 +480,7 @@ export default function SalaryMasterPage() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                HRA = (Basic + DA) × 5% · Bonus = ₹583/mo · Co.PF = ₹1,950 (OR only) · Co.ESIC = (Gross − Washing − Bonus) × 3.25% (OR + gross ≤ 21000)
+                HRA = (Basic + DA) × 5% · Bonus = ₹583/mo · Co.PF = ₹1,950 (OR only) · Co.ESIC = (Gross − Washing − Bonus) × 3.25% (OR only)
             </p>
         </div>
     )
