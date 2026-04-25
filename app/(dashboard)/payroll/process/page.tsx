@@ -106,7 +106,7 @@ function ProcessPayrollPage() {
         setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: parseFloat(value) || 0 } }))
     }
 
-    const defaultDays = new Date(parseInt(year), parseInt(month), 0).getDate()
+    const defaultDays = 26
 
     const handleProcess = async () => {
         if (!selectedSiteId) { toast.error("Select a site"); return }
