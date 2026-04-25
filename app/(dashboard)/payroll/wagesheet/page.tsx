@@ -546,7 +546,6 @@ function WageSheetInner() {
                                                 <th style={{ ...th, background: "#f0fdf4", color: "#16a34a" }} rowSpan={2}>Net Pay</th>
                                             </tr>
                                             <tr style={{ background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
-                                                <th style={th} />
                                                 {["Basic","DA","Wash","Conv.","OT","Gross"].map(h => <th key={h} style={{ ...th, background: "#eff6ff" }}>{h}</th>)}
                                                 {["PF","ESI","PT","LWF","Canteen","Penalty","Adv."].map(h => <th key={h} style={{ ...th, background: "#fef2f2" }}>{h}</th>)}
                                             </tr>
