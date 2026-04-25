@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import {
     Loader2, Play, RefreshCw, ChevronRight,
-    AlertCircle, CheckCircle2, Users, MapPin, Building2, Search
+    AlertCircle, CheckCircle2, Users, MapPin, Building2, Search,
+    Unlock, Trash2
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -48,6 +49,8 @@ function ProcessPayrollPage() {
     const [loadingStatus,    setLoadingStatus]    = useState(false)
     const [loadingEmployees, setLoadingEmployees] = useState(false)
     const [processing,       setProcessing]       = useState(false)
+    const [resetting,        setResetting]        = useState(false)
+    const [deleting,         setDeleting]         = useState(false)
     const [fetched,          setFetched]          = useState(false)
     const [search,           setSearch]           = useState("")
 
@@ -146,6 +149,35 @@ function ProcessPayrollPage() {
         } finally {
             setProcessing(false)
         }
+    }
+
+    const handleUnlock = async () => {
+        if (!confirm(`Unlock payroll ${MONTHS[parseInt(month)-1]} ${year}? Status will reset to DRAFT and can be reprocessed.`)) return
+        setResetting(true)
+        try {
+            const res = await fetch(`/api/payroll/reset?month=${month}&year=${year}&action=unlock`, { method: "DELETE" })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Payroll unlocked — you can now reprocess")
+            await fetchSiteStatus()
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Unlock failed")
+        } finally { setResetting(false) }
+    }
+
+    const handleDelete = async () => {
+        if (!selectedSiteId) return
+        const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "this site"
+        if (!confirm(`Delete all payroll records for "${siteName}" — ${MONTHS[parseInt(month)-1]} ${year}? This cannot be undone.`)) return
+        setDeleting(true)
+        try {
+            const res = await fetch(`/api/payroll/reset?month=${month}&year=${year}&siteId=${selectedSiteId}&action=delete`, { method: "DELETE" })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(`Payroll deleted for ${siteName}`)
+            await fetchSiteStatus()
+            selectSite("")
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Delete failed")
+        } finally { setDeleting(false) }
     }
 
     const filtered       = employees.filter(e => !search || `${e.firstName} ${e.lastName} ${e.employeeId}`.toLowerCase().includes(search.toLowerCase()))
@@ -358,6 +390,22 @@ function ProcessPayrollPage() {
                                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={12} className={loadingEmployees ? "animate-spin" : ""} /> Refresh
                                     </button>
+                                    {getStatus(selectedSiteId) && (
+                                        <>
+                                            <button onClick={handleUnlock} disabled={resetting || deleting}
+                                                title="Unlock payroll to reprocess"
+                                                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #f59e0b", background: "#fffbeb", fontSize: 12, color: "#b45309", fontWeight: 600, cursor: "pointer", opacity: (resetting || deleting) ? 0.6 : 1 }}>
+                                                {resetting ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />}
+                                                {resetting ? "Unlocking…" : "Unlock"}
+                                            </button>
+                                            <button onClick={handleDelete} disabled={resetting || deleting}
+                                                title="Delete payroll for this site"
+                                                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 12, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: (resetting || deleting) ? 0.6 : 1 }}>
+                                                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                                {deleting ? "Deleting…" : "Delete"}
+                                            </button>
+                                        </>
+                                    )}
                                     <button onClick={handleProcess} disabled={processing || !fetched || employees.length === 0}
                                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: (processing || !fetched) ? 0.6 : 1 }}>
                                         {processing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
