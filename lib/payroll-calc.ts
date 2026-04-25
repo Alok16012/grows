@@ -4,15 +4,18 @@
 //   "CALL" → No PF, No ESIC  (temporary / contract / non-compliance roles)
 //   "OR"   → PF + ESIC apply  (full-time / full-compliance roles)
 //
-// PT (Professional Tax – Maharashtra):
-//   Male   → ₹200/month
-//   Female → ₹0  (exempt)
+// PT (Professional Tax – Maharashtra slab, Male only):
+//   Gross ≤ ₹7,500  → ₹0
+//   Gross ₹7,501–₹10,000 → ₹175
+//   Gross > ₹10,000 → ₹200
+//   Female → ₹0 always
 //
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number
     otRatePerHour: number; canteenRatePerDay: number
-    complianceType?: string   // "CALL" | "OR" (default "OR")
+    bonus?: number             // monthly bonus (default: 7000/12)
+    complianceType?: string    // "CALL" | "OR" (default "OR")
 }, att: {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
@@ -22,6 +25,7 @@ export function calcGrowusPayroll(sal: {
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
         otRatePerHour, canteenRatePerDay,
+        bonus,
         complianceType = "OR",
     } = sal
 
@@ -36,7 +40,7 @@ export function calcGrowusPayroll(sal: {
 
     // ─── Full month components ────────────────────────────────────────────────
     const hraFull   = (basic + da) * 0.05
-    const bonusFull = 7000 / 12
+    const bonusFull = bonus ?? (7000 / 12)
     const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
 
     // ─── Prorated earned (ROUND to 0 decimal) ─────────────────────────────────
@@ -65,13 +69,16 @@ export function calcGrowusPayroll(sal: {
             ? 1800
             : Math.round((15000 / 26) * workedDays * 0.12))
 
-    // ESIC: only for OR compliance AND gross ≤ ₹21,000
+    // ESIC: only for OR compliance — no gross ceiling, all OR employees contribute
     // ROUNDUP((grossEarned - washing - bonus) * 0.75%, 0)
-    const esiEmployee = (isCALL || grossEarned > 21000) ? 0
+    const esiEmployee = isCALL ? 0
         : Math.ceil((grossEarned - washingEarned - bonusEarned) * 0.0075)
 
-    // PT: ₹200 for Male, ₹0 for Female — applies in BOTH CALL and OR
-    const pt = isFemale ? 0 : 200
+    // PT: Maharashtra slab (Male) — Female always exempt
+    const pt = isFemale ? 0
+        : grossEarned <= 7500  ? 0
+        : grossEarned <= 10000 ? 175
+        : 200
 
     // Canteen
     const canteen = canteenDays * canteenRatePerDay
@@ -87,8 +94,8 @@ export function calcGrowusPayroll(sal: {
     // Employer PF = 15000 × 13% = 1950 (only OR)
     const pfEmployer = isCALL ? 0 : Math.round(15000 * 0.13)
 
-    // Employer ESIC: only for OR + gross ≤ 21000
-    const esiEmployer = (isCALL || grossEarned > 21000) ? 0
+    // Employer ESIC: 3.25% of (fullGross - washing - bonus), only OR
+    const esiEmployer = isCALL ? 0
         : Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
 
     // CTC = fullGross + empPF + empESIC
