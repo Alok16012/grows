@@ -626,6 +626,7 @@ model EmployeeSalary {
   conveyance        Float    @default(0)   // Conveyance Allowance
   leaveWithWages    Float    @default(0)   // Leave With Wages
   otherAllowance    Float    @default(0)   // Other Allowance
+  bonus             Float    @default(583)  // Monthly bonus (manual input, default ₹583 = 7000/12)
   otRatePerHour     Float    @default(170) // OT rate per calculation unit (₹170 default)
   canteenRatePerDay Float    @default(55)  // Canteen rate per day (₹55 default)
   // Legacy/kept fields

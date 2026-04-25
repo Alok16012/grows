@@ -89,6 +89,7 @@ export async function POST(req: Request) {
                     conveyance:       salData?.conveyance       ?? 0,
                     leaveWithWages:   salData?.leaveWithWages   ?? 0,
                     otherAllowance:   salData?.otherAllowance   ?? 0,
+                    bonus:            salData?.bonus            ?? 583,
                     otRatePerHour:    salData?.otRatePerHour    ?? 170,
                     canteenRatePerDay:salData?.canteenRatePerDay?? 55,
                     complianceType:   salData?.complianceType   ?? "OR",

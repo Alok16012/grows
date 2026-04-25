@@ -10,7 +10,6 @@ import {
 
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
-const BONUS = 7000 / 12
 
 // Derived calculations
 function calc(s: SalaryRow) {
@@ -20,8 +19,8 @@ function calc(s: SalaryRow) {
     const conv   = s.conveyance || 0
     const lww    = s.leaveWithWages || 0
     const other  = s.otherAllowance || 0
+    const bonus  = s.bonus || 0
     const hra    = Math.round((basic + da) * 0.05)
-    const bonus  = Math.round(BONUS)
     const gross  = basic + da + hra + wash + conv + lww + bonus + other
     const isCALL = s.complianceType === "CALL"
     const empPF  = isCALL ? 0 : 1950
@@ -32,7 +31,7 @@ function calc(s: SalaryRow) {
 
 type SalaryRow = {
     basic: number; da: number; washing: number; conveyance: number
-    leaveWithWages: number; otherAllowance: number
+    leaveWithWages: number; otherAllowance: number; bonus: number
     otRatePerHour: number; canteenRatePerDay: number; complianceType: string
 }
 type EmpSalary = {
@@ -40,13 +39,13 @@ type EmpSalary = {
     designation: string | null; basicSalary: number
     department: { name: string } | null
     deployments: { site: { name: string } }[]
-    employeeSalary: (SalaryRow & { id: string }) | null
+    employeeSalary: (SalaryRow & { id: string; bonus: number }) | null
 }
 type EditForm = SalaryRow
 
 const EMPTY_SALARY: SalaryRow = {
     basic: 0, da: 2511, washing: 0, conveyance: 0,
-    leaveWithWages: 0, otherAllowance: 0,
+    leaveWithWages: 0, otherAllowance: 0, bonus: 583,
     otRatePerHour: 170, canteenRatePerDay: 55, complianceType: "OR",
 }
 
@@ -79,7 +78,7 @@ export default function SalaryMasterPage() {
         const s = emp.employeeSalary
         setEditForm(s ? {
             basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
-            leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+            leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? 583,
             otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
             complianceType: s.complianceType,
         } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
@@ -98,7 +97,7 @@ export default function SalaryMasterPage() {
                 body: JSON.stringify({ rows: [{
                     employeeId: emp.id,
                     basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
-                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? 583,
                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                     complianceType: newType,
                 }] }),
@@ -136,7 +135,7 @@ export default function SalaryMasterPage() {
         const headers = [
             "EMP Code", "Employee Name", "Designation", "Site",
             "Basic", "DA", "Washing", "Conveyance",
-            "Leave With Wages", "Other Allowance",
+            "Leave With Wages", "Other Allowance", "Bonus",
             "OT Rate Per Hour", "Canteen Rate Per Day", "Compliance Type",
         ]
         const rows = filtered.map(emp => {
@@ -152,6 +151,7 @@ export default function SalaryMasterPage() {
                 s?.conveyance ?? 0,
                 s?.leaveWithWages ?? 0,
                 s?.otherAllowance ?? 0,
+                s?.bonus ?? 583,
                 s?.otRatePerHour ?? 170,
                 s?.canteenRatePerDay ?? 55,
                 s?.complianceType ?? "OR",
@@ -159,7 +159,7 @@ export default function SalaryMasterPage() {
         })
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 12, 16, 14, 16, 18, 14].map(w => ({ wch: w }))
+        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 12, 16, 14, 10, 16, 18, 14].map(w => ({ wch: w }))
         XLSX.utils.book_append_sheet(wb, ws, "Salary Structure")
         XLSX.writeFile(wb, `salary_structure_master.xlsx`)
         toast.success("Template downloaded")
@@ -199,6 +199,7 @@ export default function SalaryMasterPage() {
                         conveyance:       Number(get("Conveyance") ?? 0),
                         leaveWithWages:   Number(get("LeaveWithWages") ?? get("Leave With Wages") ?? 0),
                         otherAllowance:   Number(get("OtherAllowance") ?? get("Other Allowance") ?? 0),
+                        bonus:            Number(get("Bonus") ?? 583),
                         otRatePerHour:    Number(get("OTRatePerHour") ?? get("OT Rate Per Hour") ?? 170),
                         canteenRatePerDay: Number(get("CanteenRatePerDay") ?? get("Canteen Rate Per Day") ?? 55),
                         complianceType:   String(get("ComplianceType") ?? get("Compliance Type") ?? "OR"),
@@ -302,7 +303,7 @@ export default function SalaryMasterPage() {
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Washing</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Conv.</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>LWW</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Bonus<span style={calcTag}>auto</span></th>
+                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Bonus</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Other</th>
                                 <th style={{ ...th, background: "#dcfce7", color: "#15803d" }}>Gross<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }}>Co.PF<span style={calcTag}>auto</span></th>
@@ -328,7 +329,7 @@ export default function SalaryMasterPage() {
                                 const s = emp.employeeSalary
                                 const row: SalaryRow = isEditing ? editForm : (s ? {
                                     basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
-                                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+                                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? 583,
                                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                                     complianceType: s.complianceType,
                                 } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
@@ -371,7 +372,9 @@ export default function SalaryMasterPage() {
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("leaveWithWages", "#eff6ff") : s ? fmtN(s.leaveWithWages) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff", color: "#6b7280" }}>{s || isEditing ? fmtN(bonus) : "—"}</td>
+                                        <td style={{ ...td, background: "#eff6ff" }}>
+                                            {isEditing ? numIn("bonus", "#eff6ff") : s ? fmtN(s.bonus ?? 583) : "—"}
+                                        </td>
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("otherAllowance", "#eff6ff") : s ? fmtN(s.otherAllowance) : "—"}
                                         </td>
@@ -454,22 +457,22 @@ export default function SalaryMasterPage() {
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.washing || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.conveyance || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.leaveWithWages || 0), 0),
-                                        filtered.reduce((s,e) => s + (e.employeeSalary ? Math.round(BONUS) : 0), 0),
+                                        filtered.reduce((s,e) => s + (e.employeeSalary?.bonus ?? 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.otherAllowance || 0), 0),
                                     ].map((v, i) => (
                                         <td key={i} style={{ ...td, background: "#eff6ff", fontWeight: 700 }}>{fmtN(v)}</td>
                                     ))}
                                     <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).gross : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).gross : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).empPF : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).empPF : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).empESI : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).empESI : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#f0fdf4", color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).ctc : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).ctc : 0), 0))}
                                     </td>
                                     <td colSpan={4} />
                                 </tr>
@@ -480,7 +483,7 @@ export default function SalaryMasterPage() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                HRA = (Basic + DA) × 5% · Bonus = ₹583/mo · Co.PF = ₹1,950 (OR only) · Co.ESIC = (Gross − Washing − Bonus) × 3.25% (OR only)
+                HRA = (Basic + DA) × 5% · Bonus = manual input · Co.PF = ₹1,950 (OR only) · Co.ESIC = (Gross − Washing − Bonus) × 3.25% (OR only)
             </p>
         </div>
     )

@@ -44,6 +44,7 @@ export async function POST(req: Request) {
         employeeId: string   // the UUID from Employee.id
         basic: number; da: number; washing: number; conveyance: number
         leaveWithWages: number; otherAllowance: number
+        bonus: number
         otRatePerHour: number; canteenRatePerDay: number
         complianceType: string
     }[] = body.rows ?? []
@@ -61,11 +62,11 @@ export async function POST(req: Request) {
             const conveyance = Number(row.conveyance) || 0
             const lww        = Number(row.leaveWithWages) || 0
             const other      = Number(row.otherAllowance) || 0
+            const bonus      = Number(row.bonus) || 583
             const otRate     = Number(row.otRatePerHour) || 170
             const canteen    = Number(row.canteenRatePerDay) || 55
             const cType      = String(row.complianceType || "OR").toUpperCase() === "CALL" ? "CALL" : "OR"
             const hra        = (basic + da) * 0.05
-            const bonus      = 7000 / 12
             const ctcM       = basic + da + hra + washing + conveyance + lww + bonus + other
 
             await prisma.employeeSalary.upsert({
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
                     basic, da, washing, conveyance,
                     leaveWithWages:   lww,
                     otherAllowance:   other,
+                    bonus,
                     otRatePerHour:    otRate,
                     canteenRatePerDay: canteen,
                     hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
@@ -87,6 +89,7 @@ export async function POST(req: Request) {
                     basic, da, washing, conveyance,
                     leaveWithWages:   lww,
                     otherAllowance:   other,
+                    bonus,
                     otRatePerHour:    otRate,
                     canteenRatePerDay: canteen,
                     hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
