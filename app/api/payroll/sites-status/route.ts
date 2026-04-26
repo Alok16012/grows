@@ -18,10 +18,27 @@ export async function GET(req: Request) {
             by: ["siteId"],
             where: { month, year, siteId: { not: null } },
             _count: { id: true },
+            _sum: { grossSalary: true, netSalary: true },
         })
 
+        // Get site names
+        const siteIds = records.map(r => r.siteId).filter(Boolean) as string[]
+        const sites = await prisma.site.findMany({
+            where: { id: { in: siteIds } },
+            select: { id: true, name: true, code: true, city: true },
+        })
+        const siteMap = new Map(sites.map(s => [s.id, s]))
+
         return NextResponse.json(
-            records.map(r => ({ siteId: r.siteId, processedCount: r._count.id }))
+            records.map(r => ({
+                siteId:         r.siteId,
+                siteName:       siteMap.get(r.siteId!)?.name ?? "Unknown",
+                siteCode:       siteMap.get(r.siteId!)?.code ?? "",
+                siteCity:       siteMap.get(r.siteId!)?.city ?? "",
+                processedCount: r._count.id,
+                totalGross:     r._sum.grossSalary ?? 0,
+                totalNet:       r._sum.netSalary   ?? 0,
+            }))
         )
     } catch (error) {
         console.error("[PAYROLL_SITES_STATUS]", error)

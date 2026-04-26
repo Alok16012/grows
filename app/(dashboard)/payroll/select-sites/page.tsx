@@ -1,238 +1,233 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { 
-    Search, Filter, CheckCircle2, ChevronRight, 
+import {
+    Search, CheckCircle2, ChevronRight,
     Building2, Users, Wallet, RefreshCw,
-    ArrowRight, Info
+    ArrowRight, FileSpreadsheet, AlertCircle, IndianRupee
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { toast } from "sonner"
 
+type SiteStatus = {
+    siteId: string
+    siteName: string
+    siteCode: string
+    siteCity: string
+    processedCount: number
+    totalGross: number
+    totalNet: number
+}
+
+const MONTHS = ["January","February","March","April","May","June",
+                 "July","August","September","October","November","December"]
+const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 
 export default function SelectSitesPage() {
-    const { data: session } = useSession()
-    const router = useRouter()
+    const router  = useRouter()
     const [month, setMonth] = useState(String(new Date().getMonth() + 1))
-    const [year, setYear] = useState(String(new Date().getFullYear()))
-    const [salaryStructure, setSalaryStructure] = useState("All")
-    const [search, setSearch] = useState("")
-    const [sites, setSites] = useState<any[]>([])
-    const [selectedSites, setSelectedSites] = useState<string[]>([])
-    const [loading, setLoading] = useState(true)
+    const [year,  setYear]  = useState(String(new Date().getFullYear()))
+    const [sites,    setSites]    = useState<SiteStatus[]>([])
+    const [selected, setSelected] = useState<Set<string>>(new Set())
+    const [search,   setSearch]   = useState("")
+    const [loading,  setLoading]  = useState(false)
 
-    // --- Fetch Sites ---
-    useEffect(() => {
-        const fetchSites = async () => {
-            try {
-                const res = await fetch("/api/sites?isActive=true")
-                if (res.ok) {
-                    const data = await res.json()
-                    setSites(data)
-                }
-            } catch (err) {
-                console.error("Failed to fetch sites", err)
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchSites()
-    }, [])
+    const fetchSites = useCallback(async () => {
+        setLoading(true)
+        setSelected(new Set())
+        try {
+            const res = await fetch(`/api/payroll/sites-status?month=${month}&year=${year}`)
+            if (res.ok) setSites(await res.json())
+            else setSites([])
+        } catch { toast.error("Failed to load sites") }
+        finally { setLoading(false) }
+    }, [month, year])
 
-    const toggleSite = (id: string) => {
-        setSelectedSites(prev => 
-            prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
-        )
-    }
+    useEffect(() => { fetchSites() }, [fetchSites])
 
-    const filteredSites = sites.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
+    const toggle = (id: string) =>
+        setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
 
-    const totalSelectedEmployees = sites
-        .filter(s => selectedSites.includes(s.id))
-        .reduce((acc, s) => acc + (s.employeeCount || 60), 0) // fallback to 60 for mock
+    const filtered = sites.filter(s =>
+        s.siteName.toLowerCase().includes(search.toLowerCase()) ||
+        (s.siteCode || "").toLowerCase().includes(search.toLowerCase())
+    )
+
+    const selSites   = sites.filter(s => selected.has(s.siteId))
+    const totalEmps  = selSites.reduce((a, s) => a + s.processedCount, 0)
+    const totalGross = selSites.reduce((a, s) => a + s.totalGross, 0)
+    const totalNet   = selSites.reduce((a, s) => a + s.totalNet, 0)
 
     return (
-        <div className="space-y-6 max-w-screen-2xl mx-auto pb-12 font-sans">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 }}>
+            {/* Breadcrumb */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
+                <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>
+                <ChevronRight size={11} />
+                <span style={{ fontWeight: 600, color: "var(--text2)" }}>Select Sites (Multi)</span>
+            </div>
+
             {/* Header */}
-            <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-[10.5px] text-[var(--text3)] uppercase tracking-[0.8px] font-bold">
-                    <span>Payroll</span>
-                    <ChevronRight size={12} className="text-[var(--text3)] opacity-40" />
-                    <span>Select Sites (Multi Select)</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <div>
+                    <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Select Sites — Wage Sheet</h1>
+                    <p style={{ fontSize: 12, color: "var(--text3)", margin: "3px 0 0 0" }}>Only sites with processed payroll for the selected month are shown</p>
                 </div>
-                <h1 className="text-[24px] font-black tracking-tight text-[var(--text)] mt-1">Select Sites (Multi Select)</h1>
-                <p className="text-[13.5px] text-[var(--text3)] font-medium">Select multiple sites to generate combined payroll and final wage sheet.</p>
-            </div>
-
-            {/* Selection & Summary */}
-            <div className="bg-white border border-[var(--border)] rounded-[20px] p-7 shadow-sm flex flex-col xl:flex-row gap-8 items-start border-b-4 border-b-[var(--accent)]/10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full xl:w-auto xl:min-w-[450px]">
-                    <div>
-                        <label className="text-[10.5px] font-bold text-[var(--text3)] uppercase mb-2 tracking-[0.4px]">Processing Month</label>
-                        <div className="flex gap-2">
-                            <select value={month} onChange={(e) => setMonth(e.target.value)} className="flex-1 h-11 border border-[var(--border)] rounded-xl px-4 text-[13px] font-bold outline-none focus:border-[var(--accent)] bg-white shadow-sm">
-                                {Array.from({ length: 12 }, (_, i) => (
-                                    <option key={i+1} value={i+1}>{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
-                                ))}
-                            </select>
-                            <select value={year} onChange={(e) => setYear(e.target.value)} className="w-[100px] h-11 border border-[var(--border)] rounded-xl px-4 text-[13px] font-bold outline-none focus:border-[var(--accent)] bg-white shadow-sm">
-                                {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-[10.5px] font-bold text-[var(--text3)] uppercase mb-2 tracking-[0.4px]">Salary Structure</label>
-                        <select value={salaryStructure} onChange={(e) => setSalaryStructure(e.target.value)} className="w-full h-11 border border-[var(--border)] rounded-xl px-4 text-[13px] font-bold outline-none focus:border-[var(--accent)] bg-white shadow-sm">
-                            <option>All Structures</option>
-                            <option>Standard</option>
-                            <option>Minimum Wage</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="flex gap-4 flex-1 w-full overflow-x-auto no-scrollbar">
-                    {[
-                        { label: "Selected Sites", value: selectedSites.length.toString(), icon: Building2, color: "blue" },
-                        { label: "Combined Staff", value: totalSelectedEmployees.toString(), icon: Users, color: "green" },
-                        { label: "Est. Total Gross", value: "₹ --", icon: IndianRupee, color: "purple" },
-                        { label: "Est. Net Payable", value: "₹ --", icon: Wallet, color: "orange" },
-                    ].map((card, i) => (
-                        <div key={i} className="flex-1 min-w-[150px] bg-[var(--surface2)]/50 border border-[var(--border)] rounded-2xl p-4 flex flex-col justify-center shadow-inner">
-                            <p className="text-[10px] font-bold text-[var(--text3)] uppercase tracking-[0.8px] mb-2">{card.label}</p>
-                            <div className="flex items-center justify-between">
-                                <span className={`text-[19px] font-black tracking-tight ${card.color === "blue" ? "text-blue-700" : card.color === "green" ? "text-[var(--accent)]" : card.color === "purple" ? "text-purple-700" : "text-amber-600"}`}>{card.value}</span>
-                                <div className={`h-8 w-8 rounded-xl flex items-center justify-center shadow-sm border border-white/50 ${card.color === "blue" ? "bg-blue-50 text-blue-500" : card.color === "green" ? "bg-[var(--accent-light)] text-[var(--accent)]" : card.color === "purple" ? "bg-purple-50 text-purple-500" : "bg-amber-50 text-amber-500"}`}>
-                                    <card.icon size={16} />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <select value={month} onChange={e => setMonth(e.target.value)}
+                        style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, fontWeight: 700, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
+                        {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+                    </select>
+                    <select value={year} onChange={e => setYear(e.target.value)}
+                        style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, fontWeight: 700, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
+                        {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <button onClick={fetchSites}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
+                        <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+                    </button>
                 </div>
             </div>
 
-            {/* Sites Grid */}
-            <div className="bg-white border border-[var(--border)] rounded-[20px] shadow-sm p-8 border-b-4 border-b-gray-100">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-5">
-                    <div className="flex items-center gap-6">
-                        <h3 className="text-[16px] font-black text-[var(--text)] tracking-tight">Available Sites</h3>
-                        <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface2)]/80 border border-[var(--border)] rounded-xl shadow-inner group">
-                            <input 
-                                type="checkbox"
-                                id="selectAll" 
-                                checked={selectedSites.length === sites.length && sites.length > 0}
-                                onChange={(e) => {
-                                    if (e.target.checked) setSelectedSites(sites.map(s => s.id))
-                                    else setSelectedSites([])
-                                }}
-                                className="h-5 w-5 rounded-md border-2 border-[var(--border)] accent-[var(--accent)] cursor-pointer"
-                            />
-                            <label htmlFor="selectAll" className="text-[12.5px] font-bold text-[var(--text2)] cursor-pointer select-none">Select All Sites</label>
+            {/* Stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                {[
+                    { label: "Sites with Wage Sheet", value: sites.length, icon: Building2,     color: "#3b82f6" },
+                    { label: "Selected Sites",         value: selected.size, icon: CheckCircle2, color: "#7c3aed" },
+                    { label: "Combined Staff",          value: totalEmps,    icon: Users,         color: "#16a34a" },
+                    { label: "Est. Net Payable",        value: selected.size ? fmt(totalNet) : "—", icon: Wallet, color: "#d97706" },
+                ].map(s => (
+                    <div key={s.label} style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: s.color + "15", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <s.icon size={18} style={{ color: s.color }} />
+                        </div>
+                        <div>
+                            <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px", margin: 0 }}>{s.label}</p>
+                            <p style={{ fontSize: 18, fontWeight: 800, color: s.color, margin: "2px 0 0 0" }}>{s.value}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="relative w-80">
-                            <Search className="absolute left-4 top-3 text-[var(--text3)]" size={15} />
-                            <Input placeholder="Filter by site code or name..." className="pl-11 h-10 text-[12.5px] bg-white border-[var(--border)] rounded-xl shadow-sm focus:border-[var(--accent)] transition-all" value={search} onChange={e => setSearch(e.target.value)} />
+                ))}
+            </div>
+
+            {/* Sites grid */}
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 20px" }}>
+                {/* Toolbar */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <FileSpreadsheet size={16} style={{ color: "var(--accent)" }} />
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                            Sites with Wage Sheet — {MONTHS[parseInt(month) - 1]} {year}
+                        </span>
+                        <span style={{ fontSize: 11, color: "var(--text3)" }}>({sites.length} sites)</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {/* Select all */}
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text2)", cursor: "pointer", fontWeight: 600 }}>
+                            <input type="checkbox"
+                                checked={selected.size === filtered.length && filtered.length > 0}
+                                onChange={e => setSelected(e.target.checked ? new Set(filtered.map(s => s.siteId)) : new Set())}
+                                style={{ accentColor: "var(--accent)", width: 14, height: 14 }} />
+                            Select All
+                        </label>
+                        {/* Search */}
+                        <div style={{ position: "relative" }}>
+                            <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
+                            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search site…"
+                                style={{ paddingLeft: 30, paddingRight: 10, paddingTop: 6, paddingBottom: 6, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, outline: "none", background: "var(--surface2)", color: "var(--text)", width: 180 }} />
                         </div>
-                        <span className="text-[11px] text-[var(--text3)] font-extrabold uppercase tracking-widest">{selectedSites.length} / {sites.length} Active</span>
                     </div>
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-24 gap-4">
-                        <RefreshCw className="animate-spin text-[var(--accent)]" size={32} />
-                        <p className="text-[14px] font-bold text-[var(--text3)] italic">Syncing site data...</p>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 48, gap: 10 }}>
+                        <RefreshCw size={20} className="animate-spin" style={{ color: "var(--accent)" }} />
+                        <span style={{ fontSize: 13, color: "var(--text3)" }}>Loading…</span>
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 48, gap: 10 }}>
+                        <AlertCircle size={32} style={{ color: "var(--text3)", opacity: 0.4 }} />
+                        <p style={{ fontSize: 14, color: "var(--text3)", fontWeight: 700, margin: 0 }}>
+                            No wage sheets found for {MONTHS[parseInt(month) - 1]} {year}
+                        </p>
+                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Process payroll first to generate wage sheets</p>
+                        <button onClick={() => router.push("/payroll/process")}
+                            style={{ marginTop: 8, padding: "7px 18px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                            Go to Process Payroll →
+                        </button>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                        {filteredSites.map((site) => {
-                            const isSelected = selectedSites.includes(site.id)
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                        {filtered.map(site => {
+                            const isSel = selected.has(site.siteId)
                             return (
-                                <div 
-                                    key={site.id} 
-                                    onClick={() => toggleSite(site.id)}
-                                    className={`group p-6 rounded-[22px] border-2 transition-all cursor-pointer relative overflow-hidden shadow-sm ${isSelected ? "border-[var(--accent)] bg-[var(--accent-light)]/20 ring-4 ring-[var(--accent)]/5" : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-md"}`}
-                                >
-                                    {isSelected && <div className="absolute top-4 right-4 text-[var(--accent)] scale-110 transition-transform"><CheckCircle2 size={24} fill="white" className="text-[var(--accent)]" /></div>}
-                                    <div className="flex flex-col gap-1.5 pt-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[9px] font-black uppercase tracking-wider border border-blue-100/50">{site.code || 'SITE'}</span>
+                                <div key={site.siteId} onClick={() => toggle(site.siteId)}
+                                    style={{
+                                        padding: "14px 16px", borderRadius: 12, cursor: "pointer", transition: "all 0.15s",
+                                        border: isSel ? "2px solid var(--accent)" : "2px solid var(--border)",
+                                        background: isSel ? "#f5f3ff" : "var(--surface2)",
+                                        position: "relative",
+                                    }}>
+                                    {isSel && (
+                                        <div style={{ position: "absolute", top: 10, right: 10 }}>
+                                            <CheckCircle2 size={20} style={{ color: "var(--accent)" }} />
                                         </div>
-                                        <h4 className={`text-[16px] font-black tracking-tight leading-tight ${isSelected ? "text-blue-950" : "text-[var(--text)]"}`}>{site.name}</h4>
-                                        <p className="text-[13px] text-[var(--text3)] font-bold">{site.city || 'Location Active'}</p>
+                                    )}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "#eff6ff", color: "#1d4ed8", letterSpacing: "0.3px" }}>
+                                            {site.siteCode || "SITE"}
+                                        </span>
                                     </div>
-                                    <div className="flex items-center justify-between mt-6">
-                                        <div className="flex items-center gap-1.5">
-                                            <Users size={14} className="text-[var(--text3)]" />
-                                            <span className="text-[12px] font-black text-[var(--text2)]">120 Staff</span>
+                                    <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text)", margin: "0 0 2px 0", paddingRight: 24 }}>{site.siteName}</p>
+                                    <p style={{ fontSize: 11, color: "var(--text3)", margin: "0 0 10px 0" }}>{site.siteCity || "—"}</p>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                                        <div>
+                                            <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 2px 0" }}>Staff</p>
+                                            <p style={{ fontSize: 13, fontWeight: 800, color: "#16a34a", margin: 0 }}>{site.processedCount}</p>
                                         </div>
-                                        < IndianRupee size={16} className={`transition-opacity ${isSelected ? "opacity-100 text-[var(--accent)]" : "opacity-20"}`} />
-                                    </div>
-                                    <div className={`h-1.5 w-full rounded-full mt-4 bg-gray-100 overflow-hidden`}>
-                                        <div className={`h-full rounded-full transition-all duration-700 ease-out ${isSelected ? "bg-[var(--accent)] w-full" : "bg-gray-200 w-1/3 group-hover:w-1/2"}`} />
+                                        <div>
+                                            <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 2px 0" }}>Gross</p>
+                                            <p style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", margin: 0 }}>{fmt(site.totalGross)}</p>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 2px 0" }}>Net</p>
+                                            <p style={{ fontSize: 12, fontWeight: 700, color: "#15803d", margin: 0 }}>{fmt(site.totalNet)}</p>
+                                        </div>
                                     </div>
                                 </div>
                             )
                         })}
                     </div>
                 )}
+            </div>
 
-                {/* Footer Totals */}
-                <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-100 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-                    <div className="flex flex-wrap items-center gap-10 text-[13.5px]">
-                        <div className="flex items-center gap-3"><span className="text-[var(--text3)] font-bold uppercase text-[10px] tracking-widest">Sites:</span><span className="font-black text-[15px] underline underline-offset-4 decoration-[var(--accent)]/30">{selectedSites.length} Selected</span></div>
-                        <div className="flex items-center gap-3"><span className="text-[var(--text3)] font-bold uppercase text-[10px] tracking-widest">Est. Staff:</span><span className="font-black text-[15px] text-[#1a9e6e]">{totalSelectedEmployees} Members</span></div>
-                        <div className="flex items-center gap-3"><span className="text-[var(--text3)] font-bold uppercase text-[10px] tracking-widest">Lock Status:</span><span className="font-black text-[15px] text-blue-700">Ready to Merge</span></div>
+            {/* Footer summary + action */}
+            {selected.size > 0 && (
+                <div style={{ position: "sticky", bottom: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                        <div>
+                            <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Selected Sites</p>
+                            <p style={{ fontSize: 16, fontWeight: 800, color: "#7c3aed", margin: 0 }}>{selected.size} sites</p>
+                        </div>
+                        <div>
+                            <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Staff</p>
+                            <p style={{ fontSize: 16, fontWeight: 800, color: "#16a34a", margin: 0 }}>{totalEmps} employees</p>
+                        </div>
+                        <div>
+                            <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Gross</p>
+                            <p style={{ fontSize: 16, fontWeight: 800, color: "#0369a1", margin: 0 }}>{fmt(totalGross)}</p>
+                        </div>
+                        <div>
+                            <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Net</p>
+                            <p style={{ fontSize: 16, fontWeight: 800, color: "#15803d", margin: 0 }}>{fmt(totalNet)}</p>
+                        </div>
                     </div>
-                    <Button 
-                        onClick={() => router.push("/payroll/final")}
-                        disabled={selectedSites.length === 0}
-                        className="h-12 px-10 bg-[var(--accent)] hover:opacity-90 text-white rounded-2xl shadow-xl shadow-[var(--accent)]/20 flex items-center justify-center gap-3 group font-black tracking-tight transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
-                    >
-                        Merge & Finalize Preview <ArrowRight size={20} className="group-hover:translate-x-1.5 transition-transform" />
-                    </Button>
+                    <button
+                        onClick={() => router.push(`/payroll/wagesheet?siteIds=${[...selected].join(",")}&month=${month}&year=${year}`)}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 24px", borderRadius: 10, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                        <IndianRupee size={15} /> View Wage Sheet <ArrowRight size={15} />
+                    </button>
                 </div>
-            </div>
-
-            {/* Note */}
-            <div className="bg-emerald-50/50 border border-emerald-100 rounded-[20px] p-5 flex items-center gap-4 shadow-sm">
-                <div className="h-9 w-9 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center shadow-sm"><Info size={18} /></div>
-                <div className="flex flex-col">
-                    <h5 className="text-[13px] font-black text-emerald-900">Merge Strategy Active</h5>
-                    <p className="text-[12px] text-emerald-700 leading-relaxed font-medium">
-                        Selecting multiple sites will initiate a cross-site payroll consolidation. You can review individual site performance in the <b>Final Review</b> step before locking.
-                    </p>
-                </div>
-            </div>
+            )}
         </div>
     )
-}
-
-function IndianRupee({ size, className }: { size: number, className?: string }) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-        >
-            <path d="M6 3h12" />
-            <path d="M6 8h12" />
-            <path d="m6 13 8.5 8" />
-            <path d="M6 13h3" />
-            <path d="M9 13c6.667 0 6.667-10 0-10" />
-        </svg>
-    )
-}
-
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(" ")
 }
