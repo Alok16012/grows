@@ -11,7 +11,7 @@ import {
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 
-// Derived calculations
+// Derived calculations (full-month preview — no proration)
 function calc(s: SalaryRow) {
     const basic  = s.basic || 0
     const da     = s.da || 0
@@ -24,7 +24,10 @@ function calc(s: SalaryRow) {
     const gross  = basic + da + hra + wash + conv + lww + bonus + other
     const isCALL = s.complianceType === "CALL"
     const empPF  = isCALL ? 0 : 1950
-    const empESI = isCALL ? 0 : Math.ceil((gross - wash - bonus) * 0.0325)
+    // ESIC employer applies only if full-month gross ≤ ₹21,000
+    const empESI = (!isCALL && gross <= 21000)
+        ? Math.ceil((gross - wash - bonus) * 0.0325)
+        : 0
     const ctc    = gross + empPF + empESI
     return { hra, bonus, gross, empPF, empESI, ctc }
 }
@@ -483,7 +486,7 @@ export default function SalaryMasterPage() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                HRA = (Basic + DA) × 5% · Bonus = manual input · Co.PF = ₹1,950 (OR only) · Co.ESIC = (Gross − Washing − Bonus) × 3.25% (OR only)
+                HRA = (Basic + DA) × 5% · Bonus = manual input · Co.PF = ₹1,950 (OR only) · Co.ESIC = (Gross − Washing − Bonus) × 3.25% (OR only, gross ≤ ₹21,000) · PT: Feb = ₹300
             </p>
         </div>
     )

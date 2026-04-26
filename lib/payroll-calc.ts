@@ -4,23 +4,29 @@
 //   "CALL" → No PF, No ESIC  (temporary / contract / non-compliance roles)
 //   "OR"   → PF + ESIC apply  (full-time / full-compliance roles)
 //
-// PT (Professional Tax – Maharashtra slab, Male only):
-//   Gross ≤ ₹7,500  → ₹0
-//   Gross ₹7,501–₹10,000 → ₹175
-//   Gross > ₹10,000 → ₹200
-//   Female → ₹0 always
+// PT (Professional Tax – Maharashtra slab):
+//   Gross ≤ ₹7,500              → ₹0
+//   Gross ₹7,501–₹10,000       → ₹175
+//   Gross > ₹10,000 (non-Feb)  → ₹200
+//   Gross > ₹10,000 (February) → ₹300  (annual ₹100 adjustment)
+//   Applies to all genders (female exemption removed per updated Maharashtra rules)
+//
+// ESIC:
+//   Applicable only when grossEarned ≤ ₹21,000/month
+//   Employee: 0.75%   Employer: 3.25%  of (gross − washing − bonus)
 //
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number
     otRatePerHour: number; canteenRatePerDay: number
-    bonus?: number             // monthly bonus (default: 7000/12)
+    bonus?: number             // monthly bonus (default: 583)
     complianceType?: string    // "CALL" | "OR" (default "OR")
 }, att: {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
     otherDeductions: number; productionIncentive: number; lwf: number
     gender?: string            // "Male" | "Female" (default "Male")
+    month?: number             // 1–12, used for February PT (default: current month)
 }) {
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
@@ -33,14 +39,15 @@ export function calcGrowusPayroll(sal: {
         monthDays, workedDays, otDays, canteenDays,
         penalty, advance, otherDeductions, productionIncentive, lwf,
         gender = "Male",
+        month,
     } = att
 
-    const isCALL = complianceType === "CALL"
-    const isFemale = gender?.toLowerCase() === "female"
+    const isCALL   = complianceType === "CALL"
+    const isFeb    = month === 2
 
     // ─── Full month components ────────────────────────────────────────────────
     const hraFull   = (basic + da) * 0.05
-    const bonusFull = bonus ?? (7000 / 12)
+    const bonusFull = bonus ?? 583
     const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
 
     // ─── Prorated earned (ROUND to 0 decimal) ─────────────────────────────────
@@ -62,25 +69,31 @@ export function calcGrowusPayroll(sal: {
 
     // ─── Deductions ───────────────────────────────────────────────────────────
 
-    // PF: only for OR compliance
-    // IF(workedDays>26, 1800, ROUND(15000/26*workedDays*12%, 0))
+    // ─── Step 1 done: grossEarned calculated above ────────────────────────────
+
+    // ─── Step 2: Eligibility checks ──────────────────────────────────────────
+
+    // PF eligibility: OR compliance (CALL = exempt)
+    // Formula: IF(workedDays>26, 1800, ROUND(15000/26 * workedDays * 12%, 0))
     const pfEmployee = isCALL ? 0
         : (workedDays > 26
             ? 1800
             : Math.round((15000 / 26) * workedDays * 0.12))
 
-    // ESIC: only for OR compliance — no gross ceiling, all OR employees contribute
+    // ESIC eligibility: OR compliance AND grossEarned ≤ ₹21,000
     // ROUNDUP((grossEarned - washing - bonus) * 0.75%, 0)
-    const esiEmployee = isCALL ? 0
-        : Math.ceil((grossEarned - washingEarned - bonusEarned) * 0.0075)
+    const esicBase    = grossEarned - washingEarned - bonusEarned
+    const esicEligible = !isCALL && grossEarned <= 21000
+    const esiEmployee = esicEligible ? Math.ceil(esicBase * 0.0075) : 0
 
-    // PT: Maharashtra slab (Male) — Female always exempt
-    const pt = isFemale ? 0
-        : grossEarned <= 7500  ? 0
-        : grossEarned <= 10000 ? 175
-        : 200
+    // PT: Maharashtra slab — applies to all (female exemption removed)
+    // February special: ₹300 for top slab (annual ₹100 adjustment)
+    const pt = grossEarned <= 7500  ? 0
+             : grossEarned <= 10000 ? 175
+             : isFeb                ? 300
+             :                        200
 
-    // Canteen
+    // ─── Step 3: Canteen & other deductions ──────────────────────────────────
     const canteen = canteenDays * canteenRatePerDay
 
     const totalDeductions =
@@ -88,15 +101,18 @@ export function calcGrowusPayroll(sal: {
         (lwf || 0) + (otherDeductions || 0) +
         canteen + (penalty || 0) + (advance || 0)
 
+    // ─── Step 4: Net Salary ───────────────────────────────────────────────────
     const netSalary = grossEarned - totalDeductions
 
-    // ─── Employer Contributions ───────────────────────────────────────────────
-    // Employer PF = 15000 × 13% = 1950 (only OR)
+    // ─── Step 5: Employer Contributions ──────────────────────────────────────
+    // Employer PF: 12% EPF/EPS + 0.5% EDLI + 0.5% admin = 13% of ₹15,000 = ₹1,950
     const pfEmployer = isCALL ? 0 : Math.round(15000 * 0.13)
 
-    // Employer ESIC: 3.25% of (fullGross - washing - bonus), only OR
-    const esiEmployer = isCALL ? 0
-        : Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
+    // Employer ESIC: 3.25% of (fullGross - washing - bonus), only if gross ≤ 21K
+    const esicEligibleFull = !isCALL && grossFullMonth <= 21000
+    const esiEmployer = esicEligibleFull
+        ? Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
+        : 0
 
     // CTC = fullGross + empPF + empESIC
     const ctc = grossFullMonth + pfEmployer + esiEmployer

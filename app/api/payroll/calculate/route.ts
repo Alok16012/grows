@@ -96,6 +96,7 @@ export async function POST(req: Request) {
                 }, {
                     ...att,
                     gender: emp.gender ?? "Male",
+                    month,
                 })
 
                 totalGross += calc.grossSalary
