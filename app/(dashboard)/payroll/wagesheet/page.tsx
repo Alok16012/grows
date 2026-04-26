@@ -13,8 +13,8 @@ type Site    = { id: string; name: string; code?: string }
 type SiteStatus = { siteId: string | null; processedCount: number }
 type Payroll = {
     id: string; month: number; year: number; status: string
-    basicSalary: number; da: number; washing: number; conveyance: number
-    lwwEarned: number; overtimePay: number; grossSalary: number
+    basicSalary: number; da: number; hra: number; washing: number; conveyance: number
+    lwwEarned: number; bonus: number; overtimePay: number; overtimeHrs: number; grossSalary: number
     pfEmployee: number; esiEmployee: number; pt: number; lwf: number
     canteen: number; penalty: number; advance: number; otherDeductions: number
     totalDeductions: number; netSalary: number
@@ -44,6 +44,7 @@ function WageSheetInner() {
     const [locking,          setLocking]          = useState(false)
     const [selectedSiteIds,  setSelectedSiteIds]  = useState<Set<string>>(new Set())
     const [lockingSites,     setLockingSites]     = useState(false)
+    const [dlCombined,       setDlCombined]       = useState(false)
 
     useEffect(() => {
         fetch("/api/sites?isActive=true").then(r => r.json())
@@ -124,7 +125,7 @@ function WageSheetInner() {
             })
             if (!res.ok) throw new Error(await res.text())
             const d = await res.json()
-            toast.success(`${d.count} employee(s) locked from ${selectedSiteIds.size} site(s) — sending to Compliance`)
+            toast.success(`${d.count} employee(s) locked from ${selectedSiteIds.size} site(s)`)
             setSelectedSiteIds(new Set())
             if (selId) await fetchData(selId)
             await fetchStatus()
@@ -132,6 +133,86 @@ function WageSheetInner() {
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Lock failed")
         } finally { setLockingSites(false) }
+    }
+
+    const buildFormIIAoa = (rows: Payroll[], siteName: string, m: number, y: number) => {
+        const monthName = MONTHS[m - 1].toUpperCase()
+        const headers = [
+            "Sr.No", "Emp Code", "Employee Name", "IFSC CODE", "ACCOUNT NO.",
+            "Days Paid", "OT Hrs",
+            "Basic_R", "DA_R", "HRA_R", "Conv_R", "Washing_R", "Leave_R", "Bonus_R", "",
+            "BASIC", "DA", "HRA", "CONVEYANCE ALLOWANCE", "WASHING ALLOW", "LEAVE AMT", "BONUS AMT",
+            "OT Amt", "Gross Earning",
+            "PF", "ESIC", "PT", "LWF", "CANTEEN", "OTHER DED", "ADVANCE", "Tot Ded", "Net Pay", "Signature",
+        ]
+        const dataRows = rows.map((p, i) => [
+            i + 1, p.employee.employeeId,
+            `${p.employee.firstName} ${p.employee.lastName}`,
+            p.employee.bankIFSC ?? "", p.employee.bankAccountNumber ?? "",
+            p.presentDays ?? p.workingDays ?? 0, p.overtimeHrs ?? 0,
+            Math.round(p.basicSalary), Math.round(p.da), Math.round(p.hra),
+            Math.round(p.conveyance), Math.round(p.washing),
+            Math.round(p.lwwEarned), Math.round(p.bonus), "",
+            Math.round(p.basicSalary), Math.round(p.da), Math.round(p.hra),
+            Math.round(p.conveyance), Math.round(p.washing),
+            Math.round(p.lwwEarned), Math.round(p.bonus),
+            Math.round(p.overtimePay), Math.round(p.grossSalary),
+            Math.round(p.pfEmployee), Math.round(p.esiEmployee),
+            Math.round(p.pt), Math.round(p.lwf), Math.round(p.canteen),
+            Math.round(p.otherDeductions), Math.round(p.advance),
+            Math.round(p.totalDeductions), Math.round(p.netSalary), "",
+        ])
+        const sum = (fn: (p: Payroll) => number) => Math.round(rows.reduce((s, p) => s + fn(p), 0))
+        const totRow = [
+            "", "", "TOTAL", "", "",
+            sum(p => p.presentDays ?? p.workingDays ?? 0), "",
+            ...Array(8).fill(""),
+            sum(p => p.basicSalary), sum(p => p.da), sum(p => p.hra),
+            sum(p => p.conveyance), sum(p => p.washing),
+            sum(p => p.lwwEarned), sum(p => p.bonus),
+            sum(p => p.overtimePay), sum(p => p.grossSalary),
+            sum(p => p.pfEmployee), sum(p => p.esiEmployee),
+            sum(p => p.pt), sum(p => p.lwf), sum(p => p.canteen),
+            sum(p => p.otherDeductions), sum(p => p.advance),
+            sum(p => p.totalDeductions), sum(p => p.netSalary), "",
+        ]
+        return [
+            [`FORM (II) M.W. RULES Rule (27)(1)`],
+            [`SALARIES / WAGES REGISTER FOR THE MONTH OF ${monthName} ${y}`],
+            [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", "", "",
+             "PF CODE: PUPUN2450654000", "", "", "ESIC CODE: 33000891430000999"],
+            headers,
+            ...dataRows,
+            totRow,
+        ]
+    }
+
+    const handleExportCombined = async () => {
+        if (!selectedSiteIds.size) return
+        setDlCombined(true)
+        try {
+            const wb = XLSX.utils.book_new()
+            const m = parseInt(month); const y = parseInt(year)
+            let sheetsAdded = 0
+            for (const siteId of selectedSiteIds) {
+                const site = sites.find(s => s.id === siteId)
+                const r = await fetch(`/api/payroll?siteId=${siteId}&month=${month}&year=${year}`)
+                if (!r.ok) continue
+                const rows: Payroll[] = await r.json()
+                if (!rows.length) continue
+                const aoa = buildFormIIAoa(rows, site?.name ?? siteId, m, y)
+                const ws = XLSX.utils.aoa_to_sheet(aoa)
+                const colWidths = [6,12,26,14,18,10,8, 10,8,8,10,10,10,10,4, 10,8,8,14,12,10,10, 10,14, 8,8,6,6,8,10,10,12,10,12]
+                ws["!cols"] = colWidths.map(w => ({ wch: w }))
+                const sheetName = (site?.name ?? siteId).replace(/[^a-zA-Z0-9 ]/g, "").trim().slice(0, 31) || `Site${sheetsAdded+1}`
+                XLSX.utils.book_append_sheet(wb, ws, sheetName)
+                sheetsAdded++
+            }
+            if (!sheetsAdded) { toast.error("No payroll data found for selected sites"); return }
+            XLSX.writeFile(wb, `FormII_Combined_${MONTHS[m-1]}_${y}.xlsx`)
+            toast.success(`Downloaded Form II for ${sheetsAdded} site(s)`)
+        } catch { toast.error("Download failed") }
+        finally { setDlCombined(false) }
     }
 
     const handleNEFT = () => {
@@ -300,44 +381,26 @@ function WageSheetInner() {
         <script>window.onload=()=>{window.print();}<\/script>
         </body></html>`
 
-        const w = window.open("", "_blank")
-        if (w) { w.document.write(html); w.document.close() }
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        const w = window.open(url, "_blank")
+        if (!w) toast.error("Popup blocked — please allow popups for this site and try again")
+        setTimeout(() => URL.revokeObjectURL(url), 60000)
     }
 
     const handleExport = () => {
         const exportRows = selectedIds.size > 0 ? data.filter(p => selectedIds.has(p.id)) : data
         if (!exportRows.length) return
-        const rows = exportRows.map((p, i) => ({
-            "SL": i + 1,
-            "Emp ID": p.employee.employeeId,
-            "Name": `${p.employee.firstName} ${p.employee.lastName}`,
-            "Designation": p.employee.designation ?? "",
-            "Work Days": p.workingDays ?? 0,
-            "Present Days": p.presentDays ?? 0,
-            "Basic (₹)": Math.round(p.basicSalary),
-            "DA (₹)": Math.round(p.da),
-            "Washing (₹)": Math.round(p.washing),
-            "Conveyance (₹)": Math.round(p.conveyance),
-            "OT Pay (₹)": Math.round(p.overtimePay),
-            "Gross (₹)": Math.round(p.grossSalary),
-            "PF Employee (₹)": Math.round(p.pfEmployee),
-            "ESI Employee (₹)": Math.round(p.esiEmployee),
-            "PT (₹)": Math.round(p.pt),
-            "LWF (₹)": Math.round(p.lwf),
-            "Canteen (₹)": Math.round(p.canteen),
-            "Penalty (₹)": Math.round(p.penalty),
-            "Advance (₹)": Math.round(p.advance),
-            "Other Deductions (₹)": Math.round(p.otherDeductions),
-            "Total Deductions (₹)": Math.round(p.totalDeductions),
-            "Net Pay (₹)": Math.round(p.netSalary),
-            "Status": p.status,
-        }))
-        const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.json_to_sheet(rows)
-        ws["!cols"] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }))
         const site = sites.find(s => s.id === selId)
-        XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
-        XLSX.writeFile(wb, `WageSheet_${site?.name ?? "Site"}_${MONTHS[parseInt(month)-1]}_${year}.xlsx`)
+        const m = parseInt(month); const y = parseInt(year)
+        const aoa = buildFormIIAoa(exportRows, site?.name ?? "All Sites", m, y)
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet(aoa)
+        const colWidths = [6,12,26,14,18,10,8, 10,8,8,10,10,10,10,4, 10,8,8,14,12,10,10, 10,14, 8,8,6,6,8,10,10,12,10,12]
+        ws["!cols"] = colWidths.map(w => ({ wch: w }))
+        const sheetName = (site?.name ?? "All Sites").replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 31)
+        XLSX.utils.book_append_sheet(wb, ws, sheetName)
+        XLSX.writeFile(wb, `FormII_WageSheet_${site?.name ?? "All"}_${MONTHS[m-1]}_${y}.xlsx`)
     }
 
     const selectedCount = selectedIds.size
@@ -458,19 +521,27 @@ function WageSheetInner() {
                             </>
                         )}
                     </div>
-                    {/* Lock selected sites footer */}
+                    {/* Multi-site action footer */}
                     {selectedSiteIds.size > 0 && (
                         <div style={{ padding: "10px 14px", borderTop: "2px solid #7c3aed", background: "#f5f3ff" }}>
                             <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700, marginBottom: 8 }}>
                                 {selectedSiteIds.size} site{selectedSiteIds.size > 1 ? "s" : ""} selected
                             </div>
+                            <button onClick={handleExportCombined} disabled={dlCombined}
+                                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                    padding: "7px 12px", borderRadius: 8, border: "1px solid #7c3aed",
+                                    background: "#fff", color: "#7c3aed",
+                                    fontSize: 12, fontWeight: 700, cursor: dlCombined ? "not-allowed" : "pointer", marginBottom: 6 }}>
+                                {dlCombined ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
+                                {dlCombined ? "Downloading…" : "Download Form II (Combined)"}
+                            </button>
                             <button onClick={handleLockSites} disabled={lockingSites}
                                 style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                                     padding: "8px 12px", borderRadius: 8, border: "none",
                                     background: lockingSites ? "#a78bfa" : "#7c3aed", color: "#fff",
                                     fontSize: 12, fontWeight: 700, cursor: lockingSites ? "not-allowed" : "pointer" }}>
                                 {lockingSites ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
-                                {lockingSites ? "Locking…" : "Lock & Send to Compliance"}
+                                {lockingSites ? "Locking…" : "Lock & Go to Compliance"}
                             </button>
                         </div>
                     )}
@@ -551,7 +622,7 @@ function WageSheetInner() {
                                         <button onClick={handleExport} disabled={!data.length}
                                             style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
                                             <FileSpreadsheet size={13} />
-                                            {selectedCount > 0 ? `Download (${selectedCount} selected)` : "Download Excel"}
+                                            {selectedCount > 0 ? `Form II (${selectedCount} selected)` : "Form II Excel"}
                                         </button>
                                     )}
                                     {activeView === "neft" && (
