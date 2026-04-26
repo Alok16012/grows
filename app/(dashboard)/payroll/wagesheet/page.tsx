@@ -382,15 +382,13 @@ function WageSheetInner() {
 
         const iframe = document.createElement("iframe")
         iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none"
-        document.body.appendChild(iframe)
-        const doc = iframe.contentDocument || iframe.contentWindow?.document
-        if (!doc) { toast.error("Could not generate PDF"); document.body.removeChild(iframe); return }
-        doc.open(); doc.write(html); doc.close()
-        iframe.contentWindow?.focus()
-        setTimeout(() => {
+        iframe.srcdoc = html
+        iframe.onload = () => {
+            iframe.contentWindow?.focus()
             iframe.contentWindow?.print()
             setTimeout(() => document.body.removeChild(iframe), 3000)
-        }, 500)
+        }
+        document.body.appendChild(iframe)
     }
 
     const handleExport = () => {

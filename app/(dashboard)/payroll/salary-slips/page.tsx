@@ -193,19 +193,23 @@ function SalarySlipsInner() {
 </div>`
     }
 
-    const printSlip = (p: PayrollRecord) => {
-        const w = window.open("", "_blank")
-        if (!w) return
-        w.document.write(slipPageHTML([p]))
-        w.document.close()
+    const printViaIframe = (html: string) => {
+        const iframe = document.createElement("iframe")
+        iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none"
+        iframe.srcdoc = html
+        iframe.onload = () => {
+            iframe.contentWindow?.focus()
+            iframe.contentWindow?.print()
+            setTimeout(() => document.body.removeChild(iframe), 3000)
+        }
+        document.body.appendChild(iframe)
     }
+
+    const printSlip = (p: PayrollRecord) => printViaIframe(slipPageHTML([p]))
 
     const printAllSlips = () => {
         if (!filtered.length) return
-        const w = window.open("", "_blank")
-        if (!w) return
-        w.document.write(slipPageHTML(filtered))
-        w.document.close()
+        printViaIframe(slipPageHTML(filtered))
     }
 
     const slipPageHTML = (records: PayrollRecord[]) => `<!DOCTYPE html><html><head>
