@@ -45,7 +45,8 @@ import {
     BookOpen,
     Files,
     IndianRupee,
-    TableProperties
+    TableProperties,
+    BadgeCheck
 } from "lucide-react"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
@@ -141,6 +142,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Exit", href: "/exit", icon: LogOut, roles: ["ADMIN", "MANAGER"] },
                 { name: "LMS", href: "/lms", icon: GraduationCap, roles: ["ADMIN", "MANAGER"], permission: "lms.manage" },
                 { name: "My Learning", href: "/lms/learn", icon: GraduationCap, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"], permission: "lms.view" },
+                { name: "My Onboarding", href: "/self-onboarding", icon: BadgeCheck, roles: ["INSPECTION_BOY"] },
                 { name: "My Profile", href: "/profile", icon: UserCheck, roles: ["INSPECTION_BOY"] },
             ]
         },
