@@ -378,14 +378,19 @@ function WageSheetInner() {
             <div class="footer-note">This is a computer generated statement. No signature required.<br/>HDFC Bank Ltd. — Payroll File Transactions</div>
             <div class="footer-total">Total Payable: ₹${totalAmt.toLocaleString("en-IN")}</div>
         </div>
-        <script>window.onload=()=>{window.print();}<\/script>
         </body></html>`
 
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" })
-        const url = URL.createObjectURL(blob)
-        const w = window.open(url, "_blank")
-        if (!w) toast.error("Popup blocked — please allow popups for this site and try again")
-        setTimeout(() => URL.revokeObjectURL(url), 60000)
+        const iframe = document.createElement("iframe")
+        iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none"
+        document.body.appendChild(iframe)
+        const doc = iframe.contentDocument || iframe.contentWindow?.document
+        if (!doc) { toast.error("Could not generate PDF"); document.body.removeChild(iframe); return }
+        doc.open(); doc.write(html); doc.close()
+        iframe.contentWindow?.focus()
+        setTimeout(() => {
+            iframe.contentWindow?.print()
+            setTimeout(() => document.body.removeChild(iframe), 3000)
+        }, 500)
     }
 
     const handleExport = () => {
