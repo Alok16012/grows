@@ -3,6 +3,7 @@ import { Suspense, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2, Search, Printer, CheckCircle2, RefreshCw, ChevronRight, MapPin, Building2, Clock, FileText, IndianRupee } from "lucide-react"
+import { printHTML } from "@/lib/print-html"
 
 const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
@@ -193,23 +194,11 @@ function SalarySlipsInner() {
 </div>`
     }
 
-    const printViaIframe = (html: string) => {
-        const iframe = document.createElement("iframe")
-        iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none"
-        iframe.srcdoc = html
-        iframe.onload = () => {
-            iframe.contentWindow?.focus()
-            iframe.contentWindow?.print()
-            setTimeout(() => document.body.removeChild(iframe), 3000)
-        }
-        document.body.appendChild(iframe)
-    }
-
-    const printSlip = (p: PayrollRecord) => printViaIframe(slipPageHTML([p]))
+    const printSlip = (p: PayrollRecord) => printHTML(slipPageHTML([p]))
 
     const printAllSlips = () => {
         if (!filtered.length) return
-        printViaIframe(slipPageHTML(filtered))
+        printHTML(slipPageHTML(filtered))
     }
 
     const slipPageHTML = (records: PayrollRecord[]) => `<!DOCTYPE html><html><head>

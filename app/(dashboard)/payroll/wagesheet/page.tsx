@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet, FileDown, Lock } from "lucide-react"
 import * as XLSX from "xlsx"
+import { printHTML } from "@/lib/print-html"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
@@ -380,15 +381,7 @@ function WageSheetInner() {
         </div>
         </body></html>`
 
-        const iframe = document.createElement("iframe")
-        iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none"
-        iframe.srcdoc = html
-        iframe.onload = () => {
-            iframe.contentWindow?.focus()
-            iframe.contentWindow?.print()
-            setTimeout(() => document.body.removeChild(iframe), 3000)
-        }
-        document.body.appendChild(iframe)
+        printHTML(html)
     }
 
     const handleExport = () => {
