@@ -311,6 +311,8 @@ function EmployeeModal({
     const sites = allSites
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents">("personal")
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
+    // Track employee ID created during this modal session (for mid-form saves)
+    const [draftEmpId, setDraftEmpId] = useState<string | null>(null)
     // Pending documents to upload after employee creation
     type PendingDoc = { type: string; fileName: string; fileUrl: string }
     type ExistingDoc = { id: string; type: string; fileName: string; fileUrl: string; status: string; uploadedAt: string }
@@ -348,6 +350,7 @@ function EmployeeModal({
         if (!open) return
         setActiveTab("personal")
         setSameAsCurrent(false)
+        setDraftEmpId(null)   // Reset draft ID each time the modal opens fresh
         if (employee) {
             setForm({
                 firstName: employee.firstName,
@@ -436,16 +439,18 @@ function EmployeeModal({
     const set = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setForm(f => ({ ...f, [key]: e.target.value }))
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    // Core save logic — keepOpen=true saves and stays on current tab; keepOpen=false closes modal
+    const doSave = async (keepOpen: boolean) => {
         if (!form.firstName.trim()) {
             toast.error("First name is required")
             return
         }
         setLoading(true)
         try {
-            const url = employee ? `/api/employees/${employee.id}` : "/api/employees"
-            const method = employee ? "PUT" : "POST"
+            // Use draftEmpId if employee was created earlier in this modal session
+            const existingId = employee?.id || draftEmpId
+            const url    = existingId ? `/api/employees/${existingId}` : "/api/employees"
+            const method = existingId ? "PUT" : "POST"
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
@@ -456,7 +461,10 @@ function EmployeeModal({
             })
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
-            const empId = data.id || employee?.id
+            const empId = data.id || existingId
+
+            // Remember the created ID for next saves within this session
+            if (!draftEmpId && empId) setDraftEmpId(empId)
 
             // Save salary structure if basic salary is filled
             if (empId && form.basicSalary) {
@@ -501,7 +509,6 @@ function EmployeeModal({
                     const currentDeployment = employee?.deployments?.[0]
                     const currentSiteId = currentDeployment?.site?.id
                     if (currentSiteId !== form.siteId) {
-                        // Relieve existing deployment before creating a new one
                         if (currentDeployment?.id) {
                             await fetch(`/api/deployments/${currentDeployment.id}`, {
                                 method: "PUT",
@@ -525,17 +532,28 @@ function EmployeeModal({
             }
 
             onSaved()
-            if (!employee && data._userCreated) {
-                setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
+
+            if (keepOpen) {
+                // Stay on current tab — just show a toast
+                toast.success("Saved! You can continue filling remaining sections.")
             } else {
-                toast.success(employee ? "Employee updated!" : "Employee added!")
-                onClose()
+                if (!existingId && data._userCreated) {
+                    setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
+                } else {
+                    toast.success(employee ? "Employee updated!" : "Employee added!")
+                    onClose()
+                }
             }
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : "Failed to save")
         } finally {
             setLoading(false)
         }
+    }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        await doSave(false)
     }
 
     if (!open) return null
@@ -831,6 +849,24 @@ function EmployeeModal({
                                             <label className={labelCls}>Other Allowance (₹)</label>
                                             <input type="number" value={form.salOtherAllowance} onChange={set("salOtherAllowance")} className={inputCls} placeholder="0" min="0" />
                                         </div>
+                                        {/* Bonus — auto-calculated, read-only display */}
+                                        <div>
+                                            <label className={labelCls} style={{ color: "#6366f1" }}>
+                                                Bonus — Auto (8.33% of Basic+DA)
+                                            </label>
+                                            <div style={{
+                                                padding: "7px 10px", borderRadius: 8,
+                                                border: "1px dashed #a5b4fc",
+                                                background: "#eef2ff",
+                                                fontSize: 13, fontWeight: 600, color: "#4338ca",
+                                                display: "flex", alignItems: "center", justifyContent: "space-between",
+                                            }}>
+                                                <span style={{ fontSize: 10, color: "#818cf8", fontWeight: 400 }}>Auto-calculated</span>
+                                                <span>
+                                                    ₹{Math.round(((Number(form.basicSalary) || 0) + (Number(form.salDA) || 0)) * 0.0833).toLocaleString("en-IN")}
+                                                </span>
+                                            </div>
+                                        </div>
                                         <div>
                                             <label className={labelCls}>OT Rate / Hour (₹)</label>
                                             <input type="number" value={form.salOtRatePerHour} onChange={set("salOtRatePerHour")} className={inputCls} placeholder="170" min="0" />
@@ -846,37 +882,42 @@ function EmployeeModal({
                             {/* Live Salary Breakdown */}
                             {(() => {
                                 const basic   = Number(form.basicSalary) || 0
-                                const da      = Number(form.salDA) || 0
-                                const wash    = Number(form.salWashing) || 0
-                                const conv    = Number(form.salConveyance) || 0
-                                const lww     = Number(form.salLeaveWithWages) || 0
-                                const other   = Number(form.salOtherAllowance) || 0
+                                const isCALL  = form.salComplianceType === "CALL"
+                                // CALL = contract worker: only Basic, everything else is 0
+                                const da      = isCALL ? 0 : (Number(form.salDA) || 0)
+                                const wash    = isCALL ? 0 : (Number(form.salWashing) || 0)
+                                const conv    = isCALL ? 0 : (Number(form.salConveyance) || 0)
+                                const lww     = isCALL ? 0 : (Number(form.salLeaveWithWages) || 0)
+                                const other   = isCALL ? 0 : (Number(form.salOtherAllowance) || 0)
+                                const hra     = isCALL ? 0 : Math.round((basic + da) * 0.05)
+                                const bonus   = isCALL ? 0 : Math.round((basic + da) * 0.0833)
                                 const otRate  = Number(form.salOtRatePerHour) || 170
                                 const canteen = Number(form.salCanteenRatePerDay) || 55
-                                const hra     = Math.round((basic + da) * 0.05)
-                                const bonus   = Math.round(7000 / 12)
                                 const gross   = basic + da + hra + wash + conv + lww + bonus + other
-                                const isCALL  = form.salComplianceType === "CALL"
-                                const empPF   = isCALL ? 0 : 1950
-                                const taxable = gross - wash - bonus
-                                const empESI  = (!isCALL && taxable <= 21000) ? Math.ceil(taxable * 0.0325) : 0
-                                const ctc     = gross + empPF + empESI
+                                const empPF   = 0
+                                const empESI  = 0
+                                const ctc     = gross  // CALL: no employer PF/ESI
                                 const fmt     = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
                                 if (!basic) return null
                                 return (
-                                    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px", marginTop: 4 }}>
-                                        <p style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 10px 0" }}>Live Salary Breakdown</p>
+                                    <div style={{ background: "#f8fafc", border: `1px solid ${isCALL ? "#fed7aa" : "#e2e8f0"}`, borderRadius: 10, padding: "12px 14px", marginTop: 4 }}>
+                                        <p style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 6px 0" }}>Live Salary Breakdown</p>
+                                        {isCALL && (
+                                            <p style={{ fontSize: 10, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "4px 8px", margin: "0 0 8px 0", fontWeight: 600 }}>
+                                                CALL contract — only Basic salary, no PF / ESIC / HRA / allowances
+                                            </p>
+                                        )}
                                         {/* Earnings grid */}
                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px 12px" }}>
                                             {[
                                                 { label: "Basic",       value: fmt(basic),  color: "#1d4ed8" },
-                                                { label: "DA",          value: fmt(da),     color: "#1d4ed8" },
-                                                { label: "HRA (auto)",  value: fmt(hra),    color: "#6366f1" },
-                                                { label: "Washing",     value: fmt(wash),   color: "#1d4ed8" },
-                                                { label: "Conv.",       value: fmt(conv),   color: "#1d4ed8" },
-                                                { label: "LWW",         value: fmt(lww),    color: "#1d4ed8" },
-                                                { label: "Bonus (auto)",value: fmt(bonus),  color: "#6366f1" },
-                                                { label: "Other",       value: fmt(other),  color: "#1d4ed8" },
+                                                { label: "DA",          value: isCALL ? "—" : fmt(da),     color: isCALL ? "#cbd5e1" : "#1d4ed8" },
+                                                { label: "HRA (auto)",  value: isCALL ? "—" : fmt(hra),    color: isCALL ? "#cbd5e1" : "#6366f1" },
+                                                { label: "Washing",     value: isCALL ? "—" : fmt(wash),   color: isCALL ? "#cbd5e1" : "#1d4ed8" },
+                                                { label: "Conv.",       value: isCALL ? "—" : fmt(conv),   color: isCALL ? "#cbd5e1" : "#1d4ed8" },
+                                                { label: "LWW",         value: isCALL ? "—" : fmt(lww),    color: isCALL ? "#cbd5e1" : "#1d4ed8" },
+                                                { label: "Bonus (auto)",value: isCALL ? "—" : fmt(bonus),  color: isCALL ? "#cbd5e1" : "#6366f1" },
+                                                { label: "Other",       value: isCALL ? "—" : fmt(other),  color: isCALL ? "#cbd5e1" : "#1d4ed8" },
                                                 { label: "OT Rate/Hr",  value: fmt(otRate), color: "#64748b" },
                                                 { label: "Canteen/Day", value: fmt(canteen),color: "#64748b" },
                                             ].map(r => (
@@ -895,18 +936,18 @@ function EmployeeModal({
                                             </div>
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                 <span style={{ fontSize: 10, color: "#94a3b8" }}>Co.PF</span>
-                                                <span style={{ fontSize: 11, fontWeight: 700, color: isCALL ? "#94a3b8" : "#dc2626" }}>{isCALL ? "N/A" : fmt(empPF)}</span>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8" }}>N/A</span>
                                             </div>
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                 <span style={{ fontSize: 10, color: "#94a3b8" }}>Co.ESIC</span>
-                                                <span style={{ fontSize: 11, fontWeight: 700, color: empESI === 0 ? "#94a3b8" : "#dc2626" }}>{isCALL ? "N/A" : fmt(empESI)}</span>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8" }}>N/A</span>
                                             </div>
                                         </div>
                                         {/* CTC row */}
                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-                                            <div style={{ background: "#dcfce7", borderRadius: 7, padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                <span style={{ fontSize: 10, fontWeight: 700, color: "#15803d" }}>CTC / Month</span>
-                                                <span style={{ fontSize: 13, fontWeight: 800, color: "#15803d" }}>{fmt(ctc)}</span>
+                                            <div style={{ background: isCALL ? "#fff7ed" : "#dcfce7", borderRadius: 7, padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <span style={{ fontSize: 10, fontWeight: 700, color: isCALL ? "#c2410c" : "#15803d" }}>CTC / Month</span>
+                                                <span style={{ fontSize: 13, fontWeight: 800, color: isCALL ? "#c2410c" : "#15803d" }}>{fmt(ctc)}</span>
                                             </div>
                                             <div style={{ background: "#eff6ff", borderRadius: 7, padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                 <span style={{ fontSize: 10, fontWeight: 700, color: "#1d4ed8" }}>CTC / Year</span>
@@ -1214,7 +1255,18 @@ function EmployeeModal({
                         <button onClick={onClose} type="button" className="px-4 py-2 text-[13px] font-medium text-[var(--text2)] hover:text-[var(--text)] rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
                             Cancel
                         </button>
-                        {activeTab !== "documents" ? (
+                        {/* Save button — visible on every tab */}
+                        <button
+                            type="button"
+                            onClick={() => doSave(activeTab !== "documents")}
+                            disabled={loading}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 border border-[var(--accent)] text-[var(--accent)] rounded-[8px] text-[13px] font-medium hover:bg-[var(--accent)]/10 transition-colors disabled:opacity-50"
+                        >
+                            {loading && <Loader2 size={13} className="animate-spin" />}
+                            {activeTab === "documents" ? (employee || draftEmpId ? "Save Changes" : "Add Employee") : "Save"}
+                        </button>
+                        {/* Next button — only on non-last tabs */}
+                        {activeTab !== "documents" && (
                             <button
                                 type="button"
                                 onClick={() => {
@@ -1224,16 +1276,7 @@ function EmployeeModal({
                                 }}
                                 className="inline-flex items-center gap-2 px-5 py-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 transition-opacity"
                             >
-                                Next
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleSubmit}
-                                disabled={loading}
-                                className="inline-flex items-center gap-2 px-5 py-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                            >
-                                {loading && <Loader2 size={14} className="animate-spin" />}
-                                {employee ? "Save Changes" : "Add Employee"}
+                                Next →
                             </button>
                         )}
                     </div>
@@ -1697,26 +1740,45 @@ function EmployeeDrawer({
                                                             className="w-full h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                                                     </div>
                                                 ))}
+                                                {/* Bonus auto display */}
+                                                <div>
+                                                    <label className="block text-[11px] mb-1" style={{ color: "#6366f1" }}>Bonus — Auto (8.33%)</label>
+                                                    <div className="w-full h-8 px-2.5 rounded-[6px] text-[13px] font-semibold flex items-center justify-between"
+                                                        style={{ border: "1px dashed #a5b4fc", background: "#eef2ff", color: "#4338ca" }}>
+                                                        <span style={{ fontSize: 10, color: "#818cf8", fontWeight: 400 }}>Auto</span>
+                                                        <span>₹{Math.round((salaryForm.basic + salaryForm.da) * 0.0833).toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                </div>
                                             </>
                                         )}
                                     </div>
                                     {/* Live CTC preview */}
                                     {(() => {
                                         const sf = salaryForm
-                                        const hra = (sf.basic + sf.da) * 0.05
-                                        const gross = sf.basic + sf.da + hra + sf.washing + sf.conveyance + sf.leaveWithWages + (7000/12) + sf.otherAllowance
                                         const isC = sf.complianceType === "CALL"
-                                        const pf = isC ? 0 : Math.round(15000 * 0.13)
-                                        const esic = (isC || gross > 21000) ? 0 : Math.ceil((gross - sf.washing - 7000/12) * 0.0325)
-                                        const ctc = gross + pf + esic
+                                        // CALL = contract: only Basic, everything else zero
+                                        const da    = isC ? 0 : sf.da
+                                        const wash  = isC ? 0 : sf.washing
+                                        const conv  = isC ? 0 : sf.conveyance
+                                        const lww   = isC ? 0 : sf.leaveWithWages
+                                        const other = isC ? 0 : sf.otherAllowance
+                                        const hra   = isC ? 0 : (sf.basic + da) * 0.05
+                                        const bonus = isC ? 0 : (sf.basic + da) * 0.0833
+                                        const gross = sf.basic + da + hra + wash + conv + lww + bonus + other
+                                        const pf    = 0
+                                        const esic  = 0
+                                        const ctc   = gross
                                         return (
-                                            <div className="bg-[#f0fdf4] border border-emerald-200 rounded-[8px] p-3 space-y-1 text-[12px]">
-                                                <div className="flex justify-between"><span className="text-[var(--text3)]">HRA (5%)</span><span>₹{Math.round(hra).toLocaleString("en-IN")}</span></div>
-                                                <div className="flex justify-between"><span className="text-[var(--text3)]">Bonus (₹7000/12)</span><span>₹{Math.round(7000/12).toLocaleString("en-IN")}</span></div>
+                                            <div className={`border rounded-[8px] p-3 space-y-1 text-[12px] ${isC ? "bg-amber-50 border-amber-200" : "bg-[#f0fdf4] border-emerald-200"}`}>
+                                                {isC && <div className="text-[11px] font-semibold text-amber-700 pb-1">CALL contract — Basic only, no allowances or PF/ESIC</div>}
+                                                {!isC && <>
+                                                    <div className="flex justify-between"><span className="text-[var(--text3)]">HRA (5%)</span><span>₹{Math.round(hra).toLocaleString("en-IN")}</span></div>
+                                                    <div className="flex justify-between"><span className="text-[var(--text3)]">Bonus (8.33%)</span><span>₹{Math.round(bonus).toLocaleString("en-IN")}</span></div>
+                                                </>}
                                                 <div className="flex justify-between font-medium"><span>Full Gross</span><span>₹{Math.round(gross).toLocaleString("en-IN")}</span></div>
-                                                <div className="flex justify-between text-[var(--text3)]"><span>Employer PF</span><span>₹{pf.toLocaleString("en-IN")}</span></div>
-                                                <div className="flex justify-between text-[var(--text3)]"><span>Employer ESIC</span><span>₹{esic.toLocaleString("en-IN")}</span></div>
-                                                <div className="flex justify-between font-bold text-purple-700 border-t border-emerald-200 pt-1"><span>CTC / Month</span><span>₹{Math.round(ctc).toLocaleString("en-IN")}</span></div>
+                                                <div className="flex justify-between text-[var(--text3)]"><span>Employer PF</span><span>{isC ? "N/A" : `₹${pf.toLocaleString("en-IN")}`}</span></div>
+                                                <div className="flex justify-between text-[var(--text3)]"><span>Employer ESIC</span><span>{isC ? "N/A" : `₹${esic.toLocaleString("en-IN")}`}</span></div>
+                                                <div className={`flex justify-between font-bold border-t pt-1 ${isC ? "text-amber-700 border-amber-200" : "text-purple-700 border-emerald-200"}`}><span>CTC / Month</span><span>₹{Math.round(ctc).toLocaleString("en-IN")}</span></div>
                                             </div>
                                         )
                                     })()}
@@ -1754,14 +1816,20 @@ function EmployeeDrawer({
                                     </div>
                                     {salaryData && (() => {
                                         const s = salaryData
-                                        const hra = (s.basic + s.da) * 0.05
-                                        const gross = s.basic + s.da + hra + s.washing + s.conveyance + s.leaveWithWages + (7000/12) + s.otherAllowance
                                         const isC = s.complianceType === "CALL"
-                                        const ctc = gross + (isC ? 0 : Math.round(15000 * 0.13)) + ((isC || gross > 21000) ? 0 : Math.ceil((gross - s.washing - 7000/12) * 0.0325))
+                                        const da    = isC ? 0 : s.da
+                                        const wash  = isC ? 0 : s.washing
+                                        const conv  = isC ? 0 : s.conveyance
+                                        const lww   = isC ? 0 : s.leaveWithWages
+                                        const other = isC ? 0 : s.otherAllowance
+                                        const hra   = isC ? 0 : (s.basic + da) * 0.05
+                                        const bonus = isC ? 0 : (s.basic + da) * 0.0833
+                                        const gross = s.basic + da + hra + wash + conv + lww + bonus + other
+                                        const ctc   = gross  // CALL: no employer contributions
                                         return (
-                                            <div className="bg-[#f5f3ff] border border-purple-200 rounded-[8px] p-3 flex justify-between items-center">
-                                                <span className="text-[12px] text-purple-700 font-medium">CTC / Month</span>
-                                                <span className="text-[16px] font-bold text-purple-700">₹{Math.round(ctc).toLocaleString("en-IN")}</span>
+                                            <div className={`border rounded-[8px] p-3 flex justify-between items-center ${isC ? "bg-amber-50 border-amber-200" : "bg-[#f5f3ff] border-purple-200"}`}>
+                                                <span className={`text-[12px] font-medium ${isC ? "text-amber-700" : "text-purple-700"}`}>CTC / Month</span>
+                                                <span className={`text-[16px] font-bold ${isC ? "text-amber-700" : "text-purple-700"}`}>₹{Math.round(ctc).toLocaleString("en-IN")}</span>
                                             </div>
                                         )
                                     })()}
@@ -2210,8 +2278,9 @@ export default function EmployeesPage() {
             "Date Of Leaving", "Department", "Site",
             // ── Salary ────────────────────────────────────────────────────────
             "Basic Salary", "DA", "Washing Allowance", "Conveyance Allowance",
-            "Leave With Wages", "Other Allowance", "OT Rate Per Hour",
-            "Canteen Rate Per Day", "Compliance Type",
+            "Leave With Wages", "Other Allowance",
+            "Bonus (Auto - Do Not Edit)",
+            "OT Rate Per Hour", "Canteen Rate Per Day", "Compliance Type",
             // ── Personal ──────────────────────────────────────────────────────
             "Name As Per Aadhar", "Date Of Birth", "Gender", "Blood Group",
             "Marital Status", "Nationality", "Religion", "Caste",
@@ -2236,8 +2305,8 @@ export default function EmployeesPage() {
             "Security Guard", "Full-time", "ACTIVE", "2024-01-15",
             "", "Security", "Site Name Here",
             "12000", "1000", "500", "500",
-            "0", "0", "170",
-            "55", "OR",
+            "0", "0", "1088",
+            "170", "55", "OR",
             "", "1990-05-20", "Male", "O+",
             "Single", "Indian", "Hindu", "General",
             "123 MG Road", "Mumbai", "Maharashtra", "400001",
@@ -2272,6 +2341,7 @@ export default function EmployeesPage() {
             ["Conveyance Allowance","No",  "Number",                               "500"],
             ["Leave With Wages",   "No",   "Number",                               "0"],
             ["Other Allowance",    "No",   "Number",                               "0"],
+            ["Bonus (Auto)",       "No",   "AUTO — (Basic+DA)×8.33%. Do NOT edit. System ignores this column.", "1088"],
             ["OT Rate Per Hour",   "No",   "Number (default 170)",                 "170"],
             ["Canteen Rate Per Day","No",  "Number (default 55)",                  "55"],
             ["Compliance Type",    "No",   "OR (full PF/ESI) / CALL (no PF/ESI)", "OR"],
@@ -2583,6 +2653,7 @@ export default function EmployeesPage() {
                                 <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Employee</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Department</th>
+                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Site</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Type</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Phone</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Joined</th>
@@ -2619,6 +2690,15 @@ export default function EmployeesPage() {
                                                 {emp.department ? (
                                                     <span className="px-2 py-0.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] text-[12px] text-[var(--text2)] font-medium">
                                                         {emp.department.name}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[13px] text-[var(--text3)]">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {emp.deployments?.[0]?.site ? (
+                                                    <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded-[6px] text-[12px] text-blue-700 font-medium whitespace-nowrap">
+                                                        {emp.deployments[0].site.name}
                                                     </span>
                                                 ) : (
                                                     <span className="text-[13px] text-[var(--text3)]">—</span>

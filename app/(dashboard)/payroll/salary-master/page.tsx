@@ -11,6 +11,13 @@ import {
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 
+// PT slab — Maharashtra (standard month, not February)
+function calcPT(gross: number): number {
+    if (gross > 10000) return 200
+    if (gross >= 7500) return 175
+    return 0
+}
+
 // Derived calculations (full-month preview — no proration)
 function calc(s: SalaryRow) {
     const basic  = s.basic || 0
@@ -19,17 +26,26 @@ function calc(s: SalaryRow) {
     const conv   = s.conveyance || 0
     const lww    = s.leaveWithWages || 0
     const other  = s.otherAllowance || 0
-    const bonus  = s.bonus || 0
-    const hra    = Math.round((basic + da) * 0.05)
-    const gross  = basic + da + hra + wash + conv + lww + bonus + other
     const isCALL = s.complianceType === "CALL"
+    // Bonus = 8.33% of (Basic+DA) — statutory formula; CALL = ₹0
+    const bonus  = isCALL ? 0 : Math.round((basic + da) * 0.0833)
+    const hra    = isCALL ? 0 : Math.round((basic + da) * 0.05)
+    const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
     const empPF  = isCALL ? 0 : 1950
     // ESIC employer applies only if full-month gross ≤ ₹21,000
     const empESI = (!isCALL && gross <= 21000)
         ? Math.ceil((gross - wash - bonus) * 0.0325)
         : 0
+    // Employee deductions
+    const empPFDed = isCALL ? 0 : Math.min(Math.round((basic + da) * 0.12), 1800)
+    const empESIDed = (!isCALL && gross <= 21000)
+        ? Math.ceil((gross - wash - bonus) * 0.0075)
+        : 0
+    const pt     = isCALL ? 0 : calcPT(gross)
+    const totalDed = empPFDed + empESIDed + pt
+    const netSalary = gross - totalDed
     const ctc    = gross + empPF + empESI
-    return { hra, bonus, gross, empPF, empESI, ctc }
+    return { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc }
 }
 
 type SalaryRow = {
@@ -62,6 +78,7 @@ export default function SalaryMasterPage() {
     const [saving,     setSaving]     = useState(false)
     const [uploading,  setUploading]  = useState(false)
     const [filterNone, setFilterNone] = useState(false)
+    const [filterSite, setFilterSite] = useState("")
     // Quick-change compliance type without entering full edit mode
     const [typeOverride, setTypeOverride] = useState<Record<string, string>>({})
     const [savingType,   setSavingType]   = useState<string | null>(null)
@@ -79,11 +96,13 @@ export default function SalaryMasterPage() {
 
     const startEdit = (emp: EmpSalary) => {
         const s = emp.employeeSalary
+        const compType = s?.complianceType ?? "OR"
         setEditForm(s ? {
             basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
-            leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? 583,
+            leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+            bonus: 0, // bonus auto-calculated from basic+da at payroll time
             otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
-            complianceType: s.complianceType,
+            complianceType: compType,
         } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
         setEditId(emp.id)
     }
@@ -100,7 +119,8 @@ export default function SalaryMasterPage() {
                 body: JSON.stringify({ rows: [{
                     employeeId: emp.id,
                     basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
-                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? 583,
+                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+                    bonus: 0, // auto-calculated from basic+da at payroll time
                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                     complianceType: newType,
                 }] }),
@@ -123,7 +143,7 @@ export default function SalaryMasterPage() {
             const res = await fetch("/api/payroll/salary-structure", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows: [{ employeeId: emp.id, ...editForm }] }),
+                body: JSON.stringify({ rows: [{ employeeId: emp.id, ...editForm, bonus: 0 }] }),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(`Salary structure saved for ${emp.firstName} ${emp.lastName}`)
@@ -138,34 +158,44 @@ export default function SalaryMasterPage() {
         const headers = [
             "EMP Code", "Employee Name", "Designation", "Site",
             "Basic", "DA", "Washing", "Conveyance",
-            "Leave With Wages", "Other Allowance", "Bonus",
+            "Leave With Wages", "Other Allowance",
+            "Bonus (Auto - Do Not Edit)", // reference column: (Basic+DA)×8.33%
             "OT Rate Per Hour", "Canteen Rate Per Day", "Compliance Type",
         ]
         const rows = filtered.map(emp => {
             const s = emp.employeeSalary
+            const basic = s?.basic ?? emp.basicSalary ?? 0
+            const da    = s?.da ?? 2511
+            const compType = s?.complianceType ?? "OR"
+            const autoBonus = compType === "CALL" ? 0 : Math.round((basic + da) * 0.0833)
             return [
                 emp.employeeId,
                 `${emp.firstName} ${emp.lastName}`,
                 emp.designation || "",
                 emp.deployments?.[0]?.site?.name || "",
-                s?.basic ?? emp.basicSalary ?? 0,
-                s?.da ?? 2511,
+                basic,
+                da,
                 s?.washing ?? 0,
                 s?.conveyance ?? 0,
                 s?.leaveWithWages ?? 0,
                 s?.otherAllowance ?? 0,
-                s?.bonus ?? 583,
+                autoBonus,           // auto-calculated, ignored on upload
                 s?.otRatePerHour ?? 170,
                 s?.canteenRatePerDay ?? 55,
-                s?.complianceType ?? "OR",
+                compType,
             ]
         })
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 12, 16, 14, 10, 16, 18, 14].map(w => ({ wch: w }))
+        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 12, 16, 14, 18, 16, 18, 14].map(w => ({ wch: w }))
+        // Grey out the Bonus column header to signal it's read-only
+        const bonusHeaderCell = "K1"
+        if (ws[bonusHeaderCell]) {
+            ws[bonusHeaderCell].s = { fill: { fgColor: { rgb: "F3F4F6" } }, font: { italic: true, color: { rgb: "6B7280" } } }
+        }
         XLSX.utils.book_append_sheet(wb, ws, "Salary Structure")
         XLSX.writeFile(wb, `salary_structure_master.xlsx`)
-        toast.success("Template downloaded")
+        toast.success("Template downloaded — Bonus column is auto-calculated, no need to edit")
     }
 
     // Upload Excel and bulk-save
@@ -194,6 +224,7 @@ export default function SalaryMasterPage() {
                     const uuid    = codeToId.get(empCode.toLowerCase())
                     if (!uuid) { skipped.push(empCode || "(blank)"); continue }
 
+                    const compType = String(get("ComplianceType") ?? get("Compliance Type") ?? "OR").toUpperCase()
                     rows.push({
                         employeeId:       uuid,
                         basic:            Number(get("Basic") ?? 0),
@@ -202,10 +233,10 @@ export default function SalaryMasterPage() {
                         conveyance:       Number(get("Conveyance") ?? 0),
                         leaveWithWages:   Number(get("LeaveWithWages") ?? get("Leave With Wages") ?? 0),
                         otherAllowance:   Number(get("OtherAllowance") ?? get("Other Allowance") ?? 0),
-                        bonus:            Number(get("Bonus") ?? 583),
+                        bonus:            0, // auto-calculated from basic+da at payroll time
                         otRatePerHour:    Number(get("OTRatePerHour") ?? get("OT Rate Per Hour") ?? 170),
                         canteenRatePerDay: Number(get("CanteenRatePerDay") ?? get("Canteen Rate Per Day") ?? 55),
-                        complianceType:   String(get("ComplianceType") ?? get("Compliance Type") ?? "OR"),
+                        complianceType:   compType || "OR",
                     })
                 }
 
@@ -226,8 +257,17 @@ export default function SalaryMasterPage() {
         reader.readAsArrayBuffer(file)
     }
 
+    // All unique site names across all employees for the filter dropdown
+    const allSites = Array.from(new Set(
+        data.flatMap(e => e.deployments?.map(d => d.site?.name).filter(Boolean) ?? [])
+    )).sort() as string[]
+
     const filtered = data.filter(emp => {
         if (filterNone && emp.employeeSalary) return false
+        if (filterSite) {
+            const empSites = emp.deployments?.map(d => d.site?.name) ?? []
+            if (!empSites.includes(filterSite)) return false
+        }
         if (!search) return true
         const q = search.toLowerCase()
         return `${emp.firstName} ${emp.lastName} ${emp.employeeId} ${emp.designation || ""}`.toLowerCase().includes(q)
@@ -285,6 +325,13 @@ export default function SalaryMasterPage() {
                 <Search size={13} style={{ color: "var(--text3)" }} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search employee name or code…"
                     style={{ flex: 1, minWidth: 180, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "var(--text)" }} />
+                {allSites.length > 0 && (
+                    <select value={filterSite} onChange={e => setFilterSite(e.target.value)}
+                        style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: filterSite ? "var(--text)" : "var(--text3)", outline: "none" }}>
+                        <option value="">All Sites</option>
+                        {allSites.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                )}
                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text3)", cursor: "pointer" }}>
                     <input type="checkbox" checked={filterNone} onChange={e => setFilterNone(e.target.checked)} style={{ accentColor: "var(--accent)" }} />
                     Show only not-set
@@ -306,12 +353,17 @@ export default function SalaryMasterPage() {
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Washing</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Conv.</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>LWW</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Bonus</th>
+                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Bonus<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Other</th>
                                 <th style={{ ...th, background: "#dcfce7", color: "#15803d" }}>Gross<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }}>Co.PF<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }}>Co.ESIC<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#f0fdf4", color: "#15803d" }}>CTC<span style={calcTag}>auto</span></th>
+                                <th style={{ ...th, background: "#fef9c3", color: "#92400e" }}>Emp.PF<span style={calcTag}>ded</span></th>
+                                <th style={{ ...th, background: "#fef9c3", color: "#92400e" }}>Emp.ESI<span style={calcTag}>ded</span></th>
+                                <th style={{ ...th, background: "#fef9c3", color: "#92400e" }}>PT<span style={calcTag}>ded</span></th>
+                                <th style={{ ...th, background: "#fef9c3", color: "#b91c1c" }}>Tot.Ded<span style={calcTag}>auto</span></th>
+                                <th style={{ ...th, background: "#ecfdf5", color: "#065f46" }}>Net/Mo<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#fafafa" }}>OT/Hr</th>
                                 <th style={{ ...th, background: "#fafafa" }}>Canteen/Day</th>
                                 <th style={{ ...th, background: "#fafafa" }}>Type</th>
@@ -320,11 +372,11 @@ export default function SalaryMasterPage() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={18} style={{ padding: 48, textAlign: "center" }}>
+                                <tr><td colSpan={23} style={{ padding: 48, textAlign: "center" }}>
                                     <Loader2 size={24} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} />
                                 </td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan={18} style={{ padding: 32, textAlign: "center", color: "var(--text3)", fontSize: 13 }}>
+                                <tr><td colSpan={23} style={{ padding: 32, textAlign: "center", color: "var(--text3)", fontSize: 13 }}>
                                     No employees found
                                 </td></tr>
                             ) : filtered.map((emp, idx) => {
@@ -338,7 +390,7 @@ export default function SalaryMasterPage() {
                                 } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
                                 const effectiveType = typeOverride[emp.id] ?? row.complianceType
                                 const displayRow = { ...row, complianceType: effectiveType }
-                                const { hra, bonus, gross, empPF, empESI, ctc } = calc(displayRow)
+                                const { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc } = calc(displayRow)
 
                                 const numIn = (field: keyof EditForm, bg = "transparent") => (
                                     <input
@@ -375,8 +427,8 @@ export default function SalaryMasterPage() {
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("leaveWithWages", "#eff6ff") : s ? fmtN(s.leaveWithWages) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("bonus", "#eff6ff") : s ? fmtN(s.bonus ?? 583) : "—"}
+                                        <td style={{ ...td, background: "#eff6ff", color: "#6b7280", fontStyle: "italic" }}>
+                                            {(s || isEditing) ? fmtN(bonus) : "—"}
                                         </td>
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("otherAllowance", "#eff6ff") : s ? fmtN(s.otherAllowance) : "—"}
@@ -388,6 +440,12 @@ export default function SalaryMasterPage() {
                                         <td style={{ ...td, background: "#fef2f2", color: "#dc2626" }}>{s || isEditing ? fmtN(empESI) : "—"}</td>
                                         {/* CTC */}
                                         <td style={{ ...td, background: "#f0fdf4", fontWeight: 700, color: "#15803d" }}>{s || isEditing ? fmt(ctc) : "—"}</td>
+                                        {/* Employee deductions */}
+                                        <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>{s || isEditing ? fmtN(empPFDed) : "—"}</td>
+                                        <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>{s || isEditing ? fmtN(empESIDed) : "—"}</td>
+                                        <td style={{ ...td, background: "#fef9c3", color: "#92400e", fontWeight: 700 }}>{s || isEditing ? fmtN(pt) : "—"}</td>
+                                        <td style={{ ...td, background: "#fef9c3", color: "#b91c1c", fontWeight: 700 }}>{s || isEditing ? fmtN(totalDed) : "—"}</td>
+                                        <td style={{ ...td, background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>{s || isEditing ? fmt(netSalary) : "—"}</td>
                                         {/* Config */}
                                         <td style={{ ...td, background: "#fafafa" }}>
                                             {isEditing ? numIn("otRatePerHour", "#fafafa") : s ? fmtN(s.otRatePerHour) : "170"}
@@ -460,22 +518,37 @@ export default function SalaryMasterPage() {
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.washing || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.conveyance || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.leaveWithWages || 0), 0),
-                                        filtered.reduce((s,e) => s + (e.employeeSalary?.bonus ?? 0), 0),
+                                        filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary).bonus : 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.otherAllowance || 0), 0),
                                     ].map((v, i) => (
                                         <td key={i} style={{ ...td, background: "#eff6ff", fontWeight: 700 }}>{fmtN(v)}</td>
                                     ))}
                                     <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).gross : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).gross : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).empPF : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empPF : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).empESI : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empESI : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#f0fdf4", color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc({ basic: e.employeeSalary.basic, da: e.employeeSalary.da, washing: e.employeeSalary.washing, conveyance: e.employeeSalary.conveyance, leaveWithWages: e.employeeSalary.leaveWithWages, otherAllowance: e.employeeSalary.otherAllowance, bonus: e.employeeSalary.bonus ?? 583, otRatePerHour: e.employeeSalary.otRatePerHour, canteenRatePerDay: e.employeeSalary.canteenRatePerDay, complianceType: e.employeeSalary.complianceType }).ctc : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).ctc : 0), 0))}
+                                    </td>
+                                    <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empPFDed : 0), 0))}
+                                    </td>
+                                    <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empESIDed : 0), 0))}
+                                    </td>
+                                    <td style={{ ...td, background: "#fef9c3", color: "#92400e", fontWeight: 700 }}>
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).pt : 0), 0))}
+                                    </td>
+                                    <td style={{ ...td, background: "#fef9c3", color: "#b91c1c", fontWeight: 700 }}>
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).totalDed : 0), 0))}
+                                    </td>
+                                    <td style={{ ...td, background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).netSalary : 0), 0))}
                                     </td>
                                     <td colSpan={4} />
                                 </tr>
@@ -486,7 +559,7 @@ export default function SalaryMasterPage() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                HRA = (Basic + DA) × 5% · Bonus = manual input · Co.PF = ₹1,950 (OR only) · Co.ESIC = (Gross − Washing − Bonus) × 3.25% (OR only, gross ≤ ₹21,000) · PT: Feb = ₹300
+                HRA = (Basic+DA)×5% · Bonus = (Basic+DA)×8.33% auto · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = 0.75% · PT = ₹200 (above ₹10k) / ₹175 (₹7.5k-₹10k) / ₹0 · Co.PF = ₹1,950 · Co.ESIC = 3.25% (gross ≤ ₹21k)
             </p>
         </div>
     )

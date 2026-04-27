@@ -267,6 +267,9 @@ export async function POST(req: Request) {
                             isActive:   true,
                         },
                     })
+                } else if (siteName && !siteId) {
+                    // Site name was given but not found in DB — log as a warning row
+                    errors.push({ row: rowNum, reason: `Warning: Site "${siteName}" not found in system (employee imported without site). Please assign site manually.` })
                 }
 
                 if (phone) existingPhones.add(phone)

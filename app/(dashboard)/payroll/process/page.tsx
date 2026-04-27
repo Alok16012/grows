@@ -1,12 +1,13 @@
 "use client"
 import { Suspense } from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
+import * as XLSX from "xlsx"
 import {
     Loader2, Play, RefreshCw, ChevronRight,
     AlertCircle, CheckCircle2, Users, MapPin, Building2, Search,
-    Unlock, Trash2
+    Unlock, Trash2, FileUp
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ function ProcessPayrollPage() {
     const [deleting,         setDeleting]         = useState(false)
     const [fetched,          setFetched]          = useState(false)
     const [search,           setSearch]           = useState("")
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Load sites once
     useEffect(() => {
@@ -107,6 +109,50 @@ function ProcessPayrollPage() {
 
     const setAtt = (empId: string, field: keyof AttRow, value: string) => {
         setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: parseFloat(value) || 0 } }))
+    }
+
+    const handleAttFileUpload = async (file: File) => {
+        if (!employees.length) { toast.error("Load employees first"); return }
+        try {
+            const buf = await file.arrayBuffer()
+            const wb  = XLSX.read(buf, { type: "array" })
+            const ws  = wb.Sheets[wb.SheetNames[0]]
+            const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" })
+            const headerIdx = rawRows.findIndex(row =>
+                Array.isArray(row) && row.some(cell => String(cell).trim() === "Employee ID")
+            )
+            if (headerIdx === -1) { toast.error("Cannot find 'Employee ID' header row in file"); return }
+            const headers = (rawRows[headerIdx] as unknown[]).map(h => String(h).trim())
+            const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
+                Array.isArray(row) && row.some(cell => String(cell).trim() !== "")
+            )
+            const empMap = new Map(employees.map(e => [e.employeeId.toUpperCase(), e.id]))
+            let matched = 0
+            const updates: Record<string, Partial<AttRow>> = {}
+            for (const row of dataRows) {
+                const obj: Record<string, unknown> = {}
+                headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? "" })
+                const empCode = String(obj["Employee ID"] ?? obj["EMP ID"] ?? "").trim().toUpperCase()
+                const empId   = empMap.get(empCode)
+                if (!empId) continue
+                updates[empId] = {
+                    monthDays:           Number(obj["DAYS"]                 ?? obj["Days"]                 ?? defaultDays),
+                    workedDays:          Number(obj["DAYS"]                 ?? obj["Days"]                 ?? defaultDays),
+                    otDays:              Number(obj["OT DAYS"]              ?? obj["OT Days"]              ?? 0),
+                    otherDeductions:     Number(obj["OTHER DEDUCTION"]      ?? obj["Other Deduction"]      ?? 0),
+                    lwf:                 Number(obj["LWF"]                  ?? obj["lwf"]                  ?? 0),
+                    canteenDays:         Number(obj["CANTEEN DAYS"]         ?? obj["Canteen Days"]         ?? 0),
+                    penalty:             Number(obj["PENALTY"]              ?? obj["Penalty"]              ?? 0),
+                    advance:             Number(obj["ADVANCE"]              ?? obj["Advance"]              ?? 0),
+                    productionIncentive: Number(obj["PRODUCTION INCENTIVE"] ?? obj["Production Incentive"] ?? 0),
+                }
+                matched++
+            }
+            setAttRows(prev => ({ ...prev, ...updates }))
+            toast.success(`Attendance loaded for ${matched} of ${employees.length} employees`)
+        } catch {
+            toast.error("Failed to parse attendance file")
+        }
     }
 
     const defaultDays = 26
@@ -188,9 +234,13 @@ function ProcessPayrollPage() {
     const totalGrossEst  = employees.reduce((s, e) => {
         const sal = e.employeeSalary
         const basic = sal?.status === "APPROVED" ? sal.basic : (e as any).basicSalary ?? 0
-        return s + (sal?.status === "APPROVED"
-            ? sal.basic + sal.da + sal.washing + sal.conveyance + sal.leaveWithWages + sal.otherAllowance
-            : basic)
+        if (sal?.status === "APPROVED") {
+            const isCALL = sal.complianceType === "CALL"
+            const hra    = isCALL ? 0 : Math.round((sal.basic + sal.da) * 0.05)
+            const bonus  = isCALL ? 0 : Math.round(7000 / 12)
+            return s + sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance
+        }
+        return s + basic
     }, 0)
     const processedSites = siteStatus.filter(s => (s.processedCount ?? 0) > 0).length
 
@@ -373,6 +423,10 @@ function ProcessPayrollPage() {
                     ) : (
                         /* ── Site employee table ── */
                         <>
+                            {/* Hidden file input for attendance upload */}
+                            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }}
+                                onChange={e => { const f = e.target.files?.[0]; if (f) handleAttFileUpload(f); e.target.value = "" }} />
+
                             {/* Site header bar */}
                             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -386,6 +440,11 @@ function ProcessPayrollPage() {
                                     )}
                                 </div>
                                 <div style={{ display: "flex", gap: 8 }}>
+                                    <button onClick={() => fileInputRef.current?.click()} disabled={!fetched}
+                                        title="Upload attendance Excel to auto-fill rows"
+                                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer", opacity: fetched ? 1 : 0.5 }}>
+                                        <FileUp size={12} /> Upload Attendance
+                                    </button>
                                     <button onClick={() => fetchEmployees(selectedSiteId)} disabled={loadingEmployees}
                                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={12} className={loadingEmployees ? "animate-spin" : ""} /> Refresh
@@ -480,7 +539,10 @@ function ProcessPayrollPage() {
                                             ) : filtered.map((emp, i) => {
                                                 const sal      = emp.employeeSalary
                                                 const att      = attRows[emp.id] ?? {}
-                                                const fullGross = sal ? sal.basic + sal.da + sal.washing + sal.conveyance + sal.leaveWithWages + sal.otherAllowance : 0
+                                                const isCALL   = sal?.complianceType === "CALL"
+                                                const hra      = sal && !isCALL ? Math.round((sal.basic + sal.da) * 0.05) : 0
+                                                const bonus    = sal && !isCALL ? Math.round(7000 / 12) : 0
+                                                const fullGross = sal ? sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance : 0
                                                 const approved = sal?.status === "APPROVED"
                                                 return (
                                                     <tr key={emp.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>

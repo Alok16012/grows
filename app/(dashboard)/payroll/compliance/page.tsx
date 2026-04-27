@@ -13,21 +13,24 @@ type ReportItem = { id: string; label: string; type: string }
 type LockedEmp  = { id: string; netSalary: number; grossSalary: number; siteId: string | null; employee: { employeeId: string; firstName: string; lastName: string; designation: string | null } }
 
 const PF_REPORTS: ReportItem[]   = [
-    { id: "pf-deduction", label: "PF Deduction Report",   type: "pf-deduction" },
-    { id: "pf-summary",   label: "PF Summary",            type: "pf-summary"   },
-    { id: "pf-challan",   label: "PF Challan",            type: "pf-challan"   },
-    { id: "pf-ecr",       label: "PF ECR File (EPFO)",    type: "pf-ecr"       },
-    { id: "pf-register",  label: "PF Register (UAN Wise)",type: "pf-register"  },
+    { id: "pf-summary",   label: "PF Summary (Site-wise)",  type: "pf-summary"   },
+    { id: "pf-deduction", label: "PF Deduction List (Form 12A)", type: "pf-deduction" },
+    { id: "pf-ecr",       label: "PF ECR File (EPFO)",      type: "pf-ecr"       },
+    { id: "pf-challan",   label: "PF Challan",              type: "pf-challan"   },
+    { id: "pf-register",  label: "PF Register (UAN Wise)",  type: "pf-register"  },
 ]
 const ESIC_REPORTS: ReportItem[] = [
-    { id: "esic-deduction", label: "ESIC Deduction Report", type: "esic-deduction" },
-    { id: "esic-summary",   label: "ESIC Summary",          type: "esic-summary"   },
-    { id: "esic-challan",   label: "ESIC Challan",          type: "esic-challan"   },
+    { id: "esic-summary",   label: "ESIC Summary (Site-wise)",    type: "esic-summary"   },
+    { id: "esic-deduction", label: "ESIC Deduction List (Form 7)", type: "esic-deduction" },
+    { id: "esic-challan",   label: "ESIC Challan",                type: "esic-challan"   },
 ]
 const PT_REPORTS: ReportItem[]   = [
-    { id: "pt-deduction", label: "PT Deduction Report", type: "pt-deduction" },
-    { id: "pt-summary",   label: "PT Summary",          type: "pt-summary"   },
-    { id: "pt-challan",   label: "PT Challan",          type: "pt-challan"   },
+    { id: "pt-summary",   label: "PT Summary (Site-wise)",  type: "pt-summary"   },
+    { id: "pt-deduction", label: "PT Deduction Report",     type: "pt-deduction" },
+    { id: "pt-challan",   label: "PT Challan (MTR-6)",      type: "pt-challan"   },
+]
+const WAGE_REPORTS: ReportItem[] = [
+    { id: "wage-sheet", label: "Wage Sheet — Form II (MW Rules)", type: "wage-sheet" },
 ]
 
 function ComplianceInner() {
@@ -56,17 +59,20 @@ function ComplianceInner() {
     const handleLoad = async () => {
         setLoading(true); setDataLoaded(false); setStats(null)
         try {
-            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-summary`)
+            // Use pf-deduction (employee-level) to compute stats
+            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-deduction`)
             if (!r.ok) { toast.error(await r.text() || "No payroll data found"); return }
             const data = await r.json()
+            const r2 = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=wage-sheet`)
+            const wsData = r2.ok ? await r2.json() : []
             setStats({
                 totalEmployees: data.length,
-                grossPay:       data.reduce((a: number, r: Record<string,number>) => a + (r.grossSalary || 0), 0),
-                totalDeduction: data.reduce((a: number, r: Record<string,number>) => a + (r.totalDeductions || 0), 0),
-                netPay:         data.reduce((a: number, r: Record<string,number>) => a + (r.netSalary || 0), 0),
+                grossPay:       wsData.reduce((a: number, row: Record<string,number>) => a + (row["Gross Earning"] || 0), 0),
+                totalDeduction: wsData.reduce((a: number, row: Record<string,number>) => a + (row["Tot Ded"] || 0), 0),
+                netPay:         wsData.reduce((a: number, row: Record<string,number>) => a + (row["Net Pay"] || 0), 0),
             })
             setDataLoaded(true)
-            toast.success(`Loaded compliance data for ${MONTHS[month-1]} ${year}`)
+            toast.success(`Loaded ${data.length} employees for ${MONTHS[month-1]} ${year}`)
         } catch { toast.error("Failed to load compliance data") }
         finally { setLoading(false) }
     }
@@ -78,11 +84,30 @@ function ComplianceInner() {
             if (!r.ok) { toast.error(await r.text() || "No data found"); return }
             const data = await r.json()
             if (!data?.length) { toast.error("No data to download"); return }
+
             const wb = XLSX.utils.book_new()
-            const ws = XLSX.utils.json_to_sheet(data)
-            const cols = Object.keys(data[0] || {})
-            ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
-            XLSX.utils.book_append_sheet(wb, ws, item.label.substring(0, 31))
+
+            if (item.type === "wage-sheet") {
+                // Group by siteId — use Sr.No reset per sheet
+                // Since API returns flat data without siteId, we do a separate call per site
+                // Fallback: one sheet with all employees labelled "All Sites"
+                const ws = XLSX.utils.json_to_sheet(data)
+                const cols = Object.keys(data[0] || {})
+                ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
+                // Add header rows for Form II format
+                XLSX.utils.sheet_add_aoa(ws, [
+                    [`FORM (II) M.W. RULES Rule (27)(1)`],
+                    [`SALARIES / WAGES REGISTER FOR THE MONTH OF ${MONTHS[month-1].toUpperCase()} ${year}`],
+                    ["PF CODE: PUPUN2450654000", "", "ESIC CODE: 33000891430000999"],
+                ], { origin: "A1" })
+                XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
+            } else {
+                const ws = XLSX.utils.json_to_sheet(data)
+                const cols = Object.keys(data[0] || {})
+                ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
+                XLSX.utils.book_append_sheet(wb, ws, item.label.substring(0, 31))
+            }
+
             XLSX.writeFile(wb, `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)
             toast.success(`Downloaded: ${item.label}`)
         } catch { toast.error("Download failed") }
@@ -248,9 +273,10 @@ function ComplianceInner() {
 
                     {/* Report sections */}
                     {[
-                        { title: "Provident Fund (PF)", badge: "PF",  items: PF_REPORTS,   color: "#1d4ed8" },
-                        { title: "ESIC",                badge: "ESI", items: ESIC_REPORTS, color: "#0369a1" },
-                        { title: "Professional Tax (PT)", badge: "PT", items: PT_REPORTS,  color: "#7c3aed" },
+                        { title: "Wage Sheet (Form II — MW Rules)", badge: "WS",  items: WAGE_REPORTS,  color: "#0f766e" },
+                        { title: "Provident Fund (PF)",             badge: "PF",  items: PF_REPORTS,    color: "#1d4ed8" },
+                        { title: "ESIC",                            badge: "ESI", items: ESIC_REPORTS,  color: "#0369a1" },
+                        { title: "Professional Tax (PT)",           badge: "PT",  items: PT_REPORTS,    color: "#7c3aed" },
                     ].map(section => (
                         <div key={section.title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>

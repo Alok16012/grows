@@ -89,7 +89,6 @@ export async function POST(req: Request) {
                     conveyance:       salData?.conveyance       ?? 0,
                     leaveWithWages:   salData?.leaveWithWages   ?? 0,
                     otherAllowance:   salData?.otherAllowance   ?? 0,
-                    bonus:            salData?.bonus            ?? 583,
                     otRatePerHour:    salData?.otRatePerHour    ?? 170,
                     canteenRatePerDay:salData?.canteenRatePerDay?? 55,
                     complianceType:   salData?.complianceType   ?? "OR",
@@ -114,7 +113,7 @@ export async function POST(req: Request) {
                         workingDays: att.monthDays,
                         presentDays: att.workedDays,
                         lwpDays:     att.monthDays - att.workedDays,
-                        overtimeHrs: att.otDays * 4,
+                        overtimeHrs: att.otDays,
                         status: "DRAFT",
                         processedBy: session.user.id ?? "system",
                     },
@@ -126,7 +125,7 @@ export async function POST(req: Request) {
                         workingDays: att.monthDays,
                         presentDays: att.workedDays,
                         lwpDays:     att.monthDays - att.workedDays,
-                        overtimeHrs: att.otDays * 4,
+                        overtimeHrs: att.otDays,
                         processedBy: session.user.id ?? "system",
                     }
                 })
