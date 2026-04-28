@@ -107,6 +107,8 @@ function ProcessPayrollPage() {
         else { setEmployees([]); setFetched(false) }
     }
 
+    const defaultDays = new Date(parseInt(year), parseInt(month), 0).getDate()
+
     const setAtt = (empId: string, field: keyof AttRow, value: string) => {
         setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: parseFloat(value) || 0 } }))
     }
@@ -118,44 +120,60 @@ function ProcessPayrollPage() {
             const wb  = XLSX.read(buf, { type: "array" })
             const ws  = wb.Sheets[wb.SheetNames[0]]
             const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" })
+            // Find header row — look for "Employee ID" or "EMP ID" (case-insensitive)
             const headerIdx = rawRows.findIndex(row =>
-                Array.isArray(row) && row.some(cell => String(cell).trim() === "Employee ID")
+                Array.isArray(row) && row.some(cell =>
+                    ["employee id", "emp id", "employeeid", "empid"].includes(String(cell).trim().toLowerCase())
+                )
             )
-            if (headerIdx === -1) { toast.error("Cannot find 'Employee ID' header row in file"); return }
-            const headers = (rawRows[headerIdx] as unknown[]).map(h => String(h).trim())
+            if (headerIdx === -1) { toast.error("Cannot find 'Employee ID' column in file"); return }
+            // Normalise headers to UPPERCASE for case-insensitive matching
+            const headers = (rawRows[headerIdx] as unknown[]).map(h => String(h).trim().toUpperCase())
             const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
                 Array.isArray(row) && row.some(cell => String(cell).trim() !== "")
             )
             const empMap = new Map(employees.map(e => [e.employeeId.toUpperCase(), e.id]))
+            // Helper: get value from normalised obj by multiple possible column names
+            const col = (obj: Record<string, unknown>, ...names: string[]) => {
+                for (const n of names) {
+                    const v = obj[n.toUpperCase()]
+                    if (v !== undefined && v !== "") return v
+                }
+                return undefined
+            }
             let matched = 0
             const updates: Record<string, Partial<AttRow>> = {}
             for (const row of dataRows) {
                 const obj: Record<string, unknown> = {}
                 headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? "" })
-                const empCode = String(obj["Employee ID"] ?? obj["EMP ID"] ?? "").trim().toUpperCase()
+                const empCode = String(col(obj, "Employee ID", "EMP ID", "Emp ID", "EMPID") ?? "").trim().toUpperCase()
                 const empId   = empMap.get(empCode)
                 if (!empId) continue
+                const workedDaysVal = Number(col(obj, "DAYS", "Days", "PRESENT DAYS", "WORKED DAYS", "PRESENT") ?? defaultDays)
                 updates[empId] = {
-                    monthDays:           Number(obj["DAYS"]                 ?? obj["Days"]                 ?? defaultDays),
-                    workedDays:          Number(obj["DAYS"]                 ?? obj["Days"]                 ?? defaultDays),
-                    otDays:              Number(obj["OT DAYS"]              ?? obj["OT Days"]              ?? 0),
-                    otherDeductions:     Number(obj["OTHER DEDUCTION"]      ?? obj["Other Deduction"]      ?? 0),
-                    lwf:                 Number(obj["LWF"]                  ?? obj["lwf"]                  ?? 0),
-                    canteenDays:         Number(obj["CANTEEN DAYS"]         ?? obj["Canteen Days"]         ?? 0),
-                    penalty:             Number(obj["PENALTY"]              ?? obj["Penalty"]              ?? 0),
-                    advance:             Number(obj["ADVANCE"]              ?? obj["Advance"]              ?? 0),
-                    productionIncentive: Number(obj["PRODUCTION INCENTIVE"] ?? obj["Production Incentive"] ?? 0),
+                    monthDays:           defaultDays,   // always total calendar working days — NOT from Excel
+                    workedDays:          workedDaysVal || defaultDays,
+                    otDays:              Number(col(obj, "OT DAYS", "OT Days", "OT HRS", "OT Hrs", "OTDAYS", "OTHOURS") ?? 0),
+                    otherDeductions:     Number(col(obj, "OTHER DEDUCTION", "Other Deduction", "OTHER DED") ?? 0),
+                    lwf:                 Number(col(obj, "LWF") ?? 0),
+                    canteenDays:         Number(col(obj, "CANTEEN DAYS", "Canteen Days", "CANTEEN") ?? 0),
+                    penalty:             Number(col(obj, "PENALTY", "Penalty") ?? 0),
+                    advance:             Number(col(obj, "ADVANCE", "Advance") ?? 0),
+                    productionIncentive: Number(col(obj, "PRODUCTION INCENTIVE", "Production Incentive", "PROD INCENTIVE") ?? 0),
                 }
                 matched++
             }
+            if (matched === 0) {
+                toast.error("No employees matched — check Employee IDs in file match the system")
+                return
+            }
             setAttRows(prev => ({ ...prev, ...updates }))
-            toast.success(`Attendance loaded for ${matched} of ${employees.length} employees`)
-        } catch {
-            toast.error("Failed to parse attendance file")
+            toast.success(`Attendance loaded: ${matched}/${employees.length} employees matched`)
+        } catch (e) {
+            console.error("[ATT_UPLOAD]", e)
+            toast.error("Failed to parse attendance file — check format")
         }
     }
-
-    const defaultDays = 26
 
     const handleProcess = async () => {
         if (!selectedSiteId) { toast.error("Select a site"); return }

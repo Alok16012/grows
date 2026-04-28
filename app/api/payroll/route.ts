@@ -51,6 +51,9 @@ export async function GET(req: Request) {
                         photo: true,
                         bankAccountNumber: true,
                         bankIFSC: true,
+                        uan: true,
+                        pfNumber: true,
+                        esiNumber: true,
                         deployments: {
                             where: { isActive: true },
                             include: { site: { select: { name: true } } },

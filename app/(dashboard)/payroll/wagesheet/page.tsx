@@ -14,15 +14,20 @@ type Site    = { id: string; name: string; code?: string }
 type SiteStatus = { siteId: string | null; processedCount: number }
 type Payroll = {
     id: string; month: number; year: number; status: string
+    // Full-month rate values
+    basicFull: number; daFull: number; hraFull: number; washingFull: number
+    conveyanceFull: number; lwwFull: number; bonusFull: number; grossFullMonth: number
+    // Earned (prorated) values
     basicSalary: number; da: number; hra: number; washing: number; conveyance: number
     lwwEarned: number; bonus: number; overtimePay: number; overtimeHrs: number; grossSalary: number
     pfEmployee: number; esiEmployee: number; pt: number; lwf: number
-    canteen: number; penalty: number; advance: number; otherDeductions: number
+    canteen: number; canteenDays: number; penalty: number; advance: number; otherDeductions: number
     totalDeductions: number; netSalary: number
     workingDays: number | null; presentDays: number | null
     employee: {
         employeeId: string; firstName: string; lastName: string; designation: string | null
         bankAccountNumber?: string | null; bankIFSC?: string | null
+        uan?: string | null; pfNumber?: string | null; esiNumber?: string | null
     }
 }
 
@@ -139,7 +144,7 @@ function WageSheetInner() {
     const buildFormIIAoa = (rows: Payroll[], siteName: string, m: number, y: number) => {
         const monthName = MONTHS[m - 1].toUpperCase()
         const headers = [
-            "Sr.No", "Emp Code", "Employee Name", "IFSC CODE", "ACCOUNT NO.",
+            "Sr.No", "Emp Code", "Employee Name", "UAN", "PF No.", "ESIC No.", "IFSC CODE", "ACCOUNT NO.",
             "Days Paid", "OT Hrs",
             "Basic_R", "DA_R", "HRA_R", "Conv_R", "Washing_R", "Leave_R", "Bonus_R", "",
             "BASIC", "DA", "HRA", "CONVEYANCE ALLOWANCE", "WASHING ALLOW", "LEAVE AMT", "BONUS AMT",
@@ -149,11 +154,15 @@ function WageSheetInner() {
         const dataRows = rows.map((p, i) => [
             i + 1, p.employee.employeeId,
             `${p.employee.firstName} ${p.employee.lastName}`,
+            p.employee.uan ?? "", p.employee.pfNumber ?? "", p.employee.esiNumber ?? "",
             p.employee.bankIFSC ?? "", p.employee.bankAccountNumber ?? "",
-            p.presentDays ?? p.workingDays ?? 0, p.overtimeHrs ?? 0,
-            Math.round(p.basicSalary), Math.round(p.da), Math.round(p.hra),
-            Math.round(p.conveyance), Math.round(p.washing),
-            Math.round(p.lwwEarned), Math.round(p.bonus), "",
+            p.presentDays ?? p.workingDays ?? 0, Math.round(p.overtimeHrs ?? 0),
+            // RATE columns — full-month salary structure values
+            Math.round(p.basicFull ?? p.basicSalary), Math.round(p.daFull ?? p.da),
+            Math.round(p.hraFull ?? p.hra), Math.round(p.conveyanceFull ?? p.conveyance),
+            Math.round(p.washingFull ?? p.washing), Math.round(p.lwwFull ?? p.lwwEarned),
+            Math.round(p.bonusFull ?? p.bonus), "",
+            // EARNED columns — actual prorated amounts
             Math.round(p.basicSalary), Math.round(p.da), Math.round(p.hra),
             Math.round(p.conveyance), Math.round(p.washing),
             Math.round(p.lwwEarned), Math.round(p.bonus),
@@ -165,7 +174,7 @@ function WageSheetInner() {
         ])
         const sum = (fn: (p: Payroll) => number) => Math.round(rows.reduce((s, p) => s + fn(p), 0))
         const totRow = [
-            "", "", "TOTAL", "", "",
+            "", "", "TOTAL", "", "", "", "", "",
             sum(p => p.presentDays ?? p.workingDays ?? 0), "",
             ...Array(8).fill(""),
             sum(p => p.basicSalary), sum(p => p.da), sum(p => p.hra),
@@ -788,12 +797,12 @@ function WageSheetInner() {
                                                 <th style={{ ...th, textAlign: "left" }} rowSpan={2}>Name</th>
                                                 <th style={th} rowSpan={2}>Desig.</th>
                                                 <th style={th} rowSpan={2}>P.Days</th>
-                                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }} colSpan={6}>Earnings (₹)</th>
+                                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }} colSpan={9}>Earnings (₹)</th>
                                                 <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }} colSpan={7}>Deductions (₹)</th>
                                                 <th style={{ ...th, background: "#f0fdf4", color: "#16a34a" }} rowSpan={2}>Net Pay</th>
                                             </tr>
                                             <tr style={{ background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
-                                                {["Basic","DA","Wash","Conv.","OT","Gross"].map(h => <th key={h} style={{ ...th, background: "#eff6ff" }}>{h}</th>)}
+                                                {["Basic","DA","HRA","Wash","Conv.","Bonus","OT Hrs","OT Amt","Gross"].map(h => <th key={h} style={{ ...th, background: "#eff6ff" }}>{h}</th>)}
                                                 {["PF","ESI","PT","LWF","Canteen","Penalty","Adv."].map(h => <th key={h} style={{ ...th, background: "#fef2f2" }}>{h}</th>)}
                                             </tr>
                                         </thead>
@@ -821,9 +830,12 @@ function WageSheetInner() {
                                                     <td style={td}>{p.presentDays ?? "—"}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.basicSalary)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.da)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.hra)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.washing)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.conveyance)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.overtimePay)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.bonus)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff", color: "#7c3aed" }}>{p.overtimeHrs ? fmtN(p.overtimeHrs) : "—"}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{p.overtimePay ? fmtN(p.overtimePay) : "—"}</td>
                                                     <td style={{ ...td, background: "#eff6ff", fontWeight: 700, color: "#1d4ed8" }}>{fmtN(p.grossSalary)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.pfEmployee)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.esiEmployee)}</td>
@@ -842,8 +854,11 @@ function WageSheetInner() {
                                                     <td colSpan={6} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({selectedCount > 0 ? `${selectedCount} selected` : data.length})</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.basicSalary,0))}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.da,0))}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.hra,0))}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.washing,0))}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.conveyance,0))}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.bonus,0))}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.overtimeHrs,0))}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.overtimePay,0))}</td>
                                                     <td style={{ ...td, background: "#eff6ff", color: "#1d4ed8" }}>{fmt(totals.gross)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmt(totals.pf)}</td>
