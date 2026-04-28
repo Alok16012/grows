@@ -107,7 +107,7 @@ function ProcessPayrollPage() {
         else { setEmployees([]); setFetched(false) }
     }
 
-    const defaultDays = new Date(parseInt(year), parseInt(month), 0).getDate()
+    const defaultDays = 26 // Indian payroll standard: 26 working days per month
 
     const setAtt = (empId: string, field: keyof AttRow, value: string) => {
         setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: parseFloat(value) || 0 } }))
@@ -120,55 +120,102 @@ function ProcessPayrollPage() {
             const wb  = XLSX.read(buf, { type: "array" })
             const ws  = wb.Sheets[wb.SheetNames[0]]
             const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" })
-            // Find header row — look for "Employee ID" or "EMP ID" (case-insensitive)
+
+            // Find header row — look for any Employee ID column variant
+            const EMP_ID_VARIANTS = ["employee id", "emp id", "employeeid", "empid",
+                "employee code", "emp code", "empcode", "employeecode",
+                "employee no", "emp no", "empno", "employee number"]
             const headerIdx = rawRows.findIndex(row =>
                 Array.isArray(row) && row.some(cell =>
-                    ["employee id", "emp id", "employeeid", "empid"].includes(String(cell).trim().toLowerCase())
+                    EMP_ID_VARIANTS.includes(String(cell).trim().toLowerCase())
                 )
             )
-            if (headerIdx === -1) { toast.error("Cannot find 'Employee ID' column in file"); return }
-            // Normalise headers to UPPERCASE for case-insensitive matching
-            const headers = (rawRows[headerIdx] as unknown[]).map(h => String(h).trim().toUpperCase())
+            if (headerIdx === -1) {
+                toast.error("Cannot find Employee ID column. Expected: 'Employee ID', 'Emp Code', 'Employee Code' etc.")
+                return
+            }
+
+            // Normalise headers to UPPERCASE
+            const headers = (rawRows[headerIdx] as unknown[]).map(h =>
+                String(h).trim().toUpperCase().replace(/\s+/g, " ")
+            )
             const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
                 Array.isArray(row) && row.some(cell => String(cell).trim() !== "")
             )
-            const empMap = new Map(employees.map(e => [e.employeeId.toUpperCase(), e.id]))
-            // Helper: get value from normalised obj by multiple possible column names
+            const empMap = new Map(employees.map(e => [e.employeeId.trim().toUpperCase(), e.id]))
+
+            // Helper: case-insensitive column lookup with multiple aliases
             const col = (obj: Record<string, unknown>, ...names: string[]) => {
                 for (const n of names) {
-                    const v = obj[n.toUpperCase()]
-                    if (v !== undefined && v !== "") return v
+                    const v = obj[n.toUpperCase().replace(/\s+/g, " ")]
+                    if (v !== undefined && String(v).trim() !== "") return v
                 }
                 return undefined
             }
+
             let matched = 0
             const updates: Record<string, Partial<AttRow>> = {}
+            const unmatched: string[] = []
+
             for (const row of dataRows) {
                 const obj: Record<string, unknown> = {}
                 headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? "" })
-                const empCode = String(col(obj, "Employee ID", "EMP ID", "Emp ID", "EMPID") ?? "").trim().toUpperCase()
-                const empId   = empMap.get(empCode)
-                if (!empId) continue
-                const workedDaysVal = Number(col(obj, "DAYS", "Days", "PRESENT DAYS", "WORKED DAYS", "PRESENT") ?? defaultDays)
+
+                const empCode = String(
+                    col(obj,
+                        "EMPLOYEE ID", "EMP ID", "EMPID", "EMPLOYEE CODE", "EMP CODE",
+                        "EMPCODE", "EMPLOYEECODE", "EMPLOYEE NO", "EMP NO", "EMPNO"
+                    ) ?? ""
+                ).trim().toUpperCase()
+
+                if (!empCode) continue
+                const empId = empMap.get(empCode)
+                if (!empId) { unmatched.push(empCode); continue }
+
+                const workedDaysRaw = col(obj,
+                    "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "ATTENDANCE",
+                    "WORKING DAYS", "P", "ATT DAYS", "ATT", "PAID DAYS"
+                )
+                const workedDaysVal = workedDaysRaw !== undefined ? Number(workedDaysRaw) : defaultDays
+
                 updates[empId] = {
-                    monthDays:           defaultDays,   // always total calendar working days — NOT from Excel
-                    workedDays:          workedDaysVal || defaultDays,
-                    otDays:              Number(col(obj, "OT DAYS", "OT Days", "OT HRS", "OT Hrs", "OTDAYS", "OTHOURS") ?? 0),
-                    otherDeductions:     Number(col(obj, "OTHER DEDUCTION", "Other Deduction", "OTHER DED") ?? 0),
-                    lwf:                 Number(col(obj, "LWF") ?? 0),
-                    canteenDays:         Number(col(obj, "CANTEEN DAYS", "Canteen Days", "CANTEEN") ?? 0),
-                    penalty:             Number(col(obj, "PENALTY", "Penalty") ?? 0),
-                    advance:             Number(col(obj, "ADVANCE", "Advance") ?? 0),
-                    productionIncentive: Number(col(obj, "PRODUCTION INCENTIVE", "Production Incentive", "PROD INCENTIVE") ?? 0),
+                    monthDays:  defaultDays,  // always 26 — NOT from Excel
+                    workedDays: workedDaysVal > 0 ? workedDaysVal : defaultDays,
+                    otDays:     Number(col(obj,
+                        "OT DAYS", "OT HRS", "OTDAYS", "OTHOURS", "OT", "OVERTIME",
+                        "OT HOURS", "OVER TIME"
+                    ) ?? 0),
+                    otherDeductions: Number(col(obj,
+                        "OTHER DEDUCTION", "OTHER DED", "OTHER DEDUCTIONS", "OTHER", "OTH DED"
+                    ) ?? 0),
+                    lwf:     Number(col(obj, "LWF", "LABOUR WELFARE FUND") ?? 0),
+                    canteenDays: Number(col(obj,
+                        "CANTEEN DAYS", "CANTEEN", "MESS DAYS", "FOOD DAYS"
+                    ) ?? 0),
+                    penalty: Number(col(obj, "PENALTY", "FINE") ?? 0),
+                    advance: Number(col(obj, "ADVANCE", "ADV", "LOAN") ?? 0),
+                    productionIncentive: Number(col(obj,
+                        "PRODUCTION INCENTIVE", "PROD INCENTIVE", "INCENTIVE", "PI"
+                    ) ?? 0),
                 }
                 matched++
             }
+
             if (matched === 0) {
-                toast.error("No employees matched — check Employee IDs in file match the system")
+                toast.error(
+                    unmatched.length > 0
+                        ? `No match — IDs in file: ${unmatched.slice(0, 5).join(", ")}… vs system IDs`
+                        : "No employees matched — check Employee IDs in the Excel file"
+                )
                 return
             }
+
             setAttRows(prev => ({ ...prev, ...updates }))
-            toast.success(`Attendance loaded: ${matched}/${employees.length} employees matched`)
+            const msg = `Attendance loaded: ${matched}/${employees.length} matched`
+            const warn = unmatched.length > 0 ? ` (${unmatched.length} unmatched: ${unmatched.slice(0,3).join(", ")})` : ""
+            matched === employees.length
+                ? toast.success(msg)
+                : toast.warning(msg + warn)
         } catch (e) {
             console.error("[ATT_UPLOAD]", e)
             toast.error("Failed to parse attendance file — check format")
@@ -601,11 +648,18 @@ function ProcessPayrollPage() {
                                                                 onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={attInput} />
                                                         </td>
                                                         <td style={td}>
-                                                            <span style={{ padding: "2px 7px", borderRadius: 20, fontSize: 9, fontWeight: 700,
-                                                                background: approved ? "#dcfce7" : "#fef9c3",
-                                                                color: approved ? "#15803d" : "#854d0e" }}>
-                                                                {approved ? "Approved" : (sal ? "Pending" : "No Salary")}
-                                                            </span>
+                                                            <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                                                                <span style={{ padding: "2px 7px", borderRadius: 20, fontSize: 9, fontWeight: 700,
+                                                                    background: approved ? "#dcfce7" : "#fef9c3",
+                                                                    color: approved ? "#15803d" : "#854d0e" }}>
+                                                                    {approved ? "Approved" : (sal ? "Pending" : "No Salary")}
+                                                                </span>
+                                                                <span style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700,
+                                                                    background: attRows[emp.id] ? "#dbeafe" : "#f3f4f6",
+                                                                    color: attRows[emp.id] ? "#1d4ed8" : "#9ca3af" }}>
+                                                                    {attRows[emp.id] ? "✓ Att" : "Default"}
+                                                                </span>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 )

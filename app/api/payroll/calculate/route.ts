@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
         if (!employees.length) return new NextResponse("No active employees found", { status: 404 })
 
-        const defaultMonthDays = new Date(year, month, 0).getDate()
+        const defaultMonthDays = 26 // Indian payroll standard working days
         let totalGross = 0, totalNet = 0, totalPfE = 0, totalEsiE = 0
 
         const results = await Promise.allSettled(
