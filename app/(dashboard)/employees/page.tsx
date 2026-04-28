@@ -224,9 +224,9 @@ type ModalForm = {
 const EMPTY_FORM: ModalForm = {
     firstName: "", lastName: "", email: "", phone: "", alternatePhone: "",
     dateOfBirth: "", gender: "", aadharNumber: "", panNumber: "",
-    designation: "Security Guard", departmentId: "", branchId: "", managerId: "",
+    designation: "", departmentId: "", branchId: "", managerId: "",
     dateOfJoining: "", employmentType: "Full-time", salaryType: "Monthly", basicSalary: "",
-    customRoleId: "", systemRole: "INSPECTION_BOY", role: "Security Guard",
+    customRoleId: "", systemRole: "INSPECTION_BOY", role: "",
     address: "", city: "", state: "", pincode: "",
     permanentAddress: "", permanentCity: "", permanentState: "", permanentPincode: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
@@ -411,7 +411,7 @@ function EmployeeModal({
                 safetyShoes: employee.safetyShoes ?? false,
                 customRoleId: "",
                 systemRole: "INSPECTION_BOY",
-                role: employee.designation || "Security Guard",
+                role: employee.designation || "",
                 // Salary Structure — pre-fill from existing record
                 salDA:                String(employee.employeeSalary?.da               ?? ""),
                 salWashing:           String(employee.employeeSalary?.washing          ?? ""),
@@ -2302,8 +2302,8 @@ export default function EmployeesPage() {
 
         const sample = [
             "Ramesh", "", "Kumar", "Suresh Kumar", "9876543210", "ramesh@example.com",
-            "Security Guard", "Full-time", "ACTIVE", "2024-01-15",
-            "", "Security", "Site Name Here",
+            "Guard", "Full-time", "ACTIVE", "2024-01-15",
+            "", "", "Site Name Here",
             "12000", "1000", "500", "500",
             "0", "0", "1088",
             "170", "55", "OR",
@@ -2317,7 +2317,7 @@ export default function EmployeesPage() {
             "",
             "Sita Devi", "9811223344",
             "", "",
-            "Security", "Guarding", "",
+            "", "", "",
         ]
 
         const instructions = [
