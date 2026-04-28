@@ -11,33 +11,26 @@ interface ImportRow {
     designation?: Sv; employmentType?: Sv; status?: Sv
     dateOfJoining?: Sv; dateOfLeaving?: Sv
     department?: Sv; site?: Sv
-    // Salary
     basicSalary?: Sv; da?: Sv; washing?: Sv; conveyance?: Sv
     leaveWithWages?: Sv; otherAllowance?: Sv
     otRatePerHour?: Sv; canteenRatePerDay?: Sv; complianceType?: Sv
-    // Personal
     middleName?: Sv; nameAsPerAadhar?: Sv; fathersName?: Sv
     dateOfBirth?: Sv; gender?: Sv; bloodGroup?: Sv
     maritalStatus?: Sv; nationality?: Sv; religion?: Sv; caste?: Sv
-    // Address
     address?: Sv; city?: Sv; state?: Sv; pincode?: Sv
     permanentAddress?: Sv; permanentCity?: Sv; permanentState?: Sv; permanentPincode?: Sv
-    // Identity
     aadharNumber?: Sv; panNumber?: Sv; uan?: Sv; pfNumber?: Sv; esiNumber?: Sv; labourCardNo?: Sv
-    // Bank
     bankName?: Sv; bankBranch?: Sv; bankAccountNumber?: Sv; bankIFSC?: Sv
-    // Contact
     alternatePhone?: Sv
     emergencyContact1Name?: Sv; emergencyContact1Phone?: Sv
     emergencyContact2Name?: Sv; emergencyContact2Phone?: Sv
-    // Work
     workSkill?: Sv; natureOfWork?: Sv; notes?: Sv
 }
 
-const str  = (v?: Sv): string    => v !== undefined && v !== null ? String(v).trim() : ""
-const strN = (v?: Sv): string | null => { const s = str(v); return s || null }
+const str  = (v?: Sv): string       => v !== undefined && v !== null ? String(v).trim() : ""
+const strN = (v?: Sv): string|null  => { const s = str(v); return s || null }
 const num  = (v?: Sv, def = 0): number => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? def : n }
-const dt   = (v?: Sv): Date | null => { if (!v) return null; const d = new Date(String(v)); return isNaN(d.getTime()) ? null : d }
+const dt   = (v?: Sv): Date|null    => { if (!v) return null; const d = new Date(String(v)); return isNaN(d.getTime()) ? null : d }
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
@@ -55,9 +48,16 @@ export async function POST(req: Request) {
     const errors: { row: number; reason: string }[] = []
 
     try {
-        // Pre-load lookup tables
-        const allSites       = await prisma.site.findMany({ select: { id: true, name: true } })
-        const allDepartments = await prisma.department.findMany({ select: { id: true, name: true } })
+        // ── Pre-load lookup tables once ───────────────────────────────────────
+        const [allSites, allDepartments] = await Promise.all([
+            prisma.site.findMany({ select: { id: true, name: true } }),
+            prisma.department.findMany({ select: { id: true, name: true } }),
+        ])
+
+        // ── Pre-load ALL existing employee IDs to avoid per-row DB lookups ───
+        const existingEmpIds = await prisma.employee.findMany({
+            select: { employeeId: true }
+        }).then(r => new Set(r.map(e => e.employeeId)))
 
         const lastEmployee = await prisma.employee.findFirst({
             orderBy: { createdAt: "desc" }, select: { employeeId: true },
@@ -68,84 +68,83 @@ export async function POST(req: Request) {
             if (match) nextNum = parseInt(match[0]) + 1
         }
 
-        // Pre-fetch duplicates
-        const allPhones = rows.map(r => str(r.phone)).filter(Boolean)
-        const allEmails = rows.map((r, idx) => {
-            const p = str(r.phone)
-            if (r.email) return str(r.email)
-            if (p) return `${p}@cims.local`
-            return `temp_${idx}_${Date.now()}@cims.local`
-        }).filter(Boolean)
+        // Pre-generate all employee IDs in memory (no per-row DB queries)
+        const assignedIds: string[] = []
+        for (let i = 0; i < rows.length; i++) {
+            let finalId = `EMP-${String(nextNum).padStart(4, "0")}`
+            while (existingEmpIds.has(finalId)) {
+                nextNum++
+                finalId = `EMP-${String(nextNum).padStart(4, "0")}`
+            }
+            existingEmpIds.add(finalId) // reserve in-memory so next row doesn't collide
+            assignedIds.push(finalId)
+            nextNum++
+        }
 
+        // ── Pre-check duplicate phones ────────────────────────────────────────
+        const allPhones = rows.map(r => str(r.phone)).filter(Boolean)
         const existingPhones = await prisma.employee.findMany({
             where: { phone: { in: allPhones } }, select: { phone: true }
         }).then(res => new Set(res.map(r => r.phone)))
 
+        // ── Pre-check duplicate emails / existing users ───────────────────────
+        const emailList = rows.map((r, idx) => {
+            const p = str(r.phone)
+            if (r.email) return str(r.email)
+            if (p) return `${p}@cims.local`
+            return `temp_${idx}_${Date.now()}@cims.local`
+        })
         const existingUsers = await prisma.user.findMany({
-            where: { email: { in: allEmails } },
+            where: { email: { in: emailList } },
             select: { id: true, email: true, employeeProfile: { select: { id: true } } }
         })
-        const userMap = new Map(existingUsers.map(u => [u.email.toLowerCase(), u as Record<string, unknown>]))
+        const userMap = new Map(existingUsers.map(u => [u.email.toLowerCase(), u]))
 
-        for (let i = 0; i < rows.length; i++) {
-            const row    = rows[i]
-            const rowNum = i + 2
+        // ── Process all rows in parallel (parallel bcrypt + parallel DB) ──────
+        const results = await Promise.allSettled(
+            rows.map(async (row, i) => {
+                const rowNum    = i + 2
+                const firstName = str(row.firstName)
+                const phone     = str(row.phone)
+                const finalId   = assignedIds[i]
 
-            const firstName = str(row.firstName)
-            const phone     = str(row.phone)
-
-            if (!firstName) {
-                errors.push({ row: rowNum, reason: "Missing required field (First Name)" })
-                skipped++; continue
-            }
-            if (phone && existingPhones.has(phone)) {
-                errors.push({ row: rowNum, reason: `Duplicate: phone ${phone} already exists` })
-                skipped++; continue
-            }
-
-            let userEmail = str(row.email)
-            if (!userEmail) userEmail = phone ? `${phone}@cims.local` : `temp_${i}_${Date.now()}@cims.local`
-            const userEmailLower = userEmail.toLowerCase()
-
-            const existingUser = userMap.get(userEmailLower) as { id: string; email: string; employeeProfile: { id: string } | null } | undefined
-            if (existingUser?.employeeProfile) {
-                errors.push({ row: rowNum, reason: `Duplicate: employee already exists for ${userEmail}` })
-                skipped++; continue
-            }
-
-            // Lookups
-            const siteName = str(row.site)
-            const siteId   = siteName
-                ? (allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase())?.id ?? null)
-                : null
-
-            const deptName     = str(row.department)
-            const departmentId = deptName
-                ? (allDepartments.find(d => d.name.toLowerCase() === deptName.toLowerCase())?.id ?? null)
-                : null
-
-            // Salary fields
-            const hasSalary = row.basicSalary || row.da || row.washing || row.conveyance
-
-            try {
-                // Ensure unique employee ID
-                let finalId = `EMP-${String(nextNum).padStart(4, "0")}`
-                let existing = await prisma.employee.findUnique({ where: { employeeId: finalId } })
-                while (existing) {
-                    nextNum++
-                    finalId  = `EMP-${String(nextNum).padStart(4, "0")}`
-                    existing = await prisma.employee.findUnique({ where: { employeeId: finalId } })
+                if (!firstName) {
+                    return { skip: true, rowNum, reason: "Missing required field (First Name)" }
                 }
-                nextNum++
+                if (phone && existingPhones.has(phone)) {
+                    return { skip: true, rowNum, reason: `Duplicate: phone ${phone} already exists` }
+                }
 
-                // Create / reuse user account
+                let userEmail = str(row.email)
+                if (!userEmail) userEmail = phone ? `${phone}@cims.local` : `temp_${i}_${Date.now()}@cims.local`
+                const userEmailLower = userEmail.toLowerCase()
+
+                const existingUser = userMap.get(userEmailLower)
+                if (existingUser?.employeeProfile) {
+                    return { skip: true, rowNum, reason: `Duplicate: employee already exists for ${userEmail}` }
+                }
+
+                // Lookups
+                const siteName = str(row.site)
+                const siteId   = siteName
+                    ? (allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase())?.id ?? null)
+                    : null
+                const deptName     = str(row.department)
+                const departmentId = deptName
+                    ? (allDepartments.find(d => d.name.toLowerCase() === deptName.toLowerCase())?.id ?? null)
+                    : null
+
+                const hasSalary = row.basicSalary || row.da || row.washing || row.conveyance
+
+                // Parallel: bcrypt hash + (create user if needed)
                 let userId: string
                 if (existingUser) {
                     userId = existingUser.id
                 } else {
                     const defaultPassword = phone || "123456"
-                    const passwordHash    = await bcrypt.hash(defaultPassword, 10)
-                    const newUser         = await prisma.user.create({
+                    // Cost 8 for bulk import (4× faster than 10, still secure for temp passwords)
+                    const passwordHash = await bcrypt.hash(defaultPassword, 8)
+                    const newUser = await prisma.user.create({
                         data: {
                             name:     `${firstName} ${str(row.lastName)}`.trim(),
                             email:    userEmail,
@@ -156,7 +155,6 @@ export async function POST(req: Request) {
                     userId = newUser.id
                 }
 
-                // Resolve status enum
                 const rawStatus = str(row.status).toUpperCase()
                 const validStatuses = ["ACTIVE","INACTIVE","ON_LEAVE","TERMINATED","RESIGNED"]
                 const statusVal = validStatuses.includes(rawStatus) ? rawStatus : "ACTIVE"
@@ -177,7 +175,6 @@ export async function POST(req: Request) {
                         basicSalary:   num(row.basicSalary),
                         branchId:      null,
                         departmentId,
-                        // Personal
                         middleName:       strN(row.middleName),
                         nameAsPerAadhar:  strN(row.nameAsPerAadhar),
                         fathersName:      strN(row.fathersName),
@@ -188,7 +185,6 @@ export async function POST(req: Request) {
                         nationality:      strN(row.nationality),
                         religion:         strN(row.religion),
                         caste:            strN(row.caste),
-                        // Address
                         address:          strN(row.address),
                         city:             strN(row.city),
                         state:            strN(row.state),
@@ -197,24 +193,20 @@ export async function POST(req: Request) {
                         permanentCity:    strN(row.permanentCity),
                         permanentState:   strN(row.permanentState),
                         permanentPincode: strN(row.permanentPincode),
-                        // Identity
                         aadharNumber:  strN(row.aadharNumber),
                         panNumber:     strN(row.panNumber),
                         uan:           strN(row.uan),
                         pfNumber:      strN(row.pfNumber),
                         esiNumber:     strN(row.esiNumber),
                         labourCardNo:  strN(row.labourCardNo),
-                        // Bank
                         bankName:          strN(row.bankName),
                         bankBranch:        strN(row.bankBranch),
                         bankAccountNumber: strN(row.bankAccountNumber),
                         bankIFSC:          strN(row.bankIFSC),
-                        // Emergency
                         emergencyContact1Name:  strN(row.emergencyContact1Name),
                         emergencyContact1Phone: strN(row.emergencyContact1Phone),
                         emergencyContact2Name:  strN(row.emergencyContact2Name),
                         emergencyContact2Phone: strN(row.emergencyContact2Phone),
-                        // Work
                         workSkill:    strN(row.workSkill),
                         natureOfWork: strN(row.natureOfWork),
                         notes:        strN(row.notes),
@@ -222,12 +214,12 @@ export async function POST(req: Request) {
                     },
                 })
 
-                // Fetch the created employee's UUID (needed for salary + deployment)
-                const newEmp = await prisma.employee.findFirst({
+                // Fetch the UUID of the newly created employee
+                const newEmp = await prisma.employee.findUnique({
                     where: { employeeId: finalId }, select: { id: true }
                 })
 
-                // Create salary structure if any salary field provided
+                // Salary structure
                 if (hasSalary && newEmp) {
                     const basic      = num(row.basicSalary)
                     const da         = num(row.da)
@@ -257,7 +249,7 @@ export async function POST(req: Request) {
                     })
                 }
 
-                // Create site deployment if site was provided
+                // Site deployment
                 if (siteId && newEmp) {
                     await prisma.deployment.create({
                         data: {
@@ -267,19 +259,36 @@ export async function POST(req: Request) {
                             isActive:   true,
                         },
                     })
-                } else if (siteName && !siteId) {
-                    // Site name was given but not found in DB — log as a warning row
-                    errors.push({ row: rowNum, reason: `Warning: Site "${siteName}" not found in system (employee imported without site). Please assign site manually.` })
+                } else if (siteName && !siteId && newEmp) {
+                    return {
+                        skip: false, rowNum,
+                        warning: `Site "${siteName}" not found — employee created without site assignment`
+                    }
                 }
 
                 if (phone) existingPhones.add(phone)
-                userMap.set(userEmailLower, { id: userId, email: userEmailLower, employeeProfile: { id: "new" } })
-                imported++
-            } catch (err) {
-                errors.push({ row: rowNum, reason: `DB error: ${(err as Error).message}` })
+                return { skip: false, rowNum }
+            })
+        )
+
+        for (const result of results) {
+            if (result.status === "rejected") {
                 skipped++
+                errors.push({ row: 0, reason: `DB error: ${result.reason?.message ?? result.reason}` })
+            } else {
+                const val = result.value
+                if (val.skip) {
+                    skipped++
+                    errors.push({ row: val.rowNum, reason: val.reason! })
+                } else {
+                    imported++
+                    if ("warning" in val && val.warning) {
+                        errors.push({ row: val.rowNum, reason: val.warning })
+                    }
+                }
             }
         }
+
     } catch {
         return NextResponse.json({ error: "Failed to process import" }, { status: 500 })
     }

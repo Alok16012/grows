@@ -2205,6 +2205,7 @@ export default function EmployeesPage() {
     const [showImportModal, setShowImportModal] = useState(false)
     const [importRows, setImportRows] = useState<Record<string, unknown>[]>([])
     const [importLoading, setImportLoading] = useState(false)
+    const [importProgress, setImportProgress] = useState({ done: 0, total: 0 })
     const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
     const importFileRef = useRef<HTMLInputElement>(null)
 
@@ -2461,17 +2462,35 @@ export default function EmployeesPage() {
     async function handleImportSubmit() {
         if (importRows.length === 0) return
         setImportLoading(true)
+        const BATCH = 50
+        const total = importRows.length
+        setImportProgress({ done: 0, total })
+        let totalImported = 0, totalSkipped = 0
+        const allErrors: { row: number; reason: string }[] = []
         try {
-            const res = await fetch("/api/employees/import", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows: importRows }),
-            })
-            const data = await res.json()
-            setImportResult(data)
-            if (data.imported > 0) {
-                toast.success(`${data.imported} employee(s) imported`)
+            for (let start = 0; start < total; start += BATCH) {
+                const chunk = importRows.slice(start, start + BATCH)
+                const res = await fetch("/api/employees/import", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rows: chunk }),
+                })
+                const data = await res.json()
+                totalImported += data.imported ?? 0
+                totalSkipped  += data.skipped  ?? 0
+                // Adjust row numbers to global offset
+                for (const e of (data.errors ?? [])) {
+                    allErrors.push({ row: e.row + start, reason: e.reason })
+                }
+                setImportProgress({ done: Math.min(start + BATCH, total), total })
+            }
+            const result = { imported: totalImported, skipped: totalSkipped, errors: allErrors }
+            setImportResult(result)
+            if (totalImported > 0) {
+                toast.success(`${totalImported} employee(s) imported`)
                 fetchEmployees()
+            } else {
+                toast.error("No employees imported — check errors below")
             }
         } catch {
             toast.error("Import failed")
@@ -2801,13 +2820,24 @@ export default function EmployeesPage() {
                                         </tbody>
                                     </table>
                                 </div>
+                                {importLoading && importProgress.total > 0 && (
+                                    <div style={{ marginBottom: 10 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>
+                                            <span>Importing… {importProgress.done} / {importProgress.total}</span>
+                                            <span>{Math.round(importProgress.done / importProgress.total * 100)}%</span>
+                                        </div>
+                                        <div style={{ height: 6, borderRadius: 4, background: "var(--border)" }}>
+                                            <div style={{ height: 6, borderRadius: 4, background: "var(--accent)", width: `${Math.round(importProgress.done / importProgress.total * 100)}%`, transition: "width 0.3s" }} />
+                                        </div>
+                                    </div>
+                                )}
                                 <button
                                     onClick={handleImportSubmit}
                                     disabled={importLoading}
                                     style={{ display: "flex", alignItems: "center", gap: "7px", padding: "9px 18px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: importLoading ? "not-allowed" : "pointer", opacity: importLoading ? 0.7 : 1 }}
                                 >
                                     {importLoading && <Loader2 size={14} className="animate-spin" />}
-                                    Import {importRows.length} rows
+                                    {importLoading ? `Importing ${importProgress.done}/${importProgress.total}…` : `Import ${importRows.length} rows`}
                                 </button>
                             </>
                         )}
