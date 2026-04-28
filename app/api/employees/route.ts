@@ -25,6 +25,8 @@ export async function GET(req: Request) {
         const search = searchParams.get("search")
         const employmentType = searchParams.get("employmentType")
         const companyId = searchParams.get("companyId")
+        const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
+        const pageSize = Math.min(100, parseInt(searchParams.get("pageSize") ?? "50"))
 
         const where: Record<string, any> = {}
         if (branchId) where.branchId = branchId
@@ -54,24 +56,36 @@ export async function GET(req: Request) {
             ]
         }
 
-        const employees = await prisma.employee.findMany({
-            where,
-            include: {
-                department: { select: { id: true, name: true } },
-                _count: { select: { attendances: true, leaves: true } },
-                employeeSalary: true,
-                user: { select: { role: true, customRole: { select: { name: true } } } },
-                deployments: {
-                    where: { isActive: true },
-                    include: { site: { select: { id: true, name: true, code: true } } },
-                    take: 1,
-                    orderBy: { startDate: "desc" },
+        const [employees, total] = await Promise.all([
+            prisma.employee.findMany({
+                where,
+                include: {
+                    department: { select: { id: true, name: true } },
+                    employeeSalary: {
+                        select: {
+                            basic: true, da: true, washing: true, conveyance: true,
+                            leaveWithWages: true, otherAllowance: true,
+                            otRatePerHour: true, canteenRatePerDay: true,
+                            complianceType: true, status: true,
+                            hra: true, ctcMonthly: true,
+                        }
+                    },
+                    user: { select: { role: true, customRole: { select: { name: true } } } },
+                    deployments: {
+                        where: { isActive: true },
+                        include: { site: { select: { id: true, name: true, code: true } } },
+                        take: 1,
+                        orderBy: { startDate: "desc" },
+                    },
                 },
-            },
-            orderBy: { createdAt: "desc" },
-        })
+                orderBy: { createdAt: "desc" },
+                take: pageSize,
+                skip: (page - 1) * pageSize,
+            }),
+            prisma.employee.count({ where }),
+        ])
 
-        return NextResponse.json(employees)
+        return NextResponse.json({ employees, total, page, pageSize, totalPages: Math.ceil(total / pageSize) })
     } catch (error) {
         console.error("[EMPLOYEES_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })

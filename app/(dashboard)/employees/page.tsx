@@ -2199,6 +2199,10 @@ export default function EmployeesPage() {
     const [siteFilter, setSiteFilter] = useState("")
     const [sites, setSites] = useState<{ id: string; name: string }[]>([])
     const [allDepts, setAllDepts] = useState<Department[]>([])
+    const [page, setPage] = useState(1)
+    const [totalPages, setTotalPages] = useState(1)
+    const [totalCount, setTotalCount] = useState(0)
+    const PAGE_SIZE = 50
     const [showModal, setShowModal] = useState(false)
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
     const [drawerEmployee, setDrawerEmployee] = useState<Employee | null>(null)
@@ -2224,7 +2228,7 @@ export default function EmployeesPage() {
         }
     }, [status, session, router])
 
-    const fetchEmployees = useCallback(async () => {
+    const fetchEmployees = useCallback(async (p = page) => {
         setLoading(true)
         try {
             const params = new URLSearchParams()
@@ -2233,19 +2237,36 @@ export default function EmployeesPage() {
             if (empTypeFilter) params.set("employmentType", empTypeFilter)
             if (siteFilter) params.set("siteId", siteFilter)
             if (search) params.set("search", search)
+            params.set("page", String(p))
+            params.set("pageSize", String(PAGE_SIZE))
             const res = await fetch(`/api/employees?${params}`)
             const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : [])
+            if (data && data.employees) {
+                setEmployees(Array.isArray(data.employees) ? data.employees : [])
+                setTotalPages(data.totalPages ?? 1)
+                setTotalCount(data.total ?? 0)
+            } else {
+                // fallback for old API shape
+                setEmployees(Array.isArray(data) ? data : [])
+            }
         } catch {
             toast.error("Failed to load employees")
         } finally {
             setLoading(false)
         }
-    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search])
+    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search, page])
 
+    // Debounce: reset to page 1 and refetch when filters change
     useEffect(() => {
-        if (status !== "unauthenticated") fetchEmployees()
-    }, [status, fetchEmployees])
+        if (status === "unauthenticated") return
+        const t = setTimeout(() => { setPage(1); fetchEmployees(1) }, 300)
+        return () => clearTimeout(t)
+    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search, status])
+
+    // Re-fetch when page changes (not debounced)
+    useEffect(() => {
+        if (status !== "unauthenticated") fetchEmployees(page)
+    }, [page])
 
     useEffect(() => {
         fetch("/api/departments").then(r => r.json()).then(data => setAllDepts(Array.isArray(data) ? data : [])).catch(() => {})
@@ -2530,8 +2551,8 @@ export default function EmployeesPage() {
         }
     }
 
-    // Stats
-    const total = employees.length
+    // Stats — use server total for the summary card, page-local for other counts
+    const total = totalCount || employees.length
     const active = employees.filter(e => e.status === "ACTIVE").length
     const onLeave = employees.filter(e => e.status === "ON_LEAVE").length
     const now = new Date()
@@ -2758,6 +2779,44 @@ export default function EmployeesPage() {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 4px", flexWrap: "wrap", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                        Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount} employees
+                    </span>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button onClick={() => setPage(1)} disabled={page === 1}
+                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, color: "var(--text2)" }}>
+                            «
+                        </button>
+                        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, color: "var(--text2)" }}>
+                            ‹ Prev
+                        </button>
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            const p = Math.max(1, Math.min(totalPages - 4, page - 2)) + i
+                            return (
+                                <button key={p} onClick={() => setPage(p)}
+                                    style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 12, cursor: "pointer",
+                                        background: p === page ? "var(--accent)" : "var(--surface)",
+                                        color: p === page ? "#fff" : "var(--text2)", fontWeight: p === page ? 700 : 400 }}>
+                                    {p}
+                                </button>
+                            )
+                        })}
+                        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1, color: "var(--text2)" }}>
+                            Next ›
+                        </button>
+                        <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1, color: "var(--text2)" }}>
+                            »
+                        </button>
                     </div>
                 </div>
             )}
