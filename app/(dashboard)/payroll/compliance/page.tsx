@@ -3,7 +3,7 @@ import { Suspense, useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import * as XLSX from "xlsx"
 import { toast } from "sonner"
-import { Loader2, Download, RefreshCw, ChevronRight, ShieldCheck, AlertCircle, Users, Lock } from "lucide-react"
+import { Loader2, Download, RefreshCw, ChevronRight, ShieldCheck, AlertCircle, Users, Lock, TableProperties } from "lucide-react"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
@@ -128,7 +128,13 @@ function ComplianceInner() {
                     <ShieldCheck size={20} style={{ color: "var(--accent)" }} />
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Compliance Reports</h1>
                 </div>
-                <span style={{ fontSize: 11, color: "var(--text3)" }}>{lockedEmps.length} employees locked</span>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: "var(--text3)" }}>{lockedEmps.length} employees locked</span>
+                    <button onClick={() => router.push(`/payroll/compliance/master?month=${month}&year=${year}`)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, fontWeight: 700, color: "var(--text2)", cursor: "pointer" }}>
+                        <TableProperties size={13} /> Document Master
+                    </button>
+                </div>
             </div>
 
             {/* Stepper */}

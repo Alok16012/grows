@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import {
     Loader2, RefreshCw, Play, FileSpreadsheet,
     ShieldCheck, Lock, Upload, IndianRupee,
-    ChevronRight, AlertCircle, CheckCircle2, Clock, TableProperties
+    ChevronRight, AlertCircle, CheckCircle2, Clock, TableProperties, Trash2
 } from "lucide-react"
 
 type PayrollRun = {
@@ -39,6 +39,18 @@ export default function PayrollPage() {
     const [runs, setRuns] = useState<PayrollRun[]>([])
     const [loading, setLoading] = useState(true)
     const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()))
+    const [deleting, setDeleting] = useState<string | null>(null)
+
+    const deleteRun = async (run: PayrollRun) => {
+        if (!confirm(`Delete ${MONTHS[run.month - 1]} ${run.year} payroll run? This cannot be undone.`)) return
+        setDeleting(run.id)
+        try {
+            const res = await fetch(`/api/payroll/reset?month=${run.month}&year=${run.year}&action=delete`, { method: "DELETE" })
+            if (res.ok) { toast.success("Payroll run deleted"); fetchRuns() }
+            else toast.error(await res.text())
+        } catch { toast.error("Delete failed") }
+        finally { setDeleting(null) }
+    }
 
     const fetchRuns = useCallback(async () => {
         setLoading(true)
@@ -55,7 +67,6 @@ export default function PayrollPage() {
     const currentYear  = new Date().getFullYear()
     const thisMonthRun = runs.find(r => r.month === currentMonth && r.year === currentYear)
 
-    const totalEmployees = runs.reduce((s, r) => s + r._count.payrolls, 0)
     const totalGrossYTD  = runs.reduce((s, r) => s + r.totalGross, 0)
     const totalNetYTD    = runs.reduce((s, r) => s + r.totalNet, 0)
 
@@ -218,6 +229,10 @@ export default function PayrollPage() {
                                                 <button onClick={() => router.push(`/payroll/salary-slips?month=${run.month}&year=${run.year}`)}
                                                     style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                                     Slips
+                                                </button>
+                                                <button onClick={() => deleteRun(run)} disabled={deleting === run.id}
+                                                    style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #fca5a5", background: "none", fontSize: 11, color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+                                                    {deleting === run.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                                                 </button>
                                             </div>
                                         </td>
