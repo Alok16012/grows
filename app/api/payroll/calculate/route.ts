@@ -22,12 +22,15 @@ export async function POST(req: Request) {
 
         if (!month || !year) return new NextResponse("Month and Year required", { status: 400 })
 
-        // Get or create payroll run
+        // Get or create payroll run — always allow recalculation by resetting to DRAFT
         let runId: string
         const existing = await prisma.payrollRun.findUnique({ where: { month_year: { month, year } } })
         if (existing) {
             if (existing.status !== "DRAFT") {
-                return new NextResponse(`Payroll ${month}/${year} is ${existing.status} — cannot recalculate.`, { status: 400 })
+                await prisma.payrollRun.update({
+                    where: { id: existing.id },
+                    data: { status: "DRAFT", processedBy: session.user.id ?? "system" }
+                })
             }
             runId = existing.id
         } else {
