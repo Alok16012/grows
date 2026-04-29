@@ -33,8 +33,9 @@ function calc(s: SalaryRow) {
     const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
     const empPF  = isCALL ? 0 : 1950
     // ESIC employer applies only if full-month gross ≤ ₹21,000
+    // Base = gross − washing only (bonus NOT deducted per verified formula)
     const empESI = (!isCALL && gross <= 21000)
-        ? Math.ceil((gross - wash - bonus) * 0.0325)
+        ? Math.ceil((gross - wash) * 0.0325)
         : 0
     // Employee deductions
     const empPFDed = isCALL ? 0 : Math.min(Math.round((basic + da) * 0.12), 1800)

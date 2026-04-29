@@ -1,23 +1,29 @@
 // ─── Growus Salary Formula ────────────────────────────────────────────────────
 //
+// Verified against actual VARROC PUNE wage sheet (MAR CAL).
+//
 // complianceType:
 //   "CALL" → No PF, No ESIC  (temporary / contract / non-compliance roles)
 //   "OR"   → PF + ESIC apply  (full-time / full-compliance roles)
 //
-// PT (Professional Tax – Maharashtra slab):
+// HRA:    (Basic + DA) × 5%
+// Bonus:  (Basic + DA) × 8.33%  — statutory; CALL employees get ₹0
+//
+// OT Pay: ROUND(FullMonthGross / MonthDays × OT_Days, 0)
+//   OT_Days = actual overtime days from attendance (each day = 1 extra working day)
+//
+// PF Employee:  IF(WorkedDays > 26, 1800, ROUND(15000/26 × WorkedDays × 12%))
+// PF Employer:  ROUND(15000 × 13%) = ₹1,950  (fixed)
+//
+// ESIC eligibility: based on FULL MONTH gross rate ≤ ₹21,000
+//   Employee: CEIL(EarnedGross − Washing_earned − Bonus_earned) × 0.75%)
+//   Employer: CEIL((FullMonthGross − Washing) × 3.25%)
+//
+// PT (Professional Tax – Maharashtra slab, on earned gross):
 //   Gross ≤ ₹7,500              → ₹0
 //   Gross ₹7,501–₹10,000       → ₹175
 //   Gross > ₹10,000 (non-Feb)  → ₹200
 //   Gross > ₹10,000 (February) → ₹300  (annual ₹100 adjustment)
-//
-// ESIC:
-//   Applicable only when FULL MONTH gross rate ≤ ₹21,000 (not prorated earned)
-//   Employee: 0.75%   Employer: 3.25%  of (earned gross − washing − bonus)
-//
-// Bonus: 8.33% of (Basic + DA) — statutory bonus formula
-//
-// OT: otDays from attendance = OT hours directly (no ×4 multiplier)
-//     OT Pay = otDays × otRatePerHour
 //
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
@@ -34,7 +40,7 @@ export function calcGrowusPayroll(sal: {
 }) {
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
-        otRatePerHour, canteenRatePerDay,
+        canteenRatePerDay,
         complianceType = "OR",
     } = sal
 
@@ -64,25 +70,25 @@ export function calcGrowusPayroll(sal: {
     const bonusEarned   = r(bonusFull)
     const otherEarned   = r(otherAllowance)
 
-    // OT pay: otDays = OT hours from attendance (1 OT day = 1 OT hour, no ×4)
-    const otPay = Math.round(otRatePerHour * otDays)
+    // OT Pay: ROUND(FullMonthGross / MonthDays × OT_Days, 0)
+    // Each OT_Day = 1 extra working day at the daily gross rate
+    const otPay = Math.round(grossFullMonth / monthDays * otDays)
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
         lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)
 
     // ─── Deductions ───────────────────────────────────────────────────────────
 
-    // PF: OR compliance only. ROUND(15000/26 × workedDays × 12%, 0), cap ₹1,800
+    // PF: OR compliance only. IF(WorkedDays>26, 1800, ROUND(15000/26×WorkedDays×12%))
     const pfEmployee = isCALL ? 0
         : (workedDays >= 26
             ? 1800
             : Math.round((15000 / 26) * workedDays * 0.12))
 
-    // ESIC eligibility: based on FULL MONTH gross rate (not earned amount)
-    // An employee is covered if their monthly wage rate is ≤ ₹21,000
-    const esicEligible  = !isCALL && grossFullMonth <= 21000
-    const esicBase      = grossEarned - washingEarned - bonusEarned
-    const esiEmployee   = esicEligible ? Math.ceil(esicBase * 0.0075) : 0
+    // ESIC eligibility: based on FULL MONTH gross rate ≤ ₹21,000
+    const esicEligible = !isCALL && grossFullMonth <= 21000
+    const esicBase     = grossEarned - washingEarned - bonusEarned
+    const esiEmployee  = esicEligible ? Math.ceil(esicBase * 0.0075) : 0
 
     // PT: Maharashtra slab on earned gross
     const pt = grossEarned <= 7500  ? 0
@@ -101,22 +107,23 @@ export function calcGrowusPayroll(sal: {
     const netSalary = grossEarned - totalDeductions
 
     // ─── Employer Contributions ───────────────────────────────────────────────
-    // Employer PF: 13% of ₹15,000 = ₹1,950 (12% EPF/EPS + 0.5% EDLI + 0.5% admin)
+    // PF Employer: ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
     const pfEmployer = isCALL ? 0 : Math.round(15000 * 0.13)
 
-    // Employer ESIC: 3.25% of (fullGross − washing − bonus), based on full month rate
+    // ESIC Employer: ROUNDUP((FullMonthGross − Washing) × 3.25%)
+    // Base = full month gross minus washing allowance only (bonus excluded per formula)
     const esiEmployer = esicEligible
-        ? Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
+        ? Math.ceil((grossFullMonth - washing) * 0.0325)
         : 0
 
     const ctc = grossFullMonth + pfEmployer + esiEmployer
 
     return {
-        // Full month
+        // Full month (rate/structure)
         basicFull: basic, daFull: da, hraFull, washingFull: washing,
         conveyanceFull: conveyance, lwwFull: leaveWithWages, bonusFull,
         otherFull: otherAllowance, grossFullMonth,
-        // Earned
+        // Earned (prorated)
         basicSalary: basicEarned, da: daEarned, hra: hraEarned,
         washing: washingEarned, conveyance: convEarned, lwwEarned,
         bonus: bonusEarned, allowances: otherEarned,

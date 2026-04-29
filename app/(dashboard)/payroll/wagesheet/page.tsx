@@ -16,13 +16,19 @@ type Payroll = {
     id: string; month: number; year: number; status: string
     // Full-month rate values
     basicFull: number; daFull: number; hraFull: number; washingFull: number
-    conveyanceFull: number; lwwFull: number; bonusFull: number; grossFullMonth: number
+    conveyanceFull: number; lwwFull: number; bonusFull: number
+    otherFull: number; grossFullMonth: number
     // Earned (prorated) values
     basicSalary: number; da: number; hra: number; washing: number; conveyance: number
-    lwwEarned: number; bonus: number; overtimePay: number; overtimeHrs: number; grossSalary: number
+    lwwEarned: number; bonus: number; allowances: number
+    otDays: number; overtimePay: number; overtimeHrs: number
+    productionIncentive: number; grossSalary: number
+    // Deductions
     pfEmployee: number; esiEmployee: number; pt: number; lwf: number
     canteen: number; canteenDays: number; penalty: number; advance: number; otherDeductions: number
     totalDeductions: number; netSalary: number
+    // Employer contributions & CTC
+    pfEmployer: number; esiEmployer: number; ctc: number
     workingDays: number | null; presentDays: number | null
     employee: {
         employeeId: string; firstName: string; lastName: string; designation: string | null
@@ -143,54 +149,110 @@ function WageSheetInner() {
 
     const buildFormIIAoa = (rows: Payroll[], siteName: string, m: number, y: number) => {
         const monthName = MONTHS[m - 1].toUpperCase()
+        // ── Columns exactly matching the Growus wage sheet format ───────────────
         const headers = [
-            "Sr.No", "Emp Code", "Employee Name", "UAN", "PF No.", "ESIC No.", "IFSC CODE", "ACCOUNT NO.",
-            "Days Paid", "OT Hrs",
-            "Basic_R", "DA_R", "HRA_R", "Conv_R", "Washing_R", "Leave_R", "Bonus_R", "",
-            "BASIC", "DA", "HRA", "CONVEYANCE ALLOWANCE", "WASHING ALLOW", "LEAVE AMT", "BONUS AMT",
-            "OT Amt", "Gross Earning",
-            "PF", "ESIC", "PT", "LWF", "CANTEEN", "OTHER DED", "ADVANCE", "Tot Ded", "Net Pay", "Signature",
+            // Identity
+            "Sr.No", "Emp Code", "Employee Name", "Bank A/C No.", "IFSC", "UAN", "PF No.", "ESIC No.",
+            // Attendance
+            "Month Days", "LOP", "Days Paid", "OT Days", "OT Hrs",
+            // STRUCTURE (full month rate)
+            "Basic(R)", "DA(R)", "HRA(R)", "Washing(R)", "Conv.(R)", "LWW(R)", "Bonus(R)", "Other(R)", "Gross(R)",
+            // EARNED (prorated)
+            "Basic", "DA", "HRA", "Washing", "Conv.", "LWW", "Bonus", "Other", "OT Amt", "Prod.Inc", "Gross Earning",
+            // Deductions
+            "PF(Emp)", "ESIC(Emp)", "PT", "LWF", "Canteen", "Other Ded.", "Advance", "Penalty", "Tot. Ded.", "Net Pay",
+            // Employer / CTC
+            "PF(Er)", "ESIC(Er)", "CTC",
+            // Signature
+            "Signature",
         ]
-        const dataRows = rows.map((p, i) => [
-            i + 1, p.employee.employeeId,
-            `${p.employee.firstName} ${p.employee.lastName}`,
-            p.employee.uan ?? "", p.employee.pfNumber ?? "", p.employee.esiNumber ?? "",
-            p.employee.bankIFSC ?? "", p.employee.bankAccountNumber ?? "",
-            p.presentDays ?? p.workingDays ?? 0, Math.round(p.overtimeHrs ?? 0),
-            // RATE columns — full-month salary structure values
-            Math.round(p.basicFull ?? p.basicSalary), Math.round(p.daFull ?? p.da),
-            Math.round(p.hraFull ?? p.hra), Math.round(p.conveyanceFull ?? p.conveyance),
-            Math.round(p.washingFull ?? p.washing), Math.round(p.lwwFull ?? p.lwwEarned),
-            Math.round(p.bonusFull ?? p.bonus), "",
-            // EARNED columns — actual prorated amounts
-            Math.round(p.basicSalary), Math.round(p.da), Math.round(p.hra),
-            Math.round(p.conveyance), Math.round(p.washing),
-            Math.round(p.lwwEarned), Math.round(p.bonus),
-            Math.round(p.overtimePay), Math.round(p.grossSalary),
-            Math.round(p.pfEmployee), Math.round(p.esiEmployee),
-            Math.round(p.pt), Math.round(p.lwf), Math.round(p.canteen),
-            Math.round(p.otherDeductions), Math.round(p.advance),
-            Math.round(p.totalDeductions), Math.round(p.netSalary), "",
-        ])
+        const dataRows = rows.map((p, i) => {
+            const monthDays  = p.workingDays  ?? 26
+            const workedDays = p.presentDays  ?? monthDays
+            const lop        = monthDays - workedDays
+            const otDays     = p.otDays       ?? 0   // actual OT days worked
+            const otHrs      = p.overtimeHrs  ?? Math.round(otDays * 8) // actual OT hours (fallback: days×8)
+            return [
+                // Identity
+                i + 1,
+                p.employee.employeeId,
+                `${p.employee.firstName} ${p.employee.lastName}`.trim(),
+                p.employee.bankAccountNumber ?? "",
+                p.employee.bankIFSC ?? "",
+                p.employee.uan ?? "",
+                p.employee.pfNumber ?? "",
+                p.employee.esiNumber ?? "",
+                // Attendance
+                monthDays, lop, workedDays, otDays, otHrs,
+                // STRUCTURE
+                Math.round(p.basicFull    ?? p.basicSalary),
+                Math.round(p.daFull       ?? p.da),
+                Math.round(p.hraFull      ?? p.hra),
+                Math.round(p.washingFull  ?? p.washing),
+                Math.round(p.conveyanceFull ?? p.conveyance),
+                Math.round(p.lwwFull      ?? p.lwwEarned),
+                Math.round(p.bonusFull    ?? p.bonus),
+                Math.round(p.otherFull),
+                Math.round(p.grossFullMonth),
+                // EARNED
+                Math.round(p.basicSalary),
+                Math.round(p.da),
+                Math.round(p.hra),
+                Math.round(p.washing),
+                Math.round(p.conveyance),
+                Math.round(p.lwwEarned),
+                Math.round(p.bonus),
+                Math.round(p.allowances),
+                Math.round(p.overtimePay),
+                Math.round(p.productionIncentive),
+                Math.round(p.grossSalary),
+                // Deductions
+                Math.round(p.pfEmployee),
+                Math.round(p.esiEmployee),
+                Math.round(p.pt),
+                Math.round(p.lwf),
+                Math.round(p.canteen),
+                Math.round(p.otherDeductions),
+                Math.round(p.advance),
+                Math.round(p.penalty),
+                Math.round(p.totalDeductions),
+                Math.round(p.netSalary),
+                // Employer / CTC
+                Math.round(p.pfEmployer),
+                Math.round(p.esiEmployer),
+                Math.round(p.ctc),
+                // Signature
+                "",
+            ]
+        })
         const sum = (fn: (p: Payroll) => number) => Math.round(rows.reduce((s, p) => s + fn(p), 0))
         const totRow = [
             "", "", "TOTAL", "", "", "", "", "",
-            sum(p => p.presentDays ?? p.workingDays ?? 0), "",
-            ...Array(8).fill(""),
+            "", "", sum(p => p.presentDays ?? p.workingDays ?? 0), "", "",
+            // STRUCTURE totals
+            sum(p => p.basicFull ?? p.basicSalary), sum(p => p.daFull ?? p.da),
+            sum(p => p.hraFull   ?? p.hra),          sum(p => p.washingFull ?? p.washing),
+            sum(p => p.conveyanceFull ?? p.conveyance), sum(p => p.lwwFull ?? p.lwwEarned),
+            sum(p => p.bonusFull), sum(p => p.otherFull),
+            sum(p => p.grossFullMonth),
+            // EARNED totals
             sum(p => p.basicSalary), sum(p => p.da), sum(p => p.hra),
-            sum(p => p.conveyance), sum(p => p.washing),
-            sum(p => p.lwwEarned), sum(p => p.bonus),
-            sum(p => p.overtimePay), sum(p => p.grossSalary),
-            sum(p => p.pfEmployee), sum(p => p.esiEmployee),
-            sum(p => p.pt), sum(p => p.lwf), sum(p => p.canteen),
-            sum(p => p.otherDeductions), sum(p => p.advance),
-            sum(p => p.totalDeductions), sum(p => p.netSalary), "",
+            sum(p => p.washing), sum(p => p.conveyance), sum(p => p.lwwEarned),
+            sum(p => p.bonus), sum(p => p.allowances),
+            sum(p => p.overtimePay), sum(p => p.productionIncentive), sum(p => p.grossSalary),
+            // Deduction totals
+            sum(p => p.pfEmployee), sum(p => p.esiEmployee), sum(p => p.pt),
+            sum(p => p.lwf), sum(p => p.canteen), sum(p => p.otherDeductions),
+            sum(p => p.advance), sum(p => p.penalty),
+            sum(p => p.totalDeductions), sum(p => p.netSalary),
+            // Employer totals
+            sum(p => p.pfEmployer), sum(p => p.esiEmployer), sum(p => p.ctc),
+            "",
         ]
         return [
             [`FORM (II) M.W. RULES Rule (27)(1)`],
             [`SALARIES / WAGES REGISTER FOR THE MONTH OF ${monthName} ${y}`],
-            [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", "", "",
-             "PF CODE: PUPUN2450654000", "", "", "ESIC CODE: 33000891430000999"],
+            [`SITE: ${siteName}`],
             headers,
             ...dataRows,
             totRow,
@@ -212,7 +274,16 @@ function WageSheetInner() {
                 if (!rows.length) continue
                 const aoa = buildFormIIAoa(rows, site?.name ?? siteId, m, y)
                 const ws = XLSX.utils.aoa_to_sheet(aoa)
-                const colWidths = [6,12,26,14,18,10,8, 10,8,8,10,10,10,10,4, 10,8,8,14,12,10,10, 10,14, 8,8,6,6,8,10,10,12,10,12]
+                // 47 columns: Identity(8) + Attendance(5) + Structure(9) + Earned(11) + Deductions(10) + Employer(3) + Signature(1)
+                const colWidths = [
+                    5,10,24,14,12,12,10,10,   // Identity
+                    8,5,8,7,6,                 // Attendance
+                    8,7,7,9,7,7,8,7,9,         // Structure (rate)
+                    8,7,7,8,7,7,8,7,8,8,11,   // Earned
+                    8,9,6,6,8,9,8,8,9,9,       // Deductions
+                    7,8,10,                    // Employer/CTC
+                    12,                        // Signature
+                ]
                 ws["!cols"] = colWidths.map(w => ({ wch: w }))
                 const sheetName = (site?.name ?? siteId).replace(/[^a-zA-Z0-9 ]/g, "").trim().slice(0, 31) || `Site${sheetsAdded+1}`
                 XLSX.utils.book_append_sheet(wb, ws, sheetName)
