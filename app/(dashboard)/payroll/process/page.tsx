@@ -87,10 +87,10 @@ function ProcessPayrollPage() {
         setFetched(false)
         setEmployees([])
         try {
-            const res = await fetch(`/api/employees?siteId=${siteId}&status=ACTIVE`)
+            const res = await fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=500`)
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : [])
+            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
             setFetched(true)
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Failed to fetch employees")
@@ -178,8 +178,11 @@ function ProcessPayrollPage() {
                 )
                 const workedDaysVal = workedDaysRaw !== undefined ? Number(workedDaysRaw) : defaultDays
 
+                const monthDaysRaw = col(obj, "MONTH DAYS", "MONTH WORKING DAYS", "MONTHDAYS", "WORKING DAYS IN MONTH", "TOTAL DAYS")
+                const monthDaysVal = monthDaysRaw !== undefined ? Number(monthDaysRaw) : defaultDays
+
                 updates[empId] = {
-                    monthDays:  defaultDays,  // always 26 — NOT from Excel
+                    monthDays:  monthDaysVal > 0 ? monthDaysVal : defaultDays,
                     workedDays: workedDaysVal > 0 ? workedDaysVal : defaultDays,
                     otDays:     Number(col(obj,
                         "OT DAYS", "OT HRS", "OTDAYS", "OTHOURS", "OT", "OVERTIME",
