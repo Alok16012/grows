@@ -569,36 +569,53 @@ function ProcessPayrollPage() {
                                 </div>
 
                                 <div style={{ overflowX: "auto" }}>
-                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                    <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                                         <thead>
+                                            {/* ── Section group headers (matches VARROC PUNE Excel layout) ── */}
+                                            <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                                                <th colSpan={3} style={{ ...thGroup, color: "#1B3A6B", background: "#DCE6F1" }}>IDENTIFICATION</th>
+                                                <th colSpan={11} style={{ ...thGroup, color: "#1B3A6B", background: "#D6E4F5" }}>ATTENDANCE (editable)</th>
+                                                <th colSpan={9} style={{ ...thGroup, color: "#1D6B3E", background: "#D5EDDA" }}>SALARY STRUCTURE (full month)</th>
+                                                <th rowSpan={2} style={{ ...th, background: "#FFF8E1", color: "#7B5E00" }}>Status</th>
+                                            </tr>
+                                            {/* ── Column labels ── */}
                                             <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
                                                 <th style={th}>#</th>
-                                                <th style={th}>Emp ID</th>
-                                                <th style={{ ...th, textAlign: "left" }}>Name / Designation</th>
-                                                <th style={th}>Basic</th>
-                                                <th style={th}>DA</th>
-                                                <th style={th}>Washing</th>
-                                                <th style={th}>Conv.</th>
-                                                <th style={th}>Other</th>
-                                                <th style={{ ...th, color: "#0369a1" }}>Gross</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Work Days</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Present</th>
-                                                <th style={th}>OT</th>
-                                                <th style={th}>Canteen</th>
-                                                <th style={th}>Advance</th>
-                                                <th style={th}>Penalty</th>
-                                                <th style={th}>Status</th>
+                                                <th style={th}>Emp Code</th>
+                                                <th style={{ ...th, textAlign: "left" }}>Name</th>
+                                                {/* Attendance — D to I + extras */}
+                                                <th style={{ ...th, background: "#eff6ff" }}>Month<br/>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>LOP</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Hrs</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Canteen<br/>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Other<br/>Ded</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>LWF</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Penalty</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Advance</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Prod<br/>Inc</th>
+                                                {/* Salary Structure — J to R */}
+                                                <th style={{ ...th, background: "#f0fdf4" }}>BASIC</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>DA</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>HRA</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>Washing</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>Convence</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>LWW</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>BONUS</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>Other</th>
+                                                <th style={{ ...th, background: "#dcfce7", color: "#15803d" }}>GROSS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {loadingEmployees ? (
-                                                <tr><td colSpan={16} style={{ padding: "40px 0", textAlign: "center" }}>
+                                                <tr><td colSpan={24} style={{ padding: "40px 0", textAlign: "center" }}>
                                                     <Loader2 size={20} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} />
                                                 </td></tr>
                                             ) : !fetched ? (
-                                                <tr><td colSpan={16} style={{ padding: "30px", textAlign: "center", color: "var(--text3)", fontSize: 12 }}>Loading…</td></tr>
+                                                <tr><td colSpan={24} style={{ padding: "30px", textAlign: "center", color: "var(--text3)", fontSize: 12 }}>Loading…</td></tr>
                                             ) : filtered.length === 0 ? (
-                                                <tr><td colSpan={16} style={{ padding: "30px 16px", textAlign: "center" }}>
+                                                <tr><td colSpan={24} style={{ padding: "30px 16px", textAlign: "center" }}>
                                                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: "var(--text3)", fontSize: 12 }}>
                                                         <Users size={24} style={{ opacity: 0.2 }} />
                                                         {employees.length === 0 ? "No active employees found at this site" : "No results match your search"}
@@ -609,9 +626,16 @@ function ProcessPayrollPage() {
                                                 const att      = attRows[emp.id] ?? {}
                                                 const isCALL   = sal?.complianceType === "CALL"
                                                 const hra      = sal && !isCALL ? Math.round((sal.basic + sal.da) * 0.05) : 0
-                                                const bonus    = sal && !isCALL ? Math.round(7000 / 12) : 0
+                                                // Bonus: prefer stored value, else (basic+da) × 8.33% (Payment of Bonus Act)
+                                                const storedBonus = (sal as any)?.bonus
+                                                const bonus    = sal && !isCALL ? (storedBonus != null && storedBonus > 0 ? storedBonus : Math.round((sal.basic + sal.da) * 0.0833)) : 0
                                                 const fullGross = sal ? sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance : 0
                                                 const approved = sal?.status === "APPROVED"
+                                                const monthDays  = att.monthDays  ?? defaultDays
+                                                const workedDays = att.workedDays ?? defaultDays
+                                                const lop        = monthDays - workedDays
+                                                const otDays     = att.otDays ?? 0
+                                                const otHrs      = Math.round(otDays * 8 * 100) / 100
                                                 return (
                                                     <tr key={emp.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>
                                                         <td style={td}>{i + 1}</td>
@@ -620,36 +644,56 @@ function ProcessPayrollPage() {
                                                             <div style={{ fontWeight: 600, color: "var(--text)" }}>{emp.firstName} {emp.lastName}</div>
                                                             <div style={{ fontSize: 10, color: "var(--text3)" }}>{emp.designation || "—"}</div>
                                                         </td>
-                                                        <td style={td}>{sal ? fmt(sal.basic) : "—"}</td>
-                                                        <td style={td}>{sal ? fmt(sal.da) : "—"}</td>
-                                                        <td style={td}>{sal ? fmt(sal.washing) : "—"}</td>
-                                                        <td style={td}>{sal ? fmt(sal.conveyance) : "—"}</td>
-                                                        <td style={td}>{sal ? fmt(sal.otherAllowance) : "—"}</td>
-                                                        <td style={{ ...td, fontWeight: 700, color: "#0369a1" }}>{fmt(fullGross)}</td>
+                                                        {/* ── ATTENDANCE (editable inputs) ─────────────────────── */}
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={1} max={31} value={att.monthDays ?? defaultDays}
                                                                 onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={attInput} />
                                                         </td>
+                                                        <td style={{ ...td, background: "#eff6ff", color: lop < 0 ? "#16a34a" : (lop > 0 ? "#dc2626" : "var(--text3)"), fontWeight: 700, fontSize: 10 }}>{lop}</td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} max={31} value={att.workedDays ?? defaultDays}
                                                                 onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={attInput} />
                                                         </td>
-                                                        <td style={td}>
-                                                            <input type="number" min={0} value={att.otDays ?? 0}
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
+                                                            <input type="number" min={0} step="0.01" value={att.otDays ?? 0}
                                                                 onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={attInput} />
                                                         </td>
-                                                        <td style={td}>
+                                                        <td style={{ ...td, background: "#eff6ff", color: "var(--text3)", fontSize: 10 }}>{otHrs}</td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.canteenDays ?? 0}
                                                                 onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={attInput} />
                                                         </td>
-                                                        <td style={td}>
-                                                            <input type="number" min={0} value={att.advance ?? 0}
-                                                                onChange={e => setAtt(emp.id, "advance", e.target.value)} style={attInput} />
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
+                                                            <input type="number" min={0} value={att.otherDeductions ?? 0}
+                                                                onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={attInput} />
                                                         </td>
-                                                        <td style={td}>
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
+                                                            <input type="number" min={0} value={att.lwf ?? 0}
+                                                                onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={attInput} />
+                                                        </td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.penalty ?? 0}
                                                                 onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={attInput} />
                                                         </td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
+                                                            <input type="number" min={0} value={att.advance ?? 0}
+                                                                onChange={e => setAtt(emp.id, "advance", e.target.value)} style={attInput} />
+                                                        </td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
+                                                            <input type="number" min={0} value={att.productionIncentive ?? 0}
+                                                                onChange={e => setAtt(emp.id, "productionIncentive", e.target.value)} style={attInput} />
+                                                        </td>
+                                                        {/* ── SALARY STRUCTURE (full month, read-only) ─────────── */}
+                                                        <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.basic) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.da) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4", color: "#1d4ed8" }} title="Auto: (Basic+DA)×5%">{sal ? fmt(hra) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.washing) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.conveyance) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.leaveWithWages) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4", color: "#1d4ed8" }} title="Per Bonus Act">{sal ? fmt(bonus) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.otherAllowance) : "—"}</td>
+                                                        <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>{fmt(fullGross)}</td>
+                                                        {/* ── STATUS ──────────────────────────────────────────── */}
                                                         <td style={td}>
                                                             <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
                                                                 <span style={{ padding: "2px 7px", borderRadius: 20, fontSize: 9, fontWeight: 700,
@@ -674,13 +718,39 @@ function ProcessPayrollPage() {
                                                     <td colSpan={3} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>
                                                         Total ({employees.length})
                                                     </td>
-                                                    <td style={td}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.basic ?? 0), 0))}</td>
-                                                    <td style={td}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.da ?? 0), 0))}</td>
-                                                    <td style={td}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.washing ?? 0), 0))}</td>
-                                                    <td style={td}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.conveyance ?? 0), 0))}</td>
-                                                    <td style={td}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.otherAllowance ?? 0), 0))}</td>
-                                                    <td style={{ ...td, color: "#0369a1" }}>{fmt(totalGrossEst)}</td>
-                                                    <td colSpan={7} />
+                                                    {/* Attendance totals (11 cols) */}
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays  ?? defaultDays)), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? defaultDays)), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.workedDays ?? defaultDays)), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + ((attRows[e.id]?.otDays ?? 0)), 0) * 1000) / 1000}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + ((attRows[e.id]?.otDays ?? 0) * 8), 0) * 100) / 100}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.otherDeductions ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.lwf ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.penalty ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.advance ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.productionIncentive ?? 0), 0)}</td>
+                                                    {/* Structure totals (9 cols) */}
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.basic ?? 0), 0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.da ?? 0), 0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => {
+                                                        const sa = e.employeeSalary
+                                                        if (!sa || sa.complianceType === "CALL") return s
+                                                        return s + Math.round((sa.basic + sa.da) * 0.05)
+                                                    }, 0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.washing ?? 0), 0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.conveyance ?? 0), 0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.leaveWithWages ?? 0), 0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => {
+                                                        const sa = e.employeeSalary as any
+                                                        if (!sa || sa.complianceType === "CALL") return s
+                                                        const stored = sa.bonus
+                                                        const b = (stored != null && stored > 0) ? stored : Math.round((sa.basic + sa.da) * 0.0833)
+                                                        return s + b
+                                                    }, 0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.otherAllowance ?? 0), 0))}</td>
+                                                    <td style={{ ...td, background: "#dcfce7", color: "#15803d" }}>{fmt(totalGrossEst)}</td>
+                                                    <td />
                                                 </tr>
                                             </tfoot>
                                         )}
@@ -724,6 +794,11 @@ const selectSt: React.CSSProperties = {
 const th: React.CSSProperties = {
     padding: "8px 10px", fontSize: 10, fontWeight: 700, color: "var(--text3)",
     textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center", whiteSpace: "nowrap"
+}
+const thGroup: React.CSSProperties = {
+    padding: "5px 10px", fontSize: 9, fontWeight: 800, textAlign: "center",
+    textTransform: "uppercase", letterSpacing: "0.6px", borderBottom: "1px solid var(--border)",
+    whiteSpace: "nowrap"
 }
 const td: React.CSSProperties = {
     padding: "6px 10px", textAlign: "center", color: "var(--text)", whiteSpace: "nowrap"

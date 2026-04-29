@@ -854,42 +854,94 @@ function WageSheetInner() {
                                     <span style={{ fontSize: 11, color: "var(--text3)", whiteSpace: "nowrap" }}>{filtered.length}/{data.length}</span>
                                 </div>
                                 <div style={{ overflowX: "auto" }}>
-                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                    <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                                         <thead>
+                                            {/* ── Section group headers (matches original VARROC PUNE Excel) ── */}
                                             <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
-                                                <th style={th} rowSpan={2}>
+                                                <th colSpan={5} style={{ ...thSec, color: "#1B3A6B", background: "#DCE6F1" }}>IDENTIFICATION</th>
+                                                <th colSpan={5} style={{ ...thSec, color: "#1B3A6B", background: "#D6E4F5" }}>ATTENDANCE</th>
+                                                <th colSpan={9} style={{ ...thSec, color: "#1D6B3E", background: "#D5EDDA" }}>SALARY STRUCTURE (Full Month)</th>
+                                                <th colSpan={11} style={{ ...thSec, color: "#7B5E00", background: "#FFF2CC" }}>EARNED SALARY (Prorated)</th>
+                                                <th colSpan={9} style={{ ...thSec, color: "#8B1A1A", background: "#FCE4D6" }}>DEDUCTIONS</th>
+                                                <th rowSpan={2} style={{ ...th, background: "#D9EAD3", color: "#145214" }}>NET<br/>PAY</th>
+                                                <th colSpan={3} style={{ ...thSec, color: "#0D4A6B", background: "#CFE2F3" }}>EMPLOYER CONTRI</th>
+                                            </tr>
+                                            {/* ── Column labels ── */}
+                                            <tr style={{ background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
+                                                {/* Identification */}
+                                                <th style={th}>
                                                     <input type="checkbox"
                                                         checked={filtered.length > 0 && filtered.every(p => selectedIds.has(p.id))}
                                                         onChange={() => toggleAll(filtered)}
                                                         style={{ cursor: "pointer", accentColor: "var(--accent)" }} />
                                                 </th>
-                                                <th style={th} rowSpan={2}>#</th>
-                                                <th style={th} rowSpan={2}>Emp ID</th>
-                                                <th style={{ ...th, textAlign: "left" }} rowSpan={2}>Name</th>
-                                                <th style={th} rowSpan={2}>Desig.</th>
-                                                <th style={th} rowSpan={2}>P.Days</th>
-                                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }} colSpan={9}>Earnings (₹)</th>
-                                                <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }} colSpan={7}>Deductions (₹)</th>
-                                                <th style={{ ...th, background: "#f0fdf4", color: "#16a34a" }} rowSpan={2}>Net Pay</th>
-                                            </tr>
-                                            <tr style={{ background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
-                                                {["Basic","DA","HRA","Wash","Conv.","Bonus","OT Hrs","OT Amt","Gross"].map(h => <th key={h} style={{ ...th, background: "#eff6ff" }}>{h}</th>)}
-                                                {["PF","ESI","PT","LWF","Canteen","Penalty","Adv."].map(h => <th key={h} style={{ ...th, background: "#fef2f2" }}>{h}</th>)}
+                                                <th style={th}>SR</th>
+                                                <th style={th}>EMP CODE</th>
+                                                <th style={{ ...th, textAlign: "left" }}>NAME</th>
+                                                <th style={th}>DESIG.</th>
+                                                {/* Attendance — D to I */}
+                                                <th style={{ ...th, background: "#eff6ff" }}>Month<br/>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>LOP</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>DAYS</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>DAYS</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Hrs</th>
+                                                {/* Structure — J to R */}
+                                                <th style={{ ...th, background: "#f0fdf4" }}>BASIC</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>DA</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>HRA</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>Washing</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>Convence</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>LWW</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>BONUS</th>
+                                                <th style={{ ...th, background: "#f0fdf4" }}>Other</th>
+                                                <th style={{ ...th, background: "#dcfce7", color: "#15803d" }}>GROSS</th>
+                                                {/* Earned — S to AC */}
+                                                <th style={{ ...th, background: "#fffbeb" }}>BASIC</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>DA</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>HRA</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>Washing</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>Convence</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>LWW</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>Bonus</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>Other</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>OT</th>
+                                                <th style={{ ...th, background: "#fffbeb" }}>Prod<br/>Incentive</th>
+                                                <th style={{ ...th, background: "#fef9c3", color: "#854d0e" }}>GROSS</th>
+                                                {/* Deductions — AD to AK */}
+                                                <th style={{ ...th, background: "#fef2f2" }}>PF</th>
+                                                <th style={{ ...th, background: "#fef2f2" }}>ESIC</th>
+                                                <th style={{ ...th, background: "#fef2f2" }}>PT</th>
+                                                <th style={{ ...th, background: "#fef2f2" }}>LWF</th>
+                                                <th style={{ ...th, background: "#fef2f2" }}>CANTEEN</th>
+                                                <th style={{ ...th, background: "#fef2f2" }}>PENALTY</th>
+                                                <th style={{ ...th, background: "#fef2f2" }}>ADVANCE</th>
+                                                <th style={{ ...th, background: "#fef2f2" }}>Other<br/>Ded</th>
+                                                <th style={{ ...th, background: "#fee2e2", color: "#b91c1c" }}>Total<br/>Deduction</th>
+                                                {/* Employer */}
+                                                <th style={{ ...th, background: "#dbeafe" }}>CO CONTRI<br/>PF</th>
+                                                <th style={{ ...th, background: "#dbeafe" }}>CO CONTRI<br/>ESIC</th>
+                                                <th style={{ ...th, background: "#bfdbfe", color: "#1e40af" }}>CTC</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {ldData ? (
-                                                <tr><td colSpan={20} style={{ padding: "40px 0", textAlign: "center" }}>
+                                                <tr><td colSpan={43} style={{ padding: "40px 0", textAlign: "center" }}>
                                                     <Loader2 size={20} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} />
                                                 </td></tr>
                                             ) : filtered.length === 0 ? (
-                                                <tr><td colSpan={20} style={{ padding: "30px", textAlign: "center", color: "var(--text3)", fontSize: 12 }}>
+                                                <tr><td colSpan={43} style={{ padding: "30px", textAlign: "center", color: "var(--text3)", fontSize: 12 }}>
                                                     {data.length === 0 ? "No processed payroll records found for this site and period" : "No results match your search"}
                                                 </td></tr>
-                                            ) : filtered.map((p, i) => (
+                                            ) : filtered.map((p, i) => {
+                                                const monthDays  = p.workingDays ?? 26
+                                                const workedDays = p.presentDays ?? monthDays
+                                                const lop        = monthDays - workedDays
+                                                const otHrs      = p.overtimeHrs ?? Math.round((p.otDays ?? 0) * 8)
+                                                return (
                                                 <tr key={p.id} onClick={() => toggleSelect(p.id)}
                                                     style={{ borderBottom: "1px solid var(--border)", cursor: "pointer",
                                                         background: selectedIds.has(p.id) ? "var(--accent-light)" : i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>
+                                                    {/* Identification */}
                                                     <td style={td} onClick={e => e.stopPropagation()}>
                                                         <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)}
                                                             style={{ cursor: "pointer", accentColor: "var(--accent)" }} />
@@ -898,16 +950,35 @@ function WageSheetInner() {
                                                     <td style={{ ...td, color: "var(--accent)", fontWeight: 700 }}>{p.employee.employeeId}</td>
                                                     <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{p.employee.firstName} {p.employee.lastName}</td>
                                                     <td style={{ ...td, fontSize: 10, color: "var(--text3)" }}>{p.employee.designation || "—"}</td>
-                                                    <td style={td}>{p.presentDays ?? "—"}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.basicSalary)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.da)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.hra)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.washing)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.conveyance)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmtN(p.bonus)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff", color: "#7c3aed" }}>{p.overtimeHrs ? fmtN(p.overtimeHrs) : "—"}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{p.overtimePay ? fmtN(p.overtimePay) : "—"}</td>
-                                                    <td style={{ ...td, background: "#eff6ff", fontWeight: 700, color: "#1d4ed8" }}>{fmtN(p.grossSalary)}</td>
+                                                    {/* Attendance */}
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{monthDays}</td>
+                                                    <td style={{ ...td, background: "#eff6ff", color: lop < 0 ? "#16a34a" : (lop > 0 ? "#dc2626" : "var(--text3)"), fontWeight: 700 }}>{lop}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{workedDays}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{p.otDays ?? 0}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{otHrs}</td>
+                                                    {/* Structure */}
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.basicFull ?? p.basicSalary)}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.daFull ?? p.da)}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.hraFull ?? p.hra)}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.washingFull ?? p.washing)}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.conveyanceFull ?? p.conveyance)}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.lwwFull ?? p.lwwEarned)}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.bonusFull ?? p.bonus)}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmtN(p.otherFull)}</td>
+                                                    <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>{fmtN(p.grossFullMonth)}</td>
+                                                    {/* Earned */}
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.basicSalary)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.da)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.hra)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.washing)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.conveyance)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.lwwEarned)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.bonus)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.allowances)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.overtimePay)}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmtN(p.productionIncentive)}</td>
+                                                    <td style={{ ...td, background: "#fef9c3", fontWeight: 700, color: "#854d0e" }}>{fmtN(p.grossSalary)}</td>
+                                                    {/* Deductions */}
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.pfEmployee)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.esiEmployee)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.pt)}</td>
@@ -915,23 +986,51 @@ function WageSheetInner() {
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.canteen)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.penalty)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.advance)}</td>
-                                                    <td style={{ ...td, background: "#f0fdf4", fontWeight: 700, color: "#16a34a" }}>{fmtN(p.netSalary)}</td>
+                                                    <td style={{ ...td, background: "#fef2f2" }}>{fmtN(p.otherDeductions)}</td>
+                                                    <td style={{ ...td, background: "#fee2e2", fontWeight: 700, color: "#b91c1c" }}>{fmtN(p.totalDeductions)}</td>
+                                                    {/* NET */}
+                                                    <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>{fmtN(p.netSalary)}</td>
+                                                    {/* Employer */}
+                                                    <td style={{ ...td, background: "#dbeafe" }}>{fmtN(p.pfEmployer)}</td>
+                                                    <td style={{ ...td, background: "#dbeafe" }}>{fmtN(p.esiEmployer)}</td>
+                                                    <td style={{ ...td, background: "#bfdbfe", fontWeight: 700, color: "#1e40af" }}>{fmtN(p.ctc)}</td>
                                                 </tr>
-                                            ))}
+                                                )
+                                            })}
                                         </tbody>
                                         {data.length > 0 && (
                                             <tfoot>
                                                 <tr style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
-                                                    <td colSpan={6} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({selectedCount > 0 ? `${selectedCount} selected` : data.length})</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.basicSalary,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.da,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.hra,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.washing,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.conveyance,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.bonus,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.overtimeHrs,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{fmt(data.reduce((s,p)=>s+p.overtimePay,0))}</td>
-                                                    <td style={{ ...td, background: "#eff6ff", color: "#1d4ed8" }}>{fmt(totals.gross)}</td>
+                                                    <td colSpan={5} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({selectedCount > 0 ? `${selectedCount} selected` : data.length})</td>
+                                                    {/* Attendance totals */}
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+(p.workingDays ?? 26),0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+((p.workingDays??26) - (p.presentDays??(p.workingDays??26))),0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+(p.presentDays??p.workingDays??26),0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(data.reduce((s,p)=>s+(p.otDays??0),0)*1000)/1000}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+(p.overtimeHrs??0),0)}</td>
+                                                    {/* Structure totals */}
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+(p.basicFull ?? p.basicSalary),0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+(p.daFull ?? p.da),0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+(p.hraFull ?? p.hra),0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+(p.washingFull ?? p.washing),0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+(p.conveyanceFull ?? p.conveyance),0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+(p.lwwFull ?? p.lwwEarned),0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+(p.bonusFull ?? p.bonus),0))}</td>
+                                                    <td style={{ ...td, background: "#f0fdf4" }}>{fmt(data.reduce((s,p)=>s+p.otherFull,0))}</td>
+                                                    <td style={{ ...td, background: "#dcfce7", color: "#15803d" }}>{fmt(data.reduce((s,p)=>s+p.grossFullMonth,0))}</td>
+                                                    {/* Earned totals */}
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.basicSalary,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.da,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.hra,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.washing,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.conveyance,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.lwwEarned,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.bonus,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.allowances,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.overtimePay,0))}</td>
+                                                    <td style={{ ...td, background: "#fffbeb" }}>{fmt(data.reduce((s,p)=>s+p.productionIncentive,0))}</td>
+                                                    <td style={{ ...td, background: "#fef9c3", color: "#854d0e" }}>{fmt(totals.gross)}</td>
+                                                    {/* Deduction totals */}
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmt(totals.pf)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmt(totals.esi)}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmt(data.reduce((s,p)=>s+p.pt,0))}</td>
@@ -939,7 +1038,14 @@ function WageSheetInner() {
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmt(data.reduce((s,p)=>s+p.canteen,0))}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmt(data.reduce((s,p)=>s+p.penalty,0))}</td>
                                                     <td style={{ ...td, background: "#fef2f2" }}>{fmt(data.reduce((s,p)=>s+p.advance,0))}</td>
-                                                    <td style={{ ...td, background: "#f0fdf4", color: "#16a34a" }}>{fmt(totals.net)}</td>
+                                                    <td style={{ ...td, background: "#fef2f2" }}>{fmt(data.reduce((s,p)=>s+p.otherDeductions,0))}</td>
+                                                    <td style={{ ...td, background: "#fee2e2", color: "#b91c1c" }}>{fmt(totals.ded)}</td>
+                                                    {/* NET */}
+                                                    <td style={{ ...td, background: "#dcfce7", color: "#15803d" }}>{fmt(totals.net)}</td>
+                                                    {/* Employer totals */}
+                                                    <td style={{ ...td, background: "#dbeafe" }}>{fmt(data.reduce((s,p)=>s+p.pfEmployer,0))}</td>
+                                                    <td style={{ ...td, background: "#dbeafe" }}>{fmt(data.reduce((s,p)=>s+p.esiEmployer,0))}</td>
+                                                    <td style={{ ...td, background: "#bfdbfe", color: "#1e40af" }}>{fmt(data.reduce((s,p)=>s+p.ctc,0))}</td>
                                                 </tr>
                                             </tfoot>
                                         )}
@@ -961,4 +1067,5 @@ export default function WageSheetPage() {
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }
 const sel: React.CSSProperties = { padding: "6px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }
 const th:  React.CSSProperties = { padding: "7px 9px", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", textAlign: "center", whiteSpace: "nowrap" }
+const thSec: React.CSSProperties = { padding: "5px 8px", fontSize: 9, fontWeight: 800, textAlign: "center", textTransform: "uppercase", letterSpacing: "0.6px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }
 const td:  React.CSSProperties = { padding: "5px 9px", textAlign: "center", color: "var(--text)", whiteSpace: "nowrap" }
