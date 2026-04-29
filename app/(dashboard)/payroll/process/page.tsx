@@ -20,6 +20,7 @@ type Employee = {
     employeeSalary?: {
         basic: number; da: number; washing: number; conveyance: number
         leaveWithWages: number; otherAllowance: number
+        bonus?: number   // per-employee min-wage-based bonus (₹625/₹650 etc.)
         complianceType?: string; status?: string
     } | null
 }
@@ -342,7 +343,8 @@ function ProcessPayrollPage() {
         if (sal?.status === "APPROVED") {
             const isCALL = sal.complianceType === "CALL"
             const hra    = isCALL ? 0 : Math.round((sal.basic + sal.da) * 0.05)
-            const bonus  = isCALL ? 0 : Math.round(7000 / 12)
+            const storedB = (sal as any).bonus
+            const bonus  = isCALL ? 0 : (storedB != null && storedB > 0 ? storedB : Math.round(Math.min(sal.basic + sal.da, 7000) * 0.0833))
             return s + sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance
         }
         return s + basic
@@ -663,9 +665,10 @@ function ProcessPayrollPage() {
                                                 const att      = attRows[emp.id] ?? {}
                                                 const isCALL   = sal?.complianceType === "CALL"
                                                 const hra      = sal && !isCALL ? Math.round((sal.basic + sal.da) * 0.05) : 0
-                                                // Bonus: prefer stored value, else (basic+da) × 8.33% (Payment of Bonus Act)
+                                                // Bonus: stored per-employee value preferred (e.g. ₹625/₹650 min-wage based).
+                                                // Fallback: ₹7000 statutory cap × 8.33% ≈ ₹583 (Payment of Bonus Act).
                                                 const storedBonus = (sal as any)?.bonus
-                                                const bonus    = sal && !isCALL ? (storedBonus != null && storedBonus > 0 ? storedBonus : Math.round((sal.basic + sal.da) * 0.0833)) : 0
+                                                const bonus    = sal && !isCALL ? (storedBonus != null && storedBonus > 0 ? storedBonus : Math.round(Math.min(sal.basic + sal.da, 7000) * 0.0833)) : 0
                                                 const fullGross = sal ? sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance : 0
                                                 const approved = sal?.status === "APPROVED"
                                                 const monthDays  = att.monthDays  ?? defaultDays
@@ -782,7 +785,7 @@ function ProcessPayrollPage() {
                                                         const sa = e.employeeSalary as any
                                                         if (!sa || sa.complianceType === "CALL") return s
                                                         const stored = sa.bonus
-                                                        const b = (stored != null && stored > 0) ? stored : Math.round((sa.basic + sa.da) * 0.0833)
+                                                        const b = (stored != null && stored > 0) ? stored : Math.round(Math.min(sa.basic + sa.da, 7000) * 0.0833)
                                                         return s + b
                                                     }, 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.otherAllowance ?? 0), 0))}</td>

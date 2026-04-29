@@ -65,6 +65,7 @@ export async function GET(req: Request) {
                         select: {
                             basic: true, da: true, washing: true, conveyance: true,
                             leaveWithWages: true, otherAllowance: true,
+                            bonus: true,                    // per-employee bonus (₹625/₹650 min-wage based)
                             otRatePerHour: true, canteenRatePerDay: true,
                             complianceType: true, status: true,
                             hra: true, ctcMonthly: true,

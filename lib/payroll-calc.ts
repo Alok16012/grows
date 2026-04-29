@@ -62,7 +62,10 @@ export function calcGrowusPayroll(sal: {
     const hraFull    = (basic + da) * 0.05
     // Bonus: use stored per-employee value if set, else (Basic+DA)×8.33%
     // Stored value is typically min-wage-based per Payment of Bonus Act (e.g. ₹625, ₹650)
-    const bonusFull  = isCALL ? 0 : (storedBonus != null ? storedBonus : Math.round((basic + da) * 0.0833))
+    // Bonus: use per-employee stored value (min-wage-based per Bonus Act, e.g. ₹625/₹650).
+    // Fallback ≈ ₹583 = ₹7000 statutory ceiling × 8.33% (Payment of Bonus Act 1965 cap).
+    // Set the higher state-min-wage values on the salary structure when needed.
+    const bonusFull  = isCALL ? 0 : (storedBonus != null && storedBonus > 0 ? storedBonus : Math.round(Math.min(basic + da, 7000) * 0.0833))
     const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
 
     // ─── Prorated earned (ROUND to 0 decimal) ─────────────────────────────────

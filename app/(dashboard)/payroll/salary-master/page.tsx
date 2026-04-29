@@ -27,8 +27,13 @@ function calc(s: SalaryRow) {
     const lww    = s.leaveWithWages || 0
     const other  = s.otherAllowance || 0
     const isCALL = s.complianceType === "CALL"
-    // Bonus: use stored per-employee value (min-wage-based per Bonus Act), else formula
-    const bonus  = isCALL ? 0 : (s.bonus != null && s.bonus > 0 ? s.bonus : Math.round((basic + da) * 0.0833))
+    // Bonus: use stored per-employee value (min-wage-based per Bonus Act).
+    // Fallback when not set: ₹7000 statutory ceiling × 8.33% ≈ ₹583/month
+    // (Payment of Bonus Act 1965 caps the calculation salary at ₹7000 OR
+    //  state minimum wage, whichever is higher. ₹583 is the safe legal default;
+    //  for higher min-wage states (e.g. Maharashtra ₹7500/₹7800) set per-employee
+    //  bonus on the salary structure: 7500×8.33% = ₹625, 7800×8.33% = ₹650.)
+    const bonus  = isCALL ? 0 : (s.bonus != null && s.bonus > 0 ? s.bonus : Math.round(Math.min(basic + da, 7000) * 0.0833))
     const hra    = isCALL ? 0 : Math.round((basic + da) * 0.05)
     const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
     const empPF  = isCALL ? 0 : 1950
