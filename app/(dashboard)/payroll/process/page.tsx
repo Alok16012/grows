@@ -125,9 +125,11 @@ function ProcessPayrollPage() {
             const EMP_ID_VARIANTS = ["employee id", "emp id", "employeeid", "empid",
                 "employee code", "emp code", "empcode", "employeecode",
                 "employee no", "emp no", "empno", "employee number"]
+            // Normalise: trim, collapse all whitespace (incl. newlines), lowercase
+            const normCell = (v: unknown) => String(v).trim().toLowerCase().replace(/\s+/g, " ")
             const headerIdx = rawRows.findIndex(row =>
                 Array.isArray(row) && row.some(cell =>
-                    EMP_ID_VARIANTS.includes(String(cell).trim().toLowerCase())
+                    EMP_ID_VARIANTS.includes(normCell(cell))
                 )
             )
             if (headerIdx === -1) {
@@ -169,11 +171,13 @@ function ProcessPayrollPage() {
                 ).trim().toUpperCase()
 
                 if (!empCode) continue
+                // Skip TOTAL/header rows that may exist in wage-sheet exports
+                if (/^(TOTAL|GRAND TOTAL|SR|—|-)$/i.test(empCode)) continue
                 const empId = empMap.get(empCode)
                 if (!empId) { unmatched.push(empCode); continue }
 
                 const workedDaysRaw = col(obj,
-                    "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "ATTENDANCE",
+                    "DAYS WORKED", "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "ATTENDANCE",
                     "WORKING DAYS", "P", "ATT DAYS", "ATT", "PAID DAYS"
                 )
                 const workedDaysVal = workedDaysRaw !== undefined ? Number(workedDaysRaw) : defaultDays
@@ -198,7 +202,7 @@ function ProcessPayrollPage() {
                     penalty: Number(col(obj, "PENALTY", "FINE") ?? 0),
                     advance: Number(col(obj, "ADVANCE", "ADV", "LOAN") ?? 0),
                     productionIncentive: Number(col(obj,
-                        "PRODUCTION INCENTIVE", "PROD INCENTIVE", "INCENTIVE", "PI"
+                        "PRODUCTION INCENTIVE", "PROD INCENTIVE", "PROD INC", "INCENTIVE", "PI"
                     ) ?? 0),
                 }
                 matched++

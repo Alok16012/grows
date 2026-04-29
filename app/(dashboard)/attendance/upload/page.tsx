@@ -138,16 +138,24 @@ export default function AttendanceUploadPage() {
             // Get raw rows as arrays to find the actual header row
             const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" })
 
-            // Find the row that contains "Employee ID" — that's the real header
+            // Normalise: trim, collapse whitespace (incl. newlines), uppercase
+            const norm = (v: unknown) => String(v).trim().toUpperCase().replace(/\s+/g, " ")
+
+            // Header row = first row that has any Employee-ID-like column
+            const EMP_ID_VARIANTS = new Set([
+                "EMPLOYEE ID", "EMP ID", "EMPLOYEEID", "EMPID",
+                "EMPLOYEE CODE", "EMP CODE", "EMPCODE", "EMPLOYEECODE",
+                "EMPLOYEE NO", "EMP NO", "EMPNO", "EMPLOYEE NUMBER"
+            ])
             const headerIdx = rawRows.findIndex(row =>
-                Array.isArray(row) && row.some(cell => String(cell).trim() === "Employee ID")
+                Array.isArray(row) && row.some(cell => EMP_ID_VARIANTS.has(norm(cell)))
             )
             if (headerIdx === -1) {
-                toast.error("Could not find header row with 'Employee ID' column")
+                toast.error("Could not find header row with 'Employee ID' / 'EMP CODE' column")
                 setParsing(false)
                 return
             }
-            const headers = (rawRows[headerIdx] as unknown[]).map(h => String(h).trim())
+            const headers = (rawRows[headerIdx] as unknown[]).map(h => norm(h))
             const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
                 Array.isArray(row) && row.some(cell => String(cell).trim() !== "")
             )
@@ -160,21 +168,30 @@ export default function AttendanceUploadPage() {
 
             if (rows.length === 0) { toast.error("No data rows found in file"); setParsing(false); return }
 
+            // Multi-alias column lookup (case-insensitive, whitespace-normalised keys)
+            const pick = (row: Record<string, unknown>, ...aliases: string[]) => {
+                for (const a of aliases) {
+                    const key = a.toUpperCase().replace(/\s+/g, " ")
+                    const v = row[key]
+                    if (v !== undefined && String(v).trim() !== "") return v
+                }
+                return undefined
+            }
+
             const parsed: ParsedRow[] = rows.map((row, i) => ({
                 rowIndex: i + 2,
-                rawEmployeeId: String(row["Employee ID"] ?? row["EMP ID"] ?? row["employee id"] ?? "").trim(),
-                rawName: String(row["Employee Name"] ?? row["Name"] ?? row["employee name"] ?? "").trim(),
-                // MONTH DAYS = total working days in the month (standard 26); DAYS = days employee actually worked
-                monthDays:           Number(row["MONTH DAYS"] ?? row["Month Days"] ?? row["MonthDays"] ?? 26) || 26,
-                days:                Number(row["DAYS"]                 ?? row["Days"]                 ?? 26),
-                otDays:              Number(row["OT DAYS"]              ?? row["OT Days"]              ?? 0),
-                otherDeduction:      Number(row["OTHER DEDUCTION"]      ?? row["Other Deduction"]      ?? 0),
-                lwf:                 Number(row["LWF"]                  ?? row["lwf"]                  ?? 0),
-                canteenDays:         Number(row["CANTEEN DAYS"]         ?? row["Canteen Days"]         ?? 0),
-                penalty:             Number(row["PENALTY"]              ?? row["Penalty"]              ?? 0),
-                advance:             Number(row["ADVANCE"]              ?? row["Advance"]              ?? 0),
-                productionIncentive: Number(row["PRODUCTION INCENTIVE"] ?? row["Production Incentive"] ?? 0),
-            })).filter(r => r.rawEmployeeId)
+                rawEmployeeId: String(pick(row, "EMPLOYEE ID", "EMP ID", "EMP CODE", "EMPLOYEE CODE", "EMPLOYEE NO", "EMP NO", "EMPCODE", "EMPLOYEEID") ?? "").trim(),
+                rawName:       String(pick(row, "EMPLOYEE NAME", "NAME", "EMPLOYEE", "EMP NAME") ?? "").trim(),
+                monthDays:     Number(pick(row, "MONTH DAYS", "MONTHDAYS", "TOTAL DAYS", "WORKING DAYS IN MONTH") ?? 26) || 26,
+                days:          Number(pick(row, "DAYS WORKED", "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "PAID DAYS", "ATT DAYS", "ATTENDANCE") ?? 26) || 26,
+                otDays:        Number(pick(row, "OT DAYS", "OTDAYS", "OVERTIME", "OT") ?? 0) || 0,
+                otherDeduction:Number(pick(row, "OTHER DEDUCTION", "OTHER DED", "OTH DED") ?? 0) || 0,
+                lwf:           Number(pick(row, "LWF", "LABOUR WELFARE FUND") ?? 0) || 0,
+                canteenDays:   Number(pick(row, "CANTEEN DAYS", "CANTEEN", "MESS DAYS") ?? 0) || 0,
+                penalty:       Number(pick(row, "PENALTY", "FINE") ?? 0) || 0,
+                advance:       Number(pick(row, "ADVANCE", "ADV", "LOAN") ?? 0) || 0,
+                productionIncentive: Number(pick(row, "PRODUCTION INCENTIVE", "PROD INCENTIVE", "PROD INC", "INCENTIVE", "PI") ?? 0) || 0,
+            })).filter(r => r.rawEmployeeId && !/^(SR|TOTAL|GRAND TOTAL|—)$/i.test(r.rawEmployeeId))
 
             if (!parsed.length) { toast.error("No valid Employee ID rows found"); setParsing(false); return }
 
