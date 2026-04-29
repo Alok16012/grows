@@ -15,6 +15,7 @@ type ParsedRow = {
     rowIndex: number
     rawEmployeeId: string
     rawName: string
+    monthDays: number  // total working days in the month (standard = 26)
     days: number; otDays: number; otherDeduction: number; lwf: number
     canteenDays: number; penalty: number; advance: number
     productionIncentive: number
@@ -29,13 +30,13 @@ type Employee = {
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
 const TEMPLATE_COLS = [
-    "Employee ID","Employee Name","DAYS","OT DAYS","OTHER DEDUCTION",
+    "Employee ID","Employee Name","MONTH DAYS","DAYS","OT DAYS","OTHER DEDUCTION",
     "LWF","CANTEEN DAYS","PENALTY","ADVANCE","PRODUCTION INCENTIVE"
 ]
 const TEMPLATE_SAMPLE = [
-    ["EMP-0001","Rahul Kumar",   26, 2, 150, 10, 24, 50,  1000, 0],
-    ["EMP-0002","Priya Sharma",  25, 0, 0,   10, 20, 0,   0,    500],
-    ["EMP-0003","Amit Singh",    26, 1, 200, 10, 26, 100, 500,  0],
+    ["EMP-0001","Rahul Kumar",   26, 26, 2, 150, 10, 24, 50,  1000, 0],
+    ["EMP-0002","Priya Sharma",  26, 25, 0, 0,   10, 20, 0,   0,    500],
+    ["EMP-0003","Amit Singh",    26, 26, 1, 200, 10, 26, 100, 500,  0],
 ]
 
 function downloadTemplate(siteName: string, employees: Employee[]) {
@@ -43,7 +44,7 @@ function downloadTemplate(siteName: string, employees: Employee[]) {
     const sheetName = `${siteName.slice(0, 20)} Attendance`
     const header = [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", ""]
     const empRows = employees.length > 0
-        ? employees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 0, 0, 10, 0, 0, 0, 0])
+        ? employees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 26, 0, 0, 10, 0, 0, 0, 0])
         : TEMPLATE_SAMPLE
     const wsData = [header, TEMPLATE_COLS, ...empRows]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -162,6 +163,8 @@ export default function AttendanceUploadPage() {
                 rowIndex: i + 2,
                 rawEmployeeId: String(row["Employee ID"] ?? row["EMP ID"] ?? row["employee id"] ?? "").trim(),
                 rawName: String(row["Employee Name"] ?? row["Name"] ?? row["employee name"] ?? "").trim(),
+                // MONTH DAYS = total working days in the month (standard 26); DAYS = days employee actually worked
+                monthDays:           Number(row["MONTH DAYS"] ?? row["Month Days"] ?? row["MonthDays"] ?? 26) || 26,
                 days:                Number(row["DAYS"]                 ?? row["Days"]                 ?? 26),
                 otDays:              Number(row["OT DAYS"]              ?? row["OT Days"]              ?? 0),
                 otherDeduction:      Number(row["OTHER DEDUCTION"]      ?? row["Other Deduction"]      ?? 0),
@@ -210,8 +213,8 @@ export default function AttendanceUploadPage() {
         try {
             const attendance = valid.map(r => ({
                 employeeId:          r.employeeId!,
-                monthDays:           r.days,
-                workedDays:          r.days,
+                monthDays:           r.monthDays,   // total working days in month (standard 26)
+                workedDays:          r.days,         // actual days employee worked
                 otDays:              r.otDays,
                 otherDeductions:     r.otherDeduction,
                 lwf:                 r.lwf,
