@@ -92,6 +92,8 @@ export async function POST(req: Request) {
                     conveyance:       salData?.conveyance       ?? 0,
                     leaveWithWages:   salData?.leaveWithWages   ?? 0,
                     otherAllowance:   salData?.otherAllowance   ?? 0,
+                    // Pass stored bonus from salary structure (min-wage-based per Bonus Act)
+                    bonus:            salData?.bonus            ?? undefined,
                     otRatePerHour:    salData?.otRatePerHour    ?? 170,
                     canteenRatePerDay:salData?.canteenRatePerDay?? 55,
                     complianceType:   salData?.complianceType   ?? "OR",
@@ -116,7 +118,7 @@ export async function POST(req: Request) {
                         workingDays: att.monthDays,
                         presentDays: att.workedDays,
                         lwpDays:     att.monthDays - att.workedDays,
-                        overtimeHrs: att.otDays,
+                        overtimeHrs: Math.round(att.otDays * 8), // store actual hours (days × 8)
                         status: "DRAFT",
                         processedBy: session.user.id ?? "system",
                     },
@@ -128,7 +130,7 @@ export async function POST(req: Request) {
                         workingDays: att.monthDays,
                         presentDays: att.workedDays,
                         lwpDays:     att.monthDays - att.workedDays,
-                        overtimeHrs: att.otDays,
+                        overtimeHrs: Math.round(att.otDays * 8), // store actual hours (days × 8)
                         processedBy: session.user.id ?? "system",
                     }
                 })

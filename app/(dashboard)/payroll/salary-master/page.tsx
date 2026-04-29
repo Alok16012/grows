@@ -27,21 +27,19 @@ function calc(s: SalaryRow) {
     const lww    = s.leaveWithWages || 0
     const other  = s.otherAllowance || 0
     const isCALL = s.complianceType === "CALL"
-    // Bonus = 8.33% of (Basic+DA) — statutory formula; CALL = ₹0
-    const bonus  = isCALL ? 0 : Math.round((basic + da) * 0.0833)
+    // Bonus: use stored per-employee value (min-wage-based per Bonus Act), else formula
+    const bonus  = isCALL ? 0 : (s.bonus != null && s.bonus > 0 ? s.bonus : Math.round((basic + da) * 0.0833))
     const hra    = isCALL ? 0 : Math.round((basic + da) * 0.05)
     const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
     const empPF  = isCALL ? 0 : 1950
-    // ESIC employer applies only if full-month gross ≤ ₹21,000
-    // Base = gross − washing only (bonus NOT deducted per verified formula)
-    const empESI = (!isCALL && gross <= 21000)
-        ? Math.ceil((gross - wash) * 0.0325)
-        : 0
+    // ESIC eligibility: (gross − washing) ≤ ₹21,000 (washing excluded from threshold)
+    const esicEligible = !isCALL && (gross - wash) <= 21000
+    // Employer ESIC: (gross − washing) × 3.25%
+    const empESI = esicEligible ? Math.ceil((gross - wash) * 0.0325) : 0
     // Employee deductions
-    const empPFDed = isCALL ? 0 : Math.min(Math.round((basic + da) * 0.12), 1800)
-    const empESIDed = (!isCALL && gross <= 21000)
-        ? Math.ceil((gross - wash - bonus) * 0.0075)
-        : 0
+    const empPFDed  = isCALL ? 0 : Math.min(Math.round((basic + da) * 0.12), 1800)
+    // Employee ESIC = ₹0 (Growus absorbs employee share per company policy)
+    const empESIDed = 0
     const pt     = isCALL ? 0 : calcPT(gross)
     const totalDed = empPFDed + empESIDed + pt
     const netSalary = gross - totalDed
