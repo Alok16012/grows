@@ -87,17 +87,50 @@ function ProcessPayrollPage() {
         setFetched(false)
         setEmployees([])
         try {
-            const res = await fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=500`)
-            if (!res.ok) throw new Error(await res.text())
-            const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
+            // Fetch employees + any existing saved payroll for this site/month/year in parallel
+            const [empRes, payRes] = await Promise.all([
+                fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=500`),
+                fetch(`/api/payroll?siteId=${siteId}&month=${month}&year=${year}`),
+            ])
+            if (!empRes.ok) throw new Error(await empRes.text())
+            const empData = await empRes.json()
+            setEmployees(Array.isArray(empData) ? empData : (empData.employees ?? []))
+
+            // Pre-fill attendance from saved payroll records (so user sees previously uploaded values)
+            if (payRes.ok) {
+                const payrolls: Array<{
+                    employeeId: string
+                    workingDays: number | null; presentDays: number | null
+                    otDays: number | null; canteenDays: number | null
+                    penalty: number | null; advance: number | null
+                    otherDeductions: number | null; productionIncentive: number | null
+                    lwf: number | null
+                }> = await payRes.json()
+                if (Array.isArray(payrolls) && payrolls.length > 0) {
+                    const filled: Record<string, Partial<AttRow>> = {}
+                    for (const p of payrolls) {
+                        filled[p.employeeId] = {
+                            monthDays:           p.workingDays ?? defaultDays,
+                            workedDays:          p.presentDays ?? defaultDays,
+                            otDays:              p.otDays ?? 0,
+                            canteenDays:         p.canteenDays ?? 0,
+                            penalty:             p.penalty ?? 0,
+                            advance:             p.advance ?? 0,
+                            otherDeductions:     p.otherDeductions ?? 0,
+                            productionIncentive: p.productionIncentive ?? 0,
+                            lwf:                 p.lwf ?? 0,
+                        }
+                    }
+                    setAttRows(filled)
+                }
+            }
             setFetched(true)
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Failed to fetch employees")
         } finally {
             setLoadingEmployees(false)
         }
-    }, [])
+    }, [month, year])
 
     const selectSite = (id: string) => {
         setSelectedSiteId(id)
