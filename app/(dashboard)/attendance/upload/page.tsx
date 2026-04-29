@@ -98,9 +98,10 @@ export default function AttendanceUploadPage() {
 
     useEffect(() => {
         if (!siteId) { setSiteEmployees([]); return }
-        fetch(`/api/employees?siteId=${siteId}&status=ACTIVE`)
+        // pageSize=500 to get all employees; API returns { employees:[...], total } not plain array
+        fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=500`)
             .then(r => r.json())
-            .then(d => setSiteEmployees(Array.isArray(d) ? d : []))
+            .then(d => setSiteEmployees(Array.isArray(d) ? d : (d.employees ?? [])))
             .catch(() => setSiteEmployees([]))
     }, [siteId])
 
@@ -337,7 +338,7 @@ export default function AttendanceUploadPage() {
                         </thead>
                         <tbody>
                             {(siteEmployees.length > 0
-                                ? siteEmployees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 0, 0, 10, 0, 0, 0, 0])
+                                ? siteEmployees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 26, 0, 0, 10, 0, 0, 0, 0])
                                 : TEMPLATE_SAMPLE
                             ).map((row, i, arr) => (
                                 <tr key={i} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>
