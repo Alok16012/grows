@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import {
     Loader2, RefreshCw, Play, FileSpreadsheet,
     ShieldCheck, Lock, Upload, IndianRupee,
-    ChevronRight, AlertCircle, CheckCircle2, Clock, TableProperties, Trash2
+    ChevronRight, AlertCircle, CheckCircle2, Clock, Trash2
 } from "lucide-react"
 
 type PayrollRun = {
@@ -71,13 +71,12 @@ export default function PayrollPage() {
     const totalNetYTD    = runs.reduce((s, r) => s + r.totalNet, 0)
 
     const WORKFLOW = [
-        { step: 1, label: "Salary Structure",         href: "/payroll/salary-master", icon: TableProperties, desc: "Setup employee salary components" },
-        { step: 2, label: "Upload Attendance",        href: "/attendance/upload", icon: Upload,          desc: "Import monthly attendance Excel" },
-        { step: 3, label: "Process Payroll",          href: "/payroll/process",  icon: Play,            desc: "Calculate wages site-wise" },
-        { step: 4, label: "Wage Sheet",               href: "/payroll/wagesheet",icon: FileSpreadsheet, desc: "Download site wage sheets" },
-        { step: 5, label: "Compliance Reports",       href: "/payroll/compliance",icon: ShieldCheck,    desc: "PF, ESI, PT challans" },
-        { step: 6, label: "Salary Slips",             href: "/payroll/salary-slips", icon: IndianRupee, desc: "Generate & distribute slips" },
-        { step: 7, label: "Lock Payroll",             href: "/payroll/final",    icon: Lock,            desc: "Finalize and lock the run" },
+        { step: 1, label: "Upload Attendance", href: "/payroll/process",      icon: Upload,          desc: "Upload site-wise attendance Excel" },
+        { step: 2, label: "Process Payroll",   href: "/payroll/process",      icon: Play,            desc: "Calculate wages from attendance" },
+        { step: 3, label: "Wage Sheet",        href: "/payroll/wagesheet",    icon: FileSpreadsheet, desc: "Generate & download wage sheet" },
+        { step: 4, label: "Lock Wage Sheet",   href: "/payroll/wagesheet",    icon: Lock,            desc: "Lock & finalize wage sheet" },
+        { step: 5, label: "Compliance",        href: "/payroll/compliance",   icon: ShieldCheck,     desc: "PF, ESI, PT reports & challans" },
+        { step: 6, label: "Payslip",           href: "/payroll/salary-slips", icon: IndianRupee,     desc: "Generate & send payslips" },
     ]
 
     const role = session?.user?.role

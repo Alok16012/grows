@@ -119,14 +119,11 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     roles: ["ADMIN", "MANAGER"], 
                     permission: "payroll.view",
                     subLinks: [
-                        { name: "Payments Dashboard", href: "/payroll" },
-                        { name: "Salary Structure", href: "/payroll/salary-master" },
+                        { name: "Overview", href: "/payroll" },
                         { name: "Process Payroll", href: "/payroll/process" },
-                        { name: "Site Wise Wage Sheet", href: "/payroll/wagesheet" },
-                        { name: "Select Sites (Multi)", href: "/payroll/select-sites" },
-                        { name: "Final Payroll (Multi Site)", href: "/payroll/final" },
-                        { name: "Payslip Generation", href: "/payroll/salary-slips" },
+                        { name: "Wage Sheet", href: "/payroll/wagesheet" },
                         { name: "Compliance Reports", href: "/payroll/compliance" },
+                        { name: "Payslip Generation", href: "/payroll/salary-slips" },
                     ]
                 },
                 { name: "Upload Attendance", href: "/attendance/upload", icon: Upload, roles: ["ADMIN", "MANAGER"], permission: "attendance.manage" },

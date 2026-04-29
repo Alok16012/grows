@@ -139,17 +139,17 @@ function ComplianceInner() {
 
             {/* Stepper */}
             <div style={{ display: "flex", alignItems: "center", gap: 4, overflowX: "auto", whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
-                {["Upload Attendance","Process Payroll","Wage Sheet","Compliance","Lock Payroll"].map((s, i) => (
+                {["Upload Attendance","Process Payroll","Wage Sheet","Lock Wage Sheet","Compliance","Payslip"].map((s, i) => (
                     <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 7,
-                            background: i === 3 ? "var(--accent-light)" : "transparent",
-                            color: i === 3 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 3 ? 700 : 400 }}>
-                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i === 3 ? "var(--accent)" : "var(--border)",
+                            background: i === 4 ? "var(--accent-light)" : "transparent",
+                            color: i === 4 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 4 ? 700 : 400 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i === 4 ? "var(--accent)" : "var(--border)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                color: i === 3 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i+1}</div>
+                                color: i === 4 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i+1}</div>
                             {s}
                         </div>
-                        {i < 4 && <ChevronRight size={11} style={{ color: "var(--text3)", opacity: 0.3 }} />}
+                        {i < 5 && <ChevronRight size={11} style={{ color: "var(--text3)", opacity: 0.3 }} />}
                     </div>
                 ))}
             </div>
