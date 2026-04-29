@@ -26,7 +26,7 @@ export async function GET(req: Request) {
         const employmentType = searchParams.get("employmentType")
         const companyId = searchParams.get("companyId")
         const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
-        const pageSize = Math.min(100, parseInt(searchParams.get("pageSize") ?? "50"))
+        const pageSize = Math.min(1000, parseInt(searchParams.get("pageSize") ?? "50"))
 
         const where: Record<string, any> = {}
         if (branchId) where.branchId = branchId

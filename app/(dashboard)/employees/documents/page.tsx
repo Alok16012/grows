@@ -167,10 +167,13 @@ export default function MasterDocumentsPage() {
         setLoading(true)
         try {
             const [eRes, dRes] = await Promise.all([
-                fetch("/api/employees"),
+                fetch("/api/employees?pageSize=500"),
                 fetch("/api/employees/all-documents"),
             ])
-            if (eRes.ok) setEmployees(await eRes.json())
+            if (eRes.ok) {
+                const data = await eRes.json()
+                setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
+            }
             if (dRes.ok) setDocs(await dRes.json())
         } catch { toast.error("Failed to load") }
         finally { setLoading(false) }

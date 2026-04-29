@@ -606,9 +606,10 @@ export default function EmployeeMasterPage() {
             if (statusFilter) params.set("status", statusFilter)
             if (siteFilter) params.set("siteId", siteFilter)
             if (search) params.set("search", search)
+            params.set("pageSize", "500")
             const res = await fetch(`/api/employees?${params.toString()}`)
             const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : [])
+            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
         } catch {
             toast.error("Failed to load employees")
         } finally {
