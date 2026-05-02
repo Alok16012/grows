@@ -120,6 +120,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     permission: "payroll.view",
                     subLinks: [
                         { name: "Overview", href: "/payroll" },
+                        { name: "Salary Structure Master", href: "/payroll/salary-master" },
                         { name: "Upload Attendance", href: "/attendance/upload" },
                         { name: "Process Payroll", href: "/payroll/process" },
                         { name: "Wage Sheet", href: "/payroll/wagesheet" },
