@@ -34,6 +34,7 @@ model User {
   leadActivities           LeadActivity[]   @relation("LeadActivityUser")
   leadDocsUploaded         LeadDocument[]   @relation("LeadDocUploader")
   leadFollowUpsCreated     LeadFollowUp[]   @relation("LeadFollowUpCreator")
+  leadFormsCreated         LeadForm[]       @relation("LeadFormCreator")
   hrApprovedReviews        PerformanceReview[] @relation("HRApprover")
   employeeProfile          Employee?           @relation("EmployeeUser")
 }
@@ -280,11 +281,16 @@ model Lead {
   profileUrl        String?       // WorkIndia/LinkedIn profile URL
   englishLevel      String?       // Good English / Basic English / No English
   levelOfExperience String?       // Fresher / Experienced
+  // Conversion tracking
+  convertedEmployeeId String?     // Set when lead is converted to employee
+  formSlug          String?       // Which public form was used (if any)
+  siteId            String?       // Target site for deployment after joining
   createdBy         String
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   assignee          User?         @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
   creator           User          @relation("LeadCreator", fields: [createdBy], references: [id])
+  site              Site?         @relation("LeadSite", fields: [siteId], references: [id], onDelete: SetNull)
   activities        LeadActivity[]
   documents         LeadDocument[]
   followUps         LeadFollowUp[]
@@ -292,6 +298,23 @@ model Lead {
   @@index([status])
   @@index([assignedTo])
   @@index([createdAt])
+}
+
+model LeadForm {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  siteId      String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  creator     User     @relation("LeadFormCreator", fields: [createdBy], references: [id])
+  site        Site?    @relation("LeadFormSite", fields: [siteId], references: [id], onDelete: SetNull)
+
+  @@index([slug])
+  @@index([isActive])
 }
 
 model LeadDocument {
@@ -442,6 +465,8 @@ model Site {
   branch           Branch       @relation(fields: [branchId], references: [id])
   deployments      Deployment[]
   attendances      Attendance[]
+  leads            Lead[]       @relation("LeadSite")
+  leadForms        LeadForm[]   @relation("LeadFormSite")
 
   @@index([isActive])
   @@index([clientId])

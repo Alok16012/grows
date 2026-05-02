@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     Plus, Search, Phone, Mail, MapPin, Calendar, Users,
@@ -11,7 +12,8 @@ import {
     UserCheck, Banknote, Building2, Wrench,
     FileText, GraduationCap, Award, BarChart2,
     Flame, Droplet, Thermometer, CheckSquare, AlertCircle,
-    TrendingUp, Download, Upload, Eye
+    TrendingUp, Download, Upload, Eye,
+    Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
@@ -115,6 +117,7 @@ interface Lead {
     profileUrl?: string
     englishLevel?: string
     levelOfExperience?: string
+    convertedEmployeeId?: string | null
     createdAt: string
     updatedAt: string
     assignee?: { id: string; name: string; email: string }
@@ -176,6 +179,20 @@ interface AnalyticsData {
     recruiterPerformance: { id: string; name: string; leads: number; interviews: number; joinings: number; conversion: number }[]
 }
 
+interface LeadFormEntry {
+    id: string
+    title: string
+    slug: string
+    description?: string | null
+    isActive: boolean
+    createdAt: string
+    creator: { id: string; name: string }
+    site?: { id: string; name: string } | null
+}
+
+interface SiteOption { id: string; name: string }
+interface DeptOption { id: string; name: string }
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(date: string | null | undefined) {
@@ -227,7 +244,8 @@ export default function RecruitmentPage() {
     const [leads, setLeads] = useState<Lead[]>([])
     const [users, setUsers] = useState<AppUser[]>([])
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "documents">("pipeline")
+    const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "documents" | "form-links">("pipeline")
+    const router = useRouter()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [searchQ, setSearchQ] = useState("")
     const [filterStatus, setFilterStatus] = useState("ALL")
@@ -250,6 +268,17 @@ export default function RecruitmentPage() {
     const importFileRef = useRef<HTMLInputElement>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState<string>("")
+
+    // Form links state
+    const [leadForms, setLeadForms] = useState<LeadFormEntry[]>([])
+    const [loadingForms, setLoadingForms] = useState(false)
+    const [showCreateForm, setShowCreateForm] = useState(false)
+    const [createFormData, setCreateFormData] = useState({ title: "", description: "", siteId: "" })
+    const [savingForm, setSavingForm] = useState(false)
+    const [formSites, setFormSites] = useState<SiteOption[]>([])
+
+    // Convert to employee state
+    const [convertLead, setConvertLead] = useState<Lead | null>(null)
 
     const emptyForm = {
         candidateName: "", phone: "", email: "", city: "",
@@ -383,6 +412,80 @@ export default function RecruitmentPage() {
         } finally { setAnalyticsLoading(false) }
     }
 
+    async function fetchFormLinks() {
+        setLoadingForms(true)
+        try {
+            const res = await fetch("/api/lead-forms")
+            if (!res.ok) throw new Error()
+            setLeadForms(await res.json())
+        } catch {
+            toast.error("Failed to load form links")
+        } finally { setLoadingForms(false) }
+    }
+
+    async function fetchSites() {
+        try {
+            const res = await fetch("/api/sites")
+            if (!res.ok) return
+            const data = await res.json()
+            setFormSites((data.sites ?? data).map((s: any) => ({ id: s.id, name: s.name })))
+        } catch {}
+    }
+
+    async function handleCreateFormLink(e: React.FormEvent) {
+        e.preventDefault()
+        if (!createFormData.title.trim()) return
+        setSavingForm(true)
+        try {
+            const res = await fetch("/api/lead-forms", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(createFormData),
+            })
+            if (!res.ok) throw new Error()
+            const form = await res.json()
+            setLeadForms(prev => [form, ...prev])
+            setCreateFormData({ title: "", description: "", siteId: "" })
+            setShowCreateForm(false)
+            toast.success("Form link created")
+        } catch {
+            toast.error("Failed to create form link")
+        } finally { setSavingForm(false) }
+    }
+
+    async function handleToggleFormActive(form: LeadFormEntry) {
+        try {
+            const res = await fetch(`/api/lead-forms/${form.slug}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isActive: !form.isActive }),
+            })
+            if (!res.ok) throw new Error()
+            const updated = await res.json()
+            setLeadForms(prev => prev.map(f => f.id === form.id ? { ...f, isActive: updated.isActive } : f))
+            toast.success(updated.isActive ? "Form activated" : "Form deactivated")
+        } catch {
+            toast.error("Failed to update form")
+        }
+    }
+
+    async function handleDeleteFormLink(form: LeadFormEntry) {
+        if (!confirm(`Delete form "${form.title}"? This cannot be undone.`)) return
+        try {
+            const res = await fetch(`/api/lead-forms/${form.slug}`, { method: "DELETE" })
+            if (!res.ok) throw new Error()
+            setLeadForms(prev => prev.filter(f => f.id !== form.id))
+            toast.success("Form deleted")
+        } catch {
+            toast.error("Failed to delete form")
+        }
+    }
+
+    function copyFormLink(slug: string) {
+        const url = `${window.location.origin}/apply/${slug}`
+        navigator.clipboard.writeText(url).then(() => toast.success("Link copied!")).catch(() => toast.error("Copy failed"))
+    }
+
     useEffect(() => {
         if (status !== "unauthenticated") {
             fetchLeads()
@@ -398,6 +501,10 @@ export default function RecruitmentPage() {
     useEffect(() => {
         if (activeTab === "analytics" && status !== "unauthenticated") {
             fetchAnalytics()
+        }
+        if (activeTab === "form-links" && status !== "unauthenticated") {
+            fetchFormLinks()
+            fetchSites()
         }
     }, [activeTab, status])
 
@@ -641,6 +748,7 @@ export default function RecruitmentPage() {
                         { key: "pipeline", label: "Pipeline", icon: ArrowRight },
                         { key: "analytics", label: "Analytics", icon: BarChart2 },
                         { key: "documents", label: "Documents", icon: FileText },
+                        { key: "form-links", label: "Form Links", icon: Link2 },
                     ] as const).map(tab => {
                         const Icon = tab.icon
                         return (
@@ -751,14 +859,128 @@ export default function RecruitmentPage() {
             {/* ── DOCUMENTS TAB ── */}
             {activeTab === "documents" && (
                 <div className="px-4 lg:px-0 pb-6">
-                    <DocumentsTabView 
-                        leads={leads} 
-                        onLeadClick={openDetail} 
+                    <DocumentsTabView
+                        leads={leads}
+                        onLeadClick={openDetail}
                         onView={(url, name) => {
                             setPreviewUrl(url)
                             setPreviewName(name)
                         }}
                     />
+                </div>
+            )}
+
+            {/* ── FORM LINKS TAB ── */}
+            {activeTab === "form-links" && (
+                <div className="px-4 lg:px-0 pb-6">
+                    <div className="flex items-center justify-between mb-4 mt-2">
+                        <div>
+                            <p className="text-[13px] text-[var(--text2)]">Create shareable application links to float on WhatsApp or social media. Candidates fill a form and auto-appear as leads.</p>
+                        </div>
+                        <button
+                            onClick={() => { setShowCreateForm(true); fetchSites() }}
+                            className="flex items-center gap-2 h-9 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[13px] font-semibold rounded-[8px] transition-colors shrink-0 ml-4"
+                        >
+                            <Plus size={15} /> New Form Link
+                        </button>
+                    </div>
+
+                    {showCreateForm && (
+                        <div className="bg-white border border-[var(--border)] rounded-[14px] p-5 mb-5 shadow-sm">
+                            <h3 className="text-[14px] font-semibold text-[var(--text)] mb-4">Create New Application Form</h3>
+                            <form onSubmit={handleCreateFormLink} className="flex flex-col gap-3">
+                                <Field label="Form Title *">
+                                    <input required value={createFormData.title} onChange={e => setCreateFormData(p => ({ ...p, title: e.target.value }))}
+                                        placeholder="e.g. Security Guard Vacancy - Mumbai" className={inputCls} />
+                                </Field>
+                                <Field label="Description (shown to candidates)">
+                                    <input value={createFormData.description} onChange={e => setCreateFormData(p => ({ ...p, description: e.target.value }))}
+                                        placeholder="e.g. Apply for security guard position at our client site in Andheri" className={inputCls} />
+                                </Field>
+                                <Field label="Target Site (optional)">
+                                    <select value={createFormData.siteId} onChange={e => setCreateFormData(p => ({ ...p, siteId: e.target.value }))} className={inputCls}>
+                                        <option value="">No specific site</option>
+                                        {formSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                </Field>
+                                <div className="flex gap-2 justify-end pt-1">
+                                    <button type="button" onClick={() => setShowCreateForm(false)}
+                                        className="h-9 px-4 text-[13px] text-[var(--text2)] border border-[var(--border)] rounded-[7px] hover:bg-[var(--surface2)]">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" disabled={savingForm}
+                                        className="h-9 px-5 text-[13px] font-semibold bg-[var(--accent)] text-white rounded-[7px] flex items-center gap-2 disabled:opacity-60">
+                                        {savingForm && <Loader2 size={14} className="animate-spin" />}
+                                        Create Form
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {loadingForms ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
+                        </div>
+                    ) : leadForms.length === 0 && !showCreateForm ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-3">
+                            <div className="w-14 h-14 bg-[var(--surface2)] rounded-full flex items-center justify-center">
+                                <Link2 size={22} className="text-[var(--text3)]" />
+                            </div>
+                            <p className="text-[14px] font-medium text-[var(--text2)]">No form links yet</p>
+                            <button onClick={() => setShowCreateForm(true)} className="text-[13px] text-[var(--accent)] hover:underline">Create your first form</button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            {leadForms.map(form => {
+                                const applyUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/apply/${form.slug}`
+                                return (
+                                    <div key={form.id} className="bg-white border border-[var(--border)] rounded-[14px] p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <p className="text-[14px] font-semibold text-[var(--text)]">{form.title}</p>
+                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${form.isActive ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                                                    {form.isActive ? "Active" : "Inactive"}
+                                                </span>
+                                            </div>
+                                            {form.description && <p className="text-[12px] text-[var(--text3)] mt-0.5 truncate">{form.description}</p>}
+                                            {form.site && (
+                                                <p className="text-[11px] text-[var(--text3)] mt-0.5 flex items-center gap-1">
+                                                    <MapPin size={10} />{form.site.name}
+                                                </p>
+                                            )}
+                                            <p className="text-[11px] text-[var(--accent)] mt-1 font-mono truncate">/apply/{form.slug}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                                            <button
+                                                onClick={() => copyFormLink(form.slug)}
+                                                className="flex items-center gap-1.5 h-8 px-3 text-[12px] font-medium border border-[var(--border)] rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text)] transition-colors"
+                                            >
+                                                <Copy size={13} /> Copy Link
+                                            </button>
+                                            <a href={`/apply/${form.slug}`} target="_blank" rel="noopener noreferrer"
+                                                className="flex items-center gap-1.5 h-8 px-3 text-[12px] font-medium border border-[var(--border)] rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text)] transition-colors no-underline">
+                                                <ExternalLink size={13} /> Preview
+                                            </a>
+                                            <button
+                                                onClick={() => handleToggleFormActive(form)}
+                                                className={`flex items-center gap-1.5 h-8 px-3 text-[12px] font-medium border rounded-[7px] transition-colors ${form.isActive ? "border-amber-200 text-amber-700 hover:bg-amber-50" : "border-green-200 text-green-700 hover:bg-green-50"}`}
+                                            >
+                                                {form.isActive ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                                                {form.isActive ? "Deactivate" : "Activate"}
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteFormLink(form)}
+                                                className="flex items-center gap-1 h-8 px-2.5 text-[12px] border border-red-100 text-red-500 rounded-[7px] hover:bg-red-50 transition-colors"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1009,6 +1231,21 @@ export default function RecruitmentPage() {
                     onView={(url, name) => {
                         setPreviewUrl(url)
                         setPreviewName(name)
+                    }}
+                    onConvert={(lead) => { setConvertLead(lead); setDetailLead(null) }}
+                />
+            )}
+
+            {/* ── Convert to Employee Modal ── */}
+            {convertLead && (
+                <ConvertModal
+                    lead={convertLead}
+                    onClose={() => setConvertLead(null)}
+                    onConverted={(employeeId: string, employeeCode: string) => {
+                        setConvertLead(null)
+                        setLeads(prev => prev.map(l => l.id === convertLead.id ? { ...l, convertedEmployeeId: employeeId, status: "JOINED" } : l))
+                        toast.success(`Converted! Employee ${employeeCode} created.`)
+                        router.push(`/employees/${employeeId}`)
                     }}
                 />
             )}
@@ -1472,7 +1709,7 @@ function DocumentsTabView({ leads, onLeadClick, onView }: { leads: Lead[]; onLea
 function DetailDrawer({
     lead, session, users, activityContent, activityType, savingActivity,
     onClose, onEdit, onDelete, onStatusChange, onActivityTypeChange, onActivityContentChange, onAddActivity,
-    onLeadUpdate, onView
+    onLeadUpdate, onView, onConvert
 }: {
     lead: Lead
     session: any
@@ -1489,6 +1726,7 @@ function DetailDrawer({
     onAddActivity: () => void
     onLeadUpdate: (l: Lead) => void
     onView: (url: string, name: string) => void
+    onConvert: (lead: Lead) => void
 }) {
     const [drawerTab, setDrawerTab] = useState<"overview" | "activities" | "interview" | "documents" | "followups">("overview")
     const [interviewForm, setInterviewForm] = useState({
@@ -1688,6 +1926,39 @@ function DetailDrawer({
                     {/* OVERVIEW TAB */}
                     {drawerTab === "overview" && (
                         <div className="px-5 py-4">
+                            {/* Convert to Employee banner */}
+                            {["SELECTED", "OFFERED", "JOINED"].includes(lead.status) && (
+                                <div className={`mb-4 p-3 rounded-[10px] border flex items-center justify-between gap-3 ${lead.convertedEmployeeId ? "bg-green-50 border-green-200" : "bg-[#fffbeb] border-amber-200"}`}>
+                                    {lead.convertedEmployeeId ? (
+                                        <>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle size={16} className="text-green-600 shrink-0" />
+                                                <span className="text-[13px] font-semibold text-green-700">Converted to Employee</span>
+                                            </div>
+                                            <button
+                                                onClick={() => window.open(`/employees/${lead.convertedEmployeeId}`, "_blank")}
+                                                className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-green-600 text-white rounded-[6px] hover:bg-green-700 transition-colors shrink-0"
+                                            >
+                                                <ExternalLink size={12} /> View Employee
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center gap-2">
+                                                <UserPlus size={16} className="text-amber-600 shrink-0" />
+                                                <span className="text-[13px] font-semibold text-amber-700">Ready to onboard</span>
+                                            </div>
+                                            <button
+                                                onClick={() => onConvert(lead)}
+                                                className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-[var(--accent)] text-white rounded-[6px] hover:bg-[var(--accent-hover)] transition-colors shrink-0"
+                                            >
+                                                <UserPlus size={12} /> Convert to Employee
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Resume / Profile links */}
                             {(lead.resumeUrl || lead.profileUrl) && (
                                 <div className="flex gap-2 mb-4 flex-wrap">
@@ -2036,6 +2307,170 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
             <div className="flex items-center gap-1.5 text-[12px] text-[var(--text)]">
                 <Icon size={11} className="text-[var(--text3)] shrink-0" />
                 <span className="truncate">{value}</span>
+            </div>
+        </div>
+    )
+}
+
+// ─── Convert to Employee Modal ────────────────────────────────────────────────
+function ConvertModal({ lead, onClose, onConverted }: {
+    lead: Lead
+    onClose: () => void
+    onConverted: (employeeId: string, employeeCode: string) => void
+}) {
+    const [sites, setSites] = useState<SiteOption[]>([])
+    const [departments, setDepartments] = useState<DeptOption[]>([])
+    const [submitting, setSubmitting] = useState(false)
+    const [form, setForm] = useState({
+        dateOfJoining: new Date().toISOString().slice(0, 10),
+        siteId: "",
+        departmentId: "",
+        designation: lead.position ?? "",
+        employmentType: "Full-time",
+        basicSalary: lead.expectedSalary?.toString() ?? "",
+        da: "",
+        washing: "",
+        conveyance: "",
+        leaveWithWages: "",
+        otherAllowance: "",
+        otRatePerHour: "170",
+        canteenRatePerDay: "55",
+        complianceType: "OR",
+    })
+
+    useEffect(() => {
+        fetch("/api/sites").then(r => r.json()).then(d => setSites((d.sites ?? d).map((s: any) => ({ id: s.id, name: s.name })))).catch(() => {})
+        fetch("/api/departments").then(r => r.json()).then(d => setDepartments((d.departments ?? d).map((dep: any) => ({ id: dep.id, name: dep.name })))).catch(() => {})
+    }, [])
+
+    const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+        setForm(p => ({ ...p, [k]: e.target.value }))
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault()
+        if (!form.basicSalary) { toast.error("Basic salary is required"); return }
+        setSubmitting(true)
+        try {
+            const res = await fetch(`/api/recruitment/${lead.id}/convert`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+            })
+            const data = await res.json()
+            if (!res.ok) { toast.error(data.error || "Conversion failed"); return }
+            if (data.alreadyConverted) {
+                toast.info("Already converted")
+                onConverted(data.employeeId, "existing")
+                return
+            }
+            onConverted(data.employeeId, data.employeeCode)
+        } catch {
+            toast.error("Network error")
+        } finally { setSubmitting(false) }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-[18px] shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] sticky top-0 bg-white z-10">
+                    <div>
+                        <h2 className="text-[16px] font-bold text-[var(--text)]">Convert to Employee</h2>
+                        <p className="text-[12px] text-[var(--text3)] mt-0.5">{lead.candidateName} · {lead.phone}</p>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text3)]"><X size={18} /></button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-4">
+                    {/* Joining */}
+                    <div>
+                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Joining Details</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Date of Joining *">
+                                <input required type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")} className={inputCls} />
+                            </Field>
+                            <Field label="Employment Type">
+                                <select value={form.employmentType} onChange={set("employmentType")} className={inputCls}>
+                                    <option>Full-time</option>
+                                    <option>Part-time</option>
+                                    <option>Contract</option>
+                                    <option>Daily Wage</option>
+                                </select>
+                            </Field>
+                            <Field label="Designation">
+                                <input value={form.designation} onChange={set("designation")} placeholder={lead.position ?? "Designation"} className={inputCls} />
+                            </Field>
+                            <Field label="Department">
+                                <select value={form.departmentId} onChange={set("departmentId")} className={inputCls}>
+                                    <option value="">Select department</option>
+                                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                </select>
+                            </Field>
+                            <Field label="Site / Location">
+                                <select value={form.siteId} onChange={set("siteId")} className={inputCls}>
+                                    <option value="">Select site</option>
+                                    {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </Field>
+                        </div>
+                    </div>
+
+                    {/* Salary */}
+                    <div>
+                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Salary Structure (₹/month)</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Basic Salary *">
+                                <input required type="number" min="0" value={form.basicSalary} onChange={set("basicSalary")} placeholder="e.g. 12000" className={inputCls} />
+                            </Field>
+                            <Field label="DA">
+                                <input type="number" min="0" value={form.da} onChange={set("da")} placeholder="0" className={inputCls} />
+                            </Field>
+                            <Field label="Washing Allowance">
+                                <input type="number" min="0" value={form.washing} onChange={set("washing")} placeholder="0" className={inputCls} />
+                            </Field>
+                            <Field label="Conveyance">
+                                <input type="number" min="0" value={form.conveyance} onChange={set("conveyance")} placeholder="0" className={inputCls} />
+                            </Field>
+                            <Field label="Leave With Wages">
+                                <input type="number" min="0" value={form.leaveWithWages} onChange={set("leaveWithWages")} placeholder="0" className={inputCls} />
+                            </Field>
+                            <Field label="Other Allowance">
+                                <input type="number" min="0" value={form.otherAllowance} onChange={set("otherAllowance")} placeholder="0" className={inputCls} />
+                            </Field>
+                        </div>
+                    </div>
+
+                    {/* Compliance */}
+                    <div>
+                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Compliance & Rates</p>
+                        <div className="grid grid-cols-3 gap-3">
+                            <Field label="OT Rate (₹/hr)">
+                                <input type="number" min="0" value={form.otRatePerHour} onChange={set("otRatePerHour")} className={inputCls} />
+                            </Field>
+                            <Field label="Canteen (₹/day)">
+                                <input type="number" min="0" value={form.canteenRatePerDay} onChange={set("canteenRatePerDay")} className={inputCls} />
+                            </Field>
+                            <Field label="Compliance Type">
+                                <select value={form.complianceType} onChange={set("complianceType")} className={inputCls}>
+                                    <option value="OR">OR (Overtime)</option>
+                                    <option value="CALL">CALL</option>
+                                </select>
+                            </Field>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-2 border-t border-[var(--border)]">
+                        <button type="button" onClick={onClose}
+                            className="h-9 px-4 text-[13px] font-medium text-[var(--text2)] border border-[var(--border)] rounded-[7px] hover:bg-[var(--surface2)]">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={submitting}
+                            className="h-9 px-5 text-[13px] font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-[7px] flex items-center gap-2 disabled:opacity-60">
+                            {submitting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                            {submitting ? "Converting…" : "Create Employee"}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     )
