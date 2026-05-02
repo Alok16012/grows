@@ -104,7 +104,7 @@ export default function SalaryMasterPage() {
         setEditForm(s ? {
             basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
             leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
-            bonus: 0, // bonus auto-calculated from basic+da at payroll time
+            bonus: s.bonus ?? 0, // preserve stored per-employee bonus (₹625/₹650 etc.)
             otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
             complianceType: compType,
         } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
@@ -124,7 +124,7 @@ export default function SalaryMasterPage() {
                     employeeId: emp.id,
                     basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
                     leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
-                    bonus: 0, // auto-calculated from basic+da at payroll time
+                    bonus: s.bonus ?? 0, // preserve stored bonus when changing compliance type
                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                     complianceType: newType,
                 }] }),
@@ -147,7 +147,7 @@ export default function SalaryMasterPage() {
             const res = await fetch("/api/payroll/salary-structure", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows: [{ employeeId: emp.id, ...editForm, bonus: 0 }] }),
+                body: JSON.stringify({ rows: [{ employeeId: emp.id, ...editForm }] }),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(`Salary structure saved for ${emp.firstName} ${emp.lastName}`)
@@ -158,12 +158,13 @@ export default function SalaryMasterPage() {
     }
 
     // Download Excel template with current data pre-filled
+    // Site-wise: when filterSite is set, the template includes only that site's employees
     const handleDownloadTemplate = () => {
         const headers = [
             "EMP Code", "Employee Name", "Designation", "Site",
             "Basic", "DA", "Washing", "Conveyance",
             "Leave With Wages", "Other Allowance",
-            "Bonus (Auto - Do Not Edit)", // reference column: (Basic+DA)×8.33%
+            "Bonus", // editable: per-employee min-wage based, e.g. ₹625 (7500×8.33%) or ₹650 (7800×8.33%)
             "OT Rate Per Hour", "Canteen Rate Per Day", "Compliance Type",
         ]
         const rows = filtered.map(emp => {
@@ -171,7 +172,10 @@ export default function SalaryMasterPage() {
             const basic = s?.basic ?? emp.basicSalary ?? 0
             const da    = s?.da ?? 2511
             const compType = s?.complianceType ?? "OR"
-            const autoBonus = compType === "CALL" ? 0 : Math.round((basic + da) * 0.0833)
+            // Bonus: prefer stored value (₹625/₹650 etc.), else statutory ₹7000 cap × 8.33% ≈ ₹583
+            const stored = (s as { bonus?: number } | null)?.bonus
+            const bonus  = compType === "CALL" ? 0
+                : (stored != null && stored > 0 ? stored : Math.round(Math.min(basic + da, 7000) * 0.0833))
             return [
                 emp.employeeId,
                 `${emp.firstName} ${emp.lastName}`,
@@ -183,7 +187,7 @@ export default function SalaryMasterPage() {
                 s?.conveyance ?? 0,
                 s?.leaveWithWages ?? 0,
                 s?.otherAllowance ?? 0,
-                autoBonus,           // auto-calculated, ignored on upload
+                bonus,
                 s?.otRatePerHour ?? 170,
                 s?.canteenRatePerDay ?? 55,
                 compType,
@@ -191,15 +195,15 @@ export default function SalaryMasterPage() {
         })
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 12, 16, 14, 18, 16, 18, 14].map(w => ({ wch: w }))
-        // Grey out the Bonus column header to signal it's read-only
-        const bonusHeaderCell = "K1"
-        if (ws[bonusHeaderCell]) {
-            ws[bonusHeaderCell].s = { fill: { fgColor: { rgb: "F3F4F6" } }, font: { italic: true, color: { rgb: "6B7280" } } }
-        }
+        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 12, 16, 14, 12, 16, 18, 14].map(w => ({ wch: w }))
         XLSX.utils.book_append_sheet(wb, ws, "Salary Structure")
-        XLSX.writeFile(wb, `salary_structure_master.xlsx`)
-        toast.success("Template downloaded — Bonus column is auto-calculated, no need to edit")
+        const fileName = filterSite
+            ? `salary_structure_${filterSite.replace(/[^a-zA-Z0-9]+/g, "_")}.xlsx`
+            : `salary_structure_master.xlsx`
+        XLSX.writeFile(wb, fileName)
+        toast.success(filterSite
+            ? `Template downloaded for ${filterSite} (${filtered.length} employees)`
+            : `Template downloaded (${filtered.length} employees)`)
     }
 
     // Upload Excel and bulk-save
@@ -215,20 +219,34 @@ export default function SalaryMasterPage() {
                 const ws   = wb.Sheets[wb.SheetNames[0]]
                 const raw  = XLSX.utils.sheet_to_json(ws) as Record<string, unknown>[]
 
-                // Build a map: employeeId string → UUID
-                const codeToId = new Map(data.map(e => [e.employeeId.toLowerCase(), e.id]))
+                // Build allowed employee map (site-wise: only filtered site's employees if site filter is active)
+                const allowedPool = filterSite ? filtered : data
+                const codeToId = new Map(allowedPool.map(e => [e.employeeId.toLowerCase(), e.id]))
 
                 const rows: (SalaryRow & { employeeId: string })[] = []
                 const skipped: string[] = []
+                const wrongSite: string[] = []
 
                 for (const r of raw) {
                     const lk  = (k: string) => Object.keys(r).find(kk => kk.toLowerCase().replace(/[\s_/]/g,"") === k.toLowerCase().replace(/[\s_/]/g,""))
                     const get = (k: string) => { const found = lk(k); return found ? r[found] : undefined }
                     const empCode = String(get("EMPCode") ?? get("empcode") ?? "").trim()
                     const uuid    = codeToId.get(empCode.toLowerCase())
-                    if (!uuid) { skipped.push(empCode || "(blank)"); continue }
+                    if (!uuid) {
+                        // Distinguish "not found in system" vs "found but not at this site"
+                        if (filterSite && data.some(d => d.employeeId.toLowerCase() === empCode.toLowerCase())) {
+                            wrongSite.push(empCode)
+                        } else {
+                            skipped.push(empCode || "(blank)")
+                        }
+                        continue
+                    }
 
                     const compType = String(get("ComplianceType") ?? get("Compliance Type") ?? "OR").toUpperCase()
+                    // Bonus: read from Excel (per-employee min-wage based: ₹625, ₹650 etc.)
+                    // If empty/missing, server will fallback to statutory ₹7000 × 8.33% ≈ ₹583
+                    const bonusRaw = get("Bonus") ?? get("bonus")
+                    const bonusVal = bonusRaw != null && String(bonusRaw).trim() !== "" ? Number(bonusRaw) : 0
                     rows.push({
                         employeeId:       uuid,
                         basic:            Number(get("Basic") ?? 0),
@@ -237,14 +255,19 @@ export default function SalaryMasterPage() {
                         conveyance:       Number(get("Conveyance") ?? 0),
                         leaveWithWages:   Number(get("LeaveWithWages") ?? get("Leave With Wages") ?? 0),
                         otherAllowance:   Number(get("OtherAllowance") ?? get("Other Allowance") ?? 0),
-                        bonus:            0, // auto-calculated from basic+da at payroll time
+                        bonus:            bonusVal || 0,
                         otRatePerHour:    Number(get("OTRatePerHour") ?? get("OT Rate Per Hour") ?? 170),
                         canteenRatePerDay: Number(get("CanteenRatePerDay") ?? get("Canteen Rate Per Day") ?? 55),
                         complianceType:   compType || "OR",
                     })
                 }
 
-                if (!rows.length) { toast.error("No matching employees found. Check EMP Code column."); return }
+                if (!rows.length) {
+                    toast.error(filterSite
+                        ? `No matching employees at "${filterSite}". Clear site filter to update across all sites.`
+                        : "No matching employees found. Check EMP Code column.")
+                    return
+                }
 
                 const res = await fetch("/api/payroll/salary-structure", {
                     method: "POST",
@@ -252,8 +275,12 @@ export default function SalaryMasterPage() {
                     body: JSON.stringify({ rows }),
                 })
                 const d = await res.json()
-                toast.success(`${d.updated} records updated${skipped.length ? ` | ${skipped.length} skipped (not found)` : ""}`)
-                if (skipped.length) console.warn("Skipped EMP Codes:", skipped)
+                const parts = [`${d.updated} updated`]
+                if (skipped.length)   parts.push(`${skipped.length} not found`)
+                if (wrongSite.length) parts.push(`${wrongSite.length} skipped (other site)`)
+                toast.success(`${filterSite ? `[${filterSite}] ` : ""}${parts.join(" · ")}`)
+                if (skipped.length)   console.warn("Skipped EMP Codes (not found):", skipped)
+                if (wrongSite.length) console.warn(`Skipped EMP Codes (not at "${filterSite}"):`, wrongSite)
                 await load()
             } catch (e) { toast.error((e as Error).message) }
             finally { setUploading(false) }
@@ -294,21 +321,35 @@ export default function SalaryMasterPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <IndianRupee size={20} style={{ color: "var(--accent)" }} />
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Salary Structure Master</h1>
+                    {filterSite && (
+                        <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "#dbeafe", color: "#1e40af", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            📍 Site Mode: {filterSite} ({filtered.length})
+                        </span>
+                    )}
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <button onClick={load} style={btnGhost}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
                     </button>
-                    <button onClick={handleDownloadTemplate} style={btnGhost}>
-                        <Download size={13} /> Download Template
+                    <button onClick={handleDownloadTemplate} style={btnGhost} title={filterSite ? `Download template for ${filterSite}` : "Download all-employees template"}>
+                        <Download size={13} /> {filterSite ? `Download (${filterSite})` : "Download Template"}
                     </button>
-                    <label style={{ ...btnPrimary, background: uploading ? "#a78bfa" : "#7c3aed", cursor: uploading ? "not-allowed" : "pointer" }}>
+                    <label style={{ ...btnPrimary, background: uploading ? "#a78bfa" : "#7c3aed", cursor: uploading ? "not-allowed" : "pointer" }}
+                        title={filterSite ? `Upload affects only ${filterSite} employees` : "Upload affects all matched employees"}>
                         {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                        {uploading ? "Uploading…" : "Bulk Upload Excel"}
+                        {uploading ? "Uploading…" : (filterSite ? `Upload (${filterSite})` : "Bulk Upload Excel")}
                         <input type="file" accept=".xlsx,.csv" onChange={handleUpload} style={{ display: "none" }} disabled={uploading} />
                     </label>
                 </div>
             </div>
+
+            {/* Site-wise hint banner */}
+            {!filterSite && allSites.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047", fontSize: 11, color: "#854d0e" }}>
+                    <span>💡</span>
+                    <span><b>Site-wise upload:</b> Select a site below → click <b>Download (Site)</b> → fill Bonus/Basic/DA etc. → upload back. Only that site&apos;s employees get updated.</span>
+                </div>
+            )}
 
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
@@ -357,7 +398,7 @@ export default function SalaryMasterPage() {
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Washing</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Conv.</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>LWW</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Bonus<span style={calcTag}>auto</span></th>
+                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Bonus</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Other</th>
                                 <th style={{ ...th, background: "#dcfce7", color: "#15803d" }}>Gross<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }}>Co.PF<span style={calcTag}>auto</span></th>
@@ -431,8 +472,8 @@ export default function SalaryMasterPage() {
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("leaveWithWages", "#eff6ff") : s ? fmtN(s.leaveWithWages) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff", color: "#6b7280", fontStyle: "italic" }}>
-                                            {(s || isEditing) ? fmtN(bonus) : "—"}
+                                        <td style={{ ...td, background: "#eff6ff" }} title="Per-employee bonus (Payment of Bonus Act). Min-wage based: ₹625 = 7500×8.33%, ₹650 = 7800×8.33%">
+                                            {isEditing ? numIn("bonus", "#eff6ff") : (s ? fmtN(bonus) : "—")}
                                         </td>
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("otherAllowance", "#eff6ff") : s ? fmtN(s.otherAllowance) : "—"}
