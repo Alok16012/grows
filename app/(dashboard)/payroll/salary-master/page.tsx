@@ -80,6 +80,10 @@ export default function SalaryMasterPage() {
     const [editId,     setEditId]     = useState<string | null>(null)
     const [editForm,   setEditForm]   = useState<EditForm>(EMPTY_SALARY)
     const [saving,     setSaving]     = useState(false)
+    // Drawer-based manual edit
+    const [drawerEmp,  setDrawerEmp]  = useState<EmpSalary | null>(null)
+    const [drawerForm, setDrawerForm] = useState<EditForm>(EMPTY_SALARY)
+    const [drawerSaving, setDrawerSaving] = useState(false)
     const [uploading,  setUploading]  = useState(false)
     const [filterNone, setFilterNone] = useState(false)
     const [filterSite, setFilterSite] = useState("")
@@ -109,6 +113,39 @@ export default function SalaryMasterPage() {
             complianceType: compType,
         } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
         setEditId(emp.id)
+    }
+
+    // ─── Drawer-based manual edit (cleaner UX than inline) ───────────────────
+    const openDrawer = (emp: EmpSalary) => {
+        const s = emp.employeeSalary
+        setDrawerForm(s ? {
+            basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
+            leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+            bonus: s.bonus ?? 0,
+            otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
+            complianceType: s.complianceType ?? "OR",
+        } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
+        setDrawerEmp(emp)
+    }
+    const closeDrawer = () => { if (!drawerSaving) setDrawerEmp(null) }
+    const saveDrawer = async () => {
+        if (!drawerEmp) return
+        setDrawerSaving(true)
+        try {
+            const res = await fetch("/api/payroll/salary-structure", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rows: [{ employeeId: drawerEmp.id, ...drawerForm }] }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(`Salary saved for ${drawerEmp.firstName} ${drawerEmp.lastName}`)
+            setDrawerEmp(null)
+            await load()
+        } catch (e) {
+            toast.error((e as Error).message)
+        } finally {
+            setDrawerSaving(false)
+        }
     }
 
     const handleQuickTypeChange = async (emp: EmpSalary, newType: string) => {
@@ -539,10 +576,20 @@ export default function SalaryMasterPage() {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <button onClick={() => startEdit(emp)}
-                                                    style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "var(--text2)" }}>
-                                                    <Edit2 size={11} /> Edit
-                                                </button>
+                                                <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                                                    <button onClick={() => openDrawer(emp)}
+                                                        title="Open detailed edit form"
+                                                        style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                                                        <Edit2 size={11} /> {s ? "Edit" : "Add Salary"}
+                                                    </button>
+                                                    {s && (
+                                                        <button onClick={() => startEdit(emp)}
+                                                            title="Quick inline edit"
+                                                            style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, cursor: "pointer", color: "var(--text3)" }}>
+                                                            ⚡
+                                                        </button>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -604,8 +651,132 @@ export default function SalaryMasterPage() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                HRA = (Basic+DA)×5% · Bonus = (Basic+DA)×8.33% auto · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = 0.75% · PT = ₹200 (above ₹10k) / ₹175 (₹7.5k-₹10k) / ₹0 · Co.PF = ₹1,950 · Co.ESIC = 3.25% (gross ≤ ₹21k)
+                HRA = (Basic+DA)×5% · Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = 0 (Growus absorbed) · PT = ₹200 (above ₹10k) / ₹175 (₹7.5k–₹10k) / ₹0 · Co.PF = ₹1,950 · Co.ESIC = 3.25% (gross−wash ≤ ₹21k)
             </p>
+
+            {/* ── Manual Edit Drawer ─────────────────────────────────────── */}
+            {drawerEmp && (() => {
+                const live = calc({ ...drawerForm, complianceType: drawerForm.complianceType || "OR" })
+                const isCALL = drawerForm.complianceType === "CALL"
+                const numField = (key: keyof EditForm, label: string, hint?: string) => (
+                    <div style={{ marginBottom: 10 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", marginBottom: 3, display: "block" }}>
+                            {label} {hint && <span style={{ fontSize: 9, color: "var(--text3)", fontWeight: 400, marginLeft: 4 }}>{hint}</span>}
+                        </label>
+                        <input type="number" min={0}
+                            value={String(drawerForm[key] ?? "")}
+                            onChange={e => setDrawerForm(f => ({ ...f, [key]: Number(e.target.value) || 0 }))}
+                            style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 13, outline: "none", background: "var(--surface)", color: "var(--text)", textAlign: "right", boxSizing: "border-box" }} />
+                    </div>
+                )
+                const previewRow = (label: string, value: number, color = "var(--text)", bold = false) => (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12 }}>
+                        <span style={{ color: "var(--text3)" }}>{label}</span>
+                        <span style={{ color, fontWeight: bold ? 700 : 500 }}>{fmt(value)}</span>
+                    </div>
+                )
+                return (
+                    <>
+                        <div onClick={closeDrawer} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50 }} />
+                        <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(540px, 96vw)", background: "var(--surface)", boxShadow: "-4px 0 32px rgba(0,0,0,0.2)", zIndex: 51, display: "flex", flexDirection: "column" }}>
+                            {/* Header */}
+                            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexShrink: 0, background: "linear-gradient(180deg, #faf5ff 0%, var(--surface) 100%)" }}>
+                                <div>
+                                    <p style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", margin: 0 }}>Edit Salary Structure</p>
+                                    <p style={{ fontSize: 12, color: "var(--text3)", margin: "3px 0 0 0" }}>
+                                        <span style={{ color: "var(--accent)", fontWeight: 700 }}>{drawerEmp.employeeId}</span>
+                                        {" · "}{drawerEmp.firstName} {drawerEmp.lastName}
+                                        {drawerEmp.deployments?.[0]?.site?.name && <span style={{ color: "var(--text3)" }}> · 📍 {drawerEmp.deployments[0].site.name}</span>}
+                                    </p>
+                                </div>
+                                <button onClick={closeDrawer} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", color: "var(--text3)", display: "flex" }}>
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+                                {/* Compliance type */}
+                                <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 8, background: isCALL ? "#fef3c7" : "#eff6ff", border: `1px solid ${isCALL ? "#fde047" : "#bfdbfe"}` }}>
+                                    <label style={{ fontSize: 11, fontWeight: 700, color: isCALL ? "#92400e" : "#1e40af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Compliance Type</label>
+                                    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                                        {[
+                                            { v: "OR",   label: "OR — Full PF + ESIC", desc: "Full-time / compliance role" },
+                                            { v: "CALL", label: "CALL — No PF, No ESIC", desc: "Temporary / non-compliance" },
+                                        ].map(opt => (
+                                            <label key={opt.v} style={{ flex: 1, cursor: "pointer", padding: "8px 10px", borderRadius: 7, border: `2px solid ${drawerForm.complianceType === opt.v ? (opt.v === "CALL" ? "#f59e0b" : "#3b82f6") : "transparent"}`, background: drawerForm.complianceType === opt.v ? "var(--surface)" : "transparent" }}>
+                                                <input type="radio" checked={drawerForm.complianceType === opt.v} onChange={() => setDrawerForm(f => ({ ...f, complianceType: opt.v }))} style={{ display: "none" }} />
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{opt.label}</div>
+                                                <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 1 }}>{opt.desc}</div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Earnings */}
+                                <p style={{ fontSize: 11, fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.6px", padding: "8px 0 6px", borderBottom: "1px solid #dbeafe", marginBottom: 12 }}>Earnings (Full-Month Rate)</p>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                    {numField("basic",          "Basic",          "₹")}
+                                    {numField("da",             "DA",             "₹")}
+                                    {numField("washing",        "Washing",        "₹")}
+                                    {numField("conveyance",     "Conveyance",     "₹")}
+                                    {numField("leaveWithWages", "Leave w/ Wages", "₹")}
+                                    {numField("otherAllowance", "Other Allowance","₹")}
+                                    {numField("bonus",          "Bonus",          "Min-wage based: 625/650")}
+                                    <div style={{ marginBottom: 10 }}>
+                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", marginBottom: 3, display: "block" }}>
+                                            HRA <span style={{ fontSize: 9, color: "#1d4ed8", fontWeight: 400, marginLeft: 4 }}>auto · (Basic+DA)×5%</span>
+                                        </label>
+                                        <input value={fmtN(live.hra)} disabled
+                                            style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 13, background: "#f1f5f9", color: "var(--text2)", textAlign: "right", boxSizing: "border-box" }} />
+                                    </div>
+                                </div>
+
+                                {/* Rates */}
+                                <p style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.6px", padding: "8px 0 6px", borderBottom: "1px solid #ede9fe", marginBottom: 12, marginTop: 14 }}>Rates</p>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                                    {numField("otRatePerHour",     "OT Rate / Hour",     "₹/hr")}
+                                    {numField("canteenRatePerDay", "Canteen Rate / Day", "₹/day")}
+                                </div>
+
+                                {/* Live Calculation Preview */}
+                                <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10, background: "#f8fafc", border: "1px dashed #94a3b8" }}>
+                                    <p style={{ fontSize: 11, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 8px 0" }}>📊 Live Calculation Preview</p>
+                                    {previewRow("Basic + DA",      drawerForm.basic + drawerForm.da)}
+                                    {previewRow("HRA (auto 5%)",   live.hra, "#1d4ed8")}
+                                    {previewRow("Bonus (stored)",  live.bonus, "#7c3aed")}
+                                    <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
+                                    {previewRow("Gross (full)",    live.gross,    "#15803d", true)}
+                                    <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
+                                    {previewRow("Emp PF",          live.empPFDed, "#dc2626")}
+                                    {previewRow("Emp ESI",         live.empESIDed,"#dc2626")}
+                                    {previewRow("PT",              live.pt,       "#dc2626")}
+                                    {previewRow("Total Deduction", live.totalDed, "#b91c1c", true)}
+                                    <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
+                                    {previewRow("Net Salary",      live.netSalary, "#15803d", true)}
+                                    <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
+                                    {previewRow("Co PF",           live.empPF,  "#0369a1")}
+                                    {previewRow("Co ESIC",         live.empESI, "#0369a1")}
+                                    {previewRow("CTC",             live.ctc,    "#1e40af", true)}
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: 10, justifyContent: "flex-end", flexShrink: 0, background: "var(--surface)" }}>
+                                <button onClick={closeDrawer} disabled={drawerSaving}
+                                    style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 13, color: "var(--text2)", cursor: "pointer" }}>
+                                    Cancel
+                                </button>
+                                <button onClick={saveDrawer} disabled={drawerSaving}
+                                    style={{ padding: "8px 22px", borderRadius: 8, border: "none", background: drawerSaving ? "#a78bfa" : "#7c3aed", color: "#fff", fontSize: 13, fontWeight: 700, cursor: drawerSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                                    {drawerSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                    {drawerSaving ? "Saving…" : "Save Salary"}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )
+            })()}
         </div>
     )
 }
