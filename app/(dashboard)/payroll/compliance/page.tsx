@@ -1,19 +1,24 @@
 "use client"
-import { Suspense, useState, useEffect, useCallback } from "react"
+import { Suspense, useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import * as XLSX from "xlsx"
 import { toast } from "sonner"
 import {
-    Loader2, Download, RefreshCw, ChevronRight, ShieldCheck,
-    Users, Lock, TableProperties, FileSpreadsheet, Search
+    Loader2, Download, ChevronRight, ShieldCheck, ChevronDown,
+    FileSpreadsheet, TableProperties
 } from "lucide-react"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 
-type StatsData  = { totalEmployees: number; grossPay: number; totalDeduction: number; netPay: number }
+type StatsData  = {
+    totalEmployees: number; grossPay: number; totalDeduction: number; netPay: number
+    // Month-wise compliance totals
+    pfWages: number; pfEmployee: number; pfEmployer: number; pfTotal: number; pfEmpCount: number
+    esiWages: number; esiEmployee: number; esiEmployer: number; esiTotal: number; esiEmpCount: number
+    ptTotal: number; ptEmpCount: number; ptSlab0: number; ptSlab175: number; ptSlab200: number
+}
 type ReportItem = { id: string; label: string; shortLabel: string; type: string }
-type LockedEmp  = { id: string; netSalary: number; grossSalary: number; siteId: string | null; employee: { employeeId: string; firstName: string; lastName: string; designation: string | null } }
 
 const SECTIONS: { key: string; title: string; shortTitle: string; badge: string; color: string; bg: string; border: string; items: ReportItem[] }[] = [
     {
@@ -79,48 +84,68 @@ function ComplianceInner() {
     const params  = useSearchParams()
     const [month,      setMonth]      = useState(Number(params.get("month")) || new Date().getMonth() + 1)
     const [year,       setYear]       = useState(Number(params.get("year"))  || new Date().getFullYear())
-    const [empSearch,  setEmpSearch]  = useState("")
     const [stats,      setStats]      = useState<StatsData | null>(null)
     const [loading,    setLoading]    = useState(false)
     const [dataLoaded, setDataLoaded] = useState(false)
     const [dlLoading,  setDlLoading]  = useState<string | null>(null)
-    const [lockedEmps, setLockedEmps] = useState<LockedEmp[]>([])
-    const [ldLocked,   setLdLocked]   = useState(false)
+    // Card download dropdown — open state per section key
+    const [openMenu,   setOpenMenu]   = useState<string | null>(null)
+    const menuContainerRef = useRef<HTMLDivElement>(null)
 
-    const filteredEmps = empSearch.trim()
-        ? lockedEmps.filter(e =>
-            `${e.employee.firstName} ${e.employee.lastName}`.toLowerCase().includes(empSearch.toLowerCase()) ||
-            e.employee.employeeId.toLowerCase().includes(empSearch.toLowerCase())
-          )
-        : lockedEmps
-
-    const fetchLockedEmps = useCallback(async () => {
-        setLdLocked(true)
-        try {
-            const r = await fetch(`/api/payroll?month=${month}&year=${year}&status=PROCESSED`)
-            if (r.ok) { const d = await r.json(); setLockedEmps(Array.isArray(d) ? d : []) }
-        } catch {}
-        finally { setLdLocked(false) }
-    }, [month, year])
-
-    useEffect(() => { fetchLockedEmps() }, [fetchLockedEmps])
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const onClick = (e: MouseEvent) => {
+            if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
+                setOpenMenu(null)
+            }
+        }
+        document.addEventListener("mousedown", onClick)
+        return () => document.removeEventListener("mousedown", onClick)
+    }, [])
 
     const handleLoad = async () => {
         setLoading(true); setDataLoaded(false); setStats(null)
         try {
-            const r  = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-deduction`)
-            if (!r.ok) { toast.error("No payroll data found for this period"); return }
-            const data = await r.json()
-            const r2   = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=wage-sheet`)
-            const wsData = r2.ok ? await r2.json() : []
+            // Fetch all 4 deduction lists in parallel — aggregate to month-wise totals locally
+            const [pfR, esicR, ptR, wsR] = await Promise.all([
+                fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-deduction`),
+                fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=esic-deduction`),
+                fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pt-deduction`),
+                fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=wage-sheet`),
+            ])
+            if (!pfR.ok && !esicR.ok && !ptR.ok && !wsR.ok) {
+                toast.error("No payroll data found for this period"); return
+            }
+            const pf   = pfR.ok   ? await pfR.json()   : []
+            const esic = esicR.ok ? await esicR.json() : []
+            const pt   = ptR.ok   ? await ptR.json()   : []
+            const ws   = wsR.ok   ? await wsR.json()   : []
+            const sum = (rows: Record<string, unknown>[], key: string): number =>
+                rows.reduce((s, r) => s + (Number(r[key]) || 0), 0)
+
             setStats({
-                totalEmployees: data.length,
-                grossPay:       wsData.reduce((a: number, row: Record<string,number>) => a + (row["Gross Earning"] || 0), 0),
-                totalDeduction: wsData.reduce((a: number, row: Record<string,number>) => a + (row["Tot Ded"] || 0), 0),
-                netPay:         wsData.reduce((a: number, row: Record<string,number>) => a + (row["Net Pay"] || 0), 0),
+                totalEmployees: ws.length,
+                grossPay:       sum(ws, "Gross Earning"),
+                totalDeduction: sum(ws, "Tot Ded"),
+                netPay:         sum(ws, "Net Pay"),
+                pfWages:    sum(pf, "PF Wages"),
+                pfEmployee: sum(pf, "PF Employee (12%)"),
+                pfEmployer: sum(pf, "PF Employer (13%)"),
+                pfTotal:    sum(pf, "Total PF"),
+                pfEmpCount: pf.filter((p: Record<string, unknown>) => Number(p["PF Employee (12%)"]) > 0).length,
+                esiWages:    sum(esic, "Gross"),
+                esiEmployee: sum(esic, "ESI Employee"),
+                esiEmployer: sum(esic, "ESI Employer"),
+                esiTotal:    sum(esic, "ESI Employee") + sum(esic, "ESI Employer"),
+                esiEmpCount: esic.length,
+                ptTotal:    sum(pt, "PT Deducted"),
+                ptEmpCount: pt.filter((p: Record<string, unknown>) => Number(p["PT Deducted"]) > 0).length,
+                ptSlab0:    pt.filter((p: Record<string, unknown>) => Number(p["PT Deducted"]) === 0).length,
+                ptSlab175:  pt.filter((p: Record<string, unknown>) => Number(p["PT Deducted"]) === 175).length,
+                ptSlab200:  pt.filter((p: Record<string, unknown>) => Number(p["PT Deducted"]) >= 200).length,
             })
             setDataLoaded(true)
-            toast.success(`Loaded ${data.length} employees for ${MONTHS[month-1]} ${year}`)
+            toast.success(`Loaded ${ws.length} employees for ${MONTHS[month-1]} ${year}`)
         } catch { toast.error("Failed to load compliance data") }
         finally { setLoading(false) }
     }
@@ -436,169 +461,146 @@ function ComplianceInner() {
                 )}
             </div>
 
-            {/* ── Main Body: Locked Employees + 4 Section Cards ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16, alignItems: "start" }}>
+            {/* ── Month-wise summary cards (no employee detail) ─────────────────── */}
+            <div ref={menuContainerRef} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {SECTIONS.map(section => {
+                    // Pull section-specific month totals from stats
+                    type Metric = { label: string; value: string; color?: string }
+                    let metrics: Metric[] = []
+                    if (stats) {
+                        if (section.key === "wage") {
+                            metrics = [
+                                { label: "Total Employees",   value: String(stats.totalEmployees) },
+                                { label: "Gross Pay",         value: fmt(stats.grossPay),       color: "#0369a1" },
+                                { label: "Total Deductions",  value: fmt(stats.totalDeduction), color: "#dc2626" },
+                                { label: "Net Pay",           value: fmt(stats.netPay),         color: "#16a34a" },
+                            ]
+                        } else if (section.key === "pf") {
+                            metrics = [
+                                { label: "PF Employees",      value: `${stats.pfEmpCount} / ${stats.totalEmployees}` },
+                                { label: "PF Wages",          value: fmt(stats.pfWages),    color: section.color },
+                                { label: "Employee 12%",      value: fmt(stats.pfEmployee), color: "#dc2626" },
+                                { label: "Employer 13%",      value: fmt(stats.pfEmployer), color: "#0369a1" },
+                                { label: "Total Contribution",value: fmt(stats.pfTotal),    color: section.color },
+                            ]
+                        } else if (section.key === "esic") {
+                            metrics = [
+                                { label: "ESIC Employees",    value: `${stats.esiEmpCount} / ${stats.totalEmployees}` },
+                                { label: "ESIC Wages",        value: fmt(stats.esiWages),    color: section.color },
+                                { label: "Employee 0%",       value: fmt(stats.esiEmployee), color: "#dc2626" },
+                                { label: "Employer 3.25%",    value: fmt(stats.esiEmployer), color: "#0369a1" },
+                                { label: "Total Contribution",value: fmt(stats.esiTotal),    color: section.color },
+                            ]
+                        } else if (section.key === "pt") {
+                            metrics = [
+                                { label: "PT Liable",         value: `${stats.ptEmpCount} / ${stats.totalEmployees}` },
+                                { label: "Slab ₹0",           value: String(stats.ptSlab0),   color: "var(--text3)" },
+                                { label: "Slab ₹175",         value: String(stats.ptSlab175), color: "#0369a1" },
+                                { label: "Slab ₹200+",        value: String(stats.ptSlab200), color: section.color },
+                                { label: "Total Amount",      value: fmt(stats.ptTotal),      color: section.color },
+                            ]
+                        }
+                    }
+                    return (
+                    <div key={section.key}
+                        style={{ background: "var(--surface)", border: `1.5px solid ${dataLoaded ? section.border : "var(--border)"}`, borderRadius: 14, overflow: "visible", position: "relative", transition: "border-color 0.2s" }}>
 
-                {/* LEFT: EMP ID panel */}
-                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
-                    <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", background: "#f8faff" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <Lock size={12} style={{ color: "var(--accent)" }} />
-                                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>EMP ID</span>
-                            </div>
-                            <button onClick={fetchLockedEmps} style={{ display: "flex", padding: "3px", borderRadius: 5, border: "none", background: "none", cursor: "pointer" }}>
-                                <RefreshCw size={11} style={{ color: "var(--text3)" }} />
-                            </button>
-                        </div>
-                        {/* Search */}
-                        <div style={{ position: "relative" }}>
-                            <Search size={11} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
-                            <input
-                                value={empSearch}
-                                onChange={e => setEmpSearch(e.target.value)}
-                                placeholder="Search emp…"
-                                style={{ width: "100%", padding: "5px 8px 5px 24px", fontSize: 11, border: "1px solid var(--border)", borderRadius: 6, outline: "none", background: "#fff", color: "var(--text)", boxSizing: "border-box" }}
-                            />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-                            <span style={{ fontSize: 10, color: "var(--text3)" }}>{MONTHS[month-1]} {year}</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "2px 7px", borderRadius: 20 }}>
-                                {lockedEmps.length} locked
-                            </span>
-                        </div>
-                    </div>
-
-                    <div style={{ overflowY: "auto", maxHeight: 480 }}>
-                        {ldLocked ? (
-                            <div style={{ padding: 20, textAlign: "center" }}>
-                                <Loader2 size={14} className="animate-spin" style={{ color: "var(--accent)", margin: "0 auto" }} />
-                            </div>
-                        ) : filteredEmps.length === 0 ? (
-                            <div style={{ padding: "20px 14px", textAlign: "center" }}>
-                                <Users size={18} style={{ color: "var(--text3)", margin: "0 auto 6px" }} />
-                                <p style={{ fontSize: 11, color: "var(--text3)", margin: 0 }}>
-                                    {empSearch ? "No match found" : "No locked employees"}
-                                </p>
-                            </div>
-                        ) : (
-                            filteredEmps.map(emp => (
-                                <div key={emp.id} style={{ padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-                                        <div style={{ minWidth: 0 }}>
-                                            <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {emp.employee.firstName} {emp.employee.lastName}
-                                            </p>
-                                            <p style={{ fontSize: 10, color: "var(--accent)", margin: "1px 0 0 0", fontWeight: 600 }}>{emp.employee.employeeId}</p>
-                                        </div>
-                                        <span style={{ fontSize: 10, fontWeight: 700, color: "#16a34a", whiteSpace: "nowrap", flexShrink: 0 }}>
-                                            {fmt(emp.netSalary)}
-                                        </span>
-                                    </div>
-                                    {emp.employee.designation && (
-                                        <p style={{ fontSize: 9, color: "var(--text3)", margin: "2px 0 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            {emp.employee.designation}
-                                        </p>
-                                    )}
+                        {/* Section Header */}
+                        <div style={{ padding: "16px 18px", borderBottom: `1px solid ${section.border}`, background: dataLoaded ? section.bg : "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                <div style={{
+                                    width: 44, height: 44, borderRadius: 11,
+                                    background: dataLoaded ? section.color : "var(--border)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>
+                                    <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: "0.3px" }}>{section.badge}</span>
                                 </div>
-                            ))
-                        )}
-                    </div>
-
-                    {lockedEmps.length > 0 && (
-                        <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--surface2)" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                                <span style={{ fontSize: 10, color: "var(--text3)" }}>Net Pay</span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "#16a34a" }}>{fmt(lockedEmps.reduce((s, e) => s + e.netSalary, 0))}</span>
+                                <div>
+                                    <p style={{ fontSize: 16, fontWeight: 800, color: dataLoaded ? section.color : "var(--text3)", margin: 0 }}>{section.title}</p>
+                                    <p style={{ fontSize: 11, color: "var(--text3)", margin: "2px 0 0 0" }}>{MONTHS[month-1]} {year}  ·  {section.items.length} document{section.items.length > 1 ? "s" : ""} available</p>
+                                </div>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span style={{ fontSize: 10, color: "var(--text3)" }}>Gross Pay</span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text2)" }}>{fmt(lockedEmps.reduce((s, e) => s + e.grossSalary, 0))}</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
 
-                {/* RIGHT: 4 section cards in 2x2 grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                    {SECTIONS.map(section => (
-                        <div key={section.key}
-                            style={{ background: "var(--surface)", border: `1.5px solid ${dataLoaded ? section.border : "var(--border)"}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
-
-                            {/* Section Header */}
-                            <div style={{ padding: "14px 16px", borderBottom: `1px solid ${section.border}`, background: dataLoaded ? section.bg : "var(--surface2)" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <div style={{
-                                        width: 36, height: 36, borderRadius: 10,
-                                        background: dataLoaded ? section.color : "var(--border)",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        transition: "background 0.2s",
+                            {/* Single download button with dropdown menu */}
+                            <div style={{ position: "relative" }}>
+                                <button
+                                    onClick={() => setOpenMenu(openMenu === section.key ? null : section.key)}
+                                    disabled={!dataLoaded}
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8,
+                                        border: "none", background: dataLoaded ? section.color : "var(--border)",
+                                        color: "#fff", fontSize: 12, fontWeight: 700,
+                                        cursor: dataLoaded ? "pointer" : "not-allowed",
+                                        opacity: dataLoaded ? 1 : 0.45,
                                     }}>
-                                        <span style={{ fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: "0.3px" }}>{section.badge}</span>
-                                    </div>
-                                    <div>
-                                        <p style={{ fontSize: 14, fontWeight: 800, color: dataLoaded ? section.color : "var(--text3)", margin: 0 }}>{section.shortTitle}</p>
-                                        <p style={{ fontSize: 10, color: "var(--text3)", margin: 0 }}>{section.items.length} reports</p>
-                                    </div>
-                                </div>
-                                <p style={{ fontSize: 11, color: dataLoaded ? section.color : "var(--text3)", fontWeight: 600, margin: "6px 0 0 0", opacity: 0.8 }}>{section.title}</p>
-                            </div>
-
-                            {/* Report Items */}
-                            <div style={{ padding: "6px 0" }}>
-                                {section.items.map((item, idx) => (
-                                    <div key={item.id}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                                            padding: "9px 16px", gap: 8,
-                                            borderBottom: idx < section.items.length - 1 ? "1px solid var(--border)" : "none",
-                                        }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                            <div style={{
-                                                width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-                                                background: dataLoaded ? section.color : "var(--border)",
-                                            }} />
-                                            <div style={{ minWidth: 0 }}>
-                                                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {item.shortLabel}
-                                                </p>
-                                                <p style={{ fontSize: 10, color: "var(--text3)", margin: "1px 0 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {item.label}
-                                                </p>
-                                            </div>
+                                    <Download size={13} /> Download <ChevronDown size={13} style={{ transform: openMenu === section.key ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+                                </button>
+                                {openMenu === section.key && dataLoaded && (
+                                    <div style={{
+                                        position: "absolute", top: "calc(100% + 6px)", right: 0,
+                                        background: "#fff", border: "1px solid var(--border)", borderRadius: 10,
+                                        boxShadow: "0 8px 24px rgba(0,0,0,0.12)", minWidth: 280, zIndex: 20, overflow: "hidden",
+                                    }}>
+                                        <div style={{ padding: "8px 12px", background: section.bg, borderBottom: `1px solid ${section.border}` }}>
+                                            <p style={{ fontSize: 10, fontWeight: 800, color: section.color, textTransform: "uppercase", letterSpacing: "0.5px", margin: 0 }}>
+                                                {section.title} Documents
+                                            </p>
                                         </div>
-                                        <button
-                                            onClick={() => handleDownload(item)}
-                                            disabled={!dataLoaded || dlLoading === item.id}
-                                            title={dataLoaded ? `Download ${item.label}` : "Load data first"}
-                                            style={{
-                                                width: 32, height: 32, borderRadius: 8, border: "none", flexShrink: 0,
-                                                background: dataLoaded ? section.color : "var(--border)",
-                                                color: "#fff",
-                                                display: "flex", alignItems: "center", justifyContent: "center",
-                                                cursor: dataLoaded ? "pointer" : "not-allowed",
-                                                opacity: !dataLoaded ? 0.45 : 1,
-                                                transition: "all 0.15s",
-                                            }}
-                                            onMouseEnter={e => { if (dataLoaded) (e.currentTarget as HTMLButtonElement).style.opacity = "0.8" }}
-                                            onMouseLeave={e => { if (dataLoaded) (e.currentTarget as HTMLButtonElement).style.opacity = "1" }}
-                                        >
-                                            {dlLoading === item.id
-                                                ? <Loader2 size={13} className="animate-spin" />
-                                                : <Download size={13} />
-                                            }
-                                        </button>
+                                        {section.items.map((item) => (
+                                            <button key={item.id}
+                                                onClick={() => { handleDownload(item); setOpenMenu(null) }}
+                                                disabled={dlLoading === item.id}
+                                                style={{
+                                                    display: "flex", alignItems: "center", gap: 10, width: "100%",
+                                                    padding: "10px 14px", border: "none", borderBottom: "1px solid var(--border)",
+                                                    background: "#fff", textAlign: "left", cursor: "pointer", fontSize: 12, color: "var(--text)"
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = section.bg}
+                                                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#fff"}
+                                            >
+                                                {dlLoading === item.id
+                                                    ? <Loader2 size={13} className="animate-spin" style={{ color: section.color }} />
+                                                    : <FileSpreadsheet size={13} style={{ color: section.color, flexShrink: 0 }} />}
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: "var(--text)" }}>{item.shortLabel}</p>
+                                                    <p style={{ fontSize: 10, color: "var(--text3)", margin: "1px 0 0 0" }}>{item.label}</p>
+                                                </div>
+                                            </button>
+                                        ))}
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </div>
-                    ))}
-                </div>
+
+                        {/* Month-wise totals body */}
+                        <div style={{ padding: "16px 18px" }}>
+                            {!dataLoaded ? (
+                                <p style={{ fontSize: 12, color: "var(--text3)", textAlign: "center", margin: "20px 0" }}>
+                                    Click &quot;Load Data&quot; above to view month-wise totals
+                                </p>
+                            ) : metrics.length === 0 ? (
+                                <p style={{ fontSize: 12, color: "var(--text3)", textAlign: "center", margin: "20px 0" }}>
+                                    No data
+                                </p>
+                            ) : (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                    {metrics.map((m, i) => (
+                                        <div key={i} style={{ padding: "10px 12px", borderRadius: 9, background: "var(--surface2)", border: "1px solid var(--border)" }}>
+                                            <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", margin: 0 }}>{m.label}</p>
+                                            <p style={{ fontSize: 15, fontWeight: 800, color: m.color || "var(--text)", margin: "3px 0 0 0" }}>{m.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    )
+                })}
             </div>
 
             {/* ── Footer note ── */}
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                Reports are generated from locked (processed) payroll data. Click &quot;Load Data&quot; to enable downloads.
+                Month-wise compliance summary for <strong>{MONTHS[month-1]} {year}</strong>. Click &quot;Load Data&quot; to refresh totals, then use the <strong>Download</strong> dropdown on each card to export documents.
             </p>
         </div>
     )
