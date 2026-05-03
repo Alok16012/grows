@@ -112,22 +112,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             links: [
                 { name: "Attendance", href: "/attendance", icon: Clock, roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
                 { name: "Leaves", href: "/leaves", icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view" },
-                { 
-                    name: "Payroll", 
-                    href: "/payroll", 
-                    icon: Wallet, 
-                    roles: ["ADMIN", "MANAGER"], 
-                    permission: "payroll.view",
-                    subLinks: [
-                        { name: "Overview", href: "/payroll" },
-                        { name: "Salary Structure Master", href: "/payroll/salary-master" },
-                        { name: "Upload Attendance", href: "/attendance/upload" },
-                        { name: "Process Payroll", href: "/payroll/process" },
-                        { name: "Wage Sheet", href: "/payroll/wagesheet" },
-                        { name: "Compliance Reports", href: "/payroll/compliance" },
-                        { name: "Payslip Generation", href: "/payroll/salary-slips" },
-                    ]
-                },
+                { name: "Payroll", href: "/payroll", icon: Wallet, roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
                 { name: "Assets", href: "/assets", icon: Package, roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
                 { name: "Expenses", href: "/expenses", icon: CreditCard, roles: ["ADMIN", "MANAGER"] },
             ]
