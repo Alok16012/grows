@@ -110,9 +110,10 @@ export default function SelfOnboardingPage() {
                     dateOfBirth: d.dateOfBirth ? d.dateOfBirth.slice(0, 10) : "",
                 })
             } else {
-                toast.error("Could not load your profile")
+                const err = await res.json().catch(() => ({}))
+                toast.error(err?.error ?? "Could not load your profile")
             }
-        } catch { toast.error("Network error") }
+        } catch { toast.error("Connection error — check your network and retry") }
         finally { setLoading(false) }
     }, [])
 
