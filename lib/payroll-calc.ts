@@ -19,7 +19,7 @@
 // PF Employee:  IF(WorkedDays >= 26, 1800, ROUND(15000/26 × WorkedDays × 12%))
 // PF Employer:  ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
 //
-// ESIC eligibility: (FullMonthGross − Washing) ≤ ₹21,000  [₹25,000 for Handicap]
+// ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
 //   ESIC wages = FullMonthGross − Washing  (washing excluded per ESIC Act)
 //   Employee ESIC: CEIL(esicWages × 0.75%)
 //   Employer ESIC: CEIL(esicWages × 3.25%)
@@ -98,11 +98,11 @@ export function calcGrowusPayroll(sal: {
             ? 1800
             : Math.round((15000 / 26) * workedDays * 0.12))
 
-    // ESIC eligibility: (FullMonthGross − Washing) ≤ ₹21,000  [₹25,000 for Handicap]
-    // Washing allowance is excluded from ESIC wages per ESIC Act
+    // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
+    // Contribution base = FullMonthGross − Washing (washing excluded per ESIC Act)
     const esicLimit    = isHandicap ? 25000 : 21000
     const esicWages    = grossFullMonth - washing
-    const esicEligible = !isCALL && esicWages <= esicLimit
+    const esicEligible = !isCALL && grossFullMonth <= esicLimit
     // Employee ESIC = esicWages × 0.75%
     const esiEmployee  = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
 
