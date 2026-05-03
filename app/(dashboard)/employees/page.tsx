@@ -570,12 +570,12 @@ function EmployeeModal({
             ? "border-[var(--accent)] text-[var(--accent-text)]"
             : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
         }`
-    const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+    const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
     const labelCls = "block text-[12px] text-[var(--text2)] mb-1"
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
+            <div className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
                     <h2 className="text-[16px] font-semibold text-[var(--text)]">
@@ -796,7 +796,7 @@ function EmployeeModal({
 
                             <div>
                                 <label className={labelCls}>Notes</label>
-                                <textarea value={form.notes} onChange={set("notes")} className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none" rows={3} placeholder="Additional notes..." />
+                                <textarea value={form.notes} onChange={set("notes")} className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none placeholder:text-[var(--text3)]" rows={3} placeholder="Additional notes..." />
                             </div>
                         </div>
                     )}
@@ -1574,7 +1574,7 @@ function EmployeeDrawer({
     return (
         <div className="fixed inset-0 z-50 flex">
             <div className="flex-1 bg-black/40" onClick={onClose} />
-            <div className="w-full max-w-[480px] bg-white h-full overflow-hidden flex flex-col shadow-2xl border-l border-[var(--border)]">
+            <div className="w-full max-w-[480px] bg-[var(--surface)] h-full overflow-hidden flex flex-col shadow-2xl border-l border-[var(--border)]">
                 {/* Header */}
                 <div className="px-5 pt-5 pb-4 border-b border-[var(--border)]">
                     <div className="flex items-start justify-between mb-4">
@@ -2095,12 +2095,12 @@ function EmployeeDrawer({
                     <div className="relative" ref={statusRef}>
                         <button
                             onClick={() => setStatusMenuOpen(v => !v)}
-                            className="inline-flex items-center gap-2 px-4 py-2 border border-[var(--border)] bg-white text-[var(--text)] rounded-[8px] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)] rounded-[8px] text-[13px] font-medium hover:bg-[var(--surface)] transition-colors"
                         >
                             Change Status <ChevronDown size={13} />
                         </button>
                         {statusMenuOpen && (
-                            <div className="absolute bottom-full mb-1 right-0 w-[180px] bg-white border border-[var(--border)] rounded-[10px] shadow-xl z-10 overflow-hidden py-1">
+                            <div className="absolute bottom-full mb-1 right-0 w-[180px] bg-[var(--surface)] border border-[var(--border)] rounded-[10px] shadow-xl z-10 overflow-hidden py-1">
                                 {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                                     <button
                                         key={k}
@@ -2161,7 +2161,7 @@ function RowActions({
                 <MoreVertical size={15} />
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1 w-[160px] bg-white border border-[var(--border)] rounded-[10px] shadow-xl z-20 py-1 overflow-hidden">
+                <div className="absolute right-0 top-full mt-1 w-[160px] bg-[var(--surface)] border border-[var(--border)] rounded-[10px] shadow-xl z-20 py-1 overflow-hidden">
                     <button onClick={() => { onView(); setOpen(false) }} className="w-full text-left px-4 py-2 text-[13px] flex items-center gap-2.5 hover:bg-[var(--surface2)] text-[var(--text2)] transition-colors">
                         <Eye size={14} /> View
                     </button>
@@ -2605,7 +2605,7 @@ export default function EmployeesPage() {
                     { label: "On Leave", value: onLeave, icon: <Clock size={18} />, color: "#f59e0b", bg: "#fffbeb" },
                     { label: "Terminated/Resigned", value: terminatedResignedThisMonth, icon: <TrendingDown size={18} />, color: "#dc2626", bg: "#fef2f2" },
                 ].map(stat => (
-                    <div key={stat.label} className="bg-white border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
+                    <div key={stat.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
                         <div style={{ background: stat.bg, color: stat.color }} className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0">
                             {stat.icon}
                         </div>
@@ -2618,7 +2618,7 @@ export default function EmployeesPage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white border border-[var(--border)] rounded-[12px] p-4 space-y-3">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 space-y-3">
                 {/* Status pills */}
                 <div className="flex flex-wrap gap-2">
                     {[{ k: "", label: "All" }, ...Object.entries(STATUS_CONFIG).map(([k, v]) => ({ k, label: v.label }))].map(({ k, label }) => (
@@ -2627,7 +2627,7 @@ export default function EmployeesPage() {
                             onClick={() => setStatusFilter(k)}
                             className={`px-3 py-1 rounded-full text-[12px] font-medium border transition-all ${statusFilter === k
                                 ? "bg-[var(--accent)] text-white border-[var(--accent)]"
-                                : "bg-white text-[var(--text2)] border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent-text)]"
+                                : "bg-[var(--surface2)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent-text)]"
                                 }`}
                         >
                             {label}
@@ -2650,7 +2650,7 @@ export default function EmployeesPage() {
                     <select
                         value={deptFilter}
                         onChange={e => setDeptFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
                     >
                         <option value="">All Departments</option>
                         {allDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -2658,7 +2658,7 @@ export default function EmployeesPage() {
                     <select
                         value={siteFilter}
                         onChange={e => setSiteFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
                     >
                         <option value="">All Sites</option>
                         {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -2666,7 +2666,7 @@ export default function EmployeesPage() {
                     <select
                         value={empTypeFilter}
                         onChange={e => setEmpTypeFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
                     >
                         <option value="">All Employment Types</option>
                         {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -2680,13 +2680,13 @@ export default function EmployeesPage() {
                     <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
                 </div>
             ) : employees.length === 0 ? (
-                <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[14px] bg-white border border-dashed border-[var(--border)] shadow-sm">
+                <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[14px] bg-[var(--surface2)] border border-dashed border-[var(--border)] shadow-sm">
                     <UserCheck size={36} className="text-[var(--text3)] mb-2" />
                     <h3 className="text-[15px] font-semibold text-[var(--text)]">No employees found</h3>
                     <p className="text-[13px] text-[var(--text3)] mt-1">Add your first employee to get started.</p>
                 </div>
             ) : (
-                <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
