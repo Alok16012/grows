@@ -125,6 +125,83 @@ function ComplianceInner() {
         finally { setLoading(false) }
     }
 
+    // ─── Section groupings for each report type ──────────────────────────────
+    // Each entry: [Section Label, Number of columns it spans]
+    type SectionMap = [string, number][]
+    const REPORT_SECTIONS: Record<string, SectionMap> = {
+        "pf-summary":    [["Site Info", 3], ["EPF / EPS / EDLI Wages", 3], ["Contribution Rates", 6], ["Total", 1], ["Exempted", 2]],
+        "pf-deduction":  [["Employee Info", 4], ["Wages", 2], ["Contributions", 3], ["Period", 2]],
+        "pf-ecr":        [["Employee Info", 2], ["Wages", 3], ["Contributions", 3], ["Other", 2]],
+        "pf-challan":    [["Employee Info", 4], ["Wages", 2], ["Contributions", 3], ["Other", 3]],
+        "pf-register":   [["Employee Info", 6], ["Wages", 2], ["Contributions", 3], ["Attendance", 2]],
+        "esic-summary":  [["Site Info", 3], ["Wages", 1], ["Contributions", 3], ["Exempted", 2]],
+        "esic-deduction":[["Employee Info", 4], ["Wages", 2], ["Contributions", 2]],
+        "esic-challan":  [["Employee Info", 4], ["Wages", 1], ["Contributions", 3], ["Attendance", 2]],
+        "pt-summary":    [["Site Info", 2], ["Slab-wise Count", 3], ["Total", 2]],
+        "pt-deduction":  [["Employee Info", 3], ["Wages", 1], ["Contribution", 1], ["Period", 2]],
+        "pt-challan":    [["Employee Info", 3], ["Period", 1], ["Wages", 1], ["Contribution", 1], ["Attendance", 2]],
+    }
+
+    /**
+     * Build an XLSX worksheet with hierarchical headers:
+     *   Row 1: Title (merged across all columns) — "Month Year" + report title
+     *   Row 2: Section group labels (merged per section)
+     *   Row 3: Column headers
+     *   Row 4+: Data rows
+     */
+    const buildHierarchicalSheet = (
+        data: Record<string, string | number>[],
+        reportType: string,
+        title: string,
+        m: number, y: number
+    ) => {
+        const cols = Object.keys(data[0] || {})
+        const nCols = cols.length
+        const sections = REPORT_SECTIONS[reportType] ?? [["Data", nCols]]
+
+        // Pad sections if total < nCols
+        const totalSpan = sections.reduce((s, [, n]) => s + n, 0)
+        if (totalSpan < nCols) sections.push(["", nCols - totalSpan])
+
+        // ── Build aoa ──────────────────────────────────────────────────────────
+        const titleRow:    (string | number)[] = [`${title} — ${MONTHS[m-1].toUpperCase()} ${y}`]
+        const subTitleRow: (string | number)[] = [`Generated: ${new Date().toLocaleDateString("en-IN")}  |  PF: PUPUN2450654000  |  ESIC: 33000891430000999`]
+        const sectionRow:  (string | number)[] = []
+        for (const [label, span] of sections) {
+            sectionRow.push(label)
+            for (let i = 1; i < span; i++) sectionRow.push("")
+        }
+        const headerRow = cols
+        const dataRows  = data.map(r => cols.map(c => r[c] ?? ""))
+
+        const aoa: (string | number)[][] = [titleRow, subTitleRow, sectionRow, headerRow, ...dataRows]
+        const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+        // ── Merges: title row + subtitle row + section row ────────────────────
+        const merges: XLSX.Range[] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },  // Title row
+            { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } },  // Subtitle row
+        ]
+        // Section row merges
+        let cursor = 0
+        for (const [, span] of sections) {
+            if (span > 1) merges.push({ s: { r: 2, c: cursor }, e: { r: 2, c: cursor + span - 1 } })
+            cursor += span
+        }
+        ws["!merges"] = merges
+
+        // Column widths — compute from content
+        ws["!cols"] = cols.map(k => {
+            const maxLen = Math.max(k.length, ...data.map(r => String(r[k] ?? "").length))
+            return { wch: Math.min(Math.max(maxLen + 2, 12), 30) }
+        })
+
+        // Row heights
+        ws["!rows"] = [{ hpt: 24 }, { hpt: 16 }, { hpt: 20 }, { hpt: 22 }]
+
+        return ws
+    }
+
     const handleDownload = async (item: ReportItem) => {
         setDlLoading(item.id)
         try {
@@ -135,6 +212,7 @@ function ComplianceInner() {
 
             const wb = XLSX.utils.book_new()
             if (item.type === "wage-sheet") {
+                // Wage sheet has its own hierarchical format (Form II)
                 const ws = XLSX.utils.json_to_sheet(data)
                 const cols = Object.keys(data[0] || {})
                 ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
@@ -145,14 +223,141 @@ function ComplianceInner() {
                 ], { origin: "A1" })
                 XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
             } else {
-                const ws = XLSX.utils.json_to_sheet(data)
-                ws["!cols"] = Object.keys(data[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }))
+                // All other reports use new hierarchical 3-tier header (Title → Section → Column)
+                const ws = buildHierarchicalSheet(data, item.type, item.label, month, year)
                 XLSX.utils.book_append_sheet(wb, ws, item.label.substring(0, 31))
             }
             XLSX.writeFile(wb, `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)
             toast.success(`Downloaded: ${item.label}`)
         } catch { toast.error("Download failed") }
         finally { setDlLoading(null) }
+    }
+
+    // ─── Master Combined Compliance Report ──────────────────────────────────
+    // One Excel file with PF + ESIC + PT all in one hierarchical sheet
+    const handleDownloadMaster = async () => {
+        setDlLoading("master")
+        try {
+            const [pfR, esicR, ptR] = await Promise.all([
+                fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-deduction`),
+                fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=esic-deduction`),
+                fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=pt-deduction`),
+            ])
+            if (!pfR.ok && !esicR.ok && !ptR.ok) { toast.error("No data found"); return }
+            const pf   = pfR.ok   ? await pfR.json()   : []
+            const esic = esicR.ok ? await esicR.json() : []
+            const pt   = ptR.ok   ? await ptR.json()   : []
+
+            // Merge by Emp ID into one row per employee
+            const empMap = new Map<string, Record<string, string | number>>()
+            for (const r of pf) {
+                empMap.set(r["Emp ID"], {
+                    "Emp ID":           r["Emp ID"],
+                    "Employee Name":    r["Employee Name"],
+                    "UAN":              r["UAN"] ?? "",
+                    "PF Number":        r["PF Number"] ?? "",
+                    "PF Wages":         r["PF Wages"] ?? 0,
+                    "PF Employee 12%":  r["PF Employee (12%)"] ?? 0,
+                    "PF Employer 13%":  r["PF Employer (13%)"] ?? 0,
+                    "Total PF":         r["Total PF"] ?? 0,
+                    "ESI Number":       "",
+                    "ESI Wages":        0,
+                    "ESI Employee":     0,
+                    "ESI Employer":     0,
+                    "Total ESI":        0,
+                    "PT State":         "",
+                    "PT Gross":         0,
+                    "PT Deducted":      0,
+                    "Grand Total":      r["Total PF"] ?? 0,
+                })
+            }
+            for (const r of esic) {
+                const id = r["Employee Code"]
+                const row: Record<string, string | number> = empMap.get(id) ?? { "Emp ID": id, "Employee Name": r["Employee Name"] }
+                row["ESI Number"]   = r["ESI Number"] ?? ""
+                row["ESI Wages"]    = r["Gross"] ?? 0
+                row["ESI Employee"] = r["ESI Employee"] ?? 0
+                row["ESI Employer"] = r["ESI Employer"] ?? 0
+                row["Total ESI"]    = (Number(row["ESI Employee"]) || 0) + (Number(row["ESI Employer"]) || 0)
+                row["Grand Total"]  = (Number(row["Grand Total"]) || 0) + (Number(row["Total ESI"]) || 0)
+                empMap.set(id, row)
+            }
+            for (const r of pt) {
+                const id = r["Emp ID"]
+                const row: Record<string, string | number> = empMap.get(id) ?? { "Emp ID": id, "Employee Name": r["Employee Name"] }
+                row["PT State"]    = r["State"] ?? ""
+                row["PT Gross"]    = r["Gross Salary"] ?? 0
+                row["PT Deducted"] = r["PT Deducted"] ?? 0
+                row["Grand Total"] = (Number(row["Grand Total"]) || 0) + (Number(row["PT Deducted"]) || 0)
+                empMap.set(id, row)
+            }
+
+            const data = [...empMap.values()]
+            if (!data.length) { toast.error("No payroll data for this period"); return }
+
+            // Build hierarchical sheet: Sr | EmpInfo (3) | PF (5) | ESIC (4) | PT (3) | Grand Total
+            const cols = [
+                "Sr.No", "Emp ID", "Employee Name",
+                "UAN", "PF Number", "PF Wages", "PF Employee 12%", "PF Employer 13%", "Total PF",
+                "ESI Number", "ESI Wages", "ESI Employee", "ESI Employer", "Total ESI",
+                "PT State", "PT Gross", "PT Deducted",
+                "Grand Total",
+            ]
+            const sectionRow = [
+                "Identification", "", "",
+                "PF / EPF Contribution", "", "", "", "", "",
+                "ESIC Contribution", "", "", "", "",
+                "Professional Tax", "", "",
+                "Total",
+            ]
+            const titleRow = [`MASTER COMPLIANCE REPORT — ${MONTHS[month-1].toUpperCase()} ${year}`]
+            const subRow   = [`Generated: ${new Date().toLocaleDateString("en-IN")}  |  PF: PUPUN2450654000  |  ESIC: 33000891430000999`]
+            const dataRows = data.map((r, i) => [
+                i + 1,
+                r["Emp ID"], r["Employee Name"],
+                r["UAN"], r["PF Number"], r["PF Wages"], r["PF Employee 12%"], r["PF Employer 13%"], r["Total PF"],
+                r["ESI Number"], r["ESI Wages"], r["ESI Employee"], r["ESI Employer"], r["Total ESI"],
+                r["PT State"], r["PT Gross"], r["PT Deducted"],
+                r["Grand Total"],
+            ])
+            // Grand total row
+            const sum = (key: string) => data.reduce((s, r) => s + (Number(r[key]) || 0), 0)
+            const totalRow = [
+                "", "", "TOTAL",
+                "", "", sum("PF Wages"), sum("PF Employee 12%"), sum("PF Employer 13%"), sum("Total PF"),
+                "", sum("ESI Wages"), sum("ESI Employee"), sum("ESI Employer"), sum("Total ESI"),
+                "", sum("PT Gross"), sum("PT Deducted"),
+                sum("Grand Total"),
+            ]
+
+            const aoa = [titleRow, subRow, sectionRow, cols, ...dataRows, totalRow]
+            const ws  = XLSX.utils.aoa_to_sheet(aoa)
+            const n   = cols.length
+            ws["!merges"] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: n - 1 } },   // Title
+                { s: { r: 1, c: 0 }, e: { r: 1, c: n - 1 } },   // Subtitle
+                { s: { r: 2, c: 0 }, e: { r: 2, c: 2 } },       // Identification
+                { s: { r: 2, c: 3 }, e: { r: 2, c: 8 } },       // PF
+                { s: { r: 2, c: 9 }, e: { r: 2, c: 13 } },      // ESIC
+                { s: { r: 2, c: 14}, e: { r: 2, c: 16 } },      // PT
+            ]
+            ws["!cols"] = [
+                { wch: 5 },                                        // Sr
+                { wch: 11 }, { wch: 22 },                          // Emp Info
+                { wch: 14 }, { wch: 13 }, { wch: 11 }, { wch: 13 }, { wch: 13 }, { wch: 11 },  // PF
+                { wch: 14 }, { wch: 11 }, { wch: 12 }, { wch: 12 }, { wch: 11 },               // ESIC
+                { wch: 9 },  { wch: 11 }, { wch: 12 },                                          // PT
+                { wch: 13 },                                                                     // Grand Total
+            ]
+            ws["!rows"] = [{ hpt: 24 }, { hpt: 16 }, { hpt: 20 }, { hpt: 22 }]
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, "Master Compliance")
+            XLSX.writeFile(wb, `Master_Compliance_${MONTHS[month-1]}_${year}.xlsx`)
+            toast.success(`Master compliance report downloaded — ${data.length} employees`)
+        } catch (e) {
+            console.error(e)
+            toast.error("Master download failed")
+        } finally { setDlLoading(null) }
     }
 
     return (
@@ -203,6 +408,15 @@ function ComplianceInner() {
                             ✓ Data loaded for {MONTHS[month-1]} {year}
                         </span>
                     )}
+                    <button onClick={handleDownloadMaster} disabled={!dataLoaded || dlLoading === "master"}
+                        title="Download all PF + ESIC + PT data in one hierarchical Excel sheet"
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none",
+                                 background: dataLoaded ? "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" : "var(--border)",
+                                 color: "#fff", fontSize: 12, fontWeight: 700, cursor: dataLoaded ? "pointer" : "not-allowed",
+                                 opacity: (!dataLoaded || dlLoading === "master") ? 0.6 : 1, marginLeft: "auto" }}>
+                        {dlLoading === "master" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                        {dlLoading === "master" ? "Generating…" : "📊 Master Compliance Report"}
+                    </button>
                 </div>
 
                 {stats && (
