@@ -121,8 +121,9 @@ export async function POST(req: Request) {
 
         const pfEmployee = Math.round(earnedBasic * 0.12)
         const pfEmployer = Math.round(earnedBasic * 0.12)
-        const esiEmployee = grossSalary <= 21000 ? Math.round(grossSalary * 0.0075) : 0
-        const esiEmployer = grossSalary <= 21000 ? Math.round(grossSalary * 0.0325) : 0
+        const esicWages = grossSalary  // washing not available in this route
+        const esiEmployee = esicWages <= 21000 ? Math.ceil(esicWages * 0.0075) : 0
+        const esiEmployer = esicWages <= 21000 ? Math.ceil(esicWages * 0.0325) : 0
         const tdsAmt = tds || 0
         const otherDeductionsAmt = otherDeductions || 0
         const totalDeductions = pfEmployee + esiEmployee + tdsAmt + otherDeductionsAmt

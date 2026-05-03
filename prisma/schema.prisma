@@ -526,6 +526,7 @@ model Employee {
   notes             String?
   isKycVerified     Boolean            @default(false)
   kycRejectionNote  String?
+  isHandicap        Boolean            @default(false)
   onboardingToken   String?            @unique
   userId            String?            @unique
   createdBy         String?

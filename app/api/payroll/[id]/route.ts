@@ -89,8 +89,9 @@ export async function PUT(
         const newOtherDeductions = otherDeductions !== undefined ? otherDeductions : existing.otherDeductions
 
         const grossSalary = existing.basicSalary + existing.hra + newAllowances + newOvertimePay
-        const esiEmployee = grossSalary <= 21000 ? Math.round(grossSalary * 0.0075) : 0
-        const esiEmployer = grossSalary <= 21000 ? Math.round(grossSalary * 0.0325) : 0
+        const esicWages = grossSalary - (existing.washing || 0)
+        const esiEmployee = esicWages <= 21000 ? Math.ceil(esicWages * 0.0075) : 0
+        const esiEmployer = esicWages <= 21000 ? Math.ceil(esicWages * 0.0325) : 0
         const totalDeductions = existing.pfEmployee + esiEmployee + newTds + newOtherDeductions
         const netSalary = grossSalary - totalDeductions
 

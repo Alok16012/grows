@@ -19,7 +19,7 @@ function calcPT(gross: number): number {
 }
 
 // Derived calculations (full-month preview — no proration)
-function calc(s: SalaryRow) {
+function calc(s: SalaryRow, isHandicap = false) {
     const basic  = s.basic || 0
     const da     = s.da || 0
     const wash   = s.washing || 0
@@ -27,28 +27,24 @@ function calc(s: SalaryRow) {
     const lww    = s.leaveWithWages || 0
     const other  = s.otherAllowance || 0
     const isCALL = s.complianceType === "CALL"
-    // Bonus: use stored per-employee value (min-wage-based per Bonus Act).
-    // Fallback when not set: ₹7000 statutory ceiling × 8.33% ≈ ₹583/month
-    // (Payment of Bonus Act 1965 caps the calculation salary at ₹7000 OR
-    //  state minimum wage, whichever is higher. ₹583 is the safe legal default;
-    //  for higher min-wage states (e.g. Maharashtra ₹7500/₹7800) set per-employee
-    //  bonus on the salary structure: 7500×8.33% = ₹625, 7800×8.33% = ₹650.)
     const bonus  = isCALL ? 0 : (s.bonus != null && s.bonus > 0 ? s.bonus : Math.round(Math.min(basic + da, 7000) * 0.0833))
     const hra    = isCALL ? 0 : Math.round((basic + da) * 0.05)
     const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
     const empPF  = isCALL ? 0 : 1950
-    // ESIC eligibility: (gross − washing) ≤ ₹21,000 (washing excluded from threshold)
-    const esicEligible = !isCALL && (gross - wash) <= 21000
-    // Employer ESIC: (gross − washing) × 3.25%
-    const empESI = esicEligible ? Math.ceil((gross - wash) * 0.0325) : 0
+    // ESIC wages = (gross − washing); limit ₹21,000 (₹25,000 for Handicap)
+    const esicLimit    = isHandicap ? 25000 : 21000
+    const esicWages    = gross - wash
+    const esicEligible = !isCALL && esicWages <= esicLimit
+    // Employee ESIC: esicWages × 0.75%
+    const empESIDed = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
+    // Employer ESIC: esicWages × 3.25%
+    const empESI    = esicEligible ? Math.ceil(esicWages * 0.0325) : 0
     // Employee deductions
     const empPFDed  = isCALL ? 0 : Math.min(Math.round((basic + da) * 0.12), 1800)
-    // Employee ESIC = ₹0 (Growus absorbs employee share per company policy)
-    const empESIDed = 0
-    const pt     = isCALL ? 0 : calcPT(gross)
-    const totalDed = empPFDed + empESIDed + pt
+    const pt        = isCALL ? 0 : calcPT(gross)
+    const totalDed  = empPFDed + empESIDed + pt
     const netSalary = gross - totalDed
-    const ctc    = gross + empPF + empESI
+    const ctc       = gross + empPF + empESI
     return { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc }
 }
 
@@ -59,7 +55,7 @@ type SalaryRow = {
 }
 type EmpSalary = {
     id: string; employeeId: string; firstName: string; lastName: string
-    designation: string | null; basicSalary: number
+    designation: string | null; basicSalary: number; isHandicap: boolean
     department: { name: string } | null
     deployments: { site: { name: string } }[]
     employeeSalary: (SalaryRow & { id: string; bonus: number }) | null
@@ -472,7 +468,7 @@ export default function SalaryMasterPage() {
                                 } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
                                 const effectiveType = typeOverride[emp.id] ?? row.complianceType
                                 const displayRow = { ...row, complianceType: effectiveType }
-                                const { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc } = calc(displayRow)
+                                const { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc } = calc(displayRow, emp.isHandicap)
 
                                 const numIn = (field: keyof EditForm, bg = "transparent") => (
                                     <input
@@ -610,37 +606,37 @@ export default function SalaryMasterPage() {
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.washing || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.conveyance || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.leaveWithWages || 0), 0),
-                                        filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary).bonus : 0), 0),
+                                        filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary, e.isHandicap).bonus : 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.otherAllowance || 0), 0),
                                     ].map((v, i) => (
                                         <td key={i} style={{ ...td, background: "#eff6ff", fontWeight: 700 }}>{fmtN(v)}</td>
                                     ))}
                                     <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).gross : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).gross : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empPF : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empPF : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empESI : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empESI : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#f0fdf4", color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).ctc : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).ctc : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empPFDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empPFDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).empESIDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empESIDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e", fontWeight: 700 }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).pt : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).pt : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#b91c1c", fontWeight: 700 }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).totalDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).totalDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!).netSalary : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).netSalary : 0), 0))}
                                     </td>
                                     <td colSpan={4} />
                                 </tr>
@@ -651,7 +647,7 @@ export default function SalaryMasterPage() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                HRA = (Basic+DA)×5% · Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = 0 (Growus absorbed) · PT = ₹200 (above ₹10k) / ₹175 (₹7.5k–₹10k) / ₹0 · Co.PF = ₹1,950 · Co.ESIC = 3.25% (gross−wash ≤ ₹21k)
+                HRA = (Basic+DA)×5% · Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = (Gross−Wash)×0.75% · Co.PF = ₹1,950 · Co.ESIC = (Gross−Wash)×3.25% · ESIC limit ₹21k (₹25k for Handicap)
             </p>
 
             {/* ── Manual Edit Drawer ─────────────────────────────────────── */}

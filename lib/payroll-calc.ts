@@ -19,9 +19,10 @@
 // PF Employee:  IF(WorkedDays >= 26, 1800, ROUND(15000/26 × WorkedDays × 12%))
 // PF Employer:  ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
 //
-// ESIC eligibility: (FullMonthGross − Washing) ≤ ₹21,000
-//   Employee: ₹0  — Growus absorbs employee ESIC share (policy decision)
-//   Employer: CEIL((FullMonthGross − Washing) × 3.25%)
+// ESIC eligibility: (FullMonthGross − Washing) ≤ ₹21,000  [₹25,000 for Handicap]
+//   ESIC wages = FullMonthGross − Washing  (washing excluded per ESIC Act)
+//   Employee ESIC: CEIL(esicWages × 0.75%)
+//   Employer ESIC: CEIL(esicWages × 3.25%)
 //
 // PT (Professional Tax – Maharashtra slab, on earned gross):
 //   Gross ≤ ₹7,500              → ₹0
@@ -35,6 +36,7 @@ export function calcGrowusPayroll(sal: {
     otRatePerHour: number; canteenRatePerDay: number
     bonus?: number             // per-employee bonus from salary structure (Payment of Bonus Act cap)
     complianceType?: string    // "CALL" | "OR" (default "OR")
+    isHandicap?: boolean       // ESIC eligibility limit: ₹25,000 for handicap, ₹21,000 otherwise
 }, att: {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
@@ -47,6 +49,7 @@ export function calcGrowusPayroll(sal: {
         canteenRatePerDay,
         bonus: storedBonus,
         complianceType = "OR",
+        isHandicap = false,
     } = sal
 
     const {
@@ -95,11 +98,13 @@ export function calcGrowusPayroll(sal: {
             ? 1800
             : Math.round((15000 / 26) * workedDays * 0.12))
 
-    // ESIC eligibility: (FullMonthGross − Washing) ≤ ₹21,000
-    // Washing allowance is excluded from the eligibility threshold per ESIC rules
-    const esicEligible = !isCALL && (grossFullMonth - washing) <= 21000
-    // Employee ESIC = ₹0 — Growus absorbs the employee ESIC share (company policy)
-    const esiEmployee  = 0
+    // ESIC eligibility: (FullMonthGross − Washing) ≤ ₹21,000  [₹25,000 for Handicap]
+    // Washing allowance is excluded from ESIC wages per ESIC Act
+    const esicLimit    = isHandicap ? 25000 : 21000
+    const esicWages    = grossFullMonth - washing
+    const esicEligible = !isCALL && esicWages <= esicLimit
+    // Employee ESIC = esicWages × 0.75%
+    const esiEmployee  = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
 
     // PT: Maharashtra slab on earned gross
     const pt = grossEarned <= 7500  ? 0
@@ -121,11 +126,8 @@ export function calcGrowusPayroll(sal: {
     // PF Employer: ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
     const pfEmployer = isCALL ? 0 : Math.round(15000 * 0.13)
 
-    // ESIC Employer: ROUNDUP((FullMonthGross − Washing) × 3.25%)
-    // Base = full month gross minus washing allowance only (bonus excluded per formula)
-    const esiEmployer = esicEligible
-        ? Math.ceil((grossFullMonth - washing) * 0.0325)
-        : 0
+    // ESIC Employer: CEIL(esicWages × 3.25%)
+    const esiEmployer = esicEligible ? Math.ceil(esicWages * 0.0325) : 0
 
     const ctc = grossFullMonth + pfEmployer + esiEmployer
 

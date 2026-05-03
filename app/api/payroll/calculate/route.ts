@@ -92,11 +92,11 @@ export async function POST(req: Request) {
                     conveyance:       salData?.conveyance       ?? 0,
                     leaveWithWages:   salData?.leaveWithWages   ?? 0,
                     otherAllowance:   salData?.otherAllowance   ?? 0,
-                    // Pass stored bonus from salary structure (min-wage-based per Bonus Act)
                     bonus:            salData?.bonus            ?? undefined,
                     otRatePerHour:    salData?.otRatePerHour    ?? 170,
                     canteenRatePerDay:salData?.canteenRatePerDay?? 55,
                     complianceType:   salData?.complianceType   ?? "OR",
+                    isHandicap:       emp.isHandicap            ?? false,
                 }, {
                     ...att,
                     gender: emp.gender ?? "Male",
