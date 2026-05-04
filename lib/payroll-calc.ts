@@ -13,14 +13,14 @@
 //
 // Proration: ROUND(component × WorkedDays / MonthDays)  ← multiply FIRST (Excel-exact)
 //
-// OT Pay: ROUND(FullMonthGross / MonthDays × OT_Days, 0)
-//   OT_Days = actual overtime days from attendance (each day = 1 extra working day)
+// OT Pay: ROUND(otRatePerHour × 8 × OT_Days, 0)
+//   Each OT_Day = 8 hrs at the configured per-hour rate (e.g. ₹170/hr × 8 = ₹1,360/day)
 //
 // PF Employee:  IF(WorkedDays >= 26, 1800, ROUND(15000/26 × WorkedDays × 12%))
 // PF Employer:  ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
 //
 // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
-//   ESIC wages = FullMonthGross − Washing  (washing excluded per ESIC Act)
+//   ESIC wages = EarnedGross − Washing − Bonus  (OT included; washing & bonus excluded)
 //   Employee ESIC: CEIL(esicWages × 0.75%)
 //   Employer ESIC: CEIL(esicWages × 3.25%)
 //
@@ -46,7 +46,7 @@ export function calcGrowusPayroll(sal: {
 }) {
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
-        canteenRatePerDay,
+        otRatePerHour, canteenRatePerDay,
         bonus: storedBonus,
         complianceType = "OR",
         isHandicap = false,
@@ -83,9 +83,8 @@ export function calcGrowusPayroll(sal: {
     const bonusEarned   = r(bonusFull)
     const otherEarned   = r(otherAllowance)
 
-    // OT Pay: ROUND(FullMonthGross / MonthDays × OT_Days, 0)
-    // Each OT_Day = 1 extra working day at the daily gross rate
-    const otPay = Math.round(grossFullMonth / monthDays * otDays)
+    // OT Pay: ROUND(otRatePerHour × 8 × OT_Days, 0)
+    const otPay = Math.round(otRatePerHour * 8 * otDays)
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
         lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)
@@ -99,9 +98,9 @@ export function calcGrowusPayroll(sal: {
             : Math.round((15000 / 26) * workedDays * 0.12))
 
     // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
-    // Contribution base = FullMonthGross − Washing (washing excluded per ESIC Act)
+    // Contribution base = EarnedGross − Washing − Bonus (OT included; washing & bonus excluded)
     const esicLimit    = isHandicap ? 25000 : 21000
-    const esicWages    = grossFullMonth - washing
+    const esicWages    = grossEarned - washingEarned - bonusEarned
     const esicEligible = !isCALL && grossFullMonth <= esicLimit
     // Employee ESIC = esicWages × 0.75%
     const esiEmployee  = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
