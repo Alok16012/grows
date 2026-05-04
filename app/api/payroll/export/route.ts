@@ -43,7 +43,7 @@ export async function GET(req: Request) {
         LOP: p.workingDays - p.presentDays,
         DAYS: p.presentDays,
         "OT DAYS": p.otDays,
-        "OT HRS (Calc)": p.otDays * 4,
+        "OT HRS (Calc)": p.otDays * 8,
         // Full month
         "BASIC (Full)": p.basicFull,
         "DA (Full)": p.daFull,
