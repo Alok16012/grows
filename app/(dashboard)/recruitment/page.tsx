@@ -2446,6 +2446,7 @@ function ConvertModal({ lead, onClose, onConverted }: {
     }
 
     return (
+        <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-[var(--surface)] rounded-[18px] shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
@@ -2808,5 +2809,6 @@ function ConvertModal({ lead, onClose, onConverted }: {
             </div>
         </div>
         {previewUrl && <DocumentViewer url={previewUrl} fileName={previewName} onClose={() => setPreviewUrl(null)} />}
+        </>
     )
 }
