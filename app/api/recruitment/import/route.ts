@@ -123,7 +123,7 @@ function normalizeOurRow(r: Record<string, unknown>): NormalizedRow {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER && session.user.role !== Role.HR_MANAGER)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

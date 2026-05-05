@@ -154,9 +154,9 @@ export async function PUT(
             data: updateData,
         })
 
-        // Update linked User account role if systemRole is provided
+        // Update linked User account (role + email sync)
         const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY", "CLIENT"]
-        if (systemRole || customRoleId !== undefined) {
+        if (systemRole || customRoleId !== undefined || email !== undefined) {
             const empWithUser = await prisma.employee.findUnique({
                 where: { id: params.id },
                 select: { userId: true },
@@ -165,6 +165,10 @@ export async function PUT(
                 const userUpdate: Record<string, unknown> = {}
                 if (systemRole && VALID_ROLES.includes(systemRole)) userUpdate.role = systemRole
                 if (customRoleId !== undefined) userUpdate.customRoleId = customRoleId || null
+                // Sync login email when employee email is updated
+                if (email && email.trim() && !email.includes("@cims.local")) {
+                    userUpdate.email = email.trim()
+                }
                 if (Object.keys(userUpdate).length > 0) {
                     await prisma.user.update({ where: { id: empWithUser.userId }, data: userUpdate })
                 }
