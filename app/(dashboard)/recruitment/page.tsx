@@ -2314,6 +2314,30 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 }
 
 // ─── Convert to Employee Modal ────────────────────────────────────────────────
+type ConvertForm = {
+    firstName: string; middleName: string; lastName: string
+    email: string; phone: string; alternatePhone: string
+    dateOfBirth: string; gender: string
+    aadharNumber: string; panNumber: string
+    address: string; city: string; state: string; pincode: string
+    permanentAddress: string; permanentCity: string; permanentState: string; permanentPincode: string
+    designation: string; departmentId: string; siteId: string; managerId: string
+    dateOfJoining: string; employmentType: string; salaryType: string; basicSalary: string
+    deployRole: string; deployShift: string; deployStartDate: string
+    notes: string
+    da: string; washing: string; conveyance: string; leaveWithWages: string
+    otherAllowance: string; otRatePerHour: string; canteenRatePerDay: string
+    complianceType: string
+    bankName: string; bankIFSC: string; bankAccountNumber: string; bankBranch: string
+    nameAsPerAadhar: string; fathersName: string; bloodGroup: string
+    maritalStatus: string; nationality: string; religion: string; caste: string
+    uan: string; pfNumber: string; esiNumber: string; labourCardNo: string
+    emergencyContact1Name: string; emergencyContact1Phone: string
+    emergencyContact2Name: string; emergencyContact2Phone: string
+    safetyGoggles: boolean; safetyGloves: boolean; safetyHelmet: boolean
+    safetyMask: boolean; safetyJacket: boolean; safetyEarMuffs: boolean; safetyShoes: boolean
+}
+
 function ConvertModal({ lead, onClose, onConverted }: {
     lead: Lead
     onClose: () => void
@@ -2322,21 +2346,53 @@ function ConvertModal({ lead, onClose, onConverted }: {
     const [sites, setSites] = useState<SiteOption[]>([])
     const [departments, setDepartments] = useState<DeptOption[]>([])
     const [submitting, setSubmitting] = useState(false)
-    const [form, setForm] = useState({
-        dateOfJoining: new Date().toISOString().slice(0, 10),
-        siteId: "",
+    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety">("personal")
+    const [sameAsCurrent, setSameAsCurrent] = useState(false)
+
+    const nameParts = lead.candidateName.trim().split(/\s+/)
+    const [form, setForm] = useState<ConvertForm>({
+        firstName: nameParts[0] || "",
+        middleName: "",
+        lastName: nameParts.slice(1).join(" ") || "",
+        email: lead.email || "",
+        phone: lead.phone || "",
+        alternatePhone: "",
+        dateOfBirth: "",
+        gender: lead.gender || "",
+        aadharNumber: "",
+        panNumber: "",
+        address: lead.locality || "",
+        city: lead.city || "",
+        state: "",
+        pincode: "",
+        permanentAddress: "",
+        permanentCity: "",
+        permanentState: "",
+        permanentPincode: "",
+        designation: lead.position || "",
         departmentId: "",
-        designation: lead.position ?? "",
+        siteId: "",
+        managerId: "",
+        dateOfJoining: new Date().toISOString().slice(0, 10),
         employmentType: "Full-time",
+        salaryType: "Monthly",
         basicSalary: lead.expectedSalary?.toString() ?? "",
-        da: "",
-        washing: "",
-        conveyance: "",
-        leaveWithWages: "",
-        otherAllowance: "",
-        otRatePerHour: "170",
-        canteenRatePerDay: "55",
+        deployRole: lead.position || "",
+        deployShift: "",
+        deployStartDate: "",
+        notes: "",
+        da: "", washing: "", conveyance: "", leaveWithWages: "",
+        otherAllowance: "", otRatePerHour: "170", canteenRatePerDay: "55",
         complianceType: "OR",
+        bankName: "", bankIFSC: "", bankAccountNumber: "", bankBranch: "",
+        nameAsPerAadhar: lead.candidateName || "",
+        fathersName: "", bloodGroup: "", maritalStatus: "",
+        nationality: "Indian", religion: "", caste: "",
+        uan: "", pfNumber: "", esiNumber: "", labourCardNo: "",
+        emergencyContact1Name: "", emergencyContact1Phone: "",
+        emergencyContact2Name: "", emergencyContact2Phone: "",
+        safetyGoggles: false, safetyGloves: false, safetyHelmet: false,
+        safetyMask: false, safetyJacket: false, safetyEarMuffs: false, safetyShoes: false,
     })
 
     useEffect(() => {
@@ -2344,12 +2400,18 @@ function ConvertModal({ lead, onClose, onConverted }: {
         fetch("/api/departments").then(r => r.json()).then(d => setDepartments((d.departments ?? d).map((dep: any) => ({ id: dep.id, name: dep.name })))).catch(() => {})
     }, [])
 
-    const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    const set = (k: keyof ConvertForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setForm(p => ({ ...p, [k]: e.target.value }))
+    const setCheck = (k: keyof ConvertForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
+        setForm(p => ({ ...p, [k]: e.target.checked }))
+
+    const iCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+    const lCls = "block text-[12px] text-[var(--text2)] mb-1"
+    const tabCls = (t: string) => `px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${activeTab === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        if (!form.basicSalary) { toast.error("Basic salary is required"); return }
+        if (!form.firstName.trim()) { toast.error("First name is required"); return }
         setSubmitting(true)
         try {
             const res = await fetch(`/api/recruitment/${lead.id}/convert`, {
@@ -2359,11 +2421,7 @@ function ConvertModal({ lead, onClose, onConverted }: {
             })
             const data = await res.json()
             if (!res.ok) { toast.error(data.error || "Conversion failed"); return }
-            if (data.alreadyConverted) {
-                toast.info("Already converted")
-                onConverted(data.employeeId, "existing")
-                return
-            }
+            if (data.alreadyConverted) { toast.info("Already converted"); onConverted(data.employeeId, "existing"); return }
             onConverted(data.employeeId, data.employeeCode)
         } catch {
             toast.error("Network error")
@@ -2373,8 +2431,9 @@ function ConvertModal({ lead, onClose, onConverted }: {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-[18px] shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] sticky top-0 bg-white z-10">
+            <div className="relative bg-[var(--surface)] rounded-[18px] shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
                     <div>
                         <h2 className="text-[16px] font-bold text-[var(--text)]">Convert to Employee</h2>
                         <p className="text-[12px] text-[var(--text3)] mt-0.5">{lead.candidateName} · {lead.phone}</p>
@@ -2382,83 +2441,234 @@ function ConvertModal({ lead, onClose, onConverted }: {
                     <button onClick={onClose} className="p-1.5 rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text3)]"><X size={18} /></button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-4">
-                    {/* Joining */}
-                    <div>
-                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Joining Details</p>
-                        <div className="grid grid-cols-2 gap-3">
-                            <Field label="Date of Joining *">
-                                <input required type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")} className={inputCls} />
-                            </Field>
-                            <Field label="Employment Type">
-                                <select value={form.employmentType} onChange={set("employmentType")} className={inputCls}>
-                                    <option>Full-time</option>
-                                    <option>Part-time</option>
-                                    <option>Contract</option>
-                                    <option>Daily Wage</option>
-                                </select>
-                            </Field>
-                            <Field label="Designation">
-                                <input value={form.designation} onChange={set("designation")} placeholder={lead.position ?? "Designation"} className={inputCls} />
-                            </Field>
-                            <Field label="Department">
-                                <select value={form.departmentId} onChange={set("departmentId")} className={inputCls}>
-                                    <option value="">Select department</option>
-                                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                </select>
-                            </Field>
-                            <Field label="Site / Location">
-                                <select value={form.siteId} onChange={set("siteId")} className={inputCls}>
-                                    <option value="">Select site</option>
-                                    {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                            </Field>
-                        </div>
-                    </div>
+                {/* Tabs */}
+                <div className="flex border-b border-[var(--border)] px-6 overflow-x-auto shrink-0">
+                    {(["personal", "employment", "salary", "bank", "compliance", "safety"] as const).map(t => (
+                        <button key={t} type="button" onClick={() => setActiveTab(t)} className={tabCls(t)}>
+                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : "Safety"}
+                        </button>
+                    ))}
+                </div>
 
-                    {/* Salary */}
-                    <div>
-                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Salary Structure (₹/month)</p>
-                        <div className="grid grid-cols-2 gap-3">
-                            <Field label="Basic Salary *">
-                                <input required type="number" min="0" value={form.basicSalary} onChange={set("basicSalary")} placeholder="e.g. 12000" className={inputCls} />
-                            </Field>
-                            <Field label="DA">
-                                <input type="number" min="0" value={form.da} onChange={set("da")} placeholder="0" className={inputCls} />
-                            </Field>
-                            <Field label="Washing Allowance">
-                                <input type="number" min="0" value={form.washing} onChange={set("washing")} placeholder="0" className={inputCls} />
-                            </Field>
-                            <Field label="Conveyance">
-                                <input type="number" min="0" value={form.conveyance} onChange={set("conveyance")} placeholder="0" className={inputCls} />
-                            </Field>
-                            <Field label="Leave With Wages">
-                                <input type="number" min="0" value={form.leaveWithWages} onChange={set("leaveWithWages")} placeholder="0" className={inputCls} />
-                            </Field>
-                            <Field label="Other Allowance">
-                                <input type="number" min="0" value={form.otherAllowance} onChange={set("otherAllowance")} placeholder="0" className={inputCls} />
-                            </Field>
-                        </div>
-                    </div>
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
 
-                    {/* Compliance */}
-                    <div>
-                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Compliance & Rates</p>
-                        <div className="grid grid-cols-3 gap-3">
-                            <Field label="OT Rate (₹/hr)">
-                                <input type="number" min="0" value={form.otRatePerHour} onChange={set("otRatePerHour")} className={inputCls} />
-                            </Field>
-                            <Field label="Canteen (₹/day)">
-                                <input type="number" min="0" value={form.canteenRatePerDay} onChange={set("canteenRatePerDay")} className={inputCls} />
-                            </Field>
-                            <Field label="Compliance Type">
-                                <select value={form.complianceType} onChange={set("complianceType")} className={inputCls}>
-                                    <option value="OR">OR (Overtime)</option>
-                                    <option value="CALL">CALL</option>
-                                </select>
-                            </Field>
+                    {/* ── Personal ── */}
+                    {activeTab === "personal" && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className={lCls}>First Name *</label><input required value={form.firstName} onChange={set("firstName")} className={iCls} placeholder="First name" /></div>
+                                <div><label className={lCls}>Middle Name</label><input value={form.middleName} onChange={set("middleName")} className={iCls} placeholder="Middle name" /></div>
+                                <div><label className={lCls}>Last Name</label><input value={form.lastName} onChange={set("lastName")} className={iCls} placeholder="Last name" /></div>
+                                <div><label className={lCls}>Father&apos;s Name</label><input value={form.fathersName} onChange={set("fathersName")} className={iCls} placeholder="Father's full name" /></div>
+                                <div><label className={lCls}>Phone</label><input value={form.phone} onChange={set("phone")} className={iCls} placeholder="Phone number" /></div>
+                                <div><label className={lCls}>Email</label><input type="email" value={form.email} onChange={set("email")} className={iCls} placeholder="Email address" /></div>
+                                <div><label className={lCls}>Alternate Phone</label><input value={form.alternatePhone} onChange={set("alternatePhone")} className={iCls} placeholder="Alternate phone" /></div>
+                                <div><label className={lCls}>Date of Birth</label><input type="date" value={form.dateOfBirth} onChange={set("dateOfBirth")} className={iCls} /></div>
+                                <div>
+                                    <label className={lCls}>Gender</label>
+                                    <select value={form.gender} onChange={set("gender")} className={iCls}>
+                                        <option value="">Select</option>
+                                        <option value="MALE">Male</option>
+                                        <option value="FEMALE">Female</option>
+                                        <option value="OTHER">Other</option>
+                                    </select>
+                                </div>
+                                <div><label className={lCls}>Aadhar Number</label><input value={form.aadharNumber} onChange={set("aadharNumber")} className={iCls} placeholder="XXXX XXXX XXXX" /></div>
+                                <div><label className={lCls}>PAN Number</label><input value={form.panNumber} onChange={set("panNumber")} className={iCls} placeholder="XXXXX0000X" /></div>
+                            </div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Current Address</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2"><label className={lCls}>Address</label><input value={form.address} onChange={set("address")} className={iCls} placeholder="Street address" /></div>
+                                <div><label className={lCls}>City</label><input value={form.city} onChange={set("city")} className={iCls} placeholder="City" /></div>
+                                <div><label className={lCls}>State</label><input value={form.state} onChange={set("state")} className={iCls} placeholder="State" /></div>
+                                <div><label className={lCls}>Pincode</label><input value={form.pincode} onChange={set("pincode")} className={iCls} placeholder="Pincode" /></div>
+                            </div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Permanent Address</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2 flex items-center gap-2">
+                                    <input type="checkbox" id="cvtSameAddr" checked={sameAsCurrent} onChange={e => {
+                                        if (e.target.checked) setForm(f => ({ ...f, permanentAddress: f.address, permanentCity: f.city, permanentState: f.state, permanentPincode: f.pincode }))
+                                        setSameAsCurrent(e.target.checked)
+                                    }} className="w-4 h-4" />
+                                    <label htmlFor="cvtSameAddr" className="text-sm text-[var(--text2)] cursor-pointer">Same as current address</label>
+                                </div>
+                                <div className="col-span-2"><label className={lCls}>Address</label><input value={form.permanentAddress} onChange={set("permanentAddress")} className={iCls} placeholder="Street address" disabled={sameAsCurrent} /></div>
+                                <div><label className={lCls}>City</label><input value={form.permanentCity} onChange={set("permanentCity")} className={iCls} placeholder="City" disabled={sameAsCurrent} /></div>
+                                <div><label className={lCls}>State</label><input value={form.permanentState} onChange={set("permanentState")} className={iCls} placeholder="State" disabled={sameAsCurrent} /></div>
+                                <div><label className={lCls}>Pincode</label><input value={form.permanentPincode} onChange={set("permanentPincode")} className={iCls} placeholder="Pincode" disabled={sameAsCurrent} /></div>
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* ── Employment ── */}
+                    {activeTab === "employment" && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className={lCls}>Designation</label><input value={form.designation} onChange={set("designation")} className={iCls} placeholder="e.g. Security Guard" /></div>
+                                <div>
+                                    <label className={lCls}>Department</label>
+                                    <select value={form.departmentId} onChange={set("departmentId")} className={iCls}>
+                                        <option value="">No Department</option>
+                                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    </select>
+                                </div>
+                                <div><label className={lCls}>Date of Joining</label><input type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")} className={iCls} /></div>
+                                <div>
+                                    <label className={lCls}>Employment Type</label>
+                                    <select value={form.employmentType} onChange={set("employmentType")} className={iCls}>
+                                        <option>Full-time</option><option>Part-time</option><option>Contract</option><option>Daily Wage</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={lCls}>Salary Type</label>
+                                    <select value={form.salaryType} onChange={set("salaryType")} className={iCls}>
+                                        <option>Monthly</option><option>Daily</option><option>Hourly</option>
+                                    </select>
+                                </div>
+                                <div><label className={lCls}>Basic Salary (₹)</label><input type="number" min="0" value={form.basicSalary} onChange={set("basicSalary")} className={iCls} placeholder="e.g. 12000" /></div>
+                            </div>
+                            <div className="border border-[var(--accent)]/30 bg-[var(--accent-light)]/30 rounded-[10px] p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <MapPin size={14} className="text-[var(--accent)]" />
+                                    <span className="text-[13px] font-semibold text-[var(--accent)]">Site Assignment</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2">
+                                        <label className={lCls}>Select Site</label>
+                                        <select value={form.siteId} onChange={set("siteId")} className={iCls}>
+                                            <option value="">-- No Site (Assign Later) --</option>
+                                            {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                        </select>
+                                    </div>
+                                    {form.siteId && (<>
+                                        <div><label className={lCls}>Deployment Role</label><input value={form.deployRole} onChange={set("deployRole")} className={iCls} placeholder="e.g. Security Guard" /></div>
+                                        <div>
+                                            <label className={lCls}>Shift</label>
+                                            <select value={form.deployShift} onChange={set("deployShift")} className={iCls}>
+                                                <option value="">Select Shift</option>
+                                                <option>Morning</option><option>Evening</option><option>Night</option><option>Rotating</option>
+                                            </select>
+                                        </div>
+                                        <div><label className={lCls}>Deployment Start Date</label><input type="date" value={form.deployStartDate || new Date().toISOString().split("T")[0]} onChange={set("deployStartDate")} className={iCls} /></div>
+                                    </>)}
+                                </div>
+                            </div>
+                            <div>
+                                <label className={lCls}>Notes</label>
+                                <textarea value={form.notes} onChange={set("notes")} className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] resize-none placeholder:text-[var(--text3)]" rows={3} placeholder="Additional notes..." />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Salary ── */}
+                    {activeTab === "salary" && (
+                        <div className="space-y-4">
+                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
+                                <span className="text-[12px] text-blue-700">Set the detailed salary structure for payroll calculation.</span>
+                            </div>
+                            <div>
+                                <label className={lCls}>Compliance Type</label>
+                                <div className="flex gap-4 mt-1">
+                                    <label className="flex items-center gap-2 cursor-pointer text-[13px] text-[var(--text2)]">
+                                        <input type="radio" name="cvtCompliance" value="OR" checked={form.complianceType === "OR"} onChange={() => setForm(f => ({ ...f, complianceType: "OR" }))} className="accent-[var(--accent)]" />
+                                        <span><strong>OR</strong> — PF + ESIC apply (full-time)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer text-[13px] text-[var(--text2)]">
+                                        <input type="radio" name="cvtCompliance" value="CALL" checked={form.complianceType === "CALL"} onChange={() => setForm(f => ({ ...f, complianceType: "CALL" }))} className="accent-orange-500" />
+                                        <span><strong>CALL</strong> — No PF / ESIC (contract)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className={lCls}>Basic Salary (₹)</label><input type="number" value={form.basicSalary} onChange={set("basicSalary")} className={iCls} placeholder="0" min="0" /></div>
+                                {form.complianceType !== "CALL" && (<>
+                                    <div><label className={lCls}>DA — Dearness Allowance (₹)</label><input type="number" value={form.da} onChange={set("da")} className={iCls} placeholder="0" min="0" /></div>
+                                    <div><label className={lCls}>Washing Allowance (₹)</label><input type="number" value={form.washing} onChange={set("washing")} className={iCls} placeholder="0" min="0" /></div>
+                                    <div><label className={lCls}>Conveyance Allowance (₹)</label><input type="number" value={form.conveyance} onChange={set("conveyance")} className={iCls} placeholder="0" min="0" /></div>
+                                    <div><label className={lCls}>Leave With Wages (₹)</label><input type="number" value={form.leaveWithWages} onChange={set("leaveWithWages")} className={iCls} placeholder="0" min="0" /></div>
+                                    <div><label className={lCls}>Other Allowance (₹)</label><input type="number" value={form.otherAllowance} onChange={set("otherAllowance")} className={iCls} placeholder="0" min="0" /></div>
+                                    <div><label className={lCls}>OT Rate (₹/hr)</label><input type="number" value={form.otRatePerHour} onChange={set("otRatePerHour")} className={iCls} placeholder="170" min="0" /></div>
+                                    <div><label className={lCls}>Canteen (₹/day)</label><input type="number" value={form.canteenRatePerDay} onChange={set("canteenRatePerDay")} className={iCls} placeholder="55" min="0" /></div>
+                                </>)}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Bank ── */}
+                    {activeTab === "bank" && (
+                        <div className="space-y-4">
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Bank Details</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className={lCls}>Bank Name</label><input value={form.bankName} onChange={set("bankName")} className={iCls} placeholder="Bank name" /></div>
+                                <div><label className={lCls}>IFSC Code</label><input value={form.bankIFSC} onChange={set("bankIFSC")} className={iCls} placeholder="IFSC code" /></div>
+                                <div className="col-span-2"><label className={lCls}>Account Number</label><input value={form.bankAccountNumber} onChange={set("bankAccountNumber")} className={iCls} placeholder="Account number" /></div>
+                                <div><label className={lCls}>Branch</label><input value={form.bankBranch} onChange={set("bankBranch")} className={iCls} placeholder="Bank branch" /></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Compliance ── */}
+                    {activeTab === "compliance" && (
+                        <div className="space-y-4">
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Identity</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className={lCls}>Name as per Aadhar</label><input value={form.nameAsPerAadhar} onChange={set("nameAsPerAadhar")} className={iCls} placeholder="As on Aadhar card" /></div>
+                                <div>
+                                    <label className={lCls}>Blood Group</label>
+                                    <select value={form.bloodGroup} onChange={set("bloodGroup")} className={iCls}>
+                                        <option value="">Select</option>
+                                        {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g} value={g}>{g}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={lCls}>Marital Status</label>
+                                    <select value={form.maritalStatus} onChange={set("maritalStatus")} className={iCls}>
+                                        <option value="">Select</option>
+                                        <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
+                                    </select>
+                                </div>
+                                <div><label className={lCls}>Nationality</label><input value={form.nationality} onChange={set("nationality")} className={iCls} placeholder="Nationality" /></div>
+                                <div><label className={lCls}>Religion</label><input value={form.religion} onChange={set("religion")} className={iCls} placeholder="Religion" /></div>
+                                <div><label className={lCls}>Caste</label><input value={form.caste} onChange={set("caste")} className={iCls} placeholder="Caste category" /></div>
+                            </div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Statutory Numbers</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className={lCls}>UAN (PF)</label><input value={form.uan} onChange={set("uan")} className={iCls} placeholder="Universal Account Number" /></div>
+                                <div><label className={lCls}>PF Number</label><input value={form.pfNumber} onChange={set("pfNumber")} className={iCls} placeholder="PF number" /></div>
+                                <div><label className={lCls}>ESIC Number</label><input value={form.esiNumber} onChange={set("esiNumber")} className={iCls} placeholder="ESIC number" /></div>
+                                <div><label className={lCls}>Labour Card No.</label><input value={form.labourCardNo} onChange={set("labourCardNo")} className={iCls} placeholder="Labour card number" /></div>
+                            </div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Emergency Contacts</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className={lCls}>EC1 Name</label><input value={form.emergencyContact1Name} onChange={set("emergencyContact1Name")} className={iCls} placeholder="Contact person name" /></div>
+                                <div><label className={lCls}>EC1 Phone</label><input value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} className={iCls} placeholder="Contact phone" /></div>
+                                <div><label className={lCls}>EC2 Name</label><input value={form.emergencyContact2Name} onChange={set("emergencyContact2Name")} className={iCls} placeholder="Contact person name" /></div>
+                                <div><label className={lCls}>EC2 Phone</label><input value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} className={iCls} placeholder="Contact phone" /></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Safety ── */}
+                    {activeTab === "safety" && (
+                        <div className="space-y-3">
+                            <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Safety Equipment Issued</p>
+                            {([
+                                { key: "safetyGoggles", label: "Safety Goggles" },
+                                { key: "safetyGloves",  label: "Hand Gloves" },
+                                { key: "safetyHelmet",  label: "Helmet" },
+                                { key: "safetyMask",    label: "Mask" },
+                                { key: "safetyJacket",  label: "Safety Jacket" },
+                                { key: "safetyEarMuffs",label: "Ear Muffs" },
+                                { key: "safetyShoes",   label: "Safety Shoes" },
+                            ] as { key: keyof ConvertForm; label: string }[]).map(item => (
+                                <div key={item.key} className="flex items-center gap-3 p-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30">
+                                    <input type="checkbox" id={`cvt_${item.key}`} checked={!!form[item.key]} onChange={setCheck(item.key)} className="w-4 h-4 accent-[var(--accent)]" />
+                                    <label htmlFor={`cvt_${item.key}`} className="text-[13px] text-[var(--text)] cursor-pointer select-none flex-1">{item.label}</label>
+                                    {form[item.key] && <span className="text-[11px] text-[#16a34a] font-medium">Issued</span>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="flex gap-2 justify-end pt-2 border-t border-[var(--border)]">
                         <button type="button" onClick={onClose}

@@ -18,16 +18,39 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const lead = await prisma.lead.findUnique({ where: { id: params.id } })
         if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 })
         if (lead.convertedEmployeeId) {
-            // Already converted — return existing employee id
             return NextResponse.json({ alreadyConverted: true, employeeId: lead.convertedEmployeeId })
         }
 
         const body = await req.json()
         const {
-            siteId, departmentId,
+            // Employment
+            siteId, departmentId, designation, dateOfJoining, employmentType, salaryType, managerId,
+            // Salary
             basicSalary, da, washing, conveyance, leaveWithWages, otherAllowance,
             otRatePerHour, canteenRatePerDay, complianceType,
-            dateOfJoining, employmentType, designation,
+            // Deployment
+            deployRole, deployShift, deployStartDate,
+            // Personal — explicit overrides (from form)
+            firstName: formFirstName, middleName, lastName: formLastName,
+            email: formEmail, phone: formPhone, alternatePhone,
+            dateOfBirth, gender: formGender, aadharNumber, panNumber,
+            address, city: formCity, state, pincode,
+            permanentAddress, permanentCity, permanentState, permanentPincode,
+            // Bank
+            bankName, bankBranch, bankAccountNumber, bankIFSC,
+            // Notes
+            notes,
+            // Compliance / Identity
+            nameAsPerAadhar, fathersName, bloodGroup, maritalStatus,
+            nationality, religion, caste,
+            // Statutory
+            uan, pfNumber, esiNumber, labourCardNo,
+            // Emergency
+            emergencyContact1Name, emergencyContact1Phone,
+            emergencyContact2Name, emergencyContact2Phone,
+            // Safety
+            safetyGoggles, safetyGloves, safetyHelmet,
+            safetyMask, safetyJacket, safetyEarMuffs, safetyShoes,
         } = body
 
         // ── Generate Employee ID ───────────────────────────────────────────────
@@ -47,23 +70,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             finalId = `EMP-${String(nextNum).padStart(4, "0")}`
         }
 
-        // ── Split name ────────────────────────────────────────────────────────
+        // ── Resolve name — form overrides lead ────────────────────────────────
         const nameParts = lead.candidateName.trim().split(/\s+/)
-        const firstName = nameParts[0]
-        const lastName  = nameParts.slice(1).join(" ") || ""
+        const firstName = formFirstName?.trim() || nameParts[0]
+        const lastName  = formLastName?.trim()  || nameParts.slice(1).join(" ") || ""
 
         // ── Create / reuse User account ───────────────────────────────────────
-        const userEmail = lead.email || `${lead.phone}@cims.local`
+        const resolvedEmail = formEmail?.trim() || lead.email || `${lead.phone}@cims.local`
         let userId: string
-        const existingUser = await prisma.user.findUnique({ where: { email: userEmail } })
+        const existingUser = await prisma.user.findUnique({ where: { email: resolvedEmail } })
         if (existingUser) {
             userId = existingUser.id
         } else {
             const hash = await bcrypt.hash(lead.phone || "123456", 8)
             const newUser = await prisma.user.create({
                 data: {
-                    name: lead.candidateName,
-                    email: userEmail,
+                    name: `${firstName} ${lastName}`.trim(),
+                    email: resolvedEmail,
                     password: hash,
                     role: "INSPECTION_BOY",
                 }
@@ -73,24 +96,71 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
 
-        // ── Create Employee ───────────────────────────────────────────────────
+        // ── Create Employee with all fields ───────────────────────────────────
         const employee = await prisma.employee.create({
             data: {
                 employeeId:    finalId,
                 firstName,
                 lastName,
-                phone:         lead.phone,
-                email:         lead.email || null,
-                city:          lead.city  || null,
+                middleName:    middleName   || null,
+                phone:         formPhone?.trim() || lead.phone,
+                email:         resolvedEmail !== `${lead.phone}@cims.local` ? resolvedEmail : (lead.email || null),
+                alternatePhone: alternatePhone || null,
                 designation:   designation || lead.position || null,
-                gender:        lead.gender || null,
+                gender:        formGender  || lead.gender  || null,
                 departmentId:  departmentId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
                 status:        "ACTIVE",
                 employmentType: employmentType || "Full-time",
+                salaryType:    salaryType || "Monthly",
                 basicSalary:   basicSalary ? parseFloat(basicSalary) : 0,
+                managerId:     managerId  || null,
+                notes:         notes      || null,
                 onboardingToken,
                 userId,
+                // Personal
+                dateOfBirth:   dateOfBirth ? new Date(dateOfBirth) : null,
+                aadharNumber:  aadharNumber  || null,
+                panNumber:     panNumber     || null,
+                address:       address       || null,
+                city:          formCity      || lead.city || null,
+                state:         state         || null,
+                pincode:       pincode       || null,
+                permanentAddress:  permanentAddress  || null,
+                permanentCity:     permanentCity     || null,
+                permanentState:    permanentState    || null,
+                permanentPincode:  permanentPincode  || null,
+                // Bank
+                bankName:          bankName          || null,
+                bankBranch:        bankBranch        || null,
+                bankAccountNumber: bankAccountNumber || null,
+                bankIFSC:          bankIFSC          || null,
+                // Compliance / Identity
+                nameAsPerAadhar:   nameAsPerAadhar   || null,
+                fathersName:       fathersName        || null,
+                bloodGroup:        bloodGroup         || null,
+                maritalStatus:     maritalStatus      || null,
+                nationality:       nationality        || "Indian",
+                religion:          religion           || null,
+                caste:             caste              || null,
+                // Statutory
+                uan:               uan                || null,
+                pfNumber:          pfNumber           || null,
+                esiNumber:         esiNumber          || null,
+                labourCardNo:      labourCardNo       || null,
+                // Emergency
+                emergencyContact1Name:  emergencyContact1Name  || null,
+                emergencyContact1Phone: emergencyContact1Phone || null,
+                emergencyContact2Name:  emergencyContact2Name  || null,
+                emergencyContact2Phone: emergencyContact2Phone || null,
+                // Safety
+                safetyGoggles:  !!safetyGoggles,
+                safetyGloves:   !!safetyGloves,
+                safetyHelmet:   !!safetyHelmet,
+                safetyMask:     !!safetyMask,
+                safetyJacket:   !!safetyJacket,
+                safetyEarMuffs: !!safetyEarMuffs,
+                safetyShoes:    !!safetyShoes,
             },
         })
 
@@ -129,8 +199,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 data: {
                     employeeId: employee.id,
                     siteId:     targetSiteId,
-                    startDate:  dateOfJoining ? new Date(dateOfJoining) : new Date(),
+                    startDate:  deployStartDate ? new Date(deployStartDate) : (dateOfJoining ? new Date(dateOfJoining) : new Date()),
                     isActive:   true,
+                    ...(deployShift ? { shift: deployShift } : {}),
+                    ...(deployRole  ? { role:  deployRole  } : {}),
                 },
             })
         }
@@ -144,7 +216,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             },
         })
 
-        // Activity log
         await prisma.leadActivity.create({
             data: {
                 leadId:  params.id,
