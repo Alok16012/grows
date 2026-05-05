@@ -13,8 +13,9 @@
 //
 // Proration: ROUND(component × WorkedDays / MonthDays)  ← multiply FIRST (Excel-exact)
 //
-// OT Pay: ROUND(otRatePerHour × 8 × OT_Days, 0)
-//   Each OT_Day = 8 hrs at the configured per-hour rate (e.g. ₹170/hr × 8 = ₹1,360/day)
+// OT Pay: ROUND(otRatePerHour × 4 × OT_Days, 0)
+//   Each OT_Day = 4 extra hrs at the configured per-hour rate (e.g. ₹170/hr × 4 = ₹680/day)
+//   OT_Days × 4 = actual OT hours (col I in Excel sheet)
 //
 // PF Employee:  IF(WorkedDays >= 26, 1800, ROUND(15000/26 × WorkedDays × 12%))
 // PF Employer:  ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
@@ -83,8 +84,8 @@ export function calcGrowusPayroll(sal: {
     const bonusEarned   = r(bonusFull)
     const otherEarned   = r(otherAllowance)
 
-    // OT Pay: ROUND(otRatePerHour × 8 × OT_Days, 0)
-    const otPay = Math.round(otRatePerHour * 8 * otDays)
+    // OT Pay: ROUND(otRatePerHour × 4 × OT_Days, 0)  [col I = OT_Days × 4 = actual OT hours]
+    const otPay = Math.round(otRatePerHour * 4 * otDays)
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
         lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)
