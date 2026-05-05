@@ -1894,7 +1894,8 @@ function DetailDrawer({
                 <div className="px-5 py-3 border-b border-[var(--border)] shrink-0">
                     <div className="flex flex-wrap gap-1.5">
                         {STATUSES.map(s => (
-                            <button key={s.key} onClick={() => onStatusChange(s.key)}
+                            <button key={s.key}
+                                onClick={() => s.key === "JOINED" && !lead.convertedEmployeeId ? onConvert(lead) : onStatusChange(s.key)}
                                 className="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all"
                                 style={lead.status === s.key
                                     ? { background: s.color, color: "#fff", borderColor: s.color }
