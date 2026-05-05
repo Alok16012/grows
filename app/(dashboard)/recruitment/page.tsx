@@ -2346,8 +2346,13 @@ function ConvertModal({ lead, onClose, onConverted }: {
     const [sites, setSites] = useState<SiteOption[]>([])
     const [departments, setDepartments] = useState<DeptOption[]>([])
     const [submitting, setSubmitting] = useState(false)
-    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety">("personal")
+    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "docs">("personal")
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
+    const [pendingDocs, setPendingDocs] = useState<{ type: string; fileName: string; fileUrl: string }[]>([])
+    const [docUploading, setDocUploading] = useState(false)
+    const [docType, setDocType] = useState("AADHAAR")
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewName, setPreviewName] = useState("")
 
     const nameParts = lead.candidateName.trim().split(/\s+/)
     const [form, setForm] = useState<ConvertForm>({
@@ -2422,6 +2427,18 @@ function ConvertModal({ lead, onClose, onConverted }: {
             const data = await res.json()
             if (!res.ok) { toast.error(data.error || "Conversion failed"); return }
             if (data.alreadyConverted) { toast.info("Already converted"); onConverted(data.employeeId, "existing"); return }
+            // Upload pending docs to the newly created employee
+            if (pendingDocs.length > 0) {
+                for (const doc of pendingDocs) {
+                    try {
+                        await fetch(`/api/employees/${data.employeeId}/documents`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(doc),
+                        })
+                    } catch { /* silent */ }
+                }
+            }
             onConverted(data.employeeId, data.employeeCode)
         } catch {
             toast.error("Network error")
@@ -2443,9 +2460,9 @@ function ConvertModal({ lead, onClose, onConverted }: {
 
                 {/* Tabs */}
                 <div className="flex border-b border-[var(--border)] px-6 overflow-x-auto shrink-0">
-                    {(["personal", "employment", "salary", "bank", "compliance", "safety"] as const).map(t => (
+                    {(["personal", "employment", "salary", "bank", "compliance", "safety", "docs"] as const).map(t => (
                         <button key={t} type="button" onClick={() => setActiveTab(t)} className={tabCls(t)}>
-                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : "Safety"}
+                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
                         </button>
                     ))}
                 </div>
@@ -2670,6 +2687,112 @@ function ConvertModal({ lead, onClose, onConverted }: {
                         </div>
                     )}
 
+                    {/* ── Docs ── */}
+                    {activeTab === "docs" && (() => {
+                        const CVT_DOC_TYPES = [
+                            { key: "AADHAAR",      label: "Aadhaar Card" },
+                            { key: "PAN",          label: "PAN Card" },
+                            { key: "PHOTO",        label: "Photo" },
+                            { key: "BANK_DETAILS", label: "Bank Details" },
+                            { key: "CERTIFICATE",  label: "Certificate" },
+                            { key: "RESUME",       label: "Resume" },
+                            { key: "OFFER_LETTER", label: "Offer Letter" },
+                            { key: "OTHER",        label: "Other" },
+                        ]
+                        const pendingByType: Record<string, { type: string; fileName: string; fileUrl: string }> = {}
+                        pendingDocs.forEach(d => { if (!pendingByType[d.type]) pendingByType[d.type] = d })
+                        return (
+                            <div className="border border-[var(--border)] rounded-[10px] overflow-hidden">
+                                <table className="w-full text-[12px]">
+                                    <thead>
+                                        <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                                            <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide w-[130px]">Document</th>
+                                            <th className="text-left px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Status / File</th>
+                                            <th className="px-3 py-2 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {CVT_DOC_TYPES.map(({ key, label }) => {
+                                            const pending = pendingByType[key]
+                                            const uploading = docUploading && docType === key
+                                            const fileInputId = `cvt-doc-${key}`
+                                            return (
+                                                <tr key={key} className="border-b border-[var(--border)] last:border-0">
+                                                    <td className="px-3 py-2.5 font-medium text-[var(--text)]">{label}</td>
+                                                    <td className="px-3 py-2.5">
+                                                        {pending ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                                                                <span className="truncate max-w-[160px] text-[var(--text)]">{pending.fileName}</span>
+                                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">Queued</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                                                                <span className="text-red-500 text-[11px] font-medium">Not Uploaded</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {pending ? (
+                                                                <>
+                                                                    <button type="button"
+                                                                        onClick={() => { setPreviewUrl(pending.fileUrl); setPreviewName(pending.fileName) }}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100">
+                                                                        <Eye size={11} /> View
+                                                                    </button>
+                                                                    <button type="button"
+                                                                        onClick={() => setPendingDocs(prev => prev.filter(d => d.type !== key))}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-red-50 text-red-500 hover:bg-red-100">
+                                                                        <X size={11} /> Remove
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <button type="button" disabled={uploading}
+                                                                        onClick={() => { setDocType(key); document.getElementById(fileInputId)?.click() }}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-60">
+                                                                        {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                                                                        {uploading ? "Reading…" : "Upload"}
+                                                                    </button>
+                                                                    <input id={fileInputId} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                                                                        onChange={async (ev) => {
+                                                                            const file = ev.target.files?.[0]
+                                                                            if (!file) return
+                                                                            if (file.size > 5 * 1024 * 1024) { toast.error("File too large (max 5MB)"); return }
+                                                                            setDocUploading(true)
+                                                                            try {
+                                                                                const fileUrl = await new Promise<string>((resolve, reject) => {
+                                                                                    const reader = new FileReader()
+                                                                                    reader.onload = () => resolve(reader.result as string)
+                                                                                    reader.onerror = reject
+                                                                                    reader.readAsDataURL(file)
+                                                                                })
+                                                                                setPendingDocs(prev => [...prev.filter(d => d.type !== key), { type: key, fileName: file.name, fileUrl }])
+                                                                                toast.success(`${file.name} queued`)
+                                                                            } catch { toast.error("Failed to read file") }
+                                                                            finally { setDocUploading(false); ev.target.value = "" }
+                                                                        }}
+                                                                    />
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                                {pendingDocs.length > 0 && (
+                                    <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 text-[11px] text-amber-700 font-medium">
+                                        {pendingDocs.length} document{pendingDocs.length > 1 ? "s" : ""} queued — will be uploaded after employee is created
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })()}
+
                     <div className="flex gap-2 justify-end pt-2 border-t border-[var(--border)]">
                         <button type="button" onClick={onClose}
                             className="h-9 px-4 text-[13px] font-medium text-[var(--text2)] border border-[var(--border)] rounded-[7px] hover:bg-[var(--surface2)]">
@@ -2684,5 +2807,6 @@ function ConvertModal({ lead, onClose, onConverted }: {
                 </form>
             </div>
         </div>
+        {previewUrl && <DocumentViewer url={previewUrl} fileName={previewName} onClose={() => setPreviewUrl(null)} />}
     )
 }
