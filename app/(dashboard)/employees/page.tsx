@@ -707,7 +707,17 @@ function EmployeeModal({
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={labelCls}>Role</label>
+                                    <label className={labelCls}>System Role (Login Access)</label>
+                                    <select value={form.systemRole} onChange={set("systemRole")} className={inputCls}>
+                                        <option value="INSPECTION_BOY">Staff (Default)</option>
+                                        <option value="HR_MANAGER">HR Manager</option>
+                                        <option value="MANAGER">Manager</option>
+                                        <option value="ADMIN">Admin</option>
+                                        <option value="CLIENT">Client</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Custom Role</label>
                                     <select value={form.customRoleId} onChange={set("customRoleId")} className={inputCls}>
                                         <option value="">No custom role</option>
                                         {customRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
