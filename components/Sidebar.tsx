@@ -96,7 +96,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Projects", href: "/projects", icon: Folder, roles: [] },
                 { name: "Assignments", href: "/assignments", icon: HardHat, roles: ["ADMIN", "MANAGER"] },
                 { name: "Groups", href: "/groups", icon: Users2, roles: ["ADMIN", "MANAGER"] },
-                { name: "Recruitment", href: "/recruitment", icon: Target, roles: ["ADMIN", "MANAGER"], permission: "recruitment.view" },
+                { name: "Recruitment", href: "/recruitment", icon: Target, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "recruitment.view" },
                 { name: "Employees", href: "/employees", icon: UserCheck, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
                 { name: "Employee Master", href: "/employees/master", icon: TableProperties, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
                 { name: "Master Documents", href: "/employees/documents", icon: Files, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
