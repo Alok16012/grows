@@ -195,12 +195,21 @@ export default function AttendanceUploadPage() {
 
             if (!parsed.length) { toast.error("No valid Employee ID rows found"); setParsing(false); return }
 
-            // Fetch employees for this site
-            const empRes = await fetch(`/api/employees?siteId=${siteId}&status=ACTIVE`)
-            const empData = await empRes.json()
-            const employees: Employee[] = Array.isArray(empData) ? empData : (empData.employees ?? [])
+            // Fetch ALL active employees (not just site-deployed) so attendance
+            // can be processed even if deployment record is missing for some employees
+            const [siteEmpRes, allEmpRes] = await Promise.all([
+                fetch(`/api/employees?siteId=${siteId}&status=ACTIVE`),
+                fetch(`/api/employees?status=ACTIVE&limit=2000`),
+            ])
+            const siteEmpData = await siteEmpRes.json()
+            const allEmpData  = await allEmpRes.json()
+            const siteEmployees: Employee[] = Array.isArray(siteEmpData) ? siteEmpData : (siteEmpData.employees ?? [])
+            const allEmployees:  Employee[] = Array.isArray(allEmpData)  ? allEmpData  : (allEmpData.employees  ?? [])
 
-            const empMap = new Map(employees.map(e => [e.employeeId.toUpperCase(), e]))
+            // Build map — site-deployed employees take priority, then fall back to all
+            const empMap = new Map<string, Employee>()
+            allEmployees.forEach(e => empMap.set(e.employeeId.toUpperCase(), e))
+            siteEmployees.forEach(e => empMap.set(e.employeeId.toUpperCase(), e)) // overwrite with site-specific if exists
 
             const matchedRows: MatchedRow[] = parsed.map(r => {
                 const emp = empMap.get(r.rawEmployeeId.toUpperCase())
