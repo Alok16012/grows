@@ -59,9 +59,16 @@ export async function POST(req: Request) {
             if (!employeeIds.length) return new NextResponse("No active deployments found for this site", { status: 404 })
         }
 
-        const whereClause: Record<string, unknown> = { status: "ACTIVE" }
-        if (employeeIds && employeeIds.length > 0) whereClause.id = { in: employeeIds }
-        else if (branchId) whereClause.branchId = branchId
+        const whereClause: Record<string, unknown> = {}
+        if (employeeIds && employeeIds.length > 0) {
+            // When processing from attendance upload, include ALL employees in the array
+            // regardless of status — if they're in the sheet, they worked and need payroll
+            whereClause.id = { in: employeeIds }
+        } else {
+            // Fallback (no attendance array): only process ACTIVE employees
+            whereClause.status = "ACTIVE"
+            if (branchId) whereClause.branchId = branchId
+        }
 
         const employees = await prisma.employee.findMany({
             where: whereClause,
