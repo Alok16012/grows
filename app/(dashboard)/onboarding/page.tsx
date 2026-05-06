@@ -465,14 +465,10 @@ export default function OnboardingPage() {
             })
             if (!res.ok) throw new Error(await res.text())
             if (action === "approve") {
-                toast.success("Onboarding Approved! Redirecting to employee profile…")
-                // Find the employee id from selected record
-                const empId = selected?.employee?.id
+                toast.success("Onboarding Approved! Employee is now Active.")
                 setSelected(null)
                 fetchRecords()
-                if (empId) {
-                    setTimeout(() => router.push(`/employees/${empId}`), 800)
-                }
+                setTimeout(() => router.push(`/employees`), 800)
             } else {
                 toast.success("Onboarding Rejected")
                 setSelected(null)
