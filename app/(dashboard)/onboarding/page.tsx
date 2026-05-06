@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     Search, Loader2, CheckCircle2, XCircle, Clock,
-    User, MapPin, X, ChevronRight,
-    Building2, Calendar, RefreshCw, FileText, Eye, ExternalLink
+    User, Phone, MapPin, X, ChevronRight,
+    Building2, Calendar, RefreshCw, FileText, Eye
 } from "lucide-react"
 import { format } from "date-fns"
 
