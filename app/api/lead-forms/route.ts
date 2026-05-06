@@ -6,7 +6,7 @@ import { nanoid } from "nanoid"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "MANAGER")) {
+    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const forms = await prisma.leadForm.findMany({
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "MANAGER")) {
+    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const { title, description, siteId } = await req.json()

@@ -397,7 +397,7 @@ export default function RecruitmentPage() {
             const res = await fetch("/api/admin/users")
             if (!res.ok) return
             const data = await res.json()
-            setUsers((data.users ?? data).filter((u: AppUser) => u.role === "ADMIN" || u.role === "MANAGER"))
+            setUsers((data.users ?? data).filter((u: AppUser) => u.role === "ADMIN" || u.role === "MANAGER" || u.role === "HR_MANAGER"))
         } catch {}
     }
 
@@ -1511,7 +1511,7 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
                             <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                                 <Edit2 size={13} />
                             </button>
-                            {session?.user?.role === "ADMIN" && (
+                            {session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER" || session?.user?.role === "HR_MANAGER" && (
                                 <button onClick={() => onDelete(lead.id)} className="p-1.5 rounded-[6px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                     <Trash2 size={13} />
                                 </button>
@@ -1879,7 +1879,7 @@ function DetailDrawer({
                         <button onClick={onEdit} className="p-1.5 rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                             <Edit2 size={15} />
                         </button>
-                        {session?.user?.role === "ADMIN" && (
+                        {session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER" || session?.user?.role === "HR_MANAGER" && (
                             <button onClick={onDelete} className="p-1.5 rounded-[7px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                 <Trash2 size={15} />
                             </button>
