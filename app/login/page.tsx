@@ -35,9 +35,11 @@ export default function LoginPage() {
 
         try {
             // If user typed only digits (phone number), auto-append @cims.local
-            const loginEmail = /^\d+$/.test(email.trim())
-                ? `${email.trim()}@cims.local`
-                : email.trim()
+            // For Employee IDs (e.g. EMP001) or emails, send as-is
+            const trimmed = email.trim()
+            const loginEmail = /^\d+$/.test(trimmed)
+                ? `${trimmed}@cims.local`
+                : trimmed
 
             const result = await signIn("credentials", {
                 redirect: false,
@@ -118,11 +120,11 @@ export default function LoginPage() {
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-[13px] font-medium text-[#1a1a18]">Email / Login ID</Label>
+                            <Label htmlFor="email" className="text-[13px] font-medium text-[#1a1a18]">Email / Employee ID / Phone</Label>
                             <Input
                                 id="email"
                                 type="text"
-                                placeholder="user@company.com or phone@cims.local"
+                                placeholder="Email, Employee ID (EMP001) or Phone number"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full py-[10px] px-[14px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all"

@@ -80,7 +80,7 @@ export const authOptions: NextAuthOptions = {
                         include: { customRole: { select: { permissions: true, isActive: true } } }
                     })
 
-                    // Phone-number fallback: if email lookup fails, try finding via Employee.phone
+                    // Fallback 1: Phone-number — try finding via Employee.phone
                     if (!user) {
                         // Strip @cims.local suffix and non-digits to get the raw phone number
                         const rawPhone = credentials.email.replace(/@cims\.local$/i, "").replace(/\D/g, "")
@@ -98,6 +98,24 @@ export const authOptions: NextAuthOptions = {
                                 console.log("Found user via phone lookup:", employee.user.email)
                                 user = employee.user as any
                             }
+                        }
+                    }
+
+                    // Fallback 2: Employee ID (e.g. EMP001) — try finding via Employee.employeeId
+                    if (!user) {
+                        const loginInput = credentials.email.replace(/@cims\.local$/i, "").trim()
+                        console.log("Trying employeeId fallback for:", loginInput)
+                        const employee = await prisma.employee.findFirst({
+                            where: { employeeId: { equals: loginInput, mode: "insensitive" } },
+                            include: {
+                                user: {
+                                    include: { customRole: { select: { permissions: true, isActive: true } } }
+                                }
+                            }
+                        })
+                        if (employee?.user) {
+                            console.log("Found user via employeeId lookup:", employee.user.email)
+                            user = employee.user as any
                         }
                     }
 
