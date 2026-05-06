@@ -82,6 +82,7 @@ type Employee = {
     safetyEarMuffs?: boolean
     safetyShoes?: boolean
     onboardingToken?: string
+    user?: { role: string; customRole?: { name: string } | null } | null
     employeeSalary?: {
         basic: number; da: number; washing: number; conveyance: number
         leaveWithWages: number; otherAllowance: number
@@ -410,7 +411,7 @@ function EmployeeModal({
                 safetyEarMuffs: employee.safetyEarMuffs ?? false,
                 safetyShoes: employee.safetyShoes ?? false,
                 customRoleId: "",
-                systemRole: "INSPECTION_BOY",
+                systemRole: employee.user?.role || "INSPECTION_BOY",
                 role: employee.designation || "",
                 // Salary Structure — pre-fill from existing record
                 salDA:                String(employee.employeeSalary?.da               ?? ""),
