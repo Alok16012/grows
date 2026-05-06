@@ -5,7 +5,9 @@ import { authOptions } from "@/lib/auth"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== "ADMIN") {
+    // Read access for ADMIN/MANAGER/HR_MANAGER so dashboards can display role names
+    const r = session?.user?.role
+    if (!session || (r !== "ADMIN" && r !== "MANAGER" && r !== "HR_MANAGER")) {
         return new NextResponse("Unauthorized", { status: 401 })
     }
     try {

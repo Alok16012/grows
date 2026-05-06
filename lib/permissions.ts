@@ -117,13 +117,11 @@ export function checkAccess(
     if (!session) return false
     const role = session.user.role
     if (role === "ADMIN") return true
-    // If user has a custom role AND a permission key is specified:
-    // use ONLY the custom permissions — system role does NOT grant access.
-    // This ensures different custom roles (e.g. "Quality Engineer" vs "HR Recruiter")
-    // get exactly the access their role defines, not the broader system role access.
-    if (permission && session.user.permissions?.length) {
-        return session.user.permissions.includes(permission)
-    }
-    // No custom role or no permission key: fall back to system role
-    return allowedRoles.includes(role)
+
+    // Allow if EITHER system role is in allowedRoles OR custom permission grants access.
+    // System roles (MANAGER, HR_MANAGER, etc.) are always honored — custom roles can
+    // only EXPAND access via additional permissions, never restrict baseline role access.
+    const roleAllowed = allowedRoles.includes(role)
+    const permissionAllowed = !!(permission && session.user.permissions?.includes(permission))
+    return roleAllowed || permissionAllowed
 }
