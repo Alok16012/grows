@@ -78,7 +78,7 @@ export async function PUT(
         if (action === "approve") {
             await prisma.employee.update({
                 where: { id: onboardingRecord.employeeId },
-                data: { isKycVerified: true, kycRejectionNote: null },
+                data: { isKycVerified: true, kycRejectionNote: null, status: "ACTIVE" },
             })
             const record = await prisma.onboardingRecord.update({
                 where: { id: params.id },

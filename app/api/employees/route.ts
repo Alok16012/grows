@@ -31,7 +31,12 @@ export async function GET(req: Request) {
         const where: Record<string, any> = {}
         if (branchId) where.branchId = branchId
         if (departmentId) where.departmentId = departmentId
-        if (status) where.status = status
+        if (status) {
+            where.status = status
+        } else {
+            // Exclude ONBOARDING employees from the default list — they only appear in Onboarding module
+            where.status = { not: "ONBOARDING" }
+        }
         if (employmentType) where.employmentType = employmentType
         if (companyId) {
             // filter via branch -> company

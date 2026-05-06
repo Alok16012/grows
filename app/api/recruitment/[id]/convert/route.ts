@@ -110,7 +110,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 gender:        formGender  || lead.gender  || null,
                 departmentId:  departmentId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
-                status:        "ACTIVE",
+                status:        "ONBOARDING",
                 employmentType: employmentType || "Full-time",
                 salaryType:    salaryType || "Monthly",
                 basicSalary:   basicSalary ? parseFloat(basicSalary) : 0,
