@@ -18,20 +18,40 @@ export async function GET(req: Request) {
     const search = searchParams.get("search")
 
     const where: any = {}
-    if (status && status !== "ALL") where.status = status
-    if (priority && priority !== "ALL") where.priority = priority
-    if (score && score !== "ALL") where.score = score
+    // Simple scalar filters
+    if (status     && status     !== "ALL") where.status     = status
+    if (priority   && priority   !== "ALL") where.priority   = priority
+    if (score      && score      !== "ALL") where.score      = score
     if (assignedTo && assignedTo !== "ALL") where.assignedTo = assignedTo
-    if (search) {
-        where.OR = [
-            { candidateName: { contains: search, mode: "insensitive" } },
-            { position: { contains: search, mode: "insensitive" } },
-            { phone: { contains: search, mode: "insensitive" } },
-            { city: { contains: search, mode: "insensitive" } },
-            { currentCompany: { contains: search, mode: "insensitive" } },
-            { skills: { contains: search, mode: "insensitive" } },
-        ]
+
+    // AND conditions — ownership + search stacked cleanly
+    const andClauses: any[] = []
+
+    // ADMIN sees all leads.
+    // MANAGER / HR_MANAGER see only leads they created OR are assigned to.
+    if (session.user.role !== Role.ADMIN) {
+        andClauses.push({
+            OR: [
+                { createdBy:  session.user.id },
+                { assignedTo: session.user.id },
+            ]
+        })
     }
+
+    if (search) {
+        andClauses.push({
+            OR: [
+                { candidateName:  { contains: search, mode: "insensitive" } },
+                { position:       { contains: search, mode: "insensitive" } },
+                { phone:          { contains: search, mode: "insensitive" } },
+                { city:           { contains: search, mode: "insensitive" } },
+                { currentCompany: { contains: search, mode: "insensitive" } },
+                { skills:         { contains: search, mode: "insensitive" } },
+            ]
+        })
+    }
+
+    if (andClauses.length > 0) where.AND = andClauses
 
     const leads = await prisma.lead.findMany({
         where,
