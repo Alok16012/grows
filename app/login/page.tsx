@@ -47,14 +47,20 @@ export default function LoginPage() {
                 password,
             })
 
+            console.log("[LOGIN] result:", result)
+
             if (result?.error) {
-                setError("Invalid email or password")
-            } else {
+                // Show the actual NextAuth error code so we can diagnose
+                setError(`Login failed: ${result.error}${result.status ? ` (status ${result.status})` : ""}`)
+            } else if (result?.ok) {
                 router.refresh()
                 window.location.href = "/"
+            } else {
+                setError("Login did not complete. Try again.")
             }
-        } catch (err) {
-            setError("An unexpected error occurred")
+        } catch (err: any) {
+            console.error("[LOGIN] error:", err)
+            setError(`Error: ${err?.message || "Unexpected"}`)
         } finally {
             setLoading(false)
         }
