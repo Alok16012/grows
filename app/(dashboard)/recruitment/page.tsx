@@ -1244,8 +1244,8 @@ export default function RecruitmentPage() {
                     onConverted={(employeeId: string, employeeCode: string) => {
                         setConvertLead(null)
                         setLeads(prev => prev.map(l => l.id === convertLead.id ? { ...l, convertedEmployeeId: employeeId, status: "JOINED" } : l))
-                        toast.success(`Converted! Employee ${employeeCode} created.`)
-                        router.push(`/employees/${employeeId}`)
+                        toast.success(`Employee ${employeeCode} created! Redirecting to Onboarding…`)
+                        router.push(`/onboarding`)
                     }}
                 />
             )}

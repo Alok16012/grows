@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "onboarding.view")) {
+        if (!checkAccess(session, ["ADMIN", "MANAGER", "HR_MANAGER"], "onboarding.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -53,11 +53,41 @@ export async function GET(req: Request) {
                     select: {
                         id: true,
                         firstName: true,
+                        middleName: true,
                         lastName: true,
                         employeeId: true,
                         designation: true,
                         dateOfJoining: true,
+                        dateOfBirth: true,
                         photo: true,
+                        gender: true,
+                        phone: true,
+                        alternatePhone: true,
+                        email: true,
+                        address: true,
+                        city: true,
+                        state: true,
+                        pincode: true,
+                        permanentAddress: true,
+                        permanentCity: true,
+                        permanentState: true,
+                        permanentPincode: true,
+                        nameAsPerAadhar: true,
+                        fathersName: true,
+                        bloodGroup: true,
+                        maritalStatus: true,
+                        nationality: true,
+                        religion: true,
+                        caste: true,
+                        emergencyContact1Name: true,
+                        emergencyContact1Phone: true,
+                        emergencyContact2Name: true,
+                        emergencyContact2Phone: true,
+                        employmentType: true,
+                        status: true,
+                        basicSalary: true,
+                        departmentId: true,
+                        department: { select: { name: true } },
                         deployments: {
                             where: { isActive: true },
                             include: { site: { select: { name: true } } },
@@ -66,10 +96,22 @@ export async function GET(req: Request) {
                         isKycVerified: true,
                         aadharNumber: true,
                         panNumber: true,
+                        uan: true,
+                        pfNumber: true,
+                        esiNumber: true,
+                        labourCardNo: true,
                         bankAccountNumber: true,
                         bankIFSC: true,
                         bankName: true,
+                        bankBranch: true,
                         kycRejectionNote: true,
+                        safetyGoggles: true,
+                        safetyGloves: true,
+                        safetyHelmet: true,
+                        safetyMask: true,
+                        safetyJacket: true,
+                        safetyEarMuffs: true,
+                        safetyShoes: true,
                         documents: true,
                         employeeSalary: true,
                     },
@@ -92,7 +134,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "onboarding.view")) {
+        if (!checkAccess(session, ["ADMIN", "MANAGER", "HR_MANAGER"], "onboarding.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

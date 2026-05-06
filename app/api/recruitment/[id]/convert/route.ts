@@ -225,6 +225,30 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             },
         })
 
+        // ── Create Onboarding Record ──────────────────────────────────────────
+        const existingOnboarding = await prisma.onboardingRecord.findUnique({ where: { employeeId: employee.id } })
+        if (!existingOnboarding) {
+            await prisma.onboardingRecord.create({
+                data: {
+                    employeeId: employee.id,
+                    status: "IN_PROGRESS",
+                    startedAt: new Date(),
+                    tasks: {
+                        create: [
+                            { title: "Collect Aadhar Card",              category: "Documents",    order: 1,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                            { title: "Collect PAN Card",                 category: "Documents",    order: 2,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                            { title: "Collect Bank Details",             category: "Documents",    order: 3,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                            { title: "Collect Passport Photo",           category: "Documents",    order: 4,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                            { title: "Sign Offer Letter",                category: "Documents",    order: 5,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                            { title: "Issue ID Card",                    category: "Welcome Kit",  order: 6,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                            { title: "Safety Training",                  category: "Training",     order: 7,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                            { title: "Add to Attendance System",         category: "IT Setup",     order: 8,  status: "PENDING", isRequired: true, employeeId: employee.id },
+                        ],
+                    },
+                },
+            })
+        }
+
         return NextResponse.json({
             success: true,
             employeeId: employee.id,
