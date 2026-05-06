@@ -7,7 +7,9 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push --accept-data-loss && next build",
+    "build": "prisma generate && next build",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint"
@@ -49,8 +51,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@netlify/plugin-nextjs": "^5.15.9",
-    "@types/bcryptjs": "^2.4.6",
+"@types/bcryptjs": "^2.4.6",
     "@types/formidable": "^3.4.6",
     "@types/node": "^20.19.33",
     "@types/react": "^18.3.2",

@@ -293,9 +293,23 @@ function ProcessPayrollPage() {
             if (!res.ok) throw new Error(await res.text())
             const result = await res.json()
             const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "site"
-            toast.success(`${siteName}: Processed ${result.processedCount} employees`)
-            await fetchSiteStatus()
-            selectSite("")
+            const total = result.totalEmployees ?? attendance.length
+
+            if (result.failedCount > 0) {
+                // Some records failed — likely DB connection pool exhaustion.
+                // Warn the user and keep the current site selected so they can retry.
+                toast.warning(
+                    `${siteName}: ${result.processedCount}/${total} processed. ` +
+                    `${result.failedCount} failed — click "Process Payroll" again to retry the missing records.`,
+                    { duration: 8000 }
+                )
+                await fetchSiteStatus()
+                // Do NOT clear selection — user should be able to retry immediately
+            } else {
+                toast.success(`${siteName}: All ${result.processedCount} employees processed ✓`)
+                await fetchSiteStatus()
+                selectSite("")
+            }
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Process failed")
         } finally {
