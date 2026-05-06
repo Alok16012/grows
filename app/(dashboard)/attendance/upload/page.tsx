@@ -98,8 +98,8 @@ export default function AttendanceUploadPage() {
 
     useEffect(() => {
         if (!siteId) { setSiteEmployees([]); return }
-        // pageSize=500 to get all employees; API returns { employees:[...], total } not plain array
-        fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=500`)
+        // pageSize=1000 to get all employees; API returns { employees:[...], total } not plain array
+        fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=1000`)
             .then(r => r.json())
             .then(d => setSiteEmployees(Array.isArray(d) ? d : (d.employees ?? [])))
             .catch(() => setSiteEmployees([]))
@@ -198,8 +198,8 @@ export default function AttendanceUploadPage() {
             // Fetch ALL active employees (not just site-deployed) so attendance
             // can be processed even if deployment record is missing for some employees
             const [siteEmpRes, allEmpRes] = await Promise.all([
-                fetch(`/api/employees?siteId=${siteId}&status=ACTIVE`),
-                fetch(`/api/employees?status=ACTIVE&limit=2000`),
+                fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=1000`),
+                fetch(`/api/employees?status=ACTIVE&pageSize=1000`),
             ])
             const siteEmpData = await siteEmpRes.json()
             const allEmpData  = await allEmpRes.json()
