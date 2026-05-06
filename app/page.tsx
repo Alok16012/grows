@@ -16,12 +16,15 @@ export default async function Home() {
         redirect("/admin")
       case "MANAGER":
         redirect("/manager")
+      case "HR_MANAGER":
+        redirect("/employees")
       case "INSPECTION_BOY":
         redirect("/inspection")
       case "CLIENT":
         redirect("/client")
       default:
-        redirect("/login")
+        // Unknown role — fall back to a safe page instead of bouncing to /login
+        redirect("/profile")
     }
   }
 }
