@@ -709,6 +709,42 @@ function EmployeeModal({
                     {/* Employment Tab */}
                     {activeTab === "employment" && (
                         <div className="space-y-4">
+
+                            {/* Fix Login — shown at the TOP when editing, so it's always visible */}
+                            {employee && (
+                                <div className="border border-amber-300 bg-amber-50 rounded-[10px] p-3 flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <p className="text-[12px] font-bold text-amber-700 mb-0.5">🔐 Login Account</p>
+                                        <p className="text-[11px] text-amber-600 m-0">Role select karke click karo if employee can&apos;t login</p>
+                                    </div>
+                                    {fixedCredentials ? (
+                                        <div className="bg-white border border-amber-200 rounded-[8px] px-3 py-2 text-[11px] text-amber-800 text-right">
+                                            <div><b>Email:</b> {fixedCredentials.email}</div>
+                                            <div><b>Pass:</b> <span className="font-mono font-bold">{fixedCredentials.password}</span></div>
+                                        </div>
+                                    ) : (
+                                        <button type="button" disabled={fixingLogin} onClick={async () => {
+                                            setFixingLogin(true)
+                                            try {
+                                                const res = await fetch(`/api/employees/${employee.id}/fix-login`, {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ role: form.systemRole }),
+                                                })
+                                                const data = await res.json()
+                                                if (!res.ok) { toast.error(data.error || "Failed"); return }
+                                                setFixedCredentials({ email: data.loginEmail, password: data.loginPassword })
+                                                toast.success("Login account activated!")
+                                            } catch { toast.error("Network error") }
+                                            finally { setFixingLogin(false) }
+                                        }} className="flex items-center gap-2 px-3 py-2 rounded-[8px] bg-amber-500 hover:bg-amber-600 text-white text-[12px] font-bold transition-colors whitespace-nowrap shrink-0">
+                                            {fixingLogin ? <Loader2 size={12} className="animate-spin" /> : null}
+                                            {fixingLogin ? "Fixing…" : "Fix Login"}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelCls}>System Role (Login Access)</label>
@@ -813,38 +849,6 @@ function EmployeeModal({
                                 <textarea value={form.notes} onChange={set("notes")} className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none placeholder:text-[var(--text3)]" rows={3} placeholder="Additional notes..." />
                             </div>
 
-                            {/* Fix Login Account — admin only, edit mode only */}
-                            {employee && (
-                                <div className="border border-amber-200 bg-amber-50 rounded-[10px] p-4">
-                                    <p className="text-[12px] font-bold text-amber-700 mb-1">🔐 Login Account Fix</p>
-                                    <p className="text-[11px] text-amber-600 mb-3">If employee can&apos;t login, click below to activate account, reset password to their phone number, and apply the selected System Role above.</p>
-                                    {fixedCredentials ? (
-                                        <div className="bg-white border border-amber-200 rounded-[8px] p-3 text-[12px] text-amber-800">
-                                            <div><b>Email:</b> {fixedCredentials.email}</div>
-                                            <div><b>Password:</b> <span className="font-mono">{fixedCredentials.password}</span></div>
-                                        </div>
-                                    ) : (
-                                        <button type="button" disabled={fixingLogin} onClick={async () => {
-                                            setFixingLogin(true)
-                                            try {
-                                                const res = await fetch(`/api/employees/${employee.id}/fix-login`, {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ role: form.systemRole }),
-                                                })
-                                                const data = await res.json()
-                                                if (!res.ok) { toast.error(data.error || "Failed"); return }
-                                                setFixedCredentials({ email: data.loginEmail, password: data.loginPassword })
-                                                toast.success("Login account activated!")
-                                            } catch { toast.error("Network error") }
-                                            finally { setFixingLogin(false) }
-                                        }} className="flex items-center gap-2 px-4 py-2 rounded-[8px] bg-amber-500 hover:bg-amber-600 text-white text-[12px] font-bold transition-colors">
-                                            {fixingLogin ? <Loader2 size={12} className="animate-spin" /> : null}
-                                            {fixingLogin ? "Fixing…" : "Fix Login Account"}
-                                        </button>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     )}
 
