@@ -56,35 +56,14 @@ export default function AdminToolsPage() {
     }
 
     const handleBulkFix = async () => {
-        if (!confirm("Yeh sabhi employees ke login fix karega (phone number = password). Continue?")) return
+        if (!confirm("Yeh sabhi employees ke login fix karega (password = phone number). Continue?")) return
         setBulkFixing(true)
         setBulkResult(null)
         try {
-            // Get all employees
-            const empRes = await fetch("/api/employees?pageSize=2000&status=ACTIVE")
-            const empData = await empRes.json()
-            const employees = empData.employees || empData || []
-
-            let fixed = 0, failed = 0, skipped = 0
-            const errors: string[] = []
-
-            for (const emp of employees) {
-                try {
-                    const res = await fetch("/api/debug-login", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ input: emp.phone }),
-                    })
-                    const data = await res.json()
-                    if (data.success) fixed++
-                    else { failed++; errors.push(`${emp.firstName} ${emp.lastName}: ${data.error}`) }
-                } catch (e: any) {
-                    failed++
-                    errors.push(`${emp.firstName} ${emp.lastName}: ${e.message}`)
-                }
-            }
-
-            setBulkResult({ total: employees.length, fixed, failed, skipped, errors: errors.slice(0, 10) })
+            // Single server-side API call — fast, no loop
+            const res = await fetch("/api/admin/bulk-fix-logins", { method: "POST" })
+            const data = await res.json()
+            setBulkResult(data)
         } catch (e: any) {
             setBulkResult({ error: e.message })
         } finally {
