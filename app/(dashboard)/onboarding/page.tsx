@@ -1,11 +1,12 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-    Search, Loader2, CheckCircle2, XCircle, Clock, AlertCircle,
-    User, Phone, Mail, MapPin, CreditCard, Shield, X, ChevronRight,
-    Building2, Calendar, Briefcase, RefreshCw
+    Search, Loader2, CheckCircle2, XCircle, Clock,
+    User, MapPin, X, ChevronRight,
+    Building2, Calendar, RefreshCw, FileText, Eye, ExternalLink
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -145,11 +146,12 @@ function DetailModal({ record, onClose, onAction }: {
     onAction: (id: string, action: "approve" | "reject", reason?: string) => Promise<void>
 }) {
     const e = record.employee
-    const [tab, setTab] = useState<"personal" | "employment" | "bank" | "safety">("personal")
+    const [tab, setTab] = useState<"personal" | "employment" | "bank" | "safety" | "docs">("personal")
     const [acting, setActing] = useState(false)
     const [showReject, setShowReject] = useState(false)
     const [rejectReason, setRejectReason] = useState(record.notes || "")
     const [approveNotes, setApproveNotes] = useState("")
+    const docs: { id: string; type: string; fileName: string; fileUrl: string; status: string }[] = (e.documents as any[]) || []
 
     const fullName = [e.firstName, e.middleName, e.lastName].filter(Boolean).join(" ")
     const site = e.deployments?.[0]?.site?.name
@@ -204,10 +206,10 @@ function DetailModal({ record, onClose, onAction }: {
                     </div>
 
                     {/* Tabs */}
-                    <div style={{ display: "flex", gap: 0 }}>
-                        {(["personal", "employment", "bank", "safety"] as const).map(t => (
+                    <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
+                        {(["personal", "employment", "bank", "safety", "docs"] as const).map(t => (
                             <button key={t} onClick={() => setTab(t)} style={tabCls(t)}>
-                                {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "bank" ? "Bank & Compliance" : "Safety"}
+                                {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "bank" ? "Bank & Compliance" : t === "safety" ? "Safety" : `Documents${docs.length ? ` (${docs.length})` : ""}`}
                             </button>
                         ))}
                     </div>
@@ -312,6 +314,40 @@ function DetailModal({ record, onClose, onAction }: {
                             <Field label="Safety Shoes" value={e.safetyShoes} />
                         </Section>
                     )}
+
+                    {tab === "docs" && (
+                        <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid var(--border)" }}>
+                                Uploaded Documents
+                            </div>
+                            {docs.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text3)" }}>
+                                    <FileText size={28} style={{ margin: "0 auto 8px" }} />
+                                    <p style={{ fontSize: 13, margin: 0 }}>No documents uploaded yet</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                    {docs.map((doc: any) => (
+                                        <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)" }}>
+                                            <FileText size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{doc.type.replace(/_/g, " ")}</div>
+                                                <div style={{ fontSize: 11, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.fileName}</div>
+                                            </div>
+                                            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 700, background: doc.status === "VERIFIED" ? "#dcfce7" : doc.status === "REJECTED" ? "#fee2e2" : "#fef3c7", color: doc.status === "VERIFIED" ? "#15803d" : doc.status === "REJECTED" ? "#dc2626" : "#d97706" }}>
+                                                {doc.status}
+                                            </span>
+                                            {doc.fileUrl && (
+                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+                                                    <Eye size={13} /> View
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Action Footer */}
@@ -394,6 +430,7 @@ function DetailModal({ record, onClose, onAction }: {
 
 export default function OnboardingPage() {
     const { data: session } = useSession()
+    const router = useRouter()
     const [records, setRecords] = useState<OnboardingRecord[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("ALL")
@@ -427,9 +464,20 @@ export default function OnboardingPage() {
                 body: JSON.stringify({ action, rejectionReason: reason, notes: action === "approve" ? reason : undefined }),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success(action === "approve" ? "Onboarding Approved!" : "Onboarding Rejected")
-            setSelected(null)
-            fetchRecords()
+            if (action === "approve") {
+                toast.success("Onboarding Approved! Redirecting to employee profile…")
+                // Find the employee id from selected record
+                const empId = selected?.employee?.id
+                setSelected(null)
+                fetchRecords()
+                if (empId) {
+                    setTimeout(() => router.push(`/employees/${empId}`), 800)
+                }
+            } else {
+                toast.success("Onboarding Rejected")
+                setSelected(null)
+                fetchRecords()
+            }
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Action failed")
         }

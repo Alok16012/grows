@@ -307,6 +307,8 @@ function EmployeeModal({
     const [loading, setLoading] = useState(false)
     const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
+    const [fixingLogin, setFixingLogin] = useState(false)
+    const [fixedCredentials, setFixedCredentials] = useState<{ email: string; password: string } | null>(null)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
     const sites = allSites
@@ -351,6 +353,7 @@ function EmployeeModal({
         if (!open) return
         setActiveTab("personal")
         setSameAsCurrent(false)
+        setFixedCredentials(null)
         setDraftEmpId(null)   // Reset draft ID each time the modal opens fresh
         if (employee) {
             setForm({
@@ -809,6 +812,39 @@ function EmployeeModal({
                                 <label className={labelCls}>Notes</label>
                                 <textarea value={form.notes} onChange={set("notes")} className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none placeholder:text-[var(--text3)]" rows={3} placeholder="Additional notes..." />
                             </div>
+
+                            {/* Fix Login Account — admin only, edit mode only */}
+                            {employee && (
+                                <div className="border border-amber-200 bg-amber-50 rounded-[10px] p-4">
+                                    <p className="text-[12px] font-bold text-amber-700 mb-1">🔐 Login Account Fix</p>
+                                    <p className="text-[11px] text-amber-600 mb-3">If employee can&apos;t login, click below to activate account, reset password to their phone number, and apply the selected System Role above.</p>
+                                    {fixedCredentials ? (
+                                        <div className="bg-white border border-amber-200 rounded-[8px] p-3 text-[12px] text-amber-800">
+                                            <div><b>Email:</b> {fixedCredentials.email}</div>
+                                            <div><b>Password:</b> <span className="font-mono">{fixedCredentials.password}</span></div>
+                                        </div>
+                                    ) : (
+                                        <button type="button" disabled={fixingLogin} onClick={async () => {
+                                            setFixingLogin(true)
+                                            try {
+                                                const res = await fetch(`/api/employees/${employee.id}/fix-login`, {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ role: form.systemRole }),
+                                                })
+                                                const data = await res.json()
+                                                if (!res.ok) { toast.error(data.error || "Failed"); return }
+                                                setFixedCredentials({ email: data.loginEmail, password: data.loginPassword })
+                                                toast.success("Login account activated!")
+                                            } catch { toast.error("Network error") }
+                                            finally { setFixingLogin(false) }
+                                        }} className="flex items-center gap-2 px-4 py-2 rounded-[8px] bg-amber-500 hover:bg-amber-600 text-white text-[12px] font-bold transition-colors">
+                                            {fixingLogin ? <Loader2 size={12} className="animate-spin" /> : null}
+                                            {fixingLogin ? "Fixing…" : "Fix Login Account"}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
