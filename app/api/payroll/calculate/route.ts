@@ -154,39 +154,21 @@ export async function POST(req: Request) {
             }
         })
 
-        // ── STEP 2: Find which records already exist (1 DB call) ──────────────────
-        const existingRecords = await prisma.payroll.findMany({
+        // ── STEP 2: Delete existing records for this month/year (1 DB call) ─────────
+        // Then recreate all — avoids sequential per-row updates which cause timeouts
+        // when Vercel (Mumbai) and Supabase are in different regions (200ms × 144 = 28s+).
+        // Safe to delete: no other table has a FK referencing Payroll.id.
+        await prisma.payroll.deleteMany({
             where: {
                 month, year,
                 employeeId: { in: employees.map(e => e.id) },
             },
-            select: { employeeId: true },
         })
-        const existingSet = new Set(existingRecords.map(r => r.employeeId))
 
-        const toCreate = allRows.filter(r => !existingSet.has(r.employeeId))
-        const toUpdate = allRows.filter(r =>  existingSet.has(r.employeeId))
+        // ── STEP 3: Bulk-insert ALL rows in one shot (1 DB call) ─────────────────
+        await prisma.payroll.createMany({ data: allRows })
 
-        // ── STEP 3: Bulk-create new records (1 DB call for ALL) ───────────────────
-        if (toCreate.length > 0) {
-            await prisma.payroll.createMany({ data: toCreate, skipDuplicates: true })
-        }
-
-        // ── STEP 4: Update existing records in a single transaction ───────────────
-        // prisma.$transaction([...array]) runs all ops on one connection — much faster
-        // than individual round trips, and won't timeout on 144 records.
-        if (toUpdate.length > 0) {
-            const updateOps = toUpdate.map(row => {
-                const { employeeId: empId, ...data } = row
-                return prisma.payroll.update({
-                    where: { employeeId_month_year: { employeeId: empId, month, year } },
-                    data,
-                })
-            })
-            await prisma.$transaction(updateOps)
-        }
-
-        const processedCount = allRows.length   // all rows were either created or updated
+        const processedCount = allRows.length
 
         // ── STEP 5: Update payroll run totals (1 DB call) ─────────────────────────
         await prisma.payrollRun.update({
