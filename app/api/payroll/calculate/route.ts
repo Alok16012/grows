@@ -40,9 +40,17 @@ export async function POST(req: Request) {
             runId = created.id
         }
 
-        // Build employee list — site-wise takes priority over branch-wise
+        // Build employee list:
+        // If attendance array is provided (bulk upload flow), process EXACTLY those employees.
+        // This ensures all employees from the uploaded sheet are processed, regardless of
+        // whether they have a deployment record for this site.
+        // Fallback: fetch by site deployment or branch if no attendance array is given.
         let employeeIds: string[] | null = null
-        if (siteId) {
+
+        if (attendance && Array.isArray(attendance) && attendance.length > 0) {
+            // Use the employee IDs from the attendance array directly
+            employeeIds = (attendance as { employeeId: string }[]).map(a => a.employeeId).filter(Boolean)
+        } else if (siteId) {
             const deployments = await prisma.deployment.findMany({
                 where: { siteId, isActive: true },
                 select: { employeeId: true },
@@ -52,7 +60,7 @@ export async function POST(req: Request) {
         }
 
         const whereClause: Record<string, unknown> = { status: "ACTIVE" }
-        if (employeeIds) whereClause.id = { in: employeeIds }
+        if (employeeIds && employeeIds.length > 0) whereClause.id = { in: employeeIds }
         else if (branchId) whereClause.branchId = branchId
 
         const employees = await prisma.employee.findMany({
