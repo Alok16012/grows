@@ -73,12 +73,33 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 try {
-                    const user = await prisma.user.findUnique({
+                    let user = await prisma.user.findUnique({
                         where: {
                             email: credentials.email,
                         },
                         include: { customRole: { select: { permissions: true, isActive: true } } }
                     })
+
+                    // Phone-number fallback: if email lookup fails, try finding via Employee.phone
+                    if (!user) {
+                        // Strip @cims.local suffix and non-digits to get the raw phone number
+                        const rawPhone = credentials.email.replace(/@cims\.local$/i, "").replace(/\D/g, "")
+                        if (rawPhone.length >= 10) {
+                            console.log("Email lookup failed — trying phone-number fallback for:", rawPhone)
+                            const employee = await prisma.employee.findFirst({
+                                where: { phone: { endsWith: rawPhone.slice(-10) } },
+                                include: {
+                                    user: {
+                                        include: { customRole: { select: { permissions: true, isActive: true } } }
+                                    }
+                                }
+                            })
+                            if (employee?.user) {
+                                console.log("Found user via phone lookup:", employee.user.email)
+                                user = employee.user as any
+                            }
+                        }
+                    }
 
                     if (!user) {
                         console.log("User not found in database:", credentials.email)
