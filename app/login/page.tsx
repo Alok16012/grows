@@ -15,6 +15,30 @@ export default function LoginPage() {
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
     const [isRecovering, setIsRecovering] = useState(false)
+    const [debugResult, setDebugResult] = useState<any>(null)
+    const [debugging, setDebugging] = useState(false)
+
+    const handleDebug = async () => {
+        if (!email || !password) {
+            setError("Enter login + password first")
+            return
+        }
+        setDebugging(true)
+        setDebugResult(null)
+        try {
+            const res = await fetch("/api/test-login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ input: email, password }),
+            })
+            const data = await res.json()
+            setDebugResult(data)
+        } catch (e: any) {
+            setDebugResult({ error: e.message })
+        } finally {
+            setDebugging(false)
+        }
+    }
 
     useEffect(() => {
         const handleError = (e: ErrorEvent) => {
@@ -157,6 +181,25 @@ export default function LoginPage() {
                     >
                         {loading ? "Signing in..." : "Sign In"}
                     </Button>
+
+                    <button
+                        type="button"
+                        onClick={handleDebug}
+                        disabled={debugging}
+                        className="w-full mt-2 py-[8px] bg-transparent border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[12px] font-medium hover:bg-[#f9f8f5] disabled:opacity-60"
+                    >
+                        {debugging ? "Checking..." : "Why login failed? (Diagnose)"}
+                    </button>
+
+                    {debugResult && (
+                        <div className="mt-3 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] p-3 text-[11px] text-[#1a1a18] max-h-[300px] overflow-auto">
+                            <p className="font-bold mb-1">
+                                {debugResult.ok ? "✅ Login should work" : `❌ ${debugResult.reason || "Failed"}`}
+                            </p>
+                            {debugResult.hint && <p className="text-amber-700 mb-2">{debugResult.hint}</p>}
+                            <pre className="whitespace-pre-wrap text-[10px]">{JSON.stringify(debugResult, null, 2)}</pre>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-3 my-5">
                         <div className="flex-1 h-px bg-[#e8e6e1]"></div>
