@@ -4,49 +4,69 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import bcrypt from "bcryptjs"
 
-// POST /api/employees/[id]/fix-login
-// Admin utility: activate user account, set correct role, reset password to phone number
 export async function POST(
     req: Request,
     { params }: { params: { id: string } }
 ) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session || session.user.role !== "ADMIN") {
-            return new NextResponse("Unauthorized", { status: 401 })
+        if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+        const { customRoleId } = await req.json()
+
+        const employee = await prisma.employee.findUnique({
+            where: { id: params.id },
+            select: { id: true, firstName: true, lastName: true, email: true, phone: true, userId: true }
+        })
+
+        if (!employee) return new NextResponse("Employee not found", { status: 404 })
+
+        // If employee already has a linked user → just update the role
+        if (employee.userId) {
+            await prisma.user.update({
+                where: { id: employee.userId },
+                data: { customRoleId: customRoleId || null }
+            })
+            return NextResponse.json({ created: false, message: "Role updated" })
         }
 
-        const emp = await prisma.employee.findUnique({
-            where: { id: params.id },
-            select: { userId: true, phone: true, firstName: true, lastName: true },
-        })
-        if (!emp) return new NextResponse("Employee not found", { status: 404 })
-        if (!emp.userId) return new NextResponse("No linked user account", { status: 400 })
+        // No user account — create one
+        const loginEmail = employee.email || `${employee.phone}@cims.app`
+        const tempPassword = `Grow@${employee.phone?.slice(-4) || "1234"}`
+        const hashed = await bcrypt.hash(tempPassword, 10)
 
-        const body = await req.json().catch(() => ({}))
-        const { role, newPassword } = body
+        // Check if user with this email already exists
+        let user = await prisma.user.findUnique({ where: { email: loginEmail } })
+        if (user) {
+            // Link existing user to employee
+            await prisma.employee.update({
+                where: { id: params.id },
+                data: { userId: user.id }
+            })
+            if (customRoleId) {
+                await prisma.user.update({ where: { id: user.id }, data: { customRoleId } })
+            }
+            return NextResponse.json({ created: false, message: "Existing user linked" })
+        }
 
-        const phone = emp.phone || "123456"
-        const password = newPassword || phone
-        const hash = await bcrypt.hash(password, 10)
-
-        const updated = await prisma.user.update({
-            where: { id: emp.userId },
+        // Create new user
+        user = await prisma.user.create({
             data: {
-                isActive: true,
-                password: hash,
-                ...(role ? { role } : {}),
-                name: `${emp.firstName} ${emp.lastName}`.trim(),
-            },
-            select: { id: true, email: true, role: true, isActive: true },
+                name: `${employee.firstName} ${employee.lastName}`,
+                email: loginEmail,
+                password: hashed,
+                role: "INSPECTION_BOY",
+                customRoleId: customRoleId || null,
+            }
         })
 
-        return NextResponse.json({
-            success: true,
-            user: updated,
-            loginEmail: updated.email,
-            loginPassword: password,
+        // Link user to employee
+        await prisma.employee.update({
+            where: { id: params.id },
+            data: { userId: user.id }
         })
+
+        return NextResponse.json({ created: true, email: loginEmail, password: tempPassword })
     } catch (error) {
         console.error("[FIX_LOGIN]", error)
         return new NextResponse("Internal Error", { status: 500 })

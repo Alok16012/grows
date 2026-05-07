@@ -82,7 +82,11 @@ type Employee = {
     safetyEarMuffs?: boolean
     safetyShoes?: boolean
     onboardingToken?: string
-    user?: { role: string; customRole?: { name: string } | null } | null
+    user?: { id?: string; role: string; customRoleId?: string; email?: string; customRole?: { id?: string; name: string } | null } | null
+    userId?: string
+    userRole?: string
+    userCustomRoleId?: string
+    userEmail?: string
     employeeSalary?: {
         basic: number; da: number; washing: number; conveyance: number
         leaveWithWages: number; otherAllowance: number
@@ -413,8 +417,8 @@ function EmployeeModal({
                 safetyJacket: employee.safetyJacket ?? false,
                 safetyEarMuffs: employee.safetyEarMuffs ?? false,
                 safetyShoes: employee.safetyShoes ?? false,
-                customRoleId: "",
-                systemRole: employee.user?.role || "INSPECTION_BOY",
+                customRoleId: (employee as any).user?.customRoleId || "",
+                systemRole: "INSPECTION_BOY",
                 role: employee.designation || "",
                 // Salary Structure — pre-fill from existing record
                 salDA:                String(employee.employeeSalary?.da               ?? ""),
@@ -710,59 +714,53 @@ function EmployeeModal({
                     {activeTab === "employment" && (
                         <div className="space-y-4">
 
-                            {/* Fix Login — shown at the TOP when editing, so it's always visible */}
-                            {employee && (
-                                <div className="border border-amber-300 bg-amber-50 rounded-[10px] p-3 flex items-center gap-3">
-                                    <div className="flex-1">
-                                        <p className="text-[12px] font-bold text-amber-700 mb-0.5">🔐 Login Account</p>
-                                        <p className="text-[11px] text-amber-600 m-0">Role select karke click karo if employee can&apos;t login</p>
-                                    </div>
-                                    {fixedCredentials ? (
-                                        <div className="bg-white border border-amber-200 rounded-[8px] px-3 py-2 text-[11px] text-amber-800 text-right">
-                                            <div><b>Email:</b> {fixedCredentials.email}</div>
-                                            <div><b>Pass:</b> <span className="font-mono font-bold">{fixedCredentials.password}</span></div>
+                            {/* Login Account Section */}
+                            <div className="border border-amber-200 bg-amber-50 rounded-[10px] p-4 mb-2">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base">🔐</span>
+                                        <div>
+                                            <p className="text-[13px] font-semibold text-amber-800">Login Account</p>
+                                            {employee && (employee as any).user?.email ? (
+                                                <p className="text-[11px] text-amber-600">Login: {(employee as any).user.email}</p>
+                                            ) : (
+                                                <p className="text-[11px] text-amber-600">Role select karke click karo if employee can&apos;t login</p>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <button type="button" disabled={fixingLogin} onClick={async () => {
-                                            setFixingLogin(true)
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!employee) return
+                                            if (!form.customRoleId) { alert("Pehle System Role select karo"); return }
                                             try {
                                                 const res = await fetch(`/api/employees/${employee.id}/fix-login`, {
                                                     method: "POST",
                                                     headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ role: form.systemRole }),
+                                                    body: JSON.stringify({ customRoleId: form.customRoleId })
                                                 })
                                                 const data = await res.json()
-                                                if (!res.ok) { toast.error(data.error || "Failed"); return }
-                                                setFixedCredentials({ email: data.loginEmail, password: data.loginPassword })
-                                                toast.success("Login account activated!")
-                                            } catch { toast.error("Network error") }
-                                            finally { setFixingLogin(false) }
-                                        }} className="flex items-center gap-2 px-3 py-2 rounded-[8px] bg-amber-500 hover:bg-amber-600 text-white text-[12px] font-bold transition-colors whitespace-nowrap shrink-0">
-                                            {fixingLogin ? <Loader2 size={12} className="animate-spin" /> : null}
-                                            {fixingLogin ? "Fixing…" : "Fix Login"}
-                                        </button>
-                                    )}
+                                                if (data.created) {
+                                                    setNewCredentials({ email: data.email, password: data.password })
+                                                } else {
+                                                    alert("Role update ho gaya!")
+                                                }
+                                            } catch { alert("Error") }
+                                        }}
+                                        className="px-3 py-1.5 bg-amber-500 text-white text-[12px] font-semibold rounded-lg hover:bg-amber-600"
+                                    >
+                                        Fix Login
+                                    </button>
                                 </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelCls}>System Role (Login Access)</label>
-                                    <select value={form.systemRole} onChange={set("systemRole")} className={inputCls}>
-                                        <option value="INSPECTION_BOY">Staff (Default)</option>
-                                        <option value="HR_MANAGER">HR Manager</option>
-                                        <option value="MANAGER">Manager</option>
-                                        <option value="ADMIN">Admin</option>
-                                        <option value="CLIENT">Client</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Custom Role</label>
                                     <select value={form.customRoleId} onChange={set("customRoleId")} className={inputCls}>
-                                        <option value="">No custom role</option>
+                                        <option value="">-- Select Role --</option>
                                         {customRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                     </select>
                                 </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelCls}>Department</label>
                                     <select value={form.departmentId} onChange={set("departmentId")} className={inputCls}>
