@@ -3,10 +3,11 @@ const nextConfig = {
     compress: true,
     poweredByHeader: false,
     experimental: {
-        optimizePackageImports: ["@radix-ui/react-icons", "recharts"],
+        optimizePackageImports: ["@radix-ui/react-icons", "recharts", "lucide-react", "date-fns"],
     },
-    generateBuildId: async () => {
-        return `build-${Date.now()}`;
+    images: {
+        formats: ["image/avif", "image/webp"],
+        minimumCacheTTL: 604800, // 7 days
     },
     async headers() {
         return [
