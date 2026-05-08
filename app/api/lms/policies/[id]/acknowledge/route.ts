@@ -15,11 +15,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         if (!policy) return new NextResponse("Policy not found", { status: 404 })
         if (!policy.isActive) return new NextResponse("Policy is not active", { status: 400 })
 
+        const emp = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } })
+        const empId = emp?.id ?? session.user.id
+
         const existing = await prisma.policyAcknowledgment.findUnique({
             where: {
                 policyId_employeeId: {
                     policyId: params.id,
-                    employeeId: session.user.id,
+                    employeeId: empId,
                 },
             },
         })
@@ -33,7 +36,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         await prisma.policyAcknowledgment.create({
             data: {
                 policyId: params.id,
-                employeeId: session.user.id,
+                employeeId: empId,
                 ipAddress: ip,
             },
         })

@@ -7,12 +7,26 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
-            return new NextResponse("Forbidden", { status: 403 })
-        }
+
+        const isAdmin = session.user.role === "ADMIN" || session.user.role === "MANAGER" || session.user.role === "HR_MANAGER"
 
         const body = await req.json()
         const { progress, status, score, completedAt, startedAt, dueDate } = body
+
+        // Non-admin employees can only update their own enrollment's progress
+        if (!isAdmin) {
+            const emp = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } })
+            const empId = emp?.id ?? session.user.id
+            const enrollment = await prisma.courseEnrollment.findUnique({ where: { id: params.id }, select: { employeeId: true } })
+            if (!enrollment || enrollment.employeeId !== empId) {
+                return new NextResponse("Forbidden", { status: 403 })
+            }
+            const updated = await prisma.courseEnrollment.update({
+                where: { id: params.id },
+                data: { ...(progress !== undefined && { progress }) },
+            })
+            return NextResponse.json(updated)
+        }
 
         // Fetch course to check passing score
         const enrollment = await prisma.courseEnrollment.findUnique({

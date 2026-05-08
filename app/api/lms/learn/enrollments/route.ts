@@ -8,8 +8,14 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        const employee = await prisma.employee.findFirst({
+            where: { userId: session.user.id },
+            select: { id: true, firstName: true, lastName: true },
+        })
+        if (!employee) return NextResponse.json([])
+
         const enrollments = await prisma.courseEnrollment.findMany({
-            where: { employeeId: session.user.id },
+            where: { employeeId: employee.id },
             include: {
                 course: {
                     include: {
@@ -41,11 +47,6 @@ export async function GET(req: Request) {
                 },
             },
             orderBy: { enrolledAt: "desc" },
-        })
-
-        const employee = await prisma.employee.findUnique({
-            where: { id: session.user.id },
-            select: { firstName: true, lastName: true },
         })
 
         const result = enrollments.map(e => ({

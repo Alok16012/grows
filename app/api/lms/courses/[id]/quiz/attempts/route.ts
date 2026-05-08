@@ -8,6 +8,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        const emp = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } })
+        const empId = emp?.id ?? session.user.id
+
         const quiz = await prisma.quiz.findUnique({
             where: { courseId: params.id },
             include: {
@@ -16,7 +19,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
                     orderBy: { order: "asc" },
                 },
                 attempts: {
-                    where: { employeeId: session.user.id },
+                    where: { employeeId: empId },
                     orderBy: { startedAt: "desc" },
                 },
             },
@@ -45,6 +48,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             return new NextResponse("answers object is required", { status: 400 })
         }
 
+        const emp = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } })
+        const empId = emp?.id ?? session.user.id
+
         const quiz = await prisma.quiz.findUnique({
             where: { courseId: params.id },
             include: {
@@ -52,7 +58,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                     include: { options: true },
                 },
                 attempts: {
-                    where: { employeeId: session.user.id },
+                    where: { employeeId: empId },
                 },
             },
         })
@@ -91,7 +97,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const attempt = await prisma.quizAttempt.create({
             data: {
                 quizId: quiz.id,
-                employeeId: session.user.id,
+                employeeId: empId,
                 score: scorePercent,
                 passed,
                 submittedAt: new Date(),
@@ -104,7 +110,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 where: {
                     courseId_employeeId: {
                         courseId: params.id,
-                        employeeId: session.user.id,
+                        employeeId: empId,
                     },
                 },
             })
@@ -125,7 +131,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 where: {
                     courseId_employeeId: {
                         courseId: params.id,
-                        employeeId: session.user.id,
+                        employeeId: empId,
                     },
                 },
             })
