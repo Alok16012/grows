@@ -244,7 +244,7 @@ export default function RecruitmentPage() {
     const [leads, setLeads] = useState<Lead[]>([])
     const [users, setUsers] = useState<AppUser[]>([])
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "documents" | "form-links">("pipeline")
+    const [activeTab, setActiveTab] = useState<"dashboard" | "pipeline" | "analytics" | "documents" | "form-links">("dashboard")
     const router = useRouter()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [searchQ, setSearchQ] = useState("")
@@ -499,7 +499,7 @@ export default function RecruitmentPage() {
     }, [status])
 
     useEffect(() => {
-        if (activeTab === "analytics" && status !== "unauthenticated") {
+        if ((activeTab === "analytics" || activeTab === "dashboard") && status !== "unauthenticated") {
             fetchAnalytics()
         }
         if (activeTab === "form-links" && status !== "unauthenticated") {
@@ -755,10 +755,11 @@ export default function RecruitmentPage() {
                 {/* Tabs */}
                 <div className="flex gap-1 mt-4 border-b border-[var(--border)]">
                     {([
-                        { key: "pipeline", label: "Pipeline", icon: ArrowRight },
-                        { key: "analytics", label: "Analytics", icon: BarChart2 },
-                        { key: "documents", label: "Documents", icon: FileText },
-                        { key: "form-links", label: "Form Links", icon: Link2 },
+                        { key: "dashboard",  label: "Dashboard",   icon: BarChart2  },
+                        { key: "pipeline",   label: "Pipeline",    icon: ArrowRight },
+                        { key: "analytics",  label: "Analytics",   icon: TrendingUp },
+                        { key: "documents",  label: "Documents",   icon: FileText   },
+                        { key: "form-links", label: "Form Links",  icon: Link2      },
                     ] as const).map(tab => {
                         const Icon = tab.icon
                         return (
@@ -778,6 +779,20 @@ export default function RecruitmentPage() {
                     })}
                 </div>
             </div>
+
+            {/* ── DASHBOARD TAB ── */}
+            {activeTab === "dashboard" && (
+                <div className="px-4 lg:px-0 pb-6">
+                    <RecruitmentDashboard
+                        leads={leads}
+                        loading={loading}
+                        analytics={analytics}
+                        analyticsLoading={analyticsLoading}
+                        session={session}
+                        onLeadClick={openDetail}
+                    />
+                </div>
+            )}
 
             {/* ── PIPELINE TAB ── */}
             {activeTab === "pipeline" && (
@@ -2868,5 +2883,377 @@ function ConvertModal({ lead, onClose, onConverted }: {
         </div>
         {previewUrl && <DocumentViewer url={previewUrl} fileName={previewName} onClose={() => setPreviewUrl(null)} />}
         </>
+    )
+}
+
+// ─── RecruitmentDashboard ─────────────────────────────────────────────────────
+
+function RecruitmentDashboard({
+    leads, loading, analytics, analyticsLoading, session, onLeadClick,
+}: {
+    leads: Lead[]
+    loading: boolean
+    analytics: AnalyticsData | null
+    analyticsLoading: boolean
+    session: ReturnType<typeof import("next-auth/react").useSession>["data"]
+    onLeadClick: (lead: Lead) => void
+}) {
+    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER" || session?.user?.role === "HR_MANAGER"
+
+    // ── My stats computed from leads (already filtered server-side to current user for non-admin)
+    const myTotal      = leads.length
+    const myActive     = leads.filter(l => !["REJECTED","DROPPED"].includes(l.status)).length
+    const myInterviews = leads.filter(l => ["INTERVIEW_SCHEDULED","INTERVIEW_DONE"].includes(l.status)).length
+    const mySelected   = leads.filter(l => ["SELECTED","OFFERED","JOINED"].includes(l.status)).length
+    const myJoined     = leads.filter(l => l.status === "JOINED").length
+    const myHot        = leads.filter(l => l.score === "HOT").length
+    const myPending    = leads.filter(l => {
+        if (!l.nextFollowUp) return false
+        return new Date(l.nextFollowUp) <= new Date()
+    }).length
+    const myConversion = myTotal > 0 ? Math.round((myJoined / myTotal) * 100) : 0
+
+    // Leads by status for funnel
+    const funnelStages = [
+        { key: "NEW_LEAD",            label: "New",        color: "#6b7280" },
+        { key: "CONTACTED",           label: "Contacted",  color: "#3b82f6" },
+        { key: "INTERESTED",          label: "Interested", color: "#8b5cf6" },
+        { key: "INTERVIEW_SCHEDULED", label: "Interview",  color: "#f59e0b" },
+        { key: "SELECTED",            label: "Selected",   color: "#1a9e6e" },
+        { key: "JOINED",              label: "Joined",     color: "#047857" },
+    ]
+    const funnelData = funnelStages.map(s => ({
+        ...s,
+        count: leads.filter(l => l.status === s.key).length,
+    }))
+    const maxFunnel = Math.max(...funnelData.map(f => f.count), 1)
+
+    // Source breakdown
+    const sourceMap: Record<string, number> = {}
+    leads.forEach(l => { sourceMap[l.source] = (sourceMap[l.source] ?? 0) + 1 })
+    const sourceData = Object.entries(sourceMap).sort((a, b) => b[1] - a[1]).slice(0, 8)
+        .map(([name, value]) => ({ name, value }))
+
+    // Position breakdown
+    const posMap: Record<string, number> = {}
+    leads.forEach(l => { posMap[l.position] = (posMap[l.position] ?? 0) + 1 })
+    const posData = Object.entries(posMap).sort((a, b) => b[1] - a[1]).slice(0, 6)
+
+    // Recent leads (last 5)
+    const recent = [...leads].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5)
+
+    // Overdue followups
+    const overdue = leads.filter(l => l.nextFollowUp && new Date(l.nextFollowUp) < new Date() && !["JOINED","REJECTED","DROPPED"].includes(l.status))
+        .sort((a, b) => new Date(a.nextFollowUp!).getTime() - new Date(b.nextFollowUp!).getTime())
+        .slice(0, 5)
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-24">
+                <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingTop: 8 }}>
+
+            {/* ── Personal Header ── */}
+            <div style={{
+                background: "linear-gradient(135deg, #1a9e6e 0%, #047857 100%)",
+                borderRadius: 14, padding: "20px 24px",
+                display: "flex", alignItems: "center", gap: 20,
+            }}>
+                <div style={{
+                    width: 56, height: 56, borderRadius: "50%",
+                    background: "rgba(255,255,255,0.2)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 22, fontWeight: 800, color: "#fff",
+                }}>
+                    {(session?.user?.name ?? "U")[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
+                        {isAdmin ? "Recruitment Overview" : `My Dashboard — ${session?.user?.name ?? ""}`}
+                    </div>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>
+                        {isAdmin ? "Full team recruitment metrics and performance" : "Your personal recruitment performance at a glance"}
+                    </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 36, fontWeight: 800, color: "#fff" }}>{myConversion}%</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)" }}>Conversion Rate</div>
+                </div>
+            </div>
+
+            {/* ── My KPI Cards ── */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+                {[
+                    { label: "Total Leads", value: myTotal,      color: "#3b82f6", bg: "#eff6ff",  icon: Users    },
+                    { label: "Active",      value: myActive,     color: "#8b5cf6", bg: "#f5f3ff",  icon: Target   },
+                    { label: "Interviews",  value: myInterviews, color: "#f59e0b", bg: "#fffbeb",  icon: Calendar },
+                    { label: "Joined",      value: myJoined,     color: "#047857", bg: "#ecfdf5",  icon: Award    },
+                ].map(c => (
+                    <div key={c.label} style={{
+                        background: "#fff", border: "1px solid var(--border)", borderRadius: 12,
+                        padding: "16px 18px", display: "flex", alignItems: "center", gap: 12,
+                    }}>
+                        <div style={{
+                            width: 44, height: 44, borderRadius: "50%", background: c.bg,
+                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        }}>
+                            <c.icon size={20} color={c.color} />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 26, fontWeight: 800, color: c.color }}>{c.value}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>{c.label}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* ── Secondary KPI row ── */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+                <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Flame size={18} color="#dc2626" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: "#dc2626" }}>{myHot}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Hot Leads</div>
+                    </div>
+                </div>
+                <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Clock size={18} color="#d97706" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: "#d97706" }}>{myPending}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Overdue Follow-ups</div>
+                    </div>
+                </div>
+                <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#e8f7f1", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <UserCheck size={18} color="#1a9e6e" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: "#1a9e6e" }}>{mySelected}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Selected / Offered</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20 }}>
+                {/* ── Funnel ── */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 16 }}>My Recruitment Funnel</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {funnelData.map(f => (
+                            <div key={f.key}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12 }}>
+                                    <span style={{ fontWeight: 600, color: "var(--text)" }}>{f.label}</span>
+                                    <span style={{ color: f.color, fontWeight: 700 }}>{f.count}</span>
+                                </div>
+                                <div style={{ height: 8, background: "#f3f4f6", borderRadius: 99, overflow: "hidden" }}>
+                                    <div style={{
+                                        height: "100%", borderRadius: 99,
+                                        width: `${Math.round((f.count / maxFunnel) * 100)}%`,
+                                        background: f.color,
+                                        transition: "width 0.6s ease",
+                                        minWidth: f.count > 0 ? 8 : 0,
+                                    }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* ── Source breakdown ── */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 14 }}>Leads by Source</div>
+                    {sourceData.length === 0 ? (
+                        <p style={{ color: "#9ca3af", fontSize: 13 }}>No data yet</p>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={160}>
+                            <PieChart>
+                                <Pie data={sourceData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`} labelLine={false} fontSize={10}>
+                                    {sourceData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                {/* ── Recent Leads ── */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 14 }}>Recent Leads</div>
+                    {recent.length === 0 ? (
+                        <p style={{ color: "#9ca3af", fontSize: 13 }}>No leads yet</p>
+                    ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                            {recent.map((l, i) => {
+                                const sCfg = STATUSES.find(s => s.key === l.status) ?? STATUSES[0]
+                                return (
+                                    <div key={l.id} onClick={() => onLeadClick(l)}
+                                        style={{
+                                            display: "flex", alignItems: "center", gap: 10,
+                                            padding: "9px 0", cursor: "pointer",
+                                            borderBottom: i < recent.length - 1 ? "1px solid var(--border)" : "none",
+                                        }}>
+                                        <div style={{
+                                            width: 34, height: 34, borderRadius: "50%",
+                                            background: "#f3f4f6", display: "flex", alignItems: "center",
+                                            justifyContent: "center", fontWeight: 700, fontSize: 13, color: "#6b7280",
+                                            flexShrink: 0,
+                                        }}>
+                                            {l.candidateName[0].toUpperCase()}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {l.candidateName}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{l.position} · {l.city || "—"}</div>
+                                        </div>
+                                        <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99, color: sCfg.color, background: sCfg.bg, border: `1px solid ${sCfg.border}`, whiteSpace: "nowrap" }}>
+                                            {sCfg.label}
+                                        </span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Overdue Follow-ups ── */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Overdue Follow-ups</div>
+                        {overdue.length > 0 && (
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: "#fee2e2", color: "#dc2626" }}>
+                                {overdue.length}
+                            </span>
+                        )}
+                    </div>
+                    {overdue.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "20px 0", color: "#9ca3af", fontSize: 13 }}>
+                            <CheckCircle size={28} style={{ margin: "0 auto 8px", display: "block", color: "#1a9e6e" }} />
+                            All follow-ups on track!
+                        </div>
+                    ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                            {overdue.map((l, i) => (
+                                <div key={l.id} onClick={() => onLeadClick(l)}
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 10,
+                                        padding: "9px 0", cursor: "pointer",
+                                        borderBottom: i < overdue.length - 1 ? "1px solid var(--border)" : "none",
+                                    }}>
+                                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {l.candidateName}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>
+                                            Due: {fmt(l.nextFollowUp)}
+                                        </div>
+                                    </div>
+                                    <ScoreBadge score={l.score} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Position Breakdown ── */}
+            {posData.length > 0 && (
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 14 }}>Leads by Position</div>
+                    <ResponsiveContainer width="100%" height={Math.max(120, posData.length * 36)}>
+                        <BarChart data={posData.map(([name, value]) => ({ name, value }))} layout="vertical">
+                            <XAxis type="number" tick={{ fontSize: 11 }} />
+                            <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 11 }} />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="var(--accent)" radius={[0, 4, 4, 0]} name="Leads" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+
+            {/* ── Admin: Recruiter Performance ── */}
+            {isAdmin && analytics && (
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+                    <div style={{ padding: "14px 20px", background: "#f8fafc", borderBottom: "1px solid var(--border)", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>
+                        Recruiter Performance (Team)
+                    </div>
+                    {analyticsLoading ? (
+                        <div style={{ padding: 40, textAlign: "center" }}>
+                            <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--accent)" }} />
+                        </div>
+                    ) : analytics.recruiterPerformance.length === 0 ? (
+                        <div style={{ padding: "30px 20px", color: "#9ca3af", textAlign: "center", fontSize: 13 }}>No recruiter data yet</div>
+                    ) : (
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                            <thead>
+                                <tr style={{ background: "#f9fafb", borderBottom: "1px solid var(--border)" }}>
+                                    {["Recruiter", "Total Leads", "Interviews", "Joinings", "Conversion %"].map(h => (
+                                        <th key={h} style={{ padding: "10px 16px", textAlign: h === "Recruiter" ? "left" : "center", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {analytics.recruiterPerformance.map((r, i) => (
+                                    <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                                        <td style={{ padding: "10px 16px" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                <div style={{
+                                                    width: 30, height: 30, borderRadius: "50%",
+                                                    background: PIE_COLORS[i % PIE_COLORS.length] + "22",
+                                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                                    fontSize: 12, fontWeight: 700, color: PIE_COLORS[i % PIE_COLORS.length],
+                                                }}>
+                                                    {r.name[0].toUpperCase()}
+                                                </div>
+                                                <span style={{ fontWeight: 600, color: "var(--text)" }}>{r.name}</span>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center", fontWeight: 700, color: "#3b82f6" }}>{r.leads}</td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center", color: "#f59e0b", fontWeight: 600 }}>{r.interviews}</td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center", color: "#1a9e6e", fontWeight: 700 }}>{r.joinings}</td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                                            <span style={{
+                                                padding: "3px 10px", borderRadius: 99, fontWeight: 700, fontSize: 12,
+                                                background: r.conversion >= 30 ? "#e8f7f1" : r.conversion >= 15 ? "#fef3c7" : "#fee2e2",
+                                                color: r.conversion >= 30 ? "#1a9e6e" : r.conversion >= 15 ? "#d97706" : "#ef4444",
+                                            }}>
+                                                {r.conversion}%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
+            {/* ── Admin: Full analytics funnel from API ── */}
+            {isAdmin && analytics && analytics.funnelData.length > 0 && (
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 14 }}>Team Pipeline Funnel</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={analytics.funnelData}>
+                            <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} />
+                            <Tooltip />
+                            <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} name="Count" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+        </div>
     )
 }
