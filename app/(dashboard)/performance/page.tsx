@@ -280,7 +280,7 @@ export default function PerformancePage() {
     const { data: session, status } = useSession()
     const router = useRouter()
 
-    const [activeTab, setActiveTab] = useState<"dashboard" | "reviews" | "templates">("dashboard")
+    const [activeTab, setActiveTab] = useState<"dashboard" | "my" | "team" | "reviews" | "templates">("dashboard")
 
     // Reviews state
     const [reviews, setReviews] = useState<PerformanceReview[]>([])
@@ -480,6 +480,18 @@ export default function PerformancePage() {
                         <BarChart2 size={14} /> Dashboard
                     </span>
                 </button>
+                <button style={tabStyle(activeTab === "my")} onClick={() => setActiveTab("my")}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Target size={14} /> My Performance
+                    </span>
+                </button>
+                {isAdminOrManager && (
+                    <button style={tabStyle(activeTab === "team")} onClick={() => setActiveTab("team")}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <Users size={14} /> Team Performance
+                        </span>
+                    </button>
+                )}
                 <button style={tabStyle(activeTab === "reviews")} onClick={() => setActiveTab("reviews")}>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <FileText size={14} /> Reviews
@@ -495,6 +507,25 @@ export default function PerformancePage() {
             {/* ─── DASHBOARD TAB ─────────────────────────────────────────────── */}
             {activeTab === "dashboard" && (
                 <DashboardTab data={dashboard} loading={dashLoading} />
+            )}
+
+            {/* ─── MY PERFORMANCE TAB ────────────────────────────────────────── */}
+            {activeTab === "my" && (
+                <MyPerformanceTab
+                    reviews={reviews}
+                    loading={loading}
+                    onCardClick={openDrawer}
+                    session={session}
+                />
+            )}
+
+            {/* ─── TEAM PERFORMANCE TAB ──────────────────────────────────────── */}
+            {activeTab === "team" && isAdminOrManager && (
+                <TeamPerformanceTab
+                    reviews={reviews}
+                    loading={loading}
+                    onCardClick={openDrawer}
+                />
             )}
 
             {/* ─── REVIEWS TAB ───────────────────────────────────────────────── */}
@@ -545,6 +576,455 @@ export default function PerformancePage() {
                     creating={creating}
                 />
             )}
+        </div>
+    )
+}
+
+// ─── MyPerformanceTab ─────────────────────────────────────────────────────────
+
+function MyPerformanceTab({
+    reviews, loading, onCardClick, session,
+}: {
+    reviews: PerformanceReview[]
+    loading: boolean
+    onCardClick: (r: PerformanceReview) => void
+    session: ReturnType<typeof useSession>["data"]
+}) {
+    const sorted = [...reviews].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    const latest = sorted[0] ?? null
+
+    if (loading) {
+        return (
+            <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+                <Loader2 size={28} style={{ animation: "spin 1s linear infinite", color: "var(--accent)" }} />
+            </div>
+        )
+    }
+
+    if (!latest) {
+        return (
+            <div style={{
+                textAlign: "center", padding: "80px 20px",
+                color: "#9ca3af", fontSize: 14,
+                background: "#fff", borderRadius: 12, border: "1px solid var(--border)",
+            }}>
+                <Target size={40} style={{ margin: "0 auto 14px", display: "block", color: "#d1d5db" }} />
+                <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>No Performance Reviews Yet</div>
+                <div style={{ fontSize: 13 }}>Your manager will create a review for you. Check back soon.</div>
+            </div>
+        )
+    }
+
+    const statusCfg = STATUS_CONFIG[latest.status]
+    const rankCfg = latest.performanceRank ? RANK_CONFIG[latest.performanceRank] : null
+    const calcScore = calcOverallScore(latest.kras ?? [])
+
+    const trendData = sorted.slice(0, 6).reverse().map(r => ({
+        period: fmtDate(r.periodStart),
+        score: r.overallRating ?? (calcOverallScore(r.kras ?? []) ?? 0),
+    })).filter(d => d.score > 0)
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Top summary card */}
+            <div style={{
+                background: "linear-gradient(135deg, #f0fdf4 0%, #e8f7f1 100%)",
+                border: "1px solid #bbf7d0", borderRadius: 16, padding: "24px 28px",
+                display: "flex", alignItems: "center", gap: 28,
+            }}>
+                <div style={{
+                    width: 72, height: 72, borderRadius: "50%",
+                    background: calcScore !== null
+                        ? (calcScore >= 4.5 ? "#1a9e6e" : calcScore >= 3.5 ? "#3b82f6" : calcScore >= 2.8 ? "#d97706" : "#ef4444")
+                        : "#9ca3af",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 24, fontWeight: 800, color: "#fff",
+                }}>
+                    {calcScore !== null ? calcScore.toFixed(1) : "—"}
+                </div>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#166534", marginBottom: 4 }}>
+                        {session?.user?.name ?? "My"} Performance
+                    </div>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <Badge label={statusCfg.label} color={statusCfg.color} bg={statusCfg.bg} />
+                        {rankCfg && <Badge label={rankCfg.label} color={rankCfg.color} bg={rankCfg.bg} />}
+                        <span style={{ fontSize: 13, color: "#15803d" }}>
+                            {CYCLE_CONFIG[latest.cycle]?.label} · {fmtDate(latest.periodStart)} – {fmtDate(latest.periodEnd)}
+                        </span>
+                    </div>
+                </div>
+                <button
+                    onClick={() => onCardClick(latest)}
+                    style={{
+                        padding: "9px 20px", background: "#1a9e6e", color: "#fff",
+                        border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                    }}
+                >
+                    View Full Review
+                </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                {/* KPI Table */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                        My KPIs — Latest Review
+                    </h3>
+                    {(latest.kras ?? []).length === 0 && (latest.kpis ?? []).length === 0 ? (
+                        <p style={{ color: "#9ca3af", fontSize: 13 }}>No KPIs assigned yet.</p>
+                    ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {(latest.kras ?? []).map(kra => (
+                                <div key={kra.id}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                        {kra.title} ({kra.weightage}%)
+                                    </div>
+                                    {kra.kpis.map(kpi => {
+                                        const targetNum = parseFloat(kpi.target)
+                                        const actualNum = parseFloat(kpi.actual ?? "")
+                                        const pct = (!isNaN(targetNum) && !isNaN(actualNum) && targetNum > 0)
+                                            ? Math.min(Math.round((actualNum / targetNum) * 100), 150)
+                                            : null
+                                        return (
+                                            <div key={kpi.id} style={{ marginBottom: 10 }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                                    <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 500 }}>{kpi.title}</span>
+                                                    <span style={{ fontSize: 12, color: "#6b7280" }}>
+                                                        {kpi.actual ?? "—"} / {kpi.target}
+                                                        {pct !== null && <span style={{ marginLeft: 6, color: pct >= 100 ? "#1a9e6e" : "#d97706", fontWeight: 700 }}>{pct}%</span>}
+                                                    </span>
+                                                </div>
+                                                {pct !== null && (
+                                                    <div style={{ height: 6, background: "#f3f4f6", borderRadius: 99 }}>
+                                                        <div style={{
+                                                            height: "100%", borderRadius: 99,
+                                                            width: `${Math.min(pct, 100)}%`,
+                                                            background: pct >= 100 ? "#1a9e6e" : pct >= 70 ? "#f59e0b" : "#ef4444",
+                                                            transition: "width 0.5s ease",
+                                                        }} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Self Eval + Trend */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Self Eval Summary */}
+                    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "16px 18px" }}>
+                        <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                            Self Assessment
+                        </h3>
+                        {latest.selfRating ? (
+                            <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                                    <StarRating value={latest.selfRating} readonly size={16} />
+                                    <span style={{ fontSize: 13, fontWeight: 700 }}>{latest.selfRating}/5</span>
+                                </div>
+                                {latest.selfComments && (
+                                    <p style={{ fontSize: 13, color: "#374151", margin: 0, lineHeight: 1.6, borderLeft: "3px solid var(--accent)", paddingLeft: 10 }}>
+                                        {latest.selfComments}
+                                    </p>
+                                )}
+                            </div>
+                        ) : (
+                            <div>
+                                <p style={{ color: "#9ca3af", fontSize: 13, margin: "0 0 10px" }}>Self assessment not submitted yet.</p>
+                                <button
+                                    onClick={() => onCardClick(latest)}
+                                    style={{
+                                        padding: "7px 14px", background: "var(--accent)", color: "#fff",
+                                        border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                                    }}
+                                >
+                                    Submit Self Review
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Performance Trend */}
+                    {trendData.length > 1 && (
+                        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "16px 18px" }}>
+                            <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                                My Performance Trend
+                            </h3>
+                            <ResponsiveContainer width="100%" height={140}>
+                                <LineChart data={trendData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="period" tick={{ fontSize: 10 }} />
+                                    <YAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
+                                    <Tooltip />
+                                    <Line type="monotone" dataKey="score" stroke="#1a9e6e" strokeWidth={2} dot={{ r: 4 }} name="Score" />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Past Reviews */}
+            {sorted.length > 1 && (
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", padding: "18px 20px" }}>
+                    <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                        Review History
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                        {sorted.map((r, i) => {
+                            const sc = r.overallRating ?? calcOverallScore(r.kras ?? [])
+                            const rCfg = r.performanceRank ? RANK_CONFIG[r.performanceRank] : null
+                            const sCfg = STATUS_CONFIG[r.status]
+                            return (
+                                <div
+                                    key={r.id}
+                                    onClick={() => onCardClick(r)}
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 12,
+                                        padding: "10px 0", cursor: "pointer",
+                                        borderBottom: i < sorted.length - 1 ? "1px solid var(--border)" : "none",
+                                    }}
+                                >
+                                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#6b7280" }}>
+                                        {CYCLE_CONFIG[r.cycle]?.label.slice(0, 1)}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                                            {CYCLE_CONFIG[r.cycle]?.label} — {fmtDate(r.periodStart)} to {fmtDate(r.periodEnd)}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: "#6b7280" }}>
+                                            {sc !== null ? `Score: ${sc.toFixed(1)}/5` : "Not rated"}
+                                        </div>
+                                    </div>
+                                    <Badge label={sCfg.label} color={sCfg.color} bg={sCfg.bg} />
+                                    {rCfg && <Badge label={rCfg.label} color={rCfg.color} bg={rCfg.bg} />}
+                                    <ChevronRight size={14} color="#9ca3af" />
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── TeamPerformanceTab ───────────────────────────────────────────────────────
+
+function TeamPerformanceTab({
+    reviews, loading, onCardClick,
+}: {
+    reviews: PerformanceReview[]
+    loading: boolean
+    onCardClick: (r: PerformanceReview) => void
+}) {
+    const [sortBy, setSortBy] = useState<"score" | "name" | "status">("score")
+    const [filterStatus, setFilterStatus] = useState("ALL")
+
+    if (loading) {
+        return (
+            <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+                <Loader2 size={28} style={{ animation: "spin 1s linear infinite", color: "var(--accent)" }} />
+            </div>
+        )
+    }
+
+    // Latest review per employee
+    const byEmp: Record<string, PerformanceReview> = {}
+    for (const r of reviews) {
+        if (!byEmp[r.employeeId] || new Date(r.createdAt) > new Date(byEmp[r.employeeId].createdAt)) {
+            byEmp[r.employeeId] = r
+        }
+    }
+    let list = Object.values(byEmp)
+    if (filterStatus !== "ALL") list = list.filter(r => r.status === filterStatus)
+
+    const withScore = list.map(r => ({
+        r,
+        score: r.overallRating ?? calcOverallScore(r.kras ?? []),
+    }))
+
+    if (sortBy === "score") withScore.sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+    else if (sortBy === "name") withScore.sort((a, b) => `${a.r.employee.firstName}${a.r.employee.lastName}`.localeCompare(`${b.r.employee.firstName}${b.r.employee.lastName}`))
+    else if (sortBy === "status") withScore.sort((a, b) => a.r.status.localeCompare(b.r.status))
+
+    // Quick insight metrics
+    const pending = list.filter(r => r.status === "DRAFT" || r.status === "SUBMITTED").length
+    const completed = list.filter(r => r.status === "COMPLETED").length
+    const lowPerformers = list.filter(r => r.performanceRank === "LOW_PERFORMER").length
+    const topPerformer = withScore.find(e => e.score !== null)
+
+    const insightCards = [
+        { label: "Total Employees Reviewed", value: list.length, color: "#3b82f6", bg: "#eff6ff", icon: Users },
+        { label: "Pending Reviews", value: pending, color: "#d97706", bg: "#fef3c7", icon: Clock },
+        { label: "Completed", value: completed, color: "#1a9e6e", bg: "#e8f7f1", icon: CheckCircle2 },
+        { label: "Need Attention (Low)", value: lowPerformers, color: "#ef4444", bg: "#fee2e2", icon: AlertCircle },
+    ]
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Quick Insight Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+                {insightCards.map(c => (
+                    <div key={c.label} style={{
+                        background: "#fff", border: "1px solid var(--border)", borderRadius: 12,
+                        padding: "16px 18px", display: "flex", alignItems: "center", gap: 12,
+                    }}>
+                        <div style={{
+                            width: 40, height: 40, borderRadius: "50%", background: c.bg,
+                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        }}>
+                            <c.icon size={18} color={c.color} />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{c.value}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{c.label}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Top performer highlight */}
+            {topPerformer && (
+                <div style={{
+                    background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                    border: "1px solid #86efac", borderRadius: 12, padding: "14px 20px",
+                    display: "flex", alignItems: "center", gap: 14,
+                }}>
+                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#1a9e6e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Award size={20} color="#fff" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#15803d", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>
+                            Top Performer This Cycle
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#166534" }}>
+                            {topPerformer.r.employee.firstName} {topPerformer.r.employee.lastName}
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1a9e6e", marginLeft: 10 }}>
+                                {topPerformer.score?.toFixed(2)} / 5
+                            </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#15803d" }}>{topPerformer.r.employee.designation || "—"}</div>
+                    </div>
+                </div>
+            )}
+
+            {/* Team Table */}
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+                <div style={{
+                    padding: "14px 18px", background: "#f8fafc", borderBottom: "1px solid var(--border)",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Team Review Overview</span>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <select
+                            value={filterStatus}
+                            onChange={e => setFilterStatus(e.target.value)}
+                            style={{ height: 32, padding: "0 8px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12, background: "#fff" }}
+                        >
+                            <option value="ALL">All Status</option>
+                            {(["DRAFT", "SUBMITTED", "ACKNOWLEDGED", "COMPLETED"] as ReviewStatus[]).map(s => (
+                                <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={sortBy}
+                            onChange={e => setSortBy(e.target.value as "score" | "name" | "status")}
+                            style={{ height: 32, padding: "0 8px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12, background: "#fff" }}
+                        >
+                            <option value="score">Sort: Score</option>
+                            <option value="name">Sort: Name</option>
+                            <option value="status">Sort: Status</option>
+                        </select>
+                    </div>
+                </div>
+
+                {withScore.length === 0 ? (
+                    <div style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                        No reviews found
+                    </div>
+                ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                        <thead>
+                            <tr style={{ background: "#f9fafb", borderBottom: "1px solid var(--border)" }}>
+                                <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>#</th>
+                                <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>Employee</th>
+                                <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>Cycle</th>
+                                <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>Score</th>
+                                <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>Rank</th>
+                                <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>Status</th>
+                                <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#6b7280", fontSize: 12 }}>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {withScore.map(({ r, score }, i) => {
+                                const emp = r.employee
+                                const initials = `${emp.firstName[0]}${emp.lastName[0]}`.toUpperCase()
+                                const avatarColor = getAvatarColor(emp.firstName, emp.lastName)
+                                const sCfg = STATUS_CONFIG[r.status]
+                                const rCfg = r.performanceRank ? RANK_CONFIG[r.performanceRank] : null
+                                return (
+                                    <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                                        <td style={{ padding: "10px 16px", color: "#9ca3af", fontWeight: 600 }}>{i + 1}</td>
+                                        <td style={{ padding: "10px 16px" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                <div style={{
+                                                    width: 32, height: 32, borderRadius: "50%", background: avatarColor,
+                                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                                    fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0,
+                                                }}>{initials}</div>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, color: "var(--text)" }}>{emp.firstName} {emp.lastName}</div>
+                                                    <div style={{ fontSize: 11, color: "#6b7280" }}>{emp.designation || emp.employeeId}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: "10px 16px", color: "#6b7280", fontSize: 12 }}>
+                                            {CYCLE_CONFIG[r.cycle]?.label}
+                                        </td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                                            {score !== null ? (
+                                                <span style={{
+                                                    fontWeight: 700, fontSize: 15,
+                                                    color: score >= 4.5 ? "#1a9e6e" : score >= 3.5 ? "#3b82f6" : score >= 2.8 ? "#d97706" : "#ef4444",
+                                                }}>
+                                                    {score.toFixed(2)}
+                                                </span>
+                                            ) : <span style={{ color: "#d1d5db" }}>—</span>}
+                                        </td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                                            {rCfg
+                                                ? <Badge label={rCfg.label} color={rCfg.color} bg={rCfg.bg} />
+                                                : <span style={{ color: "#d1d5db" }}>—</span>
+                                            }
+                                        </td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                                            <Badge label={sCfg.label} color={sCfg.color} bg={sCfg.bg} />
+                                        </td>
+                                        <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                                            <button
+                                                onClick={() => onCardClick(r)}
+                                                style={{
+                                                    padding: "5px 12px", background: "var(--accent)", color: "#fff",
+                                                    border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                Review
+                                            </button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
         </div>
     )
 }
