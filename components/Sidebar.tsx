@@ -188,14 +188,16 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     const filteredLinks = section.links.filter(link => {
                         // ADMIN sees everything
                         if (currentRole === "ADMIN") return true
-                        // If user has a custom role AND the link has a permission key:
-                        // use ONLY the custom permissions — no system role fallback
-                        // This ensures "Quality Engineer" (4 perms) sees less than "HR RECRUITER" (18 perms)
+                        // Links with no roles restriction: visible to all
+                        if (!link.roles || link.roles.length === 0) return true
+                        // Role check (always run for all users)
+                        const roleMatch = link.roles.includes(currentRole)
+                        // If link has a permission key AND user has custom permissions:
+                        // show if EITHER role matches OR permission is granted
                         if (link.permission && userPermissions.length > 0) {
-                            return userPermissions.includes(link.permission)
+                            return roleMatch || userPermissions.includes(link.permission)
                         }
-                        // No custom role (or link has no permission key): use system role
-                        return link.roles.includes(currentRole)
+                        return roleMatch
                     })
                     if (filteredLinks.length === 0) return null
 
