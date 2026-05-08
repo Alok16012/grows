@@ -1,7 +1,7 @@
 "use client"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import {
     Plus, Search, UserCheck, X, Loader2, Users,
@@ -2235,9 +2235,10 @@ function RowActions({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function EmployeesPage() {
+function EmployeesPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [employees, setEmployees] = useState<Employee[]>([])
     const [sitesForFilter, setSitesForFilter] = useState<Site[]>([])
     const [loading, setLoading] = useState(true)
@@ -2321,6 +2322,21 @@ export default function EmployeesPage() {
         fetch("/api/departments").then(r => r.json()).then(data => setAllDepts(Array.isArray(data) ? data : [])).catch(() => {})
         fetch("/api/sites?isActive=true").then(r => r.json()).then(data => setSites(Array.isArray(data) ? data : [])).catch(() => {})
     }, [])
+
+    // Auto-open drawer when ?id= param is present (e.g. from recruitment "View Employee")
+    useEffect(() => {
+        const id = searchParams.get("id")
+        if (!id || loading) return
+        const emp = employees.find(e => e.id === id)
+        if (emp) {
+            setDrawerEmployee(emp)
+        } else {
+            fetch(`/api/employees/${id}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => { if (data) setDrawerEmployee(data) })
+                .catch(() => {})
+        }
+    }, [searchParams, employees, loading])
 
     async function handleExport() {
         try {
@@ -2971,5 +2987,13 @@ export default function EmployeesPage() {
                 </div>
             )}
         </div>
+    )
+}
+
+export default function EmployeesPageWrapper() {
+    return (
+        <Suspense>
+            <EmployeesPage />
+        </Suspense>
     )
 }

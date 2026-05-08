@@ -1735,6 +1735,7 @@ function DetailDrawer({
         interviewResult: lead.interviewResult ?? "",
     })
     const [savingInterview, setSavingInterview] = useState(false)
+    const router = useRouter()
 
     // Document form
     const [showDocForm, setShowDocForm] = useState(false)
@@ -1937,7 +1938,7 @@ function DetailDrawer({
                                                 <span className="text-[13px] font-semibold text-green-700">Converted to Employee</span>
                                             </div>
                                             <button
-                                                onClick={() => router.push(`/employees/${lead.convertedEmployeeId}`)}
+                                                onClick={() => router.push(`/employees?id=${lead.convertedEmployeeId}`)}
                                                 className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-green-600 text-white rounded-[6px] hover:bg-green-700 transition-colors shrink-0"
                                             >
                                                 <ExternalLink size={12} /> View Employee
