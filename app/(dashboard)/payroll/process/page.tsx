@@ -13,6 +13,16 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Site = { id: string; name: string; code?: string; city?: string }
 type SiteStatus = { siteId: string | null; processedCount: number }
+type PayrollRunStatus = { status: string; month: number; year: number } | null
+
+const WORKFLOW_STEPS = [
+    { num: 1, label: "Upload Attendance", href: "/attendance/upload" },
+    { num: 2, label: "Process Payroll",   href: "/payroll/process" },
+    { num: 3, label: "Wage Sheet",        href: "/payroll/wagesheet" },
+    { num: 4, label: "Lock Wage Sheet",   href: "/payroll/compliance" },
+    { num: 5, label: "Compliance",        href: "/payroll/compliance" },
+    { num: 6, label: "Payslip",           href: "/payroll/salary-slips" },
+]
 
 type Employee = {
     id: string; employeeId: string; firstName: string; lastName: string
@@ -55,6 +65,7 @@ function ProcessPayrollPage() {
     const [deleting,         setDeleting]         = useState(false)
     const [fetched,          setFetched]          = useState(false)
     const [search,           setSearch]           = useState("")
+    const [payrollRun,       setPayrollRun]       = useState<PayrollRunStatus>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Load sites once
@@ -70,10 +81,20 @@ function ProcessPayrollPage() {
     const fetchSiteStatus = useCallback(async () => {
         setLoadingStatus(true)
         try {
-            const res = await fetch(`/api/payroll/sites-status?month=${month}&year=${year}`)
-            if (res.ok) {
-                const data = await res.json()
+            const [statusRes, runRes] = await Promise.all([
+                fetch(`/api/payroll/sites-status?month=${month}&year=${year}`),
+                fetch(`/api/payroll/runs?year=${year}`),
+            ])
+            if (statusRes.ok) {
+                const data = await statusRes.json()
                 if (Array.isArray(data)) setSiteStatus(data)
+            }
+            if (runRes.ok) {
+                const runs = await runRes.json()
+                const run = Array.isArray(runs)
+                    ? runs.find((r: any) => r.month === parseInt(month) && r.year === parseInt(year))
+                    : null
+                setPayrollRun(run ?? null)
             }
         } catch {} finally {
             setLoadingStatus(false)
@@ -81,6 +102,23 @@ function ProcessPayrollPage() {
     }, [month, year])
 
     useEffect(() => { fetchSiteStatus() }, [fetchSiteStatus])
+
+    // Step status for stepper
+    const getStepStatus = (stepNum: number): "done" | "active" | "pending" => {
+        if (!payrollRun) return stepNum === 1 ? "done" : stepNum === 2 ? "active" : "pending"
+        if (payrollRun.status === "PAID") return "done"
+        if (payrollRun.status === "PROCESSED") {
+            if (stepNum <= 2) return "done"
+            if (stepNum === 3 || stepNum === 4) return "active"
+            return "pending"
+        }
+        if (payrollRun.status === "DRAFT") {
+            if (stepNum <= 1) return "done"
+            if (stepNum === 2) return "active"
+            return "pending"
+        }
+        return "pending"
+    }
 
     // Load employees when site selected
     const fetchEmployees = useCallback(async (siteId: string) => {
@@ -384,21 +422,56 @@ function ProcessPayrollPage() {
                 </div>
             </div>
 
-            {/* Stepper */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4, overflowX: "auto", whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
-                {["Upload Attendance", "Process Payroll", "Wage Sheet", "Lock Wage Sheet", "Compliance", "Payslip"].map((s, i) => (
-                    <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 7,
-                            background: i <= 1 ? "var(--accent-light)" : "transparent",
-                            color: i <= 1 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i <= 1 ? 700 : 400 }}>
-                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i <= 1 ? "var(--accent)" : "var(--border)",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                color: i <= 1 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i + 1}</div>
-                            {s}
-                        </div>
-                        {i < 5 && <ChevronRight size={11} style={{ color: "var(--text3)", opacity: 0.3 }} />}
-                    </div>
-                ))}
+            {/* ── Sticky Workflow Stepper ── */}
+            <div style={{
+                position: "sticky", top: 0, zIndex: 20,
+                background: "var(--surface)", border: "1px solid var(--border)",
+                borderRadius: 10, padding: "10px 14px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto" }}>
+                    {WORKFLOW_STEPS.map((s, i) => {
+                        const status   = getStepStatus(s.num)
+                        const isDone   = status === "done"
+                        const isActive = status === "active"
+                        return (
+                            <div key={s.num} style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                                <button
+                                    onClick={() => router.push(s.href)}
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 6,
+                                        padding: "5px 11px", borderRadius: 7,
+                                        border: isActive ? "1.5px solid var(--accent)" : "1.5px solid transparent",
+                                        background: isDone ? "#f0fdf4" : isActive ? "var(--accent-light)" : "transparent",
+                                        color: isDone ? "#16a34a" : isActive ? "var(--accent)" : "var(--text3)",
+                                        fontSize: 12, fontWeight: isActive || isDone ? 700 : 400,
+                                        cursor: "pointer", whiteSpace: "nowrap",
+                                        transition: "all 0.15s",
+                                    }}
+                                    title={`Go to ${s.label}`}
+                                >
+                                    <div style={{
+                                        width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                                        background: isDone ? "#16a34a" : isActive ? "var(--accent)" : "var(--border)",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        color: isDone || isActive ? "#fff" : "var(--text3)",
+                                        fontSize: 9, fontWeight: 800,
+                                    }}>
+                                        {isDone ? "✓" : s.num}
+                                    </div>
+                                    {s.label}
+                                </button>
+                                {i < WORKFLOW_STEPS.length - 1 && (
+                                    <ChevronRight size={11} style={{
+                                        color: isDone ? "#16a34a" : "var(--text3)",
+                                        opacity: isDone ? 0.6 : 0.25,
+                                        flexShrink: 0,
+                                    }} />
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
             </div>
 
             {/* Month / Year row */}
