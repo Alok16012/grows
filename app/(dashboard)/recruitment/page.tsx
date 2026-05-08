@@ -583,10 +583,20 @@ export default function RecruitmentPage() {
         setShowForm(true)
     }
 
+    // ── Validation helpers ──
+    const rDigits = (v: string) => v.replace(/\D/g, "")
+    const isPhoneOk  = (v: string) => !v || rDigits(v).length === 10
+    const isAadharOk = (v: string) => !v || rDigits(v).length === 12
+    const isPANOk    = (v: string) => !v || /^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(v.trim())
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         if (!editLead && duplicateWarning) {
             toast.error(duplicateWarning)
+            return
+        }
+        if (form.phone && !isPhoneOk(form.phone)) {
+            toast.error("Phone number must be exactly 10 digits")
             return
         }
         setSaving(true)
@@ -998,13 +1008,19 @@ export default function RecruitmentPage() {
                                 </Field>
                                 <Field label="Phone *">
                                     <div className="flex flex-col gap-1">
-                                        <input required value={form.phone}
+                                        <input required value={form.phone} maxLength={10}
                                             onChange={e => {
                                                 setForm(p => ({ ...p, phone: e.target.value }))
                                                 checkDuplicate(e.target.value)
                                             }}
-                                            placeholder="Mobile number" className={inputCls} />
-                                        {duplicateWarning && (
+                                            placeholder="10-digit mobile number"
+                                            className={inputCls + (form.phone && !isPhoneOk(form.phone) ? " !border-red-400" : "")} />
+                                        {form.phone && !isPhoneOk(form.phone) && (
+                                            <p className="text-[11px] text-red-500 flex items-center gap-1">
+                                                <AlertCircle size={11} /> Phone must be exactly 10 digits
+                                            </p>
+                                        )}
+                                        {duplicateWarning && isPhoneOk(form.phone) && (
                                             <p className="text-[11px] text-amber-600 flex items-center gap-1">
                                                 <AlertCircle size={11} />
                                                 {duplicateWarning}
@@ -2412,12 +2428,29 @@ function ConvertModal({ lead, onClose, onConverted }: {
         setForm(p => ({ ...p, [k]: e.target.checked }))
 
     const iCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+    const errCls = (bad: boolean) => iCls + (bad ? " !border-red-400" : "")
     const lCls = "block text-[12px] text-[var(--text2)] mb-1"
     const tabCls = (t: string) => `px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${activeTab === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`
+
+    // Validation
+    const cDigits = (v: string) => (v || "").replace(/\D/g, "")
+    const cPhoneOk  = (v: string) => !v || cDigits(v).length === 10
+    const cAadharOk = (v: string) => !v || cDigits(v).length === 12
+    const cPANOk    = (v: string) => !v || /^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(v.trim())
+    const cErrors = {
+        phone:  !cPhoneOk(form.phone),
+        alternatePhone: !cPhoneOk((form as any).alternatePhone),
+        aadharNumber: !cAadharOk((form as any).aadharNumber),
+        panNumber: !cPANOk((form as any).panNumber),
+        ec1Phone: !cPhoneOk((form as any).emergencyContact1Phone),
+        ec2Phone: !cPhoneOk((form as any).emergencyContact2Phone),
+    }
+    const cHasErrors = Object.values(cErrors).some(Boolean)
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         if (!form.firstName.trim()) { toast.error("First name is required"); return }
+        if (cHasErrors) { toast.error("Please fix validation errors before saving"); return }
         setSubmitting(true)
         try {
             const res = await fetch(`/api/recruitment/${lead.id}/convert`, {
@@ -2479,9 +2512,17 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                 <div><label className={lCls}>Middle Name</label><input value={form.middleName} onChange={set("middleName")} className={iCls} placeholder="Middle name" /></div>
                                 <div><label className={lCls}>Last Name</label><input value={form.lastName} onChange={set("lastName")} className={iCls} placeholder="Last name" /></div>
                                 <div><label className={lCls}>Father&apos;s Name</label><input value={form.fathersName} onChange={set("fathersName")} className={iCls} placeholder="Father's full name" /></div>
-                                <div><label className={lCls}>Phone</label><input value={form.phone} onChange={set("phone")} className={iCls} placeholder="Phone number" /></div>
+                                <div>
+                                    <label className={lCls}>Phone</label>
+                                    <input value={form.phone} onChange={set("phone")} maxLength={10} className={errCls(cErrors.phone)} placeholder="10-digit mobile number" />
+                                    {cErrors.phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                </div>
                                 <div><label className={lCls}>Email</label><input type="email" value={form.email} onChange={set("email")} className={iCls} placeholder="Email address" /></div>
-                                <div><label className={lCls}>Alternate Phone</label><input value={form.alternatePhone} onChange={set("alternatePhone")} className={iCls} placeholder="Alternate phone" /></div>
+                                <div>
+                                    <label className={lCls}>Alternate Phone</label>
+                                    <input value={form.alternatePhone} onChange={set("alternatePhone")} maxLength={10} className={errCls(cErrors.alternatePhone)} placeholder="10-digit (optional)" />
+                                    {cErrors.alternatePhone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                </div>
                                 <div><label className={lCls}>Date of Birth</label><input type="date" value={form.dateOfBirth} onChange={set("dateOfBirth")} className={iCls} /></div>
                                 <div>
                                     <label className={lCls}>Gender</label>
@@ -2492,8 +2533,16 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                         <option value="OTHER">Other</option>
                                     </select>
                                 </div>
-                                <div><label className={lCls}>Aadhar Number</label><input value={form.aadharNumber} onChange={set("aadharNumber")} className={iCls} placeholder="XXXX XXXX XXXX" /></div>
-                                <div><label className={lCls}>PAN Number</label><input value={form.panNumber} onChange={set("panNumber")} className={iCls} placeholder="XXXXX0000X" /></div>
+                                <div>
+                                    <label className={lCls}>Aadhar Number</label>
+                                    <input value={form.aadharNumber} onChange={set("aadharNumber")} maxLength={12} className={errCls(cErrors.aadharNumber)} placeholder="12-digit Aadhar number" />
+                                    {cErrors.aadharNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ Aadhar must be 12 digits</p>}
+                                </div>
+                                <div>
+                                    <label className={lCls}>PAN Number</label>
+                                    <input value={form.panNumber} onChange={e => setForm(p => ({ ...p, panNumber: e.target.value.toUpperCase() }))} maxLength={10} className={errCls(cErrors.panNumber)} placeholder="AAAAA9999A" />
+                                    {cErrors.panNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ PAN format: AAAAA9999A (10 chars)</p>}
+                                </div>
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Current Address</p>
                             <div className="grid grid-cols-2 gap-3">
@@ -2660,9 +2709,17 @@ function ConvertModal({ lead, onClose, onConverted }: {
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Emergency Contacts</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div><label className={lCls}>EC1 Name</label><input value={form.emergencyContact1Name} onChange={set("emergencyContact1Name")} className={iCls} placeholder="Contact person name" /></div>
-                                <div><label className={lCls}>EC1 Phone</label><input value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} className={iCls} placeholder="Contact phone" /></div>
+                                <div>
+                                    <label className={lCls}>EC1 Phone</label>
+                                    <input value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} maxLength={10} className={errCls(cErrors.ec1Phone)} placeholder="10-digit number" />
+                                    {cErrors.ec1Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                </div>
                                 <div><label className={lCls}>EC2 Name</label><input value={form.emergencyContact2Name} onChange={set("emergencyContact2Name")} className={iCls} placeholder="Contact person name" /></div>
-                                <div><label className={lCls}>EC2 Phone</label><input value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} className={iCls} placeholder="Contact phone" /></div>
+                                <div>
+                                    <label className={lCls}>EC2 Phone</label>
+                                    <input value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} maxLength={10} className={errCls(cErrors.ec2Phone)} placeholder="10-digit number" />
+                                    {cErrors.ec2Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                </div>
                             </div>
                         </div>
                     )}

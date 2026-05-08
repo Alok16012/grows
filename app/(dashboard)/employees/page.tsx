@@ -447,10 +447,30 @@ function EmployeeModal({
     const set = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setForm(f => ({ ...f, [key]: e.target.value }))
 
+    // ── Validation helpers ──
+    const digits = (v: string) => v.replace(/\D/g, "")
+    const isPhoneValid   = (v: string) => !v || digits(v).length === 10
+    const isAadharValid  = (v: string) => !v || digits(v).length === 12
+    const isPANValid     = (v: string) => !v || /^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(v.trim())
+
+    const fieldErrors = {
+        phone:           !isPhoneValid(form.phone)           ? "Phone must be 10 digits" : "",
+        alternatePhone:  !isPhoneValid(form.alternatePhone)  ? "Phone must be 10 digits" : "",
+        aadharNumber:    !isAadharValid(form.aadharNumber)   ? "Aadhar must be 12 digits" : "",
+        panNumber:       !isPANValid(form.panNumber)         ? "PAN format: AAAAA9999A (10 chars)" : "",
+        emergencyContact1Phone: !isPhoneValid((form as any).emergencyContact1Phone) ? "Phone must be 10 digits" : "",
+        emergencyContact2Phone: !isPhoneValid((form as any).emergencyContact2Phone) ? "Phone must be 10 digits" : "",
+    }
+    const hasFieldErrors = Object.values(fieldErrors).some(Boolean)
+
     // Core save logic — keepOpen=true saves and stays on current tab; keepOpen=false closes modal
     const doSave = async (keepOpen: boolean) => {
         if (!form.firstName.trim()) {
             toast.error("First name is required")
+            return
+        }
+        if (hasFieldErrors) {
+            toast.error("Please fix validation errors before saving")
             return
         }
         setLoading(true)
@@ -626,7 +646,9 @@ function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Phone</label>
-                                    <input value={form.phone} onChange={set("phone")} className={inputCls} placeholder="Phone number" />
+                                    <input value={form.phone} onChange={set("phone")} maxLength={10}
+                                        className={inputCls + (fieldErrors.phone ? " !border-red-400" : "")} placeholder="10-digit mobile number" />
+                                    {fieldErrors.phone && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.phone}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Email</label>
@@ -634,7 +656,9 @@ function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Alternate Phone</label>
-                                    <input value={form.alternatePhone} onChange={set("alternatePhone")} className={inputCls} placeholder="Alternate phone" />
+                                    <input value={form.alternatePhone} onChange={set("alternatePhone")} maxLength={10}
+                                        className={inputCls + (fieldErrors.alternatePhone ? " !border-red-400" : "")} placeholder="10-digit number (optional)" />
+                                    {fieldErrors.alternatePhone && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.alternatePhone}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Date of Birth</label>
@@ -651,11 +675,15 @@ function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Aadhar Number</label>
-                                    <input value={form.aadharNumber} onChange={set("aadharNumber")} className={inputCls} placeholder="XXXX XXXX XXXX" />
+                                    <input value={form.aadharNumber} onChange={set("aadharNumber")} maxLength={12}
+                                        className={inputCls + (fieldErrors.aadharNumber ? " !border-red-400" : "")} placeholder="12-digit Aadhar number" />
+                                    {fieldErrors.aadharNumber && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.aadharNumber}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>PAN Number</label>
-                                    <input value={form.panNumber} onChange={set("panNumber")} className={inputCls} placeholder="XXXXX0000X" />
+                                    <input value={form.panNumber} onChange={e => setForm(f => ({ ...f, panNumber: e.target.value.toUpperCase() }))} maxLength={10}
+                                        className={inputCls + (fieldErrors.panNumber ? " !border-red-400" : "")} placeholder="AAAAA9999A" />
+                                    {fieldErrors.panNumber && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.panNumber}</p>}
                                 </div>
                             </div>
 
@@ -1094,7 +1122,9 @@ function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>EC1 Phone</label>
-                                    <input value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} className={inputCls} placeholder="Contact phone" />
+                                    <input value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} maxLength={10}
+                                        className={inputCls + (fieldErrors.emergencyContact1Phone ? " !border-red-400" : "")} placeholder="10-digit number" />
+                                    {fieldErrors.emergencyContact1Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.emergencyContact1Phone}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>EC2 Name</label>
@@ -1102,7 +1132,9 @@ function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>EC2 Phone</label>
-                                    <input value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} className={inputCls} placeholder="Contact phone" />
+                                    <input value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} maxLength={10}
+                                        className={inputCls + (fieldErrors.emergencyContact2Phone ? " !border-red-400" : "")} placeholder="10-digit number" />
+                                    {fieldErrors.emergencyContact2Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.emergencyContact2Phone}</p>}
                                 </div>
                             </div>
                         </div>
