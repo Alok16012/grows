@@ -205,7 +205,9 @@ export const authOptions: NextAuthOptions = {
                         email: user.email,
                         role: user.role,
                         permissions: user.customRole?.isActive ? user.customRole.permissions : [],
-                    }
+                        customRoleName: user.customRole?.isActive ? user.customRole.name : null,
+                        customRoleColor: user.customRole?.isActive ? user.customRole.color : null,
+                    } as any
                 } catch (error) {
                     console.error("[AUTH] Error:", error)
                     throw error
@@ -219,16 +221,20 @@ export const authOptions: NextAuthOptions = {
                 token.id = user.id
                 token.role = user.role
                 token.permissions = (user as any).permissions || []
+                ;(token as any).customRoleName = (user as any).customRoleName || null
+                ;(token as any).customRoleColor = (user as any).customRoleColor || null
             }
             if (token.id && !user) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: token.id as string },
-                        select: { role: true, isActive: true, customRole: { select: { permissions: true, isActive: true } } }
+                        select: { role: true, isActive: true, customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                     })
                     if (dbUser) {
                         token.role = dbUser.role
                         token.permissions = dbUser.customRole?.isActive ? dbUser.customRole.permissions : []
+                        ;(token as any).customRoleName = dbUser.customRole?.isActive ? dbUser.customRole.name : null
+                        ;(token as any).customRoleColor = dbUser.customRole?.isActive ? dbUser.customRole.color : null
                     }
                 } catch { }
             }
@@ -239,6 +245,8 @@ export const authOptions: NextAuthOptions = {
                 session.user.id = token.id
                 session.user.role = token.role as Role
                 session.user.permissions = (token.permissions as string[]) || []
+                ;(session.user as any).customRoleName = (token as any).customRoleName || null
+                ;(session.user as any).customRoleColor = (token as any).customRoleColor || null
             }
             return session
         },

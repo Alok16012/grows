@@ -277,9 +277,22 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 <p className="text-[13px] font-semibold text-[var(--text)] truncate">{session?.user?.name || "User"}</p>
                                 <p className="text-[11px] text-[var(--text3)] truncate">{session?.user?.email}</p>
                                 <div className="mt-2">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] border border-[var(--accent-text)]/10">
-                                        {session?.user?.role?.replace("_", " ") || "USER"}
-                                    </span>
+                                    {(session?.user as any)?.customRoleName ? (
+                                        <span
+                                            style={{
+                                                color: (session?.user as any)?.customRoleColor || "#6366f1",
+                                                background: `${(session?.user as any)?.customRoleColor || "#6366f1"}15`,
+                                                borderColor: `${(session?.user as any)?.customRoleColor || "#6366f1"}40`,
+                                            }}
+                                            className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                                        >
+                                            {(session?.user as any).customRoleName}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] border border-[var(--accent-text)]/10">
+                                            {session?.user?.role?.replace("_", " ") || "USER"}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                             <div className="p-1">
