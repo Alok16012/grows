@@ -253,7 +253,7 @@ export default function DocumentTypesPage() {
     useEffect(() => {
         if (status === "unauthenticated") { router.push("/login"); return }
         if (status === "authenticated") {
-            if (!isAdmin) { router.push("/documents"); return }
+            if (!isAdmin) { router.push("/"); return }
             loadTypes()
         }
     }, [status, isAdmin, router, loadTypes])
@@ -285,13 +285,6 @@ export default function DocumentTypesPage() {
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                     <div className="flex items-center gap-2 text-[13px] text-[var(--text3)] mb-1">
-                        <span
-                            onClick={() => router.push("/documents")}
-                            className="hover:text-[var(--accent)] cursor-pointer transition-colors"
-                        >
-                            Documents
-                        </span>
-                        <ChevronRight size={13} />
                         <span className="text-[var(--text)]">Document Types</span>
                     </div>
                     <h1 className="text-[22px] font-semibold text-[var(--text)] flex items-center gap-2">

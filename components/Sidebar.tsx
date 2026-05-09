@@ -132,7 +132,6 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "DOCUMENTS",
             links: [
-                { name: "Documents", href: "/documents", icon: FileText, roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"], permission: "documents.view" },
                 { name: "Doc Types", href: "/documents/types", icon: FolderOpen, roles: ["ADMIN", "HR_MANAGER"], permission: "documents.view" },
             ]
         },
