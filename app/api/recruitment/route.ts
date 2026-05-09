@@ -7,7 +7,7 @@ import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.view")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

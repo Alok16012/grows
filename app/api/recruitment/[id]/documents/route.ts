@@ -8,7 +8,7 @@ import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -54,7 +54,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
