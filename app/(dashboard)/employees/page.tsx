@@ -594,9 +594,9 @@ function EmployeeModal({
         setForm(f => ({ ...f, [key]: e.target.checked }))
 
     const tabCls = (t: string) =>
-        `px-4 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${activeTab === t
+        `px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${activeTab === t
             ? "border-[var(--accent)] text-[var(--accent-text)]"
-            : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
+            : "border-transparent text-[var(--text)] hover:text-[var(--accent-text)] hover:border-[var(--border)]"
         }`
     const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
     const labelCls = "block text-[12px] text-[var(--text2)] mb-1"
