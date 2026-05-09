@@ -50,14 +50,16 @@ export const authOptions: NextAuthOptions = {
                     try {
                         const realUser = await prisma.user.findUnique({
                             where: { email: credentials.email },
-                            include: { customRole: { select: { permissions: true, isActive: true } } }
+                            include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                         })
                         if (realUser) {
                             return {
                                 id: realUser.id, name: realUser.name, email: realUser.email,
                                 role: realUser.role,
                                 permissions: realUser.customRole?.isActive ? realUser.customRole.permissions : [],
-                            }
+                                customRoleName: realUser.customRole?.isActive ? realUser.customRole.name : null,
+                                customRoleColor: realUser.customRole?.isActive ? realUser.customRole.color : null,
+                            } as any
                         }
                     } catch (e) { console.error("[AUTH] Demo error:", e) }
                     return {
@@ -79,7 +81,7 @@ export const authOptions: NextAuthOptions = {
                     // Step 1: Direct email lookup
                     user = await prisma.user.findUnique({
                         where: { email: inputRaw },
-                        include: { customRole: { select: { permissions: true, isActive: true } } }
+                        include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                     })
                     if (user) {
                         console.log("[AUTH] Found via email:", user.email)
@@ -96,7 +98,7 @@ export const authOptions: NextAuthOptions = {
                         matchedEmployee = await prisma.employee.findFirst({
                             where: { phone: { endsWith: inputDigits } },
                             include: {
-                                user: { include: { customRole: { select: { permissions: true, isActive: true } } } }
+                                user: { include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } } }
                             }
                         })
                         if (matchedEmployee?.user) {
@@ -111,7 +113,7 @@ export const authOptions: NextAuthOptions = {
                         const emp = await prisma.employee.findFirst({
                             where: { employeeId: { equals: inputClean, mode: "insensitive" } },
                             include: {
-                                user: { include: { customRole: { select: { permissions: true, isActive: true } } } }
+                                user: { include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } } }
                             }
                         })
                         if (emp) {
@@ -136,18 +138,18 @@ export const authOptions: NextAuthOptions = {
 
                         const existing = await prisma.user.findUnique({
                             where: { email },
-                            include: { customRole: { select: { permissions: true, isActive: true } } }
+                            include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                         })
                         if (existing) {
                             user = await prisma.user.update({
                                 where: { id: existing.id },
                                 data: { isActive: true, password: hash, name },
-                                include: { customRole: { select: { permissions: true, isActive: true } } }
+                                include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                             })
                         } else {
                             user = await prisma.user.create({
                                 data: { email, name, role: "INSPECTION_BOY", isActive: true, password: hash },
-                                include: { customRole: { select: { permissions: true, isActive: true } } }
+                                include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                             })
                         }
                         await prisma.employee.update({
@@ -178,7 +180,7 @@ export const authOptions: NextAuthOptions = {
                         user = await prisma.user.update({
                             where: { id: user.id },
                             data: { password: hash, isActive: true },
-                            include: { customRole: { select: { permissions: true, isActive: true } } }
+                            include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                         })
                         passwordOk = true
                     }
@@ -194,7 +196,7 @@ export const authOptions: NextAuthOptions = {
                         user = await prisma.user.update({
                             where: { id: user.id },
                             data: { isActive: true },
-                            include: { customRole: { select: { permissions: true, isActive: true } } }
+                            include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                         })
                     }
 

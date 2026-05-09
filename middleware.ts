@@ -10,16 +10,35 @@ const rolePaths: Record<string, string> = {
     "CLIENT": "/client",
 }
 
+// Pick a sensible landing page for a user with a custom role based on
+// what permissions they actually hold. Falls back to the system-role
+// default when they don't match any permission-based home.
+function landingForCustomRole(permissions: string[]): string | null {
+    if (permissions.includes("recruitment.view")) return "/recruitment"
+    if (permissions.includes("employees.view")) return "/employees"
+    if (permissions.includes("attendance.view")) return "/attendance"
+    if (permissions.includes("payroll.view")) return "/payroll"
+    if (permissions.includes("helpdesk.view")) return "/helpdesk"
+    if (permissions.includes("lms.view")) return "/lms/learn"
+    return null
+}
+
 export default withAuth(
     function middleware(req) {
         const token = req.nextauth.token
         const path = req.nextUrl.pathname
         const role = (token?.role as string) || ""
+        const customRoleName = (token as any)?.customRoleName as string | null
+        const permissions = ((token as any)?.permissions || []) as string[]
+
+        // Resolve dashboard: custom role wins (driven by permissions);
+        // fall back to the system role default.
+        const customLanding = customRoleName ? landingForCustomRole(permissions) : null
 
         // /login: bounce signed-in users to their own dashboard
         if (path === "/login") {
             if (token) {
-                const target = rolePaths[role] || "/"
+                const target = customLanding || rolePaths[role] || "/"
                 return NextResponse.redirect(new URL(target, req.url))
             }
             return NextResponse.next()
@@ -30,7 +49,7 @@ export default withAuth(
             return NextResponse.redirect(new URL("/login", req.url))
         }
 
-        const ownDashboard = rolePaths[role] || "/"
+        const ownDashboard = customLanding || rolePaths[role] || "/"
 
         // Role-gated route trees
         // /admin → ADMIN only
