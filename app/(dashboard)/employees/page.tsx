@@ -594,8 +594,8 @@ function EmployeeModal({
         setForm(f => ({ ...f, [key]: e.target.checked }))
 
     const tabCls = (t: string) =>
-        `px-4 py-2.5 text-[13px] font-semibold transition-colors whitespace-nowrap rounded-t-md ${activeTab === t
-            ? "bg-[var(--accent)] text-white"
+        `px-3 py-2 text-[13px] font-semibold transition-colors whitespace-nowrap rounded-md ${activeTab === t
+            ? "bg-[var(--accent)] text-white shadow-sm"
             : "text-[var(--text)] hover:bg-[var(--surface2)]"
         }`
     const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
@@ -615,7 +615,7 @@ function EmployeeModal({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b border-[var(--border)] px-4 pt-2 overflow-x-auto bg-[var(--surface)]">
+                <div className="flex gap-1 border-b border-[var(--border)] px-4 py-3 overflow-x-auto bg-[var(--surface2)]/40">
                     {(["personal", "employment", "salary", "bank", "compliance", "safety", "documents"] as const).map(t => (
                         <button type="button" key={t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
                             {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
