@@ -655,10 +655,23 @@ export default function ProfilePage() {
                 <div>
                     <p className="text-[17px] font-semibold text-[var(--text)]">{formData.name}</p>
                     <p className="text-[12px] text-[var(--text3)] mt-0.5">{formData.email}</p>
-                    <span className="inline-block mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide"
-                        style={{ backgroundColor: badge.bg, color: badge.color }}>
-                        {formData.role.replace("_", " ")}
-                    </span>
+                    {(session?.user as any)?.customRoleName ? (
+                        <span
+                            className="inline-block mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide border"
+                            style={{
+                                color: (session?.user as any)?.customRoleColor || "#6366f1",
+                                background: `${(session?.user as any)?.customRoleColor || "#6366f1"}15`,
+                                borderColor: `${(session?.user as any)?.customRoleColor || "#6366f1"}40`,
+                            }}
+                        >
+                            {(session?.user as any).customRoleName}
+                        </span>
+                    ) : (
+                        <span className="inline-block mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide"
+                            style={{ backgroundColor: badge.bg, color: badge.color }}>
+                            {formData.role.replace("_", " ")}
+                        </span>
+                    )}
                 </div>
             </div>
 
