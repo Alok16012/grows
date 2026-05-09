@@ -33,6 +33,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     })
 
     if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+    // Non-admins can only view their own created or assigned leads.
+    if (session!.user.role !== Role.ADMIN
+        && lead.createdBy !== session!.user.id
+        && lead.assignedTo !== session!.user.id) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
     return NextResponse.json(lead)
 }
 
@@ -46,6 +54,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         const body = await req.json()
         const prev = await prisma.lead.findUnique({ where: { id: params.id } })
         if (!prev) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+        // Non-admins can only modify leads they created or are assigned to.
+        if (session!.user.role !== Role.ADMIN
+            && prev.createdBy !== session!.user.id
+            && prev.assignedTo !== session!.user.id) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 })
+        }
 
         // Resolve real DB user ID (session.user.id may be a demo-xxx string)
         const actorId = await resolveUserId(session)

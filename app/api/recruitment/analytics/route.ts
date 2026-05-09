@@ -16,14 +16,20 @@ export async function GET(req: Request) {
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
+    // ADMIN sees all; everyone else only sees their own created or assigned leads.
+    const ownershipWhere = session!.user.role === Role.ADMIN
+        ? {}
+        : { OR: [{ createdBy: session!.user.id }, { assignedTo: session!.user.id }] }
+
     const [allLeads, todayLeads] = await Promise.all([
         prisma.lead.findMany({
+            where: ownershipWhere,
             include: {
                 assignee: { select: { id: true, name: true } },
             }
         }),
         prisma.lead.count({
-            where: { createdAt: { gte: today, lt: tomorrow } }
+            where: { AND: [ownershipWhere, { createdAt: { gte: today, lt: tomorrow } }] }
         })
     ])
 
