@@ -82,7 +82,7 @@ type Employee = {
     safetyEarMuffs?: boolean
     safetyShoes?: boolean
     onboardingToken?: string
-    user?: { id?: string; role: string; customRoleId?: string; email?: string; customRole?: { id?: string; name: string } | null } | null
+    user?: { id?: string; role: string; customRoleId?: string; email?: string; customRole?: { id?: string; name: string; color?: string } | null } | null
     userId?: string
     userRole?: string
     userCustomRoleId?: string
@@ -1669,6 +1669,18 @@ function EmployeeDrawer({
                                 {employee.designation && (
                                     <p className="text-[12px] text-[var(--text3)] mt-0.5">{employee.designation}</p>
                                 )}
+                                {(employee as any).user?.customRole?.name && (
+                                    <span
+                                        style={{
+                                            color: (employee as any).user.customRole.color || "#6366f1",
+                                            background: `${(employee as any).user.customRole.color || "#6366f1"}15`,
+                                            borderColor: `${(employee as any).user.customRole.color || "#6366f1"}40`,
+                                        }}
+                                        className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold border"
+                                    >
+                                        {(employee as any).user.customRole.name}
+                                    </span>
+                                )}
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -2819,6 +2831,18 @@ function EmployeesPage() {
                                                         <p className="text-[11px] font-mono text-[var(--accent-text)]">{emp.employeeId}</p>
                                                         {emp.designation && (
                                                             <p className="text-[11px] text-[var(--text3)]">{emp.designation}</p>
+                                                        )}
+                                                        {(emp as any).user?.customRole?.name && (
+                                                            <span
+                                                                style={{
+                                                                    color: (emp as any).user.customRole.color || "#6366f1",
+                                                                    background: `${(emp as any).user.customRole.color || "#6366f1"}15`,
+                                                                    borderColor: `${(emp as any).user.customRole.color || "#6366f1"}40`,
+                                                                }}
+                                                                className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border"
+                                                            >
+                                                                {(emp as any).user.customRole.name}
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>

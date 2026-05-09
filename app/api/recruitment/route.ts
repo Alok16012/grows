@@ -3,10 +3,11 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER && session.user.role !== Role.HR_MANAGER)) {
+    if (!checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -68,7 +69,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER && session.user.role !== Role.HR_MANAGER)) {
+    if (!checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

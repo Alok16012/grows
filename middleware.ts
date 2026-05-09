@@ -49,7 +49,6 @@ export default withAuth(
         if (path.startsWith("/client") && role !== "CLIENT") {
             return NextResponse.redirect(new URL(ownDashboard, req.url))
         }
-
         return NextResponse.next()
     },
     {

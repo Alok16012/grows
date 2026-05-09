@@ -76,7 +76,7 @@ export async function GET(req: Request) {
                             hra: true, ctcMonthly: true,
                         }
                     },
-                    user: { select: { id: true, role: true, customRoleId: true, email: true, customRole: { select: { id: true, name: true } } } },
+                    user: { select: { id: true, role: true, customRoleId: true, email: true, customRole: { select: { id: true, name: true, color: true } } } },
                     deployments: {
                         where: { isActive: true },
                         include: { site: { select: { id: true, name: true, code: true } } },

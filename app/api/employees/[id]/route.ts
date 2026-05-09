@@ -26,6 +26,7 @@ export async function GET(
                 leaves: { orderBy: { createdAt: "desc" } },
                 payrolls: { orderBy: [{ year: "desc" }, { month: "desc" }] },
                 assets: { include: { asset: true } },
+                user: { select: { id: true, role: true, customRoleId: true, email: true, customRole: { select: { id: true, name: true, color: true } } } },
             },
         })
 

@@ -486,27 +486,35 @@ export default function RecruitmentPage() {
         navigator.clipboard.writeText(url).then(() => toast.success("Link copied!")).catch(() => toast.error("Copy failed"))
     }
 
+    const userPermissions: string[] = (session?.user as any)?.permissions ?? []
+    const isAuthorized = status === "authenticated" && (
+        session?.user?.role === "ADMIN" ||
+        session?.user?.role === "MANAGER" ||
+        session?.user?.role === "HR_MANAGER" ||
+        userPermissions.includes("recruitment.view")
+    )
+
     useEffect(() => {
-        if (status !== "unauthenticated") {
+        if (isAuthorized) {
             fetchLeads()
         }
-    }, [filterStatus, filterPriority, filterScore, searchQ, status])
+    }, [filterStatus, filterPriority, filterScore, searchQ, isAuthorized])
 
     useEffect(() => {
-        if (status !== "unauthenticated") {
+        if (isAuthorized) {
             fetchUsers()
         }
-    }, [status])
+    }, [isAuthorized])
 
     useEffect(() => {
-        if (activeTab === "analytics" && status !== "unauthenticated") {
+        if (activeTab === "analytics" && isAuthorized) {
             fetchAnalytics()
         }
-        if (activeTab === "form-links" && status !== "unauthenticated") {
+        if (activeTab === "form-links" && isAuthorized) {
             fetchFormLinks()
             fetchSites()
         }
-    }, [activeTab, status])
+    }, [activeTab, isAuthorized])
 
     // Duplicate phone check
     const checkDuplicate = useCallback(async (phone: string) => {
@@ -700,6 +708,19 @@ export default function RecruitmentPage() {
     }, [leads])
 
     // ─────────────────────────────────────────────────────────────────────────────
+    if (status === "loading") {
+        return <div className="flex items-center justify-center min-h-[300px]"><Loader2 className="animate-spin text-[var(--text3)]" size={28} /></div>
+    }
+    if (!isAuthorized) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-center">
+                <AlertCircle size={40} className="text-red-400" />
+                <h2 className="text-lg font-semibold text-[var(--text)]">Access Restricted</h2>
+                <p className="text-sm text-[var(--text2)]">You don&apos;t have permission to view the recruitment pipeline.</p>
+            </div>
+        )
+    }
+
     return (
         <div className="flex flex-col gap-0 min-h-full">
 
