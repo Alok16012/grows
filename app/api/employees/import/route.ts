@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import crypto from "crypto"
 
 type Sv = string | number | undefined
 
@@ -155,9 +156,7 @@ export async function POST(req: Request) {
                     userId = newUser.id
                 }
 
-                const rawStatus = str(row.status).toUpperCase()
-                const validStatuses = ["ACTIVE","INACTIVE","ON_LEAVE","TERMINATED","RESIGNED"]
-                const statusVal = validStatuses.includes(rawStatus) ? rawStatus : "ACTIVE"
+                const onboardingToken = crypto.randomBytes(20).toString("hex")
 
                 await prisma.employee.create({
                     data: {
@@ -169,7 +168,8 @@ export async function POST(req: Request) {
                         alternatePhone: strN(row.alternatePhone),
                         designation:   strN(row.designation),
                         employmentType: str(row.employmentType) || "Full-time",
-                        status:        statusVal as "ACTIVE"|"INACTIVE"|"ON_LEAVE"|"TERMINATED"|"RESIGNED",
+                        status:        "ONBOARDING",
+                        onboardingToken,
                         dateOfJoining: dt(row.dateOfJoining),
                         dateOfLeaving: dt(row.dateOfLeaving),
                         basicSalary:   num(row.basicSalary),
@@ -265,6 +265,16 @@ export async function POST(req: Request) {
                     return {
                         skip: false, rowNum,
                         warning: `Site "${siteName}" not found — employee created without site assignment`
+                    }
+                }
+
+                // Create onboarding record so employee appears in onboarding pipeline
+                if (newEmp) {
+                    const existing = await prisma.onboardingRecord.findUnique({ where: { employeeId: newEmp.id } })
+                    if (!existing) {
+                        await prisma.onboardingRecord.create({
+                            data: { employeeId: newEmp.id, status: "NOT_STARTED" }
+                        })
                     }
                 }
 

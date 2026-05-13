@@ -89,7 +89,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                     name: `${firstName} ${lastName}`.trim(),
                     email: resolvedEmail,
                     password: hash,
-                    role: "INSPECTION_BOY",
+                    role: "INSPECTION_BOY", // default; admin can change after onboarding
                 }
             })
             userId = newUser.id
