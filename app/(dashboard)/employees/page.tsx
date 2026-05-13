@@ -2535,6 +2535,8 @@ function EmployeesPage() {
                     else if (lk === "conveyanceallowance")     entry.conveyance = val
                     else if (lk === "leavewithwages")          entry.leaveWithWages = val
                     else if (lk === "otherallowance")          entry.otherAllowance = val
+                    else if (lk === "bonus")                   entry.bonus = val
+                    else if (lk === "hra")                     entry.hra = val
                     else if (lk === "otrateperhour")           entry.otRatePerHour = val
                     else if (lk === "canteenrateperday")       entry.canteenRatePerDay = val
                     else if (lk === "compliancetype")          entry.complianceType = val

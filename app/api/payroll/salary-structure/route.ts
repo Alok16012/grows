@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const body = await req.json()
     const rows: {
         employeeId: string   // the UUID from Employee.id
-        basic: number; da: number; washing: number; conveyance: number
+        basic: number; da: number; hra?: number; washing: number; conveyance: number
         leaveWithWages: number; otherAllowance: number
         bonus: number
         otRatePerHour: number; canteenRatePerDay: number
@@ -62,11 +62,11 @@ export async function POST(req: Request) {
             const conveyance = Number(row.conveyance) || 0
             const lww        = Number(row.leaveWithWages) || 0
             const other      = Number(row.otherAllowance) || 0
-            const bonus      = Number(row.bonus) || 583
+            const bonus      = Number(row.bonus) || 0
+            const hra        = Number(row.hra) || 0
             const otRate     = Number(row.otRatePerHour) || 170
             const canteen    = Number(row.canteenRatePerDay) || 55
             const cType      = String(row.complianceType || "OR").toUpperCase() === "CALL" ? "CALL" : "OR"
-            const hra        = (basic + da) * 0.05
             const ctcM       = basic + da + hra + washing + conveyance + lww + bonus + other
 
             await prisma.employeeSalary.upsert({

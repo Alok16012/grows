@@ -11,8 +11,8 @@ interface ImportRow {
     designation?: Sv; employmentType?: Sv; status?: Sv
     dateOfJoining?: Sv; dateOfLeaving?: Sv
     department?: Sv; site?: Sv
-    basicSalary?: Sv; da?: Sv; washing?: Sv; conveyance?: Sv
-    leaveWithWages?: Sv; otherAllowance?: Sv
+    basicSalary?: Sv; da?: Sv; hra?: Sv; washing?: Sv; conveyance?: Sv
+    leaveWithWages?: Sv; otherAllowance?: Sv; bonus?: Sv
     otRatePerHour?: Sv; canteenRatePerDay?: Sv; complianceType?: Sv
     middleName?: Sv; nameAsPerAadhar?: Sv; fathersName?: Sv
     dateOfBirth?: Sv; gender?: Sv; bloodGroup?: Sv
@@ -223,21 +223,23 @@ export async function POST(req: Request) {
                 if (hasSalary && newEmp) {
                     const basic      = num(row.basicSalary)
                     const da         = num(row.da)
+                    const hra        = num(row.hra)
                     const washing    = num(row.washing)
                     const conveyance = num(row.conveyance)
                     const lww        = num(row.leaveWithWages)
                     const other      = num(row.otherAllowance)
+                    const bonus      = num(row.bonus)
                     const otRate     = num(row.otRatePerHour, 170)
                     const canteen    = num(row.canteenRatePerDay, 55)
                     const cType      = str(row.complianceType).toUpperCase() === "CALL" ? "CALL" : "OR"
-                    const hra        = (basic + da) * 0.05
-                    const ctcM       = basic + da + hra + washing + conveyance + lww + other
+                    const ctcM       = basic + da + hra + washing + conveyance + lww + bonus + other
                     await prisma.employeeSalary.create({
                         data: {
                             employeeId:       newEmp.id,
                             basic, da, washing, conveyance,
                             leaveWithWages:   lww,
                             otherAllowance:   other,
+                            bonus,
                             otRatePerHour:    otRate,
                             canteenRatePerDay: canteen,
                             hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,

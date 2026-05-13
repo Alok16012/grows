@@ -307,26 +307,26 @@ function WageSheetInner() {
         const payDate = `${String(today.getDate()).padStart(2,"0")}/${String(today.getMonth()+1).padStart(2,"0")}/${today.getFullYear()}`
 
         const rows = exportRows.map(p => [
-            "N",                                                    // 1 Transaction Type
-            "",                                                     // 2 Blank
-            p.employee.bankAccountNumber || "",                     // 3 Account Number
-            Math.round(p.netSalary),                               // 4 Net Salary
-            `${p.employee.firstName} ${p.employee.lastName}`.toUpperCase(), // 5 Name (CAPS)
-            "", "", "", "", "", "",                                 // 6-11 Blank (6)
-            caption,                                               // 12 Caption 1
-            caption,                                               // 13 Caption 2
-            siteShort,                                             // 14 Site Name
-            "", "", "", "", "", "",                                 // 15-20 Blank (6)
-            payDate,                                               // 21 Payment Date
-            "",                                                    // 22 Blank
-            p.employee.bankIFSC || "",                             // 23 IFSC
-            "", "",                                                // 24-25 Blank (2)
-            neftEmail,                                             // 26 Email
+            "N",                                                    // col A  Transaction Type
+            "",                                                     // col B  Blank
+            p.employee.bankAccountNumber || "",                     // col C  Account Number
+            Math.round(p.netSalary),                               // col D  Net Salary
+            `${p.employee.firstName} ${p.employee.lastName}`.toUpperCase(), // col E  Name (CAPS)
+            "", "", "", "", "", "", "",                             // col F-L Blank (7)
+            caption,                                               // col M  Caption 1
+            caption,                                               // col N  Caption 2
+            siteShort,                                             // col O  Site Name
+            "", "", "", "", "", "", "",                             // col P-V Blank (7)
+            payDate,                                               // col W  Payment Date
+            "",                                                    // col X  Blank
+            p.employee.bankIFSC || "",                             // col Y  IFSC
+            "", "",                                                // col Z-AA Blank (2)
+            neftEmail,                                             // col AB Email
         ])
 
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet(rows)
-        ws["!cols"] = Array(26).fill({ wch: 20 })
+        ws["!cols"] = Array(28).fill({ wch: 20 })
         XLSX.utils.book_append_sheet(wb, ws, "NEFT")
         XLSX.writeFile(wb, `NEFT_${site?.name ?? "Site"}_${MONTHS[m-1]}_${y}.xlsx`)
     }

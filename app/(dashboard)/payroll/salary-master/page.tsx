@@ -28,7 +28,7 @@ function calc(s: SalaryRow, isHandicap = false) {
     const other  = s.otherAllowance || 0
     const isCALL = s.complianceType === "CALL"
     const bonus  = isCALL ? 0 : (s.bonus != null && s.bonus > 0 ? s.bonus : Math.round(Math.min(basic + da, 7000) * 0.0833))
-    const hra    = isCALL ? 0 : Math.round((basic + da) * 0.05)
+    const hra    = isCALL ? 0 : (s.hra || 0)
     const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
     const empPF  = isCALL ? 0 : 1950
     // ESIC wages = (gross − washing); limit ₹21,000 (₹25,000 for Handicap)
@@ -49,7 +49,7 @@ function calc(s: SalaryRow, isHandicap = false) {
 }
 
 type SalaryRow = {
-    basic: number; da: number; washing: number; conveyance: number
+    basic: number; da: number; hra: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number; bonus: number
     otRatePerHour: number; canteenRatePerDay: number; complianceType: string
 }
@@ -63,7 +63,7 @@ type EmpSalary = {
 type EditForm = SalaryRow
 
 const EMPTY_SALARY: SalaryRow = {
-    basic: 0, da: 2511, washing: 0, conveyance: 0,
+    basic: 0, da: 2511, hra: 0, washing: 0, conveyance: 0,
     leaveWithWages: 0, otherAllowance: 0, bonus: 583,
     otRatePerHour: 170, canteenRatePerDay: 55, complianceType: "OR",
 }
@@ -102,9 +102,9 @@ export default function SalaryMasterPage() {
         const s = emp.employeeSalary
         const compType = s?.complianceType ?? "OR"
         setEditForm(s ? {
-            basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
+            basic: s.basic, da: s.da, hra: s.hra ?? 0, washing: s.washing, conveyance: s.conveyance,
             leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
-            bonus: s.bonus ?? 0, // preserve stored per-employee bonus (₹625/₹650 etc.)
+            bonus: s.bonus ?? 0,
             otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
             complianceType: compType,
         } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
@@ -115,7 +115,7 @@ export default function SalaryMasterPage() {
     const openDrawer = (emp: EmpSalary) => {
         const s = emp.employeeSalary
         setDrawerForm(s ? {
-            basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
+            basic: s.basic, da: s.da, hra: s.hra ?? 0, washing: s.washing, conveyance: s.conveyance,
             leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
             bonus: s.bonus ?? 0,
             otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
@@ -155,9 +155,9 @@ export default function SalaryMasterPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ rows: [{
                     employeeId: emp.id,
-                    basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
+                    basic: s.basic, da: s.da, hra: s.hra ?? 0, washing: s.washing, conveyance: s.conveyance,
                     leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
-                    bonus: s.bonus ?? 0, // preserve stored bonus when changing compliance type
+                    bonus: s.bonus ?? 0,
                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                     complianceType: newType,
                 }] }),
@@ -195,9 +195,8 @@ export default function SalaryMasterPage() {
     const handleDownloadTemplate = () => {
         const headers = [
             "EMP Code", "Employee Name", "Designation", "Site",
-            "Basic", "DA", "Washing", "Conveyance",
-            "Leave With Wages", "Other Allowance",
-            "Bonus", // editable: per-employee min-wage based, e.g. ₹625 (7500×8.33%) or ₹650 (7800×8.33%)
+            "Basic", "DA", "HRA", "Washing", "Conveyance",
+            "Leave With Wages", "Other Allowance", "Bonus",
             "OT Rate Per Hour", "Canteen Rate Per Day", "Compliance Type",
         ]
         const rows = filtered.map(emp => {
@@ -205,7 +204,6 @@ export default function SalaryMasterPage() {
             const basic = s?.basic ?? emp.basicSalary ?? 0
             const da    = s?.da ?? 2511
             const compType = s?.complianceType ?? "OR"
-            // Bonus: prefer stored value (₹625/₹650 etc.), else statutory ₹7000 cap × 8.33% ≈ ₹583
             const stored = (s as { bonus?: number } | null)?.bonus
             const bonus  = compType === "CALL" ? 0
                 : (stored != null && stored > 0 ? stored : Math.round(Math.min(basic + da, 7000) * 0.0833))
@@ -216,6 +214,7 @@ export default function SalaryMasterPage() {
                 emp.deployments?.[0]?.site?.name || "",
                 basic,
                 da,
+                s?.hra ?? 0,
                 s?.washing ?? 0,
                 s?.conveyance ?? 0,
                 s?.leaveWithWages ?? 0,
@@ -228,7 +227,7 @@ export default function SalaryMasterPage() {
         })
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 12, 16, 14, 12, 16, 18, 14].map(w => ({ wch: w }))
+        ws["!cols"] = [14, 22, 18, 18, 10, 10, 10, 10, 12, 16, 14, 12, 16, 18, 14].map(w => ({ wch: w }))
         XLSX.utils.book_append_sheet(wb, ws, "Salary Structure")
         const fileName = filterSite
             ? `salary_structure_${filterSite.replace(/[^a-zA-Z0-9]+/g, "_")}.xlsx`
@@ -280,10 +279,13 @@ export default function SalaryMasterPage() {
                     // If empty/missing, server will fallback to statutory ₹7000 × 8.33% ≈ ₹583
                     const bonusRaw = get("Bonus") ?? get("bonus")
                     const bonusVal = bonusRaw != null && String(bonusRaw).trim() !== "" ? Number(bonusRaw) : 0
+                    const hraRaw = get("HRA") ?? get("hra")
+                    const hraVal = hraRaw != null && String(hraRaw).trim() !== "" ? Number(hraRaw) : 0
                     rows.push({
                         employeeId:       uuid,
                         basic:            Number(get("Basic") ?? 0),
                         da:               Number(get("DA") ?? 2511),
+                        hra:              hraVal,
                         washing:          Number(get("Washing") ?? 0),
                         conveyance:       Number(get("Conveyance") ?? 0),
                         leaveWithWages:   Number(get("LeaveWithWages") ?? get("Leave With Wages") ?? 0),
@@ -427,7 +429,7 @@ export default function SalaryMasterPage() {
                                 <th style={{ ...th, textAlign: "left" }}>Employee</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Basic</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>DA</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>HRA<span style={calcTag}>auto</span></th>
+                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>HRA</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Washing</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Conv.</th>
                                 <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>LWW</th>
@@ -461,7 +463,7 @@ export default function SalaryMasterPage() {
                                 const isEditing = editId === emp.id
                                 const s = emp.employeeSalary
                                 const row: SalaryRow = isEditing ? editForm : (s ? {
-                                    basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
+                                    basic: s.basic, da: s.da, hra: s.hra ?? 0, washing: s.washing, conveyance: s.conveyance,
                                     leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? 583,
                                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                                     complianceType: s.complianceType,
@@ -495,7 +497,9 @@ export default function SalaryMasterPage() {
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("da", "#eff6ff") : s ? fmtN(s.da) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff", color: "#6b7280" }}>{s || isEditing ? fmtN(hra) : "—"}</td>
+                                        <td style={{ ...td, background: "#eff6ff" }}>
+                                            {isEditing ? numIn("hra", "#eff6ff") : s ? fmtN(s.hra ?? 0) : "—"}
+                                        </td>
                                         <td style={{ ...td, background: "#eff6ff" }}>
                                             {isEditing ? numIn("washing", "#eff6ff") : s ? fmtN(s.washing) : "—"}
                                         </td>
@@ -602,7 +606,7 @@ export default function SalaryMasterPage() {
                                     {[
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.basic || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.da || 0), 0),
-                                        filtered.reduce((s,e) => s + (e.employeeSalary ? Math.round((e.employeeSalary.basic + e.employeeSalary.da)*0.05) : 0), 0),
+                                        filtered.reduce((s,e) => s + (e.employeeSalary?.hra || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.washing || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.conveyance || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.leaveWithWages || 0), 0),
@@ -647,7 +651,7 @@ export default function SalaryMasterPage() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                HRA = (Basic+DA)×5% · Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = (Gross−Wash)×0.75% · Co.PF = ₹1,950 · Co.ESIC = (Gross−Wash)×3.25% · ESIC limit ₹21k (₹25k for Handicap)
+                Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = (Gross−Wash)×0.75% · Co.PF = ₹1,950 · Co.ESIC = (Gross−Wash)×3.25% · ESIC limit ₹21k (₹25k for Handicap)
             </p>
 
             {/* ── Manual Edit Drawer ─────────────────────────────────────── */}
@@ -719,13 +723,7 @@ export default function SalaryMasterPage() {
                                     {numField("leaveWithWages", "Leave w/ Wages", "₹")}
                                     {numField("otherAllowance", "Other Allowance","₹")}
                                     {numField("bonus",          "Bonus",          "Min-wage based: 625/650")}
-                                    <div style={{ marginBottom: 10 }}>
-                                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", marginBottom: 3, display: "block" }}>
-                                            HRA <span style={{ fontSize: 9, color: "#1d4ed8", fontWeight: 400, marginLeft: 4 }}>auto · (Basic+DA)×5%</span>
-                                        </label>
-                                        <input value={fmtN(live.hra)} disabled
-                                            style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 13, background: "#f1f5f9", color: "var(--text2)", textAlign: "right", boxSizing: "border-box" }} />
-                                    </div>
+                                    {numField("hra",            "HRA",            "₹")}
                                 </div>
 
                                 {/* Rates */}
@@ -739,7 +737,7 @@ export default function SalaryMasterPage() {
                                 <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10, background: "#f8fafc", border: "1px dashed #94a3b8" }}>
                                     <p style={{ fontSize: 11, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 8px 0" }}>📊 Live Calculation Preview</p>
                                     {previewRow("Basic + DA",      drawerForm.basic + drawerForm.da)}
-                                    {previewRow("HRA (auto 5%)",   live.hra, "#1d4ed8")}
+                                    {previewRow("HRA",             live.hra, "#1d4ed8")}
                                     {previewRow("Bonus (stored)",  live.bonus, "#7c3aed")}
                                     <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
                                     {previewRow("Gross (full)",    live.gross,    "#15803d", true)}
