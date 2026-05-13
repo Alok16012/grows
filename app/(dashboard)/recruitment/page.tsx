@@ -16,6 +16,7 @@ import {
     Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
 import * as XLSX from "xlsx"
 import {
@@ -279,6 +280,11 @@ export default function RecruitmentPage() {
 
     // Convert to employee state
     const [convertLead, setConvertLead] = useState<Lead | null>(null)
+
+    // View/edit employee modal
+    const [viewEmpOpen, setViewEmpOpen] = useState(false)
+    const [viewEmpData, setViewEmpData] = useState<EmpType | null>(null)
+    const [viewEmpLoading, setViewEmpLoading] = useState(false)
 
     const emptyForm = {
         candidateName: "", phone: "", email: "", city: "",
@@ -1270,6 +1276,15 @@ export default function RecruitmentPage() {
                         setPreviewName(name)
                     }}
                     onConvert={(lead) => { setConvertLead(lead); setDetailLead(null) }}
+                    onViewEmployee={async (employeeId) => {
+                        setViewEmpLoading(true)
+                        try {
+                            const r = await fetch(`/api/employees/${employeeId}`)
+                            if (r.ok) { setViewEmpData(await r.json()); setViewEmpOpen(true) }
+                            else toast.error("Could not load employee")
+                        } catch { toast.error("Failed to load employee") }
+                        finally { setViewEmpLoading(false) }
+                    }}
                 />
             )}
 
@@ -1286,6 +1301,14 @@ export default function RecruitmentPage() {
                     }}
                 />
             )}
+
+            <EmployeeModal
+                open={viewEmpOpen}
+                onClose={() => { setViewEmpOpen(false); setViewEmpData(null) }}
+                onSaved={() => {}}
+                employee={viewEmpData}
+                allSites={formSites}
+            />
 
             <DocumentViewer 
                 url={previewUrl} 
@@ -1746,7 +1769,7 @@ function DocumentsTabView({ leads, onLeadClick, onView }: { leads: Lead[]; onLea
 function DetailDrawer({
     lead, session, users, activityContent, activityType, savingActivity,
     onClose, onEdit, onDelete, onStatusChange, onActivityTypeChange, onActivityContentChange, onAddActivity,
-    onLeadUpdate, onView, onConvert
+    onLeadUpdate, onView, onConvert, onViewEmployee
 }: {
     lead: Lead
     session: any
@@ -1764,6 +1787,7 @@ function DetailDrawer({
     onLeadUpdate: (l: Lead) => void
     onView: (url: string, name: string) => void
     onConvert: (lead: Lead) => void
+    onViewEmployee: (employeeId: string) => void
 }) {
     const [drawerTab, setDrawerTab] = useState<"overview" | "activities" | "interview" | "documents" | "followups">("overview")
     const [interviewForm, setInterviewForm] = useState({
@@ -1975,7 +1999,7 @@ function DetailDrawer({
                                                 <span className="text-[13px] font-semibold text-green-700">Converted to Employee</span>
                                             </div>
                                             <button
-                                                onClick={() => router.push(`/employees?id=${lead.convertedEmployeeId}`)}
+                                                onClick={() => lead.convertedEmployeeId && onViewEmployee(lead.convertedEmployeeId)}
                                                 className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-green-600 text-white rounded-[6px] hover:bg-green-700 transition-colors shrink-0"
                                             >
                                                 <ExternalLink size={12} /> View Employee
