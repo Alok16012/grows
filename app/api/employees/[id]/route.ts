@@ -11,7 +11,9 @@ export async function GET(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")) {
+        const canViewEmployee = checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")
+        const canViewViaRecruitment = checkAccess(session, [], "recruitment.manage") || checkAccess(session, [], "recruitment.view")
+        if (!canViewEmployee && !canViewViaRecruitment) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
