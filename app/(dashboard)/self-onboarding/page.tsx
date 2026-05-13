@@ -6,7 +6,8 @@ import { toast } from "sonner"
 import {
     User, MapPin, Shield, CreditCard, Users, CheckCircle2,
     ChevronRight, ChevronLeft, Save, Loader2, AlertCircle,
-    RefreshCw, BadgeCheck, Clock, Building2, CalendarDays
+    RefreshCw, BadgeCheck, Clock, Building2, CalendarDays,
+    FileText, UploadCloud
 } from "lucide-react"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -54,6 +55,16 @@ const STEPS = [
     { id: 3, label: "Documents", icon: Shield,      desc: "Aadhar, PAN & statutory IDs" },
     { id: 4, label: "Bank",      icon: CreditCard,  desc: "Salary bank account details" },
     { id: 5, label: "Emergency", icon: Users,       desc: "Emergency contacts" },
+    { id: 6, label: "Uploads",   icon: FileText,    desc: "Upload identity documents" },
+]
+
+const DOC_UPLOAD_TYPES = [
+    { type: "AADHAAR",     label: "Aadhaar Card" },
+    { type: "PAN",         label: "PAN Card" },
+    { type: "PHOTO",       label: "Passport Photo" },
+    { type: "RESUME",      label: "Resume / CV" },
+    { type: "CERTIFICATE", label: "Educational Certificate" },
+    { type: "OTHER",       label: "Other Document" },
 ]
 
 // ── Small UI helpers ─────────────────────────────────────────────────────────
@@ -94,6 +105,8 @@ export default function SelfOnboardingPage() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving]   = useState(false)
     const [sameAddr, setSameAddr] = useState(false)
+    const [docs, setDocs] = useState<{ id: string; type: string; fileName: string; fileUrl: string; status: string | null }[]>([])
+    const [uploadingDoc, setUploadingDoc] = useState<Record<string, boolean>>({})
 
     const f = (k: keyof EmpProfile) => String(form[k] ?? "")
     const set = (k: keyof EmpProfile) => (v: string) => setForm(prev => ({ ...prev, [k]: v }))
@@ -101,18 +114,22 @@ export default function SelfOnboardingPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch("/api/employee/self-profile")
-            if (res.ok) {
-                const d: EmpProfile = await res.json()
+            const [profileRes, docsRes] = await Promise.all([
+                fetch("/api/employee/self-profile"),
+                fetch("/api/me/documents"),
+            ])
+            if (profileRes.ok) {
+                const d: EmpProfile = await profileRes.json()
                 setProfile(d)
                 setForm({
                     ...d,
                     dateOfBirth: d.dateOfBirth ? d.dateOfBirth.slice(0, 10) : "",
                 })
             } else {
-                const err = await res.json().catch(() => ({}))
+                const err = await profileRes.json().catch(() => ({}))
                 toast.error(err?.error ?? "Could not load your profile")
             }
+            if (docsRes.ok) setDocs(await docsRes.json())
         } catch { toast.error("Connection error — check your network and retry") }
         finally { setLoading(false) }
     }, [])
@@ -151,7 +168,35 @@ export default function SelfOnboardingPage() {
         finally { setSaving(false) }
     }
 
-    const saveAndNext = async () => { await save(); if (step < 5) setStep(s => s + 1) }
+    const saveAndNext = async () => { await save(); if (step < STEPS.length) setStep(s => s + 1) }
+
+    const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setUploadingDoc(p => ({ ...p, [type]: true }))
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const uploadRes = await fetch("/api/upload", { method: "POST", body: fd })
+            if (!uploadRes.ok) throw new Error(await uploadRes.text())
+            const { url } = await uploadRes.json()
+
+            const metaRes = await fetch("/api/me/documents", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type, fileName: file.name, fileUrl: url }),
+            })
+            if (!metaRes.ok) throw new Error(await metaRes.text())
+            const saved = await metaRes.json()
+            setDocs(prev => [...prev.filter(d => d.type !== type), saved])
+            toast.success(`${type} uploaded`)
+        } catch {
+            toast.error(`Failed to upload ${type}`)
+        } finally {
+            setUploadingDoc(p => ({ ...p, [type]: false }))
+            e.target.value = ""
+        }
+    }
 
     const pct = completion(profile)
 
@@ -484,7 +529,7 @@ export default function SelfOnboardingPage() {
                         <div style={{ background: "var(--surface2)", borderRadius: 12, padding: "16px 20px", border: "1px solid var(--border)" }}>
                             <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", margin: "0 0 12px" }}>Onboarding Summary</p>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                                {STEPS.slice(0, 4).map(s => {
+                                {STEPS.slice(0, 5).map(s => {
                                     const Icon = s.icon
                                     return (
                                         <div key={s.id} onClick={() => setStep(s.id)}
@@ -502,6 +547,56 @@ export default function SelfOnboardingPage() {
                         </div>
                     </div>
                 )}
+
+                {/* ── Step 6: Upload Docs ───────────────────────────────── */}
+                {step === 6 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1d4ed8" }}>
+                            Upload clear, legible copies of each document. Accepted formats: PDF, JPG, PNG.
+                        </div>
+                        {DOC_UPLOAD_TYPES.map(({ type, label }) => {
+                            const existing = docs.find(d => d.type === type)
+                            const uploading = uploadingDoc[type]
+                            return (
+                                <div key={type} style={{
+                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                    padding: "12px 14px", borderRadius: 12, gap: 12,
+                                    border: `1px solid ${existing ? "rgba(22,163,74,0.3)" : "var(--border)"}`,
+                                    background: existing ? "#f0fdf4" : "var(--surface2)",
+                                }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                                        <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: existing ? "rgba(22,163,74,0.1)" : "var(--surface)" }}>
+                                            <FileText size={16} style={{ color: existing ? "#16a34a" : "var(--text3)" }} />
+                                        </div>
+                                        <div style={{ minWidth: 0 }}>
+                                            <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 1px", color: "var(--text)" }}>{label}</p>
+                                            {existing
+                                                ? <p style={{ fontSize: 11, margin: 0, color: existing.status === "REJECTED" ? "#dc2626" : "#16a34a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                    {existing.status === "REJECTED" ? "Rejected — please re-upload" : `✓ ${existing.fileName}`}
+                                                  </p>
+                                                : <p style={{ fontSize: 11, margin: 0, color: "var(--text3)" }}>Not uploaded</p>
+                                            }
+                                        </div>
+                                    </div>
+                                    <label style={{ flexShrink: 0, cursor: uploading ? "not-allowed" : "pointer" }}>
+                                        <div style={{
+                                            display: "flex", alignItems: "center", gap: 6,
+                                            padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                                            border: "1px solid var(--accent)", color: "var(--accent)",
+                                            background: "var(--accent-light)", opacity: uploading ? 0.6 : 1,
+                                        }}>
+                                            {uploading
+                                                ? <><Loader2 size={12} className="animate-spin" /> Uploading…</>
+                                                : <><UploadCloud size={12} /> {existing ? "Re-upload" : "Upload"}</>
+                                            }
+                                        </div>
+                                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} disabled={uploading} onChange={e => handleDocUpload(e, type)} />
+                                    </label>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* ── Navigation footer ───────────────────────────────────────── */}
@@ -517,7 +612,7 @@ export default function SelfOnboardingPage() {
                         {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                         Save Draft
                     </button>
-                    {step < 5 ? (
+                    {step < STEPS.length ? (
                         <button onClick={saveAndNext} disabled={saving}
                             style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 24px", borderRadius: 10, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
                             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
