@@ -2,6 +2,15 @@
 
 export const PERMISSION_GROUPS = [
     {
+        group: "Inspection",
+        key: "inspection",
+        permissions: [
+            { key: "inspection.view",   label: "View Assigned Inspections" },
+            { key: "inspection.submit", label: "Submit Inspection Report" },
+            { key: "inspection.history", label: "View Inspection History" },
+        ]
+    },
+    {
         group: "Employees",
         key: "employees",
         permissions: [
