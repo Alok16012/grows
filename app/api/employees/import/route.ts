@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
-import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 type Sv = string | number | undefined
@@ -88,19 +87,6 @@ export async function POST(req: Request) {
             where: { phone: { in: allPhones } }, select: { phone: true }
         }).then(res => new Set(res.map(r => r.phone)))
 
-        // ── Pre-check duplicate emails / existing users ───────────────────────
-        const emailList = rows.map((r, idx) => {
-            const p = str(r.phone)
-            if (r.email) return str(r.email)
-            if (p) return `${p}@cims.local`
-            return `temp_${idx}_${Date.now()}@cims.local`
-        })
-        const existingUsers = await prisma.user.findMany({
-            where: { email: { in: emailList } },
-            select: { id: true, email: true, employeeProfile: { select: { id: true } } }
-        })
-        const userMap = new Map(existingUsers.map(u => [u.email.toLowerCase(), u]))
-
         // ── Process all rows in parallel (parallel bcrypt + parallel DB) ──────
         const results = await Promise.allSettled(
             rows.map(async (row, i) => {
@@ -116,15 +102,6 @@ export async function POST(req: Request) {
                     return { skip: true, rowNum, reason: `Duplicate: phone ${phone} already exists` }
                 }
 
-                let userEmail = str(row.email)
-                if (!userEmail) userEmail = phone ? `${phone}@cims.local` : `temp_${i}_${Date.now()}@cims.local`
-                const userEmailLower = userEmail.toLowerCase()
-
-                const existingUser = userMap.get(userEmailLower)
-                if (existingUser?.employeeProfile) {
-                    return { skip: true, rowNum, reason: `Duplicate: employee already exists for ${userEmail}` }
-                }
-
                 // Lookups
                 const siteName = str(row.site)
                 const siteId   = siteName
@@ -136,26 +113,6 @@ export async function POST(req: Request) {
                     : null
 
                 const hasSalary = row.basicSalary || row.da || row.washing || row.conveyance
-
-                // Parallel: bcrypt hash + (create user if needed)
-                let userId: string
-                if (existingUser) {
-                    userId = existingUser.id
-                } else {
-                    const defaultPassword = phone || "123456"
-                    // Cost 8 for bulk import (4× faster than 10, still secure for temp passwords)
-                    const passwordHash = await bcrypt.hash(defaultPassword, 8)
-                    const newUser = await prisma.user.create({
-                        data: {
-                            name:     `${firstName} ${str(row.lastName)}`.trim(),
-                            email:    userEmail,
-                            password: passwordHash,
-                            role:     "INSPECTION_BOY",
-                        },
-                    })
-                    userId = newUser.id
-                }
-
                 const onboardingToken = crypto.randomBytes(20).toString("hex")
 
                 await prisma.employee.create({
@@ -210,7 +167,6 @@ export async function POST(req: Request) {
                         workSkill:    strN(row.workSkill),
                         natureOfWork: strN(row.natureOfWork),
                         notes:        strN(row.notes),
-                        userId,
                     },
                 })
 

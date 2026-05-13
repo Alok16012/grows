@@ -3,7 +3,6 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
@@ -113,7 +112,6 @@ export async function POST(req: Request) {
             aadharNumber, panNumber, bankAccountNumber, bankIFSC, bankName,
             photo, designation, departmentId, branchId,
             dateOfJoining, status, employmentType, basicSalary, notes,
-            customRoleId, systemRole,
             // New fields
             middleName, nameAsPerAadhar, fathersName, bloodGroup, maritalStatus, marriageDate, nationality, religion, caste,
             uan, pfNumber, esiNumber, labourCardNo, labourCardExpDate,
@@ -149,43 +147,6 @@ export async function POST(req: Request) {
             ? `EMP-${String(nextNum + 1).padStart(4, "0")}`
             : employeeId
 
-        // ── Auto-create User account ──────────────────────────────────────────
-        // Email: use provided email, else phone@cims.local
-        // Password: phone number (employee can change later)
-        // Role: INSPECTION_BOY by default
-        const userEmail = email || (phone ? `${phone}@cims.local` : `temp_${Date.now()}@cims.local`)
-        const passwordHash = await bcrypt.hash(phone || "123456", 10)
-
-        // Check if user already exists with this email
-        const existingUser = await prisma.user.findUnique({ where: { email: userEmail } })
-
-        // Validate system role — only allow valid role values
-        const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY", "CLIENT"]
-        const assignedRole = (systemRole && VALID_ROLES.includes(systemRole)) ? systemRole : "INSPECTION_BOY"
-
-        let userId: string
-        if (existingUser) {
-            userId = existingUser.id
-            // Update role and customRoleId if provided
-            const updatePayload: Record<string, unknown> = {}
-            if (systemRole && VALID_ROLES.includes(systemRole)) updatePayload.role = assignedRole
-            if (customRoleId) updatePayload.customRoleId = customRoleId
-            if (Object.keys(updatePayload).length > 0) {
-                await prisma.user.update({ where: { id: existingUser.id }, data: updatePayload })
-            }
-        } else {
-            const newUser = await prisma.user.create({
-                data: {
-                    name: `${firstName} ${lastName}`,
-                    email: userEmail,
-                    password: passwordHash,
-                    role: assignedRole,
-                    customRoleId: customRoleId || null,
-                },
-            })
-            userId = newUser.id
-        }
-
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
 
         const employee = await prisma.employee.create({
@@ -213,10 +174,9 @@ export async function POST(req: Request) {
                 departmentId: departmentId || null,
                 branchId: branchId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
-                status: status || "ACTIVE",
+                status: "ONBOARDING",
                 employmentType: employmentType || "Full-time",
                 basicSalary: basicSalary ? parseFloat(basicSalary) : 0,
-                userId,
                 // New fields
                 middleName: middleName || null,
                 nameAsPerAadhar: nameAsPerAadhar || null,
@@ -272,11 +232,12 @@ export async function POST(req: Request) {
             },
         })
 
+        await prisma.onboardingRecord.create({
+            data: { employeeId: employee.id, status: "NOT_STARTED" }
+        })
+
         return NextResponse.json({
             ...employee,
-            _userCreated: !existingUser,
-            _loginEmail: userEmail,
-            _loginPassword: phone || "123456",
             _onboardingLink: `/onboarding/${onboardingToken}`,
         })
     } catch (error) {

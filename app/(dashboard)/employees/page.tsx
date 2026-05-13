@@ -204,7 +204,7 @@ type ModalForm = {
     dateOfBirth: string; gender: string; aadharNumber: string; panNumber: string
     designation: string; departmentId: string; branchId: string; managerId: string
     dateOfJoining: string; employmentType: string; salaryType: string; basicSalary: string
-    customRoleId: string; systemRole: string; role: string
+    customRoleId: string; role: string
     address: string; city: string; state: string; pincode: string
     permanentAddress: string; permanentCity: string; permanentState: string; permanentPincode: string
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
@@ -231,7 +231,7 @@ const EMPTY_FORM: ModalForm = {
     dateOfBirth: "", gender: "", aadharNumber: "", panNumber: "",
     designation: "", departmentId: "", branchId: "", managerId: "",
     dateOfJoining: "", employmentType: "Full-time", salaryType: "Monthly", basicSalary: "",
-    customRoleId: "", systemRole: "INSPECTION_BOY", role: "",
+    customRoleId: "", role: "",
     address: "", city: "", state: "", pincode: "",
     permanentAddress: "", permanentCity: "", permanentState: "", permanentPincode: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
@@ -418,7 +418,6 @@ function EmployeeModal({
                 safetyEarMuffs: employee.safetyEarMuffs ?? false,
                 safetyShoes: employee.safetyShoes ?? false,
                 customRoleId: (employee as any).user?.customRoleId || "",
-                systemRole: "INSPECTION_BOY",
                 role: employee.designation || "",
                 // Salary Structure — pre-fill from existing record
                 salDA:                String(employee.employeeSalary?.da               ?? ""),
