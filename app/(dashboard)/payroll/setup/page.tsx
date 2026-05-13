@@ -12,7 +12,7 @@ import * as XLSX from "xlsx"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SalarySalary = {
-    basic: number; da: number; washing: number; conveyance: number
+    basic: number; da: number; hra: number; bonus: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number
     otRatePerHour: number; canteenRatePerDay: number; status: string
     complianceType: string   // "CALL" | "OR"
@@ -50,12 +50,12 @@ function fmt(n: number) {
 
 // ─── Growus formula (client-side preview) ────────────────────────────────────
 function calcPreview(sal: SalarySalary, att: AttInput, gender = "Male"): CalcResult {
-    const { basic, da, washing, conveyance, leaveWithWages, otherAllowance, otRatePerHour, canteenRatePerDay, complianceType } = sal
+    const { basic, da, hra: hraStored, bonus: bonusStored, washing, conveyance, leaveWithWages, otherAllowance, otRatePerHour, canteenRatePerDay, complianceType } = sal
     const { monthDays, workedDays, otDays, canteenDays, penalty, advance, otherDeductions, productionIncentive, lwf } = att
     const isCALL = complianceType === "CALL"
     const isFemale = gender?.toLowerCase() === "female"
-    const hraFull = (basic + da) * 0.05
-    const bonusFull = 7000 / 12
+    const hraFull = isCALL ? 0 : (hraStored ?? 0)
+    const bonusFull = isCALL ? 0 : (bonusStored ?? 0)
     const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
     const r = (x: number) => Math.round(x / monthDays * workedDays)
     const basicSalary = r(basic), daE = r(da), hraE = r(hraFull)
@@ -89,14 +89,15 @@ function SalaryModal({ emp, onClose, onSaved }: {
     emp: EmpRow; onClose: () => void; onSaved: (s: SalarySalary) => void
 }) {
     const [form, setForm] = useState<SalarySalary>(emp.salary ?? {
-        basic: 0, da: 0, washing: 0, conveyance: 0, leaveWithWages: 0,
+        basic: 0, da: 0, hra: 0, bonus: 0, washing: 0, conveyance: 0, leaveWithWages: 0,
         otherAllowance: 0, otRatePerHour: 170, canteenRatePerDay: 55,
         status: "APPROVED", complianceType: "OR"
     })
     const [saving, setSaving] = useState(false)
 
-    const hra = (form.basic + form.da) * 0.05
-    const gross = form.basic + form.da + hra + form.washing + form.conveyance + form.leaveWithWages + (7000/12) + form.otherAllowance
+    const hra = form.hra ?? 0
+    const bonus = form.bonus ?? 0
+    const gross = form.basic + form.da + hra + form.washing + form.conveyance + form.leaveWithWages + bonus + form.otherAllowance
 
     const save = async () => {
         setSaving(true)
@@ -168,6 +169,7 @@ function SalaryModal({ emp, onClose, onSaved }: {
                     <div className="grid grid-cols-2 gap-4">
                         {([
                             ["basic","BASIC",true],["da","DA (Dearness Allowance)",true],
+                            ["hra","HRA (₹)",false],["bonus","Bonus (₹)",false],
                             ["washing","Washing Allowance",false],["conveyance","Conveyance",false],
                             ["leaveWithWages","Leave With Wages",false],["otherAllowance","Other Allowance",false],
                             ["otRatePerHour","OT Rate/Hour (₹)",false],["canteenRatePerDay","Canteen Rate/Day (₹)",false],
@@ -684,10 +686,11 @@ export default function PayrollPage() {
                             {employees.map(emp => {
                                 const s = emp.salary
                                 const isCALL = s?.complianceType === "CALL"
-                                const hra   = s ? (s.basic + s.da) * 0.05 : 0
-                                const gross = s ? s.basic + s.da + hra + s.washing + s.conveyance + s.leaveWithWages + (7000/12) + s.otherAllowance : 0
+                                const hra   = s ? (isCALL ? 0 : (s.hra ?? 0)) : 0
+                                const bonus = s ? (isCALL ? 0 : (s.bonus ?? 0)) : 0
+                                const gross = s ? s.basic + s.da + hra + s.washing + s.conveyance + s.leaveWithWages + bonus + s.otherAllowance : 0
                                 const empPF = (s && !isCALL) ? Math.round(15000 * 0.13) : 0
-                                const empESIC = (s && !isCALL && gross <= 21000) ? Math.ceil((gross - (s?.washing ?? 0) - 7000/12) * 0.0325) : 0
+                                const empESIC = (s && !isCALL && gross <= 21000) ? Math.ceil((gross - (s?.washing ?? 0) - bonus) * 0.0325) : 0
                                 const ctc   = s ? gross + empPF + empESIC : 0
                                 return (
                                     <tr key={emp.id} className="hover:bg-[var(--surface)]">

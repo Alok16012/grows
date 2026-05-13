@@ -121,7 +121,7 @@ export type ModalForm = {
     emergencyContact2Name: string; emergencyContact2Phone: string
     safetyGoggles: boolean; safetyGloves: boolean; safetyHelmet: boolean
     safetyMask: boolean; safetyJacket: boolean; safetyEarMuffs: boolean; safetyShoes: boolean
-    salDA: string; salWashing: string; salConveyance: string; salLeaveWithWages: string
+    salDA: string; salHRA: string; salBonus: string; salWashing: string; salConveyance: string; salLeaveWithWages: string
     salOtherAllowance: string; salOtRatePerHour: string; salCanteenRatePerDay: string
     salComplianceType: string
     siteId: string; deployShift: string; deployRole: string; deployStartDate: string
@@ -144,7 +144,7 @@ export const EMPTY_FORM: ModalForm = {
     emergencyContact2Name: "", emergencyContact2Phone: "",
     safetyGoggles: false, safetyGloves: false, safetyHelmet: false,
     safetyMask: false, safetyJacket: false, safetyEarMuffs: false, safetyShoes: false,
-    salDA: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
+    salDA: "", salHRA: "", salBonus: "", salWashing: "", salConveyance: "", salLeaveWithWages: "",
     salOtherAllowance: "", salOtRatePerHour: "170", salCanteenRatePerDay: "55",
     salComplianceType: "OR",
     siteId: "", deployShift: "", deployRole: "", deployStartDate: "",
@@ -308,6 +308,8 @@ export function EmployeeModal({
                 customRoleId: (employee as any).user?.customRoleId || "",
                 role: employee.designation || "",
                 salDA:                String(employee.employeeSalary?.da               ?? ""),
+                salHRA:               String(employee.employeeSalary?.hra              ?? ""),
+                salBonus:             String((employee.employeeSalary as any)?.bonus   ?? ""),
                 salWashing:           String(employee.employeeSalary?.washing          ?? ""),
                 salConveyance:        String(employee.employeeSalary?.conveyance       ?? ""),
                 salLeaveWithWages:    String(employee.employeeSalary?.leaveWithWages   ?? ""),
@@ -374,6 +376,8 @@ export function EmployeeModal({
                         body: JSON.stringify({
                             basic:            Number(form.basicSalary) || 0,
                             da:               Number(form.salDA) || 0,
+                            hra:              Number(form.salHRA) || 0,
+                            bonus:            Number(form.salBonus) || 0,
                             washing:          Number(form.salWashing) || 0,
                             conveyance:       Number(form.salConveyance) || 0,
                             leaveWithWages:   Number(form.salLeaveWithWages) || 0,
@@ -780,6 +784,14 @@ export function EmployeeModal({
                                             <input type="number" value={form.salDA} onChange={set("salDA")} className={inputCls} placeholder="0" min="0" />
                                         </div>
                                         <div>
+                                            <label className={labelCls}>HRA (₹)</label>
+                                            <input type="number" value={form.salHRA} onChange={set("salHRA")} className={inputCls} placeholder="0" min="0" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Bonus (₹)</label>
+                                            <input type="number" value={form.salBonus} onChange={set("salBonus")} className={inputCls} placeholder="0" min="0" />
+                                        </div>
+                                        <div>
                                             <label className={labelCls}>Washing Allowance (₹)</label>
                                             <input type="number" value={form.salWashing} onChange={set("salWashing")} className={inputCls} placeholder="0" min="0" />
                                         </div>
@@ -794,13 +806,6 @@ export function EmployeeModal({
                                         <div>
                                             <label className={labelCls}>Other Allowance (₹)</label>
                                             <input type="number" value={form.salOtherAllowance} onChange={set("salOtherAllowance")} className={inputCls} placeholder="0" min="0" />
-                                        </div>
-                                        <div>
-                                            <label className={labelCls} style={{ color: "#6366f1" }}>Bonus — Auto (8.33% of Basic+DA)</label>
-                                            <div style={{ padding: "7px 10px", borderRadius: 8, border: "1px dashed #a5b4fc", background: "#eef2ff", fontSize: 13, fontWeight: 600, color: "#4338ca", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                                <span style={{ fontSize: 10, color: "#818cf8", fontWeight: 400 }}>Auto-calculated</span>
-                                                <span>₹{Math.round(((Number(form.basicSalary) || 0) + (Number(form.salDA) || 0)) * 0.0833).toLocaleString("en-IN")}</span>
-                                            </div>
                                         </div>
                                         <div>
                                             <label className={labelCls}>OT Rate / Hour (₹)</label>
@@ -818,12 +823,12 @@ export function EmployeeModal({
                                 const basic   = Number(form.basicSalary) || 0
                                 const isCALL  = form.salComplianceType === "CALL"
                                 const da      = isCALL ? 0 : (Number(form.salDA) || 0)
+                                const hra     = isCALL ? 0 : (Number(form.salHRA) || 0)
+                                const bonus   = isCALL ? 0 : (Number(form.salBonus) || 0)
                                 const wash    = isCALL ? 0 : (Number(form.salWashing) || 0)
                                 const conv    = isCALL ? 0 : (Number(form.salConveyance) || 0)
                                 const lww     = isCALL ? 0 : (Number(form.salLeaveWithWages) || 0)
                                 const other   = isCALL ? 0 : (Number(form.salOtherAllowance) || 0)
-                                const hra     = isCALL ? 0 : Math.round((basic + da) * 0.05)
-                                const bonus   = isCALL ? 0 : Math.round((basic + da) * 0.0833)
                                 const otRate  = Number(form.salOtRatePerHour) || 170
                                 const canteen = Number(form.salCanteenRatePerDay) || 55
                                 const gross   = basic + da + hra + wash + conv + lww + bonus + other
@@ -842,11 +847,11 @@ export function EmployeeModal({
                                             {[
                                                 { label: "Basic",       value: fmt(basic),  color: "#1d4ed8" },
                                                 { label: "DA",          value: isCALL ? "—" : fmt(da),     color: isCALL ? "#cbd5e1" : "#1d4ed8" },
-                                                { label: "HRA (auto)",  value: isCALL ? "—" : fmt(hra),    color: isCALL ? "#cbd5e1" : "#6366f1" },
+                                                { label: "HRA",         value: isCALL ? "—" : fmt(hra),    color: isCALL ? "#cbd5e1" : "#6366f1" },
                                                 { label: "Washing",     value: isCALL ? "—" : fmt(wash),   color: isCALL ? "#cbd5e1" : "#1d4ed8" },
                                                 { label: "Conv.",       value: isCALL ? "—" : fmt(conv),   color: isCALL ? "#cbd5e1" : "#1d4ed8" },
                                                 { label: "LWW",         value: isCALL ? "—" : fmt(lww),    color: isCALL ? "#cbd5e1" : "#1d4ed8" },
-                                                { label: "Bonus (auto)",value: isCALL ? "—" : fmt(bonus),  color: isCALL ? "#cbd5e1" : "#6366f1" },
+                                                { label: "Bonus",       value: isCALL ? "—" : fmt(bonus),  color: isCALL ? "#cbd5e1" : "#6366f1" },
                                                 { label: "Other",       value: isCALL ? "—" : fmt(other),  color: isCALL ? "#cbd5e1" : "#1d4ed8" },
                                                 { label: "OT Rate/Hr",  value: fmt(otRate), color: "#64748b" },
                                                 { label: "Canteen/Day", value: fmt(canteen),color: "#64748b" },

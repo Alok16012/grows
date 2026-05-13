@@ -191,7 +191,7 @@ function EmployeeDrawer({
     const statusRef = useRef<HTMLDivElement>(null)
 
     // Salary structure state
-    type SalaryData = { basic: number; da: number; washing: number; conveyance: number; leaveWithWages: number; otherAllowance: number; otRatePerHour: number; canteenRatePerDay: number; complianceType: string; status: string; hra?: number; ctcMonthly?: number }
+    type SalaryData = { basic: number; da: number; hra?: number; bonus?: number; washing: number; conveyance: number; leaveWithWages: number; otherAllowance: number; otRatePerHour: number; canteenRatePerDay: number; complianceType: string; status: string; ctcMonthly?: number }
     const [salaryData, setSalaryData] = useState<SalaryData | null>(null)
     const [salaryLoading, setSalaryLoading] = useState(false)
     const [salaryEditing, setSalaryEditing] = useState(false)
@@ -559,6 +559,8 @@ function EmployeeDrawer({
                                             <>
                                                 {([
                                                     { key: "da", label: "DA (₹)" },
+                                                    { key: "hra", label: "HRA (₹)" },
+                                                    { key: "bonus", label: "Bonus (₹)" },
                                                     { key: "washing", label: "Washing (₹)" },
                                                     { key: "conveyance", label: "Conveyance (₹)" },
                                                     { key: "leaveWithWages", label: "Leave With Wages (₹)" },
@@ -568,20 +570,11 @@ function EmployeeDrawer({
                                                 ] as { key: keyof SalaryData; label: string }[]).map(f => (
                                                     <div key={f.key}>
                                                         <label className="block text-[11px] text-[var(--text3)] mb-1">{f.label}</label>
-                                                        <input type="number" value={salaryForm[f.key] as number} min="0"
+                                                        <input type="number" value={(salaryForm[f.key] as number) ?? 0} min="0"
                                                             onChange={e => setSalaryForm(p => ({ ...p, [f.key]: Number(e.target.value) || 0 }))}
                                                             className="w-full h-8 px-2.5 border border-[var(--border)] rounded-[6px] text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                                                     </div>
                                                 ))}
-                                                {/* Bonus auto display */}
-                                                <div>
-                                                    <label className="block text-[11px] mb-1" style={{ color: "#6366f1" }}>Bonus — Auto (8.33%)</label>
-                                                    <div className="w-full h-8 px-2.5 rounded-[6px] text-[13px] font-semibold flex items-center justify-between"
-                                                        style={{ border: "1px dashed #a5b4fc", background: "#eef2ff", color: "#4338ca" }}>
-                                                        <span style={{ fontSize: 10, color: "#818cf8", fontWeight: 400 }}>Auto</span>
-                                                        <span>₹{Math.round((salaryForm.basic + salaryForm.da) * 0.0833).toLocaleString("en-IN")}</span>
-                                                    </div>
-                                                </div>
                                             </>
                                         )}
                                     </div>
@@ -595,8 +588,8 @@ function EmployeeDrawer({
                                         const conv  = isC ? 0 : sf.conveyance
                                         const lww   = isC ? 0 : sf.leaveWithWages
                                         const other = isC ? 0 : sf.otherAllowance
-                                        const hra   = isC ? 0 : (sf.basic + da) * 0.05
-                                        const bonus = isC ? 0 : (sf.basic + da) * 0.0833
+                                        const hra   = isC ? 0 : (sf.hra ?? 0)
+                                        const bonus = isC ? 0 : (sf.bonus ?? 0)
                                         const gross = sf.basic + da + hra + wash + conv + lww + bonus + other
                                         const pf    = 0
                                         const esic  = 0
@@ -605,8 +598,8 @@ function EmployeeDrawer({
                                             <div className={`border rounded-[8px] p-3 space-y-1 text-[12px] ${isC ? "bg-amber-50 border-amber-200" : "bg-[#f0fdf4] border-emerald-200"}`}>
                                                 {isC && <div className="text-[11px] font-semibold text-amber-700 pb-1">CALL contract — Basic only, no allowances or PF/ESIC</div>}
                                                 {!isC && <>
-                                                    <div className="flex justify-between"><span className="text-[var(--text3)]">HRA (5%)</span><span>₹{Math.round(hra).toLocaleString("en-IN")}</span></div>
-                                                    <div className="flex justify-between"><span className="text-[var(--text3)]">Bonus (8.33%)</span><span>₹{Math.round(bonus).toLocaleString("en-IN")}</span></div>
+                                                    <div className="flex justify-between"><span className="text-[var(--text3)]">HRA</span><span>₹{Math.round(hra).toLocaleString("en-IN")}</span></div>
+                                                    <div className="flex justify-between"><span className="text-[var(--text3)]">Bonus</span><span>₹{Math.round(bonus).toLocaleString("en-IN")}</span></div>
                                                 </>}
                                                 <div className="flex justify-between font-medium"><span>Full Gross</span><span>₹{Math.round(gross).toLocaleString("en-IN")}</span></div>
                                                 <div className="flex justify-between text-[var(--text3)]"><span>Employer PF</span><span>{isC ? "N/A" : `₹${pf.toLocaleString("en-IN")}`}</span></div>
@@ -655,8 +648,8 @@ function EmployeeDrawer({
                                         const conv  = isC ? 0 : s.conveyance
                                         const lww   = isC ? 0 : s.leaveWithWages
                                         const other = isC ? 0 : s.otherAllowance
-                                        const hra   = isC ? 0 : (s.basic + da) * 0.05
-                                        const bonus = isC ? 0 : (s.basic + da) * 0.0833
+                                        const hra   = isC ? 0 : (s.hra ?? 0)
+                                        const bonus = isC ? 0 : (s.bonus ?? 0)
                                         const gross = s.basic + da + hra + wash + conv + lww + bonus + other
                                         const ctc   = gross  // CALL: no employer contributions
                                         return (

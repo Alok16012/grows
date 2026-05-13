@@ -27,7 +27,7 @@ function calc(s: SalaryRow, isHandicap = false) {
     const lww    = s.leaveWithWages || 0
     const other  = s.otherAllowance || 0
     const isCALL = s.complianceType === "CALL"
-    const bonus  = isCALL ? 0 : (s.bonus != null && s.bonus > 0 ? s.bonus : Math.round(Math.min(basic + da, 7000) * 0.0833))
+    const bonus  = isCALL ? 0 : (s.bonus ?? 0)
     const hra    = isCALL ? 0 : (s.hra || 0)
     const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
     const empPF  = isCALL ? 0 : 1950
@@ -204,9 +204,7 @@ export default function SalaryMasterPage() {
             const basic = s?.basic ?? emp.basicSalary ?? 0
             const da    = s?.da ?? 2511
             const compType = s?.complianceType ?? "OR"
-            const stored = (s as { bonus?: number } | null)?.bonus
-            const bonus  = compType === "CALL" ? 0
-                : (stored != null && stored > 0 ? stored : Math.round(Math.min(basic + da, 7000) * 0.0833))
+            const bonus  = compType === "CALL" ? 0 : ((s as { bonus?: number } | null)?.bonus ?? 0)
             return [
                 emp.employeeId,
                 `${emp.firstName} ${emp.lastName}`,

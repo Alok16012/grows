@@ -35,6 +35,7 @@ export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number
     otRatePerHour: number; canteenRatePerDay: number
+    hra?: number               // manual HRA from salary structure (no auto-calc)
     bonus?: number             // per-employee bonus from salary structure (Payment of Bonus Act cap)
     complianceType?: string    // "CALL" | "OR" (default "OR")
     isHandicap?: boolean       // ESIC eligibility limit: ₹25,000 for handicap, ₹21,000 otherwise
@@ -48,6 +49,7 @@ export function calcGrowusPayroll(sal: {
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
         otRatePerHour, canteenRatePerDay,
+        hra: storedHra,
         bonus: storedBonus,
         complianceType = "OR",
         isHandicap = false,
@@ -63,13 +65,10 @@ export function calcGrowusPayroll(sal: {
     const isFeb  = month === 2
 
     // ─── Full month components ────────────────────────────────────────────────
-    const hraFull    = (basic + da) * 0.05
-    // Bonus: use stored per-employee value if set, else (Basic+DA)×8.33%
-    // Stored value is typically min-wage-based per Payment of Bonus Act (e.g. ₹625, ₹650)
-    // Bonus: use per-employee stored value (min-wage-based per Bonus Act, e.g. ₹625/₹650).
-    // Fallback ≈ ₹583 = ₹7000 statutory ceiling × 8.33% (Payment of Bonus Act 1965 cap).
-    // Set the higher state-min-wage values on the salary structure when needed.
-    const bonusFull  = isCALL ? 0 : (storedBonus != null && storedBonus > 0 ? storedBonus : Math.round(Math.min(basic + da, 7000) * 0.0833))
+    // HRA: use manually stored value from salary structure (no auto-calculation)
+    const hraFull    = isCALL ? 0 : (storedHra != null && storedHra >= 0 ? storedHra : 0)
+    // Bonus: use manually stored value from salary structure (no auto-calculation)
+    const bonusFull  = isCALL ? 0 : (storedBonus != null && storedBonus > 0 ? storedBonus : 0)
     const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
 
     // ─── Prorated earned (ROUND to 0 decimal) ─────────────────────────────────

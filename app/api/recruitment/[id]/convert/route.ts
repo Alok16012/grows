@@ -28,7 +28,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             siteId, departmentId, designation, dateOfJoining, employmentType, salaryType, managerId,
             // Salary
             basicSalary, da, washing, conveyance, leaveWithWages, otherAllowance,
-            otRatePerHour, canteenRatePerDay, complianceType,
+            otRatePerHour, canteenRatePerDay, complianceType, hra: hraInput, bonus: bonusInput,
             // Deployment
             deployRole, deployShift, deployStartDate,
             // Personal — explicit overrides (from form)
@@ -169,13 +169,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const basic = parseFloat(basicSalary || 0)
         const daAmt = parseFloat(da || 0)
         if (basic > 0) {
-            const hra    = (basic + daAmt) * 0.05
+            const cType  = String(complianceType || "OR").toUpperCase() === "CALL" ? "CALL" : "OR"
+            const isCALL = cType === "CALL"
+            const hra    = isCALL ? 0 : (parseFloat(hraInput || 0) || 0)
+            const bonus  = isCALL ? 0 : (parseFloat(bonusInput || 0) || 0)
             const wash   = parseFloat(washing || 0)
             const conv   = parseFloat(conveyance || 0)
             const lww    = parseFloat(leaveWithWages || 0)
             const other  = parseFloat(otherAllowance || 0)
-            const ctcM   = basic + daAmt + hra + wash + conv + lww + other
-            const cType  = String(complianceType || "OR").toUpperCase() === "CALL" ? "CALL" : "OR"
+            const ctcM   = basic + daAmt + hra + wash + conv + lww + bonus + other
             await prisma.employeeSalary.create({
                 data: {
                     employeeId:       employee.id,
@@ -184,7 +186,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                     otherAllowance:   other,
                     otRatePerHour:    parseFloat(otRatePerHour || 170),
                     canteenRatePerDay: parseFloat(canteenRatePerDay || 55),
-                    hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
+                    hra, bonus, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
                     complianceType:   cType,
                     status:           "APPROVED",
                     proposedBy:       session.user.id,

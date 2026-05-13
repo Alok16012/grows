@@ -394,9 +394,8 @@ function ProcessPayrollPage() {
         const basic = sal?.status === "APPROVED" ? sal.basic : (e as any).basicSalary ?? 0
         if (sal?.status === "APPROVED") {
             const isCALL = sal.complianceType === "CALL"
-            const hra    = isCALL ? 0 : Math.round((sal.basic + sal.da) * 0.05)
-            const storedB = (sal as any).bonus
-            const bonus  = isCALL ? 0 : (storedB != null && storedB > 0 ? storedB : Math.round(Math.min(sal.basic + sal.da, 7000) * 0.0833))
+            const hra    = isCALL ? 0 : ((sal as any).hra ?? 0)
+            const bonus  = isCALL ? 0 : ((sal as any).bonus ?? 0)
             return s + sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance
         }
         return s + basic
@@ -751,11 +750,8 @@ function ProcessPayrollPage() {
                                                 const sal      = emp.employeeSalary
                                                 const att      = attRows[emp.id] ?? {}
                                                 const isCALL   = sal?.complianceType === "CALL"
-                                                const hra      = sal && !isCALL ? Math.round((sal.basic + sal.da) * 0.05) : 0
-                                                // Bonus: stored per-employee value preferred (e.g. ₹625/₹650 min-wage based).
-                                                // Fallback: ₹7000 statutory cap × 8.33% ≈ ₹583 (Payment of Bonus Act).
-                                                const storedBonus = (sal as any)?.bonus
-                                                const bonus    = sal && !isCALL ? (storedBonus != null && storedBonus > 0 ? storedBonus : Math.round(Math.min(sal.basic + sal.da, 7000) * 0.0833)) : 0
+                                                const hra      = sal && !isCALL ? ((sal as any).hra ?? 0) : 0
+                                                const bonus    = sal && !isCALL ? ((sal as any).bonus ?? 0) : 0
                                                 const fullGross = sal ? sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance : 0
                                                 const approved = sal?.status === "APPROVED"
                                                 const monthDays  = att.monthDays  ?? defaultDays
@@ -861,9 +857,9 @@ function ProcessPayrollPage() {
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.basic ?? 0), 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.da ?? 0), 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => {
-                                                        const sa = e.employeeSalary
+                                                        const sa = e.employeeSalary as any
                                                         if (!sa || sa.complianceType === "CALL") return s
-                                                        return s + Math.round((sa.basic + sa.da) * 0.05)
+                                                        return s + (sa.hra ?? 0)
                                                     }, 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.washing ?? 0), 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.conveyance ?? 0), 0))}</td>
@@ -871,9 +867,7 @@ function ProcessPayrollPage() {
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => {
                                                         const sa = e.employeeSalary as any
                                                         if (!sa || sa.complianceType === "CALL") return s
-                                                        const stored = sa.bonus
-                                                        const b = (stored != null && stored > 0) ? stored : Math.round(Math.min(sa.basic + sa.da, 7000) * 0.0833)
-                                                        return s + b
+                                                        return s + (sa.bonus ?? 0)
                                                     }, 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.otherAllowance ?? 0), 0))}</td>
                                                     <td style={{ ...td, background: "#dcfce7", color: "#15803d" }}>{fmt(totalGrossEst)}</td>

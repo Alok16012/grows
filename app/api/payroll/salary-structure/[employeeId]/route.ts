@@ -24,18 +24,16 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
         otRatePerHour, canteenRatePerDay, status,
-        complianceType,   // "CALL" | "OR"
+        complianceType, hra: hraInput, bonus: bonusInput,
     } = body
 
-    // Auto-calculate HRA for reference
-    const hra = (Number(basic) + Number(da)) * 0.05
     const isCALL = complianceType === "CALL"
+    const hra = isCALL ? 0 : (Number(hraInput) || 0)
+    const bonus = isCALL ? 0 : (Number(bonusInput) || 0)
     const grossFull = Number(basic) + Number(da) + hra + Number(washing) + Number(conveyance) +
-        Number(leaveWithWages) + Number(otherAllowance) + (7000 / 12)
-    // Employer PF: only for OR compliance
+        Number(leaveWithWages) + bonus + Number(otherAllowance)
     const empPF = isCALL ? 0 : Math.round(15000 * 0.13)
-    // Employer ESIC: only for OR compliance AND gross ≤ 21000
-    const empESIC = (isCALL || grossFull > 21000) ? 0 : Math.ceil((grossFull - Number(washing) - (7000 / 12)) * 0.0325)
+    const empESIC = (isCALL || grossFull > 21000) ? 0 : Math.ceil((grossFull - Number(washing) - bonus) * 0.0325)
     const ctcMonthly = grossFull + empPF + empESIC
 
     const sal = await prisma.employeeSalary.upsert({
@@ -51,6 +49,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             otRatePerHour: Number(otRatePerHour) || 170,
             canteenRatePerDay: Number(canteenRatePerDay) || 55,
             hra,
+            bonus,
             ctcMonthly,
             ctcAnnual: ctcMonthly * 12,
             status: status || "APPROVED",
@@ -68,6 +67,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             otRatePerHour: Number(otRatePerHour) || 170,
             canteenRatePerDay: Number(canteenRatePerDay) || 55,
             hra,
+            bonus,
             ctcMonthly,
             ctcAnnual: ctcMonthly * 12,
             status: status || "APPROVED",
