@@ -336,8 +336,21 @@ export default function PayrollPage() {
     }
 
     const downloadSalaryTemplate = () => {
-        const headers = [["Employee ID", "Basic", "DA", "Washing", "Conveyance", "Leave With Wages", "Other Allowance", "OT Rate/Hour", "Canteen Rate/Day", "Compliance Type (OR/CALL)"]]
-        const sampleRows = employees.slice(0, 3).map(e => [e.employeeId, e.salary?.basic ?? 0, e.salary?.da ?? 0, e.salary?.washing ?? 0, e.salary?.conveyance ?? 0, e.salary?.leaveWithWages ?? 0, e.salary?.otherAllowance ?? 0, e.salary?.otRatePerHour ?? 170, e.salary?.canteenRatePerDay ?? 55, e.salary?.complianceType ?? "OR"])
+        const headers = [["Employee ID", "Basic", "DA", "HRA", "Bonus", "Washing", "Conveyance", "Leave With Wages", "Other Allowance", "OT Rate/Hour", "Canteen Rate/Day", "Compliance Type (OR/CALL)"]]
+        const sampleRows = employees.slice(0, 3).map(e => [
+            e.employeeId,
+            e.salary?.basic ?? 0,
+            e.salary?.da ?? 0,
+            (e.salary as { hra?: number } | null)?.hra ?? 0,
+            (e.salary as { bonus?: number } | null)?.bonus ?? 0,
+            e.salary?.washing ?? 0,
+            e.salary?.conveyance ?? 0,
+            e.salary?.leaveWithWages ?? 0,
+            e.salary?.otherAllowance ?? 0,
+            e.salary?.otRatePerHour ?? 170,
+            e.salary?.canteenRatePerDay ?? 55,
+            e.salary?.complianceType ?? "OR",
+        ])
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleRows])
         ws["!cols"] = headers[0].map(h => ({ wch: Math.max(h.length + 2, 14) }))
@@ -369,6 +382,8 @@ export default function PayrollPage() {
                         body: JSON.stringify({
                             basic: Number(row["Basic"]) || 0,
                             da: Number(row["DA"]) || 0,
+                            hra: Number(row["HRA"]) || 0,
+                            bonus: Number(row["Bonus"]) || 0,
                             washing: Number(row["Washing"]) || 0,
                             conveyance: Number(row["Conveyance"]) || 0,
                             leaveWithWages: Number(row["Leave With Wages"]) || 0,
@@ -675,7 +690,8 @@ export default function PayrollPage() {
                                 <th className="px-4 py-3 text-left text-[var(--text3)] font-semibold">Employee</th>
                                 <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">BASIC</th>
                                 <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">DA</th>
-                                <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">HRA (auto)</th>
+                                <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">HRA</th>
+                                <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">Bonus</th>
                                 <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">Washing</th>
                                 <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">Full Gross</th>
                                 <th className="px-4 py-3 text-right text-[var(--text3)] font-semibold">CTC/Month</th>
@@ -703,7 +719,8 @@ export default function PayrollPage() {
                                         </td>
                                         <td className="px-4 py-3 text-right">{s ? fmt(s.basic) : <span className="text-[var(--text3)]">—</span>}</td>
                                         <td className="px-4 py-3 text-right">{s ? fmt(s.da) : "—"}</td>
-                                        <td className="px-4 py-3 text-right text-[var(--text3)]">{s ? fmt(hra) : "—"}</td>
+                                        <td className="px-4 py-3 text-right">{s ? fmt(hra) : "—"}</td>
+                                        <td className="px-4 py-3 text-right">{s ? fmt(bonus) : "—"}</td>
                                         <td className="px-4 py-3 text-right">{s ? fmt(s.washing) : "—"}</td>
                                         <td className="px-4 py-3 text-right font-medium">{s ? fmt(gross) : "—"}</td>
                                         <td className="px-4 py-3 text-right font-semibold text-purple-700">{s ? fmt(ctc) : "—"}</td>
