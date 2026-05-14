@@ -118,6 +118,7 @@ export async function POST(req: Request) {
             const calc = calcGrowusPayroll({
                 basic:             salBasic,
                 da:                salData?.da               ?? 0,
+                hra:               salData?.hra              ?? 0,
                 washing:           salData?.washing          ?? 0,
                 conveyance:        salData?.conveyance       ?? 0,
                 leaveWithWages:    salData?.leaveWithWages   ?? 0,
