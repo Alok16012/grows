@@ -153,6 +153,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             links: [
                 { name: "Users", href: "/admin/users", icon: Users, roles: ["ADMIN"] },
                 { name: "Roles", href: "/admin/roles", icon: Shield, roles: ["ADMIN"] },
+                { name: "Wage Rule Book", href: "/admin/rule-book", icon: BookOpen, roles: ["ADMIN"] },
                 { name: "Reports", href: "/reports", icon: BarChart2, roles: ["CLIENT"] },
             ]
         }
