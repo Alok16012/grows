@@ -16,7 +16,14 @@ export async function POST(
 ) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+    // Allow if user is in role list OR has any of the document/employee/recruitment permissions
+    const allowed =
+        checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload") ||
+        checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view") ||
+        checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit") ||
+        checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.create") ||
+        checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.manage")
+    if (!allowed) {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

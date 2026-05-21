@@ -127,6 +127,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "My Learning", href: "/lms/learn", icon: GraduationCap, roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"], permission: "lms.view" },
                 { name: "My Onboarding", href: "/self-onboarding", icon: BadgeCheck, roles: ["INSPECTION_BOY"] },
                 { name: "My Profile", href: "/profile", icon: UserCheck, roles: ["INSPECTION_BOY"] },
+                { name: "My Attendance", href: "/attendance", icon: Clock, roles: ["INSPECTION_BOY"] },
+                { name: "My Leaves", href: "/leaves", icon: CalendarOff, roles: ["INSPECTION_BOY"] },
             ]
         },
         {
@@ -152,6 +154,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "CONFIGURATION",
             links: [
                 { name: "Users", href: "/admin/users", icon: Users, roles: ["ADMIN"] },
+                { name: "Clients", href: "/admin/clients", icon: Building2, roles: ["ADMIN"] },
                 { name: "Roles", href: "/admin/roles", icon: Shield, roles: ["ADMIN"] },
                 { name: "Wage Rule Book", href: "/admin/rule-book", icon: BookOpen, roles: ["ADMIN"] },
                 { name: "Reports", href: "/reports", icon: BarChart2, roles: ["CLIENT"] },

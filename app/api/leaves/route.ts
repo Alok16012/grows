@@ -8,6 +8,28 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+        const isInspector = session.user.role === "INSPECTION_BOY"
+
+        // INSPECTION_BOY can only view their own leaves
+        if (isInspector) {
+            const linkedEmployee = await prisma.employee.findUnique({ where: { userId: session.user.id } })
+            if (!linkedEmployee) return NextResponse.json([])
+            const { searchParams } = new URL(req.url)
+            const monthParam = searchParams.get("month")
+            const where: Record<string, unknown> = { employeeId: linkedEmployee.id }
+            if (monthParam?.includes("-")) {
+                const [yr, mo] = monthParam.split("-").map(Number)
+                where.startDate = { gte: new Date(yr, mo - 1, 1), lt: new Date(yr, mo, 1) }
+            }
+            const leaves = await prisma.leave.findMany({
+                where,
+                include: { employee: { select: { id: true, firstName: true, lastName: true, employeeId: true, designation: true, photo: true } } },
+                orderBy: { createdAt: "desc" },
+            })
+            return NextResponse.json(leaves)
+        }
+
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -71,6 +93,28 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+        const isInspector = session.user.role === "INSPECTION_BOY"
+
+        // INSPECTION_BOY can apply leave only for their own linked employee
+        if (isInspector) {
+            const linkedEmployee = await prisma.employee.findUnique({ where: { userId: session.user.id } })
+            if (!linkedEmployee) return new NextResponse("No employee record linked", { status: 400 })
+            const body = await req.json()
+            const { type, startDate, endDate, days, reason } = body
+            if (!type || !startDate || !endDate || !days) {
+                return new NextResponse("type, startDate, endDate and days are required", { status: 400 })
+            }
+            const leave = await prisma.leave.create({
+                data: {
+                    employeeId: linkedEmployee.id,
+                    type, startDate: new Date(startDate), endDate: new Date(endDate),
+                    days: parseFloat(days), reason, status: "PENDING",
+                },
+            })
+            return NextResponse.json(leave)
+        }
+
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }

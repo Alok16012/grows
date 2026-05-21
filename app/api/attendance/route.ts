@@ -8,6 +8,32 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+        const isInspector = session.user.role === "INSPECTION_BOY"
+
+        // INSPECTION_BOY can only view their own attendance
+        if (isInspector) {
+            const linkedEmployee = await prisma.employee.findUnique({ where: { userId: session.user.id } })
+            if (!linkedEmployee) return NextResponse.json([])
+            const { searchParams } = new URL(req.url)
+            const monthParam = searchParams.get("month")
+            const month = monthParam?.includes("-") ? monthParam.split("-")[1] : monthParam
+            const year = monthParam?.includes("-") ? monthParam.split("-")[0] : searchParams.get("year")
+            const where: Record<string, unknown> = { employeeId: linkedEmployee.id }
+            if (monthParam && month && year) {
+                where.date = { gte: new Date(parseInt(year), parseInt(month) - 1, 1), lt: new Date(parseInt(year), parseInt(month), 1) }
+            }
+            const attendances = await prisma.attendance.findMany({
+                where,
+                include: {
+                    employee: { select: { id: true, firstName: true, lastName: true, employeeId: true, designation: true, photo: true } },
+                    site: { select: { id: true, name: true } },
+                },
+                orderBy: { date: "desc" },
+            })
+            return NextResponse.json(attendances)
+        }
+
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "attendance.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }

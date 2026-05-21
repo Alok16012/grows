@@ -74,6 +74,32 @@ export async function POST(req: Request) {
             }
         })
 
+        // Auto-create Employee record for inspectors so they appear in HR workflows
+        if (role === Role.INSPECTION_BOY) {
+            const nameParts = name.trim().split(" ")
+            const firstName = nameParts[0]
+            const lastName = nameParts.slice(1).join(" ") || "-"
+            // Generate unique employeeId: INS-<timestamp suffix>
+            const empId = "INS-" + Date.now().toString().slice(-6)
+            try {
+                await prisma.employee.create({
+                    data: {
+                        employeeId: empId,
+                        firstName,
+                        lastName,
+                        email,
+                        phone: body.phone || null,
+                        designation: "Inspector",
+                        status: "ACTIVE",
+                        userId: user.id,
+                    }
+                })
+            } catch (empErr) {
+                console.error("Failed to auto-create Employee for inspector:", empErr)
+                // Non-fatal: user is created, employee will be linked manually if needed
+            }
+        }
+
         const { password: _, ...safeUser } = user
         return NextResponse.json(safeUser)
     } catch (error: any) {
