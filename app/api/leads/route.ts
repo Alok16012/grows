@@ -7,7 +7,9 @@ import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    const role = session?.user?.role
+    // ADMIN, MANAGER, HR_MANAGER can access leads list
+    if (!session || (role !== Role.ADMIN && role !== Role.MANAGER && role !== "HR_MANAGER")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
         // Resolve real DB user ID (session.user.id may be a demo-xxx string)
@@ -22,6 +24,14 @@ export async function GET(req: Request) {
     const search = searchParams.get("search")
 
     const where: any = {}
+    // Visibility rule: ADMIN sees all leads. Everyone else sees ONLY leads
+    // they created themselves OR leads assigned to them.
+    if (role !== Role.ADMIN) {
+        where.OR = [
+            { createdBy: actorId },
+            { assignedTo: actorId },
+        ]
+    }
     if (status && status !== "ALL") where.status = status
     if (priority && priority !== "ALL") where.priority = priority
     if (assignedTo && assignedTo !== "ALL") where.assignedTo = assignedTo
