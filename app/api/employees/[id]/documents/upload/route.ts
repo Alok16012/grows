@@ -16,14 +16,9 @@ export async function POST(
 ) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    // Allow if user is in role list OR has any of the document/employee/recruitment permissions
-    const allowed =
-        checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload") ||
-        checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view") ||
-        checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit") ||
-        checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.create") ||
-        checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.manage")
-    if (!allowed) {
+    // Any authenticated staff user can upload employee docs.
+    // Block only CLIENT role (they shouldn't be touching employee data).
+    if (session.user.role === "CLIENT") {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

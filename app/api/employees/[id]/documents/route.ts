@@ -13,7 +13,7 @@ export async function GET(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+        if (session.user.role === "CLIENT") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -36,13 +36,8 @@ export async function POST(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        const allowed =
-            checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload") ||
-            checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view") ||
-            checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit") ||
-            checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.create") ||
-            checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.manage")
-        if (!allowed) {
+        // Any authenticated staff user can save employee docs; block clients only.
+        if (session.user.role === "CLIENT") {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
