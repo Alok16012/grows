@@ -163,13 +163,25 @@ export default function PayrollPage() {
         return "pending"
     }
 
-    const activeStep = STEPS.find(s => getStepStatus(s.step) === "active")
-    const doneCount  = STEPS.filter(s => getStepStatus(s.step) === "done").length
-    const progressPct = Math.round((doneCount / STEPS.length) * 100)
-
     // Which step number is currently open as a panel
     const panelToStep: Record<string, number> = { attendance: 1, process: 2, wagesheet: 3, compliance: 4, payslips: 5 }
     const openStepNum = activePanel ? (panelToStep[activePanel] ?? null) : null
+
+    // Display status: when a panel is open, all steps before it show as "done",
+    // the open step shows as "active", steps after show as "pending"
+    // This gives the user a clear sense of their journey through the flow
+    const getDisplayStatus = (stepNum: number): "done" | "active" | "pending" => {
+        if (openStepNum !== null) {
+            if (stepNum < openStepNum) return "done"
+            if (stepNum === openStepNum) return "active"
+            return "pending"
+        }
+        return getStepStatus(stepNum)
+    }
+
+    const activeStep  = STEPS.find(s => getStepStatus(s.step) === "active")
+    const doneCount   = STEPS.filter(s => getDisplayStatus(s.step) === "done").length
+    const progressPct = Math.round(((doneCount + (openStepNum !== null ? 0.5 : 0)) / STEPS.length) * 100)
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48, maxWidth: 1200 }}>
@@ -208,9 +220,23 @@ export default function PayrollPage() {
                         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Monthly Payroll Workflow</span>
                         <span style={{ fontSize: 11, color: "var(--text3)" }}>· {MONTHS[currentMonth - 1]} {currentYear}</span>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)" }}>
-                        {doneCount}/{STEPS.length} steps done
-                    </span>
+                    {openStepNum !== null ? (
+                        <span style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: STEPS[openStepNum - 1]?.color,
+                            background: `${STEPS[openStepNum - 1]?.color}12`,
+                            padding: "3px 10px",
+                            borderRadius: 20,
+                            border: `1px solid ${STEPS[openStepNum - 1]?.color}30`,
+                        }}>
+                            Step {openStepNum} of {STEPS.length} — {STEPS[openStepNum - 1]?.label}
+                        </span>
+                    ) : (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)" }}>
+                            {doneCount}/{STEPS.length} steps done
+                        </span>
+                    )}
                 </div>
 
                 {/* Thin Progress Bar */}
@@ -231,7 +257,7 @@ export default function PayrollPage() {
                             background: "var(--border)",
                             zIndex: 0,
                         }} />
-                        {/* Done portion of line */}
+                        {/* Done portion of line (green) */}
                         {doneCount > 0 && (
                             <div style={{
                                 position: "absolute",
@@ -244,12 +270,25 @@ export default function PayrollPage() {
                                 transition: "width 0.6s ease",
                             }} />
                         )}
+                        {/* Open step half-fill (step color) */}
+                        {openStepNum !== null && openStepNum > 1 && (
+                            <div style={{
+                                position: "absolute",
+                                top: 18,
+                                left: `calc(10% + ${((doneCount) / (STEPS.length - 1)) * 80}%)`,
+                                width: `calc(${(1 / (STEPS.length - 1)) * 80 / 2}%)`,
+                                height: 2,
+                                background: STEPS[openStepNum - 1]?.color ?? "var(--accent)",
+                                zIndex: 0,
+                                transition: "width 0.6s ease",
+                            }} />
+                        )}
 
                         {STEPS.map((s) => {
-                            const status = getStepStatus(s.step)
+                            const status    = getDisplayStatus(s.step)   // ← uses open-panel overlay
                             const isDone    = status === "done"
                             const isActive  = status === "active"
-                            const isOpen    = openStepNum === s.step   // ← panel currently open
+                            const isOpen    = openStepNum === s.step     // ← panel currently open
                             const Icon = s.icon
                             // All steps open inline panels
                             const handleStepClick = () => {
@@ -331,6 +370,64 @@ export default function PayrollPage() {
                         })}
                     </div>
                 </div>
+
+                {/* ── Flow Breadcrumb — shows journey when a panel is open ── */}
+                {openStepNum !== null && (
+                    <div style={{
+                        margin: "0 20px 12px",
+                        padding: "10px 16px",
+                        borderRadius: 10,
+                        background: `${STEPS[openStepNum - 1]?.color}08`,
+                        border: `1px solid ${STEPS[openStepNum - 1]?.color}22`,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0,
+                        overflowX: "auto",
+                        flexWrap: "wrap",
+                        rowGap: 4,
+                    }}>
+                        {STEPS.map((s, i) => {
+                            const ds = getDisplayStatus(s.step)
+                            const isCurrentOpen = s.step === openStepNum
+                            const isAfter = s.step > openStepNum
+                            return (
+                                <div key={s.step} style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                                    <span style={{
+                                        fontSize: 11,
+                                        fontWeight: isCurrentOpen ? 800 : ds === "done" ? 600 : 400,
+                                        color: isCurrentOpen
+                                            ? STEPS[openStepNum - 1]?.color
+                                            : ds === "done" ? "#16a34a"
+                                            : "var(--text3)",
+                                        padding: "2px 6px",
+                                        borderRadius: 6,
+                                        background: isCurrentOpen ? `${STEPS[openStepNum - 1]?.color}15` : "transparent",
+                                        whiteSpace: "nowrap",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                    }}>
+                                        {ds === "done"
+                                            ? <span style={{ color: "#16a34a" }}>✓</span>
+                                            : isCurrentOpen
+                                                ? <span style={{ fontSize: 9 }}>▶</span>
+                                                : <span style={{ color: "var(--text3)", opacity: 0.4 }}>○</span>
+                                        }
+                                        {s.label}
+                                    </span>
+                                    {i < STEPS.length - 1 && (
+                                        <span style={{
+                                            fontSize: 10,
+                                            color: ds === "done" ? "#16a34a" : "var(--border)",
+                                            margin: "0 2px",
+                                            fontWeight: 700,
+                                        }}>→</span>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
 
                 {/* Active Step Call-to-Action */}
                 {activeStep && (() => {
