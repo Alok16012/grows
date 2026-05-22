@@ -379,6 +379,110 @@ export default function InspectionFormPage() {
         const error = errors[template.id]
         const readOnly = !canEdit
 
+        // ── Checkbox fieldType ─────────────────────────────────────────────────
+        if (template.fieldType === "checkbox") {
+            const isChecked = value === "true"
+            return (
+                <div key={template.id} id={`field-${template.id}`}
+                    className={`bg-white border ${error ? "border-[#dc2626]" : isChecked ? "border-[#1a9e6e]" : "border-[#e8e6e1]"} rounded-[10px] mb-[8px] transition-all duration-150 ${isChecked ? "bg-[#f0fdf4]" : ""}`}>
+                    <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={() => handleFieldChange(template.id, isChecked ? "false" : "true")}
+                        className="w-full flex items-center justify-between p-[14px_16px] cursor-pointer disabled:cursor-default"
+                    >
+                        <div className="flex items-center gap-3 text-left">
+                            {/* Big tick circle */}
+                            <div className={`w-[28px] h-[28px] rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all duration-200 ${isChecked ? "bg-[#1a9e6e] border-[#1a9e6e]" : "bg-white border-[#d4d1ca]"}`}>
+                                {isChecked && (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                )}
+                            </div>
+                            <div>
+                                <p className={`text-[13px] font-[600] transition-colors ${isChecked ? "text-[#0d6b4a]" : "text-[#1a1a18]"}`}>
+                                    {template.fieldLabel}
+                                    {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
+                                </p>
+                                {template.options && (
+                                    <p className="text-[11px] text-[#9e9b95] mt-[1px]">{template.options}</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className={`text-[12px] font-[700] px-[10px] py-[4px] rounded-[20px] flex-shrink-0 ml-3 transition-all ${isChecked ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#f3f4f6] text-[#9ca3af]"}`}>
+                            {isChecked ? "✓ Done" : "Pending"}
+                        </div>
+                    </button>
+                    {error && <p className="text-[11px] font-medium text-[#dc2626] px-[16px] pb-[10px]">{error}</p>}
+                </div>
+            )
+        }
+
+        // ── OK / NG fieldType (pass / fail) ───────────────────────────────────
+        if (template.fieldType === "ok_ng" || template.fieldType === "pass_fail") {
+            const isOK = value === "OK" || value === "PASS"
+            const isNG = value === "NG" || value === "FAIL"
+            const okLabel  = template.fieldType === "pass_fail" ? "PASS" : "OK"
+            const ngLabel  = template.fieldType === "pass_fail" ? "FAIL" : "NG"
+            return (
+                <div key={template.id} id={`field-${template.id}`}
+                    className={`bg-white border ${error ? "border-[#dc2626]" : isOK ? "border-[#1a9e6e]" : isNG ? "border-[#dc2626]" : "border-[#e8e6e1]"} rounded-[10px] mb-[8px] p-[12px_14px] transition-all duration-150`}>
+                    <div className="flex items-center justify-between mb-[10px]">
+                        <div className="text-[11px] font-[600] text-[#6b6860] uppercase tracking-[0.4px]">
+                            {template.fieldLabel}
+                            {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
+                        </div>
+                        <div className="text-[10px] font-[500] px-[8px] py-[2px] rounded-[20px] bg-[#f5f3ff] text-[#7c3aed]">INSPECTION</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-[8px]">
+                        <button type="button" disabled={readOnly}
+                            onClick={() => handleFieldChange(template.id, okLabel)}
+                            className={`py-[12px] rounded-[10px] text-[14px] font-[700] border-2 transition-all duration-200 disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2 ${isOK ? "bg-[#1a9e6e] border-[#1a9e6e] text-white shadow-sm" : "bg-white border-[#e8e6e1] text-[#6b6860] hover:border-[#1a9e6e] hover:text-[#1a9e6e]"}`}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            {okLabel}
+                        </button>
+                        <button type="button" disabled={readOnly}
+                            onClick={() => handleFieldChange(template.id, ngLabel)}
+                            className={`py-[12px] rounded-[10px] text-[14px] font-[700] border-2 transition-all duration-200 disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2 ${isNG ? "bg-[#dc2626] border-[#dc2626] text-white shadow-sm" : "bg-white border-[#e8e6e1] text-[#6b6860] hover:border-[#dc2626] hover:text-[#dc2626]"}`}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            {ngLabel}
+                        </button>
+                    </div>
+                    {error && <p className="text-[11px] font-medium text-[#dc2626] mt-2">{error}</p>}
+                </div>
+            )
+        }
+
+        // ── Rating (1-5 stars) ─────────────────────────────────────────────────
+        if (template.fieldType === "rating") {
+            const rating = parseInt(value) || 0
+            return (
+                <div key={template.id} id={`field-${template.id}`}
+                    className={`bg-white border ${error ? "border-[#dc2626]" : "border-[#e8e6e1]"} rounded-[10px] mb-[8px] p-[12px_14px] transition-all duration-150`}>
+                    <div className="flex items-center justify-between mb-[10px]">
+                        <div className="text-[11px] font-[600] text-[#6b6860] uppercase tracking-[0.4px]">
+                            {template.fieldLabel}
+                            {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
+                        </div>
+                        <div className="text-[10px] font-[500] px-[8px] py-[2px] rounded-[20px] bg-[#fef3c7] text-[#d97706]">RATING</div>
+                    </div>
+                    <div className="flex gap-[8px]">
+                        {[1,2,3,4,5].map(star => (
+                            <button key={star} type="button" disabled={readOnly}
+                                onClick={() => handleFieldChange(template.id, String(rating === star ? 0 : star))}
+                                className="text-[28px] transition-transform hover:scale-110 disabled:cursor-default">
+                                {star <= rating ? "⭐" : "☆"}
+                            </button>
+                        ))}
+                        {rating > 0 && <span className="text-[12px] font-[600] text-[#d97706] self-center ml-1">{rating}/5</span>}
+                    </div>
+                    {error && <p className="text-[11px] font-medium text-[#dc2626] mt-2">{error}</p>}
+                </div>
+            )
+        }
+
+        // ── Default fields (text, number, date, textarea, dropdown) ───────────
         let pillClass = ""
         let pillText = template.fieldType.toUpperCase()
         if (template.fieldType === "date") pillClass = "bg-[#eff6ff] text-[#3b82f6]"
