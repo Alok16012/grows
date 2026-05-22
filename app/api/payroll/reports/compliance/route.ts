@@ -63,13 +63,21 @@ function epsContrib(p: PayrollRow) {
     return Math.round(pfWages(p) * 0.0833)
 }
 function esiWages(p: PayrollRow) {
-    return p.grossSalary - (p.washing ?? 0) - (p.bonus ?? 0)
+    // Clamp at 0 — bonus/washing > gross (e.g., zero-day month) was producing
+    // negative ESI wages, which EPFO/ESIC challan validators reject.
+    return Math.max(0, p.grossSalary - (p.washing ?? 0) - (p.bonus ?? 0))
+}
+function ncpDays(p: PayrollRow) {
+    // Clamp at 0 — present > working (OT-padded zero-day months) was producing
+    // negative NCP days, which EPFO ECR rejects.
+    return Math.max(0, (p.workingDays ?? 26) - (p.presentDays ?? p.workingDays ?? 26))
 }
 
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+        const role = session?.user.role
+        if (!session || (role !== Role.ADMIN && role !== Role.MANAGER && role !== Role.HR_MANAGER)) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
 
@@ -306,7 +314,7 @@ export async function GET(req: Request) {
                         "EPF Contribution (EE)": p.pfEmployee,
                         "EPS Contribution (ER)": epsContrib(p),
                         "EPF Contribution (ER)": Math.max(0, p.pfEmployer - epsContrib(p)),
-                        "NCP Days": (p.workingDays ?? 26) - (p.presentDays ?? p.workingDays ?? 26),
+                        "NCP Days": ncpDays(p),
                         "Refund of Advances": 0,
                     }))
                     break
@@ -321,7 +329,7 @@ export async function GET(req: Request) {
                         "EPF Contribution (EE)": p.pfEmployee,
                         "EPF Contribution (ER)": p.pfEmployer,
                         "EPS Contribution": epsContrib(p),
-                        "NCP Days": (p.workingDays ?? 26) - (p.presentDays ?? p.workingDays ?? 26),
+                        "NCP Days": ncpDays(p),
                         "Refund of Advances": 0,
                     }))
                     break

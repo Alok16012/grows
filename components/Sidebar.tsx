@@ -68,25 +68,25 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const pathname = usePathname()
     const { data: session } = useSession()
     const role = session?.user?.role as string | undefined
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => { setMounted(true) }, [])
 
     const [pendingCount, setPendingCount] = useState(0)
 
+    // Approval count poll — pauses when tab is hidden to avoid wasted fetches.
+    // Interval bumped 60s → 5min; the badge isn't time-critical.
     useEffect(() => {
-        if (role === "ADMIN" || role === "MANAGER") {
-            const fetchCount = async () => {
-                try {
-                    const res = await fetch("/api/approvals?count=true")
-                    const data = await res.json()
-                    setPendingCount(data.count || 0)
-                } catch { /* silent */ }
-            }
-            fetchCount()
-            const interval = setInterval(fetchCount, 60000)
-            return () => clearInterval(interval)
+        if (role !== "ADMIN" && role !== "MANAGER") return
+        let stopped = false
+        const fetchCount = async () => {
+            if (document.hidden) return
+            try {
+                const res = await fetch("/api/approvals?count=true")
+                const data = await res.json()
+                if (!stopped) setPendingCount(data.count || 0)
+            } catch { /* silent */ }
         }
+        fetchCount()
+        const interval = setInterval(fetchCount, 5 * 60_000)
+        return () => { stopped = true; clearInterval(interval) }
     }, [role])
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
@@ -261,7 +261,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
             {/* ── Navigation ── */}
             <div className="flex-1 overflow-y-auto pt-4 px-2 scrollbar-thin">
-                {mounted && navigation.map((section) => {
+                {navigation.map((section) => {
                     const currentRole = String(role || "")
 
                     const filteredLinks = section.links.filter(link => {

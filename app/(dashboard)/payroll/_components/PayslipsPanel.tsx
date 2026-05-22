@@ -94,7 +94,7 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
         const earnings=[
             {label:"Basic",                 fullRate:rate(p.basicSalary), amt:p.basicSalary},
             {label:"DA",                     fullRate:rate(p.da),          amt:p.da},
-            {label:"HRA",                    fullRate:0,                   amt:0},
+            {label:"HRA",                    fullRate:rate(p.hra),         amt:p.hra},
             {label:"Educational Allowance",  fullRate:0,                   amt:0},
             {label:"Conveyance Allow.",      fullRate:rate(p.conveyance),  amt:p.conveyance},
             {label:"Medical Allowance",      fullRate:0,                   amt:0},

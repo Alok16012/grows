@@ -11,16 +11,26 @@ const nextConfig = {
     },
     async headers() {
         return [
+            // Long-cache static assets
             {
                 source: "/_next/static/:path*",
                 headers: [
                     { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
                 ],
             },
+            // Auth endpoints must never be cached
             {
-                source: "/((?!_next/static|_next/image|favicon.ico).*)",
+                source: "/api/auth/:path*",
                 headers: [
                     { key: "Cache-Control", value: "no-store, must-revalidate" },
+                ],
+            },
+            // Mutable API data — short revalidate window (allows browser back/forward cache,
+            // RSC payload cache, and CDN revalidation)
+            {
+                source: "/api/:path*",
+                headers: [
+                    { key: "Cache-Control", value: "private, no-cache, must-revalidate" },
                 ],
             },
         ]

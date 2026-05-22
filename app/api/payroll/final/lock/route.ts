@@ -8,6 +8,13 @@ export async function POST(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        // Only ADMIN / MANAGER / HR_MANAGER can lock payroll — locking is destructive
+        // (no edits possible after) so it shouldn't be available to any signed-in user.
+        const role = (session.user as { role?: string })?.role
+        if (role !== "ADMIN" && role !== "MANAGER" && role !== "HR_MANAGER") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+
         const body = await req.json()
         const { month, year, siteIds, payrollIds } = body
 
@@ -23,28 +30,30 @@ export async function POST(req: Request) {
                 ...(siteIds?.length ? { siteId: { in: siteIds } } : {})
             }
 
-        const updated = await prisma.payroll.updateMany({
-            where,
-            data: {
-                status: "PROCESSED",
-                processedAt: new Date(),
-                processedBy: session.user.id ?? "system"
-            }
-        })
+        // Wrap both updates in a transaction so we never end up with payrolls
+        // locked but the run still DRAFT (or vice-versa) on a partial failure.
+        const [updated] = await prisma.$transaction([
+            prisma.payroll.updateMany({
+                where,
+                data: {
+                    status: "PROCESSED",
+                    processedAt: new Date(),
+                    processedBy: session.user.id ?? "system"
+                }
+            }),
+            prisma.payrollRun.updateMany({
+                where: { month, year, status: "DRAFT" },
+                data: {
+                    status: "PROCESSED",
+                    lockedAt: new Date()
+                }
+            }),
+        ])
 
-        // Also update PayrollRun if it exists
-        await prisma.payrollRun.updateMany({
-            where: { month, year, status: "DRAFT" },
-            data: { 
-                status: "PROCESSED",
-                lockedAt: new Date()
-            }
-        })
-
-        return NextResponse.json({ 
-            success: true, 
+        return NextResponse.json({
+            success: true,
             message: `Locked ${updated.count} payroll records.`,
-            count: updated.count 
+            count: updated.count
         })
     } catch (error) {
         console.error("[PAYROLL_FINAL_LOCK]", error)

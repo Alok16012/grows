@@ -3,17 +3,26 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import dynamic from "next/dynamic"
 import {
     Loader2, RefreshCw, Play, FileSpreadsheet,
     ShieldCheck, Upload, IndianRupee,
     Clock, Trash2, TrendingUp, Settings2, Lock,
     CheckCircle2, ArrowRight, ChevronRight
 } from "lucide-react"
-import ProcessPanel    from "./_components/ProcessPanel"
-import AttendancePanel from "./_components/AttendancePanel"
-import WageSheetPanel  from "./_components/WageSheetPanel"
-import CompliancePanel from "./_components/CompliancePanel"
-import PayslipsPanel   from "./_components/PayslipsPanel"
+
+// Panels are lazy-loaded — each pulls xlsx (~430KB) so eager imports
+// bloated the initial payroll bundle. Only one is open at a time.
+const panelLoading = (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 48, gap: 8, color: "var(--text3)" }}>
+        <Loader2 size={18} className="animate-spin" /> Loading…
+    </div>
+)
+const ProcessPanel    = dynamic(() => import("./_components/ProcessPanel"),    { ssr: false, loading: () => panelLoading })
+const AttendancePanel = dynamic(() => import("./_components/AttendancePanel"), { ssr: false, loading: () => panelLoading })
+const WageSheetPanel  = dynamic(() => import("./_components/WageSheetPanel"),  { ssr: false, loading: () => panelLoading })
+const CompliancePanel = dynamic(() => import("./_components/CompliancePanel"), { ssr: false, loading: () => panelLoading })
+const PayslipsPanel   = dynamic(() => import("./_components/PayslipsPanel"),   { ssr: false, loading: () => panelLoading })
 
 type PayrollRun = {
     id: string
