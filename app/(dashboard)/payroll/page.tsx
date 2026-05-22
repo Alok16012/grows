@@ -9,6 +9,7 @@ import {
     Clock, Trash2, TrendingUp, Settings2, Lock,
     CheckCircle2, ArrowRight, ChevronRight
 } from "lucide-react"
+import ProcessPanel from "./_components/ProcessPanel"
 
 type PayrollRun = {
     id: string
@@ -99,10 +100,11 @@ export default function PayrollPage() {
     const { data: session } = useSession()
     const router = useRouter()
 
-    const [runs,       setRuns]      = useState<PayrollRun[]>([])
-    const [loading,    setLoading]   = useState(true)
-    const [yearFilter, setYearFilter]= useState(String(new Date().getFullYear()))
-    const [deleting,   setDeleting]  = useState<string | null>(null)
+    const [runs,        setRuns]       = useState<PayrollRun[]>([])
+    const [loading,     setLoading]    = useState(true)
+    const [yearFilter,  setYearFilter] = useState(String(new Date().getFullYear()))
+    const [deleting,    setDeleting]   = useState<string | null>(null)
+    const [activePanel, setActivePanel]= useState<"process" | null>(null)
 
     const fetchRuns = useCallback(async () => {
         setLoading(true)
@@ -240,11 +242,16 @@ export default function PayrollPage() {
                             const isDone    = status === "done"
                             const isActive  = status === "active"
                             const Icon = s.icon
+                            // Steps 1 & 2 open inline panel; others navigate
+                            const handleStepClick = () => {
+                                if (s.step === 1 || s.step === 2) setActivePanel("process")
+                                else router.push(s.href)
+                            }
 
                             return (
                                 <button
                                     key={s.step}
-                                    onClick={() => router.push(s.href)}
+                                    onClick={handleStepClick}
                                     style={{
                                         flex: 1,
                                         display: "flex",
@@ -342,7 +349,10 @@ export default function PayrollPage() {
                                 </p>
                             </div>
                             <button
-                                onClick={() => router.push(activeStep.href)}
+                                onClick={() => {
+                                    if (activeStep.step === 1 || activeStep.step === 2) setActivePanel("process")
+                                    else router.push(activeStep.href)
+                                }}
                                 style={{
                                     display: "flex",
                                     alignItems: "center",
@@ -398,6 +408,14 @@ export default function PayrollPage() {
                     </p>
                 </div>
             </div>
+
+            {/* ── Inline Process Panel ── */}
+            {activePanel === "process" && (
+                <ProcessPanel
+                    onClose={() => setActivePanel(null)}
+                    onDone={() => { setActivePanel(null); fetchRuns() }}
+                />
+            )}
 
             {/* ── Stats Row ── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12 }}>
