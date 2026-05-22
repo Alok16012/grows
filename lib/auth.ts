@@ -1,7 +1,6 @@
 
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { Role } from "@prisma/client"
@@ -21,7 +20,10 @@ const DEV_LOG = process.env.NODE_ENV !== "production"
 const dlog = (...args: unknown[]) => { if (DEV_LOG) console.log(...args) }
 
 export const authOptions: NextAuthOptions = {
-    adapter: PrismaAdapter(prisma),
+    // PrismaAdapter removed — we use Credentials provider with JWT strategy,
+    // so the adapter is not required. Removing it also eliminates a major
+    // failure mode where a bad DATABASE_URL surfaces as a generic
+    // "server configuration" error during NextAuth init.
     session: {
         strategy: "jwt",
         maxAge: 30 * 24 * 60 * 60, // 30 days
