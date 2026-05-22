@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { startOfMonth, endOfMonth, subDays } from "date-fns"
+import { unstable_cache } from "next/cache"
 
 export const dynamic = "force-dynamic"
 
@@ -16,21 +17,14 @@ type RiskRow = {
     avg_sent_back: number | null
 }
 
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.MANAGER && session.user.role !== Role.ADMIN)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    try {
+// 30-second server cache — repeat dashboard loads served instantly.
+const getStats = unstable_cache(
+    async () => {
         const now = new Date()
         const monthStart = startOfMonth(now)
         const monthEnd = endOfMonth(now)
         const sevenDaysAgo = subDays(now, 7)
 
-        // All queries run in parallel. The risk-alerts aggregation is a single
-        // raw SQL GROUP BY — replaces the previous N+1 (10 projects × all their
-        // inspections fetched as nested objects) that was taking ~7 seconds.
         const [
             pendingApprovals,
             activeAssignments,
@@ -77,7 +71,6 @@ export async function GET() {
             prisma.inspection.count({
                 where: { status: "pending", submittedAt: { lte: sevenDaysAgo } },
             }),
-            // Single GROUP BY aggregation — one DB roundtrip instead of N+1
             prisma.$queryRaw<RiskRow[]>`
                 SELECT
                     p.id            as project_id,
@@ -119,7 +112,7 @@ export async function GET() {
             .filter(p => p.isAtRisk)
             .slice(0, 5)
 
-        return NextResponse.json({
+        return {
             pendingApprovals,
             activeAssignments,
             completedThisMonth,
@@ -139,9 +132,22 @@ export async function GET() {
                 status: a.status,
                 createdAt: a.createdAt,
             })),
-        }, {
+        }
+    },
+    ["manager-stats"],
+    { revalidate: 30, tags: ["manager-stats"] },
+)
+
+export async function GET() {
+    const session = await getServerSession(authOptions)
+    if (!session || (session.user.role !== Role.MANAGER && session.user.role !== Role.ADMIN)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    try {
+        const stats = await getStats()
+        return NextResponse.json(stats, {
             headers: {
-                "Cache-Control": "private, s-maxage=30, stale-while-revalidate=60",
+                "Cache-Control": "private, max-age=15, stale-while-revalidate=60",
             },
         })
     } catch (error) {

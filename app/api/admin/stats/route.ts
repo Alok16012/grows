@@ -4,23 +4,21 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { startOfMonth, endOfMonth } from "date-fns"
+import { unstable_cache } from "next/cache"
 
 export const dynamic = "force-dynamic"
 
-export async function GET() {
-    const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== Role.ADMIN) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    try {
+// Cached server-side for 30s. First request after 30s = slow (hits DB);
+// every subsequent request in the window = instant (no DB hit at all).
+// This is the single biggest dashboard speedup — counts don't change
+// second-to-second, so 30s staleness is fine.
+const getStats = unstable_cache(
+    async () => {
         const now = new Date()
         const monthStart = startOfMonth(now)
         const monthEnd = endOfMonth(now)
         const monthRange = { gte: monthStart, lte: monthEnd }
 
-        // All queries run in parallel. We use `count()` instead of `findMany`
-        // + JS filtering — DB does aggregation 10-100x faster.
         const [
             totalCompanies,
             totalProjects,
@@ -52,11 +50,7 @@ export async function GET() {
             prisma.inspection.count({ where: { submittedAt: monthRange } }),
         ])
 
-        const approvalRate = totalThisMonth > 0
-            ? Math.round((approvedThisMonth / totalThisMonth) * 100)
-            : 0
-
-        return NextResponse.json({
+        return {
             totalCompanies,
             totalProjects,
             pendingApprovals,
@@ -72,11 +66,26 @@ export async function GET() {
                 totalInspections: totalThisMonth,
                 approved: approvedThisMonth,
                 rejected: rejectedThisMonth,
-                approvalRate,
+                approvalRate: totalThisMonth > 0
+                    ? Math.round((approvedThisMonth / totalThisMonth) * 100)
+                    : 0,
             },
-        }, {
+        }
+    },
+    ["admin-stats"],
+    { revalidate: 30, tags: ["admin-stats"] },
+)
+
+export async function GET() {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== Role.ADMIN) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    try {
+        const stats = await getStats()
+        return NextResponse.json(stats, {
             headers: {
-                "Cache-Control": "private, s-maxage=30, stale-while-revalidate=60",
+                "Cache-Control": "private, max-age=15, stale-while-revalidate=60",
             },
         })
     } catch (error) {

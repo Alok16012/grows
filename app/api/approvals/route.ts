@@ -1,9 +1,17 @@
-
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { unstable_cache } from "next/cache"
+
+// Sidebar polls this count every 5 minutes. Cache for 60s so concurrent
+// badge fetches don't hammer the DB.
+const getPendingCount = unstable_cache(
+    async () => prisma.inspection.count({ where: { status: "pending" } }),
+    ["approvals-count"],
+    { revalidate: 60, tags: ["approvals"] },
+)
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -16,10 +24,10 @@ export async function GET(req: Request) {
         const countOnly = searchParams.get("count") === "true"
 
         if (countOnly) {
-            const count = await prisma.inspection.count({
-                where: { status: "pending" }
+            const count = await getPendingCount()
+            return NextResponse.json({ count }, {
+                headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" },
             })
-            return NextResponse.json({ count })
         }
 
         const pendingInspections = await prisma.inspection.findMany({
