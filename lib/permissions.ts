@@ -1,15 +1,66 @@
-// ─── Permission Definitions (shared between admin roles UI and access checks) ─
+// ─── Permission Definitions ──────────────────────────────────────────────────
+// Used by:
+//   1. Admin → Roles UI (to build the permission checklist)
+//   2. Sidebar (to show / hide nav items)
+//   3. API routes + page guards (via checkAccess)
+//
+// Groups are ordered to match the sidebar sections so admins picking
+// permissions for a custom role see a familiar layout.
 
 export const PERMISSION_GROUPS = [
+
+    // ── INSPECTIONS ──────────────────────────────────────────────────────────
     {
-        group: "Inspection",
+        group: "Projects",
+        key: "projects",
+        permissions: [
+            { key: "projects.view",   label: "View Projects" },
+            { key: "projects.manage", label: "Create / Edit / Delete Projects" },
+        ]
+    },
+    {
+        group: "Assignments",
+        key: "assignments",
+        permissions: [
+            { key: "assignments.view",   label: "View Assignments" },
+            { key: "assignments.manage", label: "Create / Edit / Delete Assignments" },
+        ]
+    },
+    {
+        group: "Sites",
+        key: "sites",
+        permissions: [
+            { key: "sites.view",   label: "View Sites" },
+            { key: "sites.manage", label: "Create / Edit / Delete Sites" },
+        ]
+    },
+    {
+        group: "Groups",
+        key: "groups",
+        permissions: [
+            { key: "groups.view",   label: "View Groups" },
+            { key: "groups.manage", label: "Manage Groups" },
+        ]
+    },
+    {
+        group: "Field Tasks",
+        key: "field",
+        permissions: [
+            { key: "field.view",   label: "View Field Tasks" },
+            { key: "field.manage", label: "Assign / Manage Field Tasks" },
+        ]
+    },
+    {
+        group: "Inspection (Inspector)",
         key: "inspection",
         permissions: [
-            { key: "inspection.view",   label: "View Assigned Inspections" },
-            { key: "inspection.submit", label: "Submit Inspection Report" },
+            { key: "inspection.view",    label: "View Assigned Inspections" },
+            { key: "inspection.submit",  label: "Submit Inspection Report" },
             { key: "inspection.history", label: "View Inspection History" },
         ]
     },
+
+    // ── WORKFORCE ────────────────────────────────────────────────────────────
     {
         group: "Employees",
         key: "employees",
@@ -20,6 +71,33 @@ export const PERMISSION_GROUPS = [
             { key: "employees.delete", label: "Delete Employee" },
         ]
     },
+    {
+        group: "Recruitment",
+        key: "recruitment",
+        permissions: [
+            { key: "recruitment.view",   label: "View Recruitment" },
+            { key: "recruitment.manage", label: "Manage Candidates" },
+        ]
+    },
+    {
+        group: "Onboarding",
+        key: "onboarding",
+        permissions: [
+            { key: "onboarding.view",   label: "View Onboarding" },
+            { key: "onboarding.manage", label: "Manage Onboarding" },
+        ]
+    },
+    {
+        group: "Documents",
+        key: "documents",
+        permissions: [
+            { key: "documents.view",   label: "View Documents" },
+            { key: "documents.upload", label: "Upload Documents" },
+            { key: "documents.verify", label: "Verify Documents" },
+        ]
+    },
+
+    // ── HR OPERATIONS ────────────────────────────────────────────────────────
     {
         group: "Attendance",
         key: "attendance",
@@ -46,22 +124,23 @@ export const PERMISSION_GROUPS = [
         ]
     },
     {
-        group: "Documents",
-        key: "documents",
+        group: "Assets",
+        key: "assets",
         permissions: [
-            { key: "documents.view",   label: "View Documents" },
-            { key: "documents.upload", label: "Upload Documents" },
-            { key: "documents.verify", label: "Verify Documents" },
+            { key: "assets.view",   label: "View Assets" },
+            { key: "assets.manage", label: "Assign / Return Assets" },
         ]
     },
     {
-        group: "Onboarding",
-        key: "onboarding",
+        group: "Expenses",
+        key: "expenses",
         permissions: [
-            { key: "onboarding.view",   label: "View Onboarding" },
-            { key: "onboarding.manage", label: "Manage Onboarding" },
+            { key: "expenses.view",   label: "View Expenses" },
+            { key: "expenses.manage", label: "Approve / Reject Expenses" },
         ]
     },
+
+    // ── TALENT & GROWTH ──────────────────────────────────────────────────────
     {
         group: "Performance",
         key: "performance",
@@ -71,27 +150,55 @@ export const PERMISSION_GROUPS = [
         ]
     },
     {
-        group: "Assets",
-        key: "assets",
+        group: "Exit Management",
+        key: "exit",
         permissions: [
-            { key: "assets.view",   label: "View Assets" },
-            { key: "assets.manage", label: "Assign / Return Assets" },
+            { key: "exit.view",   label: "View Exit Requests" },
+            { key: "exit.manage", label: "Process Exit Clearances" },
         ]
     },
     {
-        group: "Recruitment",
-        key: "recruitment",
+        group: "Training (LMS)",
+        key: "lms",
         permissions: [
-            { key: "recruitment.view",   label: "View Recruitment" },
-            { key: "recruitment.manage", label: "Manage Candidates" },
+            { key: "lms.view",   label: "View Courses" },
+            { key: "lms.manage", label: "Manage Courses & Enrollments" },
+        ]
+    },
+
+    // ── CLIENTS & FINANCE ────────────────────────────────────────────────────
+    {
+        group: "Companies",
+        key: "companies",
+        permissions: [
+            { key: "companies.view",   label: "View Companies" },
+            { key: "companies.manage", label: "Add / Edit Companies" },
         ]
     },
     {
-        group: "Reports",
-        key: "reports",
+        group: "Billing",
+        key: "billing",
         permissions: [
-            { key: "reports.view",   label: "View Reports" },
-            { key: "reports.export", label: "Export Reports" },
+            { key: "billing.view",   label: "View Invoices" },
+            { key: "billing.manage", label: "Create / Edit Invoices & Payments" },
+        ]
+    },
+    {
+        group: "Contracts",
+        key: "contracts",
+        permissions: [
+            { key: "contracts.view",   label: "View Contracts" },
+            { key: "contracts.manage", label: "Create / Edit Contracts" },
+        ]
+    },
+
+    // ── OPERATIONS ───────────────────────────────────────────────────────────
+    {
+        group: "Approvals",
+        key: "approvals",
+        permissions: [
+            { key: "approvals.view",   label: "View Approval Queue" },
+            { key: "approvals.manage", label: "Approve / Reject Items" },
         ]
     },
     {
@@ -102,12 +209,14 @@ export const PERMISSION_GROUPS = [
             { key: "helpdesk.manage", label: "Manage Tickets" },
         ]
     },
+
+    // ── ANALYTICS ────────────────────────────────────────────────────────────
     {
-        group: "LMS",
-        key: "lms",
+        group: "Reports & Analytics",
+        key: "reports",
         permissions: [
-            { key: "lms.view",   label: "View Courses" },
-            { key: "lms.manage", label: "Manage Courses & Enrollments" },
+            { key: "reports.view",   label: "View Reports & Analytics" },
+            { key: "reports.export", label: "Export Reports" },
         ]
     },
 ]

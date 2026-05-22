@@ -119,11 +119,11 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "INSPECTIONS",
             links: [
-                { name: "Projects",         href: "/projects",     icon: Folder,       roles: ["ADMIN", "MANAGER"] },
-                { name: "Assignments",      href: "/assignments",  icon: HardHat,      roles: ["ADMIN", "MANAGER"] },
-                { name: "Sites",            href: "/sites",        icon: MapPin,       roles: ["ADMIN", "MANAGER"] },
-                { name: "Groups",           href: "/groups",       icon: Users2,       roles: ["ADMIN", "MANAGER"] },
-                { name: "Field Tasks",      href: "/field",        icon: Navigation,   roles: ["ADMIN", "MANAGER"] },
+                { name: "Projects",         href: "/projects",     icon: Folder,       roles: ["ADMIN", "MANAGER"], permission: "projects.view" },
+                { name: "Assignments",      href: "/assignments",  icon: HardHat,      roles: ["ADMIN", "MANAGER"], permission: "assignments.view" },
+                { name: "Sites",            href: "/sites",        icon: MapPin,       roles: ["ADMIN", "MANAGER"], permission: "sites.view" },
+                { name: "Groups",           href: "/groups",       icon: Users2,       roles: ["ADMIN", "MANAGER"], permission: "groups.view" },
+                { name: "Field Tasks",      href: "/field",        icon: Navigation,   roles: ["ADMIN", "MANAGER"], permission: "field.view" },
             ],
         },
 
@@ -147,7 +147,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Leaves",       href: "/leaves",     icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view" },
                 { name: "Payroll",      href: "/payroll",    icon: Wallet,      roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
                 { name: "Assets",       href: "/assets",     icon: Package,     roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
-                { name: "Expenses",     href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"] },
+                { name: "Expenses",     href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"], permission: "expenses.view" },
             ],
         },
 
@@ -156,7 +156,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "TALENT & GROWTH",
             links: [
                 { name: "Performance",      href: "/performance", icon: Star,          roles: ["ADMIN", "MANAGER"], permission: "performance.view" },
-                { name: "Exit Management",  href: "/exit",        icon: LogOut,        roles: ["ADMIN", "MANAGER"] },
+                { name: "Exit Management",  href: "/exit",        icon: LogOut,        roles: ["ADMIN", "MANAGER"], permission: "exit.view" },
                 { name: "Training (LMS)",   href: "/lms",         icon: GraduationCap, roles: ["ADMIN", "MANAGER"], permission: "lms.manage" },
             ],
         },
@@ -165,9 +165,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "CLIENTS & FINANCE",
             links: [
-                { name: "Companies",    href: "/companies", icon: Building2,     roles: ["ADMIN", "MANAGER"] },
-                { name: "Billing",      href: "/billing",   icon: Receipt,       roles: ["ADMIN", "MANAGER"] },
-                { name: "Contracts",    href: "/contracts", icon: FileSignature, roles: ["ADMIN", "MANAGER"] },
+                { name: "Companies",    href: "/companies", icon: Building2,     roles: ["ADMIN", "MANAGER"], permission: "companies.view" },
+                { name: "Billing",      href: "/billing",   icon: Receipt,       roles: ["ADMIN", "MANAGER"], permission: "billing.view" },
+                { name: "Contracts",    href: "/contracts", icon: FileSignature, roles: ["ADMIN", "MANAGER"], permission: "contracts.view" },
             ],
         },
 
@@ -175,7 +175,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "OPERATIONS",
             links: [
-                { name: "Approvals",    href: "/approvals",  icon: CheckSquare,  roles: ["ADMIN", "MANAGER"], badge: true },
+                { name: "Approvals",    href: "/approvals",  icon: CheckSquare,  roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: true },
                 { name: "Helpdesk",     href: "/helpdesk",   icon: Headphones,   roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
             ],
         },
