@@ -5,6 +5,17 @@ import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { startOfMonth, endOfMonth, subDays } from "date-fns"
 
+export const dynamic = "force-dynamic"
+
+type RiskRow = {
+    project_id: string
+    project_name: string
+    company_name: string
+    total: bigint
+    rejected: bigint
+    avg_sent_back: number | null
+}
+
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session || (session.user.role !== Role.MANAGER && session.user.role !== Role.ADMIN)) {
@@ -17,6 +28,9 @@ export async function GET() {
         const monthEnd = endOfMonth(now)
         const sevenDaysAgo = subDays(now, 7)
 
+        // All queries run in parallel. The risk-alerts aggregation is a single
+        // raw SQL GROUP BY — replaces the previous N+1 (10 projects × all their
+        // inspections fetched as nested objects) that was taking ~7 seconds.
         const [
             pendingApprovals,
             activeAssignments,
@@ -24,7 +38,7 @@ export async function GET() {
             recentPending,
             recentAssignments,
             overdueInspections,
-            projectsWithStats
+            riskRows,
         ] = await Promise.all([
             prisma.inspection.count({ where: { status: "pending" } }),
             prisma.assignment.count({ where: { status: "active" } }),
@@ -33,65 +47,76 @@ export async function GET() {
                 where: { status: "pending" },
                 take: 5,
                 orderBy: { submittedAt: "desc" },
-                include: {
-                    assignment: { include: { project: { include: { company: true } } } },
-                    submitter: { select: { name: true } }
-                }
+                select: {
+                    id: true,
+                    submittedAt: true,
+                    assignment: {
+                        select: {
+                            project: {
+                                select: {
+                                    name: true,
+                                    company: { select: { name: true } },
+                                },
+                            },
+                        },
+                    },
+                    submitter: { select: { name: true } },
+                },
             }),
             prisma.assignment.findMany({
                 take: 5,
                 orderBy: { createdAt: "desc" },
-                include: {
-                    project: true,
-                    inspectionBoy: { select: { name: true } }
-                }
-            }),
-            // Inspections pending > 7 days = overdue
-            prisma.inspection.count({
-                where: { status: "pending", submittedAt: { lte: sevenDaysAgo } }
-            }),
-            // Projects with high sent-back rates (risk indicator)
-            prisma.project.findMany({
-                take: 10,
                 select: {
                     id: true,
-                    name: true,
-                    company: { select: { name: true } },
-                    assignments: {
-                        select: {
-                            inspections: {
-                                select: { status: true, sentBackCount: true }
-                            }
-                        }
-                    }
-                }
-            })
+                    status: true,
+                    createdAt: true,
+                    project: { select: { name: true } },
+                    inspectionBoy: { select: { name: true } },
+                },
+            }),
+            prisma.inspection.count({
+                where: { status: "pending", submittedAt: { lte: sevenDaysAgo } },
+            }),
+            // Single GROUP BY aggregation — one DB roundtrip instead of N+1
+            prisma.$queryRaw<RiskRow[]>`
+                SELECT
+                    p.id            as project_id,
+                    p.name          as project_name,
+                    c.name          as company_name,
+                    COUNT(i.id)     as total,
+                    COUNT(CASE WHEN i.status = 'rejected' THEN 1 END) as rejected,
+                    AVG(COALESCE(i."sentBackCount", 0)) as avg_sent_back
+                FROM "Project" p
+                JOIN "Company" c ON c.id = p."companyId"
+                LEFT JOIN "Assignment" a ON a."projectId" = p.id
+                LEFT JOIN "Inspection" i ON i."assignmentId" = a.id
+                GROUP BY p.id, p.name, c.name
+                HAVING COUNT(i.id) > 0
+                ORDER BY (CASE WHEN COUNT(i.id) > 0 THEN
+                    COUNT(CASE WHEN i.status = 'rejected' THEN 1 END)::float / COUNT(i.id)
+                ELSE 0 END) DESC
+                LIMIT 10
+            `,
         ])
 
-        // Calculate risk alerts
-        const riskAlerts = projectsWithStats
-            .map(p => {
-                const allInspections = p.assignments.flatMap(a => a.inspections)
-                const total = allInspections.length
-                const rejected = allInspections.filter(i => i.status === "rejected").length
-                const avgSentBack = total > 0
-                    ? allInspections.reduce((s, i) => s + (i.sentBackCount || 0), 0) / total
-                    : 0
+        const riskAlerts = riskRows
+            .map(r => {
+                const total = Number(r.total)
+                const rejected = Number(r.rejected)
+                const avgSentBack = Number(r.avg_sent_back ?? 0)
                 const rejectionRate = total > 0 ? (rejected / total) * 100 : 0
-
                 return {
-                    projectId: p.id,
-                    projectName: p.name,
-                    companyName: p.company.name,
+                    projectId: r.project_id,
+                    projectName: r.project_name,
+                    companyName: r.company_name,
                     total,
                     rejected,
                     rejectionRate: parseFloat(rejectionRate.toFixed(1)),
                     avgSentBack: parseFloat(avgSentBack.toFixed(1)),
-                    isAtRisk: rejectionRate > 20 || avgSentBack > 1.5
+                    isAtRisk: rejectionRate > 20 || avgSentBack > 1.5,
                 }
             })
-            .filter(p => p.isAtRisk && p.total > 0)
-            .sort((a, b) => b.rejectionRate - a.rejectionRate)
+            .filter(p => p.isAtRisk)
             .slice(0, 5)
 
         return NextResponse.json({
@@ -105,18 +130,22 @@ export async function GET() {
                 projectName: i.assignment.project.name,
                 companyName: i.assignment.project.company.name,
                 inspectorName: i.submitter.name,
-                submittedAt: i.submittedAt
+                submittedAt: i.submittedAt,
             })),
             recentAssignments: recentAssignments.map(a => ({
                 id: a.id,
                 projectName: a.project.name,
                 inspectorName: a.inspectionBoy.name,
                 status: a.status,
-                createdAt: a.createdAt
-            }))
+                createdAt: a.createdAt,
+            })),
+        }, {
+            headers: {
+                "Cache-Control": "private, s-maxage=30, stale-while-revalidate=60",
+            },
         })
     } catch (error) {
         console.error("MANAGER_STATS_ERROR", error)
-        return NextResponse.json({ error: "Internal Error" }, { status: 500 })
+        return NextResponse.json({ error: "Failed to load stats" }, { status: 500 })
     }
 }
