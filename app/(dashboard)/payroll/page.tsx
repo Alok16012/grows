@@ -9,7 +9,11 @@ import {
     Clock, Trash2, TrendingUp, Settings2, Lock,
     CheckCircle2, ArrowRight, ChevronRight
 } from "lucide-react"
-import ProcessPanel from "./_components/ProcessPanel"
+import ProcessPanel    from "./_components/ProcessPanel"
+import AttendancePanel from "./_components/AttendancePanel"
+import WageSheetPanel  from "./_components/WageSheetPanel"
+import CompliancePanel from "./_components/CompliancePanel"
+import PayslipsPanel   from "./_components/PayslipsPanel"
 
 type PayrollRun = {
     id: string
@@ -104,7 +108,7 @@ export default function PayrollPage() {
     const [loading,     setLoading]    = useState(true)
     const [yearFilter,  setYearFilter] = useState(String(new Date().getFullYear()))
     const [deleting,    setDeleting]   = useState<string | null>(null)
-    const [activePanel, setActivePanel]= useState<"process" | null>(null)
+    const [activePanel, setActivePanel]= useState<"attendance" | "process" | "wagesheet" | "compliance" | "payslips" | null>(null)
 
     const fetchRuns = useCallback(async () => {
         setLoading(true)
@@ -242,10 +246,13 @@ export default function PayrollPage() {
                             const isDone    = status === "done"
                             const isActive  = status === "active"
                             const Icon = s.icon
-                            // Steps 1 & 2 open inline panel; others navigate
+                            // All steps open inline panels
                             const handleStepClick = () => {
-                                if (s.step === 1 || s.step === 2) setActivePanel("process")
-                                else router.push(s.href)
+                                if (s.step === 1) setActivePanel("attendance")
+                                else if (s.step === 2) setActivePanel("process")
+                                else if (s.step === 3) setActivePanel("wagesheet")
+                                else if (s.step === 4) setActivePanel("compliance")
+                                else if (s.step === 5) setActivePanel("payslips")
                             }
 
                             return (
@@ -350,8 +357,11 @@ export default function PayrollPage() {
                             </div>
                             <button
                                 onClick={() => {
-                                    if (activeStep.step === 1 || activeStep.step === 2) setActivePanel("process")
-                                    else router.push(activeStep.href)
+                                    if (activeStep.step === 1) setActivePanel("attendance")
+                                    else if (activeStep.step === 2) setActivePanel("process")
+                                    else if (activeStep.step === 3) setActivePanel("wagesheet")
+                                    else if (activeStep.step === 4) setActivePanel("compliance")
+                                    else if (activeStep.step === 5) setActivePanel("payslips")
                                 }}
                                 style={{
                                     display: "flex",
@@ -409,11 +419,33 @@ export default function PayrollPage() {
                 </div>
             </div>
 
-            {/* ── Inline Process Panel ── */}
+            {/* ── Inline Panels ── */}
+            {activePanel === "attendance" && (
+                <AttendancePanel
+                    onClose={() => setActivePanel(null)}
+                    onDone={() => { setActivePanel("process"); fetchRuns() }}
+                />
+            )}
             {activePanel === "process" && (
                 <ProcessPanel
                     onClose={() => setActivePanel(null)}
-                    onDone={() => { setActivePanel(null); fetchRuns() }}
+                    onDone={() => { setActivePanel("wagesheet"); fetchRuns() }}
+                />
+            )}
+            {activePanel === "wagesheet" && (
+                <WageSheetPanel
+                    onClose={() => setActivePanel(null)}
+                    onDone={(next) => { setActivePanel(next === "compliance" ? "compliance" : null); fetchRuns() }}
+                />
+            )}
+            {activePanel === "compliance" && (
+                <CompliancePanel
+                    onClose={() => setActivePanel(null)}
+                />
+            )}
+            {activePanel === "payslips" && (
+                <PayslipsPanel
+                    onClose={() => setActivePanel(null)}
                 />
             )}
 
@@ -460,9 +492,9 @@ export default function PayrollPage() {
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 48, gap: 8 }}>
                         <Clock size={32} style={{ color: "var(--text3)", opacity: 0.3 }} />
                         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>No payroll runs for {yearFilter}</p>
-                        <button onClick={() => router.push("/payroll/process")}
+                        <button onClick={() => setActivePanel("attendance")}
                             style={{ marginTop: 6, padding: "7px 18px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                            Process First Payroll
+                            Start First Payroll
                         </button>
                     </div>
                 ) : (
@@ -512,15 +544,15 @@ export default function PayrollPage() {
                                             </td>
                                             <td style={{ padding: "12px 16px" }}>
                                                 <div style={{ display: "flex", gap: 6 }}>
-                                                    <button onClick={() => router.push(`/payroll/process?month=${run.month}&year=${run.year}`)}
+                                                    <button onClick={() => setActivePanel("process")}
                                                         style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                                         View
                                                     </button>
-                                                    <button onClick={() => router.push(`/payroll/wagesheet?month=${run.month}&year=${run.year}`)}
+                                                    <button onClick={() => setActivePanel("wagesheet")}
                                                         style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                                         Wage Sheet
                                                     </button>
-                                                    <button onClick={() => router.push(`/payroll/salary-slips?month=${run.month}&year=${run.year}`)}
+                                                    <button onClick={() => setActivePanel("payslips")}
                                                         style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                                         Slips
                                                     </button>
