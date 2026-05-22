@@ -167,6 +167,10 @@ export default function PayrollPage() {
     const doneCount  = STEPS.filter(s => getStepStatus(s.step) === "done").length
     const progressPct = Math.round((doneCount / STEPS.length) * 100)
 
+    // Which step number is currently open as a panel
+    const panelToStep: Record<string, number> = { attendance: 1, process: 2, wagesheet: 3, compliance: 4, payslips: 5 }
+    const openStepNum = activePanel ? (panelToStep[activePanel] ?? null) : null
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48, maxWidth: 1200 }}>
 
@@ -245,6 +249,7 @@ export default function PayrollPage() {
                             const status = getStepStatus(s.step)
                             const isDone    = status === "done"
                             const isActive  = status === "active"
+                            const isOpen    = openStepNum === s.step   // ← panel currently open
                             const Icon = s.icon
                             // All steps open inline panels
                             const handleStepClick = () => {
@@ -278,18 +283,24 @@ export default function PayrollPage() {
                                         width: 36,
                                         height: 36,
                                         borderRadius: "50%",
-                                        background: isDone ? "#16a34a" : isActive ? s.color : "var(--surface)",
-                                        border: `2px solid ${isDone ? "#16a34a" : isActive ? s.color : "var(--border)"}`,
+                                        background: isDone ? "#16a34a" : (isOpen || isActive) ? s.color : "var(--surface)",
+                                        border: `2px solid ${isDone ? "#16a34a" : (isOpen || isActive) ? s.color : "var(--border)"}`,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        boxShadow: isActive ? `0 0 0 4px ${s.color}22` : isDone ? "0 0 0 3px #16a34a18" : "none",
+                                        boxShadow: isOpen
+                                            ? `0 0 0 5px ${s.color}30, 0 0 0 2px ${s.color}80`
+                                            : isActive ? `0 0 0 4px ${s.color}22`
+                                            : isDone ? "0 0 0 3px #16a34a18"
+                                            : "none",
                                         transition: "all 0.3s",
                                         flexShrink: 0,
+                                        outline: isOpen ? `2px solid ${s.color}` : "none",
+                                        outlineOffset: 3,
                                     }}>
                                         {isDone
                                             ? <CheckCircle2 size={18} style={{ color: "#fff" }} />
-                                            : <Icon size={16} style={{ color: isActive ? "#fff" : "var(--text3)" }} />
+                                            : <Icon size={16} style={{ color: (isOpen || isActive) ? "#fff" : "var(--text3)" }} />
                                         }
                                     </div>
 
@@ -297,8 +308,8 @@ export default function PayrollPage() {
                                     <div style={{ textAlign: "center" }}>
                                         <p style={{
                                             fontSize: 11,
-                                            fontWeight: isDone || isActive ? 700 : 500,
-                                            color: isDone ? "#16a34a" : isActive ? s.color : "var(--text3)",
+                                            fontWeight: isDone || isOpen || isActive ? 700 : 500,
+                                            color: isDone ? "#16a34a" : (isOpen || isActive) ? s.color : "var(--text3)",
                                             margin: 0,
                                             lineHeight: 1.3,
                                             whiteSpace: "nowrap",
@@ -307,11 +318,12 @@ export default function PayrollPage() {
                                         </p>
                                         <p style={{
                                             fontSize: 10,
-                                            color: isDone ? "#16a34a" : isActive ? s.color : "var(--text3)",
+                                            color: isDone ? "#16a34a" : (isOpen || isActive) ? s.color : "var(--text3)",
                                             margin: "2px 0 0 0",
-                                            opacity: isDone || isActive ? 0.7 : 0.5,
+                                            opacity: isDone || isOpen || isActive ? 0.85 : 0.5,
+                                            fontWeight: isOpen ? 700 : 400,
                                         }}>
-                                            {isDone ? "Done" : isActive ? "In Progress" : "Pending"}
+                                            {isDone ? "Done" : isOpen ? "▶ Open" : isActive ? "In Progress" : "Pending"}
                                         </p>
                                     </div>
                                 </button>
