@@ -40,7 +40,9 @@ export default function DashboardLayout({
             <div className="flex flex-col w-full min-w-0">
                 <TopNav onMenuClick={() => setIsSidebarOpen(true)} />
                 <main className="flex-1 overflow-y-auto flex flex-col">
-                    <div className="flex-1 mx-auto w-full flex flex-col gap-0 p-0 lg:gap-8 lg:p-8 max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {/* Removed 500ms fade-in/slide animation — was adding
+                        perceived 500ms latency to every page navigation. */}
+                    <div className="flex-1 mx-auto w-full flex flex-col gap-0 p-0 lg:gap-8 lg:p-8 max-w-7xl">
                         {children}
                     </div>
                     <footer className="py-4 text-center text-[13px] text-muted-foreground/80 mt-auto">
