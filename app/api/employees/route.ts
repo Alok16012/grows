@@ -69,7 +69,7 @@ export async function GET(req: Request) {
                         select: {
                             basic: true, da: true, washing: true, conveyance: true,
                             leaveWithWages: true, otherAllowance: true,
-                            bonus: true,                    // per-employee bonus (₹625/₹650 min-wage based)
+                            bonus: true,
                             otRatePerHour: true, canteenRatePerDay: true,
                             complianceType: true, status: true,
                             hra: true, ctcMonthly: true,
@@ -90,7 +90,13 @@ export async function GET(req: Request) {
             prisma.employee.count({ where }),
         ])
 
-        return NextResponse.json({ employees, total, page, pageSize, totalPages: Math.ceil(total / pageSize) })
+        return NextResponse.json({ employees, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }, {
+            headers: {
+                // Browser-cache for 10s — back-button / list re-renders within
+                // 10s reuse the cached response instead of re-querying.
+                "Cache-Control": "private, max-age=10, stale-while-revalidate=30",
+            },
+        })
     } catch (error) {
         console.error("[EMPLOYEES_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })
