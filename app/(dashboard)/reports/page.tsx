@@ -33,7 +33,9 @@ import {
     Trash2
 } from "lucide-react"
 import { toast } from "sonner"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed on Excel export click. Eager import
+// was adding ~430KB to the initial /reports bundle.
+const loadXLSX = () => import("xlsx")
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -294,7 +296,8 @@ export default function ReportsPage() {
         return rows
     }, [data?.records, searchTerm, colFilters, sortKey, sortDir])
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
+        const XLSX = await loadXLSX()
         let formattedData: any = []
         let sheetName = ""
         let fileNamePrefix = ""
