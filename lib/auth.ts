@@ -220,7 +220,15 @@ export const authOptions: NextAuthOptions = {
                 ;(token as any).customRoleName = (user as any).customRoleName || null
                 ;(token as any).customRoleColor = (user as any).customRoleColor || null
             }
-            if (token.id && !user) {
+            // Refresh user role/permissions from DB at most once every 10 minutes.
+            // Previously this ran on EVERY request — adding ~500-700ms of latency
+            // to every API call. Now the JWT carries role+permissions for 10
+            // minutes; after that, one request refreshes them.
+            const REFRESH_INTERVAL_MS = 10 * 60 * 1000
+            const lastRefresh = (token as { roleRefreshedAt?: number }).roleRefreshedAt ?? 0
+            const needsRefresh = token.id && !user && (Date.now() - lastRefresh > REFRESH_INTERVAL_MS)
+
+            if (needsRefresh) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: token.id as string },
@@ -231,8 +239,14 @@ export const authOptions: NextAuthOptions = {
                         token.permissions = dbUser.customRole?.isActive ? dbUser.customRole.permissions : []
                         ;(token as any).customRoleName = dbUser.customRole?.isActive ? dbUser.customRole.name : null
                         ;(token as any).customRoleColor = dbUser.customRole?.isActive ? dbUser.customRole.color : null
+                        ;(token as { roleRefreshedAt?: number }).roleRefreshedAt = Date.now()
                     }
-                } catch { }
+                } catch { /* keep stale token rather than crash */ }
+            } else if (token.id && !user && !lastRefresh) {
+                // First request after this fix lands — mark refresh time so the
+                // interval kicks in. Don't hit the DB; the token already has
+                // role/permissions from the authorize() callback at login.
+                ;(token as { roleRefreshedAt?: number }).roleRefreshedAt = Date.now()
             }
             return token
         },
