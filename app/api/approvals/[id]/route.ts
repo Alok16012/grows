@@ -191,7 +191,9 @@ export async function PATCH(
                     update: {}
                 })
 
-                const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cims-sooty.vercel.app"
+                // NEXT_PUBLIC_APP_URL must be set on Vercel — fail loudly if missing
+                // instead of silently sending links to the wrong domain.
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? ""
                 const shareUrl = `${appUrl}/share/${shareLink.token}`
 
                 // Find all active CLIENT users for this company

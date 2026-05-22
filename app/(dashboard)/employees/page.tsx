@@ -12,7 +12,9 @@ import {
     Copy, Link2, RefreshCw
 } from "lucide-react"
 import { format } from "date-fns"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — it's a ~430KB dep used only on template download
+// and import. Eager import would bloat the post-login landing bundle.
+const loadXLSX = () => import("xlsx")
 import { EmployeeModal, Employee, STATUS_CONFIG } from "@/components/EmployeeModal"
 import { DocumentViewer } from "@/components/DocumentViewer"
 
@@ -1133,7 +1135,8 @@ function EmployeesPage() {
         }
     }
 
-    function handleDownloadTemplate() {
+    async function handleDownloadTemplate() {
+        const XLSX = await loadXLSX()
         const headers = [
             // ── Required ──────────────────────────────────────────────────────
             "First Name*", "Middle Name", "Last Name", "Fathers Name", "Phone*", "Email",
@@ -1241,7 +1244,8 @@ function EmployeesPage() {
         const file = e.target.files?.[0]
         if (!file) return
         const reader = new FileReader()
-        reader.onload = (ev) => {
+        reader.onload = async (ev) => {
+            const XLSX = await loadXLSX()
             const arrayBuffer = ev.target?.result as ArrayBuffer
             const wb = XLSX.read(arrayBuffer, { type: "array" })
             const ws = wb.Sheets[wb.SheetNames[0]]

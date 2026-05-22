@@ -1,25 +1,18 @@
-
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 
+// Diagnostic endpoint — ADMIN only. Returns minimal info, no env/stack leakage.
 export async function GET() {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== "ADMIN") {
+        return new NextResponse("Forbidden", { status: 403 })
+    }
     try {
-        // Try a tiny query
-        const result = await prisma.$queryRaw`SELECT 1 as connected`
-        return NextResponse.json({
-            status: "connected",
-            result,
-            db_url_exists: !!process.env.DATABASE_URL,
-            env: process.env.NODE_ENV
-        })
-    } catch (error: any) {
-        console.error("Diagnostic Error:", error)
-        return NextResponse.json({
-            status: "error",
-            message: error.message,
-            stack: error.stack,
-            db_url_exists: !!process.env.DATABASE_URL,
-            env: process.env.NODE_ENV
-        }, { status: 500 })
+        await prisma.$queryRaw`SELECT 1 as connected`
+        return NextResponse.json({ status: "connected" })
+    } catch {
+        return NextResponse.json({ status: "error" }, { status: 500 })
     }
 }
