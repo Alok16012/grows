@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { checkAccess } from "@/lib/permissions"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import { v4 as uuidv4 } from "uuid"
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy Supabase client — constructing at module load fails Vercel's
+// "collect page data" build step when env vars aren't yet injected.
+let _supabase: SupabaseClient | null = null
+function getSupabase(): SupabaseClient {
+    if (_supabase) return _supabase
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) {
+        throw new Error("Supabase credentials missing — set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in env")
+    }
+    _supabase = createClient(url, key)
+    return _supabase
+}
 
 export async function POST(
     req: Request,
@@ -36,7 +44,7 @@ export async function POST(
         const bytes = await file.arrayBuffer()
         const buffer = Buffer.from(bytes)
 
-        const { error } = await supabase.storage
+        const { error } = await getSupabase().storage
             .from("documents")
             .upload(path, buffer, {
                 contentType: file.type || "application/octet-stream",
@@ -48,7 +56,7 @@ export async function POST(
             return new NextResponse(error.message, { status: 500 })
         }
 
-        const { data: publicData } = supabase.storage
+        const { data: publicData } = getSupabase().storage
             .from("documents")
             .getPublicUrl(path)
 
