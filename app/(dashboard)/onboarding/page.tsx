@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import {
     Search, Loader2, CheckCircle2, XCircle, Clock,
     User, Phone, MapPin, X, ChevronRight,
-    Building2, Calendar, RefreshCw, FileText, Eye
+    Building2, Calendar, RefreshCw, FileText, Eye, Link2, Copy, Check
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -436,6 +436,15 @@ export default function OnboardingPage() {
     const [filter, setFilter] = useState("ALL")
     const [search, setSearch] = useState("")
     const [selected, setSelected] = useState<OnboardingRecord | null>(null)
+    const [linkCopied, setLinkCopied] = useState(false)
+
+    const copyJoinLink = () => {
+        const url = `${window.location.origin}/join`
+        navigator.clipboard.writeText(url)
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 2500)
+        toast.success("Join link copied to clipboard!")
+    }
 
     const fetchRecords = useCallback(async () => {
         setLoading(true)
@@ -498,9 +507,17 @@ export default function OnboardingPage() {
                         Review, approve or reject newly joined employees
                     </p>
                 </div>
-                <button onClick={fetchRecords} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-                    <RefreshCw size={13} /> Refresh
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                        onClick={copyJoinLink}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--accent)", background: "var(--accent-light)", color: "var(--accent-text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                    >
+                        {linkCopied ? <><Check size={13} /> Copied!</> : <><Link2 size={13} /> Share Join Link</>}
+                    </button>
+                    <button onClick={fetchRecords} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                        <RefreshCw size={13} /> Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Stats */}
