@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
     Loader2, CheckCircle2, Copy, Check, AlertCircle,
     ChevronRight, ChevronLeft, Upload, X, FileText, ImageIcon
@@ -24,6 +24,8 @@ type FormData = {
     emergencyContact2Name: string; emergencyContact2Phone: string
     // Employment
     designation: string; dateOfJoining: string; employmentType: string
+    // Site + HR assignment
+    siteId: string; hrId: string
     // Bank & Compliance
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
     aadharNumber: string; panNumber: string
@@ -45,6 +47,7 @@ const INITIAL: FormData = {
     emergencyContact1Name: "", emergencyContact1Phone: "",
     emergencyContact2Name: "", emergencyContact2Phone: "",
     designation: "", dateOfJoining: "", employmentType: "",
+    siteId: "", hrId: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
     aadharNumber: "", panNumber: "",
     safetyGoggles: false, safetyGloves: false, safetyHelmet: false,
@@ -112,6 +115,19 @@ export default function JoinPage() {
     const [submitted, setSubmitted] = useState(false)
     const [result, setResult] = useState<{ employeeId: string } | null>(null)
     const [copied, setCopied] = useState(false)
+    // Site + HR dropdown options, loaded from /api/join (public GET)
+    const [sites, setSites] = useState<{ id: string; name: string; code?: string | null }[]>([])
+    const [hrUsers, setHrUsers] = useState<{ id: string; name: string; role?: string | null }[]>([])
+
+    useEffect(() => {
+        fetch("/api/join")
+            .then(r => r.json())
+            .then(d => {
+                if (Array.isArray(d?.sites)) setSites(d.sites)
+                if (Array.isArray(d?.hrUsers)) setHrUsers(d.hrUsers)
+            })
+            .catch(() => { /* dropdowns just stay empty */ })
+    }, [])
 
     // Docs state
     const [docs, setDocs] = useState<DocFile[]>(
@@ -492,9 +508,42 @@ export default function JoinPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Site + HR Assignment */}
+                                <div>
+                                    <SecTitle>Posting & HR Assignment</SecTitle>
+                                    <div style={{ ...g2, marginTop: 14 }}>
+                                        <div>
+                                            <Lbl text="Work Site" />
+                                            <select style={sel} value={form.siteId} onChange={e => set("siteId", e.target.value)}>
+                                                <option value="">Select your work site</option>
+                                                {sites.map(s => (
+                                                    <option key={s.id} value={s.id}>
+                                                        {s.name}{s.code ? ` (${s.code})` : ""}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <Lbl text="Assigned HR / Manager" />
+                                            <select style={sel} value={form.hrId} onChange={e => set("hrId", e.target.value)}>
+                                                <option value="">Select your HR contact</option>
+                                                {hrUsers.map(u => (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.name}{u.role ? ` — ${u.role.replace("_", " ")}` : ""}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p style={{ fontSize: 11, color: "var(--text3)", margin: "8px 0 0 0" }}>
+                                        Pick the site where you&apos;ll work and the HR person handling your onboarding.
+                                    </p>
+                                </div>
+
                                 <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px" }}>
                                     <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, lineHeight: 1.6 }}>
-                                        💡 Salary, department, and site assignment will be configured by HR after approval.
+                                        💡 Salary and department will be configured by HR after approval.
                                     </p>
                                 </div>
                             </div>

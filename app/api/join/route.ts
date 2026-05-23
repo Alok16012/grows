@@ -2,6 +2,32 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
 
+// Public route — returns site + HR lists so the /join form can render
+// the Work Site and Assigned HR dropdowns without needing a session.
+export async function GET() {
+    try {
+        const [sites, hrUsers] = await Promise.all([
+            prisma.site.findMany({
+                where: { isActive: true },
+                select: { id: true, name: true, code: true },
+                orderBy: { name: "asc" },
+            }),
+            prisma.user.findMany({
+                where: {
+                    isActive: true,
+                    role: { in: ["HR_MANAGER", "MANAGER", "ADMIN"] },
+                },
+                select: { id: true, name: true, email: true, role: true },
+                orderBy: { name: "asc" },
+            }),
+        ])
+        return NextResponse.json({ sites, hrUsers })
+    } catch (error) {
+        console.error("[JOIN_GET]", error)
+        return NextResponse.json({ sites: [], hrUsers: [] }, { status: 200 })
+    }
+}
+
 const DEFAULT_TASKS = [
     { title: "Collect Aadhar Card",           category: "Documents",   order: 1 },
     { title: "Collect PAN Card",              category: "Documents",   order: 2 },
@@ -44,6 +70,8 @@ export async function POST(req: Request) {
             bankAccountNumber, bankIFSC, bankName, bankBranch,
             // Employment
             employmentType, nationality, religion,
+            // Site + HR assignment (NEW)
+            siteId, hrId,
             // Safety (declared by employee)
             safetyGoggles, safetyGloves, safetyHelmet,
             safetyMask, safetyJacket, safetyEarMuffs, safetyShoes,
@@ -114,6 +142,8 @@ export async function POST(req: Request) {
                 employmentType:    employmentType    || null,
                 nationality:       nationality       || null,
                 religion:          religion          || null,
+                // HR assignment from self-registration form
+                managerId:         hrId              || null,
                 // Safety equipment declared by employee
                 safetyGoggles:  !!safetyGoggles,
                 safetyGloves:   !!safetyGloves,
@@ -126,6 +156,20 @@ export async function POST(req: Request) {
                 onboardingToken,
             },
         })
+
+        // If a site was selected, create an active Deployment for the new employee
+        if (siteId) {
+            await prisma.deployment.create({
+                data: {
+                    employeeId: employee.id,
+                    siteId,
+                    startDate: new Date(),
+                    isActive: true,
+                },
+            }).catch(err => {
+                console.error("[JOIN_POST_DEPLOYMENT]", err)
+            })
+        }
 
         // Create onboarding record with default tasks
         await prisma.onboardingRecord.create({
