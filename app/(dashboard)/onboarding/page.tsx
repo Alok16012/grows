@@ -9,6 +9,7 @@ import {
     Building2, Calendar, RefreshCw, FileText, Eye, Link2, Copy, Check
 } from "lucide-react"
 import { format } from "date-fns"
+import { DocumentViewer } from "@/components/DocumentViewer"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -151,7 +152,37 @@ function DetailModal({ record, onClose, onAction }: {
     const [showReject, setShowReject] = useState(false)
     const [rejectReason, setRejectReason] = useState(record.notes || "")
     const [approveNotes, setApproveNotes] = useState("")
-    const docs: { id: string; type: string; fileName: string; fileUrl: string; status: string }[] = (e.documents as any[]) || []
+    const [viewDoc, setViewDoc] = useState<{ url: string; name: string } | null>(null)
+    const [docs, setDocs] = useState<{ id: string; type: string; fileName: string; fileUrl: string; status: string; rejectionReason?: string | null }[]>(((e.documents as any[]) || []))
+    const [docActing, setDocActing] = useState<string | null>(null)
+    const [docRejectId, setDocRejectId] = useState<string | null>(null)
+    const [docRejectReason, setDocRejectReason] = useState("")
+
+    const verifyDoc = async (docId: string, status: "VERIFIED" | "REJECTED", reason?: string) => {
+        setDocActing(docId)
+        try {
+            const res = await fetch("/api/onboarding/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: "DOCUMENT",
+                    employeeId: e.id,
+                    documentId: docId,
+                    status,
+                    rejectionReason: reason,
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            setDocs(prev => prev.map(d => d.id === docId ? { ...d, status, rejectionReason: status === "REJECTED" ? (reason || null) : null } : d))
+            toast.success(status === "VERIFIED" ? "Document verified" : "Document rejected")
+            setDocRejectId(null)
+            setDocRejectReason("")
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to update document")
+        } finally {
+            setDocActing(null)
+        }
+    }
 
     const fullName = [e.firstName, e.middleName, e.lastName].filter(Boolean).join(" ")
     const site = e.deployments?.[0]?.site?.name
@@ -327,20 +358,78 @@ function DetailModal({ record, onClose, onAction }: {
                                 </div>
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                    {docs.map((doc: any) => (
-                                        <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)" }}>
-                                            <FileText size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{doc.type.replace(/_/g, " ")}</div>
-                                                <div style={{ fontSize: 11, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.fileName}</div>
+                                    {docs.map((doc) => (
+                                        <div key={doc.id} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                <FileText size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{doc.type.replace(/_/g, " ")}</div>
+                                                    <div style={{ fontSize: 11, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.fileName}</div>
+                                                    {doc.status === "REJECTED" && doc.rejectionReason && (
+                                                        <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2 }}>Reason: {doc.rejectionReason}</div>
+                                                    )}
+                                                </div>
+                                                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 700, background: doc.status === "VERIFIED" ? "#dcfce7" : doc.status === "REJECTED" ? "#fee2e2" : "#fef3c7", color: doc.status === "VERIFIED" ? "#15803d" : doc.status === "REJECTED" ? "#dc2626" : "#d97706" }}>
+                                                    {doc.status}
+                                                </span>
+                                                {doc.fileUrl && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewDoc({ url: doc.fileUrl, name: doc.fileName || doc.type })}
+                                                        style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--accent)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                                                    >
+                                                        <Eye size={13} /> View
+                                                    </button>
+                                                )}
+                                                {doc.status !== "VERIFIED" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => verifyDoc(doc.id, "VERIFIED")}
+                                                        disabled={docActing === doc.id}
+                                                        style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#15803d", fontWeight: 700, background: "#dcfce7", border: "1px solid #86efac", borderRadius: 6, cursor: docActing === doc.id ? "not-allowed" : "pointer", padding: "4px 8px" }}
+                                                    >
+                                                        {docActing === doc.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Verify
+                                                    </button>
+                                                )}
+                                                {doc.status !== "REJECTED" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setDocRejectId(doc.id); setDocRejectReason("") }}
+                                                        disabled={docActing === doc.id}
+                                                        style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#dc2626", fontWeight: 700, background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}
+                                                    >
+                                                        <XCircle size={12} /> Reject
+                                                    </button>
+                                                )}
                                             </div>
-                                            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 700, background: doc.status === "VERIFIED" ? "#dcfce7" : doc.status === "REJECTED" ? "#fee2e2" : "#fef3c7", color: doc.status === "VERIFIED" ? "#15803d" : doc.status === "REJECTED" ? "#dc2626" : "#d97706" }}>
-                                                {doc.status}
-                                            </span>
-                                            {doc.fileUrl && (
-                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-                                                    <Eye size={13} /> View
-                                                </a>
+                                            {docRejectId === doc.id && (
+                                                <div style={{ display: "flex", gap: 6, padding: "8px", background: "#fef2f2", borderRadius: 6, border: "1px solid #fecaca" }}>
+                                                    <input
+                                                        autoFocus
+                                                        value={docRejectReason}
+                                                        onChange={ev => setDocRejectReason(ev.target.value)}
+                                                        placeholder="Rejection reason…"
+                                                        style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid #fca5a5", fontSize: 12, background: "#fff", color: "#7f1d1d", outline: "none" }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (!docRejectReason.trim()) { toast.error("Reason required"); return }
+                                                            verifyDoc(doc.id, "REJECTED", docRejectReason.trim())
+                                                        }}
+                                                        disabled={docActing === doc.id}
+                                                        style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                                    >
+                                                        Confirm
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setDocRejectId(null); setDocRejectReason("") }}
+                                                        style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     ))}
@@ -422,6 +511,9 @@ function DetailModal({ record, onClose, onAction }: {
                     </div>
                 )}
             </div>
+            {viewDoc && (
+                <DocumentViewer url={viewDoc.url} fileName={viewDoc.name} onClose={() => setViewDoc(null)} />
+            )}
         </div>
     )
 }
