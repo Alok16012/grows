@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 
-const VALID_TYPES = ["RESUME", "AADHAAR", "PAN", "PHOTO", "CERTIFICATE", "OFFER_LETTER", "OTHER"]
+const VALID_TYPES = ["RESUME", "AADHAAR", "PAN", "PHOTO", "BANK_DETAILS", "CERTIFICATE", "OFFER_LETTER", "OTHER"]
 
 export async function GET(
     req: Request,
