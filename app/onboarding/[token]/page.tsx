@@ -20,6 +20,9 @@ type FormData = {
     fathersName: string
     maritalStatus: string
     photo: string
+    // Assignment (NEW)
+    siteId: string
+    hrId: string
     // Current Address
     address: string
     city: string
@@ -46,8 +49,12 @@ type FormData = {
     bankBranch: string
 }
 
+type SiteOption = { id: string; name: string; code?: string | null }
+type HrOption = { id: string; name: string; email?: string | null; role?: string | null }
+
 const EMPTY: FormData = {
     dateOfBirth: "", gender: "", bloodGroup: "", fathersName: "", maritalStatus: "", photo: "",
+    siteId: "", hrId: "",
     address: "", city: "", state: "", pincode: "",
     permanentAddress: "", permanentCity: "", permanentState: "", permanentPincode: "", sameAsCurrent: false,
     emergencyContact1Name: "", emergencyContact1Phone: "", emergencyContact2Name: "", emergencyContact2Phone: "",
@@ -95,6 +102,8 @@ export default function OnboardingPortal() {
     const [docs, setDocs] = useState<Doc[]>([])
     const [uploadingDocs, setUploadingDocs] = useState<Record<string, boolean>>({})
     const [photoUploading, setPhotoUploading] = useState(false)
+    const [sites, setSites] = useState<SiteOption[]>([])
+    const [hrUsers, setHrUsers] = useState<HrOption[]>([])
 
     useEffect(() => {
         if (!token) return
@@ -103,6 +112,8 @@ export default function OnboardingPortal() {
             .then(data => {
                 if (data.id) {
                     setEmployee(data)
+                    if (Array.isArray(data.sites)) setSites(data.sites)
+                    if (Array.isArray(data.hrUsers)) setHrUsers(data.hrUsers)
                     setForm({
                         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split("T")[0] : "",
                         gender: data.gender || "",
@@ -110,6 +121,8 @@ export default function OnboardingPortal() {
                         fathersName: data.fathersName || "",
                         maritalStatus: data.maritalStatus || "",
                         photo: data.photo || "",
+                        siteId: data.currentSiteId || "",
+                        hrId: data.managerId || "",
                         address: data.address || "",
                         city: data.city || "",
                         state: data.state || "",
@@ -359,6 +372,36 @@ export default function OnboardingPortal() {
                                         <input type="text" value={form.fathersName} onChange={set("fathersName")} placeholder="Father's full name" className={inp} />
                                     </Field>
                                 </div>
+                            </div>
+
+                            {/* Site + HR Assignment */}
+                            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                                <p style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 600, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Posting & HR</p>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                                    <Field label="Work Site *">
+                                        <select value={form.siteId} onChange={set("siteId")} className={inp} required>
+                                            <option value="">Select your work site...</option>
+                                            {sites.map(s => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name}{s.code ? ` (${s.code})` : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                    <Field label="Assigned HR / Manager *">
+                                        <select value={form.hrId} onChange={set("hrId")} className={inp} required>
+                                            <option value="">Select your HR contact...</option>
+                                            {hrUsers.map(u => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.name}{u.role ? ` — ${u.role.replace("_", " ")}` : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                </div>
+                                <p style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
+                                    Your work location and the HR person handling your onboarding.
+                                </p>
                             </div>
                         </div>
                     )}
