@@ -6,7 +6,7 @@ import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
-    UserCircle2, MapPin, CreditCard, Contact
+    UserCircle2, MapPin, CreditCard, Contact, Camera
 } from "lucide-react"
 
 // ─── Self-service Details Tab ────────────────────────────────────────────────
@@ -601,15 +601,45 @@ export default function ProfilePage() {
     const [activeTab, setActiveTab] = useState<"profile"|"documents"|"onboarding"|"payslip"|"letters">("profile")
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [formData, setFormData] = useState({ name: "", email: "", phone: "", role: "" })
+    const [formData, setFormData] = useState({ name: "", email: "", phone: "", role: "", image: "" })
+    const [photoUploading, setPhotoUploading] = useState(false)
 
     const isEmployee = session?.user?.role === "INSPECTION_BOY"
 
     useEffect(() => {
         fetch("/api/profile").then(r => r.json()).then(d => {
-            setFormData({ name: d.name||"", email: d.email||"", phone: d.phone||"", role: d.role||"" })
+            setFormData({ name: d.name||"", email: d.email||"", phone: d.phone||"", role: d.role||"", image: d.image||"" })
         }).finally(() => setLoading(false))
     }, [])
+
+    const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (file.size > 3 * 1024 * 1024) { toast.error("Photo too large (max 3MB)"); e.target.value = ""; return }
+        setPhotoUploading(true)
+        try {
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.onerror = reject
+                reader.readAsDataURL(file)
+            })
+            const res = await fetch("/api/profile", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: dataUrl }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            setFormData(f => ({ ...f, image: dataUrl }))
+            await update({ image: dataUrl } as any)
+            toast.success("Profile photo updated!")
+        } catch (err: any) {
+            toast.error(err?.message || "Photo upload failed")
+        } finally {
+            setPhotoUploading(false)
+            e.target.value = ""
+        }
+    }
 
     const saveProfile = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -649,8 +679,21 @@ export default function ProfilePage() {
         <div className="max-w-3xl mx-auto pb-12 space-y-5">
             {/* Header card */}
             <div className="bg-white border border-[var(--border)] rounded-2xl p-6 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-[#1a1a18] text-white flex items-center justify-center text-[22px] font-bold shrink-0">
-                    {formData.name.charAt(0).toUpperCase()}
+                <div className="relative shrink-0">
+                    <div className="w-16 h-16 rounded-full overflow-hidden bg-[#1a1a18] text-white flex items-center justify-center text-[22px] font-bold border-2 border-[var(--border)]">
+                        {formData.image ? (
+                            <img src={formData.image} alt={formData.name} className="w-full h-full object-cover" />
+                        ) : (
+                            formData.name.charAt(0).toUpperCase()
+                        )}
+                    </div>
+                    <label
+                        className={`absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shadow-md ${photoUploading ? "cursor-wait opacity-70" : "cursor-pointer hover:opacity-90"}`}
+                        title="Upload profile photo"
+                    >
+                        {photoUploading ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+                        <input type="file" accept="image/*" className="hidden" onChange={uploadPhoto} disabled={photoUploading} />
+                    </label>
                 </div>
                 <div>
                     <p className="text-[17px] font-semibold text-[var(--text)]">{formData.name}</p>

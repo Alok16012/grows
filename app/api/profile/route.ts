@@ -11,13 +11,14 @@ export async function PUT(req: Request) {
         }
 
         const data = await req.json()
-        const { name, phone } = data
+        const { name, phone, image } = data
 
         const updatedUser = await prisma.user.update({
             where: { id: session.user.id },
             data: {
-                name,
-                phone
+                ...(name !== undefined ? { name } : {}),
+                ...(phone !== undefined ? { phone } : {}),
+                ...(image !== undefined ? { image } : {}),
             }
         })
 
