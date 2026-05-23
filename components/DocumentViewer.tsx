@@ -20,7 +20,9 @@ interface DocumentViewerProps {
 export function DocumentViewer({ url, fileName, onClose }: DocumentViewerProps) {
     const [zoom, setZoom] = React.useState(1)
     const [rotation, setRotation] = React.useState(0)
-    const [isMaximized, setIsMaximized] = React.useState(false)
+    // Default to maximized — most users want a full view to actually read the
+    // document, not a cramped 56rem-wide preview.
+    const [isMaximized, setIsMaximized] = React.useState(true)
 
     if (!url) return null
 
@@ -39,8 +41,10 @@ export function DocumentViewer({ url, fileName, onClose }: DocumentViewerProps) 
     return (
         <Dialog open={!!url} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className={cn(
-                "max-w-[95vw] w-full p-0 overflow-hidden bg-black/95 border-none",
-                isMaximized ? "h-[95vh]" : "h-[85vh] sm:max-w-4xl"
+                "p-0 overflow-hidden bg-black/95 border-none",
+                isMaximized
+                    ? "max-w-[98vw] w-[98vw] h-[96vh]"
+                    : "max-w-5xl w-[90vw] h-[85vh]",
             )}>
                 <DialogHeader className="sr-only">
                     <DialogTitle>{fileName || "Document Viewer"}</DialogTitle>
@@ -78,17 +82,21 @@ export function DocumentViewer({ url, fileName, onClose }: DocumentViewerProps) 
                     </div>
 
                     {/* Viewer Area */}
-                    <div className="flex-1 overflow-hidden relative flex items-center justify-center p-2 sm:p-4">
+                    <div className="flex-1 overflow-auto relative flex items-center justify-center p-2 sm:p-4">
                         {isImage ? (
-                            <div 
-                                className="transition-transform duration-200 ease-out flex items-center justify-center h-full w-full"
-                                style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
+                            <div
+                                className="transition-transform duration-200 ease-out inline-flex items-center justify-center"
+                                style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, transformOrigin: "center" }}
                             >
-                                <img 
-                                    src={url} 
-                                    alt={fileName || "Document"} 
-                                    className="max-h-full max-w-full object-contain shadow-2xl rounded-sm"
-                                    style={{ imageRendering: 'auto' }}
+                                <img
+                                    src={url}
+                                    alt={fileName || "Document"}
+                                    className="object-contain shadow-2xl rounded-sm"
+                                    style={{
+                                        imageRendering: "auto",
+                                        maxHeight: "calc(96vh - 80px)",
+                                        maxWidth: "calc(98vw - 40px)",
+                                    }}
                                 />
                             </div>
                         ) : isPdf ? (
