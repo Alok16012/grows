@@ -229,7 +229,8 @@ export default function JoinPage() {
             })
             const data = await res.json()
             if (!res.ok) {
-                setErrors({ firstName: data.error || "Submission failed" })
+                const msg = data.message || data.error || "Submission failed"
+                setErrors({ firstName: msg })
                 setLoading(false)
                 return
             }

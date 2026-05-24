@@ -150,7 +150,9 @@ export async function POST(req: Request) {
                 bankIFSC:          bankIFSC          || null,
                 bankName:          bankName          || null,
                 bankBranch:        bankBranch        || null,
-                employmentType:    employmentType    || null,
+                // employmentType is non-nullable in the schema with a default —
+                // only set when provided, otherwise let the default apply.
+                ...(employmentType ? { employmentType } : {}),
                 nationality:       nationality       || null,
                 religion:          religion          || null,
                 // HR assignment from self-registration form
