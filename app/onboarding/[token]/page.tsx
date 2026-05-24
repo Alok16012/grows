@@ -50,7 +50,7 @@ type FormData = {
 }
 
 type SiteOption = { id: string; name: string; code?: string | null }
-type HrOption = { id: string; name: string; email?: string | null; role?: string | null }
+type HrOption = { id: string; name: string; email?: string | null; role?: string | null; customRole?: { name: string } | null }
 
 const EMPTY: FormData = {
     dateOfBirth: "", gender: "", bloodGroup: "", fathersName: "", maritalStatus: "", photo: "",
@@ -393,7 +393,7 @@ export default function OnboardingPortal() {
                                             <option value="">Select your HR contact...</option>
                                             {hrUsers.map(u => (
                                                 <option key={u.id} value={u.id}>
-                                                    {u.name}{u.role ? ` — ${u.role.replace("_", " ")}` : ""}
+                                                    {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
                                                 </option>
                                             ))}
                                         </select>

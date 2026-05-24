@@ -117,7 +117,7 @@ export default function JoinPage() {
     const [copied, setCopied] = useState(false)
     // Site + HR dropdown options, loaded from /api/join (public GET)
     const [sites, setSites] = useState<{ id: string; name: string; code?: string | null }[]>([])
-    const [hrUsers, setHrUsers] = useState<{ id: string; name: string; role?: string | null }[]>([])
+    const [hrUsers, setHrUsers] = useState<{ id: string; name: string; role?: string | null; customRole?: { name: string } | null }[]>([])
 
     useEffect(() => {
         fetch("/api/join")
@@ -530,7 +530,7 @@ export default function JoinPage() {
                                                 <option value="">Select your HR contact</option>
                                                 {hrUsers.map(u => (
                                                     <option key={u.id} value={u.id}>
-                                                        {u.name}{u.role ? ` — ${u.role.replace("_", " ")}` : ""}
+                                                        {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
                                                     </option>
                                                 ))}
                                             </select>
