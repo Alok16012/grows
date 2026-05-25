@@ -1432,86 +1432,116 @@ function KanbanView({
 }) {
     return (
         <div className="flex gap-3 overflow-x-auto pb-4 px-4 lg:px-0 flex-1">
-            {STATUSES.map(status => (
+            {STATUSES.map(status => {
+                const colLeads = leads[status.key] ?? []
+                const onSiteCount = status.key === "JOINED"
+                    ? colLeads.filter(l => l.source === "On-site Join").length
+                    : 0
+                return (
                 <div key={status.key} className="flex flex-col shrink-0 w-[240px]">
                     <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-[8px]"
                         style={{ background: status.bg, border: `1px solid ${status.border}` }}>
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: status.color }} />
                         <span className="text-[12px] font-semibold flex-1 truncate" style={{ color: status.color }}>{status.label}</span>
+                        {onSiteCount > 0 && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1"
+                                style={{ background: "#dcfce7", color: "#047857", border: "1px solid #86efac" }}>
+                                <CheckCircle size={9} />
+                                {onSiteCount} on-site
+                            </span>
+                        )}
                         <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-white/70" style={{ color: status.color }}>
-                            {leads[status.key]?.length ?? 0}
+                            {colLeads.length}
                         </span>
                     </div>
                     <div className="flex flex-col gap-2">
-                        {(leads[status.key] ?? []).map(lead => (
+                        {colLeads.map(lead => (
                             <KanbanCard key={lead.id} lead={lead} onCard={onCard} statusColor={status.color} />
                         ))}
-                        {(leads[status.key] ?? []).length === 0 && (
+                        {colLeads.length === 0 && (
                             <div className="border-2 border-dashed border-[var(--border)] rounded-[10px] py-6 flex items-center justify-center">
                                 <p className="text-[11px] text-[var(--text3)]">No candidates</p>
                             </div>
                         )}
                     </div>
                 </div>
-            ))}
+                )
+            })}
         </div>
     )
 }
 
 function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lead) => void; statusColor: string }) {
+    const isOnSiteJoin = lead.source === "On-site Join"
     return (
         <div onClick={() => onCard(lead)}
-            className="bg-white border border-[var(--border)] rounded-[10px] p-3 cursor-pointer hover:shadow-md hover:border-[var(--accent)] transition-all group">
-            <div className="flex items-start justify-between gap-1 mb-1">
-                <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
-                <div className="flex items-center gap-1 shrink-0">
-                    <PriorityDot priority={lead.priority} />
+            className="bg-white border rounded-[10px] cursor-pointer hover:shadow-md transition-all group overflow-hidden"
+            style={{
+                borderColor: isOnSiteJoin ? "#6ee7b7" : "var(--border)",
+                boxShadow: isOnSiteJoin ? "0 0 0 1px #6ee7b7" : undefined,
+            }}>
+            {/* On-site join top banner */}
+            {isOnSiteJoin && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5"
+                    style={{ background: "linear-gradient(90deg, #ecfdf5 0%, #d1fae5 100%)", borderBottom: "1px solid #a7f3d0" }}>
+                    <CheckCircle size={11} style={{ color: "#047857", flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#047857", letterSpacing: "0.4px", textTransform: "uppercase" }}>
+                        On-site Join
+                    </span>
                 </div>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-[var(--text2)] mb-1.5">
-                <Briefcase size={10} className="shrink-0" />
-                <span className="truncate">{lead.position}</span>
-            </div>
-            {/* Score badge */}
-            <div className="mb-2">
-                <ScoreBadge score={lead.score} />
-            </div>
-            <div className="flex flex-col gap-1">
-                {lead.experience != null && (
-                    <span className="text-[11px] text-[var(--text3)]">{lead.experience}y exp</span>
-                )}
-                {lead.phone && (
-                    <div className="flex items-center gap-1 text-[11px] text-[var(--text3)]">
-                        <Phone size={10} />
-                        <span>{lead.phone}</span>
+            )}
+            <div className="p-3">
+                <div className="flex items-start justify-between gap-1 mb-1">
+                    <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <PriorityDot priority={lead.priority} />
                     </div>
-                )}
-                {lead.city && (
-                    <div className="flex items-center gap-1 text-[11px] text-[var(--text3)]">
-                        <MapPin size={10} />
-                        <span>{lead.city}</span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] text-[var(--text2)] mb-1.5">
+                    <Briefcase size={10} className="shrink-0" />
+                    <span className="truncate">{lead.position}</span>
+                </div>
+                {/* Score badge */}
+                <div className="mb-2">
+                    <ScoreBadge score={lead.score} />
+                </div>
+                <div className="flex flex-col gap-1">
+                    {lead.experience != null && (
+                        <span className="text-[11px] text-[var(--text3)]">{lead.experience}y exp</span>
+                    )}
+                    {lead.phone && (
+                        <div className="flex items-center gap-1 text-[11px] text-[var(--text3)]">
+                            <Phone size={10} />
+                            <span>{lead.phone}</span>
+                        </div>
+                    )}
+                    {lead.city && (
+                        <div className="flex items-center gap-1 text-[11px] text-[var(--text3)]">
+                            <MapPin size={10} />
+                            <span>{lead.city}</span>
+                        </div>
+                    )}
+                    {lead.interviewDate && (
+                        <div className="flex items-center gap-1 text-[11px] text-[#f59e0b]">
+                            <Calendar size={10} />
+                            <span>{fmt(lead.interviewDate)}</span>
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border)]">
+                    <span className="text-[10px] text-[var(--text3)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-full">{lead.source}</span>
+                    <div className="flex items-center gap-1.5">
+                        {lead._count?.documents ? (
+                            <span className="text-[10px] text-[var(--text3)] flex items-center gap-0.5">
+                                <FileText size={9} />{lead._count.documents}
+                            </span>
+                        ) : null}
+                        {lead._count?.activities ? (
+                            <span className="text-[10px] text-[var(--text3)] flex items-center gap-0.5">
+                                <MessageSquare size={9} />{lead._count.activities}
+                            </span>
+                        ) : null}
                     </div>
-                )}
-                {lead.interviewDate && (
-                    <div className="flex items-center gap-1 text-[11px] text-[#f59e0b]">
-                        <Calendar size={10} />
-                        <span>{fmt(lead.interviewDate)}</span>
-                    </div>
-                )}
-            </div>
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border)]">
-                <span className="text-[10px] text-[var(--text3)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-full">{lead.source}</span>
-                <div className="flex items-center gap-1.5">
-                    {lead._count?.documents ? (
-                        <span className="text-[10px] text-[var(--text3)] flex items-center gap-0.5">
-                            <FileText size={9} />{lead._count.documents}
-                        </span>
-                    ) : null}
-                    {lead._count?.activities ? (
-                        <span className="text-[10px] text-[var(--text3)] flex items-center gap-0.5">
-                            <MessageSquare size={9} />{lead._count.activities}
-                        </span>
-                    ) : null}
                 </div>
             </div>
         </div>

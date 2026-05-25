@@ -14,6 +14,8 @@ export default function AdminToolsPage() {
     const [bulkFixing, setBulkFixing] = useState(false)
     const [bulkResult, setBulkResult] = useState<any>(null)
     const [loading, setLoading] = useState(false)
+    const [roleFixing, setRoleFixing] = useState(false)
+    const [roleFixResult, setRoleFixResult] = useState<any>(null)
 
     if (session?.user?.role !== "ADMIN") {
         return <div className="p-8 text-red-500">Admin only page.</div>
@@ -125,11 +127,54 @@ export default function AdminToolsPage() {
                                 <p>Login: <strong>{fixResult.loginInput}</strong></p>
                                 <p>Password: <strong>{fixResult.loginPassword}</strong></p>
                                 <p>Email: {fixResult.user?.email}</p>
-                                <p>Role: {fixResult.user?.role}</p>
+                                <p>
+                                    Custom Role: <strong>{fixResult.user?.customRoleName || "None (Field Worker)"}</strong>
+                                </p>
                             </>
                         ) : (
                             <p>❌ {fixResult.error}</p>
                         )}
+                    </div>
+                )}
+            </div>
+
+            {/* Fix Custom Role Users (MIS Executive, HR Recruiter, etc.) */}
+            <div className="bg-white border border-purple-200 rounded-[12px] p-6 mb-6">
+                <h2 className="text-[15px] font-semibold text-[#1a1a18] mb-1">🛡️ Fix Custom Role Dashboard Access</h2>
+                <p className="text-[12px] text-[#9e9b95] mb-1">
+                    MIS Executive, HR Recruiter jaise custom role waale users jo abhi <strong>INSPECTION_BOY</strong> pe hain,
+                    unhe <strong>MANAGER</strong> level pe upgrade karega.
+                </p>
+                <p className="text-[12px] text-amber-600 mb-4">
+                    ⚠️ Yeh sirf unhe hi affect karega jinke paas custom role assigned hai — pure field workers safe hain.
+                </p>
+                <button
+                    onClick={async () => {
+                        if (!confirm("Custom role waale INSPECTION_BOY users ko MANAGER level pe upgrade kare?")) return
+                        setRoleFixing(true)
+                        setRoleFixResult(null)
+                        try {
+                            const res = await fetch("/api/admin/fix-custom-role-users", { method: "POST" })
+                            const data = await res.json()
+                            setRoleFixResult(data)
+                        } catch (e: any) {
+                            setRoleFixResult({ error: e.message })
+                        } finally {
+                            setRoleFixing(false)
+                        }
+                    }}
+                    disabled={roleFixing}
+                    className="px-5 py-2.5 bg-purple-600 text-white rounded-[8px] text-[13px] font-medium disabled:opacity-50"
+                >
+                    {roleFixing ? "Fixing..." : "Fix Custom Role Users"}
+                </button>
+
+                {roleFixResult && (
+                    <div className={`mt-4 p-3 rounded-[8px] text-[12px] ${roleFixResult.error ? "bg-red-50 border border-red-200 text-red-800" : "bg-purple-50 border border-purple-200 text-purple-800"}`}>
+                        {roleFixResult.error
+                            ? <p>❌ {roleFixResult.error}</p>
+                            : <><p className="font-bold">✅ Done!</p><p>{roleFixResult.message}</p><p className="mt-1 text-[11px] text-purple-600">Users ko re-login karna hoga nayi session ke liye.</p></>
+                        }
                     </div>
                 )}
             </div>

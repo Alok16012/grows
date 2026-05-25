@@ -301,20 +301,26 @@ model Lead {
 }
 
 model LeadForm {
-  id          String   @id @default(uuid())
+  id          String       @id @default(uuid())
   title       String
-  slug        String   @unique
+  slug        String       @unique
   description String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean      @default(true)
+  formType    LeadFormType @default(RECRUITMENT)
   siteId      String?
   createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  creator     User     @relation("LeadFormCreator", fields: [createdBy], references: [id])
-  site        Site?    @relation("LeadFormSite", fields: [siteId], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  creator     User         @relation("LeadFormCreator", fields: [createdBy], references: [id])
+  site        Site?        @relation("LeadFormSite", fields: [siteId], references: [id], onDelete: SetNull)
 
   @@index([slug])
   @@index([isActive])
+}
+
+enum LeadFormType {
+  RECRUITMENT
+  ON_SITE_JOIN
 }
 
 model LeadDocument {

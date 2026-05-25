@@ -21,11 +21,20 @@ export async function POST(
 
         if (!employee) return new NextResponse("Employee not found", { status: 404 })
 
-        // If employee already has a linked user → just update the role
+        // Custom role assigned → system role should be MANAGER so they get
+        // the manager dashboard & sidebar, not the inspector workflow.
+        // No custom role → INSPECTION_BOY (field worker default).
+        const systemRole = customRoleId ? "MANAGER" : "INSPECTION_BOY"
+
+        // If employee already has a linked user → update customRole + system role
         if (employee.userId) {
             await prisma.user.update({
                 where: { id: employee.userId },
-                data: { customRoleId: customRoleId || null }
+                data: {
+                    customRoleId: customRoleId || null,
+                    // Upgrade to MANAGER if custom role assigned; downgrade if removed
+                    role: systemRole as any,
+                }
             })
             return NextResponse.json({ created: false, message: "Role updated" })
         }
@@ -38,14 +47,18 @@ export async function POST(
         // Check if user with this email already exists
         let user = await prisma.user.findUnique({ where: { email: loginEmail } })
         if (user) {
-            // Link existing user to employee
+            // Link existing user to employee & update role
             await prisma.employee.update({
                 where: { id: params.id },
                 data: { userId: user.id }
             })
-            if (customRoleId) {
-                await prisma.user.update({ where: { id: user.id }, data: { customRoleId } })
-            }
+            await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    customRoleId: customRoleId || null,
+                    role: systemRole as any,
+                }
+            })
             return NextResponse.json({ created: false, message: "Existing user linked" })
         }
 
@@ -55,7 +68,7 @@ export async function POST(
                 name: `${employee.firstName} ${employee.lastName}`,
                 email: loginEmail,
                 password: hashed,
-                role: "INSPECTION_BOY",
+                role: systemRole as any,
                 customRoleId: customRoleId || null,
             }
         })

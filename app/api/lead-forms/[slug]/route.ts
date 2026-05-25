@@ -11,7 +11,13 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
     })
     if (!form) return NextResponse.json({ error: "Form not found" }, { status: 404 })
     if (!form.isActive) return NextResponse.json({ error: "This form is no longer active" }, { status: 410 })
-    return NextResponse.json({ id: form.id, title: form.title, description: form.description, siteName: form.site?.name ?? null })
+    return NextResponse.json({
+        id:          form.id,
+        title:       form.title,
+        description: form.description,
+        siteName:    form.site?.name ?? null,
+        formType:    (form as any).formType ?? "RECRUITMENT",
+    })
 }
 
 // PATCH — toggle active / update (admin only)

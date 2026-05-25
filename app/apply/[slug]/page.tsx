@@ -11,7 +11,7 @@ const POSITIONS = [
 ]
 const QUALIFICATIONS = ["8th Pass", "10th Pass", "12th Pass", "ITI", "Diploma", "Graduate", "Post Graduate", "Other"]
 
-type FormMeta = { title: string; description: string | null; siteName: string | null }
+type FormMeta = { title: string; description: string | null; siteName: string | null; formType: string }
 
 export default function ApplyPage() {
     const { slug } = useParams<{ slug: string }>()
@@ -26,6 +26,8 @@ export default function ApplyPage() {
         position: "", experience: "", qualification: "",
         skills: "", gender: "", age: "", expectedSalary: "", notes: "",
     })
+
+    const isOnSiteJoin = meta?.formType === "ON_SITE_JOIN"
 
     useEffect(() => {
         fetch(`/api/lead-forms/${slug}`)
@@ -74,10 +76,24 @@ export default function ApplyPage() {
             <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <CheckCircle2 size={40} style={{ color: "#16a34a" }} />
             </div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: "#15803d", textAlign: "center" }}>Application Submitted!</h2>
-            <p style={{ color: "#166534", fontSize: 14, textAlign: "center", maxWidth: 340 }}>
-                Thank you <b>{form.candidateName}</b>! Your application has been received. Our HR team will contact you on <b>{form.phone}</b> shortly.
-            </p>
+            {isOnSiteJoin ? (
+                <>
+                    <h2 style={{ fontSize: 22, fontWeight: 800, color: "#15803d", textAlign: "center" }}>Joining Confirmed!</h2>
+                    <p style={{ color: "#166534", fontSize: 14, textAlign: "center", maxWidth: 340 }}>
+                        Welcome aboard, <b>{form.candidateName}</b>! Your on-site joining has been recorded. Please report to HR for further formalities.
+                    </p>
+                    <div style={{ marginTop: 4, padding: "8px 20px", borderRadius: 20, background: "#dcfce7", border: "1px solid #86efac" }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>Status: Joined ✓</span>
+                    </div>
+                </>
+            ) : (
+                <>
+                    <h2 style={{ fontSize: 22, fontWeight: 800, color: "#15803d", textAlign: "center" }}>Application Submitted!</h2>
+                    <p style={{ color: "#166534", fontSize: 14, textAlign: "center", maxWidth: 340 }}>
+                        Thank you <b>{form.candidateName}</b>! Your application has been received. Our HR team will contact you on <b>{form.phone}</b> shortly.
+                    </p>
+                </>
+            )}
         </div>
     )
 
@@ -92,16 +108,24 @@ export default function ApplyPage() {
         <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px 60px" }}>
             <div style={{ width: "100%", maxWidth: 520, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }}>
                 {/* Header */}
-                <div style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "28px 28px 24px" }}>
+                <div style={{ background: isOnSiteJoin ? "linear-gradient(135deg, #047857 0%, #065f46 100%)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "28px 28px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <Briefcase size={20} color="#fff" />
                         </div>
                         <div>
-                            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", margin: 0 }}>Job Application</p>
+                            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", margin: 0 }}>
+                                {isOnSiteJoin ? "On-site Joining" : "Job Application"}
+                            </p>
                             <h1 style={{ fontSize: 18, fontWeight: 800, color: "#fff", margin: 0 }}>{meta!.title}</h1>
                         </div>
                     </div>
+                    {isOnSiteJoin && (
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6, padding: "4px 12px", borderRadius: 20, background: "rgba(255,255,255,0.2)" }}>
+                            <CheckCircle2 size={12} color="#fff" />
+                            <span style={{ fontSize: 11, color: "#fff", fontWeight: 600 }}>Walk-in Join — details fill karein</span>
+                        </div>
+                    )}
                     {meta!.description && <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", margin: "8px 0 0 0" }}>{meta!.description}</p>}
                     {meta!.siteName && (
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8 }}>
@@ -196,12 +220,19 @@ export default function ApplyPage() {
                     <button type="submit" disabled={submitting} style={{
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                         padding: "12px 24px", borderRadius: 10, border: "none",
-                        background: submitting ? "#a5b4fc" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        background: submitting
+                            ? (isOnSiteJoin ? "#6ee7b7" : "#a5b4fc")
+                            : isOnSiteJoin
+                                ? "linear-gradient(135deg, #047857 0%, #065f46 100%)"
+                                : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                         color: "#fff", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer",
-                        boxShadow: submitting ? "none" : "0 4px 15px rgba(102,126,234,0.4)",
+                        boxShadow: submitting ? "none" : isOnSiteJoin ? "0 4px 15px rgba(4,120,87,0.4)" : "0 4px 15px rgba(102,126,234,0.4)",
                     }}>
                         {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                        {submitting ? "Submitting…" : "Submit Application"}
+                        {submitting
+                            ? (isOnSiteJoin ? "Joining…" : "Submitting…")
+                            : isOnSiteJoin ? "Confirm On-site Joining" : "Submit Application"
+                        }
                     </button>
 
                     <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", margin: 0 }}>

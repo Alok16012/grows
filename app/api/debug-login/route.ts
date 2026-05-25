@@ -87,15 +87,21 @@ export async function POST(req: Request) {
 
     const { input, newPassword } = await req.json()
 
-    // Find employee by phone or employeeId
+    // Find employee by phone or employeeId — include customRoleId to set correct system role
     const rawPhone = (input || "").replace(/\D/g, "")
     let employee: any = null
 
     if (rawPhone.length >= 10) {
-        employee = await prisma.employee.findFirst({ where: { phone: { endsWith: rawPhone.slice(-10) } } })
+        employee = await prisma.employee.findFirst({
+            where: { phone: { endsWith: rawPhone.slice(-10) } },
+            include: { user: { select: { id: true, customRoleId: true } } }
+        })
     }
     if (!employee) {
-        employee = await prisma.employee.findFirst({ where: { employeeId: { equals: input, mode: "insensitive" } } })
+        employee = await prisma.employee.findFirst({
+            where: { employeeId: { equals: input, mode: "insensitive" } },
+            include: { user: { select: { id: true, customRoleId: true } } }
+        })
     }
 
     if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 })
@@ -104,21 +110,34 @@ export async function POST(req: Request) {
     const hash = await bcrypt.hash(password, 10)
     const email = `${employee.phone}@cims.local`
 
+    // Custom role assigned → MANAGER dashboard; no custom role → field worker
+    const existingCustomRoleId = employee.user?.customRoleId || null
+    const systemRole = existingCustomRoleId ? "MANAGER" : "INSPECTION_BOY"
+
     let user
     if (employee.userId) {
         user = await prisma.user.update({
             where: { id: employee.userId },
-            data: { isActive: true, password: hash, name: `${employee.firstName} ${employee.lastName}`.trim() },
-            select: { id: true, email: true, role: true, isActive: true }
+            data: {
+                isActive: true,
+                password: hash,
+                name: `${employee.firstName} ${employee.lastName}`.trim(),
+                role: systemRole as any,
+            },
+            select: { id: true, email: true, role: true, isActive: true, customRoleId: true }
         })
     } else {
         // Check if user with this email already exists
-        const existing = await prisma.user.findUnique({ where: { email } })
+        const existing = await prisma.user.findUnique({
+            where: { email },
+            select: { id: true, customRoleId: true }
+        })
         if (existing) {
+            const role = existing.customRoleId ? "MANAGER" : "INSPECTION_BOY"
             user = await prisma.user.update({
                 where: { id: existing.id },
-                data: { isActive: true, password: hash, name: `${employee.firstName} ${employee.lastName}`.trim() },
-                select: { id: true, email: true, role: true, isActive: true }
+                data: { isActive: true, password: hash, name: `${employee.firstName} ${employee.lastName}`.trim(), role: role as any },
+                select: { id: true, email: true, role: true, isActive: true, customRoleId: true }
             })
             await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id } })
         } else {
@@ -126,15 +145,24 @@ export async function POST(req: Request) {
                 data: {
                     email,
                     name: `${employee.firstName} ${employee.lastName}`.trim(),
-                    role: "INSPECTION_BOY",
+                    role: systemRole as any,
                     isActive: true,
                     password: hash
                 },
-                select: { id: true, email: true, role: true, isActive: true }
+                select: { id: true, email: true, role: true, isActive: true, customRoleId: true }
             })
             await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } })
         }
     }
 
-    return NextResponse.json({ success: true, user, loginInput: employee.phone, loginPassword: password })
+    const customRoleName = existingCustomRoleId
+        ? (await prisma.customRole.findUnique({ where: { id: existingCustomRoleId }, select: { name: true } }))?.name
+        : null
+
+    return NextResponse.json({
+        success: true,
+        user: { ...user, customRoleName },
+        loginInput: employee.phone,
+        loginPassword: password
+    })
 }

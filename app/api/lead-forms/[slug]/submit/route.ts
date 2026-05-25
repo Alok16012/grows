@@ -24,6 +24,12 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
         })
         if (!systemUser) return NextResponse.json({ error: "System error" }, { status: 500 })
 
+        // ON_SITE_JOIN forms → candidate is physically joining, mark as JOINED directly
+        const isOnSiteJoin = (form as any).formType === "ON_SITE_JOIN"
+        const leadStatus = isOnSiteJoin ? "JOINED" : "NEW_LEAD"
+        const leadSource = isOnSiteJoin ? "On-site Join" : "Form Link"
+        const joinedAt   = isOnSiteJoin ? new Date() : null
+
         const lead = await prisma.lead.create({
             data: {
                 candidateName: String(candidateName).trim(),
@@ -38,17 +44,29 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
                 age:           age ? parseInt(String(age)) : null,
                 expectedSalary: expectedSalary ? parseFloat(String(expectedSalary)) : null,
                 notes:         notes || null,
-                source:        "Form Link",
+                source:        leadSource,
                 formSlug:      params.slug,
                 siteId:        form.siteId || null,
-                status:        "NEW_LEAD",
+                status:        leadStatus,
                 priority:      "MEDIUM",
                 score:         "WARM",
                 createdBy:     systemUser.id,
             },
         })
 
-        return NextResponse.json({ success: true, leadId: lead.id })
+        // Log an activity for on-site joins so HR can see when they walked in
+        if (isOnSiteJoin) {
+            await prisma.leadActivity.create({
+                data: {
+                    leadId:  lead.id,
+                    userId:  systemUser.id,
+                    type:    "note",
+                    content: `Candidate ${String(candidateName).trim()} joined on-site via walk-in form`,
+                },
+            })
+        }
+
+        return NextResponse.json({ success: true, leadId: lead.id, status: leadStatus })
     } catch (err) {
         console.error("[LEAD_FORM_SUBMIT]", err)
         return NextResponse.json({ error: "Submission failed" }, { status: 500 })

@@ -106,9 +106,15 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             links: [
                 {
                     name: "Dashboard",
-                    href: role === "INSPECTION_BOY" ? "/inspection" : role === "MANAGER" ? "/manager" : "/admin",
+                    href: role === "INSPECTION_BOY"
+                        ? "/inspection"
+                        : (role === "MANAGER" || role === "HR_MANAGER")
+                            ? "/manager"
+                            : "/admin",
                     icon: LayoutDashboard,
-                    roles: ["ADMIN", "MANAGER", "INSPECTION_BOY"],
+                    // All non-CLIENT roles get Dashboard; custom role users
+                    // are MANAGER/HR_MANAGER at system level so they're covered
+                    roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"],
                 },
                 // CLIENT gets their own portal as the first item
                 { name: "Client Portal", href: "/client", icon: FileText, roles: ["CLIENT"] },
@@ -266,9 +272,21 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
                     const filteredLinks = section.links.filter(link => {
                         if (currentRole === "ADMIN") return true
-                        if (link.permission && userPermissions.length > 0) {
+
+                        // ── Custom Role assigned ───────────────────────────────
+                        // If user has custom role permissions, show ONLY items
+                        // matching those permissions. System role is ignored for
+                        // nav visibility so "HR RECRUITER" doesn't see everything
+                        // a MANAGER sees.
+                        if (userPermissions.length > 0) {
+                            // Links with no permission key (e.g. Dashboard) →
+                            // show only if their system role is in the roles list
+                            if (!link.permission) return link.roles.includes(currentRole)
+                            // Links with permission key → must be in custom role
                             return userPermissions.includes(link.permission)
                         }
+
+                        // ── No custom role → standard system-role access ───────
                         return link.roles.includes(currentRole)
                     })
 
