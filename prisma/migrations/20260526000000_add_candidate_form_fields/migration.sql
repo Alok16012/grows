@@ -1,0 +1,23 @@
+-- Add candidate personal information form fields to Lead
+ALTER TABLE "Lead"
+    ADD COLUMN IF NOT EXISTS "tshirtSize"         TEXT,
+    ADD COLUMN IF NOT EXISTS "bloodGroup"         TEXT,
+    ADD COLUMN IF NOT EXISTS "altPhone"           TEXT,
+    ADD COLUMN IF NOT EXISTS "dateOfBirth"        TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "fatherName"         TEXT,
+    ADD COLUMN IF NOT EXISTS "fatherOccupation"   TEXT,
+    ADD COLUMN IF NOT EXISTS "motherName"         TEXT,
+    ADD COLUMN IF NOT EXISTS "motherOccupation"   TEXT,
+    ADD COLUMN IF NOT EXISTS "maritalStatus"      TEXT,
+    ADD COLUMN IF NOT EXISTS "nationality"        TEXT,
+    ADD COLUMN IF NOT EXISTS "aadharNumber"       TEXT,
+    ADD COLUMN IF NOT EXISTS "presentAddress"     TEXT,
+    ADD COLUMN IF NOT EXISTS "permanentAddress"   TEXT,
+    ADD COLUMN IF NOT EXISTS "currentDesignation" TEXT,
+    ADD COLUMN IF NOT EXISTS "pfEsicNumber"       TEXT,
+    ADD COLUMN IF NOT EXISTS "reasonForLeaving"   TEXT,
+    ADD COLUMN IF NOT EXISTS "documentsSubmitted" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    ADD COLUMN IF NOT EXISTS "hasBike"            BOOLEAN,
+    ADD COLUMN IF NOT EXISTS "declarationDate"    TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "declarationPlace"   TEXT,
+    ADD COLUMN IF NOT EXISTS "educationDetails"   JSONB;

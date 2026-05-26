@@ -74,6 +74,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             "locality", "gender", "languages", "course", "specialization",
             "collegeName", "courseStartYear", "courseEndYear", "previousDesignation",
             "previousCompany", "resumeUrl", "profileUrl", "englishLevel", "levelOfExperience",
+            // Candidate Personal Information Form
+            "tshirtSize", "bloodGroup", "altPhone", "fatherName", "fatherOccupation",
+            "motherName", "motherOccupation", "maritalStatus", "nationality", "aadharNumber",
+            "presentAddress", "permanentAddress", "currentDesignation", "pfEsicNumber",
+            "reasonForLeaving", "declarationPlace",
         ]
         allowedFields.forEach(f => {
             if (f in body) updateData[f] = body[f] ?? null
@@ -85,6 +90,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         if (body.currentSalary !== undefined) updateData.currentSalary = body.currentSalary ? parseFloat(body.currentSalary) : null
         if (body.interviewDate !== undefined) updateData.interviewDate = body.interviewDate ? new Date(body.interviewDate) : null
         if (body.nextFollowUp !== undefined) updateData.nextFollowUp = body.nextFollowUp ? new Date(body.nextFollowUp) : null
+        if (body.dateOfBirth !== undefined) updateData.dateOfBirth = body.dateOfBirth ? new Date(body.dateOfBirth) : null
+        if (body.declarationDate !== undefined) updateData.declarationDate = body.declarationDate ? new Date(body.declarationDate) : null
+        if (body.hasBike !== undefined) updateData.hasBike = body.hasBike === "Yes" || body.hasBike === true ? true : body.hasBike === "No" || body.hasBike === false ? false : null
+        if (body.documentsSubmitted !== undefined) updateData.documentsSubmitted = Array.isArray(body.documentsSubmitted) ? body.documentsSubmitted : []
+        if (body.educationDetails !== undefined) updateData.educationDetails = body.educationDetails || null
 
         // Status change
         if (body.status && body.status !== prev.status) {

@@ -82,7 +82,15 @@ export async function POST(req: Request) {
             source, priority, score, assignedTo, notes, nextFollowUp,
             locality, gender, languages, age, course, specialization, collegeName,
             courseStartYear, courseEndYear, previousDesignation, previousCompany,
-            resumeUrl, profileUrl, englishLevel, levelOfExperience
+            resumeUrl, profileUrl, englishLevel, levelOfExperience,
+            // Candidate Personal Information Form fields
+            tshirtSize, bloodGroup, altPhone, dateOfBirth,
+            fatherName, fatherOccupation, motherName, motherOccupation,
+            maritalStatus, nationality, aadharNumber,
+            presentAddress, permanentAddress,
+            currentDesignation, pfEsicNumber, reasonForLeaving,
+            hasBike, declarationDate, declarationPlace,
+            documentsSubmitted, educationDetails,
         } = body
 
         if (!candidateName || !phone || !position || !source) {
@@ -141,6 +149,28 @@ export async function POST(req: Request) {
                 profileUrl: profileUrl || null,
                 englishLevel: englishLevel || null,
                 levelOfExperience: levelOfExperience || null,
+                // ─── Candidate Personal Information Form fields ───
+                tshirtSize: tshirtSize || null,
+                bloodGroup: bloodGroup || null,
+                altPhone: altPhone || null,
+                dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+                fatherName: fatherName || null,
+                fatherOccupation: fatherOccupation || null,
+                motherName: motherName || null,
+                motherOccupation: motherOccupation || null,
+                maritalStatus: maritalStatus || null,
+                nationality: nationality || null,
+                aadharNumber: aadharNumber || null,
+                presentAddress: presentAddress || null,
+                permanentAddress: permanentAddress || null,
+                currentDesignation: currentDesignation || null,
+                pfEsicNumber: pfEsicNumber || null,
+                reasonForLeaving: reasonForLeaving || null,
+                hasBike: hasBike === "Yes" || hasBike === true ? true : hasBike === "No" || hasBike === false ? false : null,
+                declarationDate: declarationDate ? new Date(declarationDate) : null,
+                declarationPlace: declarationPlace || null,
+                documentsSubmitted: Array.isArray(documentsSubmitted) ? documentsSubmitted : [],
+                educationDetails: educationDetails && Array.isArray(educationDetails) && educationDetails.length ? educationDetails : undefined,
             },
             include: {
                 assignee: { select: { id: true, name: true } },

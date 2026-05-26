@@ -14,7 +14,16 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
 
         const body = await req.json()
         const { candidateName, phone, email, city, position, experience,
-                qualification, skills, gender, age, expectedSalary, notes, profileUrl } = body
+                qualification, skills, gender, age, expectedSalary, notes, profileUrl,
+                // Candidate Personal Information Form fields
+                tshirtSize, bloodGroup, altPhone, dateOfBirth,
+                fatherName, fatherOccupation, motherName, motherOccupation,
+                maritalStatus, nationality, aadharNumber,
+                presentAddress, permanentAddress,
+                currentCompany, currentDesignation, currentSalary,
+                pfEsicNumber, previousCompany, reasonForLeaving,
+                hasBike, declarationDate, declarationPlace,
+                documentsSubmitted, educationDetails } = body
 
         if (!candidateName || !phone) {
             return NextResponse.json({ error: "Name and phone are required" }, { status: 400 })
@@ -33,30 +42,55 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
         const leadSource = isOnSiteJoin ? "On-site Join" : "Form Link"
         const joinedAt   = isOnSiteJoin ? new Date() : null
 
-        const lead = await prisma.lead.create({
-            data: {
-                candidateName: String(candidateName).trim(),
-                phone:         String(phone).trim(),
-                email:         email ? String(email).trim() : null,
-                city:          city  ? String(city).trim()  : null,
-                position:      position ? String(position).trim() : "Not Specified",
-                experience:    experience ? parseFloat(String(experience)) : null,
-                qualification: qualification || null,
-                skills:        skills || null,
-                gender:        gender || null,
-                age:           age ? parseInt(String(age)) : null,
-                expectedSalary: expectedSalary ? parseFloat(String(expectedSalary)) : null,
-                notes:         notes || null,
-                profileUrl:    profileUrl || null,
-                source:        leadSource,
-                formSlug:      params.slug,
-                siteId:        form.siteId || null,
-                status:        leadStatus,
-                priority:      "MEDIUM",
-                score:         "WARM",
-                createdBy:     systemUser.id,
-            },
-        })
+        const leadData: any = {
+            candidateName: String(candidateName).trim(),
+            phone:         String(phone).trim(),
+            email:         email ? String(email).trim() : null,
+            city:          city  ? String(city).trim()  : null,
+            position:      position ? String(position).trim() : "Not Specified",
+            experience:    experience ? parseFloat(String(experience)) : null,
+            qualification: qualification || null,
+            skills:        skills || null,
+            gender:        gender || null,
+            age:           age ? parseInt(String(age)) : null,
+            expectedSalary: expectedSalary ? parseFloat(String(expectedSalary)) : null,
+            notes:         notes || null,
+            profileUrl:    profileUrl || null,
+            source:        leadSource,
+            formSlug:      params.slug,
+            siteId:        form.siteId || null,
+            status:        leadStatus,
+            priority:      "MEDIUM",
+            score:         "WARM",
+            createdBy:     systemUser.id,
+            // ─── New candidate-form fields ───
+            tshirtSize:         tshirtSize || null,
+            bloodGroup:         bloodGroup || null,
+            altPhone:           altPhone || null,
+            dateOfBirth:        dateOfBirth ? new Date(dateOfBirth) : null,
+            fatherName:         fatherName || null,
+            fatherOccupation:   fatherOccupation || null,
+            motherName:         motherName || null,
+            motherOccupation:   motherOccupation || null,
+            maritalStatus:      maritalStatus || null,
+            nationality:        nationality || null,
+            aadharNumber:       aadharNumber || null,
+            presentAddress:     presentAddress || null,
+            permanentAddress:   permanentAddress || null,
+            currentCompany:     currentCompany || null,
+            currentDesignation: currentDesignation || null,
+            currentSalary:      currentSalary ? parseFloat(String(currentSalary)) : null,
+            pfEsicNumber:       pfEsicNumber || null,
+            previousCompany:    previousCompany || null,
+            reasonForLeaving:   reasonForLeaving || null,
+            hasBike:            hasBike === "Yes" ? true : hasBike === "No" ? false : null,
+            declarationDate:    declarationDate ? new Date(declarationDate) : null,
+            declarationPlace:   declarationPlace || null,
+            documentsSubmitted: Array.isArray(documentsSubmitted) ? documentsSubmitted : [],
+            educationDetails:   educationDetails && Array.isArray(educationDetails) && educationDetails.length ? educationDetails : undefined,
+        }
+
+        const lead = await prisma.lead.create({ data: leadData })
 
         // Log an activity for on-site joins so HR can see when they walked in
         if (isOnSiteJoin) {

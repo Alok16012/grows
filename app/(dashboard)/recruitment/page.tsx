@@ -61,10 +61,14 @@ const ACTIVITY_TYPES = [
 ]
 
 const POSITIONS = [
+    "HR Recruiter", "Team Leader", "HR Executive", "Payroll Executive",
+    "Account Executive", "MIS Executive", "Operation Manager",
+    "Quality Supervisor", "Quality Engineer", "Field Recruiter",
+    "Operation Head", "HR Manager",
     "Inspector", "Senior Inspector", "Lead Inspector",
     "Security Guard", "Security Supervisor",
     "Driver", "Heavy Vehicle Driver",
-    "Supervisor", "Team Leader",
+    "Supervisor",
     "Helper / Labour", "Electrician", "Plumber",
     "Housekeeping Staff", "Peon / Office Boy",
     "Data Entry Operator", "Other"
@@ -297,7 +301,14 @@ export default function RecruitmentPage() {
         course: "", specialization: "", collegeName: "",
         courseStartYear: "", courseEndYear: "",
         previousDesignation: "", previousCompany: "",
-        resumeUrl: "", profileUrl: "", englishLevel: "", levelOfExperience: ""
+        resumeUrl: "", profileUrl: "", englishLevel: "", levelOfExperience: "",
+        // Candidate Personal Information Form fields
+        tshirtSize: "", bloodGroup: "", altPhone: "", dateOfBirth: "",
+        fatherName: "", fatherOccupation: "", motherName: "", motherOccupation: "",
+        maritalStatus: "", nationality: "Indian", aadharNumber: "",
+        presentAddress: "", permanentAddress: "",
+        currentDesignation: "", pfEsicNumber: "", reasonForLeaving: "",
+        hasBike: "", declarationDate: "", declarationPlace: "",
     }
     const [form, setForm] = useState(emptyForm)
 
@@ -588,6 +599,26 @@ export default function RecruitmentPage() {
             profileUrl: lead.profileUrl ?? "",
             englishLevel: lead.englishLevel ?? "",
             levelOfExperience: lead.levelOfExperience ?? "",
+            // Candidate Personal Information Form fields
+            tshirtSize: (lead as any).tshirtSize ?? "",
+            bloodGroup: (lead as any).bloodGroup ?? "",
+            altPhone: (lead as any).altPhone ?? "",
+            dateOfBirth: (lead as any).dateOfBirth ? String((lead as any).dateOfBirth).slice(0, 10) : "",
+            fatherName: (lead as any).fatherName ?? "",
+            fatherOccupation: (lead as any).fatherOccupation ?? "",
+            motherName: (lead as any).motherName ?? "",
+            motherOccupation: (lead as any).motherOccupation ?? "",
+            maritalStatus: (lead as any).maritalStatus ?? "",
+            nationality: (lead as any).nationality ?? "Indian",
+            aadharNumber: (lead as any).aadharNumber ?? "",
+            presentAddress: (lead as any).presentAddress ?? "",
+            permanentAddress: (lead as any).permanentAddress ?? "",
+            currentDesignation: (lead as any).currentDesignation ?? "",
+            pfEsicNumber: (lead as any).pfEsicNumber ?? "",
+            reasonForLeaving: (lead as any).reasonForLeaving ?? "",
+            hasBike: (lead as any).hasBike === true ? "Yes" : (lead as any).hasBike === false ? "No" : "",
+            declarationDate: (lead as any).declarationDate ? String((lead as any).declarationDate).slice(0, 10) : "",
+            declarationPlace: (lead as any).declarationPlace ?? "",
         })
         setShowForm(true)
     }
@@ -1221,6 +1252,89 @@ export default function RecruitmentPage() {
                                 <Field label="Next Follow-up Date">
                                     <input type="date" value={form.nextFollowUp} onChange={e => setForm(p => ({ ...p, nextFollowUp: e.target.value }))}
                                         className={inputCls} />
+                                </Field>
+                            </div>
+                        </div>
+
+                        {/* Personal Info (Candidate Form) */}
+                        <div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Personal Info</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <Field label="T-Shirt Size">
+                                    <select value={form.tshirtSize} onChange={e => setForm(p => ({ ...p, tshirtSize: e.target.value }))} className={inputCls}>
+                                        <option value="">Select…</option>
+                                        {["S", "M", "L", "XL", "XXL"].map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </Field>
+                                <Field label="Blood Group">
+                                    <select value={form.bloodGroup} onChange={e => setForm(p => ({ ...p, bloodGroup: e.target.value }))} className={inputCls}>
+                                        <option value="">Select…</option>
+                                        {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(b => <option key={b} value={b}>{b}</option>)}
+                                    </select>
+                                </Field>
+                                <Field label="Alternative Number">
+                                    <input value={form.altPhone} onChange={e => setForm(p => ({ ...p, altPhone: e.target.value }))} maxLength={10} className={inputCls} />
+                                </Field>
+                                <Field label="Date of Birth">
+                                    <input type="date" value={form.dateOfBirth} onChange={e => setForm(p => ({ ...p, dateOfBirth: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Marital Status">
+                                    <select value={form.maritalStatus} onChange={e => setForm(p => ({ ...p, maritalStatus: e.target.value }))} className={inputCls}>
+                                        <option value="">Select…</option>
+                                        <option>Single</option><option>Married</option><option>Other</option>
+                                    </select>
+                                </Field>
+                                <Field label="Nationality">
+                                    <input value={form.nationality} onChange={e => setForm(p => ({ ...p, nationality: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Father's Name">
+                                    <input value={form.fatherName} onChange={e => setForm(p => ({ ...p, fatherName: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Father's Occupation">
+                                    <input value={form.fatherOccupation} onChange={e => setForm(p => ({ ...p, fatherOccupation: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Mother's Name">
+                                    <input value={form.motherName} onChange={e => setForm(p => ({ ...p, motherName: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Mother's Occupation">
+                                    <input value={form.motherOccupation} onChange={e => setForm(p => ({ ...p, motherOccupation: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Aadhar Number">
+                                    <input value={form.aadharNumber} onChange={e => setForm(p => ({ ...p, aadharNumber: e.target.value }))} maxLength={14} className={inputCls} />
+                                </Field>
+                            </div>
+                        </div>
+
+                        {/* Address */}
+                        <div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Address</p>
+                            <div className="grid grid-cols-1 gap-3">
+                                <Field label="Present Address">
+                                    <textarea rows={2} value={form.presentAddress} onChange={e => setForm(p => ({ ...p, presentAddress: e.target.value }))} className={`${inputCls} !h-auto resize-none`} />
+                                </Field>
+                                <Field label="Permanent Address">
+                                    <textarea rows={2} value={form.permanentAddress} onChange={e => setForm(p => ({ ...p, permanentAddress: e.target.value }))} className={`${inputCls} !h-auto resize-none`} />
+                                </Field>
+                            </div>
+                        </div>
+
+                        {/* Employment Extras */}
+                        <div>
+                            <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Employment Extras</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <Field label="Current Designation">
+                                    <input value={form.currentDesignation} onChange={e => setForm(p => ({ ...p, currentDesignation: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="PF & ESIC Number">
+                                    <input value={form.pfEsicNumber} onChange={e => setForm(p => ({ ...p, pfEsicNumber: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Reason for Leaving">
+                                    <input value={form.reasonForLeaving} onChange={e => setForm(p => ({ ...p, reasonForLeaving: e.target.value }))} className={inputCls} />
+                                </Field>
+                                <Field label="Has Bike?">
+                                    <select value={form.hasBike} onChange={e => setForm(p => ({ ...p, hasBike: e.target.value }))} className={inputCls}>
+                                        <option value="">Select…</option><option>Yes</option><option>No</option>
+                                    </select>
                                 </Field>
                             </div>
                         </div>
