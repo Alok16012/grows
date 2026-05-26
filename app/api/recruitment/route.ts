@@ -54,17 +54,50 @@ export async function GET(req: Request) {
 
     if (andClauses.length > 0) where.AND = andClauses
 
-    const leads = await prisma.lead.findMany({
-        where,
-        include: {
-            assignee: { select: { id: true, name: true, email: true } },
-            creator: { select: { id: true, name: true } },
-            _count: { select: { activities: true, documents: true, followUps: true } }
-        },
-        orderBy: { createdAt: "desc" }
-    })
-
-    return NextResponse.json(leads)
+    // Try full select first; fall back to "original columns only" if the
+    // new candidate-form columns don't exist yet in the deployed DB.
+    try {
+        const leads = await prisma.lead.findMany({
+            where,
+            include: {
+                assignee: { select: { id: true, name: true, email: true } },
+                creator: { select: { id: true, name: true } },
+                _count: { select: { activities: true, documents: true, followUps: true } }
+            },
+            orderBy: { createdAt: "desc" }
+        })
+        return NextResponse.json(leads)
+    } catch (err: any) {
+        const msg = String(err?.message || "")
+        const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+        if (!missingColumn) {
+            console.error("[RECRUITMENT_GET]", err)
+            return NextResponse.json({ error: "Failed to load candidates" }, { status: 500 })
+        }
+        // Fallback — DB migration not yet applied. Select only pre-migration columns.
+        const leads = await prisma.lead.findMany({
+            where,
+            select: {
+                id: true, candidateName: true, phone: true, email: true, city: true,
+                position: true, experience: true, currentCompany: true, qualification: true,
+                skills: true, expectedSalary: true, currentSalary: true, interviewDate: true,
+                interviewMode: true, source: true, status: true, priority: true, score: true,
+                interviewerId: true, interviewFeedback: true, interviewResult: true,
+                assignedTo: true, notes: true, nextFollowUp: true, locality: true,
+                gender: true, languages: true, age: true, course: true, specialization: true,
+                collegeName: true, courseStartYear: true, courseEndYear: true,
+                previousDesignation: true, previousCompany: true, resumeUrl: true,
+                profileUrl: true, englishLevel: true, levelOfExperience: true,
+                convertedEmployeeId: true, formSlug: true, siteId: true,
+                createdBy: true, createdAt: true, updatedAt: true,
+                assignee: { select: { id: true, name: true, email: true } },
+                creator: { select: { id: true, name: true } },
+                _count: { select: { activities: true, documents: true, followUps: true } }
+            },
+            orderBy: { createdAt: "desc" }
+        })
+        return NextResponse.json(leads)
+    }
 }
 
 export async function POST(req: Request) {
@@ -115,69 +148,87 @@ export async function POST(req: Request) {
             }, { status: 409 })
         }
 
-        const lead = await prisma.lead.create({
-            data: {
-                candidateName, phone, position, source,
-                email: email || null,
-                city: city || null,
-                experience: experience ? parseFloat(experience) : null,
-                currentCompany: currentCompany || null,
-                qualification: qualification || null,
-                skills: skills || null,
-                expectedSalary: expectedSalary ? parseFloat(expectedSalary) : null,
-                currentSalary: currentSalary ? parseFloat(currentSalary) : null,
-                interviewDate: interviewDate ? new Date(interviewDate) : null,
-                interviewMode: interviewMode || null,
-                priority: priority || "MEDIUM",
-                score: score || "WARM",
-                assignedTo: assignedTo || null,
-                notes: notes || null,
-                nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : null,
-                createdBy: creatorId,
-                locality: locality || null,
-                gender: gender || null,
-                languages: languages || null,
-                age: age ? parseInt(age) : null,
-                course: course || null,
-                specialization: specialization || null,
-                collegeName: collegeName || null,
-                courseStartYear: courseStartYear || null,
-                courseEndYear: courseEndYear || null,
-                previousDesignation: previousDesignation || null,
-                previousCompany: previousCompany || null,
-                resumeUrl: resumeUrl || null,
-                profileUrl: profileUrl || null,
-                englishLevel: englishLevel || null,
-                levelOfExperience: levelOfExperience || null,
-                // ─── Candidate Personal Information Form fields ───
-                tshirtSize: tshirtSize || null,
-                bloodGroup: bloodGroup || null,
-                altPhone: altPhone || null,
-                dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-                fatherName: fatherName || null,
-                fatherOccupation: fatherOccupation || null,
-                motherName: motherName || null,
-                motherOccupation: motherOccupation || null,
-                maritalStatus: maritalStatus || null,
-                nationality: nationality || null,
-                aadharNumber: aadharNumber || null,
-                presentAddress: presentAddress || null,
-                permanentAddress: permanentAddress || null,
-                currentDesignation: currentDesignation || null,
-                pfEsicNumber: pfEsicNumber || null,
-                reasonForLeaving: reasonForLeaving || null,
-                hasBike: hasBike === "Yes" || hasBike === true ? true : hasBike === "No" || hasBike === false ? false : null,
-                declarationDate: declarationDate ? new Date(declarationDate) : null,
-                declarationPlace: declarationPlace || null,
-                documentsSubmitted: Array.isArray(documentsSubmitted) ? documentsSubmitted : [],
-                educationDetails: educationDetails && Array.isArray(educationDetails) && educationDetails.length ? educationDetails : undefined,
-            },
-            include: {
-                assignee: { select: { id: true, name: true } },
-                creator: { select: { id: true, name: true } },
-                _count: { select: { activities: true, documents: true, followUps: true } }
-            }
-        })
+        const coreData: any = {
+            candidateName, phone, position, source,
+            email: email || null,
+            city: city || null,
+            experience: experience ? parseFloat(experience) : null,
+            currentCompany: currentCompany || null,
+            qualification: qualification || null,
+            skills: skills || null,
+            expectedSalary: expectedSalary ? parseFloat(expectedSalary) : null,
+            currentSalary: currentSalary ? parseFloat(currentSalary) : null,
+            interviewDate: interviewDate ? new Date(interviewDate) : null,
+            interviewMode: interviewMode || null,
+            priority: priority || "MEDIUM",
+            score: score || "WARM",
+            assignedTo: assignedTo || null,
+            notes: notes || null,
+            nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : null,
+            createdBy: creatorId,
+            locality: locality || null,
+            gender: gender || null,
+            languages: languages || null,
+            age: age ? parseInt(age) : null,
+            course: course || null,
+            specialization: specialization || null,
+            collegeName: collegeName || null,
+            courseStartYear: courseStartYear || null,
+            courseEndYear: courseEndYear || null,
+            previousDesignation: previousDesignation || null,
+            previousCompany: previousCompany || null,
+            resumeUrl: resumeUrl || null,
+            profileUrl: profileUrl || null,
+            englishLevel: englishLevel || null,
+            levelOfExperience: levelOfExperience || null,
+        }
+        const newFieldsData = {
+            tshirtSize: tshirtSize || null,
+            bloodGroup: bloodGroup || null,
+            altPhone: altPhone || null,
+            dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+            fatherName: fatherName || null,
+            fatherOccupation: fatherOccupation || null,
+            motherName: motherName || null,
+            motherOccupation: motherOccupation || null,
+            maritalStatus: maritalStatus || null,
+            nationality: nationality || null,
+            aadharNumber: aadharNumber || null,
+            presentAddress: presentAddress || null,
+            permanentAddress: permanentAddress || null,
+            currentDesignation: currentDesignation || null,
+            pfEsicNumber: pfEsicNumber || null,
+            reasonForLeaving: reasonForLeaving || null,
+            hasBike: hasBike === "Yes" || hasBike === true ? true : hasBike === "No" || hasBike === false ? false : null,
+            declarationDate: declarationDate ? new Date(declarationDate) : null,
+            declarationPlace: declarationPlace || null,
+            documentsSubmitted: Array.isArray(documentsSubmitted) ? documentsSubmitted : [],
+            educationDetails: educationDetails && Array.isArray(educationDetails) && educationDetails.length ? educationDetails : undefined,
+        }
+        let lead
+        try {
+            lead = await prisma.lead.create({
+                data: { ...coreData, ...newFieldsData },
+                include: {
+                    assignee: { select: { id: true, name: true } },
+                    creator: { select: { id: true, name: true } },
+                    _count: { select: { activities: true, documents: true, followUps: true } }
+                }
+            })
+        } catch (err: any) {
+            const msg = String(err?.message || "")
+            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            if (!missingColumn) throw err
+            // Migration not applied yet — create without the new fields
+            lead = await prisma.lead.create({
+                data: coreData,
+                include: {
+                    assignee: { select: { id: true, name: true } },
+                    creator: { select: { id: true, name: true } },
+                    _count: { select: { activities: true, documents: true, followUps: true } }
+                }
+            })
+        }
 
         await prisma.leadActivity.create({
             data: {

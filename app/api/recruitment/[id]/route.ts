@@ -12,25 +12,55 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const lead = await prisma.lead.findUnique({
-        where: { id: params.id },
-        include: {
-            assignee: { select: { id: true, name: true, email: true } },
-            creator: { select: { id: true, name: true } },
-            activities: {
-                include: { user: { select: { id: true, name: true } } },
-                orderBy: { createdAt: "desc" }
-            },
-            documents: {
-                include: { uploader: { select: { id: true, name: true } } },
-                orderBy: { createdAt: "desc" }
-            },
-            followUps: {
-                include: { creator: { select: { id: true, name: true } } },
-                orderBy: { scheduledAt: "asc" }
+    let lead
+    try {
+        lead = await prisma.lead.findUnique({
+            where: { id: params.id },
+            include: {
+                assignee: { select: { id: true, name: true, email: true } },
+                creator: { select: { id: true, name: true } },
+                activities: {
+                    include: { user: { select: { id: true, name: true } } },
+                    orderBy: { createdAt: "desc" }
+                },
+                documents: {
+                    include: { uploader: { select: { id: true, name: true } } },
+                    orderBy: { createdAt: "desc" }
+                },
+                followUps: {
+                    include: { creator: { select: { id: true, name: true } } },
+                    orderBy: { scheduledAt: "asc" }
+                }
             }
-        }
-    })
+        })
+    } catch (err: any) {
+        const msg = String(err?.message || "")
+        const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+        if (!missingColumn) throw err
+        // Fallback — fetch with only pre-migration columns
+        lead = await prisma.lead.findUnique({
+            where: { id: params.id },
+            select: {
+                id: true, candidateName: true, phone: true, email: true, city: true,
+                position: true, experience: true, currentCompany: true, qualification: true,
+                skills: true, expectedSalary: true, currentSalary: true, interviewDate: true,
+                interviewMode: true, source: true, status: true, priority: true, score: true,
+                interviewerId: true, interviewFeedback: true, interviewResult: true,
+                assignedTo: true, notes: true, nextFollowUp: true, locality: true,
+                gender: true, languages: true, age: true, course: true, specialization: true,
+                collegeName: true, courseStartYear: true, courseEndYear: true,
+                previousDesignation: true, previousCompany: true, resumeUrl: true,
+                profileUrl: true, englishLevel: true, levelOfExperience: true,
+                convertedEmployeeId: true, formSlug: true, siteId: true,
+                createdBy: true, createdAt: true, updatedAt: true,
+                assignee: { select: { id: true, name: true, email: true } },
+                creator: { select: { id: true, name: true } },
+                activities: { include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+                documents: { include: { uploader: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+                followUps: { include: { creator: { select: { id: true, name: true } } }, orderBy: { scheduledAt: "asc" } },
+            } as any
+        }) as any
+    }
 
     if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
@@ -180,26 +210,48 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             }
         }
 
-        const lead = await prisma.lead.update({
-            where: { id: params.id },
-            data: updateData,
-            include: {
-                assignee: { select: { id: true, name: true } },
-                creator: { select: { id: true, name: true } },
-                activities: {
-                    include: { user: { select: { id: true, name: true } } },
-                    orderBy: { createdAt: "desc" }
-                },
-                documents: {
-                    include: { uploader: { select: { id: true, name: true } } },
-                    orderBy: { createdAt: "desc" }
-                },
-                followUps: {
-                    include: { creator: { select: { id: true, name: true } } },
-                    orderBy: { scheduledAt: "asc" }
+        // Try update with all fields. If a new column doesn't exist yet,
+        // strip new fields from updateData and retry.
+        const newFieldKeys = [
+            "tshirtSize", "bloodGroup", "altPhone", "dateOfBirth", "fatherName",
+            "fatherOccupation", "motherName", "motherOccupation", "maritalStatus",
+            "nationality", "aadharNumber", "presentAddress", "permanentAddress",
+            "currentDesignation", "pfEsicNumber", "reasonForLeaving", "hasBike",
+            "declarationDate", "declarationPlace", "documentsSubmitted", "educationDetails",
+        ]
+        let lead
+        try {
+            lead = await prisma.lead.update({
+                where: { id: params.id },
+                data: updateData,
+                include: {
+                    assignee: { select: { id: true, name: true } },
+                    creator: { select: { id: true, name: true } },
+                    activities: { include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+                    documents: { include: { uploader: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+                    followUps: { include: { creator: { select: { id: true, name: true } } }, orderBy: { scheduledAt: "asc" } },
                 }
+            })
+        } catch (err: any) {
+            const msg = String(err?.message || "")
+            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            if (!missingColumn) throw err
+            const coreUpdate: any = {}
+            for (const k of Object.keys(updateData)) {
+                if (!newFieldKeys.includes(k)) coreUpdate[k] = updateData[k]
             }
-        })
+            lead = await prisma.lead.update({
+                where: { id: params.id },
+                data: coreUpdate,
+                include: {
+                    assignee: { select: { id: true, name: true } },
+                    creator: { select: { id: true, name: true } },
+                    activities: { include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+                    documents: { include: { uploader: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+                    followUps: { include: { creator: { select: { id: true, name: true } } }, orderBy: { scheduledAt: "asc" } },
+                }
+            })
+        }
 
         return NextResponse.json(lead)
     } catch (err) {

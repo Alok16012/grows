@@ -90,7 +90,28 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             educationDetails:   educationDetails && Array.isArray(educationDetails) && educationDetails.length ? educationDetails : undefined,
         }
 
-        const lead = await prisma.lead.create({ data: leadData })
+        // New candidate-form fields may not exist in DB yet — fall back if column missing
+        const newFieldKeys = [
+            "tshirtSize", "bloodGroup", "altPhone", "dateOfBirth", "fatherName",
+            "fatherOccupation", "motherName", "motherOccupation", "maritalStatus",
+            "nationality", "aadharNumber", "presentAddress", "permanentAddress",
+            "currentCompany", "currentDesignation", "currentSalary", "pfEsicNumber",
+            "previousCompany", "reasonForLeaving", "hasBike", "declarationDate",
+            "declarationPlace", "documentsSubmitted", "educationDetails",
+        ]
+        let lead
+        try {
+            lead = await prisma.lead.create({ data: leadData })
+        } catch (err: any) {
+            const msg = String(err?.message || "")
+            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            if (!missingColumn) throw err
+            const coreData: any = {}
+            for (const k of Object.keys(leadData)) {
+                if (!newFieldKeys.includes(k)) coreData[k] = (leadData as any)[k]
+            }
+            lead = await prisma.lead.create({ data: coreData })
+        }
 
         // Log an activity for on-site joins so HR can see when they walked in
         if (isOnSiteJoin) {
