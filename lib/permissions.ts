@@ -289,5 +289,10 @@ export function checkAccess(
     // only EXPAND access via additional permissions, never restrict baseline role access.
     const roleAllowed = allowedRoles.includes(role)
     const permissionAllowed = !!(permission && session.user.permissions?.includes(permission))
-    return roleAllowed || permissionAllowed
+    const allowed = roleAllowed || permissionAllowed
+
+    if (!allowed && process.env.NODE_ENV !== "test") {
+        console.log(`[checkAccess DENY] role=${role} allowedRoles=${JSON.stringify(allowedRoles)} permission=${permission} userPerms=${JSON.stringify(session.user.permissions || [])}`)
+    }
+    return allowed
 }
