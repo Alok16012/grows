@@ -8,9 +8,9 @@ import { checkAccess } from "@/lib/permissions"
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "sites.view")) {
-            return new NextResponse("Forbidden", { status: 403 })
+            return NextResponse.json({ error: "Forbidden - missing sites.view permission" }, { status: 403 })
         }
 
         const { searchParams } = new URL(req.url)
