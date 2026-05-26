@@ -3,13 +3,14 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 
 export async function POST(
     req: Request,
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!checkAccess(session, ["MANAGER"], "assignments.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -36,7 +37,7 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!checkAccess(session, ["MANAGER"], "assignments.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

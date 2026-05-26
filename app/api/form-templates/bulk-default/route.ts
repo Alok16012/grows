@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 const FIXED_FIELDS = [
     { fieldLabel: "INSP. DATE", fieldType: "date", isRequired: true, category: "FIXED" },
@@ -40,9 +41,7 @@ const AUTO_FIELDS = [
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!session) return new NextResponse("Unauthorized", { status: 401 })
-
-        if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

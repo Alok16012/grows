@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -49,10 +50,9 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Assignment not found" }, { status: 404 })
         }
 
-        // Access check: Inspector assigned or ADMIN/MANAGER
+        // Access check: Inspector assigned or ADMIN/MANAGER (or custom role with permission)
         if (
-            session.user.role !== Role.ADMIN &&
-            session.user.role !== Role.MANAGER &&
+            !checkAccess(session, ["MANAGER"], "assignments.view") &&
             assignment.inspectionBoyId !== session.user.id
         ) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })

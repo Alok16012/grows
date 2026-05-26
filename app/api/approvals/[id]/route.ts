@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 import { sendApprovalEmail } from "@/lib/email"
 
 export async function GET(
@@ -11,7 +12,7 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!checkAccess(session, ["MANAGER"], "approvals.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -56,7 +57,7 @@ export async function PATCH(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!checkAccess(session, ["MANAGER"], "approvals.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

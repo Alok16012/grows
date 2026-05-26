@@ -15,6 +15,9 @@ const rolePaths: Record<string, string> = {
 // default when they don't match any permission-based home.
 function landingForCustomRole(permissions: string[]): string | null {
     if (permissions.includes("recruitment.view")) return "/recruitment"
+    if (permissions.includes("assignments.view")) return "/assignments"
+    if (permissions.includes("projects.view")) return "/projects"
+    if (permissions.includes("sites.view")) return "/sites"
     if (permissions.includes("employees.view")) return "/employees"
     if (permissions.includes("attendance.view")) return "/attendance"
     if (permissions.includes("payroll.view")) return "/payroll"

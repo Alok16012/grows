@@ -3,13 +3,14 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
     const role = session?.user?.role
-    // ADMIN, MANAGER, HR_MANAGER can access leads list
-    if (!session || (role !== Role.ADMIN && role !== Role.MANAGER && role !== "HR_MANAGER")) {
+    // ADMIN, MANAGER, HR_MANAGER (or custom roles with permission) can access leads list
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
         // Resolve real DB user ID (session.user.id may be a demo-xxx string)
@@ -61,7 +62,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!checkAccess(session, ["MANAGER"], "recruitment.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

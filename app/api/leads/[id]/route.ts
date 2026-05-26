@@ -3,11 +3,12 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role, LeadStatus } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!checkAccess(session, ["MANAGER"], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
         // Resolve real DB user ID (session.user.id may be a demo-xxx string)
@@ -33,7 +34,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!checkAccess(session, ["MANAGER"], "recruitment.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

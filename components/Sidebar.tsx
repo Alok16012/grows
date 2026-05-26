@@ -90,6 +90,32 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     }, [role])
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
+    const customRoleName = (session?.user as any)?.customRoleName as string | null
+
+    // Land custom-role users on a page they actually have access to,
+    // instead of routing them by their system role (which is often INSPECTION_BOY).
+    function landingForUser(): string {
+        if (role === "ADMIN") return "/admin"
+        if (role === "CLIENT") return "/client"
+
+        // Custom role → pick first page they have permission for
+        if (customRoleName) {
+            if (userPermissions.includes("recruitment.view")) return "/recruitment"
+            if (userPermissions.includes("assignments.view")) return "/assignments"
+            if (userPermissions.includes("projects.view")) return "/projects"
+            if (userPermissions.includes("sites.view")) return "/sites"
+            if (userPermissions.includes("employees.view")) return "/employees"
+            if (userPermissions.includes("attendance.view")) return "/attendance"
+            if (userPermissions.includes("payroll.view")) return "/payroll"
+            if (userPermissions.includes("helpdesk.view")) return "/helpdesk"
+            if (userPermissions.includes("lms.view")) return "/lms/learn"
+            return "/manager"
+        }
+
+        if (role === "MANAGER" || role === "HR_MANAGER") return "/manager"
+        return "/inspection"
+    }
+    const dashboardHref = landingForUser()
 
     // ─────────────────────────────────────────────────────────────────────────
     // NAVIGATION CONFIG
@@ -106,14 +132,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             links: [
                 {
                     name: "Dashboard",
-                    href: role === "INSPECTION_BOY"
-                        ? "/inspection"
-                        : (role === "MANAGER" || role === "HR_MANAGER")
-                            ? "/manager"
-                            : "/admin",
+                    href: dashboardHref,
                     icon: LayoutDashboard,
-                    // All non-CLIENT roles get Dashboard; custom role users
-                    // are MANAGER/HR_MANAGER at system level so they're covered
                     roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"],
                 },
                 // CLIENT gets their own portal as the first item
