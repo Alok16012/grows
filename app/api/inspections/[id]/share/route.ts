@@ -24,7 +24,7 @@ export async function POST(
         where: { inspectionId: params.id },
         create: {
             inspectionId: params.id,
-            createdBy: session.user.id
+            createdBy: session!.user.id
         },
         update: {}
     })

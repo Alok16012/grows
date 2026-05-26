@@ -123,7 +123,7 @@ export async function PATCH(
 
         if (action === "approve") {
             updateData.approvedAt = new Date()
-            updateData.approvedBy = session.user.id
+            updateData.approvedBy = session!.user.id
         }
 
         const assignment = await prisma.assignment.findUnique({
@@ -188,7 +188,7 @@ export async function PATCH(
                 // Auto-create shareable link
                 const shareLink = await prisma.shareableLink.upsert({
                     where: { inspectionId: inspectionId },
-                    create: { inspectionId, createdBy: session.user.id },
+                    create: { inspectionId, createdBy: session!.user.id },
                     update: {}
                 })
 
@@ -223,7 +223,7 @@ export async function PATCH(
                         approvedAt: new Date(),
                         reviewerNotes: reviewerNotes || null,
                         shareUrl,
-                        approvedByName: session.user.name || session.user.email || "Manager"
+                        approvedByName: session!.user.name || session!.user.email || "Manager"
                     })
                 }
             } catch (emailErr) {

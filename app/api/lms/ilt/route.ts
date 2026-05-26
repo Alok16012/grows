@@ -24,7 +24,7 @@ export async function GET(req: Request) {
             include: {
                 _count: { select: { attendances: true } },
                 attendances: {
-                    where: { employeeId: session.user.id },
+                    where: { employeeId: session!.user.id },
                     select: { status: true },
                 },
             },
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
             return new NextResponse("Forbidden", { status: 403 })
         }
         // Resolve real DB user ID
-        const actorId = await resolveUserId(session)
+        const actorId = await resolveUserId(session!)
         if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
 
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
             data: {
                 title,
                 description: description || null,
-                instructorId: instructorId || session.user.id,
+                instructorId: instructorId || session!.user.id,
                 courseId: courseId || null,
                 location: location || null,
                 startTime: new Date(startTime),

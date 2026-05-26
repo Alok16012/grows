@@ -11,8 +11,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     if (!checkAccess(session, ["MANAGER"], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
-        const actorId = await resolveUserId(session)
+        // Resolve real DB user ID (session!.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session!)
         if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
 
@@ -38,7 +38,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const actorId = await resolveUserId(session)
+    const actorId = await resolveUserId(session!)
     if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
     try {
@@ -108,7 +108,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== Role.ADMIN) {
+    if (!session || session!.user.role !== Role.ADMIN) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

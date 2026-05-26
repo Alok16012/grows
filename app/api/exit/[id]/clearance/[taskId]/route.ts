@@ -23,7 +23,7 @@ export async function PUT(
 
     if (status === "COMPLETED") {
       taskUpdateData.completedAt = new Date()
-      taskUpdateData.completedBy = completedBy || session.user.name || session.user.id
+      taskUpdateData.completedBy = completedBy || session!.user.name || session!.user.id
     } else {
       taskUpdateData.completedAt = null
       taskUpdateData.completedBy = null

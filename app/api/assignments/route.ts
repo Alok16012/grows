@@ -206,7 +206,7 @@ export async function POST(req: Request) {
                         data: {
                             projectId,
                             inspectionBoyId,
-                            assignedBy: session.user.id,
+                            assignedBy: session!.user.id,
                             status: "active",
                             recurrenceType: recurType,
                             recurrenceActive: recurType !== "none"
@@ -225,7 +225,7 @@ export async function POST(req: Request) {
                 for (const mId of mgrIds) {
                     await prisma.projectManager.upsert({
                         where: { projectId_managerId: { projectId, managerId: mId } },
-                        create: { projectId, managerId: mId, assignedBy: session.user.id },
+                        create: { projectId, managerId: mId, assignedBy: session!.user.id },
                         update: {}
                     })
                 }

@@ -103,7 +103,7 @@ export async function POST(req: Request) {
         lastWorkingDate: lastWorkingDate ? new Date(lastWorkingDate) : null,
         noticePeriodDays: noticePeriodDays ? parseInt(String(noticePeriodDays)) : 30,
         reason: reason || null,
-        initiatedBy: session.user.id,
+        initiatedBy: session!.user.id,
         status: "INITIATED",
         clearanceTasks: {
           create: DEFAULT_CLEARANCE.map(t => ({

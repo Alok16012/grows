@@ -21,7 +21,7 @@ export async function PUT(
             where: { id: params.taskId },
             data: {
                 ...(status && { status }),
-                ...(status === "COMPLETED" && { completedAt: new Date(), completedBy: completedBy || session.user.name || null }),
+                ...(status === "COMPLETED" && { completedAt: new Date(), completedBy: completedBy || session!.user.name || null }),
                 ...(status !== "COMPLETED" && { completedAt: null, completedBy: null }),
             },
         })

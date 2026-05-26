@@ -46,7 +46,7 @@ export async function POST(req: Request) {
                     data: {
                         status: status, // VERIFIED or REJECTED
                         rejectionReason: status === "REJECTED" ? rejectionReason : null,
-                        verifiedBy: session.user.id
+                        verifiedBy: session!.user.id
                     }
                 })
                 return NextResponse.json({ success: true, document: updatedDoc })
@@ -65,8 +65,8 @@ export async function POST(req: Request) {
                         hra: parseFloat(salaryData.hra || 0),
                         specialAllowance: parseFloat(salaryData.specialAllowance || 0),
                         status: "APPROVED",
-                        proposedBy: session.user.id,
-                        approvedBy: session.user.id,
+                        proposedBy: session!.user.id,
+                        approvedBy: session!.user.id,
                     },
                     update: {
                         ctcAnnual: parseFloat(salaryData.ctcAnnual),
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
                         hra: parseFloat(salaryData.hra || 0),
                         specialAllowance: parseFloat(salaryData.specialAllowance || 0),
                         status: "APPROVED",
-                        approvedBy: session.user.id,
+                        approvedBy: session!.user.id,
                     }
                 })
                 return NextResponse.json({ success: true, salary: upsertedSalary })

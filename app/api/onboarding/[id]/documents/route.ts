@@ -88,7 +88,7 @@ export async function PATCH(
             data: {
                 status,
                 rejectionReason: rejectionReason || null,
-                verifiedBy: session.user.name || session.user.email || null,
+                verifiedBy: session!.user.name || session!.user.email || null,
             },
         })
 

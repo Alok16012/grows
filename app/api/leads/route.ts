@@ -13,8 +13,8 @@ export async function GET(req: Request) {
     if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
-        const actorId = await resolveUserId(session)
+        // Resolve real DB user ID (session!.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session!)
         if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
 
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const actorId = await resolveUserId(session)
+    const actorId = await resolveUserId(session!)
     if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
     try {

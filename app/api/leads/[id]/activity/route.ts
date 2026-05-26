@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const activity = await prisma.leadActivity.create({
         data: {
             leadId: params.id,
-            userId: session.user.id,
+            userId: session!.user.id,
             type,
             content: content.trim()
         },

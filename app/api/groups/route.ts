@@ -15,8 +15,8 @@ export async function GET(req: Request) {
     if (!session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-        // Resolve real DB user ID (session.user.id may be a demo-xxx string)
-        const actorId = await resolveUserId(session)
+        // Resolve real DB user ID (session!.user.id may be a demo-xxx string)
+        const actorId = await resolveUserId(session!)
         if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
 
@@ -148,7 +148,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const actorId = await resolveUserId(session)
+    const actorId = await resolveUserId(session!)
     if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
     try {
@@ -176,7 +176,7 @@ export async function POST(req: Request) {
                     data: managerIds.map(managerId => ({
                         projectId: project.id,
                         managerId,
-                        assignedBy: session.user.id
+                        assignedBy: session!.user.id
                     }))
                 })
             }
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
                     data: inspectorIds.map(inspectorId => ({
                         projectId: project.id,
                         inspectionBoyId: inspectorId,
-                        assignedBy: session.user.id
+                        assignedBy: session!.user.id
                     }))
                 })
             }

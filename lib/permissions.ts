@@ -276,7 +276,7 @@ export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
 // - permission: custom role permission key that also grants access
 
 export function checkAccess(
-    session: { user: { role: string; permissions?: string[] } } | null,
+    session: { user: { role: string; permissions?: string[] } } | null | undefined,
     allowedRoles: string[],
     permission?: string
 ): boolean {
@@ -284,9 +284,6 @@ export function checkAccess(
     const role = session.user.role
     if (role === "ADMIN") return true
 
-    // Allow if EITHER system role is in allowedRoles OR custom permission grants access.
-    // System roles (MANAGER, HR_MANAGER, etc.) are always honored — custom roles can
-    // only EXPAND access via additional permissions, never restrict baseline role access.
     const roleAllowed = allowedRoles.includes(role)
     const permissionAllowed = !!(permission && session.user.permissions?.includes(permission))
     return roleAllowed || permissionAllowed

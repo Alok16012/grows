@@ -201,8 +201,8 @@ export async function POST(req: Request) {
                             hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
                             complianceType:   cType,
                             status:           "APPROVED",
-                            proposedBy:       session.user.id,
-                            approvedBy:       session.user.id,
+                            proposedBy:       session!.user.id,
+                            approvedBy:       session!.user.id,
                         },
                     })
                 }
