@@ -230,9 +230,10 @@ export const authOptions: NextAuthOptions = {
                 ;(token as any).customRoleName = (user as any).customRoleName || null
                 ;(token as any).customRoleColor = (user as any).customRoleColor || null
             }
-            // Refresh user role/permissions from DB at most once every 2 minutes
-            // (down from 10 — custom role permission changes need to land quickly).
-            const REFRESH_INTERVAL_MS = 2 * 60 * 1000
+            // Refresh user role/permissions from DB at most once every 30 seconds.
+            // Permission changes propagate quickly; cost is ~1 DB query per 30s
+            // per active user, which is acceptable for this app's scale.
+            const REFRESH_INTERVAL_MS = 30 * 1000
             const lastRefresh = (token as { roleRefreshedAt?: number }).roleRefreshedAt ?? 0
             const needsRefresh = token.id && !user && (Date.now() - lastRefresh > REFRESH_INTERVAL_MS)
 
