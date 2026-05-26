@@ -17,6 +17,9 @@ export async function GET(req: Request) {
             include: {
                 company: {
                     select: { name: true }
+                },
+                customRole: {
+                    select: { name: true, color: true }
                 }
             },
             orderBy: {

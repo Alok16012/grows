@@ -272,14 +272,23 @@ export default function UserManagementPage() {
         return matchesSearch && matchesRole
     })
 
-    const getRoleBadge = (role: string) => {
-        switch (role) {
+    const getRoleBadge = (user: any) => {
+        if (user.customRole?.name) {
+            const color = user.customRole.color || "#6366f1"
+            return (
+                <Badge style={{ background: `${color}15`, color, borderColor: `${color}40` }}
+                    className="px-2 py-0 h-5 text-[10px] font-bold border">
+                    {user.customRole.name.toUpperCase()}
+                </Badge>
+            )
+        }
+        switch (user.role) {
             case "ADMIN": return <Badge className="bg-red-50 text-red-600 hover:bg-red-50 border-red-100 px-2 py-0 h-5 text-[10px] font-bold">ADMIN</Badge>
             case "MANAGER": return <Badge className="bg-blue-50 text-blue-600 hover:bg-blue-50 border-blue-100 px-2 py-0 h-5 text-[10px] font-bold">MANAGER</Badge>
             case "HR_MANAGER": return <Badge className="bg-teal-50 text-teal-600 hover:bg-teal-50 border-teal-100 px-2 py-0 h-5 text-[10px] font-bold">HR MANAGER</Badge>
             case "INSPECTION_BOY": return <Badge className="bg-amber-50 text-amber-600 hover:bg-amber-50 border-amber-100 px-2 py-0 h-5 text-[10px] font-bold">INSPECTOR</Badge>
             case "CLIENT": return <Badge className="bg-purple-50 text-purple-600 hover:bg-purple-50 border-purple-100 px-2 py-0 h-5 text-[10px] font-bold">CLIENT</Badge>
-            default: return <Badge variant="outline" className="px-2 py-0 h-5 text-[10px] font-bold">{role}</Badge>
+            default: return <Badge variant="outline" className="px-2 py-0 h-5 text-[10px] font-bold">{user.role}</Badge>
         }
     }
 
@@ -351,20 +360,28 @@ export default function UserManagementPage() {
                             user.role === "MANAGER" ? "bg-[#eff6ff] text-[#1d4ed8]" :
                             user.role === "INSPECTION_BOY" ? "bg-[#fef3c7] text-[#92400e]" :
                             "bg-[#f9f8f5] text-[#6b6860]"
-                        }`}>
+                        }`}
+                        style={user.customRole?.color ? { background: `${user.customRole.color}20`, color: user.customRole.color } : {}}>
                             {user.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                                 <span className="text-[13.5px] font-medium text-[#1a1a18]">{user.name}</span>
-                                <span className={`px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium ${
-                                    user.role === "INSPECTION_BOY" ? "bg-[#fef3c7] text-[#92400e]" :
-                                    user.role === "MANAGER" ? "bg-[#eff6ff] text-[#1d4ed8]" :
-                                    user.role === "ADMIN" ? "bg-[#e8f7f1] text-[#0d6b4a]" :
-                                    "bg-[#f9f8f5] text-[#6b6860]"
-                                }`}>
-                                    {user.role === "ADMIN" ? "Admin" : user.role === "MANAGER" ? "Manager" : user.role === "INSPECTION_BOY" ? "Inspector" : user.role === "CLIENT" ? "Client" : user.role}
-                                </span>
+                                {user.customRole?.name ? (
+                                    <span className="px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium"
+                                        style={{ background: `${user.customRole.color || "#6366f1"}20`, color: user.customRole.color || "#6366f1" }}>
+                                        {user.customRole.name}
+                                    </span>
+                                ) : (
+                                    <span className={`px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium ${
+                                        user.role === "INSPECTION_BOY" ? "bg-[#fef3c7] text-[#92400e]" :
+                                        user.role === "MANAGER" ? "bg-[#eff6ff] text-[#1d4ed8]" :
+                                        user.role === "ADMIN" ? "bg-[#e8f7f1] text-[#0d6b4a]" :
+                                        "bg-[#f9f8f5] text-[#6b6860]"
+                                    }`}>
+                                        {user.role === "ADMIN" ? "Admin" : user.role === "MANAGER" ? "Manager" : user.role === "INSPECTION_BOY" ? "Inspector" : user.role === "CLIENT" ? "Client" : user.role}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <Mail className="h-3 w-3 text-[#9e9b95]" />
