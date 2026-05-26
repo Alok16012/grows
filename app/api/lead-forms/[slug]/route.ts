@@ -6,9 +6,14 @@ import { checkAccess } from "@/lib/permissions"
 
 // Public GET — no auth required (used by public apply page)
 export async function GET(_req: Request, { params }: { params: { slug: string } }) {
+    // Explicit select avoids querying `formType` column on DBs where the
+    // migration hasn't been applied yet.
     const form = await prisma.leadForm.findUnique({
         where: { slug: params.slug },
-        include: { site: { select: { id: true, name: true } } },
+        select: {
+            id: true, title: true, description: true, isActive: true,
+            site: { select: { id: true, name: true } },
+        },
     })
     if (!form) return NextResponse.json({ error: "Form not found" }, { status: 404 })
     if (!form.isActive) return NextResponse.json({ error: "This form is no longer active" }, { status: 410 })
@@ -17,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
         title:       form.title,
         description: form.description,
         siteName:    form.site?.name ?? null,
-        formType:    (form as any).formType ?? "RECRUITMENT",
+        formType:    "RECRUITMENT",
     })
 }
 

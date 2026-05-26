@@ -4,7 +4,10 @@ import prisma from "@/lib/prisma"
 // Public POST — no auth required
 export async function POST(req: Request, { params }: { params: { slug: string } }) {
     try {
-        const form = await prisma.leadForm.findUnique({ where: { slug: params.slug } })
+        const form = await prisma.leadForm.findUnique({
+            where: { slug: params.slug },
+            select: { id: true, isActive: true, siteId: true },
+        })
         if (!form || !form.isActive) {
             return NextResponse.json({ error: "Form not found or inactive" }, { status: 404 })
         }

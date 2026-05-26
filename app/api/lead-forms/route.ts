@@ -10,14 +10,24 @@ export async function GET() {
     if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const forms = await prisma.leadForm.findMany({
-        include: {
-            creator: { select: { id: true, name: true } },
-            site: { select: { id: true, name: true } },
-        },
-        orderBy: { createdAt: "desc" },
-    })
-    return NextResponse.json(forms)
+    // Use raw SQL to avoid Prisma SELECT-ing the `formType` column when the
+    // migration hasn't been applied yet on the deployed DB. Fall back if needed.
+    try {
+        const forms = await prisma.leadForm.findMany({
+            select: {
+                id: true, title: true, description: true, slug: true,
+                isActive: true, siteId: true, createdBy: true, createdAt: true, updatedAt: true,
+                creator: { select: { id: true, name: true } },
+                site: { select: { id: true, name: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        })
+        // Add formType field with default for client-side compatibility
+        return NextResponse.json(forms.map(f => ({ ...f, formType: "RECRUITMENT" })))
+    } catch (e: any) {
+        console.error("[LEAD_FORMS_GET]", e)
+        return NextResponse.json({ error: "Failed to fetch forms" }, { status: 500 })
+    }
 }
 
 export async function POST(req: Request) {
