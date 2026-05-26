@@ -4,10 +4,30 @@ import { useParams } from "next/navigation"
 import { Loader2, CheckCircle2, AlertCircle, Send, Briefcase, User, MapPin, Camera, Plus, Trash2 } from "lucide-react"
 
 const POSITIONS = [
-    "HR Recruiter", "Team Leader", "HR Executive", "Payroll Executive",
-    "Account Executive", "MIS Executive", "Operation Manager",
-    "Quality Supervisor", "Quality Engineer", "Field Recruiter",
-    "Operation Head", "HR Manager",
+    "Quality Inspector",
+    "Quality Supervisor",
+    "Security Guard",
+    "Security Supervisor",
+    "Driver",
+    "Heavy Vehicle Driver",
+    "Helper / Labour",
+    "Electrician",
+    "Plumber",
+    "Housekeeping Staff",
+    "Peon / Office Boy",
+    "Data Entry Operator",
+    "HR Recruiter",
+    "HR Recruiter TL",
+    "HR Executive",
+    "HR Manager",
+    "Field Recruiter",
+    "Payroll Executive",
+    "Compliance Executive",
+    "Account Executive",
+    "MIS Executive",
+    "Operations Manager",
+    "Operations Head",
+    "Other",
 ]
 const TSHIRT_SIZES = ["S", "M", "L", "XL", "XXL"]
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]

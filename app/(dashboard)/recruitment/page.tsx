@@ -61,17 +61,30 @@ const ACTIVITY_TYPES = [
 ]
 
 const POSITIONS = [
-    "HR Recruiter", "Team Leader", "HR Executive", "Payroll Executive",
-    "Account Executive", "MIS Executive", "Operation Manager",
-    "Quality Supervisor", "Quality Engineer", "Field Recruiter",
-    "Operation Head", "HR Manager",
-    "Inspector", "Senior Inspector", "Lead Inspector",
-    "Security Guard", "Security Supervisor",
-    "Driver", "Heavy Vehicle Driver",
-    "Supervisor",
-    "Helper / Labour", "Electrician", "Plumber",
-    "Housekeeping Staff", "Peon / Office Boy",
-    "Data Entry Operator", "Other"
+    "Quality Inspector",
+    "Quality Supervisor",
+    "Security Guard",
+    "Security Supervisor",
+    "Driver",
+    "Heavy Vehicle Driver",
+    "Helper / Labour",
+    "Electrician",
+    "Plumber",
+    "Housekeeping Staff",
+    "Peon / Office Boy",
+    "Data Entry Operator",
+    "HR Recruiter",
+    "HR Recruiter TL",
+    "HR Executive",
+    "HR Manager",
+    "Field Recruiter",
+    "Payroll Executive",
+    "Compliance Executive",
+    "Account Executive",
+    "MIS Executive",
+    "Operations Manager",
+    "Operations Head",
+    "Other",
 ]
 
 const SOURCES = ["Walk-in", "LinkedIn", "Naukri", "Indeed", "WorkIndia", "Referral", "WhatsApp", "Agency", "Newspaper Ad", "Other"]
