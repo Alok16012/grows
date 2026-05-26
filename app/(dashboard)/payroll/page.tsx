@@ -10,6 +10,7 @@ import {
     Clock, Trash2, TrendingUp, Settings2, Lock,
     CheckCircle2, ArrowRight, ChevronRight
 } from "lucide-react"
+import { can } from "@/lib/can"
 
 // Panels are lazy-loaded — each pulls xlsx (~430KB) so eager imports
 // bloated the initial payroll bundle. Only one is open at a time.
@@ -142,8 +143,7 @@ export default function PayrollPage() {
     }
 
     const role = session?.user?.role
-    const payrollPerms: string[] = (session?.user as any)?.permissions || []
-    if (role && role !== "ADMIN" && role !== "MANAGER" && !payrollPerms.includes("payroll.view")) {
+    if (role && !can(session, "payroll.view")) {
         return (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--text3)", fontSize: 13 }}>
                 Access denied

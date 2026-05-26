@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     Plus, Search, Phone, Mail, MapPin, Calendar, Users,
     Target, X, ChevronRight, Briefcase,
@@ -492,13 +493,7 @@ export default function RecruitmentPage() {
         navigator.clipboard.writeText(url).then(() => toast.success("Link copied!")).catch(() => toast.error("Copy failed"))
     }
 
-    const userPermissions: string[] = (session?.user as any)?.permissions ?? []
-    const isAuthorized = status === "authenticated" && (
-        session?.user?.role === "ADMIN" ||
-        session?.user?.role === "MANAGER" ||
-        session?.user?.role === "HR_MANAGER" ||
-        userPermissions.includes("recruitment.view")
-    )
+    const isAuthorized = status === "authenticated" && can(session, "recruitment.view")
 
     useEffect(() => {
         if (isAuthorized) {
@@ -1601,7 +1596,7 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
                             <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                                 <Edit2 size={13} />
                             </button>
-                            {session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER" || session?.user?.role === "HR_MANAGER" && (
+                            {can(session, "recruitment.view") && (
                                 <button onClick={() => onDelete(lead.id)} className="p-1.5 rounded-[6px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                     <Trash2 size={13} />
                                 </button>
@@ -1971,7 +1966,7 @@ function DetailDrawer({
                         <button onClick={onEdit} className="p-1.5 rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                             <Edit2 size={15} />
                         </button>
-                        {session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER" || session?.user?.role === "HR_MANAGER" && (
+                        {can(session, "recruitment.view") && (
                             <button onClick={onDelete} className="p-1.5 rounded-[7px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                 <Trash2 size={15} />
                             </button>

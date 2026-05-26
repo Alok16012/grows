@@ -9,6 +9,7 @@ import {
     LayoutDashboard, AlertCircle, Search, Info, Building2
 } from "lucide-react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 
 const MONTHS = [
     "January", "February", "March", "April", "May", "June",
@@ -99,8 +100,7 @@ export default function ReportsDownloadsPage() {
         }
     }
 
-    const payrollReportPerms: string[] = (session?.user as any)?.permissions || []
-    if (role && role !== "ADMIN" && role !== "MANAGER" && !payrollReportPerms.includes("payroll.view")) {
+    if (role && !can(session, "payroll.view")) {
         return <div className="p-8 text-[var(--text2)]">Access denied.</div>
     }
 

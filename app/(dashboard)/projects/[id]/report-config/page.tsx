@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
+import { can } from "@/lib/can"
 import { ChevronLeft, Save, Bell, FileText, Check, AlertTriangle, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -21,7 +22,7 @@ export default function ReportConfigPage() {
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER") router.push("/")
+        if (status === "authenticated" && !can(session, "projects.view")) router.push("/")
     }, [status, session, router])
 
     useEffect(() => {

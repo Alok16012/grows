@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     GraduationCap, Plus, Search, BookOpen, Users, CheckCircle,
     AlertTriangle, MoreVertical, X, Loader2,
@@ -2546,7 +2547,7 @@ function ILTTab() {
     const [savingAttendance, setSavingAttendance] = useState(false)
     const [form, setForm] = useState({ title: "", description: "", location: "", startTime: "", endTime: "", maxSeats: "20" })
     const [saving, setSaving] = useState(false)
-    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+    const isAdmin = can(session, "lms.view")
 
     const fetchSessions = useCallback(async () => {
         setLoading(true)
@@ -2856,7 +2857,7 @@ function PoliciesTab() {
     const [saving, setSaving] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState<string>("")
-    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+    const isAdmin = can(session, "lms.view")
 
     const fetchPolicies = useCallback(async () => {
         setLoading(true)

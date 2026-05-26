@@ -9,6 +9,7 @@ import {
     ChevronRight, User
 } from "lucide-react"
 import { format } from "date-fns"
+import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -428,9 +429,7 @@ export default function LeavesPage() {
     const [showApply, setShowApply] = useState(false)
     const [selectedLeave, setSelectedLeave] = useState<Leave | null>(null)
 
-    const leavesPerms: string[] = (session?.user as any)?.permissions || []
-    const isAdminOrManager = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
-        || leavesPerms.includes("leaves.view")
+    const isAdminOrManager = can(session, "leaves.view")
 
     useEffect(() => {
         if (status !== "unauthenticated") return

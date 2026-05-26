@@ -11,6 +11,7 @@ import {
     BarChart3, ArrowLeft
 } from "lucide-react"
 import { format } from "date-fns"
+import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -680,11 +681,7 @@ export default function AssetsPage() {
     }, [status, router])
 
     useEffect(() => {
-        if (status === "authenticated") {
-            const role = session?.user?.role
-            const perms: string[] = (session?.user as any)?.permissions || []
-            if (role !== "ADMIN" && role !== "MANAGER" && !perms.includes("assets.view")) router.push("/")
-        }
+        if (status === "authenticated" && !can(session, "assets.view")) router.push("/")
     }, [status, session, router])
 
     // Fetch employees (for modals)

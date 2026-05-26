@@ -4,12 +4,22 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { Role } from "@prisma/client"
+import { MANAGER_DEFAULT_PERMISSIONS, HR_MANAGER_DEFAULT_PERMISSIONS } from "@/lib/permissions"
 
 // Normalize a phone-like string to last 10 digits
 const phoneDigits = (s: string | null | undefined): string => {
     if (!s) return ""
     const d = s.replace(/\D/g, "")
     return d.length >= 10 ? d.slice(-10) : d
+}
+
+// Resolve effective permissions for a user object from the DB.
+// Custom role → use its permissions. MANAGER/HR_MANAGER without custom role → defaults.
+function resolvePermissions(user: { role: string; customRole?: { isActive: boolean; permissions: string[] } | null }): string[] {
+    if (user.customRole?.isActive) return user.customRole.permissions
+    if (user.role === "MANAGER") return MANAGER_DEFAULT_PERMISSIONS
+    if (user.role === "HR_MANAGER") return HR_MANAGER_DEFAULT_PERMISSIONS
+    return []
 }
 
 // Demo users + phone-as-password auto-heal are only enabled in development
@@ -65,7 +75,7 @@ export const authOptions: NextAuthOptions = {
                                 return {
                                     id: realUser.id, name: realUser.name, email: realUser.email,
                                     role: realUser.role,
-                                    permissions: realUser.customRole?.isActive ? realUser.customRole.permissions : [],
+                                    permissions: resolvePermissions(realUser),
                                     customRoleName: realUser.customRole?.isActive ? realUser.customRole.name : null,
                                     customRoleColor: realUser.customRole?.isActive ? realUser.customRole.color : null,
                                 } as any
@@ -199,7 +209,7 @@ export const authOptions: NextAuthOptions = {
                         name: user.name,
                         email: user.email,
                         role: user.role,
-                        permissions: user.customRole?.isActive ? user.customRole.permissions : [],
+                        permissions: resolvePermissions(user),
                         customRoleName: user.customRole?.isActive ? user.customRole.name : null,
                         customRoleColor: user.customRole?.isActive ? user.customRole.color : null,
                     } as any
@@ -236,7 +246,7 @@ export const authOptions: NextAuthOptions = {
                     })
                     if (dbUser) {
                         token.role = dbUser.role
-                        token.permissions = dbUser.customRole?.isActive ? dbUser.customRole.permissions : []
+                        token.permissions = resolvePermissions(dbUser)
                         ;(token as any).customRoleName = dbUser.customRole?.isActive ? dbUser.customRole.name : null
                         ;(token as any).customRoleColor = dbUser.customRole?.isActive ? dbUser.customRole.color : null
                         ;(token as { roleRefreshedAt?: number }).roleRefreshedAt = Date.now()

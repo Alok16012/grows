@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     Plus, Loader2, X, Star, Search,
     ChevronDown, Trash2, TrendingUp, CheckCircle2,
@@ -312,8 +313,7 @@ export default function PerformancePage() {
     const [templates, setTemplates] = useState<KPITemplate[]>([])
     const [templatesLoading, setTemplatesLoading] = useState(false)
 
-    const isAdminOrManager =
-        session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+    const isAdminOrManager = can(session, "performance.view")
 
     const fetchReviews = useCallback(async () => {
         setLoading(true)
@@ -1870,7 +1870,7 @@ function DrawerHRApproval({
     const [notes, setNotes] = useState(review.managerComments ?? "")
     const [approving, setApproving] = useState(false)
 
-    const isHR = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+    const isHR = can(session, "performance.view")
 
     const handleApprove = async () => {
         setApproving(true)

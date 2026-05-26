@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     Plus, Search, MapPin, Loader2, X, Users, Edit2,
     MoreVertical, Trash2, Phone, Building2, ChevronDown,
@@ -732,8 +733,8 @@ function RelieveDialog({ deployment, onRelieved, onCancel }: {
 
 // ─── Site Detail Drawer ───────────────────────────────────────────────────────
 
-function SiteDrawer({ site, onClose, onRefresh, role }: {
-    site: Site; onClose: () => void; onRefresh: () => void; role?: string
+function SiteDrawer({ site, onClose, onRefresh, session }: {
+    site: Site; onClose: () => void; onRefresh: () => void; session?: any
 }) {
     const [detailedSite, setDetailedSite] = useState<Site | null>(null)
     const [loadingDetail, setLoadingDetail] = useState(false)
@@ -910,7 +911,7 @@ function SiteDrawer({ site, onClose, onRefresh, role }: {
                         )}
 
                         {/* Assign Button / Form */}
-                        {(role === "ADMIN" || role === "MANAGER") && !showAssign && (
+                        {can(session, "sites.view") && !showAssign && (
                             <button
                                 onClick={() => setShowAssign(true)}
                                 className="mt-3 w-full flex items-center justify-center gap-2 h-9 border border-dashed border-[var(--accent)]/50 rounded-[9px] text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors">
@@ -1172,7 +1173,7 @@ export default function SitesPage() {
             {detailSite && (
                 <SiteDrawer
                     site={detailSite}
-                    role={role}
+                    session={session}
                     onClose={() => setDetailSite(null)}
                     onRefresh={fetchSites}
                 />

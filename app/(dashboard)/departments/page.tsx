@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     Plus, X, Loader2, Users, Briefcase, Search, Pencil, Trash2
 } from "lucide-react"
@@ -194,7 +195,7 @@ export default function DepartmentsPage() {
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER" && session?.user?.role !== "HR_MANAGER") {
+        if (status === "authenticated" && !can(session, "employees.view")) {
             router.push("/")
         }
     }, [status, session, router])

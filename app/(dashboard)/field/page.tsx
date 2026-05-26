@@ -21,6 +21,7 @@ import {
     MapPin,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { can } from "@/lib/can"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -734,9 +735,7 @@ export default function FieldPage() {
         fetchStats()
     }
 
-    const fieldPerms: string[] = (session?.user as any)?.permissions || []
-    const isAdminOrManager = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
-        || fieldPerms.includes("field.view")
+    const isAdminOrManager = can(session, "field.view")
 
     return (
         <div className="flex-1 flex flex-col min-h-0">

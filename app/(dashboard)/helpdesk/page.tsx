@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     Plus, Search, Loader2, X, Headphones,
     Clock, CheckCircle2, AlertCircle, Timer,
@@ -618,7 +619,7 @@ export default function HelpdeskPage() {
     const [showNew, setShowNew] = useState(false)
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
 
-    const isPrivileged = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+    const isPrivileged = can(session, "helpdesk.view")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")

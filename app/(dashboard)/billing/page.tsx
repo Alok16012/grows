@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     Plus, Search, Loader2, X, Receipt,
     ChevronDown, Trash2, Send, FileText,
@@ -1069,7 +1070,7 @@ export default function BillingPage() {
 
     const role = session?.user?.role
     const isAdmin = role === "ADMIN"
-    const isPrivileged = isAdmin || role === "MANAGER"
+    const isPrivileged = can(session, "billing.view")
 
     const now = new Date()
     const [invoices, setInvoices] = useState<Invoice[]>([])

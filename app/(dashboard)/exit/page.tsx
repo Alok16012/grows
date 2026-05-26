@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
   Plus, Loader2, X, Search, MoreVertical,
   LogOut, CheckCircle2, Clock, AlertCircle,
@@ -1302,7 +1303,7 @@ function FnFTab({
   })
   const [saving, setSaving] = useState(false)
 
-  const canEdit = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+  const canEdit = can(session, "exit.manage")
 
   const handleSave = async () => {
     setSaving(true)

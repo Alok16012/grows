@@ -221,6 +221,54 @@ export const PERMISSION_GROUPS = [
     },
 ]
 
+// ─── Default Permissions per System Role ─────────────────────────────────────
+// When a MANAGER or HR_MANAGER user has no customRole assigned, they get these
+// permissions injected into their JWT so pages can do pure permission checks.
+
+export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
+    "projects.view", "projects.manage",
+    "assignments.view", "assignments.manage",
+    "sites.view", "sites.manage",
+    "groups.view", "groups.manage",
+    "field.view", "field.manage",
+    "employees.view", "employees.create", "employees.edit", "employees.delete",
+    "recruitment.view", "recruitment.manage",
+    "onboarding.view", "onboarding.manage",
+    "documents.view", "documents.upload", "documents.verify",
+    "attendance.view", "attendance.manage",
+    "leaves.view", "leaves.manage", "leaves.approve",
+    "payroll.view", "payroll.manage",
+    "assets.view", "assets.manage",
+    "expenses.view", "expenses.manage",
+    "performance.view", "performance.manage",
+    "exit.view", "exit.manage",
+    "lms.view", "lms.manage",
+    "companies.view", "companies.manage",
+    "billing.view", "billing.manage",
+    "contracts.view", "contracts.manage",
+    "approvals.view", "approvals.manage",
+    "helpdesk.view", "helpdesk.manage",
+    "reports.view", "reports.export",
+    "recruitment.view", "recruitment.manage",
+]
+
+export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
+    "employees.view", "employees.create", "employees.edit", "employees.delete",
+    "recruitment.view", "recruitment.manage",
+    "onboarding.view", "onboarding.manage",
+    "documents.view", "documents.upload", "documents.verify",
+    "attendance.view", "attendance.manage",
+    "leaves.view", "leaves.manage", "leaves.approve",
+    "payroll.view", "payroll.manage",
+    "assets.view", "assets.manage",
+    "expenses.view", "expenses.manage",
+    "performance.view", "performance.manage",
+    "exit.view", "exit.manage",
+    "lms.view", "lms.manage",
+    "helpdesk.view", "helpdesk.manage",
+    "reports.view",
+]
+
 // ─── Access Check Helper ─────────────────────────────────────────────────────
 // Use in API routes and page-level checks.
 // - ADMIN always passes

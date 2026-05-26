@@ -29,6 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { can } from "@/lib/can"
 
 interface Manager {
     id: string
@@ -406,9 +407,7 @@ function GroupsContent() {
         }
     }
 
-    const userPermissions: string[] = (session?.user as any)?.permissions || []
-    const canAccessGroups = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
-        || userPermissions.includes("groups.view")
+    const canAccessGroups = can(session, "groups.view")
 
     useEffect(() => {
         if (status === "unauthenticated") {

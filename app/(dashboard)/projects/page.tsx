@@ -11,6 +11,7 @@ import {
     Plus, Loader2, FolderOpen, Search, LayoutTemplate,
     Pencil, Calendar, Building2, FolderKanban
 } from "lucide-react"
+import { can } from "@/lib/can"
 
 type Project = {
     id: string
@@ -33,8 +34,7 @@ export default function ProjectsPage() {
     const [selectedCompanyId, setSelectedCompanyId] = useState("all")
     const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
 
-    const userPermissions: string[] = (session?.user as any)?.permissions || []
-    const isAdminOrManager = role === "ADMIN" || role === "MANAGER" || userPermissions.includes("projects.view")
+    const isAdminOrManager = can(session, "projects.view")
 
     const fetchProjects = useCallback(async () => {
         setLoading(true)

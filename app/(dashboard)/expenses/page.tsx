@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import {
     Plus, Search, Loader2, X, CreditCard,
     ChevronRight, CheckCircle2, Clock,
@@ -852,7 +853,7 @@ export default function ExpensesPage() {
     const { data: session } = useSession()
     const role = session?.user?.role
     const userId = session?.user?.id || ""
-    const isPrivileged = role === "ADMIN" || role === "MANAGER"
+    const isPrivileged = can(session, "expenses.view")
 
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [loading, setLoading] = useState(true)

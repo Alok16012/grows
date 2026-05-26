@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { format, parseISO } from "date-fns"
+import { can } from "@/lib/can"
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -197,7 +198,7 @@ export default function ReportsPage() {
 
     useEffect(() => {
         if (!mounted) return
-        if (role === "ADMIN" || role === "MANAGER") {
+        if (can(session, "reports.view")) {
             fetch("/api/companies").then(r => r.json()).then(d => setCompanies(Array.isArray(d) ? d : [])).catch(() => { })
             fetch("/api/users?role=INSPECTION_BOY").then(r => r.json()).then(d => setInspectors(Array.isArray(d) ? d : [])).catch(() => { })
         } else if (role === "INSPECTION_BOY") {

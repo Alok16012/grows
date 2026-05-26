@@ -4,15 +4,14 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Loader2, Zap, Check, ChevronDown, Search, Trash2 } from "lucide-react"
+import { can } from "@/lib/can"
 
 export default function AssignmentsPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
 
     const [mounted, setMounted] = useState(false)
-    const userPermissions: string[] = (session?.user as any)?.permissions || []
-    const isManagerOrAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
-        || userPermissions.includes("assignments.view")
+    const isManagerOrAdmin = can(session, "assignments.view")
 
     useEffect(() => {
         setMounted(true)
