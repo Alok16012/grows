@@ -1007,9 +1007,17 @@ export default function SitesPage() {
             if (typeFilter) params.set("siteType", typeFilter)
             if (search) params.set("search", search)
             const res = await fetch(`/api/sites?${params}`)
+            if (!res.ok) {
+                const errText = await res.text().catch(() => "")
+                console.error("[fetchSites] HTTP", res.status, errText)
+                toast.error(`Failed to load sites (${res.status})${errText ? ": " + errText.slice(0, 80) : ""}`)
+                setSites([])
+                return
+            }
             const data = await res.json()
             setSites(Array.isArray(data) ? data : [])
-        } catch {
+        } catch (e) {
+            console.error("[fetchSites]", e)
             toast.error("Failed to load sites")
         } finally {
             setLoading(false)
