@@ -1,7 +1,7 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
-import { Loader2, CheckCircle2, AlertCircle, Send, Briefcase, User, Phone, Mail, MapPin } from "lucide-react"
+import { Loader2, CheckCircle2, AlertCircle, Send, Briefcase, User, Phone, Mail, MapPin, Camera } from "lucide-react"
 
 const POSITIONS = [
     "Security Guard", "Security Supervisor", "Inspector", "Senior Inspector",
@@ -29,6 +29,24 @@ export default function ApplyPage() {
 
     const isOnSiteJoin = meta?.formType === "ON_SITE_JOIN"
 
+    const [photo, setPhoto] = useState("")
+    const [photoUploading, setPhotoUploading] = useState(false)
+    const photoRef = useRef<HTMLInputElement>(null)
+
+    async function uploadPhoto(file: File) {
+        if (file.size > 2 * 1024 * 1024) { setError("Photo 2MB se badi nahi honi chahiye"); return }
+        setPhotoUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            const data = await res.json()
+            if (data.url) setPhoto(data.url)
+            else setError("Photo upload failed")
+        } catch { setError("Photo upload error") }
+        finally { setPhotoUploading(false) }
+    }
+
     useEffect(() => {
         fetch(`/api/lead-forms/${slug}`)
             .then(r => r.ok ? r.json() : null)
@@ -48,7 +66,7 @@ export default function ApplyPage() {
             const res = await fetch(`/api/lead-forms/${slug}/submit`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify({ ...form, profileUrl: photo || undefined }),
             })
             const data = await res.json()
             if (!res.ok) { setError(data.error || "Submission failed"); return }
@@ -137,6 +155,35 @@ export default function ApplyPage() {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} style={{ padding: 28, display: "flex", flexDirection: "column", gap: 16 }}>
+
+                    {/* Photo Upload */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                        <div onClick={() => photoRef.current?.click()} style={{ cursor: "pointer", position: "relative", flexShrink: 0 }}>
+                            {photo ? (
+                                <img src={photo} alt="Profile" style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "2.5px solid #6366f1" }} />
+                            ) : (
+                                <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center", border: "2px dashed #6366f1" }}>
+                                    <User size={24} color="#6366f1" />
+                                </div>
+                            )}
+                            {photoUploading && (
+                                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Loader2 size={16} color="#fff" className="animate-spin" />
+                                </div>
+                            )}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 12, fontWeight: 700, color: "#374151", margin: "0 0 5px" }}>Profile Photo <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span></p>
+                            <button type="button" onClick={() => photoRef.current?.click()} disabled={photoUploading}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 7, background: photo ? "#f0fdf4" : "#ede9fe", color: photo ? "#047857" : "#6366f1", fontSize: 11, fontWeight: 600, border: `1px solid ${photo ? "#86efac" : "#c4b5fd"}`, cursor: "pointer" }}>
+                                <Camera size={11} /> {photoUploading ? "Uploading…" : photo ? "Change Photo" : "Upload Photo"}
+                            </button>
+                            <p style={{ fontSize: 10, color: "#9ca3af", margin: "4px 0 0" }}>JPG / PNG • max 2MB</p>
+                        </div>
+                        <input ref={photoRef} type="file" accept="image/*" style={{ display: "none" }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); e.target.value = "" }} />
+                    </div>
+
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                         <div>
                             <label style={lbl}>Full Name *</label>

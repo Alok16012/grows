@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import {
     X, Loader2, CheckCircle, User, MapPin,
-    Eye, Download, Trash2, Upload,
+    Eye, Download, Trash2, Upload, Camera,
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 
@@ -224,6 +224,9 @@ export function EmployeeModal({
     const [docUploading, setDocUploading] = useState(false)
     const [docDeleting, setDocDeleting] = useState<string | null>(null)
     const [docType, setDocType] = useState("AADHAAR")
+    const [photo, setPhoto] = useState<string>("")
+    const [photoUploading, setPhotoUploading] = useState(false)
+    const photoInputRef = useRef<HTMLInputElement>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState<string>("")
 
@@ -249,6 +252,7 @@ export function EmployeeModal({
         setActiveTab("personal")
         setSameAsCurrent(false)
         setDraftEmpId(null)
+        setPhoto(employee?.photo || "")
         if (employee) {
             setForm({
                 firstName: employee.firstName,
@@ -360,7 +364,7 @@ export function EmployeeModal({
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, designation: form.role }),
+                body: JSON.stringify({ ...form, designation: form.role, photo: photo || undefined }),
             })
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
@@ -504,6 +508,57 @@ export function EmployeeModal({
                     {/* Personal Tab */}
                     {activeTab === "personal" && (
                         <div className="space-y-4">
+                            {/* ── Profile Photo ── */}
+                            <div className="flex items-center gap-4 p-3 bg-[var(--surface2)] rounded-[10px] border border-[var(--border)]">
+                                <div className="relative shrink-0">
+                                    {photo ? (
+                                        <img src={photo} alt="Profile" className="w-16 h-16 rounded-full object-cover border-2 border-[var(--accent)]" />
+                                    ) : (
+                                        <div className="w-16 h-16 rounded-full bg-[var(--accent-light)] flex items-center justify-center border-2 border-dashed border-[var(--accent)]">
+                                            <User size={24} className="text-[var(--accent)]" />
+                                        </div>
+                                    )}
+                                    {photoUploading && (
+                                        <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                                            <Loader2 size={16} className="text-white animate-spin" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[13px] font-semibold text-[var(--text)] mb-1">Profile Photo</p>
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => photoInputRef.current?.click()}
+                                            disabled={photoUploading}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] bg-[var(--accent)] text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-50">
+                                            <Camera size={12} /> {photo ? "Change" : "Upload"} Photo
+                                        </button>
+                                        {photo && (
+                                            <button type="button" onClick={() => setPhoto("")}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-[var(--border)] text-[var(--text3)] text-[12px] hover:bg-[var(--surface)]">
+                                                <Trash2 size={12} /> Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="text-[11px] text-[var(--text3)] mt-1">JPG, PNG — max 2MB</p>
+                                </div>
+                                <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0]
+                                        if (!file) return
+                                        if (file.size > 2 * 1024 * 1024) { toast.error("Photo 2MB se badi nahi honi chahiye"); return }
+                                        setPhotoUploading(true)
+                                        try {
+                                            const fd = new FormData()
+                                            fd.append("file", file)
+                                            const res = await fetch("/api/upload", { method: "POST", body: fd })
+                                            const data = await res.json()
+                                            if (data.url) setPhoto(data.url)
+                                            else toast.error("Photo upload failed")
+                                        } catch { toast.error("Upload error") }
+                                        finally { setPhotoUploading(false); e.target.value = "" }
+                                    }}
+                                />
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelCls}>First Name *</label>

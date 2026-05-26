@@ -135,6 +135,24 @@ export default function JoinPage() {
     )
     const fileRefs = useRef<(HTMLInputElement | null)[]>([])
 
+    // Profile photo state
+    const [photo, setPhoto] = useState<string>("")
+    const [photoUploading, setPhotoUploading] = useState(false)
+    const photoInputRef = useRef<HTMLInputElement>(null)
+
+    async function handlePhotoSelect(file: File) {
+        if (file.size > 2 * 1024 * 1024) { alert("Photo 2MB se badi nahi honi chahiye"); return }
+        setPhotoUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            const data = await res.json()
+            if (data.url) setPhoto(data.url)
+        } catch { /* silent */ }
+        finally { setPhotoUploading(false) }
+    }
+
     const set = (k: keyof FormData, v: string | boolean) =>
         setForm(prev => {
             const u = { ...prev, [k]: v }
@@ -225,7 +243,7 @@ export default function JoinPage() {
             const res = await fetch("/api/join", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ ...payload, photo: photo || undefined }),
             })
             const data = await res.json()
             if (!res.ok) {
@@ -347,6 +365,42 @@ export default function JoinPage() {
                         {/* ── PERSONAL ─────────────────────────────────────────── */}
                         {tab === "personal" && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+
+                                {/* ── Profile Photo ── */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)" }}>
+                                    <div style={{ position: "relative", flexShrink: 0 }} onClick={() => photoInputRef.current?.click()}>
+                                        {photo ? (
+                                            <img src={photo} alt="Profile" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2.5px solid var(--accent)", cursor: "pointer" }} />
+                                        ) : (
+                                            <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--accent-light)", display: "flex", alignItems: "center", justifyContent: "center", border: "2.5px dashed var(--accent)", cursor: "pointer" }}>
+                                                <ImageIcon size={28} color="var(--accent)" />
+                                            </div>
+                                        )}
+                                        {photoUploading && (
+                                            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                <Loader2 size={18} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", margin: "0 0 6px" }}>Profile Photo</p>
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            <button type="button" onClick={() => photoInputRef.current?.click()} disabled={photoUploading}
+                                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: photoUploading ? 0.6 : 1 }}>
+                                                <Upload size={12} /> {photo ? "Change" : "Upload Photo"}
+                                            </button>
+                                            {photo && (
+                                                <button type="button" onClick={() => setPhoto("")}
+                                                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "transparent", color: "var(--text3)", fontSize: 12, border: "1px solid var(--border)", cursor: "pointer" }}>
+                                                    <X size={12} /> Remove
+                                                </button>
+                                            )}
+                                        </div>
+                                        <p style={{ fontSize: 11, color: "var(--text3)", margin: "5px 0 0" }}>JPG / PNG — max 2MB</p>
+                                    </div>
+                                    <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }}
+                                        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoSelect(f); e.target.value = "" }} />
+                                </div>
 
                                 <div>
                                     <SecTitle>Basic Info</SecTitle>

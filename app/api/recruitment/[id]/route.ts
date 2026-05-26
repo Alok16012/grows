@@ -149,8 +149,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             city: body.city || prev.city || null,
                             designation: body.position || prev.position || null,
                             branchId: branch.id,
-                            status: "INACTIVE", // Wait until onboarding verified
+                            status: "INACTIVE",
                             onboardingToken: token,
+                            // Copy profile photo from lead if available
+                            photo: prev.profileUrl || null,
                         }
                     })
 

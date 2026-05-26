@@ -11,7 +11,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
 
         const body = await req.json()
         const { candidateName, phone, email, city, position, experience,
-                qualification, skills, gender, age, expectedSalary, notes } = body
+                qualification, skills, gender, age, expectedSalary, notes, profileUrl } = body
 
         if (!candidateName || !phone) {
             return NextResponse.json({ error: "Name and phone are required" }, { status: 400 })
@@ -44,6 +44,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
                 age:           age ? parseInt(String(age)) : null,
                 expectedSalary: expectedSalary ? parseFloat(String(expectedSalary)) : null,
                 notes:         notes || null,
+                profileUrl:    profileUrl || null,
                 source:        leadSource,
                 formSlug:      params.slug,
                 siteId:        form.siteId || null,
