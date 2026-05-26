@@ -10,7 +10,15 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "sites.view")) {
-            return NextResponse.json({ error: "Forbidden - missing sites.view permission" }, { status: 403 })
+            return NextResponse.json({
+                error: "Forbidden - missing sites.view permission",
+                debug: {
+                    role: session.user.role,
+                    permissions: (session.user as any).permissions || [],
+                    permissionCount: ((session.user as any).permissions || []).length,
+                    customRoleName: (session.user as any).customRoleName,
+                }
+            }, { status: 403 })
         }
 
         const { searchParams } = new URL(req.url)
