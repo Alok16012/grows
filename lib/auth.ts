@@ -204,6 +204,12 @@ export const authOptions: NextAuthOptions = {
                         })
                     }
 
+                    // Look up employee record for profile photo (linked via userId)
+                    const employee = await prisma.employee.findFirst({
+                        where: { userId: user.id },
+                        select: { photo: true }
+                    }).catch(() => null)
+
                     return {
                         id: user.id,
                         name: user.name,
@@ -212,6 +218,7 @@ export const authOptions: NextAuthOptions = {
                         permissions: resolvePermissions(user),
                         customRoleName: user.customRole?.isActive ? user.customRole.name : null,
                         customRoleColor: user.customRole?.isActive ? user.customRole.color : null,
+                        photo: employee?.photo || null,
                     } as any
                 } catch (error) {
                     // Never log raw credentials — only the bare error for ops debugging
@@ -229,6 +236,7 @@ export const authOptions: NextAuthOptions = {
                 token.permissions = (user as any).permissions || []
                 ;(token as any).customRoleName = (user as any).customRoleName || null
                 ;(token as any).customRoleColor = (user as any).customRoleColor || null
+                ;(token as any).photo = (user as any).photo || null
             }
             // Refresh user role/permissions from DB at most once every 30 seconds.
             // Permission changes propagate quickly; cost is ~1 DB query per 30s
@@ -243,11 +251,16 @@ export const authOptions: NextAuthOptions = {
                         where: { id: token.id as string },
                         select: { role: true, isActive: true, customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                     })
+                    const employee = await prisma.employee.findFirst({
+                        where: { userId: token.id as string },
+                        select: { photo: true }
+                    }).catch(() => null)
                     if (dbUser) {
                         token.role = dbUser.role
                         token.permissions = resolvePermissions(dbUser)
                         ;(token as any).customRoleName = dbUser.customRole?.isActive ? dbUser.customRole.name : null
                         ;(token as any).customRoleColor = dbUser.customRole?.isActive ? dbUser.customRole.color : null
+                        ;(token as any).photo = employee?.photo || null
                         ;(token as { roleRefreshedAt?: number }).roleRefreshedAt = Date.now()
                     }
                 } catch { /* keep stale token rather than crash */ }
@@ -266,6 +279,7 @@ export const authOptions: NextAuthOptions = {
                 session.user.permissions = (token.permissions as string[]) || []
                 ;(session.user as any).customRoleName = (token as any).customRoleName || null
                 ;(session.user as any).customRoleColor = (token as any).customRoleColor || null
+                ;(session.user as any).photo = (token as any).photo || null
             }
             return session
         },
