@@ -388,7 +388,7 @@ function GroupsContent() {
 
     const openCreateGroupDialog = async () => {
         setCreateGroupOpen(true)
-        if (companies.length === 0 && (session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER")) {
+        if (companies.length === 0 && canAccessGroups) {
             setFetchingCompanies(true)
             try {
                 const res = await fetch("/api/companies")
@@ -406,19 +406,23 @@ function GroupsContent() {
         }
     }
 
+    const userPermissions: string[] = (session?.user as any)?.permissions || []
+    const canAccessGroups = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+        || userPermissions.includes("groups.view")
+
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/login")
-        } else if (status === "authenticated" && session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER") {
+        } else if (status === "authenticated" && !canAccessGroups) {
             router.push("/")
         }
-    }, [status, session, router])
+    }, [status, session, router, canAccessGroups])
 
     useEffect(() => {
-        if (session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER") {
+        if (canAccessGroups) {
             fetchGroups()
         }
-    }, [session?.user?.role])
+    }, [canAccessGroups])
 
     const fetchGroups = async () => {
         setLoading(true)
@@ -550,7 +554,7 @@ function GroupsContent() {
         group.projects.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
     )
 
-    const canEdit = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+    const canEdit = canAccessGroups
 
     if (loading) {
         return (

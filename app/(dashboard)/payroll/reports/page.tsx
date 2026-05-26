@@ -99,7 +99,8 @@ export default function ReportsDownloadsPage() {
         }
     }
 
-    if (role && role !== "ADMIN" && role !== "MANAGER") {
+    const payrollReportPerms: string[] = (session?.user as any)?.permissions || []
+    if (role && role !== "ADMIN" && role !== "MANAGER" && !payrollReportPerms.includes("payroll.view")) {
         return <div className="p-8 text-[var(--text2)]">Access denied.</div>
     }
 

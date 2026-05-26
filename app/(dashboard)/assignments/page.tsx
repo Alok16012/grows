@@ -10,7 +10,9 @@ export default function AssignmentsPage() {
     const router = useRouter()
 
     const [mounted, setMounted] = useState(false)
+    const userPermissions: string[] = (session?.user as any)?.permissions || []
     const isManagerOrAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+        || userPermissions.includes("assignments.view")
 
     useEffect(() => {
         setMounted(true)

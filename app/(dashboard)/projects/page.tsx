@@ -33,7 +33,8 @@ export default function ProjectsPage() {
     const [selectedCompanyId, setSelectedCompanyId] = useState("all")
     const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
 
-    const isAdminOrManager = role === "ADMIN" || role === "MANAGER"
+    const userPermissions: string[] = (session?.user as any)?.permissions || []
+    const isAdminOrManager = role === "ADMIN" || role === "MANAGER" || userPermissions.includes("projects.view")
 
     const fetchProjects = useCallback(async () => {
         setLoading(true)

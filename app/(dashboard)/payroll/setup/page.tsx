@@ -413,7 +413,8 @@ export default function PayrollPage() {
     if (status === "loading" || loading) {
         return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--accent)]" /></div>
     }
-    if (session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER") {
+    const payrollSetupPerms: string[] = (session?.user as any)?.permissions || []
+    if (session?.user?.role !== "ADMIN" && session?.user?.role !== "MANAGER" && !payrollSetupPerms.includes("payroll.view")) {
         return <div className="p-8 text-center text-red-500">Access Denied</div>
     }
 

@@ -682,7 +682,8 @@ export default function AssetsPage() {
     useEffect(() => {
         if (status === "authenticated") {
             const role = session?.user?.role
-            if (role !== "ADMIN" && role !== "MANAGER") router.push("/")
+            const perms: string[] = (session?.user as any)?.permissions || []
+            if (role !== "ADMIN" && role !== "MANAGER" && !perms.includes("assets.view")) router.push("/")
         }
     }, [status, session, router])
 

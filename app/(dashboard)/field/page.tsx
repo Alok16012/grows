@@ -734,7 +734,9 @@ export default function FieldPage() {
         fetchStats()
     }
 
+    const fieldPerms: string[] = (session?.user as any)?.permissions || []
     const isAdminOrManager = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+        || fieldPerms.includes("field.view")
 
     return (
         <div className="flex-1 flex flex-col min-h-0">

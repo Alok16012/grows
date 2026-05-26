@@ -142,7 +142,8 @@ export default function PayrollPage() {
     }
 
     const role = session?.user?.role
-    if (role && role !== "ADMIN" && role !== "MANAGER") {
+    const payrollPerms: string[] = (session?.user as any)?.permissions || []
+    if (role && role !== "ADMIN" && role !== "MANAGER" && !payrollPerms.includes("payroll.view")) {
         return (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--text3)", fontSize: 13 }}>
                 Access denied

@@ -428,7 +428,9 @@ export default function LeavesPage() {
     const [showApply, setShowApply] = useState(false)
     const [selectedLeave, setSelectedLeave] = useState<Leave | null>(null)
 
+    const leavesPerms: string[] = (session?.user as any)?.permissions || []
     const isAdminOrManager = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
+        || leavesPerms.includes("leaves.view")
 
     useEffect(() => {
         if (status !== "unauthenticated") return
