@@ -7,7 +7,7 @@ import { checkAccess } from "@/lib/permissions"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const forms = await prisma.leadForm.findMany({

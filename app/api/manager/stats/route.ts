@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { startOfMonth, endOfMonth, subDays } from "date-fns"
 import { unstable_cache } from "next/cache"
+import { checkAccess } from "@/lib/permissions"
 
 export const dynamic = "force-dynamic"
 
@@ -140,7 +141,7 @@ const getStats = unstable_cache(
 
 export async function GET() {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.MANAGER && session.user.role !== Role.ADMIN)) {
+    if (!checkAccess(session, ["MANAGER"], "reports.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     try {

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 // DELETE /api/payroll/reset?month=4&year=2026&siteId=xxx&action=delete|unlock
 export async function DELETE(req: Request) {
@@ -9,8 +10,7 @@ export async function DELETE(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const role = session.user.role
-        if (role !== "ADMIN" && role !== "MANAGER" && role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(
     req: Request,
@@ -14,7 +15,7 @@ export async function GET(
         const expense = await prisma.expense.findUnique({ where: { id: params.id } })
         if (!expense) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.view")
         if (!isPrivileged && expense.submittedBy !== session.user.id) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -51,7 +52,7 @@ export async function PUT(
         const expense = await prisma.expense.findUnique({ where: { id: params.id } })
         if (!expense) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.manage")
         const isOwner = expense.submittedBy === session.user.id
 
         if (!isPrivileged && !isOwner) {

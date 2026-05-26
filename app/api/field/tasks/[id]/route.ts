@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -51,7 +52,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         const task = await prisma.fieldTask.findUnique({ where: { id: params.id } })
         if (!task) return new NextResponse("Not Found", { status: 404 })
 
-        const isAdminOrManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isAdminOrManager = checkAccess(session, ["MANAGER"], "field.manage")
         const body = await req.json()
 
         if (!isAdminOrManager) {
@@ -105,7 +106,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN") {
+        if (!checkAccess(session, ["MANAGER"], "field.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "assets.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "assets.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
         // Resolve real DB user ID

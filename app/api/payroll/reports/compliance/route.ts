@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
-import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 
 type PayrollRow = {
     id: string
@@ -76,8 +76,7 @@ function ncpDays(p: PayrollRow) {
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        const role = session?.user.role
-        if (!session || (role !== Role.ADMIN && role !== Role.MANAGER && role !== Role.HR_MANAGER)) {
+        if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
 

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function POST(req: Request) {
     try {
@@ -10,8 +11,7 @@ export async function POST(req: Request) {
 
         // Only ADMIN / MANAGER / HR_MANAGER can lock payroll — locking is destructive
         // (no edits possible after) so it shouldn't be available to any signed-in user.
-        const role = (session.user as { role?: string })?.role
-        if (role !== "ADMIN" && role !== "MANAGER" && role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

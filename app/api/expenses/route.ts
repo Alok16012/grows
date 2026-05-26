@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     try {
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
         const search = searchParams.get("search")
         const submittedBy = searchParams.get("submittedBy")
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.view")
 
         const where: Record<string, unknown> = {}
 

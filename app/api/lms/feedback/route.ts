@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 // GET /api/lms/feedback?courseId=xxx  — get current employee's feedback for a course
 export async function GET(req: Request) {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
         }
 
         // Return all feedback for admin view
-        if (session.user.role === "ADMIN" || session.user.role === "MANAGER") {
+        if (checkAccess(session, ["MANAGER"], "lms.view")) {
             const allFeedback = await prisma.courseFeedback.findMany({
                 include: {
                     course: { select: { title: true, courseCode: true } },

@@ -3,14 +3,14 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
+import { checkAccess } from "@/lib/permissions"
 
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const role = session.user.role
-        if (role !== "ADMIN" && role !== "MANAGER" && role !== "HR_MANAGER") {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
 

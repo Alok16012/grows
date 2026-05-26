@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371000 // Earth radius in meters
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isAdminOrManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isAdminOrManager = checkAccess(session, ["MANAGER"], "field.view")
         if (!isAdminOrManager) return new NextResponse("Forbidden", { status: 403 })
 
         const { searchParams } = new URL(req.url)
