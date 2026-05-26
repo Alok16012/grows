@@ -35,7 +35,7 @@ const COURSE_ROWS = ["BE / BTECH", "DIPLOMA", "ITI / OTHER", "12TH", "10TH"]
 const DOC_OPTIONS = ["PAN Card", "Aadhar Card", "Bank Passbook", "Educational Certificates", "Resume", "Passport Size Photo"]
 
 type EducationRow = { course: string; stream: string; institute: string; year: string; percentage: string; location: string }
-type FormMeta = { title: string; description: string | null; siteName: string | null; formType: string }
+type FormMeta = { title: string; description: string | null; siteName: string | null; formType: string; hrName: string | null }
 
 export default function ApplyPage() {
     const { slug } = useParams<{ slug: string }>()
@@ -178,28 +178,39 @@ export default function ApplyPage() {
     return (
         <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 12px 60px" }}>
             <div style={{ width: "100%", maxWidth: 780, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }}>
-                {/* Header */}
-                <div style={{ background: isOnSiteJoin ? "linear-gradient(135deg, #047857 0%, #065f46 100%)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "28px 28px 24px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Briefcase size={20} color="#fff" />
+                {/* Header — Logo + Company Name (big) + HR Name */}
+                <div style={{ background: isOnSiteJoin ? "linear-gradient(135deg, #047857 0%, #065f46 100%)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "32px 32px 28px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                        <div style={{ width: 64, height: 64, borderRadius: 14, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/logo.png" alt="Growus Auto" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                         </div>
-                        <div>
-                            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", margin: 0 }}>
-                                Growus Auto India Pvt. Ltd.
-                            </p>
-                            <h1 style={{ fontSize: 18, fontWeight: 800, color: "#fff", margin: 0 }}>
-                                {isOnSiteJoin ? "Candidate On-site Joining" : "Candidate Personal Information Form"}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <h1 style={{ fontSize: 26, fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "0.5px", lineHeight: 1.1 }}>
+                                GROWUS AUTO INDIA PVT. LTD.
                             </h1>
+                            {meta!.hrName && (
+                                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.9)", margin: "6px 0 0", fontWeight: 500 }}>
+                                    HR: {meta!.hrName}
+                                </p>
+                            )}
+                            {meta!.siteName && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
+                                    <MapPin size={12} color="rgba(255,255,255,0.7)" />
+                                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>{meta!.siteName}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    {meta!.description && <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", margin: "8px 0 0 0" }}>{meta!.description}</p>}
-                    {meta!.siteName && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8 }}>
-                            <MapPin size={12} color="rgba(255,255,255,0.7)" />
-                            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>{meta!.siteName}</span>
-                        </div>
-                    )}
+                </div>
+
+                {/* Form title — moved below header */}
+                <div style={{ padding: "20px 24px 4px", borderBottom: "1px solid #e2e8f0", background: "#fafbff" }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1f2937", margin: 0, textAlign: "center" }}>
+                        {isOnSiteJoin ? "Candidate On-site Joining" : "Candidate Personal Information Form"}
+                    </h2>
+                    {meta!.description && <p style={{ fontSize: 12, color: "#6b7280", margin: "6px 0 12px", textAlign: "center" }}>{meta!.description}</p>}
+                    {!meta!.description && <div style={{ height: 12 }} />}
                 </div>
 
                 <form onSubmit={handleSubmit} style={{ padding: 22, display: "flex", flexDirection: "column", gap: 16 }}>

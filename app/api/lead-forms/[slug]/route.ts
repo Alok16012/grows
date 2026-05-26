@@ -13,6 +13,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
         select: {
             id: true, title: true, description: true, isActive: true,
             site: { select: { id: true, name: true } },
+            creator: { select: { name: true } },
         },
     })
     if (!form) return NextResponse.json({ error: "Form not found" }, { status: 404 })
@@ -22,6 +23,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
         title:       form.title,
         description: form.description,
         siteName:    form.site?.name ?? null,
+        hrName:      form.creator?.name ?? null,
         formType:    "RECRUITMENT",
     })
 }
