@@ -90,22 +90,24 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             educationDetails:   educationDetails && Array.isArray(educationDetails) && educationDetails.length ? educationDetails : undefined,
         }
 
-        // New candidate-form fields may not exist in DB yet — fall back if column missing
+        // New candidate-form fields may not exist in DB yet — fall back if column missing.
+        // Only fields that are actually NEW in the migration (currentCompany/Salary etc. existed before).
         const newFieldKeys = [
             "tshirtSize", "bloodGroup", "altPhone", "dateOfBirth", "fatherName",
             "fatherOccupation", "motherName", "motherOccupation", "maritalStatus",
             "nationality", "aadharNumber", "presentAddress", "permanentAddress",
-            "currentCompany", "currentDesignation", "currentSalary", "pfEsicNumber",
-            "previousCompany", "reasonForLeaving", "hasBike", "declarationDate",
+            "currentDesignation", "pfEsicNumber",
+            "reasonForLeaving", "hasBike", "declarationDate",
             "declarationPlace", "documentsSubmitted", "educationDetails",
         ]
         let lead
         try {
             lead = await prisma.lead.create({ data: leadData })
         } catch (err: any) {
-            const msg = String(err?.message || "")
-            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            const msg = String(err?.message || "").toLowerCase()
+            const missingColumn = msg.includes("does not exist") || msg.includes("unknown arg") || msg.includes("unknown field") || err?.code === "P2022" || err?.code === "P2009"
             if (!missingColumn) throw err
+            console.warn("[LEAD_FORM_SUBMIT] fallback — stripping new fields, reason:", err?.code, msg.slice(0, 150))
             const coreData: any = {}
             for (const k of Object.keys(leadData)) {
                 if (!newFieldKeys.includes(k)) coreData[k] = (leadData as any)[k]
@@ -126,8 +128,12 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
         }
 
         return NextResponse.json({ success: true, leadId: lead.id, status: leadStatus })
-    } catch (err) {
+    } catch (err: any) {
         console.error("[LEAD_FORM_SUBMIT]", err)
-        return NextResponse.json({ error: "Submission failed" }, { status: 500 })
+        const detail = String(err?.message || "")
+        const code = err?.code
+        return NextResponse.json({
+            error: `Submission failed${code ? " [" + code + "]" : ""}: ${detail.slice(0, 200)}`
+        }, { status: 500 })
     }
 }
