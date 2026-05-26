@@ -1025,8 +1025,11 @@ export default function SitesPage() {
     }, [statusFilter, typeFilter, search])
 
     useEffect(() => {
-        if (status === "authenticated") fetchSites()
-    }, [status, fetchSites])
+        if (status === "authenticated") {
+            console.log("[SitesPage DEBUG] session.user =", JSON.stringify(session?.user, null, 2))
+            fetchSites()
+        }
+    }, [status, fetchSites, session])
 
     // Stats
     const totalSites = sites.length
