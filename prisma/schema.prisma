@@ -1606,6 +1606,9 @@ enum ExpenseCategory {
   MEDICAL
   UNIFORM
   TRAINING
+  HOTEL
+  MATERIAL
+  MOBILE_RECHARGE
   OTHER
 }
 

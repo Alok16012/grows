@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
@@ -8,6 +8,7 @@ import {
     ChevronRight, CheckCircle2, Clock,
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
+    Upload, FileText, Paperclip,
     type LucideIcon
 } from "lucide-react"
 import { format } from "date-fns"
@@ -18,7 +19,9 @@ type ExpenseStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "PAID"
 type ExpenseCategory =
     | "TRAVEL" | "FOOD" | "ACCOMMODATION" | "FUEL"
     | "OFFICE_SUPPLIES" | "COMMUNICATION" | "MEDICAL"
-    | "UNIFORM" | "TRAINING" | "OTHER"
+    | "UNIFORM" | "TRAINING"
+    | "HOTEL" | "MATERIAL" | "MOBILE_RECHARGE"
+    | "OTHER"
 
 type ExpenseUser = { id: string; name: string; email: string }
 
@@ -48,10 +51,12 @@ type Expense = {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
+// Categories shown in create / filter dropdowns (Growus spec).
+// Legacy categories (ACCOMMODATION, OFFICE_SUPPLIES, COMMUNICATION, MEDICAL,
+// UNIFORM, TRAINING) still render correctly for historical entries.
 const CATEGORIES: ExpenseCategory[] = [
-    "TRAVEL", "FOOD", "ACCOMMODATION", "FUEL",
-    "OFFICE_SUPPLIES", "COMMUNICATION", "MEDICAL",
-    "UNIFORM", "TRAINING", "OTHER"
+    "TRAVEL", "FUEL", "FOOD", "HOTEL",
+    "MATERIAL", "MOBILE_RECHARGE", "OFFICE_SUPPLIES", "OTHER",
 ]
 
 const PAYMENT_MODES = ["Cash", "NEFT", "RTGS", "UPI", "Cheque", "Bank Transfer"]
@@ -68,11 +73,14 @@ function categoryLabel(cat: ExpenseCategory): string {
         FOOD: "Food",
         ACCOMMODATION: "Accommodation",
         FUEL: "Fuel",
-        OFFICE_SUPPLIES: "Office Supplies",
+        OFFICE_SUPPLIES: "Office Expense",
         COMMUNICATION: "Communication",
         MEDICAL: "Medical",
         UNIFORM: "Uniform",
         TRAINING: "Training",
+        HOTEL: "Hotel",
+        MATERIAL: "Material",
+        MOBILE_RECHARGE: "Mobile Recharge",
         OTHER: "Other",
     }
     return map[cat] || cat
@@ -89,6 +97,9 @@ function categoryStyle(cat: ExpenseCategory): { bg: string; color: string } {
         MEDICAL: { bg: "#fef2f2", color: "#ef4444" },
         UNIFORM: { bg: "#eef2ff", color: "#6366f1" },
         TRAINING: { bg: "#f0fdf4", color: "#22c55e" },
+        HOTEL: { bg: "#fdf4ff", color: "#a855f7" },
+        MATERIAL: { bg: "#fef3c7", color: "#b45309" },
+        MOBILE_RECHARGE: { bg: "#ecfeff", color: "#0891b2" },
         OTHER: { bg: "#f9fafb", color: "#6b7280" },
     }
     return map[cat] || { bg: "#f9fafb", color: "#6b7280" }
@@ -135,6 +146,9 @@ function AddExpenseModal({
     editExpense?: Expense | null
 }) {
     const [loading, setLoading] = useState(false)
+    const [receiptUrl, setReceiptUrl] = useState("")
+    const [receiptUploading, setReceiptUploading] = useState(false)
+    const receiptInputRef = useRef<HTMLInputElement>(null)
     const [form, setForm] = useState({
         title: "",
         category: "TRAVEL" as ExpenseCategory,
@@ -153,6 +167,7 @@ function AddExpenseModal({
                     date: format(new Date(editExpense.date), "yyyy-MM-dd"),
                     description: editExpense.description || "",
                 })
+                setReceiptUrl(editExpense.receiptUrl || "")
             } else {
                 setForm({
                     title: "",
@@ -161,9 +176,24 @@ function AddExpenseModal({
                     date: format(new Date(), "yyyy-MM-dd"),
                     description: "",
                 })
+                setReceiptUrl("")
             }
         }
     }, [open, editExpense])
+
+    const uploadReceipt = async (file: File) => {
+        if (file.size > 5 * 1024 * 1024) { toast.error("Receipt must be under 5MB"); return }
+        setReceiptUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            const data = await res.json()
+            if (data.url) setReceiptUrl(data.url)
+            else toast.error("Receipt upload failed")
+        } catch { toast.error("Receipt upload error") }
+        finally { setReceiptUploading(false) }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -174,7 +204,7 @@ function AddExpenseModal({
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }),
+                body: JSON.stringify({ ...form, amount: parseFloat(form.amount), receiptUrl: receiptUrl || null }),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(editExpense ? "Expense updated!" : "Expense created!")
@@ -262,8 +292,49 @@ function AddExpenseModal({
                             rows={3}
                         />
                     </div>
-                    <div className="rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] p-3 text-[12px] text-[var(--text2)]">
-                        Receipt upload will be available in the next release. You can attach receipts once the expense is submitted.
+                    <div>
+                        <label className="block text-[12px] text-[var(--text2)] mb-1">Receipt / Bill</label>
+                        <div className="rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] p-3 flex items-center gap-3">
+                            {receiptUrl ? (
+                                /\.(jpe?g|png|gif|webp)$/i.test(receiptUrl) ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={receiptUrl} alt="Receipt" className="w-14 h-14 rounded-[6px] object-cover border border-[var(--border)]" />
+                                ) : (
+                                    <div className="w-14 h-14 rounded-[6px] bg-white border border-[var(--border)] flex items-center justify-center">
+                                        <FileText size={20} className="text-[var(--accent)]" />
+                                    </div>
+                                )
+                            ) : (
+                                <div className="w-14 h-14 rounded-[6px] bg-white border border-dashed border-[var(--border)] flex items-center justify-center">
+                                    <Upload size={18} className="text-[var(--text3)]" />
+                                </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                {receiptUrl ? (
+                                    <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
+                                        className="text-[12px] font-medium text-[var(--accent)] hover:underline block truncate">
+                                        View attached receipt
+                                    </a>
+                                ) : (
+                                    <p className="text-[12px] text-[var(--text2)]">JPG / PNG / PDF • max 5MB</p>
+                                )}
+                                <div className="flex items-center gap-2 mt-1">
+                                    <button type="button" onClick={() => receiptInputRef.current?.click()} disabled={receiptUploading}
+                                        className="h-7 px-3 text-[11px] font-semibold bg-white border border-[var(--border)] rounded-[6px] hover:bg-[var(--surface)] disabled:opacity-60 inline-flex items-center gap-1.5">
+                                        {receiptUploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                                        {receiptUploading ? "Uploading…" : receiptUrl ? "Change" : "Upload"}
+                                    </button>
+                                    {receiptUrl && (
+                                        <button type="button" onClick={() => setReceiptUrl("")}
+                                            className="h-7 px-3 text-[11px] font-semibold text-red-500 border border-red-200 rounded-[6px] hover:bg-red-50 inline-flex items-center gap-1.5">
+                                            <Trash2 size={11} /> Remove
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            <input ref={receiptInputRef} type="file" accept="image/*,application/pdf" className="hidden"
+                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = "" }} />
+                        </div>
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                         <button
@@ -464,6 +535,24 @@ function ExpenseDrawer({
                                 <p className="text-[13px] text-[var(--text)] bg-[var(--surface2)] rounded-[10px] p-3 leading-relaxed">
                                     {expense.description}
                                 </p>
+                            </div>
+                        )}
+
+                        {/* Receipt */}
+                        {expense.receiptUrl && (
+                            <div>
+                                <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Receipt / Bill</p>
+                                {/\.(jpe?g|png|gif|webp)$/i.test(expense.receiptUrl) ? (
+                                    <a href={expense.receiptUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={expense.receiptUrl} alt="Receipt" className="w-full max-h-72 object-contain rounded-[10px] border border-[var(--border)] bg-[var(--surface2)]" />
+                                    </a>
+                                ) : (
+                                    <a href={expense.receiptUrl} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--surface2)]">
+                                        <FileText size={14} /> View attached file
+                                    </a>
+                                )}
                             </div>
                         )}
 
@@ -728,7 +817,12 @@ function ExpenseRow({
 
                 {/* Title + Category */}
                 <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-[var(--text)] truncate">{expense.title}</p>
+                    <div className="flex items-center gap-1.5">
+                        <p className="text-[13px] font-medium text-[var(--text)] truncate">{expense.title}</p>
+                        {expense.receiptUrl && (
+                            <Paperclip size={11} className="text-[var(--accent)] shrink-0" />
+                        )}
+                    </div>
                     <span
                         className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium mt-0.5"
                         style={{ background: catStyle.bg, color: catStyle.color }}

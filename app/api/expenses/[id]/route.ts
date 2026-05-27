@@ -60,7 +60,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { action, title, category, amount, date, description, rejectionReason, paymentMode } = body
+        const { action, title, category, amount, date, description, receiptUrl, rejectionReason, paymentMode } = body
 
         const updateData: Record<string, unknown> = {}
 
@@ -71,6 +71,7 @@ export async function PUT(
             if (amount !== undefined) updateData.amount = parseFloat(amount)
             if (date !== undefined) updateData.date = new Date(date)
             if (description !== undefined) updateData.description = description || null
+            if (receiptUrl !== undefined) updateData.receiptUrl = receiptUrl || null
         }
 
         // Action-based transitions

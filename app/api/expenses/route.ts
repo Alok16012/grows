@@ -86,7 +86,7 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { title, category, amount, date, description, employeeId } = body
+        const { title, category, amount, date, description, employeeId, receiptUrl } = body
 
         if (!title || !category || !amount || !date) {
             return new NextResponse("title, category, amount, and date are required", { status: 400 })
@@ -104,6 +104,7 @@ export async function POST(req: Request) {
                 amount: parseFloat(amount),
                 date: new Date(date),
                 description: description || null,
+                receiptUrl: receiptUrl || null,
                 employeeId: employeeId || null,
                 submittedBy: session.user.id,
                 status: "DRAFT",
