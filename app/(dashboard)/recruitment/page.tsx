@@ -1683,8 +1683,13 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
             {leads.map(lead => (
                 <div key={lead.id} onClick={() => onCard(lead)}
                     className="bg-white border border-[var(--border)] rounded-[12px] p-4 cursor-pointer hover:shadow-sm hover:border-[var(--accent)] transition-all flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[14px]">
-                        {lead.candidateName.charAt(0).toUpperCase()}
+                    <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[14px] overflow-hidden">
+                        {lead.profileUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover" />
+                        ) : (
+                            lead.candidateName.charAt(0).toUpperCase()
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -2078,8 +2083,13 @@ function DetailDrawer({
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-white z-10 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent)] font-bold text-[15px]">
-                            {lead.candidateName.charAt(0).toUpperCase()}
+                        <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent)] font-bold text-[15px] overflow-hidden">
+                            {lead.profileUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover" />
+                            ) : (
+                                lead.candidateName.charAt(0).toUpperCase()
+                            )}
                         </div>
                         <div>
                             <p className="text-[15px] font-bold text-[var(--text)]">{lead.candidateName}</p>
