@@ -101,7 +101,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                             otDays: p.otDays ?? 0, canteenDays: p.canteenDays ?? 0,
                             penalty: p.penalty ?? 0, advance: p.advance ?? 0,
                             otherDeductions: p.otherDeductions ?? 0, productionIncentive: p.productionIncentive ?? 0,
-                            lwf: p.lwf ?? 0,
+                            lwf: 0, // always manual — don't auto-fill from saved data
                         }
                     }
                     setAttRows(filled)
@@ -154,7 +154,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                     workedDays: workedDaysRaw !== undefined && workedDaysRaw !== "" ? Number(workedDaysRaw) : defaultDays,
                     otDays: Number(col(obj,"OT DAYS","OT HRS","OTDAYS","OTHOURS","OT","OVERTIME","OT HOURS","OVER TIME") ?? 0),
                     otherDeductions: Number(col(obj,"OTHER DEDUCTION","OTHER DED","OTHER DEDUCTIONS","OTHER","OTH DED") ?? 0),
-                    lwf: Number(col(obj,"LWF","LABOUR WELFARE FUND") ?? 0),
+                    lwf: 0, // manual only — don't import from attendance file
                     canteenDays: Number(col(obj,"CANTEEN DAYS","CANTEEN","MESS DAYS","FOOD DAYS") ?? 0),
                     penalty: Number(col(obj,"PENALTY","FINE") ?? 0),
                     advance: Number(col(obj,"ADVANCE","ADV","LOAN") ?? 0),
