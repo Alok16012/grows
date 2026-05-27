@@ -120,7 +120,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
     }
 
     const setAtt = (empId: string, field: keyof AttRow, value: string) =>
-        setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: parseFloat(value) || 0 } }))
+        setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: value === "" ? 0 : parseFloat(value) } }))
 
     const handleAttFileUpload = async (file: File) => {
         if (!employees.length) { toast.error("Load employees first"); return }
@@ -150,8 +150,8 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                 const workedDaysRaw = col(obj,"DAYS WORKED","DAYS","PRESENT DAYS","WORKED DAYS","PRESENT","ATTENDANCE","WORKING DAYS","P","ATT DAYS","ATT","PAID DAYS")
                 const monthDaysRaw  = col(obj,"MONTH DAYS","MONTH WORKING DAYS","MONTHDAYS","WORKING DAYS IN MONTH","TOTAL DAYS")
                 updates[empId] = {
-                    monthDays: monthDaysRaw !== undefined ? Number(monthDaysRaw) || defaultDays : defaultDays,
-                    workedDays: workedDaysRaw !== undefined ? Number(workedDaysRaw) || defaultDays : defaultDays,
+                    monthDays: monthDaysRaw !== undefined && monthDaysRaw !== "" ? Number(monthDaysRaw) : defaultDays,
+                    workedDays: workedDaysRaw !== undefined && workedDaysRaw !== "" ? Number(workedDaysRaw) : defaultDays,
                     otDays: Number(col(obj,"OT DAYS","OT HRS","OTDAYS","OTHOURS","OT","OVERTIME","OT HOURS","OVER TIME") ?? 0),
                     otherDeductions: Number(col(obj,"OTHER DEDUCTION","OTHER DED","OTHER DEDUCTIONS","OTHER","OTH DED") ?? 0),
                     lwf: Number(col(obj,"LWF","LABOUR WELFARE FUND") ?? 0),
