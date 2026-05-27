@@ -8,10 +8,11 @@ import {
     ChevronRight, CheckCircle2, Clock,
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
-    Upload, FileText, Paperclip, Briefcase,
+    Upload, FileText, Paperclip, Briefcase, Download,
     type LucideIcon
 } from "lucide-react"
 import { format } from "date-fns"
+import * as XLSX from "xlsx"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1151,6 +1152,43 @@ export default function ExpensesPage() {
 
     const STATUS_FILTERS: StatusFilter[] = ["ALL", "DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"]
 
+    function exportExpenses(fmt: "xlsx" | "csv") {
+        if (expenses.length === 0) { toast.error("No expenses to export"); return }
+        const rows = expenses.map(e => ({
+            "Expense No": e.expenseNo,
+            "Title": e.title,
+            "Category": categoryLabel(e.category),
+            "Amount (₹)": e.amount,
+            "Date": format(new Date(e.date), "dd-MM-yyyy"),
+            "Project": e.project?.name || "",
+            "Client": e.project?.company?.name || "",
+            "Status": e.status,
+            "Submitted By": e.submittedByUser?.name || "",
+            "Description": e.description || "",
+            "Receipt": e.receiptUrl ? "Yes" : "No",
+            "Payment Mode": e.paymentMode || "",
+            "Payment Date": e.paymentDate ? format(new Date(e.paymentDate), "dd-MM-yyyy") : e.paidAt ? format(new Date(e.paidAt), "dd-MM-yyyy") : "",
+            "UTR / Txn ID": e.transactionId || "",
+            "Approved By": e.approvedByUser?.name || "",
+            "Rejection Reason": e.rejectionReason || "",
+        }))
+        const ws = XLSX.utils.json_to_sheet(rows)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, "Expenses")
+        const fileName = `Expenses_${monthFilter || format(new Date(), "yyyy-MM")}.${fmt}`
+        if (fmt === "csv") {
+            const csv = XLSX.utils.sheet_to_csv(ws)
+            const blob = new Blob([csv], { type: "text/csv" })
+            const a = document.createElement("a")
+            a.href = URL.createObjectURL(blob)
+            a.download = fileName
+            a.click()
+        } else {
+            XLSX.writeFile(wb, fileName)
+        }
+        toast.success(`Exported ${rows.length} expenses`)
+    }
+
     return (
         <div className="min-h-screen bg-[var(--surface)] p-4 md:p-6">
             {/* Header */}
@@ -1162,12 +1200,26 @@ export default function ExpensesPage() {
                     </h1>
                     <p className="text-[13px] text-[var(--text2)] mt-0.5">Track and manage employee expense claims</p>
                 </div>
-                <button
-                    onClick={() => setAddOpen(true)}
-                    className="h-9 px-4 bg-[var(--accent)] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity"
-                >
-                    <Plus size={16} /> Add Expense
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => exportExpenses("xlsx")}
+                        className="h-9 px-3 border border-[var(--border)] text-[var(--text2)] text-[12px] font-medium rounded-[8px] hover:bg-[var(--surface2)] flex items-center gap-1.5 transition-colors"
+                    >
+                        <Download size={13} /> Excel
+                    </button>
+                    <button
+                        onClick={() => exportExpenses("csv")}
+                        className="h-9 px-3 border border-[var(--border)] text-[var(--text2)] text-[12px] font-medium rounded-[8px] hover:bg-[var(--surface2)] flex items-center gap-1.5 transition-colors"
+                    >
+                        <Download size={13} /> CSV
+                    </button>
+                    <button
+                        onClick={() => setAddOpen(true)}
+                        className="h-9 px-4 bg-[var(--accent)] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity"
+                    >
+                        <Plus size={16} /> Add Expense
+                    </button>
+                </div>
             </div>
 
             {/* Stats Row */}
