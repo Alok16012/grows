@@ -66,6 +66,7 @@ export async function POST(req: Request) {
             firstName, lastName, middleName,
             phone, email, designation,
             dateOfJoining,
+            photo,
             // Personal
             dateOfBirth, gender, bloodGroup, fathersName, maritalStatus,
             // Current address
@@ -167,8 +168,40 @@ export async function POST(req: Request) {
                 safetyShoes:    !!safetyShoes,
                 status:            "ONBOARDING",
                 onboardingToken,
+                photo:             photo || null,
             },
         })
+
+        // Also create a Lead in ON_SITE_JOINED status so the candidate
+        // appears in the Recruitment kanban — even though they bypassed
+        // the apply form and went straight through external onboarding.
+        try {
+            const adminUser = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } })
+            if (adminUser) {
+                const candidateName = [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean).join(" ")
+                await prisma.lead.create({
+                    data: {
+                        candidateName,
+                        phone:    phone.trim(),
+                        email:    email?.trim() || null,
+                        city:     city || null,
+                        position: designation?.trim() || "Not Specified",
+                        gender:   gender || null,
+                        profileUrl: photo || null,
+                        source:   "External Onboarding",
+                        status:   "ON_SITE_JOINED" as any,
+                        priority: "MEDIUM",
+                        score:    "WARM",
+                        siteId:   siteId || null,
+                        createdBy: adminUser.id,
+                        convertedEmployeeId: employee.id,
+                    } as any,
+                })
+            }
+        } catch (leadErr) {
+            // Non-fatal — employee is already created, lead is a nice-to-have for HR visibility
+            console.error("[JOIN_POST] lead-mirror failed:", leadErr)
+        }
 
         // If a site was selected, create an active Deployment for the new employee
         if (siteId) {
