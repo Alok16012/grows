@@ -124,6 +124,62 @@ export async function PUT(
             updated = await prisma.expense.update({ where: { id: params.id }, data: safeUpdate })
         }
 
+        // ── Fire in-app notifications ──
+        try {
+            const expTitle = expense.title
+            const expNo = expense.expenseNo
+            const actorName = session.user.name || "Someone"
+
+            if (action === "SUBMIT") {
+                // Notify admins/managers that a new expense needs approval
+                const managers = await prisma.user.findMany({
+                    where: { role: { in: ["ADMIN", "MANAGER"] }, isActive: true },
+                    select: { id: true },
+                })
+                await prisma.notification.createMany({
+                    data: managers.map(m => ({
+                        userId: m.id,
+                        title: "Expense Submitted",
+                        message: `${actorName} submitted ${expNo} — ${expTitle}`,
+                        type: "expense",
+                        link: "/expenses",
+                    })),
+                })
+            } else if (action === "APPROVE") {
+                await prisma.notification.create({
+                    data: {
+                        userId: expense.submittedBy,
+                        title: "Expense Approved ✓",
+                        message: `Your expense ${expNo} (${expTitle}) has been approved`,
+                        type: "expense",
+                        link: "/expenses",
+                    },
+                })
+            } else if (action === "REJECT") {
+                await prisma.notification.create({
+                    data: {
+                        userId: expense.submittedBy,
+                        title: "Expense Rejected ✗",
+                        message: `Your expense ${expNo} (${expTitle}) was rejected: ${rejectionReason}`,
+                        type: "expense",
+                        link: "/expenses",
+                    },
+                })
+            } else if (action === "PAID") {
+                await prisma.notification.create({
+                    data: {
+                        userId: expense.submittedBy,
+                        title: "Payment Completed 💰",
+                        message: `Your expense ${expNo} (${expTitle}) has been paid via ${paymentMode}`,
+                        type: "expense",
+                        link: "/expenses",
+                    },
+                })
+            }
+        } catch (notifErr) {
+            console.error("[EXPENSE_NOTIF]", notifErr)
+        }
+
         return NextResponse.json(updated)
     } catch (error) {
         console.error("[EXPENSE_PUT]", error)
