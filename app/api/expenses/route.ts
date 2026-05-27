@@ -14,6 +14,8 @@ export async function GET(req: Request) {
         const category = searchParams.get("category")
         const dateFrom = searchParams.get("dateFrom")
         const dateTo = searchParams.get("dateTo")
+        const month = searchParams.get("month")          // "YYYY-MM"
+        const projectId = searchParams.get("projectId")
         const search = searchParams.get("search")
         const submittedBy = searchParams.get("submittedBy")
 
@@ -30,8 +32,15 @@ export async function GET(req: Request) {
 
         if (status && status !== "ALL") where.status = status
         if (category && category !== "ALL") where.category = category
+        if (projectId && projectId !== "ALL") where.projectId = projectId
 
-        if (dateFrom || dateTo) {
+        // Month filter wins over date range when both are present
+        if (month && /^\d{4}-\d{2}$/.test(month)) {
+            const [y, m] = month.split("-").map(Number)
+            const start = new Date(y, m - 1, 1)
+            const end = new Date(y, m, 0, 23, 59, 59, 999)
+            where.date = { gte: start, lte: end }
+        } else if (dateFrom || dateTo) {
             const dateFilter: Record<string, Date> = {}
             if (dateFrom) dateFilter.gte = new Date(dateFrom)
             if (dateTo) {
@@ -49,10 +58,26 @@ export async function GET(req: Request) {
             ]
         }
 
-        const expenses = await prisma.expense.findMany({
-            where,
-            orderBy: { createdAt: "desc" },
-        })
+        // Migration-safe: if projectId column doesn't exist yet, drop the filter + include
+        let expenses
+        try {
+            expenses = await prisma.expense.findMany({
+                where,
+                include: { project: { select: { id: true, name: true, company: { select: { id: true, name: true } } } } },
+                orderBy: { createdAt: "desc" },
+            }) as any[]
+        } catch (err: any) {
+            const msg = String(err?.message || "").toLowerCase()
+            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            if (!missingColumn) throw err
+            console.warn("[EXPENSES_GET] project column not yet migrated, falling back")
+            const fallbackWhere = { ...where }
+            delete fallbackWhere.projectId
+            expenses = await prisma.expense.findMany({
+                where: fallbackWhere,
+                orderBy: { createdAt: "desc" },
+            }) as any[]
+        }
 
         // Fetch user info for submittedBy and approvedBy
         const userIds = new Set<string>()
@@ -86,7 +111,7 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { title, category, amount, date, description, employeeId, receiptUrl } = body
+        const { title, category, amount, date, description, employeeId, receiptUrl, projectId } = body
 
         if (!title || !category || !amount || !date) {
             return new NextResponse("title, category, amount, and date are required", { status: 400 })
@@ -96,20 +121,30 @@ export async function POST(req: Request) {
         const count = await prisma.expense.count()
         const expenseNo = `EXP-${String(count + 1).padStart(4, "0")}`
 
-        const expense = await prisma.expense.create({
-            data: {
-                expenseNo,
-                title,
-                category,
-                amount: parseFloat(amount),
-                date: new Date(date),
-                description: description || null,
-                receiptUrl: receiptUrl || null,
-                employeeId: employeeId || null,
-                submittedBy: session.user.id,
-                status: "DRAFT",
-            },
-        })
+        const coreData: any = {
+            expenseNo,
+            title,
+            category,
+            amount: parseFloat(amount),
+            date: new Date(date),
+            description: description || null,
+            receiptUrl: receiptUrl || null,
+            employeeId: employeeId || null,
+            submittedBy: session.user.id,
+            status: "DRAFT",
+        }
+        let expense
+        try {
+            expense = await prisma.expense.create({
+                data: { ...coreData, projectId: projectId || null },
+            })
+        } catch (err: any) {
+            const msg = String(err?.message || "").toLowerCase()
+            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            if (!missingColumn) throw err
+            console.warn("[EXPENSES_POST] project column not yet migrated, creating without projectId")
+            expense = await prisma.expense.create({ data: coreData })
+        }
 
         return NextResponse.json(expense)
     } catch (error) {

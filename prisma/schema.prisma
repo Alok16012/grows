@@ -74,6 +74,7 @@ model Project {
   createdAt       DateTime         @default(now())
   assignments     Assignment[]
   formTemplates   FormTemplate[]
+  expenses        Expense[]
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   projectManagers ProjectManager[]
   defectColumns   Json?
@@ -1623,6 +1624,8 @@ model Expense {
   receiptUrl      String?         // file upload URL
   submittedBy     String          // userId
   employeeId      String?         // optional: on behalf of employee
+  projectId       String?         // optional: link to project/client
+  project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   approvedBy      String?         // userId
   approvedAt      DateTime?
   rejectedAt      DateTime?
@@ -1636,6 +1639,7 @@ model Expense {
   @@index([status])
   @@index([submittedBy])
   @@index([date])
+  @@index([projectId])
 }
 
 // ─── CLIENT & CONTRACT MANAGEMENT ─────────────────────────────────────────────

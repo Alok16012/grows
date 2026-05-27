@@ -60,7 +60,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { action, title, category, amount, date, description, receiptUrl, rejectionReason, paymentMode } = body
+        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode } = body
 
         const updateData: Record<string, unknown> = {}
 
@@ -72,6 +72,7 @@ export async function PUT(
             if (date !== undefined) updateData.date = new Date(date)
             if (description !== undefined) updateData.description = description || null
             if (receiptUrl !== undefined) updateData.receiptUrl = receiptUrl || null
+            if (projectId !== undefined) updateData.projectId = projectId || null
         }
 
         // Action-based transitions
@@ -109,10 +110,16 @@ export async function PUT(
             return new NextResponse("No valid updates", { status: 400 })
         }
 
-        const updated = await prisma.expense.update({
-            where: { id: params.id },
-            data: updateData,
-        })
+        let updated
+        try {
+            updated = await prisma.expense.update({ where: { id: params.id }, data: updateData })
+        } catch (err: any) {
+            const msg = String(err?.message || "").toLowerCase()
+            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            if (!missingColumn) throw err
+            const { projectId: _drop, ...safeUpdate } = updateData as any
+            updated = await prisma.expense.update({ where: { id: params.id }, data: safeUpdate })
+        }
 
         return NextResponse.json(updated)
     } catch (error) {

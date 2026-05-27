@@ -8,7 +8,7 @@ import {
     ChevronRight, CheckCircle2, Clock,
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
-    Upload, FileText, Paperclip,
+    Upload, FileText, Paperclip, Briefcase,
     type LucideIcon
 } from "lucide-react"
 import { format } from "date-fns"
@@ -25,6 +25,8 @@ type ExpenseCategory =
 
 type ExpenseUser = { id: string; name: string; email: string }
 
+type ExpenseProject = { id: string; name: string; company?: { id: string; name: string } | null }
+
 type Expense = {
     id: string
     expenseNo: string
@@ -36,6 +38,8 @@ type Expense = {
     receiptUrl: string | null
     submittedBy: string
     employeeId: string | null
+    projectId: string | null
+    project: ExpenseProject | null
     approvedBy: string | null
     approvedAt: string | null
     rejectedAt: string | null
@@ -149,13 +153,27 @@ function AddExpenseModal({
     const [receiptUrl, setReceiptUrl] = useState("")
     const [receiptUploading, setReceiptUploading] = useState(false)
     const receiptInputRef = useRef<HTMLInputElement>(null)
+    const [projects, setProjects] = useState<ExpenseProject[]>([])
     const [form, setForm] = useState({
         title: "",
         category: "TRAVEL" as ExpenseCategory,
         amount: "",
         date: format(new Date(), "yyyy-MM-dd"),
         description: "",
+        projectId: "",
     })
+
+    useEffect(() => {
+        if (!open) return
+        // Load projects once per open
+        fetch("/api/projects")
+            .then(r => r.ok ? r.json() : [])
+            .then((data: any) => {
+                const list = Array.isArray(data) ? data : (data.projects ?? [])
+                setProjects(list.map((p: any) => ({ id: p.id, name: p.name, company: p.company ?? null })))
+            })
+            .catch(() => setProjects([]))
+    }, [open])
 
     useEffect(() => {
         if (open) {
@@ -166,6 +184,7 @@ function AddExpenseModal({
                     amount: String(editExpense.amount),
                     date: format(new Date(editExpense.date), "yyyy-MM-dd"),
                     description: editExpense.description || "",
+                    projectId: editExpense.projectId || "",
                 })
                 setReceiptUrl(editExpense.receiptUrl || "")
             } else {
@@ -175,6 +194,7 @@ function AddExpenseModal({
                     amount: "",
                     date: format(new Date(), "yyyy-MM-dd"),
                     description: "",
+                    projectId: "",
                 })
                 setReceiptUrl("")
             }
@@ -204,7 +224,12 @@ function AddExpenseModal({
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, amount: parseFloat(form.amount), receiptUrl: receiptUrl || null }),
+                body: JSON.stringify({
+                    ...form,
+                    amount: parseFloat(form.amount),
+                    receiptUrl: receiptUrl || null,
+                    projectId: form.projectId || null,
+                }),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(editExpense ? "Expense updated!" : "Expense created!")
@@ -272,15 +297,32 @@ function AddExpenseModal({
                             />
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-[12px] text-[var(--text2)] mb-1">Date *</label>
-                        <input
-                            type="date"
-                            value={form.date}
-                            onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                            className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                            required
-                        />
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[12px] text-[var(--text2)] mb-1">Date *</label>
+                            <input
+                                type="date"
+                                value={form.date}
+                                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[12px] text-[var(--text2)] mb-1">Project / Client</label>
+                            <select
+                                value={form.projectId}
+                                onChange={e => setForm(f => ({ ...f, projectId: e.target.value }))}
+                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                            >
+                                <option value="">— None —</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name}{p.company?.name ? ` · ${p.company.name}` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <label className="block text-[12px] text-[var(--text2)] mb-1">Description</label>
@@ -527,6 +569,18 @@ function ExpenseDrawer({
                                 </div>
                             </div>
                         </div>
+
+                        {/* Project / Client */}
+                        {expense.project && (
+                            <div>
+                                <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Project / Client</p>
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#eef2ff] text-[#4338ca] text-[12px] font-medium">
+                                    <Briefcase size={12} />
+                                    {expense.project.name}
+                                    {expense.project.company?.name ? <span className="opacity-70">· {expense.project.company.name}</span> : null}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Description */}
                         {expense.description && (
@@ -823,12 +877,20 @@ function ExpenseRow({
                             <Paperclip size={11} className="text-[var(--accent)] shrink-0" />
                         )}
                     </div>
-                    <span
-                        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium mt-0.5"
-                        style={{ background: catStyle.bg, color: catStyle.color }}
-                    >
-                        {categoryLabel(expense.category)}
-                    </span>
+                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                        <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                            style={{ background: catStyle.bg, color: catStyle.color }}
+                        >
+                            {categoryLabel(expense.category)}
+                        </span>
+                        {expense.project?.name && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#eef2ff] text-[#4338ca]">
+                                <Briefcase size={9} />
+                                <span className="truncate max-w-[100px]">{expense.project.name}</span>
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Date */}
@@ -954,11 +1016,25 @@ export default function ExpensesPage() {
     const [activeTab, setActiveTab] = useState<ActiveTab>("mine")
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL")
     const [categoryFilter, setCategoryFilter] = useState<string>("ALL")
+    const [projectFilter, setProjectFilter] = useState<string>("ALL")
+    const [monthFilter, setMonthFilter] = useState<string>("")  // YYYY-MM
     const [dateFrom, setDateFrom] = useState("")
     const [dateTo, setDateTo] = useState("")
     const [search, setSearch] = useState("")
     const [addOpen, setAddOpen] = useState(false)
     const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+    const [projectsList, setProjectsList] = useState<ExpenseProject[]>([])
+
+    // Load projects once for the filter dropdown
+    useEffect(() => {
+        fetch("/api/projects")
+            .then(r => r.ok ? r.json() : [])
+            .then((data: any) => {
+                const list = Array.isArray(data) ? data : (data.projects ?? [])
+                setProjectsList(list.map((p: any) => ({ id: p.id, name: p.name, company: p.company ?? null })))
+            })
+            .catch(() => setProjectsList([]))
+    }, [])
 
     const fetchExpenses = useCallback(async () => {
         setLoading(true)
@@ -966,8 +1042,10 @@ export default function ExpensesPage() {
             const params = new URLSearchParams()
             if (statusFilter !== "ALL") params.set("status", statusFilter)
             if (categoryFilter !== "ALL") params.set("category", categoryFilter)
-            if (dateFrom) params.set("dateFrom", dateFrom)
-            if (dateTo) params.set("dateTo", dateTo)
+            if (projectFilter !== "ALL") params.set("projectId", projectFilter)
+            if (monthFilter) params.set("month", monthFilter)
+            if (!monthFilter && dateFrom) params.set("dateFrom", dateFrom)
+            if (!monthFilter && dateTo) params.set("dateTo", dateTo)
             if (search) params.set("search", search)
             if (activeTab === "mine") params.set("submittedBy", userId)
 
@@ -987,12 +1065,12 @@ export default function ExpensesPage() {
         } finally {
             setLoading(false)
         }
-    }, [statusFilter, categoryFilter, dateFrom, dateTo, search, activeTab, userId, selectedExpense])
+    }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId, selectedExpense])
 
     useEffect(() => {
         if (userId) fetchExpenses()
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statusFilter, categoryFilter, dateFrom, dateTo, search, activeTab, userId])
+    }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId])
 
     // Stats computed from all "mine" data (independent call)
     const [stats, setStats] = useState({
@@ -1124,7 +1202,7 @@ export default function ExpensesPage() {
                         </button>
                     ))}
                 </div>
-                {/* Second row: Category + Date range + Search */}
+                {/* Second row: Category + Project + Month + Date range + Search */}
                 <div className="flex flex-wrap gap-2">
                     <select
                         value={categoryFilter}
@@ -1134,12 +1212,30 @@ export default function ExpensesPage() {
                         <option value="ALL">All Categories</option>
                         {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
                     </select>
-                    <div className="flex items-center gap-1">
+                    <select
+                        value={projectFilter}
+                        onChange={e => setProjectFilter(e.target.value)}
+                        className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors max-w-[180px]"
+                    >
+                        <option value="ALL">All Projects</option>
+                        {projectsList.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <input
+                        type="month"
+                        value={monthFilter}
+                        onChange={e => setMonthFilter(e.target.value)}
+                        title="Filter by month"
+                        className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                    />
+                    <div className={`flex items-center gap-1 ${monthFilter ? "opacity-50 pointer-events-none" : ""}`}>
                         <Calendar size={13} className="text-[var(--text3)] shrink-0" />
                         <input
                             type="date"
                             value={dateFrom}
                             onChange={e => setDateFrom(e.target.value)}
+                            disabled={!!monthFilter}
                             className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                             placeholder="From"
                         />
@@ -1148,6 +1244,7 @@ export default function ExpensesPage() {
                             type="date"
                             value={dateTo}
                             onChange={e => setDateTo(e.target.value)}
+                            disabled={!!monthFilter}
                             className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                             placeholder="To"
                         />
