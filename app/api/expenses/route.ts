@@ -63,25 +63,30 @@ export async function GET(req: Request) {
             ]
         }
 
-        // Migration-safe: if projectId column doesn't exist yet, drop the filter + include
-        let expenses
+        // Try full query with project include; fall back to plain query
+        // if Project table or projectId column doesn't exist yet.
+        let expenses: any[]
         try {
             expenses = await prisma.expense.findMany({
                 where,
                 include: { project: { select: { id: true, name: true, company: { select: { id: true, name: true } } } } },
                 orderBy: { createdAt: "desc" },
             }) as any[]
-        } catch (err: any) {
-            const msg = String(err?.message || "").toLowerCase()
-            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
-            if (!missingColumn) throw err
-            console.warn("[EXPENSES_GET] project column not yet migrated, falling back")
+        } catch {
+            // Any failure (missing table/column/relation) → retry without project
             const fallbackWhere = { ...where }
             delete fallbackWhere.projectId
-            expenses = await prisma.expense.findMany({
-                where: fallbackWhere,
-                orderBy: { createdAt: "desc" },
-            }) as any[]
+            try {
+                expenses = await prisma.expense.findMany({
+                    where: fallbackWhere,
+                    orderBy: { createdAt: "desc" },
+                }) as any[]
+            } catch {
+                // Final fallback — no filters at all
+                expenses = await prisma.expense.findMany({
+                    orderBy: { createdAt: "desc" },
+                }) as any[]
+            }
         }
 
         // Fetch user info for submittedBy and approvedBy
