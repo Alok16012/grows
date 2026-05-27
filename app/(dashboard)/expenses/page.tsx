@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import * as XLSX from "xlsx"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1037,7 +1038,7 @@ function StatCard({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type ActiveTab = "mine" | "all" | "accounts"
+type ActiveTab = "mine" | "all" | "accounts" | "analytics"
 type StatusFilter = "ALL" | ExpenseStatus
 
 export default function ExpensesPage() {
@@ -1257,7 +1258,7 @@ export default function ExpensesPage() {
             {/* Tabs */}
             {isPrivileged && (
                 <div className="flex gap-1 mb-4 border-b border-[var(--border)]">
-                    {(["mine", "all", "accounts"] as ActiveTab[]).map(tab => (
+                    {(["mine", "all", "accounts", "analytics"] as ActiveTab[]).map(tab => (
                         <button
                             key={tab}
                             onClick={() => {
@@ -1272,14 +1273,19 @@ export default function ExpensesPage() {
                                 : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
                                 }`}
                         >
-                            {tab === "mine" ? "My Expenses" : tab === "all" ? "All Expenses" : "💰 Accounts"}
+                            {tab === "mine" ? "My Expenses" : tab === "all" ? "All Expenses" : tab === "accounts" ? "💰 Accounts" : "📊 Analytics"}
                         </button>
                     ))}
                 </div>
             )}
 
-            {/* Filters */}
-            <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 mb-4 space-y-3">
+            {/* Analytics Tab */}
+            {activeTab === "analytics" && (
+                <ExpenseAnalytics expenses={expenses} loading={loading} />
+            )}
+
+            {/* Filters — hidden on analytics tab */}
+            {activeTab !== "analytics" && <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 mb-4 space-y-3">
                 {/* Status pills */}
                 <div className="flex flex-wrap gap-1.5">
                     {(activeTab === "accounts" ? ["ALL", "APPROVED", "PAID"] as StatusFilter[] : STATUS_FILTERS).map(s => (
@@ -1358,8 +1364,9 @@ export default function ExpensesPage() {
                         )}
                     </div>
                 </div>
-            </div>
+            </div>}
 
+            {activeTab !== "analytics" && <>
             {/* Accounts Summary Banner */}
             {activeTab === "accounts" && (
                 <div className="bg-gradient-to-r from-[#8b5cf6] to-[#6d28d9] rounded-[12px] p-4 mb-4 text-white">
@@ -1442,6 +1449,7 @@ export default function ExpensesPage() {
             {!loading && expenses.length > 0 && (
                 <p className="text-[12px] text-[var(--text3)] mt-2 text-right">{expenses.length} expense{expenses.length !== 1 ? "s" : ""}</p>
             )}
+            </>}
 
             {/* Modals / Drawers */}
             <AddExpenseModal
@@ -1456,6 +1464,90 @@ export default function ExpensesPage() {
                 isPrivileged={isPrivileged}
                 currentUserId={userId}
             />
+        </div>
+    )
+}
+
+// ─── Analytics Panel ──────────────────────────────────────────────────────────
+
+const CHART_COLORS = ["#6366f1", "#06b6d4", "#f59e0b", "#ef4444", "#22c55e", "#a855f7", "#f97316", "#0891b2", "#8b5cf6", "#ec4899"]
+
+function ExpenseAnalytics({ expenses, loading }: { expenses: Expense[]; loading: boolean }) {
+    if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--text3)]" /></div>
+
+    const now = new Date()
+    const monthlyMap = new Map<string, { approved: number; paid: number; total: number }>()
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        monthlyMap.set(format(d, "yyyy-MM"), { approved: 0, paid: 0, total: 0 })
+    }
+    expenses.forEach(e => {
+        const key = format(new Date(e.date), "yyyy-MM")
+        const entry = monthlyMap.get(key)
+        if (entry) {
+            entry.total += e.amount
+            if (e.status === "APPROVED") entry.approved += e.amount
+            if (e.status === "PAID") entry.paid += e.amount
+        }
+    })
+    const monthlyData = Array.from(monthlyMap.entries()).map(([m, v]) => ({
+        month: format(new Date(m + "-01"), "MMM yy"),
+        Approved: Math.round(v.approved), Paid: Math.round(v.paid), Total: Math.round(v.total),
+    }))
+
+    const catMap = new Map<string, number>()
+    expenses.forEach(e => { const lbl = categoryLabel(e.category); catMap.set(lbl, (catMap.get(lbl) || 0) + e.amount) })
+    const catData = Array.from(catMap.entries()).map(([name, value]) => ({ name, value: Math.round(value) })).sort((a, b) => b.value - a.value)
+
+    const empMap = new Map<string, number>()
+    expenses.forEach(e => { const name = e.submittedByUser?.name || "Unknown"; empMap.set(name, (empMap.get(name) || 0) + e.amount) })
+    const empData = Array.from(empMap.entries()).map(([name, amount]) => ({ name, amount: Math.round(amount) })).sort((a, b) => b.amount - a.amount).slice(0, 10)
+
+    const card = "bg-white border border-[var(--border)] rounded-[12px] p-4"
+    return (
+        <div className="space-y-4">
+            <div className={card}>
+                <h3 className="text-[14px] font-semibold text-[var(--text)] mb-4">Monthly Expense Trend (Last 6 Months)</h3>
+                <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={monthlyData}>
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(v: any) => [`₹${Number(v).toLocaleString("en-IN")}`, ""]} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="Total" fill="#e0e7ff" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Approved" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Paid" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className={card}>
+                    <h3 className="text-[14px] font-semibold text-[var(--text)] mb-4">Category-wise Breakdown</h3>
+                    {catData.length === 0 ? <p className="text-[13px] text-[var(--text3)] text-center py-8">No data</p> : (
+                        <ResponsiveContainer width="100%" height={260}>
+                            <PieChart>
+                                <Pie data={catData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} style={{ fontSize: 10 }}>
+                                    {catData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip formatter={(v: any) => [`₹${Number(v).toLocaleString("en-IN")}`, ""]} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+                <div className={card}>
+                    <h3 className="text-[14px] font-semibold text-[var(--text)] mb-4">Top Employees by Expense</h3>
+                    {empData.length === 0 ? <p className="text-[13px] text-[var(--text3)] text-center py-8">No data</p> : (
+                        <ResponsiveContainer width="100%" height={260}>
+                            <BarChart data={empData} layout="vertical">
+                                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}k`} />
+                                <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={90} />
+                                <Tooltip formatter={(v: any) => [`₹${Number(v).toLocaleString("en-IN")}`, "Amount"]} />
+                                <Bar dataKey="amount" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
         </div>
     )
 }
