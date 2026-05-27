@@ -81,11 +81,19 @@ export async function POST(req: Request) {
             nextNum++
         }
 
-        // ── Pre-check duplicate phones ────────────────────────────────────────
+        // ── Pre-check duplicates: phone OR (name+site) ─────────────────────
         const allPhones = rows.map(r => str(r.phone)).filter(Boolean)
         const existingPhones = await prisma.employee.findMany({
             where: { phone: { in: allPhones } }, select: { phone: true }
         }).then(res => new Set(res.map(r => r.phone)))
+
+        // For rows without phone: check name+site duplicates
+        const existingNameSite = await prisma.employee.findMany({
+            select: { firstName: true, lastName: true, deployments: { where: { isActive: true }, select: { siteId: true }, take: 1 } }
+        }).then(res => new Set(res.map(e => {
+            const sId = e.deployments?.[0]?.siteId || ""
+            return `${e.firstName.toLowerCase()}|${(e.lastName || "").toLowerCase()}|${sId}`
+        })))
 
         // ── Process all rows in parallel (parallel bcrypt + parallel DB) ──────
         const results = await Promise.allSettled(
@@ -98,8 +106,18 @@ export async function POST(req: Request) {
                 if (!firstName) {
                     return { skip: true, rowNum, reason: "Missing required field (First Name)" }
                 }
+                // Duplicate check: phone first, then name+site
                 if (phone && existingPhones.has(phone)) {
                     return { skip: true, rowNum, reason: `Duplicate: phone ${phone} already exists` }
+                }
+                if (!phone) {
+                    const siteName = str(row.site)
+                    const siteId = siteName ? (allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase())?.id ?? "") : ""
+                    const nameKey = `${firstName.toLowerCase()}|${str(row.lastName).toLowerCase()}|${siteId}`
+                    if (existingNameSite.has(nameKey)) {
+                        return { skip: true, rowNum, reason: `Duplicate: ${firstName} ${str(row.lastName)} already at site ${siteName || "none"}` }
+                    }
+                    existingNameSite.add(nameKey)
                 }
 
                 // Lookups
@@ -125,7 +143,7 @@ export async function POST(req: Request) {
                         alternatePhone: strN(row.alternatePhone),
                         designation:   strN(row.designation),
                         employmentType: str(row.employmentType) || "Full-time",
-                        status:        "ONBOARDING",
+                        status:        "ACTIVE",
                         onboardingToken,
                         dateOfJoining: dt(row.dateOfJoining),
                         dateOfLeaving: dt(row.dateOfLeaving),
@@ -221,16 +239,6 @@ export async function POST(req: Request) {
                     return {
                         skip: false, rowNum,
                         warning: `Site "${siteName}" not found — employee created without site assignment`
-                    }
-                }
-
-                // Create onboarding record so employee appears in onboarding pipeline
-                if (newEmp) {
-                    const existing = await prisma.onboardingRecord.findUnique({ where: { employeeId: newEmp.id } })
-                    if (!existing) {
-                        await prisma.onboardingRecord.create({
-                            data: { employeeId: newEmp.id, status: "NOT_STARTED" }
-                        })
                     }
                 }
 
