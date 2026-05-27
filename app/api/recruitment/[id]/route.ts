@@ -139,6 +139,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 SELECTED: "Selected",
                 OFFERED: "Offered",
                 JOINED: "Joined",
+                ON_SITE_JOINED: "On-site Joined",
                 REJECTED: "Rejected",
                 DROPPED: "Dropped",
             }

@@ -36,9 +36,9 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
         })
         if (!systemUser) return NextResponse.json({ error: "System error" }, { status: 500 })
 
-        // ON_SITE_JOIN forms → candidate is physically joining, mark as JOINED directly
+        // ON_SITE_JOIN forms → candidate physically joined on-site, mark ON_SITE_JOINED directly
         const isOnSiteJoin = (form as any).formType === "ON_SITE_JOIN"
-        const leadStatus = isOnSiteJoin ? "JOINED" : "NEW_LEAD"
+        const leadStatus = isOnSiteJoin ? "ON_SITE_JOINED" : "NEW_LEAD"
         const leadSource = isOnSiteJoin ? "On-site Join" : "Form Link"
         const joinedAt   = isOnSiteJoin ? new Date() : null
 

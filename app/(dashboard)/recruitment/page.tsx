@@ -36,6 +36,7 @@ const STATUSES = [
     { key: "SELECTED",            label: "Selected",            color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
     { key: "OFFERED",             label: "Offered",             color: "#65a30d", bg: "#f7fee7", border: "#bef264" },
     { key: "JOINED",              label: "Joined ✓",            color: "#047857", bg: "#ecfdf5", border: "#6ee7b7" },
+    { key: "ON_SITE_JOINED",      label: "On-site Joined ✓✓",   color: "#0d9488", bg: "#f0fdfa", border: "#5eead4" },
     { key: "REJECTED",            label: "Rejected",            color: "#9ca3af", bg: "#f9fafb", border: "#e5e7eb" },
     { key: "DROPPED",             label: "Dropped",             color: "#9ca3af", bg: "#f3f4f6", border: "#d1d5db" },
 ]
@@ -1816,6 +1817,7 @@ function AnalyticsView({ data }: { data: AnalyticsData }) {
         NEW_LEAD: "New", CONTACTED: "Contacted", INTERESTED: "Interested",
         INTERVIEW_SCHEDULED: "Scheduled", INTERVIEW_DONE: "Done",
         SELECTED: "Selected", OFFERED: "Offered", JOINED: "Joined",
+        ON_SITE_JOINED: "On-site Joined",
         REJECTED: "Rejected", DROPPED: "Dropped",
     }
 
