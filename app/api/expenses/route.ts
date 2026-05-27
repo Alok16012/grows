@@ -18,6 +18,7 @@ export async function GET(req: Request) {
         const projectId = searchParams.get("projectId")
         const search = searchParams.get("search")
         const submittedBy = searchParams.get("submittedBy")
+        const accountsView = searchParams.get("accountsView") === "true"
 
         const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.view")
 
@@ -30,7 +31,11 @@ export async function GET(req: Request) {
             if (submittedBy) where.submittedBy = submittedBy
         }
 
-        if (status && status !== "ALL") where.status = status
+        // Accounts view: only payment-relevant statuses (approved = to-pay, paid = settled)
+        if (accountsView) {
+            if (status && status !== "ALL") where.status = status
+            else where.status = { in: ["APPROVED", "PAID"] }
+        } else if (status && status !== "ALL") where.status = status
         if (category && category !== "ALL") where.category = category
         if (projectId && projectId !== "ALL") where.projectId = projectId
 

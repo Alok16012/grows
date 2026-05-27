@@ -1036,7 +1036,7 @@ function StatCard({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type ActiveTab = "mine" | "all"
+type ActiveTab = "mine" | "all" | "accounts"
 type StatusFilter = "ALL" | ExpenseStatus
 
 export default function ExpensesPage() {
@@ -1074,6 +1074,7 @@ export default function ExpensesPage() {
         setLoading(true)
         try {
             const params = new URLSearchParams()
+            if (activeTab === "accounts") params.set("accountsView", "true")
             if (statusFilter !== "ALL") params.set("status", statusFilter)
             if (categoryFilter !== "ALL") params.set("category", categoryFilter)
             if (projectFilter !== "ALL") params.set("projectId", projectFilter)
@@ -1204,16 +1205,22 @@ export default function ExpensesPage() {
             {/* Tabs */}
             {isPrivileged && (
                 <div className="flex gap-1 mb-4 border-b border-[var(--border)]">
-                    {(["mine", "all"] as ActiveTab[]).map(tab => (
+                    {(["mine", "all", "accounts"] as ActiveTab[]).map(tab => (
                         <button
                             key={tab}
-                            onClick={() => setActiveTab(tab)}
+                            onClick={() => {
+                                setActiveTab(tab)
+                                if (tab === "accounts" && !monthFilter) {
+                                    setMonthFilter(format(new Date(), "yyyy-MM"))
+                                    setStatusFilter("ALL")
+                                }
+                            }}
                             className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${activeTab === tab
                                 ? "border-[var(--accent)] text-[var(--accent)]"
                                 : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
                                 }`}
                         >
-                            {tab === "mine" ? "My Expenses" : "All Expenses"}
+                            {tab === "mine" ? "My Expenses" : tab === "all" ? "All Expenses" : "💰 Accounts"}
                         </button>
                     ))}
                 </div>
@@ -1223,7 +1230,7 @@ export default function ExpensesPage() {
             <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 mb-4 space-y-3">
                 {/* Status pills */}
                 <div className="flex flex-wrap gap-1.5">
-                    {STATUS_FILTERS.map(s => (
+                    {(activeTab === "accounts" ? ["ALL", "APPROVED", "PAID"] as StatusFilter[] : STATUS_FILTERS).map(s => (
                         <button
                             key={s}
                             onClick={() => setStatusFilter(s)}
@@ -1232,7 +1239,7 @@ export default function ExpensesPage() {
                                 : "bg-[var(--surface2)] text-[var(--text2)] hover:bg-[var(--border)]"
                                 }`}
                         >
-                            {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+                            {s === "ALL" ? "All" : s === "APPROVED" ? "To Pay" : s.charAt(0) + s.slice(1).toLowerCase()}
                         </button>
                     ))}
                 </div>
@@ -1300,6 +1307,43 @@ export default function ExpensesPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Accounts Summary Banner */}
+            {activeTab === "accounts" && (
+                <div className="bg-gradient-to-r from-[#8b5cf6] to-[#6d28d9] rounded-[12px] p-4 mb-4 text-white">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70 mb-3">
+                        Monthly Payment Sheet {monthFilter ? `— ${format(new Date(monthFilter + "-01"), "MMMM yyyy")}` : ""}
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {(() => {
+                            const approved = expenses.filter(e => e.status === "APPROVED")
+                            const paid = expenses.filter(e => e.status === "PAID")
+                            const toPayAmt = approved.reduce((s, e) => s + e.amount, 0)
+                            const paidAmt = paid.reduce((s, e) => s + e.amount, 0)
+                            return (
+                                <>
+                                    <div>
+                                        <p className="text-[22px] font-bold">{formatINR(toPayAmt)}</p>
+                                        <p className="text-[11px] opacity-80">Pending Payment ({approved.length})</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[22px] font-bold">{formatINR(paidAmt)}</p>
+                                        <p className="text-[11px] opacity-80">Paid ({paid.length})</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[22px] font-bold">{formatINR(toPayAmt + paidAmt)}</p>
+                                        <p className="text-[11px] opacity-80">Total ({approved.length + paid.length})</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[22px] font-bold">{approved.length}</p>
+                                        <p className="text-[11px] opacity-80">To Process</p>
+                                    </div>
+                                </>
+                            )
+                        })()}
+                    </div>
+                </div>
+            )}
 
             {/* Expense List */}
             <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
