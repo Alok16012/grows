@@ -1630,8 +1630,10 @@ model Expense {
   approvedAt      DateTime?
   rejectedAt      DateTime?
   rejectionReason String?
-  paidAt          DateTime?
+  paidAt          DateTime?       // when it was marked paid (timestamp)
+  paymentDate     DateTime?       // actual date the payment was made (accounts-entered)
   paymentMode     String?         // Cash, NEFT, etc.
+  transactionId   String?         // UTR / transaction reference number
   status          ExpenseStatus   @default(DRAFT)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt

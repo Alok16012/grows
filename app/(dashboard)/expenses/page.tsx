@@ -45,7 +45,9 @@ type Expense = {
     rejectedAt: string | null
     rejectionReason: string | null
     paidAt: string | null
+    paymentDate: string | null
     paymentMode: string | null
+    transactionId: string | null
     status: ExpenseStatus
     createdAt: string
     updatedAt: string
@@ -421,6 +423,8 @@ function ExpenseDrawer({
     const [showPayBox, setShowPayBox] = useState(false)
     const [rejectionReason, setRejectionReason] = useState("")
     const [paymentMode, setPaymentMode] = useState("NEFT")
+    const [transactionId, setTransactionId] = useState("")
+    const [paymentDate, setPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"))
     const [showEditModal, setShowEditModal] = useState(false)
 
     useEffect(() => {
@@ -428,6 +432,8 @@ function ExpenseDrawer({
         setShowPayBox(false)
         setRejectionReason("")
         setPaymentMode("NEFT")
+        setTransactionId("")
+        setPaymentDate(format(new Date(), "yyyy-MM-dd"))
     }, [expense?.id])
 
     if (!expense) return null
@@ -632,11 +638,19 @@ function ExpenseDrawer({
                                         <span className="font-medium text-[var(--text)]">{expense.paymentMode}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[var(--text3)]">Paid on: </span>
+                                        <span className="text-[var(--text3)]">Payment date: </span>
                                         <span className="font-medium text-[var(--text)]">
-                                            {expense.paidAt ? format(new Date(expense.paidAt), "dd MMM yyyy") : "-"}
+                                            {expense.paymentDate
+                                                ? format(new Date(expense.paymentDate), "dd MMM yyyy")
+                                                : expense.paidAt ? format(new Date(expense.paidAt), "dd MMM yyyy") : "-"}
                                         </span>
                                     </div>
+                                    {expense.transactionId && (
+                                        <div className="col-span-2">
+                                            <span className="text-[var(--text3)]">UTR / Txn ID: </span>
+                                            <span className="font-mono font-medium text-[var(--text)]">{expense.transactionId}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -777,17 +791,37 @@ function ExpenseDrawer({
                                         </button>
                                     ) : (
                                         <div className="space-y-2">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-[12px] text-[var(--text2)] mb-1">Payment Mode</label>
+                                                    <select
+                                                        value={paymentMode}
+                                                        onChange={e => setPaymentMode(e.target.value)}
+                                                        className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                                    >
+                                                        {PAYMENT_MODES.map(m => (
+                                                            <option key={m} value={m}>{m}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[12px] text-[var(--text2)] mb-1">Payment Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={paymentDate}
+                                                        onChange={e => setPaymentDate(e.target.value)}
+                                                        className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                                    />
+                                                </div>
+                                            </div>
                                             <div>
-                                                <label className="block text-[12px] text-[var(--text2)] mb-1">Payment Mode</label>
-                                                <select
-                                                    value={paymentMode}
-                                                    onChange={e => setPaymentMode(e.target.value)}
+                                                <label className="block text-[12px] text-[var(--text2)] mb-1">UTR / Transaction ID</label>
+                                                <input
+                                                    value={transactionId}
+                                                    onChange={e => setTransactionId(e.target.value)}
+                                                    placeholder="e.g. NEFT reference / UTR number"
                                                     className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                                >
-                                                    {PAYMENT_MODES.map(m => (
-                                                        <option key={m} value={m}>{m}</option>
-                                                    ))}
-                                                </select>
+                                                />
                                             </div>
                                             <div className="flex gap-2">
                                                 <button
@@ -797,7 +831,7 @@ function ExpenseDrawer({
                                                     Cancel
                                                 </button>
                                                 <button
-                                                    onClick={() => doAction("PAID", { paymentMode })}
+                                                    onClick={() => doAction("PAID", { paymentMode, transactionId, paymentDate })}
                                                     disabled={actionLoading}
                                                     className="flex-1 h-9 rounded-[8px] bg-[#8b5cf6] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-1 transition-opacity disabled:opacity-60"
                                                 >

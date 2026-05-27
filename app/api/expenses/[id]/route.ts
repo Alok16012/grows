@@ -60,7 +60,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode } = body
+        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate } = body
 
         const updateData: Record<string, unknown> = {}
 
@@ -104,6 +104,8 @@ export async function PUT(
             updateData.status = "PAID"
             updateData.paidAt = new Date()
             updateData.paymentMode = paymentMode
+            updateData.transactionId = transactionId || null
+            updateData.paymentDate = paymentDate ? new Date(paymentDate) : new Date()
         }
 
         if (Object.keys(updateData).length === 0) {
@@ -117,7 +119,8 @@ export async function PUT(
             const msg = String(err?.message || "").toLowerCase()
             const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
             if (!missingColumn) throw err
-            const { projectId: _drop, ...safeUpdate } = updateData as any
+            // Drop columns that may not be migrated yet, then retry
+            const { projectId: _p, transactionId: _t, paymentDate: _d, ...safeUpdate } = updateData as any
             updated = await prisma.expense.update({ where: { id: params.id }, data: safeUpdate })
         }
 
