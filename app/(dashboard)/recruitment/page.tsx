@@ -14,7 +14,7 @@ import {
     FileText, GraduationCap, Award, BarChart2,
     Flame, Droplet, Thermometer, CheckSquare, AlertCircle,
     TrendingUp, Download, Upload, Eye,
-    Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight
+    Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
@@ -287,6 +287,24 @@ export default function RecruitmentPage() {
     const importFileRef = useRef<HTMLInputElement>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState<string>("")
+
+    // Candidate photo upload
+    const [candidatePhoto, setCandidatePhoto] = useState("")
+    const [candidatePhotoUploading, setCandidatePhotoUploading] = useState(false)
+    const candidatePhotoRef = useRef<HTMLInputElement>(null)
+    async function uploadCandidatePhoto(file: File) {
+        if (file.size > 2 * 1024 * 1024) { toast.error("Photo must be under 2MB"); return }
+        setCandidatePhotoUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            const data = await res.json()
+            if (data.url) setCandidatePhoto(data.url)
+            else toast.error("Photo upload failed")
+        } catch { toast.error("Photo upload error") }
+        finally { setCandidatePhotoUploading(false) }
+    }
 
     // Form links state
     const [leadForms, setLeadForms] = useState<LeadFormEntry[]>([])
@@ -570,12 +588,14 @@ export default function RecruitmentPage() {
     function openAddForm() {
         setEditLead(null)
         setForm(emptyForm)
+        setCandidatePhoto("")
         setDuplicateWarning("")
         setShowForm(true)
     }
 
     function openEditForm(lead: Lead) {
         setEditLead(lead)
+        setCandidatePhoto(lead.profileUrl ?? "")
         setDuplicateWarning("")
         setForm({
             candidateName: lead.candidateName ?? "",
@@ -659,7 +679,7 @@ export default function RecruitmentPage() {
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form)
+                body: JSON.stringify({ ...form, profileUrl: candidatePhoto || form.profileUrl || null })
             })
             if (!res.ok) {
                 const err = await res.json()
@@ -1064,6 +1084,44 @@ export default function RecruitmentPage() {
             {showForm && (
                 <Modal onClose={() => setShowForm(false)} title={editLead ? "Edit Candidate" : "Add Candidate"} wide>
                     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                        {/* Photo Upload */}
+                        <div className="flex items-center gap-4 p-3 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px]">
+                            <div onClick={() => candidatePhotoRef.current?.click()} className="relative cursor-pointer shrink-0">
+                                {candidatePhoto ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={candidatePhoto} alt="Candidate" className="w-14 h-14 rounded-full object-cover border-2 border-[var(--accent)]" />
+                                ) : (
+                                    <div className="w-14 h-14 rounded-full bg-[var(--accent-light)] border-2 border-dashed border-[var(--accent)] flex items-center justify-center">
+                                        <Camera size={20} className="text-[var(--accent)]" />
+                                    </div>
+                                )}
+                                {candidatePhotoUploading && (
+                                    <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                                        <Loader2 size={16} className="text-white animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-[12px] font-semibold text-[var(--text)] mb-1">Candidate Photo <span className="font-normal text-[var(--text3)]">(optional)</span></p>
+                                <div className="flex items-center gap-2">
+                                    <button type="button" onClick={() => candidatePhotoRef.current?.click()} disabled={candidatePhotoUploading}
+                                        className="flex items-center gap-1.5 h-7 px-3 text-[11px] font-semibold bg-white border border-[var(--border)] rounded-[6px] hover:bg-[var(--surface)] disabled:opacity-60">
+                                        <Camera size={11} />
+                                        {candidatePhotoUploading ? "Uploading…" : candidatePhoto ? "Change" : "Upload"}
+                                    </button>
+                                    {candidatePhoto && (
+                                        <button type="button" onClick={() => setCandidatePhoto("")}
+                                            className="flex items-center gap-1.5 h-7 px-3 text-[11px] font-semibold text-red-500 border border-red-200 rounded-[6px] hover:bg-red-50">
+                                            <Trash2 size={11} /> Remove
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-[10px] text-[var(--text3)] mt-1">JPG / PNG • max 2MB</p>
+                            </div>
+                            <input ref={candidatePhotoRef} type="file" accept="image/*" className="hidden"
+                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadCandidatePhoto(f); e.target.value = "" }} />
+                        </div>
+
                         {/* Basic Info */}
                         <div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Basic Info</p>
