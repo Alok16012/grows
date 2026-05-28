@@ -1042,6 +1042,9 @@ function EmployeesPage() {
     const [importProgress, setImportProgress] = useState({ done: 0, total: 0 })
     const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
     const importFileRef = useRef<HTMLInputElement>(null)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [bulkDeleting, setBulkDeleting] = useState(false)
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
     const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "HR_MANAGER"
 
@@ -1053,6 +1056,7 @@ function EmployeesPage() {
     }, [status, session, router])
 
     const fetchEmployees = useCallback(async (p = page) => {
+        setSelectedIds(new Set())
         setLoading(true)
         try {
             const params = new URLSearchParams()
@@ -1396,6 +1400,26 @@ function EmployeesPage() {
         }
     }
 
+    const handleBulkDelete = async () => {
+        setBulkDeleting(true)
+        try {
+            const res = await fetch("/api/employees", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: Array.from(selectedIds) }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            const data = await res.json()
+            toast.success(`${data.deleted} employee${data.deleted !== 1 ? "s" : ""} permanently deleted`)
+            setShowBulkDeleteConfirm(false)
+            fetchEmployees()
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Bulk delete failed")
+        } finally {
+            setBulkDeleting(false)
+        }
+    }
+
     // Stats — use server total for the summary card, page-local for other counts
     const total = totalCount || employees.length
     const active = employees.filter(e => e.status === "ACTIVE").length
@@ -1531,11 +1555,43 @@ function EmployeesPage() {
                     <p className="text-[13px] text-[var(--text3)] mt-1">Add your first employee to get started.</p>
                 </div>
             ) : (
+                <>
+                {/* Bulk action bar */}
+                {isAdmin && selectedIds.size > 0 && (
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-[10px]">
+                        <span className="text-[13px] font-semibold text-[var(--accent)]">{selectedIds.size} employee{selectedIds.size !== 1 ? "s" : ""} selected</span>
+                        <button
+                            onClick={() => setShowBulkDeleteConfirm(true)}
+                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-[7px] text-[12px] font-semibold hover:bg-red-700 transition-colors"
+                        >
+                            <Trash2 size={13} /> Delete Selected
+                        </button>
+                        <button
+                            onClick={() => setSelectedIds(new Set())}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--surface)] border border-[var(--border)] text-[var(--text2)] rounded-[7px] text-[12px] font-medium hover:bg-[var(--surface2)] transition-colors"
+                        >
+                            <X size={13} /> Clear
+                        </button>
+                    </div>
+                )}
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
+                                    {isAdmin && (
+                                        <th className="px-4 py-3 w-10">
+                                            <input
+                                                type="checkbox"
+                                                className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+                                                checked={employees.length > 0 && employees.every(e => selectedIds.has(e.id))}
+                                                onChange={e => {
+                                                    if (e.target.checked) setSelectedIds(new Set(employees.map(emp => emp.id)))
+                                                    else setSelectedIds(new Set())
+                                                }}
+                                            />
+                                        </th>
+                                    )}
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Employee</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Department</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Site</th>
@@ -1555,8 +1611,25 @@ function EmployeesPage() {
                                     return (
                                         <tr
                                             key={emp.id}
-                                            className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/30 transition-colors ${i === employees.length - 1 ? "border-b-0" : ""}`}
+                                            className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/30 transition-colors ${selectedIds.has(emp.id) ? "bg-[var(--accent)]/5" : ""} ${i === employees.length - 1 ? "border-b-0" : ""}`}
                                         >
+                                            {isAdmin && (
+                                                <td className="px-4 py-3 w-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+                                                        checked={selectedIds.has(emp.id)}
+                                                        onChange={e => {
+                                                            setSelectedIds(prev => {
+                                                                const next = new Set(prev)
+                                                                if (e.target.checked) next.add(emp.id)
+                                                                else next.delete(emp.id)
+                                                                return next
+                                                            })
+                                                        }}
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="px-5 py-3">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={36} />
@@ -1636,6 +1709,41 @@ function EmployeesPage() {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                </>
+            )}
+
+            {/* Bulk Delete Confirmation Modal */}
+            {showBulkDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-6 w-full max-w-sm shadow-xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                                <Trash2 size={18} className="text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-[15px] font-semibold text-[var(--text)]">Delete {selectedIds.size} Employee{selectedIds.size !== 1 ? "s" : ""}?</h3>
+                                <p className="text-[12px] text-[var(--text3)] mt-0.5">This will permanently remove all their records. Cannot be undone.</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 justify-end mt-5">
+                            <button
+                                onClick={() => setShowBulkDeleteConfirm(false)}
+                                disabled={bulkDeleting}
+                                className="px-4 py-2 rounded-[8px] text-[13px] font-medium bg-[var(--surface2)] border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={bulkDeleting}
+                                className="px-4 py-2 rounded-[8px] text-[13px] font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60 inline-flex items-center gap-1.5"
+                            >
+                                {bulkDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                                {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

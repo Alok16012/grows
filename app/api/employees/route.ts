@@ -251,3 +251,32 @@ export async function POST(req: Request) {
         return new NextResponse("Internal Error", { status: 500 })
     }
 }
+
+export async function DELETE(req: Request) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (!checkAccess(session, ["ADMIN", "MANAGER", "HR_MANAGER"], "employees.delete")) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+
+        const { ids } = await req.json() as { ids: string[] }
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return new NextResponse("ids array required", { status: 400 })
+        }
+
+        await prisma.$transaction([
+            prisma.attendance.deleteMany({ where: { employeeId: { in: ids } } }),
+            prisma.leave.deleteMany({ where: { employeeId: { in: ids } } }),
+            prisma.payroll.deleteMany({ where: { employeeId: { in: ids } } }),
+            prisma.advanceAndReimbursement.deleteMany({ where: { employeeId: { in: ids } } }),
+            prisma.quizAttempt.deleteMany({ where: { employeeId: { in: ids } } }),
+            prisma.employee.deleteMany({ where: { id: { in: ids } } }),
+        ])
+
+        return NextResponse.json({ success: true, deleted: ids.length })
+    } catch (error) {
+        console.error("[EMPLOYEES_BULK_DELETE]", error)
+        return new NextResponse("Internal Error", { status: 500 })
+    }
+}
