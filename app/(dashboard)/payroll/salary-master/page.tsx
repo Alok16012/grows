@@ -12,14 +12,16 @@ const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : 
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 
 // PT slab — Maharashtra (standard month, not February)
-function calcPT(gross: number): number {
+function calcPT(gross: number, gender?: string | null): number {
+    // Female employees: exempt up to ₹25,000 (Maharashtra notification)
+    if (gender === "Female" && gross <= 25000) return 0
     if (gross > 10000) return 200
     if (gross >= 7500) return 175
     return 0
 }
 
 // Derived calculations (full-month preview — no proration)
-function calc(s: SalaryRow, isHandicap = false) {
+function calc(s: SalaryRow, isHandicap = false, gender?: string | null) {
     const basic  = s.basic || 0
     const da     = s.da || 0
     const wash   = s.washing || 0
@@ -41,7 +43,7 @@ function calc(s: SalaryRow, isHandicap = false) {
     const empESI    = esicEligible ? Math.ceil(esicWages * 0.0325) : 0
     // Employee deductions
     const empPFDed  = isCALL ? 0 : Math.min(Math.round((basic + da) * 0.12), 1800)
-    const pt        = isCALL ? 0 : calcPT(gross)
+    const pt        = isCALL ? 0 : calcPT(gross, gender)
     const totalDed  = empPFDed + empESIDed + pt
     const netSalary = gross - totalDed
     const ctc       = gross + empPF + empESI
@@ -56,6 +58,7 @@ type SalaryRow = {
 type EmpSalary = {
     id: string; employeeId: string; firstName: string; lastName: string
     designation: string | null; basicSalary: number; isHandicap: boolean
+    gender?: string | null
     department: { name: string } | null
     deployments: { site: { name: string } }[]
     employeeSalary: (SalaryRow & { id: string; bonus: number }) | null
@@ -468,7 +471,7 @@ export default function SalaryMasterPage() {
                                 } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
                                 const effectiveType = typeOverride[emp.id] ?? row.complianceType
                                 const displayRow = { ...row, complianceType: effectiveType }
-                                const { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc } = calc(displayRow, emp.isHandicap)
+                                const { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc } = calc(displayRow, emp.isHandicap, emp.gender)
 
                                 const numIn = (field: keyof EditForm, bg = "transparent") => (
                                     <input
@@ -608,37 +611,37 @@ export default function SalaryMasterPage() {
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.washing || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.conveyance || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.leaveWithWages || 0), 0),
-                                        filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary, e.isHandicap).bonus : 0), 0),
+                                        filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary, e.isHandicap, e.gender).bonus : 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.otherAllowance || 0), 0),
                                     ].map((v, i) => (
                                         <td key={i} style={{ ...td, background: "#eff6ff", fontWeight: 700 }}>{fmtN(v)}</td>
                                     ))}
                                     <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).gross : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).gross : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empPF : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empPF : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empESI : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empESI : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#f0fdf4", color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).ctc : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).ctc : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empPFDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empPFDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).empESIDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empESIDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e", fontWeight: 700 }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).pt : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).pt : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#b91c1c", fontWeight: 700 }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).totalDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).totalDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap).netSalary : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).netSalary : 0), 0))}
                                     </td>
                                     <td colSpan={4} />
                                 </tr>

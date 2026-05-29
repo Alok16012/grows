@@ -26,9 +26,10 @@
 //   Employer ESIC: CEIL(esicWages × 3.25%)
 //
 // PT (Professional Tax – Maharashtra slab, on earned gross):
-//   Gross ≤ ₹7,500              → ₹0
-//   Gross ₹7,501–₹10,000       → ₹175
-//   Gross > ₹10,000 (non-Feb)  → ₹200
+//   Female, Gross ≤ ₹25,000    → ₹0   (Maharashtra female exemption)
+//   Gross ≤ ₹7,500             → ₹0
+//   Gross ₹7,501–₹10,000      → ₹175
+//   Gross > ₹10,000 (non-Feb) → ₹200
 //   Gross > ₹10,000 (February) → ₹300  (annual ₹100 adjustment)
 //
 export function calcGrowusPayroll(sal: {
@@ -59,10 +60,12 @@ export function calcGrowusPayroll(sal: {
         monthDays, workedDays, otDays, canteenDays,
         penalty, advance, otherDeductions, productionIncentive, lwf,
         month,
+        gender,
     } = att
 
-    const isCALL = complianceType === "CALL"
-    const isFeb  = month === 2
+    const isCALL    = complianceType === "CALL"
+    const isFeb     = month === 2
+    const isFemale  = gender === "Female"
 
     // ─── Full month components ────────────────────────────────────────────────
     // HRA: use manually stored value from salary structure (no auto-calculation)
@@ -106,7 +109,9 @@ export function calcGrowusPayroll(sal: {
     const esiEmployee  = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
 
     // PT: Maharashtra slab on earned gross
-    const pt = grossEarned <= 7500  ? 0
+    // Female employees are exempt up to ₹25,000 (Maharashtra notification)
+    const pt = (isFemale && grossEarned <= 25000) ? 0
+             : grossEarned <= 7500  ? 0
              : grossEarned <= 10000 ? 175
              : isFeb                ? 300
              :                        200

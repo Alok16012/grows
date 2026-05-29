@@ -19,6 +19,8 @@ export async function GET() {
             lastName: true,
             designation: true,
             basicSalary: true,
+            gender: true,
+            isHandicap: true,
             department: { select: { name: true } },
             deployments: {
                 where: { isActive: true },
