@@ -41,8 +41,9 @@ function calc(s: SalaryRow, isHandicap = false, gender?: string | null) {
     const empESIDed = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
     // Employer ESIC: esicWages × 3.25%
     const empESI    = esicEligible ? Math.ceil(esicWages * 0.0325) : 0
-    // Employee deductions
-    const empPFDed  = isCALL ? 0 : Math.min(Math.round((basic + da) * 0.12), 1800)
+    // Employee PF: min(Basic + DA, ₹15,000) × 12%
+    const pfBase    = isCALL ? 0 : Math.min(basic + da, 15000)
+    const empPFDed  = isCALL ? 0 : Math.round(pfBase * 0.12)
     const pt        = isCALL ? 0 : calcPT(gross, gender)
     const totalDed  = empPFDed + empESIDed + pt
     const netSalary = gross - totalDed

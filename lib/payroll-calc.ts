@@ -17,7 +17,8 @@
 //   Each OT_Day = 4 extra hrs at the configured per-hour rate (e.g. ₹170/hr × 4 = ₹680/day)
 //   OT_Days × 4 = actual OT hours (col I in Excel sheet)
 //
-// PF Employee:  IF(WorkedDays >= 26, 1800, ROUND(15000/26 × WorkedDays × 12%))
+// PF Employee:  pfBase = min(Basic + DA, ₹15,000)  — statutory ceiling
+//               IF(WorkedDays >= 26, ROUND(pfBase × 12%), ROUND(pfBase/26 × WorkedDays × 12%))
 // PF Employer:  ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
 //
 // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
@@ -94,11 +95,13 @@ export function calcGrowusPayroll(sal: {
 
     // ─── Deductions ───────────────────────────────────────────────────────────
 
-    // PF: OR compliance only. IF(WorkedDays>26, 1800, ROUND(15000/26×WorkedDays×12%))
+    // PF base = min(Basic + DA, ₹15,000) — capped at statutory ceiling
+    // Employee PF: IF(WorkedDays >= 26, pfBase × 12%, ROUND(pfBase/26 × WorkedDays × 12%))
+    const pfBase     = Math.min(basic + da, 15000)
     const pfEmployee = isCALL ? 0
         : (workedDays >= 26
-            ? 1800
-            : Math.round((15000 / 26) * workedDays * 0.12))
+            ? Math.round(pfBase * 0.12)
+            : Math.round((pfBase / 26) * workedDays * 0.12))
 
     // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
     // Contribution base = EarnedGross − Washing − Bonus (OT included; washing & bonus excluded)
