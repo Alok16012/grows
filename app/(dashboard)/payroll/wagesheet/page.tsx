@@ -161,8 +161,8 @@ function WageSheetInner() {
             "Basic", "DA", "HRA", "Washing", "Conv.", "LWW", "Bonus", "Other", "OT Amt", "Prod.Inc", "Gross Earning",
             // Deductions
             "PF(Emp)", "ESIC(Emp)", "PT", "LWF", "Canteen", "Other Ded.", "Advance", "Penalty", "Tot. Ded.", "Net Pay",
-            // Employer / CTC
-            "PF(Er)", "ESIC(Er)", "CTC",
+            // Employer / CTC  (employer PF breakdown is in Compliance — not on wage sheet)
+            "ESIC(Er)", "CTC",
             // Signature
             "Signature",
         ]
@@ -217,8 +217,7 @@ function WageSheetInner() {
                 Math.round(p.penalty),
                 Math.round(p.totalDeductions),
                 Math.round(p.netSalary),
-                // Employer / CTC
-                Math.round(p.pfEmployer),
+                // Employer / CTC  (pfEmployer not on wage sheet)
                 Math.round(p.esiEmployer),
                 Math.round(p.ctc),
                 // Signature
@@ -245,8 +244,8 @@ function WageSheetInner() {
             sum(p => p.lwf), sum(p => p.canteen), sum(p => p.otherDeductions),
             sum(p => p.advance), sum(p => p.penalty),
             sum(p => p.totalDeductions), sum(p => p.netSalary),
-            // Employer totals
-            sum(p => p.pfEmployer), sum(p => p.esiEmployer), sum(p => p.ctc),
+            // Employer totals  (pfEmployer not on wage sheet)
+            sum(p => p.esiEmployer), sum(p => p.ctc),
             "",
         ]
         return [
@@ -274,14 +273,14 @@ function WageSheetInner() {
                 if (!rows.length) continue
                 const aoa = buildFormIIAoa(rows, site?.name ?? siteId, m, y)
                 const ws = XLSX.utils.aoa_to_sheet(aoa)
-                // 47 columns: Identity(8) + Attendance(5) + Structure(9) + Earned(11) + Deductions(10) + Employer(3) + Signature(1)
+                // 46 columns: Identity(8) + Attendance(5) + Structure(9) + Earned(11) + Deductions(10) + Employer(2) + Signature(1)
                 const colWidths = [
                     5,10,24,14,12,12,10,10,   // Identity
                     8,5,8,7,6,                 // Attendance
                     8,7,7,9,7,7,8,7,9,         // Structure (rate)
                     8,7,7,8,7,7,8,7,8,8,11,   // Earned
                     8,9,6,6,8,9,8,8,9,9,       // Deductions
-                    7,8,10,                    // Employer/CTC
+                    8,10,                      // ESIC(Er) + CTC
                     12,                        // Signature
                 ]
                 ws["!cols"] = colWidths.map(w => ({ wch: w }))
@@ -917,8 +916,7 @@ function WageSheetInner() {
                                                 <th style={{ ...th, background: "#fef2f2" }}>ADVANCE</th>
                                                 <th style={{ ...th, background: "#fef2f2" }}>Other<br/>Ded</th>
                                                 <th style={{ ...th, background: "#fee2e2", color: "#b91c1c" }}>Total<br/>Deduction</th>
-                                                {/* Employer */}
-                                                <th style={{ ...th, background: "#dbeafe" }}>CO CONTRI<br/>PF</th>
+                                                {/* Employer — PF breakdown in Compliance */}
                                                 <th style={{ ...th, background: "#dbeafe" }}>CO CONTRI<br/>ESIC</th>
                                                 <th style={{ ...th, background: "#bfdbfe", color: "#1e40af" }}>CTC</th>
                                             </tr>
@@ -990,8 +988,7 @@ function WageSheetInner() {
                                                     <td style={{ ...td, background: "#fee2e2", fontWeight: 700, color: "#b91c1c" }}>{fmtN(p.totalDeductions)}</td>
                                                     {/* NET */}
                                                     <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>{fmtN(p.netSalary)}</td>
-                                                    {/* Employer */}
-                                                    <td style={{ ...td, background: "#dbeafe" }}>{fmtN(p.pfEmployer)}</td>
+                                                    {/* Employer — PF breakdown in Compliance */}
                                                     <td style={{ ...td, background: "#dbeafe" }}>{fmtN(p.esiEmployer)}</td>
                                                     <td style={{ ...td, background: "#bfdbfe", fontWeight: 700, color: "#1e40af" }}>{fmtN(p.ctc)}</td>
                                                 </tr>
@@ -1042,8 +1039,7 @@ function WageSheetInner() {
                                                     <td style={{ ...td, background: "#fee2e2", color: "#b91c1c" }}>{fmt(totals.ded)}</td>
                                                     {/* NET */}
                                                     <td style={{ ...td, background: "#dcfce7", color: "#15803d" }}>{fmt(totals.net)}</td>
-                                                    {/* Employer totals */}
-                                                    <td style={{ ...td, background: "#dbeafe" }}>{fmt(data.reduce((s,p)=>s+p.pfEmployer,0))}</td>
+                                                    {/* Employer totals — PF breakdown in Compliance */}
                                                     <td style={{ ...td, background: "#dbeafe" }}>{fmt(data.reduce((s,p)=>s+p.esiEmployer,0))}</td>
                                                     <td style={{ ...td, background: "#bfdbfe", color: "#1e40af" }}>{fmt(data.reduce((s,p)=>s+p.ctc,0))}</td>
                                                 </tr>

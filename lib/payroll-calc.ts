@@ -19,7 +19,12 @@
 //
 // PF Employee:  pfBase = min(Basic + DA, ₹15,000)  — statutory ceiling
 //               IF(WorkedDays >= 26, ROUND(pfBase × 12%), ROUND(pfBase/26 × WorkedDays × 12%))
-// PF Employer:  ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
+// PF Employer (all on pfBase):
+//   Employer EPS      = pfBase × 8.33%
+//   Employer EPF diff = pfBase × 3.67%
+//   EDLI              = pfBase × 0.50%
+//   EPF Admin charges = pfBase × 0.50%
+//   Total pfEmployer  = sum of above (≈ 13%)
 //
 // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
 //   ESIC wages = EarnedGross − Washing − Bonus  (OT included; washing & bonus excluded)
@@ -130,8 +135,12 @@ export function calcGrowusPayroll(sal: {
     const netSalary = grossEarned - totalDeductions
 
     // ─── Employer Contributions ───────────────────────────────────────────────
-    // PF Employer: ROUND(15000 × 13%) = ₹1,950  (12% EPF + 0.5% EDLI + 0.5% admin)
-    const pfEmployer = isCALL ? 0 : Math.round(15000 * 0.13)
+    // Employer PF — 4 components on pfBase = min(Basic+DA, ₹15,000)
+    const eps         = isCALL ? 0 : Math.round(pfBase * 0.0833)  // EPS  8.33%
+    const epfEmployer = isCALL ? 0 : Math.round(pfBase * 0.0367)  // EPF diff 3.67%
+    const edli        = isCALL ? 0 : Math.round(pfBase * 0.005)   // EDLI 0.50%
+    const epfAdmin    = isCALL ? 0 : Math.round(pfBase * 0.005)   // Admin 0.50%
+    const pfEmployer  = eps + epfEmployer + edli + epfAdmin        // total ≈ 13%
 
     // ESIC Employer: CEIL(esicWages × 3.25%)
     const esiEmployer = esicEligible ? Math.ceil(esicWages * 0.0325) : 0

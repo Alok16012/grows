@@ -32,7 +32,12 @@ type Row = {
     overtimePay: number
     grossSalary: number
     pfEmployee: number
-    pfEmployer: number
+    // Employer PF breakdown (computed from basic+da, not stored separately)
+    eps: number          // EPS  8.33%
+    epfEr: number        // EPF diff 3.67%
+    edli: number         // EDLI 0.50%
+    epfAdmin: number     // EPF Admin 0.50%
+    pfEmployer: number   // total (eps+epfEr+edli+epfAdmin)
     esiEmployee: number
     esiEmployer: number
     pt: number
@@ -57,8 +62,12 @@ function masterPrintHTML(rows: Row[], month: number, year: number): string {
         bonus: rows.reduce((s, r) => s + r.bonus, 0),
         ot: rows.reduce((s, r) => s + r.overtimePay, 0),
         gross: rows.reduce((s, r) => s + r.grossSalary, 0),
-        pfEE: rows.reduce((s, r) => s + r.pfEmployee, 0),
-        pfER: rows.reduce((s, r) => s + r.pfEmployer, 0),
+        pfEE:    rows.reduce((s, r) => s + r.pfEmployee, 0),
+        eps:     rows.reduce((s, r) => s + r.eps, 0),
+        epfEr:   rows.reduce((s, r) => s + r.epfEr, 0),
+        edli:    rows.reduce((s, r) => s + r.edli, 0),
+        epfAdmin:rows.reduce((s, r) => s + r.epfAdmin, 0),
+        pfER:    rows.reduce((s, r) => s + r.pfEmployer, 0),
         esiEE: rows.reduce((s, r) => s + r.esiEmployee, 0),
         esiER: rows.reduce((s, r) => s + r.esiEmployer, 0),
         pt: rows.reduce((s, r) => s + r.pt, 0),
@@ -76,6 +85,7 @@ function masterPrintHTML(rows: Row[], month: number, year: number): string {
     const thStyle = `style="border:1px solid #999;padding:4px 5px;font-size:8.5px;text-align:center;background:#1e293b;color:#fff;white-space:nowrap;"`
     const thStyleE = `style="border:1px solid #999;padding:4px 5px;font-size:8.5px;text-align:center;background:#065f46;color:#fff;white-space:nowrap;"`
     const thStyleD = `style="border:1px solid #999;padding:4px 5px;font-size:8.5px;text-align:center;background:#7f1d1d;color:#fff;white-space:nowrap;"`
+    const thStyleP = `style="border:1px solid #999;padding:4px 5px;font-size:8.5px;text-align:center;background:#4c1d95;color:#fff;white-space:nowrap;"`
     const totStyle = `style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#f8fafc;text-align:right;white-space:nowrap;"`
     const totStyleL = `style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#f8fafc;text-align:left;white-space:nowrap;"`
 
@@ -98,7 +108,11 @@ function masterPrintHTML(rows: Row[], month: number, year: number): string {
             <td ${tdStyle}>${fmtN(r.overtimePay)}</td>
             <td ${tdStyle} style="border:1px solid #ccc;padding:3px 5px;font-size:9px;white-space:nowrap;text-align:right;font-weight:700;color:#065f46">${fmtN(r.grossSalary)}</td>
             <td ${tdStyle}>${fmtN(r.pfEmployee)}</td>
-            <td ${tdStyle}>${fmtN(r.pfEmployer)}</td>
+            <td ${tdStyle} style="border:1px solid #ccc;padding:3px 5px;font-size:9px;white-space:nowrap;text-align:right;color:#6d28d9">${fmtN(r.eps)}</td>
+            <td ${tdStyle} style="border:1px solid #ccc;padding:3px 5px;font-size:9px;white-space:nowrap;text-align:right;color:#6d28d9">${fmtN(r.epfEr)}</td>
+            <td ${tdStyle} style="border:1px solid #ccc;padding:3px 5px;font-size:9px;white-space:nowrap;text-align:right;color:#6d28d9">${fmtN(r.edli)}</td>
+            <td ${tdStyle} style="border:1px solid #ccc;padding:3px 5px;font-size:9px;white-space:nowrap;text-align:right;color:#6d28d9">${fmtN(r.epfAdmin)}</td>
+            <td ${tdStyle} style="border:1px solid #ccc;padding:3px 5px;font-size:9px;white-space:nowrap;text-align:right;font-weight:700;color:#4c1d95">${fmtN(r.pfEmployer)}</td>
             <td ${tdStyle}>${fmtN(r.esiEmployee)}</td>
             <td ${tdStyle}>${fmtN(r.esiEmployer)}</td>
             <td ${tdStyle}>${fmtN(r.pt)}</td>
@@ -134,7 +148,7 @@ function masterPrintHTML(rows: Row[], month: number, year: number): string {
                 <th ${thStyle} rowspan="2">ESI No.</th>
                 <th ${thStyle} rowspan="2">Days</th>
                 <th ${thStyleE} colspan="9">EARNINGS</th>
-                <th ${thStyleD} colspan="11">DEDUCTIONS</th>
+                <th ${thStyleD} colspan="14">DEDUCTIONS &amp; EMPLOYER PF</th>
                 <th ${thStyle} rowspan="2">Net Pay</th>
             </tr>
             <tr>
@@ -148,7 +162,11 @@ function masterPrintHTML(rows: Row[], month: number, year: number): string {
                 <th ${thStyleE}>OT</th>
                 <th ${thStyleE}>Gross</th>
                 <th ${thStyleD}>PF (EE)</th>
-                <th ${thStyleD}>PF (ER)</th>
+                <th ${thStyleP}>EPS<br/>8.33%</th>
+                <th ${thStyleP}>EPF Er<br/>3.67%</th>
+                <th ${thStyleP}>EDLI<br/>0.50%</th>
+                <th ${thStyleP}>Admin<br/>0.50%</th>
+                <th ${thStyleP}>PF Er<br/>Total</th>
                 <th ${thStyleD}>ESI (EE)</th>
                 <th ${thStyleD}>ESI (ER)</th>
                 <th ${thStyleD}>PT</th>
@@ -174,7 +192,11 @@ function masterPrintHTML(rows: Row[], month: number, year: number): string {
                 <td ${totStyle}>${fmtN(totals.ot)}</td>
                 <td ${totStyle} style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#f8fafc;text-align:right;white-space:nowrap;color:#065f46">${fmtN(totals.gross)}</td>
                 <td ${totStyle}>${fmtN(totals.pfEE)}</td>
-                <td ${totStyle}>${fmtN(totals.pfER)}</td>
+                <td ${totStyle} style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#f3e8ff;text-align:right;white-space:nowrap;color:#6d28d9">${fmtN(totals.eps)}</td>
+                <td ${totStyle} style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#f3e8ff;text-align:right;white-space:nowrap;color:#6d28d9">${fmtN(totals.epfEr)}</td>
+                <td ${totStyle} style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#f3e8ff;text-align:right;white-space:nowrap;color:#6d28d9">${fmtN(totals.edli)}</td>
+                <td ${totStyle} style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#f3e8ff;text-align:right;white-space:nowrap;color:#6d28d9">${fmtN(totals.epfAdmin)}</td>
+                <td ${totStyle} style="border:1px solid #999;padding:3px 5px;font-size:9px;font-weight:700;background:#ede9fe;text-align:right;white-space:nowrap;color:#4c1d95">${fmtN(totals.pfER)}</td>
                 <td ${totStyle}>${fmtN(totals.esiEE)}</td>
                 <td ${totStyle}>${fmtN(totals.esiER)}</td>
                 <td ${totStyle}>${fmtN(totals.pt)}</td>
@@ -234,6 +256,15 @@ function ComplianceMasterInner() {
                     overtimePay:     Number(p.overtimePay ?? 0),
                     grossSalary:     Number(p.grossSalary ?? 0),
                     pfEmployee:      Number(p.pfEmployee ?? 0),
+                    ...(() => {
+                        const pfBase = Math.min(Number(p.basicSalary ?? 0) + Number(p.da ?? 0), 15000)
+                        return {
+                            eps:      Math.round(pfBase * 0.0833),
+                            epfEr:    Math.round(pfBase * 0.0367),
+                            edli:     Math.round(pfBase * 0.005),
+                            epfAdmin: Math.round(pfBase * 0.005),
+                        }
+                    })(),
                     pfEmployer:      Number(p.pfEmployer ?? 0),
                     esiEmployee:     Number(p.esiEmployee ?? 0),
                     esiEmployer:     Number(p.esiEmployer ?? 0),
@@ -278,8 +309,12 @@ function ComplianceMasterInner() {
         bonus: filtered.reduce((s, r) => s + r.bonus, 0),
         ot:    filtered.reduce((s, r) => s + r.overtimePay, 0),
         gross: filtered.reduce((s, r) => s + r.grossSalary, 0),
-        pfEE:  filtered.reduce((s, r) => s + r.pfEmployee, 0),
-        pfER:  filtered.reduce((s, r) => s + r.pfEmployer, 0),
+        pfEE:     filtered.reduce((s, r) => s + r.pfEmployee, 0),
+        eps:      filtered.reduce((s, r) => s + r.eps, 0),
+        epfEr:    filtered.reduce((s, r) => s + r.epfEr, 0),
+        edli:     filtered.reduce((s, r) => s + r.edli, 0),
+        epfAdmin: filtered.reduce((s, r) => s + r.epfAdmin, 0),
+        pfER:     filtered.reduce((s, r) => s + r.pfEmployer, 0),
         esiEE: filtered.reduce((s, r) => s + r.esiEmployee, 0),
         esiER: filtered.reduce((s, r) => s + r.esiEmployer, 0),
         pt:    filtered.reduce((s, r) => s + r.pt, 0),
@@ -313,8 +348,12 @@ function ComplianceMasterInner() {
             "OT Pay": r.overtimePay,
             "Gross Salary": r.grossSalary,
             "PF Employee (12%)": r.pfEmployee,
-            "PF Employer (13%)": r.pfEmployer,
-            "Total PF": r.pfEmployee + r.pfEmployer,
+            "EPS - Employer (8.33%)": r.eps,
+            "EPF - Employer (3.67%)": r.epfEr,
+            "EDLI (0.50%)": r.edli,
+            "EPF Admin (0.50%)": r.epfAdmin,
+            "Total Employer PF": r.pfEmployer,
+            "Total PF (EE+ER)": r.pfEmployee + r.pfEmployer,
             "ESI Employee (0.75%)": r.esiEmployee,
             "ESI Employer (3.25%)": r.esiEmployer,
             "Total ESI": r.esiEmployee + r.esiEmployer,
@@ -339,8 +378,13 @@ function ComplianceMasterInner() {
             "Conveyance": totals.conv, "Washing": totals.wash,
             "Leave With Wages": totals.lww, "Bonus": totals.bonus,
             "OT Pay": totals.ot, "Gross Salary": totals.gross,
-            "PF Employee (12%)": totals.pfEE, "PF Employer (13%)": totals.pfER,
-            "Total PF": totals.pfEE + totals.pfER,
+            "PF Employee (12%)": totals.pfEE,
+            "EPS - Employer (8.33%)": totals.eps,
+            "EPF - Employer (3.67%)": totals.epfEr,
+            "EDLI (0.50%)": totals.edli,
+            "EPF Admin (0.50%)": totals.epfAdmin,
+            "Total Employer PF": totals.pfER,
+            "Total PF (EE+ER)": totals.pfEE + totals.pfER,
             "ESI Employee (0.75%)": totals.esiEE, "ESI Employer (3.25%)": totals.esiER,
             "Total ESI": totals.esiEE + totals.esiER,
             "PT": totals.pt, "LWF": totals.lwf, "Canteen": totals.cant,
@@ -479,14 +523,20 @@ function ComplianceMasterInner() {
                                 <TH s={th0} rowSpan={2}>ESI No.</TH>
                                 <TH s={th0} rowSpan={2}>Days</TH>
                                 <TH s={thE} colSpan={9}>EARNINGS</TH>
-                                <TH s={thD} colSpan={11}>DEDUCTIONS</TH>
+                                <TH s={thD} colSpan={14}>DEDUCTIONS & EMPLOYER PF</TH>
                                 <TH s={th0} rowSpan={2}>Net Pay</TH>
                             </tr>
                             <tr>
                                 {["Basic","DA","HRA","Conv","Washing","LWW","Bonus","OT","Gross"].map(h => (
                                     <TH key={h} s={thE}>{h}</TH>
                                 ))}
-                                {["PF (EE)","PF (ER)","ESI (EE)","ESI (ER)","PT","LWF","Canteen","Penalty","Advance","Other","Tot Ded"].map(h => (
+                                {["PF (EE)"].map(h => <TH key={h} s={thD}>{h}</TH>)}
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EPS<br/><span style={{fontSize:8,opacity:0.8}}>8.33%</span></TH>
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EPF Er<br/><span style={{fontSize:8,opacity:0.8}}>3.67%</span></TH>
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EDLI<br/><span style={{fontSize:8,opacity:0.8}}>0.50%</span></TH>
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>Admin<br/><span style={{fontSize:8,opacity:0.8}}>0.50%</span></TH>
+                                <TH s={{ background: "#5b21b6", color: "#fff" }}>PF Er<br/><span style={{fontSize:8,opacity:0.8}}>Total</span></TH>
+                                {["ESI (EE)","ESI (ER)","PT","LWF","Canteen","Penalty","Advance","Other","Tot Ded"].map(h => (
                                     <TH key={h} s={thD}>{h}</TH>
                                 ))}
                             </tr>
@@ -514,7 +564,11 @@ function ComplianceMasterInner() {
                                     <TD right>{fmtN(r.overtimePay)}</TD>
                                     <TD right bold color="#065f46">{fmtN(r.grossSalary)}</TD>
                                     <TD right>{fmtN(r.pfEmployee)}</TD>
-                                    <TD right>{fmtN(r.pfEmployer)}</TD>
+                                    <td style={{ padding:"4px 7px", fontSize:11, whiteSpace:"nowrap", borderBottom:"1px solid var(--border)", borderRight:"1px solid var(--border)", textAlign:"right", color:"#7c3aed" }}>{fmtN(r.eps)}</td>
+                                    <td style={{ padding:"4px 7px", fontSize:11, whiteSpace:"nowrap", borderBottom:"1px solid var(--border)", borderRight:"1px solid var(--border)", textAlign:"right", color:"#7c3aed" }}>{fmtN(r.epfEr)}</td>
+                                    <td style={{ padding:"4px 7px", fontSize:11, whiteSpace:"nowrap", borderBottom:"1px solid var(--border)", borderRight:"1px solid var(--border)", textAlign:"right", color:"#7c3aed" }}>{fmtN(r.edli)}</td>
+                                    <td style={{ padding:"4px 7px", fontSize:11, whiteSpace:"nowrap", borderBottom:"1px solid var(--border)", borderRight:"1px solid var(--border)", textAlign:"right", color:"#7c3aed" }}>{fmtN(r.epfAdmin)}</td>
+                                    <td style={{ padding:"4px 7px", fontSize:11, whiteSpace:"nowrap", borderBottom:"1px solid var(--border)", borderRight:"1px solid var(--border)", textAlign:"right", fontWeight:700, color:"#5b21b6" }}>{fmtN(r.pfEmployer)}</td>
                                     <TD right>{fmtN(r.esiEmployee)}</TD>
                                     <TD right>{fmtN(r.esiEmployer)}</TD>
                                     <TD right>{fmtN(r.pt)}</TD>
@@ -537,8 +591,15 @@ function ComplianceMasterInner() {
                                     <td key={i} style={{ padding: "6px 7px", fontSize: 11, fontWeight: 700, color: "#86efac", textAlign: "right", whiteSpace: "nowrap", background: "#1e293b", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(v)}</td>
                                 ))}
                                 <td style={{ padding: "6px 7px", fontSize: 11, fontWeight: 800, color: "#4ade80", textAlign: "right", whiteSpace: "nowrap", background: "#065f46", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(totals.gross)}</td>
-                                {[totals.pfEE, totals.pfER, totals.esiEE, totals.esiER, totals.pt, totals.lwf, totals.cant, totals.pen, totals.adv, totals.other].map((v, i) => (
+                                {[totals.pfEE].map((v, i) => (
                                     <td key={i} style={{ padding: "6px 7px", fontSize: 11, fontWeight: 700, color: "#fca5a5", textAlign: "right", whiteSpace: "nowrap", background: "#1e293b", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(v)}</td>
+                                ))}
+                                {[totals.eps, totals.epfEr, totals.edli, totals.epfAdmin].map((v, i) => (
+                                    <td key={`ep${i}`} style={{ padding: "6px 7px", fontSize: 11, fontWeight: 700, color: "#d8b4fe", textAlign: "right", whiteSpace: "nowrap", background: "#4c1d95", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(v)}</td>
+                                ))}
+                                <td style={{ padding: "6px 7px", fontSize: 11, fontWeight: 800, color: "#ede9fe", textAlign: "right", whiteSpace: "nowrap", background: "#3b0764", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(totals.pfER)}</td>
+                                {[totals.esiEE, totals.esiER, totals.pt, totals.lwf, totals.cant, totals.pen, totals.adv, totals.other].map((v, i) => (
+                                    <td key={`d${i}`} style={{ padding: "6px 7px", fontSize: 11, fontWeight: 700, color: "#fca5a5", textAlign: "right", whiteSpace: "nowrap", background: "#1e293b", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(v)}</td>
                                 ))}
                                 <td style={{ padding: "6px 7px", fontSize: 11, fontWeight: 800, color: "#f87171", textAlign: "right", whiteSpace: "nowrap", background: "#7f1d1d", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(totals.totD)}</td>
                                 <td style={{ padding: "6px 7px", fontSize: 11, fontWeight: 800, color: "#93c5fd", textAlign: "right", whiteSpace: "nowrap", background: "#1e3a8a", borderRight: "1px solid rgba(255,255,255,0.1)" }}>{fmtN(totals.net)}</td>
