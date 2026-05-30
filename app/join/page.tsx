@@ -179,12 +179,35 @@ export default function JoinPage() {
         if (t === "personal") {
             if (!form.firstName.trim()) e.firstName = "Required"
             if (!form.lastName.trim())  e.lastName  = "Required"
+            if (!form.gender)           e.gender    = "Required"
+            if (!form.dateOfBirth)      e.dateOfBirth = "Required"
             if (!form.phone.trim())     e.phone     = "Required"
             else if (!/^[6-9]\d{9}$/.test(form.phone.replace(/\s/g,""))) e.phone = "Enter valid 10-digit mobile"
             if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter valid email"
+            if (!form.address.trim())   e.address   = "Required"
+            if (!form.city.trim())      e.city      = "Required"
+            if (!form.state.trim())     e.state     = "Required"
+            if (!form.pincode.trim())   e.pincode   = "Required"
             if (!form.emergencyContact1Name.trim())  e.emergencyContact1Name  = "Required"
             if (!form.emergencyContact1Phone.trim()) e.emergencyContact1Phone = "Required"
             else if (!/^\d{10}$/.test(form.emergencyContact1Phone.replace(/\s/g,""))) e.emergencyContact1Phone = "Valid 10-digit number required"
+        }
+        if (t === "employment") {
+            if (!form.designation.trim())   e.designation   = "Required"
+            if (!form.dateOfJoining)        e.dateOfJoining = "Required"
+            if (!form.employmentType)       e.employmentType = "Required"
+            if (!form.siteId)               e.siteId        = "Required"
+            if (!form.hrId)                 e.hrId          = "Required"
+        }
+        if (t === "bank") {
+            if (!form.bankName.trim())          e.bankName          = "Required"
+            if (!form.bankAccountNumber.trim()) e.bankAccountNumber = "Required"
+            if (!form.bankIFSC.trim())          e.bankIFSC          = "Required"
+            else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bankIFSC)) e.bankIFSC = "Enter valid IFSC (e.g. SBIN0001234)"
+            if (!form.aadharNumber.trim())      e.aadharNumber      = "Required"
+            else if (form.aadharNumber.length !== 12) e.aadharNumber = "Must be exactly 12 digits"
+            if (!form.panNumber.trim())         e.panNumber         = "Required"
+            else if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.panNumber)) e.panNumber = "Enter valid PAN (e.g. ABCDE1234F)"
         }
         setErrors(e)
         return Object.keys(e).length === 0
@@ -422,15 +445,17 @@ export default function JoinPage() {
                                     </div>
                                     <div style={{ ...g2, marginTop: 14 }}>
                                         <div>
-                                            <Lbl text="Gender" />
-                                            <select style={sel} value={form.gender} onChange={e => set("gender", e.target.value)}>
+                                            <Lbl text="Gender" required />
+                                            <select style={{ ...sel, borderColor: errors.gender ? "var(--red)" : undefined }} value={form.gender} onChange={e => { set("gender", e.target.value); clrErr("gender") }}>
                                                 <option value="">Select gender</option>
                                                 <option>Male</option><option>Female</option><option>Other</option>
                                             </select>
+                                            <Err msg={errors.gender} />
                                         </div>
                                         <div>
-                                            <Lbl text="Date of Birth" />
-                                            <input style={inp} type="date" value={form.dateOfBirth} onChange={e => set("dateOfBirth", e.target.value)} />
+                                            <Lbl text="Date of Birth" required />
+                                            <input style={{ ...inp, borderColor: errors.dateOfBirth ? "var(--red)" : undefined }} type="date" value={form.dateOfBirth} onChange={e => { set("dateOfBirth", e.target.value); clrErr("dateOfBirth") }} />
+                                            <Err msg={errors.dateOfBirth} />
                                         </div>
                                         <div>
                                             <Lbl text="Blood Group" />
@@ -484,12 +509,25 @@ export default function JoinPage() {
                                     <SecTitle>Current Address</SecTitle>
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px 20px", marginTop: 14 }}>
                                         <div style={span2}>
-                                            <Lbl text="Street Address" />
-                                            <input style={inp} placeholder="House No., Street, Area" value={form.address} onChange={e => set("address", e.target.value)} />
+                                            <Lbl text="Street Address" required />
+                                            <input style={{ ...inp, borderColor: errors.address ? "var(--red)" : undefined }} placeholder="House No., Street, Area" value={form.address} onChange={e => { set("address", e.target.value); clrErr("address") }} />
+                                            <Err msg={errors.address} />
                                         </div>
-                                        <div><Lbl text="City" /><input style={inp} placeholder="Mumbai" value={form.city} onChange={e => set("city", e.target.value)} /></div>
-                                        <div><Lbl text="State" /><input style={inp} placeholder="Maharashtra" value={form.state} onChange={e => set("state", e.target.value)} /></div>
-                                        <div><Lbl text="PIN Code" /><input style={inp} placeholder="400001" maxLength={6} value={form.pincode} onChange={e => set("pincode", e.target.value.replace(/\D/g,""))} /></div>
+                                        <div>
+                                            <Lbl text="City" required />
+                                            <input style={{ ...inp, borderColor: errors.city ? "var(--red)" : undefined }} placeholder="Mumbai" value={form.city} onChange={e => { set("city", e.target.value); clrErr("city") }} />
+                                            <Err msg={errors.city} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="State" required />
+                                            <input style={{ ...inp, borderColor: errors.state ? "var(--red)" : undefined }} placeholder="Maharashtra" value={form.state} onChange={e => { set("state", e.target.value); clrErr("state") }} />
+                                            <Err msg={errors.state} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="PIN Code" required />
+                                            <input style={{ ...inp, borderColor: errors.pincode ? "var(--red)" : undefined }} placeholder="400001" maxLength={6} value={form.pincode} onChange={e => { set("pincode", e.target.value.replace(/\D/g,"")); clrErr("pincode") }} />
+                                            <Err msg={errors.pincode} />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -544,22 +582,25 @@ export default function JoinPage() {
                                     <SecTitle>Job Details</SecTitle>
                                     <div style={{ ...g2, marginTop: 14 }}>
                                         <div>
-                                            <Lbl text="Designation / Role" />
-                                            <input style={inp} placeholder="e.g. Security Guard" value={form.designation} onChange={e => set("designation", e.target.value)} />
+                                            <Lbl text="Designation / Role" required />
+                                            <input style={{ ...inp, borderColor: errors.designation ? "var(--red)" : undefined }} placeholder="e.g. Security Guard" value={form.designation} onChange={e => { set("designation", e.target.value); clrErr("designation") }} />
+                                            <Err msg={errors.designation} />
                                         </div>
                                         <div>
-                                            <Lbl text="Date of Joining" />
-                                            <input style={inp} type="date" value={form.dateOfJoining} onChange={e => set("dateOfJoining", e.target.value)} />
+                                            <Lbl text="Date of Joining" required />
+                                            <input style={{ ...inp, borderColor: errors.dateOfJoining ? "var(--red)" : undefined }} type="date" value={form.dateOfJoining} onChange={e => { set("dateOfJoining", e.target.value); clrErr("dateOfJoining") }} />
+                                            <Err msg={errors.dateOfJoining} />
                                         </div>
                                         <div>
-                                            <Lbl text="Employment Type" />
-                                            <select style={sel} value={form.employmentType} onChange={e => set("employmentType", e.target.value)}>
+                                            <Lbl text="Employment Type" required />
+                                            <select style={{ ...sel, borderColor: errors.employmentType ? "var(--red)" : undefined }} value={form.employmentType} onChange={e => { set("employmentType", e.target.value); clrErr("employmentType") }}>
                                                 <option value="">Select type</option>
                                                 <option value="FULL_TIME">Full Time</option>
                                                 <option value="PART_TIME">Part Time</option>
                                                 <option value="CONTRACT">Contract</option>
                                                 <option value="DAILY_WAGE">Daily Wage</option>
                                             </select>
+                                            <Err msg={errors.employmentType} />
                                         </div>
                                     </div>
                                 </div>
@@ -569,8 +610,8 @@ export default function JoinPage() {
                                     <SecTitle>Posting & HR Assignment</SecTitle>
                                     <div style={{ ...g2, marginTop: 14 }}>
                                         <div>
-                                            <Lbl text="Work Site" />
-                                            <select style={sel} value={form.siteId} onChange={e => set("siteId", e.target.value)}>
+                                            <Lbl text="Work Site" required />
+                                            <select style={{ ...sel, borderColor: errors.siteId ? "var(--red)" : undefined }} value={form.siteId} onChange={e => { set("siteId", e.target.value); clrErr("siteId") }}>
                                                 <option value="">Select your work site</option>
                                                 {sites.map(s => (
                                                     <option key={s.id} value={s.id}>
@@ -578,10 +619,11 @@ export default function JoinPage() {
                                                     </option>
                                                 ))}
                                             </select>
+                                            <Err msg={errors.siteId} />
                                         </div>
                                         <div>
-                                            <Lbl text="Assigned HR / Manager" />
-                                            <select style={sel} value={form.hrId} onChange={e => set("hrId", e.target.value)}>
+                                            <Lbl text="Assigned HR / Manager" required />
+                                            <select style={{ ...sel, borderColor: errors.hrId ? "var(--red)" : undefined }} value={form.hrId} onChange={e => { set("hrId", e.target.value); clrErr("hrId") }}>
                                                 <option value="">Select your HR contact</option>
                                                 {hrUsers.map(u => (
                                                     <option key={u.id} value={u.id}>
@@ -589,6 +631,7 @@ export default function JoinPage() {
                                                     </option>
                                                 ))}
                                             </select>
+                                            <Err msg={errors.hrId} />
                                         </div>
                                     </div>
                                     <p style={{ fontSize: 11, color: "var(--text3)", margin: "8px 0 0 0" }}>
@@ -614,17 +657,37 @@ export default function JoinPage() {
                                 <div>
                                     <SecTitle>Bank Details</SecTitle>
                                     <div style={{ ...g2, marginTop: 14 }}>
-                                        <div><Lbl text="Bank Name" /><input style={inp} placeholder="State Bank of India" value={form.bankName} onChange={e => set("bankName", e.target.value)} /></div>
+                                        <div>
+                                            <Lbl text="Bank Name" required />
+                                            <input style={{ ...inp, borderColor: errors.bankName ? "var(--red)" : undefined }} placeholder="State Bank of India" value={form.bankName} onChange={e => { set("bankName", e.target.value); clrErr("bankName") }} />
+                                            <Err msg={errors.bankName} />
+                                        </div>
                                         <div><Lbl text="Branch Name" /><input style={inp} placeholder="Andheri West" value={form.bankBranch} onChange={e => set("bankBranch", e.target.value)} /></div>
-                                        <div style={span2}><Lbl text="Account Number" /><input style={inp} placeholder="Your account number" value={form.bankAccountNumber} onChange={e => set("bankAccountNumber", e.target.value.replace(/\D/g,""))} /></div>
-                                        <div><Lbl text="IFSC Code" /><input style={{ ...inp, textTransform: "uppercase" }} placeholder="SBIN0001234" maxLength={11} value={form.bankIFSC} onChange={e => set("bankIFSC", e.target.value.toUpperCase())} /></div>
+                                        <div style={span2}>
+                                            <Lbl text="Account Number" required />
+                                            <input style={{ ...inp, borderColor: errors.bankAccountNumber ? "var(--red)" : undefined }} placeholder="Your account number" value={form.bankAccountNumber} onChange={e => { set("bankAccountNumber", e.target.value.replace(/\D/g,"")); clrErr("bankAccountNumber") }} />
+                                            <Err msg={errors.bankAccountNumber} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="IFSC Code" required />
+                                            <input style={{ ...inp, textTransform: "uppercase", borderColor: errors.bankIFSC ? "var(--red)" : undefined }} placeholder="SBIN0001234" maxLength={11} value={form.bankIFSC} onChange={e => { set("bankIFSC", e.target.value.toUpperCase()); clrErr("bankIFSC") }} />
+                                            <Err msg={errors.bankIFSC} />
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
                                     <SecTitle>KYC Documents</SecTitle>
                                     <div style={{ ...g2, marginTop: 14 }}>
-                                        <div><Lbl text="Aadhar Number" /><input style={inp} placeholder="12-digit number" maxLength={12} value={form.aadharNumber} onChange={e => set("aadharNumber", e.target.value.replace(/\D/g,""))} /></div>
-                                        <div><Lbl text="PAN Number" /><input style={{ ...inp, textTransform: "uppercase" }} placeholder="ABCDE1234F" maxLength={10} value={form.panNumber} onChange={e => set("panNumber", e.target.value.toUpperCase())} /></div>
+                                        <div>
+                                            <Lbl text="Aadhar Number" required />
+                                            <input style={{ ...inp, borderColor: errors.aadharNumber ? "var(--red)" : undefined }} placeholder="12-digit number" maxLength={12} value={form.aadharNumber} onChange={e => { set("aadharNumber", e.target.value.replace(/\D/g,"")); clrErr("aadharNumber") }} />
+                                            <Err msg={errors.aadharNumber} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="PAN Number" required />
+                                            <input style={{ ...inp, textTransform: "uppercase", borderColor: errors.panNumber ? "var(--red)" : undefined }} placeholder="ABCDE1234F" maxLength={10} value={form.panNumber} onChange={e => { set("panNumber", e.target.value.toUpperCase()); clrErr("panNumber") }} />
+                                            <Err msg={errors.panNumber} />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
