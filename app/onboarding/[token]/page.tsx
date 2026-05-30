@@ -326,6 +326,38 @@ export default function OnboardingPortal() {
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Personal Details</h2>
 
+                            {/* ── Posting & HR — FIRST thing employee fills ── */}
+                            <div style={{ marginBottom: 24, padding: "16px", borderRadius: 14, background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                                <p style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 700, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 14px" }}>
+                                    Posting &amp; Assignment
+                                </p>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                                    <Field label="Work Site *">
+                                        <select value={form.siteId} onChange={set("siteId")} className={inp} required>
+                                            <option value="">Select your work site...</option>
+                                            {sites.map(s => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name}{s.code ? ` (${s.code})` : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                    <Field label="Assigned HR / Manager *">
+                                        <select value={form.hrId} onChange={set("hrId")} className={inp} required>
+                                            <option value="">Select your HR contact...</option>
+                                            {hrUsers.map(u => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                </div>
+                                <p style={{ fontSize: 11, color: "#6b7280", marginTop: 10, margin: "10px 0 0" }}>
+                                    Select the site where you'll work and the HR person handling your onboarding.
+                                </p>
+                            </div>
+
                             {/* Photo upload */}
                             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
                                 <div style={{ position: "relative", flexShrink: 0 }}>
@@ -372,36 +404,6 @@ export default function OnboardingPortal() {
                                         <input type="text" value={form.fathersName} onChange={set("fathersName")} placeholder="Father's full name" className={inp} />
                                     </Field>
                                 </div>
-                            </div>
-
-                            {/* Site + HR Assignment */}
-                            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                                <p style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 600, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Posting & HR</p>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                                    <Field label="Work Site *">
-                                        <select value={form.siteId} onChange={set("siteId")} className={inp} required>
-                                            <option value="">Select your work site...</option>
-                                            {sites.map(s => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.name}{s.code ? ` (${s.code})` : ""}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field label="Assigned HR / Manager *">
-                                        <select value={form.hrId} onChange={set("hrId")} className={inp} required>
-                                            <option value="">Select your HR contact...</option>
-                                            {hrUsers.map(u => (
-                                                <option key={u.id} value={u.id}>
-                                                    {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                </div>
-                                <p style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
-                                    Your work location and the HR person handling your onboarding.
-                                </p>
                             </div>
                         </div>
                     )}
