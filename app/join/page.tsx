@@ -177,6 +177,8 @@ export default function JoinPage() {
     function validate(t: string): boolean {
         const e: Partial<Record<keyof FormData, string>> = {}
         if (t === "personal") {
+            if (!form.siteId)               e.siteId        = "Required"
+            if (!form.hrId)                 e.hrId          = "Required"
             if (!form.firstName.trim()) e.firstName = "Required"
             if (!form.lastName.trim())  e.lastName  = "Required"
             if (!form.gender)           e.gender    = "Required"
@@ -196,8 +198,6 @@ export default function JoinPage() {
             if (!form.designation.trim())   e.designation   = "Required"
             if (!form.dateOfJoining)        e.dateOfJoining = "Required"
             if (!form.employmentType)       e.employmentType = "Required"
-            if (!form.siteId)               e.siteId        = "Required"
-            if (!form.hrId)                 e.hrId          = "Required"
         }
         if (t === "bank") {
             if (!form.bankName.trim())          e.bankName          = "Required"
@@ -388,6 +388,37 @@ export default function JoinPage() {
                         {/* ── PERSONAL ─────────────────────────────────────────── */}
                         {tab === "personal" && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+
+                                {/* ── Work Site & HR — shown first ── */}
+                                <div style={{ padding: "16px", borderRadius: 14, background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                                    <p style={{ fontSize: 11, fontWeight: 700, color: "#818cf8", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 12px" }}>Posting & Assignment</p>
+                                    <div style={{ ...g2 }}>
+                                        <div>
+                                            <Lbl text="Work Site" required />
+                                            <select style={{ ...sel, borderColor: errors.siteId ? "var(--red)" : undefined }} value={form.siteId} onChange={e => { set("siteId", e.target.value); clrErr("siteId") }}>
+                                                <option value="">Select your work site</option>
+                                                {sites.map(s => (
+                                                    <option key={s.id} value={s.id}>
+                                                        {s.name}{s.code ? ` (${s.code})` : ""}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <Err msg={errors.siteId} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="Assigned HR / Manager" required />
+                                            <select style={{ ...sel, borderColor: errors.hrId ? "var(--red)" : undefined }} value={form.hrId} onChange={e => { set("hrId", e.target.value); clrErr("hrId") }}>
+                                                <option value="">Select your HR contact</option>
+                                                {hrUsers.map(u => (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <Err msg={errors.hrId} />
+                                        </div>
+                                    </div>
+                                </div>
 
                                 {/* ── Profile Photo ── */}
                                 <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)" }}>
@@ -603,40 +634,6 @@ export default function JoinPage() {
                                             <Err msg={errors.employmentType} />
                                         </div>
                                     </div>
-                                </div>
-
-                                {/* Site + HR Assignment */}
-                                <div>
-                                    <SecTitle>Posting & HR Assignment</SecTitle>
-                                    <div style={{ ...g2, marginTop: 14 }}>
-                                        <div>
-                                            <Lbl text="Work Site" required />
-                                            <select style={{ ...sel, borderColor: errors.siteId ? "var(--red)" : undefined }} value={form.siteId} onChange={e => { set("siteId", e.target.value); clrErr("siteId") }}>
-                                                <option value="">Select your work site</option>
-                                                {sites.map(s => (
-                                                    <option key={s.id} value={s.id}>
-                                                        {s.name}{s.code ? ` (${s.code})` : ""}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <Err msg={errors.siteId} />
-                                        </div>
-                                        <div>
-                                            <Lbl text="Assigned HR / Manager" required />
-                                            <select style={{ ...sel, borderColor: errors.hrId ? "var(--red)" : undefined }} value={form.hrId} onChange={e => { set("hrId", e.target.value); clrErr("hrId") }}>
-                                                <option value="">Select your HR contact</option>
-                                                {hrUsers.map(u => (
-                                                    <option key={u.id} value={u.id}>
-                                                        {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <Err msg={errors.hrId} />
-                                        </div>
-                                    </div>
-                                    <p style={{ fontSize: 11, color: "var(--text3)", margin: "8px 0 0 0" }}>
-                                        Pick the site where you&apos;ll work and the HR person handling your onboarding.
-                                    </p>
                                 </div>
 
                                 <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px" }}>
