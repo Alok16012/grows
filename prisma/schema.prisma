@@ -1634,6 +1634,8 @@ model Expense {
   paymentDate     DateTime?       // actual date the payment was made (accounts-entered)
   paymentMode     String?         // Cash, NEFT, etc.
   transactionId   String?         // UTR / transaction reference number
+  travelDays      Int?            // TRAVEL expenses: number of days travelled in the month
+  travelDailyRate Float?          // TRAVEL expenses: ₹-per-day rate locked at submission time
   status          ExpenseStatus   @default(DRAFT)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -1723,6 +1725,13 @@ enum HrDocStatus {
   APPROVED
   REJECTED
   ISSUED
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?  // userId who last updated
 }
 
 model HrDocument {

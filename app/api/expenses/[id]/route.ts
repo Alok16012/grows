@@ -60,7 +60,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate } = body
+        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate } = body
 
         const updateData: Record<string, unknown> = {}
 
@@ -68,11 +68,13 @@ export async function PUT(
             // Owner can edit DRAFT fields
             if (title !== undefined) updateData.title = title
             if (category !== undefined) updateData.category = category
-            if (amount !== undefined) updateData.amount = parseFloat(amount)
+            if (amount !== undefined) updateData.amount = parseFloat(String(amount))
             if (date !== undefined) updateData.date = new Date(date)
             if (description !== undefined) updateData.description = description || null
             if (receiptUrl !== undefined) updateData.receiptUrl = receiptUrl || null
             if (projectId !== undefined) updateData.projectId = projectId || null
+            if (travelDays !== undefined) updateData.travelDays = travelDays ? parseInt(String(travelDays)) : null
+            if (travelDailyRate !== undefined) updateData.travelDailyRate = travelDailyRate ? parseFloat(String(travelDailyRate)) : null
         }
 
         // Action-based transitions

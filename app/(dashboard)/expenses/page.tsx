@@ -50,6 +50,8 @@ type Expense = {
     paymentDate: string | null
     paymentMode: string | null
     transactionId: string | null
+    travelDays: number | null
+    travelDailyRate: number | null
     status: ExpenseStatus
     createdAt: string
     updatedAt: string
@@ -158,6 +160,9 @@ function AddExpenseModal({
     const [receiptUploading, setReceiptUploading] = useState(false)
     const receiptInputRef = useRef<HTMLInputElement>(null)
     const [projects, setProjects] = useState<ExpenseProject[]>([])
+    const [travelDays, setTravelDays] = useState("")
+    const [travelRate, setTravelRate] = useState(0)
+    const [travelRateLoaded, setTravelRateLoaded] = useState(false)
     const [form, setForm] = useState({
         title: "",
         category: "TRAVEL" as ExpenseCategory,
@@ -177,6 +182,11 @@ function AddExpenseModal({
                 setProjects(list.map((p: any) => ({ id: p.id, name: p.name, company: p.company ?? null })))
             })
             .catch(() => setProjects([]))
+        // Load travel daily rate from settings
+        fetch("/api/settings?key=TRAVEL_DAILY_RATE")
+            .then(r => r.ok ? r.json() : { value: "0" })
+            .then(d => { setTravelRate(parseFloat(d.value || "0")); setTravelRateLoaded(true) })
+            .catch(() => setTravelRateLoaded(true))
     }, [open])
 
     useEffect(() => {
@@ -191,6 +201,7 @@ function AddExpenseModal({
                     projectId: editExpense.projectId || "",
                 })
                 setReceiptUrl(editExpense.receiptUrl || "")
+                setTravelDays(editExpense.travelDays ? String(editExpense.travelDays) : "")
             } else {
                 setForm({
                     title: "",
@@ -201,6 +212,7 @@ function AddExpenseModal({
                     projectId: "",
                 })
                 setReceiptUrl("")
+                setTravelDays("")
             }
         }
     }, [open, editExpense])
@@ -230,7 +242,9 @@ function AddExpenseModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...form,
-                    amount: parseFloat(form.amount),
+                    amount: form.category === "TRAVEL" && travelDays ? travelRate * parseInt(travelDays) : parseFloat(form.amount),
+                    travelDays: form.category === "TRAVEL" && travelDays ? parseInt(travelDays) : undefined,
+                    travelDailyRate: form.category === "TRAVEL" && travelDays ? travelRate : undefined,
                     receiptUrl: receiptUrl || null,
                     projectId: form.projectId || null,
                 }),
@@ -287,20 +301,59 @@ function AddExpenseModal({
                                 ))}
                             </select>
                         </div>
-                        <div>
-                            <label className="block text-[12px] text-[var(--text2)] mb-1">Amount (₹) *</label>
-                            <input
-                                type="number"
-                                value={form.amount}
-                                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
-                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                required
-                            />
-                        </div>
+                        {form.category !== "TRAVEL" && (
+                            <div>
+                                <label className="block text-[12px] text-[var(--text2)] mb-1">Amount (₹) *</label>
+                                <input
+                                    type="number"
+                                    value={form.amount}
+                                    onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                                    placeholder="0.00"
+                                    min="0"
+                                    step="0.01"
+                                    className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                    required
+                                />
+                            </div>
+                        )}
                     </div>
+                    {form.category === "TRAVEL" && (
+                        <div style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 10, padding: "12px 14px" }}>
+                            <p style={{ fontSize: 11, fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>Monthly Travel Allowance</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[12px] text-[var(--text2)] mb-1">Travel Days *</label>
+                                    <input
+                                        type="number"
+                                        value={travelDays}
+                                        onChange={e => setTravelDays(e.target.value)}
+                                        placeholder="e.g. 22"
+                                        min="1" max="31"
+                                        className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[12px] text-[var(--text2)] mb-1">Daily Rate (₹)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            value={travelRate || ""}
+                                            onChange={e => setTravelRate(parseFloat(e.target.value) || 0)}
+                                            placeholder="0"
+                                            min="0"
+                                            className="flex-1 h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            {travelDays && travelRate > 0 && (
+                                <div style={{ marginTop: 8, padding: "6px 10px", background: "white", borderRadius: 6, border: "1px solid rgba(59,130,246,0.2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span style={{ fontSize: 12, color: "#6b7280" }}>{travelDays} days × ₹{travelRate}/day</span>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1d4ed8" }}>₹{(parseInt(travelDays) * travelRate).toLocaleString("en-IN")}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="block text-[12px] text-[var(--text2)] mb-1">Date *</label>
@@ -1036,9 +1089,244 @@ function StatCard({
     )
 }
 
+// ─── Employee Summary Tab ──────────────────────────────────────────────────────
+
+const EMP_CATS: ExpenseCategory[] = ["TRAVEL","FOOD","FUEL","HOTEL","MATERIAL","MOBILE_RECHARGE","OFFICE_SUPPLIES","OTHER"]
+const CAT_LABELS: Record<string, string> = {
+    TRAVEL: "Travel", FOOD: "Food", FUEL: "Fuel", HOTEL: "Hotel",
+    MATERIAL: "Material", MOBILE_RECHARGE: "Mobile", OFFICE_SUPPLIES: "Office", OTHER: "Other"
+}
+
+function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
+    const [employees, setEmployees] = useState<{id:string;firstName:string;lastName:string;employeeId:string}[]>([])
+    const [selectedEmpId, setSelectedEmpId] = useState("")
+    const [year, setYear] = useState(new Date().getFullYear())
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(false)
+    const [detailModal, setDetailModal] = useState<{month:string;cat:string;items:any[]}|null>(null)
+    const [travelRate, setTravelRate] = useState(0)
+    const [savingRate, setSavingRate] = useState(false)
+    const [showRateSetting, setShowRateSetting] = useState(false)
+    const [rateInput, setRateInput] = useState("")
+
+    useEffect(() => {
+        // Load employees list
+        fetch("/api/employees?pageSize=500")
+            .then(r => r.ok ? r.json() : { employees: [] })
+            .then(d => setEmployees(d.employees || []))
+            .catch(() => {})
+        // Load travel rate
+        fetch("/api/settings?key=TRAVEL_DAILY_RATE")
+            .then(r => r.ok ? r.json() : { value: "0" })
+            .then(d => { const v = parseFloat(d.value || "0"); setTravelRate(v); setRateInput(String(v)) })
+            .catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (!selectedEmpId) return
+        setLoading(true)
+        fetch(`/api/expenses/employee-summary?employeeId=${selectedEmpId}&year=${year}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { setData(d); setLoading(false) })
+            .catch(() => setLoading(false))
+    }, [selectedEmpId, year])
+
+    const saveRate = async () => {
+        setSavingRate(true)
+        try {
+            await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key: "TRAVEL_DAILY_RATE", value: rateInput })
+            })
+            setTravelRate(parseFloat(rateInput) || 0)
+            setShowRateSetting(false)
+            toast.success("Travel daily rate updated!")
+        } catch { toast.error("Failed to save rate") }
+        finally { setSavingRate(false) }
+    }
+
+    const currentYear = new Date().getFullYear()
+    const years = [currentYear, currentYear - 1, currentYear - 2]
+
+    return (
+        <div>
+            {/* Header controls */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                <select
+                    value={selectedEmpId}
+                    onChange={e => setSelectedEmpId(e.target.value)}
+                    style={{ height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none", minWidth: 220 }}
+                >
+                    <option value="">— Select Employee —</option>
+                    {employees.map(e => (
+                        <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.employeeId})</option>
+                    ))}
+                </select>
+                <select
+                    value={year}
+                    onChange={e => setYear(parseInt(e.target.value))}
+                    style={{ height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none" }}
+                >
+                    {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                {isPrivileged && (
+                    <button
+                        onClick={() => setShowRateSetting(s => !s)}
+                        style={{ height: 36, padding: "0 14px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                        ⚙️ Travel Rate: ₹{travelRate}/day
+                    </button>
+                )}
+                {showRateSetting && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "4px 10px" }}>
+                        <span style={{ fontSize: 12, color: "var(--text2)" }}>₹/day</span>
+                        <input
+                            type="number"
+                            value={rateInput}
+                            onChange={e => setRateInput(e.target.value)}
+                            style={{ width: 80, height: 28, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13 }}
+                        />
+                        <button
+                            onClick={saveRate}
+                            disabled={savingRate}
+                            style={{ height: 28, padding: "0 10px", background: "var(--accent)", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                        >
+                            {savingRate ? "…" : "Save"}
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {!selectedEmpId && (
+                <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)", fontSize: 14 }}>
+                    Select an employee to view their expense summary
+                </div>
+            )}
+
+            {selectedEmpId && loading && (
+                <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)" }}>
+                    <Loader2 size={20} className="animate-spin inline-block" />
+                </div>
+            )}
+
+            {selectedEmpId && !loading && data && (
+                <>
+                    <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                            <thead>
+                                <tr style={{ borderBottom: "2px solid var(--border)" }}>
+                                    <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>Month</th>
+                                    {EMP_CATS.map(cat => (
+                                        <th key={cat} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap", fontSize: 11 }}>
+                                            {CAT_LABELS[cat] || cat}
+                                        </th>
+                                    ))}
+                                    <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.rows.map((row: any) => {
+                                    const hasAny = row.total > 0
+                                    return (
+                                        <tr key={row.month} style={{ borderBottom: "1px solid var(--border)", background: hasAny ? "white" : "var(--surface2)" }}>
+                                            <td style={{ padding: "9px 12px", fontWeight: hasAny ? 600 : 400, color: hasAny ? "var(--text)" : "var(--text3)", whiteSpace: "nowrap" }}>
+                                                {row.label}
+                                            </td>
+                                            {EMP_CATS.map(cat => {
+                                                const amt = row[cat] || 0
+                                                const items = row.items?.[cat] || []
+                                                return (
+                                                    <td key={cat} style={{ textAlign: "right", padding: "9px 10px" }}>
+                                                        {amt > 0 ? (
+                                                            <button
+                                                                onClick={() => setDetailModal({ month: row.label, cat: CAT_LABELS[cat] || cat, items })}
+                                                                style={{ background: categoryStyle(cat as ExpenseCategory).bg, color: categoryStyle(cat as ExpenseCategory).color, border: "none", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                                                            >
+                                                                {formatINR(amt)}
+                                                            </button>
+                                                        ) : (
+                                                            <span style={{ color: "var(--text3)", fontSize: 12 }}>—</span>
+                                                        )}
+                                                    </td>
+                                                )
+                                            })}
+                                            <td style={{ textAlign: "right", padding: "9px 12px", fontWeight: 700, color: hasAny ? "var(--text)" : "var(--text3)" }}>
+                                                {hasAny ? formatINR(row.total) : "—"}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                            <tfoot>
+                                <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
+                                    <td style={{ padding: "9px 12px", fontWeight: 700, color: "var(--text)" }}>Total</td>
+                                    {EMP_CATS.map(cat => (
+                                        <td key={cat} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: data.totals[cat] > 0 ? "var(--text)" : "var(--text3)" }}>
+                                            {data.totals[cat] > 0 ? formatINR(data.totals[cat]) : "—"}
+                                        </td>
+                                    ))}
+                                    <td style={{ textAlign: "right", padding: "9px 12px", fontWeight: 800, color: "var(--text)", fontSize: 14 }}>
+                                        {formatINR(data.totals.total)}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    {/* Detail Modal */}
+                    {detailModal && (
+                        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                            <div style={{ background: "white", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "80vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
+                                    <div>
+                                        <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>{detailModal.cat} Expenses</p>
+                                        <p style={{ fontSize: 12, color: "var(--text3)" }}>{detailModal.month} · {data.employee.name}</p>
+                                    </div>
+                                    <button onClick={() => setDetailModal(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)" }}>
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                <div style={{ overflowY: "auto", flex: 1, padding: "12px 0" }}>
+                                    {detailModal.items.length === 0 ? (
+                                        <p style={{ textAlign: "center", padding: "24px", color: "var(--text3)", fontSize: 13 }}>No expenses</p>
+                                    ) : detailModal.items.map((item: any) => (
+                                        <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: "1px solid var(--border)" }}>
+                                            <div style={{ flex: 1 }}>
+                                                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{item.title}</p>
+                                                <p style={{ fontSize: 11, color: "var(--text3)" }}>
+                                                    {format(new Date(item.date), "dd MMM yyyy")}
+                                                    {item.travelDays ? ` · ${item.travelDays} days × ₹${item.travelDailyRate}/day` : ""}
+                                                    {item.description ? ` · ${item.description}` : ""}
+                                                </p>
+                                            </div>
+                                            <div style={{ textAlign: "right" }}>
+                                                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{formatINR(item.amount)}</p>
+                                                <span style={{ background: statusStyle(item.status).bg, color: statusStyle(item.status).color, fontSize: 10, padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>
+                                                    {statusStyle(item.status).label}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{detailModal.items.length} expense{detailModal.items.length !== 1 ? "s" : ""}</span>
+                                    <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
+                                        {formatINR(detailModal.items.reduce((s: number, i: any) => s + i.amount, 0))}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type ActiveTab = "mine" | "all" | "accounts" | "analytics"
+type ActiveTab = "mine" | "all" | "accounts" | "analytics" | "employee"
 type StatusFilter = "ALL" | ExpenseStatus
 
 export default function ExpensesPage() {
@@ -1273,9 +1561,20 @@ export default function ExpensesPage() {
                                 : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
                                 }`}
                         >
-                            {tab === "mine" ? "My Expenses" : tab === "all" ? "All Expenses" : tab === "accounts" ? "💰 Accounts" : "📊 Analytics"}
+                            {tab === "mine" ? "My Expenses" : tab === "all" ? "All Expenses" : tab === "accounts" ? "💰 Accounts" : tab === "analytics" ? "📊 Analytics" : "👤 By Employee"}
                         </button>
                     ))}
+                    {isPrivileged && (
+                        <button
+                            onClick={() => setActiveTab("employee")}
+                            className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${activeTab === "employee"
+                                ? "border-[var(--accent)] text-[var(--accent)]"
+                                : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
+                            }`}
+                        >
+                            👤 By Employee
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -1284,8 +1583,13 @@ export default function ExpensesPage() {
                 <ExpenseAnalytics expenses={expenses} loading={loading} />
             )}
 
-            {/* Filters — hidden on analytics tab */}
-            {activeTab !== "analytics" && <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 mb-4 space-y-3">
+            {/* By Employee Tab */}
+            {activeTab === "employee" && (
+                <EmployeeSummaryTab isPrivileged={isPrivileged} />
+            )}
+
+            {/* Filters — hidden on analytics and employee tabs */}
+            {activeTab !== "analytics" && activeTab !== "employee" && <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 mb-4 space-y-3">
                 {/* Status pills */}
                 <div className="flex flex-wrap gap-1.5">
                     {(activeTab === "accounts" ? ["ALL", "APPROVED", "PAID"] as StatusFilter[] : STATUS_FILTERS).map(s => (
@@ -1366,7 +1670,7 @@ export default function ExpensesPage() {
                 </div>
             </div>}
 
-            {activeTab !== "analytics" && <>
+            {activeTab !== "analytics" && activeTab !== "employee" && <>
             {/* Accounts Summary Banner */}
             {activeTab === "accounts" && (
                 <div className="bg-gradient-to-r from-[#8b5cf6] to-[#6d28d9] rounded-[12px] p-4 mb-4 text-white">
