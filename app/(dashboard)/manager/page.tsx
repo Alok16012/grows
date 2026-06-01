@@ -6,13 +6,145 @@ import { Button } from "@/components/ui/button"
 import {
     ClipboardCheck, HardHat, CheckCircle2, Clock, Building2, Calendar, Loader2,
     UserCircle2, ClipboardList, Users, ThumbsUp, ThumbsDown, AlertTriangle,
-    TrendingUp, BarChart2
+    TrendingUp, BarChart2, CreditCard, ChevronRight
 } from "lucide-react"
 import Link from "next/link"
 import { format, formatDistanceToNow, isValid } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import BulkImportInspectors from "@/components/BulkImportInspectors"
+
+// ─── Expense Team Summary Table ───────────────────────────────────────────────
+
+const EXP_COLS = [
+    { key: "TRAVEL",          label: "Travel",   color: "#3b82f6" },
+    { key: "FUEL",            label: "Fuel",     color: "#ca8a04" },
+    { key: "FOOD",            label: "Food",     color: "#f97316" },
+    { key: "HOTEL",           label: "Hotel",    color: "#a855f7" },
+    { key: "MATERIAL",        label: "Material", color: "#b45309" },
+    { key: "MOBILE_RECHARGE", label: "Mobile",   color: "#0891b2" },
+    { key: "OFFICE_SUPPLIES", label: "Office",   color: "#0d9488" },
+    { key: "OTHER",           label: "Other",    color: "#6b7280" },
+]
+
+function fmt(n: number) {
+    return n > 0 ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 }) : "—"
+}
+
+function ExpenseTeamTable() {
+    const now = new Date()
+    const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        setLoading(true)
+        fetch(`/api/expenses/team-summary?month=${month}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { setData(d); setLoading(false) })
+            .catch(() => setLoading(false))
+    }, [month])
+
+    // Build month options: last 6 months
+    const monthOptions = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+        return { val, label: d.toLocaleString("en-IN", { month: "short", year: "numeric" }) }
+    })
+
+    return (
+        <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden mt-4">
+            {/* Header */}
+            <div className="p-4 border-b border-[#e8e6e1] flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-1">
+                    <CreditCard className="h-4 w-4 text-[#1a9e6e]" />
+                    <span className="text-[13.5px] font-semibold text-[#1a1a18]">Employee Expense Summary</span>
+                    {data && (
+                        <span className="text-[11px] bg-[#e8f7f1] text-[#0d6b4a] px-2 py-0.5 rounded-full font-medium">
+                            {data.monthLabel}
+                        </span>
+                    )}
+                </div>
+                <div className="flex items-center gap-2">
+                    <select
+                        value={month}
+                        onChange={e => setMonth(e.target.value)}
+                        className="h-8 rounded-[7px] border border-[#e8e6e1] bg-white px-2 text-[12px] text-[#1a1a18] outline-none focus:border-[#1a9e6e]"
+                    >
+                        {monthOptions.map(o => (
+                            <option key={o.val} value={o.val}>{o.label}</option>
+                        ))}
+                    </select>
+                    <Link href="/expenses" className="text-[12.5px] font-medium text-[#1a9e6e] hover:underline whitespace-nowrap">
+                        View All →
+                    </Link>
+                </div>
+            </div>
+
+            {/* Table */}
+            {loading ? (
+                <div className="p-6 flex justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#9e9b95]" />
+                </div>
+            ) : !data || data.rows.length === 0 ? (
+                <div className="p-8 text-center">
+                    <CreditCard className="h-8 w-8 text-[#d4d1ca] mx-auto mb-3" />
+                    <p className="text-[13px] text-[#9e9b95]">No expenses submitted for this month.</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full" style={{ fontSize: 12 }}>
+                        <thead>
+                            <tr style={{ borderBottom: "1px solid #e8e6e1", background: "#f9f8f5" }}>
+                                <th style={{ textAlign: "left", padding: "8px 16px", fontWeight: 600, color: "#6b6860", whiteSpace: "nowrap" }}>Employee</th>
+                                <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, color: "#6b6860", whiteSpace: "nowrap" }}>Department</th>
+                                {EXP_COLS.map(c => (
+                                    <th key={c.key} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>
+                                        {c.label}
+                                    </th>
+                                ))}
+                                <th style={{ textAlign: "right", padding: "8px 16px", fontWeight: 700, color: "#1a1a18", whiteSpace: "nowrap" }}>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.rows.map((row: any) => (
+                                <tr key={row.id} style={{ borderBottom: "1px solid #f0eeea" }}
+                                    className="hover:bg-[#f9f8f5] transition-colors">
+                                    <td style={{ padding: "9px 16px", whiteSpace: "nowrap" }}>
+                                        <p style={{ fontWeight: 600, color: "#1a1a18", fontSize: 12.5 }}>{row.name}</p>
+                                        <p style={{ color: "#9e9b95", fontSize: 11 }}>{row.employeeId} · {row.designation}</p>
+                                    </td>
+                                    <td style={{ padding: "9px 10px", color: "#6b6860", whiteSpace: "nowrap" }}>{row.department}</td>
+                                    {EXP_COLS.map(c => (
+                                        <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", color: row[c.key] > 0 ? c.color : "#d4d1ca", fontWeight: row[c.key] > 0 ? 600 : 400 }}>
+                                            {fmt(row[c.key])}
+                                        </td>
+                                    ))}
+                                    <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 700, color: "#1a1a18", whiteSpace: "nowrap" }}>
+                                        {fmt(row.total)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr style={{ borderTop: "2px solid #e8e6e1", background: "#f9f8f5" }}>
+                                <td style={{ padding: "9px 16px", fontWeight: 700, color: "#1a1a18" }} colSpan={2}>Total</td>
+                                {EXP_COLS.map(c => (
+                                    <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: data.totals[c.key] > 0 ? c.color : "#d4d1ca" }}>
+                                        {fmt(data.totals[c.key])}
+                                    </td>
+                                ))}
+                                <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 800, color: "#1a1a18", fontSize: 13 }}>
+                                    {fmt(data.totals.total)}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            )}
+        </div>
+    )
+}
 
 function safeFormat(val: any, fmt: string): string {
     try { if (!val) return "—"; const d = new Date(val); if (!isValid(d)) return "—"; return format(d, fmt) } catch { return "—" }
@@ -231,6 +363,9 @@ export default function ManagerDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Employee Expense Summary */}
+            <ExpenseTeamTable />
 
             {/* Quick Links */}
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">

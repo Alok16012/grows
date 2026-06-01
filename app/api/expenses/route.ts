@@ -63,8 +63,8 @@ export async function GET(req: Request) {
             ]
         }
 
-        // Try full query with project include; fall back to plain query
-        // if Project table or projectId column doesn't exist yet.
+        // Try full query with project include; fall back progressively
+        // if new columns / tables don't yet exist in DB (pre-migration).
         let expenses: any[]
         try {
             expenses = await prisma.expense.findMany({
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
                 orderBy: { createdAt: "desc" },
             }) as any[]
         } catch {
-            // Any failure (missing table/column/relation) → retry without project
+            // Drop project relation and retry
             const fallbackWhere = { ...where }
             delete fallbackWhere.projectId
             try {
@@ -82,10 +82,19 @@ export async function GET(req: Request) {
                     orderBy: { createdAt: "desc" },
                 }) as any[]
             } catch {
-                // Final fallback — no filters at all
-                expenses = await prisma.expense.findMany({
-                    orderBy: { createdAt: "desc" },
-                }) as any[]
+                // Ultimate fallback: raw SQL selecting only stable columns.
+                // Safe even before travelDays / travelDailyRate migration runs.
+                const { Prisma } = await import("@prisma/client")
+                const rows: any[] = await (prisma as any).$queryRaw(
+                    Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
+                               description, "receiptUrl", "submittedBy", "employeeId",
+                               "projectId", "approvedBy", "approvedAt", "rejectedAt",
+                               "rejectionReason", "paidAt", "paymentDate", "paymentMode",
+                               "transactionId", status, "createdAt", "updatedAt"
+                               FROM "Expense"
+                               ORDER BY "createdAt" DESC`
+                )
+                expenses = rows
             }
         }
 

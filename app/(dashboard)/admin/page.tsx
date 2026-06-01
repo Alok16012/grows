@@ -17,7 +17,9 @@ import {
     ArrowUpRight,
     Search,
     Plus,
-    ClipboardList
+    ClipboardList,
+    CreditCard,
+    Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -25,6 +27,114 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+
+// ─── Expense Team Summary (reused on admin dashboard) ────────────────────────
+
+const EXP_COLS_ADMIN = [
+    { key: "TRAVEL",          label: "Travel",   color: "#3b82f6" },
+    { key: "FUEL",            label: "Fuel",     color: "#ca8a04" },
+    { key: "FOOD",            label: "Food",     color: "#f97316" },
+    { key: "HOTEL",           label: "Hotel",    color: "#a855f7" },
+    { key: "MATERIAL",        label: "Material", color: "#b45309" },
+    { key: "MOBILE_RECHARGE", label: "Mobile",   color: "#0891b2" },
+    { key: "OFFICE_SUPPLIES", label: "Office",   color: "#0d9488" },
+    { key: "OTHER",           label: "Other",    color: "#6b7280" },
+]
+
+function fmtAdmin(n: number) {
+    return n > 0 ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 }) : "—"
+}
+
+function AdminExpenseTable() {
+    const now = new Date()
+    const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+    const [data, setData] = useState<any>(null)
+    const [loadingExp, setLoadingExp] = useState(true)
+
+    useEffect(() => {
+        setLoadingExp(true)
+        fetch(`/api/expenses/team-summary?month=${month}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { setData(d); setLoadingExp(false) })
+            .catch(() => setLoadingExp(false))
+    }, [month])
+
+    const monthOptions = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+        return { val, label: d.toLocaleString("en-IN", { month: "short", year: "numeric" }) }
+    })
+
+    return (
+        <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden mt-4">
+            <div className="p-4 border-b border-[var(--border)] flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-1">
+                    <CreditCard className="h-4 w-4 text-[var(--accent)]" />
+                    <span className="text-[13.5px] font-semibold text-[var(--text)]">Employee Expense Summary</span>
+                    {data && <span className="text-[11px] bg-[#e8f7f1] text-[#0d6b4a] px-2 py-0.5 rounded-full font-medium">{data.monthLabel}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                    <select value={month} onChange={e => setMonth(e.target.value)}
+                        className="h-8 rounded-[7px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none">
+                        {monthOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
+                    </select>
+                    <Link href="/expenses" className="text-[12.5px] font-medium text-[var(--accent)] hover:underline whitespace-nowrap">View All →</Link>
+                </div>
+            </div>
+            {loadingExp ? (
+                <div className="p-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-[var(--text3)]" /></div>
+            ) : !data || data.rows.length === 0 ? (
+                <div className="p-8 text-center">
+                    <CreditCard className="h-8 w-8 text-[var(--text3)] mx-auto mb-3" />
+                    <p className="text-[13px] text-[var(--text3)]">No expenses submitted for this month.</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full" style={{ fontSize: 12 }}>
+                        <thead>
+                            <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
+                                <th style={{ textAlign: "left", padding: "8px 16px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>Employee</th>
+                                <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>Department</th>
+                                {EXP_COLS_ADMIN.map(c => (
+                                    <th key={c.key} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
+                                ))}
+                                <th style={{ textAlign: "right", padding: "8px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.rows.map((row: any) => (
+                                <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }} className="hover:bg-[var(--surface2)] transition-colors">
+                                    <td style={{ padding: "9px 16px", whiteSpace: "nowrap" }}>
+                                        <p style={{ fontWeight: 600, color: "var(--text)", fontSize: 12.5 }}>{row.name}</p>
+                                        <p style={{ color: "var(--text3)", fontSize: 11 }}>{row.employeeId} · {row.designation}</p>
+                                    </td>
+                                    <td style={{ padding: "9px 10px", color: "var(--text2)", whiteSpace: "nowrap" }}>{row.department}</td>
+                                    {EXP_COLS_ADMIN.map(c => (
+                                        <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", color: row[c.key] > 0 ? c.color : "var(--text3)", fontWeight: row[c.key] > 0 ? 600 : 400 }}>
+                                            {fmtAdmin(row[c.key])}
+                                        </td>
+                                    ))}
+                                    <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>{fmtAdmin(row.total)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
+                                <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }} colSpan={2}>Total</td>
+                                {EXP_COLS_ADMIN.map(c => (
+                                    <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: data.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
+                                        {fmtAdmin(data.totals[c.key])}
+                                    </td>
+                                ))}
+                                <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 800, color: "var(--text)", fontSize: 13 }}>{fmtAdmin(data.totals.total)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            )}
+        </div>
+    )
+}
 
 export default function AdminDashboard() {
     const { data: session } = useSession()
@@ -361,6 +471,9 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Employee Expense Summary */}
+            <AdminExpenseTable />
         </div>
     )
 }

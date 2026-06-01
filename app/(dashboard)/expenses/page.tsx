@@ -1393,7 +1393,7 @@ export default function ExpensesPage() {
     }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId, selectedExpense])
 
     useEffect(() => {
-        if (userId) fetchExpenses()
+        if (userId && activeTab !== "employee") fetchExpenses()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId])
 
