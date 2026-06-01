@@ -84,32 +84,43 @@ export async function GET(req: Request) {
             } catch {
                 // Ultimate fallback: raw SQL selecting only stable columns.
                 // Safe even before travelDays / travelDailyRate migration runs.
-                const { Prisma } = await import("@prisma/client")
-                const rows: any[] = await (prisma as any).$queryRaw(
-                    Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
-                               description, "receiptUrl", "submittedBy", "employeeId",
-                               "projectId", "approvedBy", "approvedAt", "rejectedAt",
-                               "rejectionReason", "paidAt", "paymentDate", "paymentMode",
-                               "transactionId", status, "createdAt", "updatedAt"
-                               FROM "Expense"
-                               ORDER BY "createdAt" DESC`
-                )
-                expenses = rows
+                try {
+                    const { Prisma } = await import("@prisma/client")
+                    const rows: any[] = await (prisma as any).$queryRaw(
+                        Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
+                                   description, "receiptUrl", "submittedBy", "employeeId",
+                                   "projectId", "approvedBy", "approvedAt", "rejectedAt",
+                                   "rejectionReason", "paidAt", "paymentDate", "paymentMode",
+                                   "transactionId", status, "createdAt", "updatedAt"
+                                   FROM "Expense"
+                                   ORDER BY "createdAt" DESC`
+                    )
+                    expenses = rows
+                } catch (rawErr) {
+                    console.error("[EXPENSES_GET] $queryRaw fallback failed:", rawErr)
+                    expenses = []  // return empty list rather than 500
+                }
             }
         }
 
         // Fetch user info for submittedBy and approvedBy
-        const userIds = new Set<string>()
-        expenses.forEach(e => {
-            userIds.add(e.submittedBy)
-            if (e.approvedBy) userIds.add(e.approvedBy)
-        })
-
-        const users = await prisma.user.findMany({
-            where: { id: { in: Array.from(userIds) } },
-            select: { id: true, name: true, email: true },
-        })
-        const userMap = Object.fromEntries(users.map(u => [u.id, u]))
+        let userMap: Record<string, { id: string; name: string | null; email: string }> = {}
+        try {
+            const userIds = new Set<string>()
+            expenses.forEach(e => {
+                if (e.submittedBy) userIds.add(e.submittedBy)
+                if (e.approvedBy)  userIds.add(e.approvedBy)
+            })
+            if (userIds.size > 0) {
+                const users = await prisma.user.findMany({
+                    where: { id: { in: Array.from(userIds) } },
+                    select: { id: true, name: true, email: true },
+                })
+                userMap = Object.fromEntries(users.map(u => [u.id, u]))
+            }
+        } catch {
+            // non-fatal: expense list still returns, just without user names
+        }
 
         const result = expenses.map(e => ({
             ...e,

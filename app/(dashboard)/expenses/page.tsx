@@ -1445,14 +1445,19 @@ type ActiveTab = "mine" | "all" | "accounts" | "analytics" | "employee"
 type StatusFilter = "ALL" | ExpenseStatus
 
 export default function ExpensesPage() {
-    const { data: session } = useSession()
+    const { data: session, status: sessionStatus } = useSession()
     const role = session?.user?.role
     const userId = session?.user?.id || ""
     const isPrivileged = can(session, "expenses.view")
 
+    // sessionReady flips true exactly once — after the first non-loading session status.
+    // This prevents fetchExpenses from firing before we know the user's role and have
+    // set the correct starting tab (privileged → "employee", others → "mine").
+    const [sessionReady, setSessionReady] = useState(false)
+
     const [expenses, setExpenses] = useState<Expense[]>([])
-    const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<ActiveTab>(isPrivileged ? "employee" : "mine")
+    const [loading, setLoading] = useState(false)
+    const [activeTab, setActiveTab] = useState<ActiveTab>("mine")
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL")
     const [categoryFilter, setCategoryFilter] = useState<string>("ALL")
     const [projectFilter, setProjectFilter] = useState<string>("ALL")
@@ -1474,6 +1479,15 @@ export default function ExpensesPage() {
             })
             .catch(() => setProjectsList([]))
     }, [])
+
+    // Once session is known, flip sessionReady and set the correct starting tab.
+    // Must run BEFORE the fetch effect (defined below) so that when sessionReady becomes
+    // true on the NEXT render, activeTab is already "employee" for privileged users.
+    useEffect(() => {
+        if (sessionStatus === "loading" || sessionReady) return
+        setSessionReady(true)
+        if (isPrivileged) setActiveTab("employee")
+    }, [sessionStatus, isPrivileged, sessionReady])
 
     const fetchExpenses = useCallback(async () => {
         setLoading(true)
@@ -1508,9 +1522,12 @@ export default function ExpensesPage() {
     }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId, selectedExpense])
 
     useEffect(() => {
-        if (userId && activeTab !== "employee") fetchExpenses()
+        // Wait until we know the session (avoids the "mine" flash for privileged users
+        // that would otherwise trigger a spurious fetch before the tab is corrected).
+        if (!sessionReady || !userId || activeTab === "employee") return
+        fetchExpenses()
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId])
+    }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId, sessionReady])
 
     // Stats computed from all "mine" data (independent call)
     const [stats, setStats] = useState({
@@ -1521,7 +1538,7 @@ export default function ExpensesPage() {
     })
 
     useEffect(() => {
-        if (!userId) return
+        if (!sessionReady || !userId) return
         const fetchStats = async () => {
             try {
                 const res = await fetch(`/api/expenses?submittedBy=${userId}`)
@@ -1552,7 +1569,7 @@ export default function ExpensesPage() {
             }
         }
         fetchStats()
-    }, [userId, expenses])
+    }, [userId, expenses, sessionReady])
 
     const STATUS_FILTERS: StatusFilter[] = ["ALL", "DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"]
 
