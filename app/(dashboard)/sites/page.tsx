@@ -89,13 +89,15 @@ function getAvatarColor(name: string) {
 function Avatar({ firstName, lastName, photo, size = 32 }: {
     firstName: string; lastName: string; photo?: string; size?: number
 }) {
+    const [imgErr, setImgErr] = useState(false)
     const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
     const bg = getAvatarColor(firstName)
-    if (photo) {
+    if (photo && !imgErr) {
         return (
             <img src={photo} alt={`${firstName} ${lastName}`}
                 style={{ width: size, height: size }}
-                className="rounded-full object-cover shrink-0" />
+                className="rounded-full object-cover shrink-0"
+                onError={() => setImgErr(true)} />
         )
     }
     return (

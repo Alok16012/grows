@@ -836,6 +836,7 @@ function ReviewsTab({
 // ─── ReviewCard ───────────────────────────────────────────────────────────────
 
 function ReviewCard({ review, onClick }: { review: PerformanceReview; onClick: () => void }) {
+    const [imgErr, setImgErr] = useState(false)
     const emp = review.employee
     const name = `${emp.firstName} ${emp.lastName}`
     const initials = `${emp.firstName[0]}${emp.lastName[0]}`.toUpperCase()
@@ -865,9 +866,10 @@ function ReviewCard({ review, onClick }: { review: PerformanceReview; onClick: (
             }}
         >
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                {emp.photo ? (
+                {emp.photo && !imgErr ? (
                     <img src={emp.photo} alt={name}
-                        style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                        onError={() => setImgErr(true)} />
                 ) : (
                     <div style={{
                         width: 42, height: 42, borderRadius: "50%",

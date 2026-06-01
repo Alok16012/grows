@@ -117,10 +117,12 @@ function fmtINR(amount?: number | null) {
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function Avatar({ first, last, photo, size = 38 }: { first: string; last: string; photo?: string | null; size?: number }) {
-  if (photo) {
+  const [imgErr, setImgErr] = useState(false)
+  if (photo && !imgErr) {
     return (
       <img src={photo} alt={`${first} ${last}`}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+        onError={() => setImgErr(true)} />
     )
   }
   const color = getAvatarColor(first)

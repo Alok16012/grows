@@ -330,15 +330,16 @@ export default function MasterDocumentsPage() {
                                         {/* Name */}
                                         <td className="px-4 py-2 align-top pt-3">
                                             <div className="flex items-center gap-2">
-                                                {emp.photo ? (
-                                                    <img src={emp.photo} alt=""
-                                                        className="w-7 h-7 rounded-full object-cover shrink-0" />
-                                                ) : (
-                                                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                                                        style={{ background: ac }}>
-                                                        {emp.firstName[0]}{emp.lastName[0]}
-                                                    </div>
-                                                )}
+                                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                                                    style={{ background: ac, position: "relative", overflow: "hidden" }}>
+                                                    {emp.firstName[0]}{emp.lastName[0]}
+                                                    {emp.photo && (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img src={emp.photo} alt=""
+                                                            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                                                            onError={e => (e.currentTarget.style.display = "none")} />
+                                                    )}
+                                                </div>
                                                 <div>
                                                     <p className="font-semibold text-[#1a1a18] whitespace-nowrap">{emp.firstName} {emp.lastName}</p>
                                                     {emp.designation && <p className="text-[10px] text-[#9e9b95]">{emp.designation}</p>}

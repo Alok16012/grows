@@ -64,10 +64,11 @@ const BULK_STATUSES = ["PRESENT", "ABSENT", "HALF_DAY", "LATE", "LEAVE"]
 function Avatar({ firstName, lastName, photo, size = 36 }: {
     firstName: string; lastName: string; photo?: string; size?: number
 }) {
+    const [imgErr, setImgErr] = useState(false)
     const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
     const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
     const bg = colors[(firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length]
-    if (photo) return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" />
+    if (photo && !imgErr) return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" onError={() => setImgErr(true)} />
     return (
         <div style={{ width: size, height: size, background: bg, fontSize: size * 0.33 }}
             className="rounded-full flex items-center justify-center text-white font-semibold shrink-0 select-none">
