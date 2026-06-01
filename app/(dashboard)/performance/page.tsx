@@ -865,14 +865,19 @@ function ReviewCard({ review, onClick }: { review: PerformanceReview; onClick: (
             }}
         >
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <div style={{
-                    width: 42, height: 42, borderRadius: "50%",
-                    background: avatarColor, display: "flex", alignItems: "center",
-                    justifyContent: "center", fontWeight: 700, fontSize: 15, color: "#fff",
-                    flexShrink: 0,
-                }}>
-                    {initials}
-                </div>
+                {emp.photo ? (
+                    <img src={emp.photo} alt={name}
+                        style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                ) : (
+                    <div style={{
+                        width: 42, height: 42, borderRadius: "50%",
+                        background: avatarColor, display: "flex", alignItems: "center",
+                        justifyContent: "center", fontWeight: 700, fontSize: 15, color: "#fff",
+                        flexShrink: 0,
+                    }}>
+                        {initials}
+                    </div>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {name}

@@ -116,7 +116,13 @@ function fmtINR(amount?: number | null) {
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function Avatar({ first, last, size = 38 }: { first: string; last: string; size?: number }) {
+function Avatar({ first, last, photo, size = 38 }: { first: string; last: string; photo?: string | null; size?: number }) {
+  if (photo) {
+    return (
+      <img src={photo} alt={`${first} ${last}`}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+    )
+  }
   const color = getAvatarColor(first)
   return (
     <div
@@ -389,7 +395,7 @@ export default function ExitPage() {
               }}
               onClick={() => openDrawer(exit.id)}
             >
-              <Avatar first={emp.firstName} last={emp.lastName} />
+              <Avatar first={emp.firstName} last={emp.lastName} photo={emp.photo} />
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
@@ -783,7 +789,7 @@ function ExitDrawer({
           padding: "18px 24px", borderBottom: "1px solid var(--border)",
           display: "flex", alignItems: "center", gap: 14, flexShrink: 0,
         }}>
-          <Avatar first={emp.firstName} last={emp.lastName} size={44} />
+          <Avatar first={emp.firstName} last={emp.lastName} photo={emp.photo} size={44} />
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>
