@@ -6,7 +6,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
     try {
         const form = await prisma.leadForm.findUnique({
             where: { slug: params.slug },
-            select: { id: true, isActive: true, siteId: true },
+            select: { id: true, isActive: true, siteId: true, createdBy: true, formType: true },
         })
         if (!form || !form.isActive) {
             return NextResponse.json({ error: "Form not found or inactive" }, { status: 404 })
@@ -29,15 +29,18 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             return NextResponse.json({ error: "Name and phone are required" }, { status: 400 })
         }
 
-        // Find the system user who created the form (use as createdBy)
-        const systemUser = await prisma.user.findFirst({
-            where: { role: "ADMIN" },
-            select: { id: true },
-        })
-        if (!systemUser) return NextResponse.json({ error: "System error" }, { status: 500 })
+        // The lead's owner is the HR/recruiter who created the form — this ensures the
+        // lead shows up in their recruitment tab (the GET route filters by createdBy / assignedTo).
+        // Fall back to the first admin only if the form creator cannot be verified.
+        let leadOwnerId = form.createdBy
+        if (!leadOwnerId) {
+            const fallbackAdmin = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } })
+            if (!fallbackAdmin) return NextResponse.json({ error: "System error" }, { status: 500 })
+            leadOwnerId = fallbackAdmin.id
+        }
 
         // ON_SITE_JOIN forms → candidate physically joined on-site, mark ON_SITE_JOINED directly
-        const isOnSiteJoin = (form as any).formType === "ON_SITE_JOIN"
+        const isOnSiteJoin = form.formType === "ON_SITE_JOIN"
         const leadStatus = isOnSiteJoin ? "ON_SITE_JOINED" : "NEW_LEAD"
         const leadSource = isOnSiteJoin ? "On-site Join" : "Form Link"
         const joinedAt   = isOnSiteJoin ? new Date() : null
@@ -62,7 +65,8 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             status:        leadStatus,
             priority:      "MEDIUM",
             score:         "WARM",
-            createdBy:     systemUser.id,
+            createdBy:     leadOwnerId,   // HR/recruiter who created the form
+            assignedTo:    leadOwnerId,   // auto-assign so it appears in their recruitment tab
             // ─── New candidate-form fields ───
             tshirtSize:         tshirtSize || null,
             bloodGroup:         bloodGroup || null,
@@ -120,7 +124,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
                     "experience", "qualification", "skills", "gender", "age",
                     "expectedSalary", "notes", "profileUrl",
                     "source", "formSlug", "siteId", "status", "priority", "score",
-                    "createdBy", "createdAt", "updatedAt"
+                    "createdBy", "assignedTo", "createdAt", "updatedAt"
                 ) VALUES (
                     ${id},
                     ${leadData.candidateName}, ${leadData.phone}, ${leadData.email}, ${leadData.city}, ${leadData.position},
@@ -128,7 +132,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
                     ${leadData.expectedSalary}::float8, ${leadData.notes}, ${leadData.profileUrl},
                     ${leadData.source}, ${leadData.formSlug}, ${leadData.siteId},
                     ${leadData.status}::"LeadStatus", ${leadData.priority}::"LeadPriority", ${leadData.score}::"LeadScore",
-                    ${leadData.createdBy}, NOW(), NOW()
+                    ${leadData.createdBy}, ${leadData.assignedTo}, NOW(), NOW()
                 )
             `
             lead = { id, status: leadData.status }
@@ -139,7 +143,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             await prisma.leadActivity.create({
                 data: {
                     leadId:  lead.id,
-                    userId:  systemUser.id,
+                    userId:  leadOwnerId,
                     type:    "note",
                     content: `Candidate ${String(candidateName).trim()} joined on-site via walk-in form`,
                 },
