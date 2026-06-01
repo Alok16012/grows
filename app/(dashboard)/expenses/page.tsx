@@ -1097,39 +1097,111 @@ const CAT_LABELS: Record<string, string> = {
     MATERIAL: "Material", MOBILE_RECHARGE: "Mobile", OFFICE_SUPPLIES: "Office", OTHER: "Other"
 }
 
+// Column config for the team table
+const TEAM_COLS = [
+    { key: "TRAVEL",          label: "Travel",         color: "#3b82f6", bg: "#eff6ff" },
+    { key: "FUEL",            label: "Fuel",           color: "#ca8a04", bg: "#fefce8" },
+    { key: "FOOD",            label: "Food",           color: "#f97316", bg: "#fff7ed" },
+    { key: "HOTEL",           label: "Hotel",          color: "#a855f7", bg: "#fdf4ff" },
+    { key: "MATERIAL",        label: "Material",       color: "#b45309", bg: "#fef3c7" },
+    { key: "MOBILE_RECHARGE", label: "Mobile",         color: "#0891b2", bg: "#ecfeff" },
+    { key: "OFFICE_SUPPLIES", label: "Office",         color: "#0d9488", bg: "#f0fdfa" },
+    { key: "OTHER",           label: "Other",          color: "#6b7280", bg: "#f9fafb" },
+]
+
+// ─── Detail modal (shared) ────────────────────────────────────────────────────
+function ExpenseDetailModal({ title, subtitle, items, onClose }: {
+    title: string; subtitle: string; items: any[]; onClose: () => void
+}) {
+    const total = items.reduce((s: number, i: any) => s + (i.amount || 0), 0)
+    return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div style={{ background: "white", borderRadius: 16, width: "100%", maxWidth: 540, maxHeight: "82vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--border)" }}>
+                    <div>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{title}</p>
+                        <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 1 }}>{subtitle}</p>
+                    </div>
+                    <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4 }}><X size={17} /></button>
+                </div>
+                <div style={{ overflowY: "auto", flex: 1 }}>
+                    {items.length === 0 ? (
+                        <p style={{ textAlign: "center", padding: 32, color: "var(--text3)", fontSize: 13 }}>No expenses found</p>
+                    ) : items.map((item: any) => (
+                        <div key={item.id} style={{ display: "flex", gap: 12, padding: "11px 20px", borderBottom: "1px solid var(--border)" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{item.title}</p>
+                                <p style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.5 }}>
+                                    {format(new Date(item.date), "dd MMM yyyy")}
+                                    {item.travelDays ? ` · ${item.travelDays} days × ₹${item.travelDailyRate}/day` : ""}
+                                    {item.description ? ` · ${item.description}` : ""}
+                                </p>
+                            </div>
+                            <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{formatINR(item.amount)}</p>
+                                <span style={{ background: statusStyle(item.status).bg, color: statusStyle(item.status).color, fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                                    {statusStyle(item.status).label}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{ padding: "10px 20px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--surface2)" }}>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{items.length} expense{items.length !== 1 ? "s" : ""}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{formatINR(total)}</span>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Employee Summary Tab (team-wide table + per-employee drill-down) ─────────
 function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
-    const [employees, setEmployees] = useState<{id:string;firstName:string;lastName:string;employeeId:string}[]>([])
-    const [selectedEmpId, setSelectedEmpId] = useState("")
-    const [year, setYear] = useState(new Date().getFullYear())
-    const [data, setData] = useState<any>(null)
-    const [loading, setLoading] = useState(false)
-    const [detailModal, setDetailModal] = useState<{month:string;cat:string;items:any[]}|null>(null)
-    const [travelRate, setTravelRate] = useState(0)
-    const [savingRate, setSavingRate] = useState(false)
+    const now = new Date()
+    const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+    const [teamData, setTeamData] = useState<any>(null)
+    const [teamLoading, setTeamLoading] = useState(true)
+
+    // Per-employee drill-down state
+    const [drillEmpId, setDrillEmpId]   = useState<string | null>(null)
+    const [drillYear, setDrillYear]     = useState(now.getFullYear())
+    const [drillData, setDrillData]     = useState<any>(null)
+    const [drillLoading, setDrillLoading] = useState(false)
+
+    // Detail item modal
+    const [modal, setModal] = useState<{ title: string; subtitle: string; items: any[] } | null>(null)
+
+    // Travel rate setting
+    const [travelRate, setTravelRate]     = useState(0)
+    const [rateInput, setRateInput]       = useState("")
     const [showRateSetting, setShowRateSetting] = useState(false)
-    const [rateInput, setRateInput] = useState("")
+    const [savingRate, setSavingRate]     = useState(false)
+
+    // Load team data & travel rate
+    useEffect(() => {
+        setTeamLoading(true)
+        fetch(`/api/expenses/team-summary?month=${month}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { setTeamData(d); setTeamLoading(false) })
+            .catch(() => setTeamLoading(false))
+    }, [month])
 
     useEffect(() => {
-        // Load employees list
-        fetch("/api/employees?pageSize=500")
-            .then(r => r.ok ? r.json() : { employees: [] })
-            .then(d => setEmployees(d.employees || []))
-            .catch(() => {})
-        // Load travel rate
         fetch("/api/settings?key=TRAVEL_DAILY_RATE")
             .then(r => r.ok ? r.json() : { value: "0" })
             .then(d => { const v = parseFloat(d.value || "0"); setTravelRate(v); setRateInput(String(v)) })
             .catch(() => {})
     }, [])
 
+    // Per-employee drill-down
     useEffect(() => {
-        if (!selectedEmpId) return
-        setLoading(true)
-        fetch(`/api/expenses/employee-summary?employeeId=${selectedEmpId}&year=${year}`)
+        if (!drillEmpId) { setDrillData(null); return }
+        setDrillLoading(true)
+        fetch(`/api/expenses/employee-summary?employeeId=${drillEmpId}&year=${drillYear}`)
             .then(r => r.ok ? r.json() : null)
-            .then(d => { setData(d); setLoading(false) })
-            .catch(() => setLoading(false))
-    }, [selectedEmpId, year])
+            .then(d => { setDrillData(d); setDrillLoading(false) })
+            .catch(() => setDrillLoading(false))
+    }, [drillEmpId, drillYear])
 
     const saveRate = async () => {
         setSavingRate(true)
@@ -1137,7 +1209,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
             await fetch("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key: "TRAVEL_DAILY_RATE", value: rateInput })
+                body: JSON.stringify({ key: "TRAVEL_DAILY_RATE", value: rateInput }),
             })
             setTravelRate(parseFloat(rateInput) || 0)
             setShowRateSetting(false)
@@ -1146,103 +1218,108 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
         finally { setSavingRate(false) }
     }
 
-    const currentYear = new Date().getFullYear()
-    const years = [currentYear, currentYear - 1, currentYear - 2]
+    const monthOptions = Array.from({ length: 12 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+        return { val, label: d.toLocaleString("en-IN", { month: "short", year: "numeric" }) }
+    })
+    const drillYears = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2]
+
+    const drillEmployee = drillEmpId && teamData?.rows?.find((r: any) => r.id === drillEmpId)
 
     return (
         <div>
-            {/* Header controls */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                <select
-                    value={selectedEmpId}
-                    onChange={e => setSelectedEmpId(e.target.value)}
-                    style={{ height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none", minWidth: 220 }}
-                >
-                    <option value="">— Select Employee —</option>
-                    {employees.map(e => (
-                        <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.employeeId})</option>
-                    ))}
+            {/* ── Toolbar ─────────────────────────────── */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                <select value={month} onChange={e => { setMonth(e.target.value); setDrillEmpId(null) }}
+                    style={{ height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none" }}>
+                    {monthOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                 </select>
-                <select
-                    value={year}
-                    onChange={e => setYear(parseInt(e.target.value))}
-                    style={{ height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none" }}
-                >
-                    {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+
                 {isPrivileged && (
-                    <button
-                        onClick={() => setShowRateSetting(s => !s)}
-                        style={{ height: 36, padding: "0 14px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                        ⚙️ Travel Rate: ₹{travelRate}/day
-                    </button>
-                )}
-                {showRateSetting && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "4px 10px" }}>
-                        <span style={{ fontSize: 12, color: "var(--text2)" }}>₹/day</span>
-                        <input
-                            type="number"
-                            value={rateInput}
-                            onChange={e => setRateInput(e.target.value)}
-                            style={{ width: 80, height: 28, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13 }}
-                        />
-                        <button
-                            onClick={saveRate}
-                            disabled={savingRate}
-                            style={{ height: 28, padding: "0 10px", background: "var(--accent)", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                        >
-                            {savingRate ? "…" : "Save"}
+                    <>
+                        <button onClick={() => setShowRateSetting(s => !s)}
+                            style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                            ⚙️ Travel: ₹{travelRate}/day
                         </button>
-                    </div>
+                        {showRateSetting && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "3px 10px" }}>
+                                <span style={{ fontSize: 12, color: "var(--text3)" }}>₹/day</span>
+                                <input type="number" value={rateInput} onChange={e => setRateInput(e.target.value)}
+                                    style={{ width: 72, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
+                                <button onClick={saveRate} disabled={savingRate}
+                                    style={{ height: 26, padding: "0 10px", background: "var(--accent)", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                                    {savingRate ? "…" : "Save"}
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {drillEmpId && (
+                    <button onClick={() => { setDrillEmpId(null); setDrillData(null) }}
+                        style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "#fef2f2", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                        <X size={13} /> Close drill-down
+                    </button>
                 )}
             </div>
 
-            {!selectedEmpId && (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)", fontSize: 14 }}>
-                    Select an employee to view their expense summary
-                </div>
-            )}
-
-            {selectedEmpId && loading && (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)" }}>
-                    <Loader2 size={20} className="animate-spin inline-block" />
-                </div>
-            )}
-
-            {selectedEmpId && !loading && data && (
-                <>
-                    <div style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                            <thead>
-                                <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                                    <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>Month</th>
-                                    {EMP_CATS.map(cat => (
-                                        <th key={cat} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap", fontSize: 11 }}>
-                                            {CAT_LABELS[cat] || cat}
-                                        </th>
-                                    ))}
-                                    <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {data.rows.map((row: any) => {
-                                    const hasAny = row.total > 0
-                                    return (
-                                        <tr key={row.month} style={{ borderBottom: "1px solid var(--border)", background: hasAny ? "white" : "var(--surface2)" }}>
-                                            <td style={{ padding: "9px 12px", fontWeight: hasAny ? 600 : 400, color: hasAny ? "var(--text)" : "var(--text3)", whiteSpace: "nowrap" }}>
-                                                {row.label}
+            {/* ── Team Table ──────────────────────────── */}
+            {!drillEmpId && (
+                <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
+                    {teamLoading ? (
+                        <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+                            <Loader2 size={20} className="animate-spin" style={{ color: "var(--text3)" }} />
+                        </div>
+                    ) : !teamData || teamData.rows.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "48px 16px", color: "var(--text3)" }}>
+                            <CreditCard size={28} style={{ margin: "0 auto 10px", opacity: 0.4 }} />
+                            <p style={{ fontSize: 13 }}>No expenses submitted for {teamData?.monthLabel ?? "this month"}.</p>
+                        </div>
+                    ) : (
+                        <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                                <thead>
+                                    <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                                        <th style={{ textAlign: "left", padding: "9px 16px", fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>Employee</th>
+                                        <th style={{ textAlign: "left", padding: "9px 10px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>Dept</th>
+                                        {TEAM_COLS.map(c => (
+                                            <th key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
+                                        ))}
+                                        <th style={{ textAlign: "right", padding: "9px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {teamData.rows.map((row: any) => (
+                                        <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }}
+                                            className="hover:bg-[var(--surface2)] transition-colors">
+                                            <td style={{ padding: "10px 16px", whiteSpace: "nowrap" }}>
+                                                <button onClick={() => setDrillEmpId(row.id)}
+                                                    style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
+                                                    <p style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)" }}>{row.name}</p>
+                                                    <p style={{ fontSize: 11, color: "var(--text3)" }}>{row.employeeId} · {row.designation}</p>
+                                                </button>
                                             </td>
-                                            {EMP_CATS.map(cat => {
-                                                const amt = row[cat] || 0
-                                                const items = row.items?.[cat] || []
+                                            <td style={{ padding: "10px 10px", color: "var(--text2)", whiteSpace: "nowrap" }}>{row.department}</td>
+                                            {TEAM_COLS.map(c => {
+                                                const amt: number = row[c.key] || 0
                                                 return (
-                                                    <td key={cat} style={{ textAlign: "right", padding: "9px 10px" }}>
+                                                    <td key={c.key} style={{ textAlign: "right", padding: "10px 10px" }}>
                                                         {amt > 0 ? (
                                                             <button
-                                                                onClick={() => setDetailModal({ month: row.label, cat: CAT_LABELS[cat] || cat, items })}
-                                                                style={{ background: categoryStyle(cat as ExpenseCategory).bg, color: categoryStyle(cat as ExpenseCategory).color, border: "none", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                                                            >
+                                                                onClick={() => {
+                                                                    // Fetch individual expenses for this employee + category + month
+                                                                    const [y, m2] = month.split("-").map(Number)
+                                                                    const mStart = new Date(y, m2 - 1, 1).toISOString()
+                                                                    const mEnd   = new Date(y, m2, 0, 23, 59, 59).toISOString()
+                                                                    // row.userId is the linked user account ID (used by submittedBy filter)
+                                                                    const uid = row.userId || row.id
+                                                                    fetch(`/api/expenses?submittedBy=${uid}&category=${c.key}&dateFrom=${mStart.slice(0,10)}&dateTo=${mEnd.slice(0,10)}`)
+                                                                        .then(r => r.ok ? r.json() : [])
+                                                                        .then((items: any[]) => setModal({ title: `${row.name} — ${c.label}`, subtitle: teamData.monthLabel, items }))
+                                                                        .catch(() => {})
+                                                                }}
+                                                                style={{ background: c.bg, color: c.color, border: "none", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                                                                 {formatINR(amt)}
                                                             </button>
                                                         ) : (
@@ -1251,74 +1328,112 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                                     </td>
                                                 )
                                             })}
-                                            <td style={{ textAlign: "right", padding: "9px 12px", fontWeight: 700, color: hasAny ? "var(--text)" : "var(--text3)" }}>
-                                                {hasAny ? formatINR(row.total) : "—"}
+                                            <td style={{ textAlign: "right", padding: "10px 16px", fontWeight: 800, color: "var(--text)", fontSize: 13, whiteSpace: "nowrap" }}>
+                                                {formatINR(row.total)}
                                             </td>
                                         </tr>
-                                    )
-                                })}
-                            </tbody>
-                            <tfoot>
-                                <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
-                                    <td style={{ padding: "9px 12px", fontWeight: 700, color: "var(--text)" }}>Total</td>
-                                    {EMP_CATS.map(cat => (
-                                        <td key={cat} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: data.totals[cat] > 0 ? "var(--text)" : "var(--text3)" }}>
-                                            {data.totals[cat] > 0 ? formatINR(data.totals[cat]) : "—"}
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
+                                        <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }} colSpan={2}>Grand Total</td>
+                                        {TEAM_COLS.map(c => (
+                                            <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: teamData.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
+                                                {teamData.totals[c.key] > 0 ? formatINR(teamData.totals[c.key]) : "—"}
+                                            </td>
+                                        ))}
+                                        <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 800, color: "var(--text)", fontSize: 14 }}>
+                                            {formatINR(teamData.totals.total)}
                                         </td>
-                                    ))}
-                                    <td style={{ textAlign: "right", padding: "9px 12px", fontWeight: 800, color: "var(--text)", fontSize: 14 }}>
-                                        {formatINR(data.totals.total)}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-
-                    {/* Detail Modal */}
-                    {detailModal && (
-                        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-                            <div style={{ background: "white", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "80vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
-                                    <div>
-                                        <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>{detailModal.cat} Expenses</p>
-                                        <p style={{ fontSize: 12, color: "var(--text3)" }}>{detailModal.month} · {data.employee.name}</p>
-                                    </div>
-                                    <button onClick={() => setDetailModal(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)" }}>
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                                <div style={{ overflowY: "auto", flex: 1, padding: "12px 0" }}>
-                                    {detailModal.items.length === 0 ? (
-                                        <p style={{ textAlign: "center", padding: "24px", color: "var(--text3)", fontSize: 13 }}>No expenses</p>
-                                    ) : detailModal.items.map((item: any) => (
-                                        <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: "1px solid var(--border)" }}>
-                                            <div style={{ flex: 1 }}>
-                                                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{item.title}</p>
-                                                <p style={{ fontSize: 11, color: "var(--text3)" }}>
-                                                    {format(new Date(item.date), "dd MMM yyyy")}
-                                                    {item.travelDays ? ` · ${item.travelDays} days × ₹${item.travelDailyRate}/day` : ""}
-                                                    {item.description ? ` · ${item.description}` : ""}
-                                                </p>
-                                            </div>
-                                            <div style={{ textAlign: "right" }}>
-                                                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{formatINR(item.amount)}</p>
-                                                <span style={{ background: statusStyle(item.status).bg, color: statusStyle(item.status).color, fontSize: 10, padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>
-                                                    {statusStyle(item.status).label}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{detailModal.items.length} expense{detailModal.items.length !== 1 ? "s" : ""}</span>
-                                    <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
-                                        {formatINR(detailModal.items.reduce((s: number, i: any) => s + i.amount, 0))}
-                                    </span>
-                                </div>
-                            </div>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     )}
-                </>
+                </div>
+            )}
+
+            {/* ── Per-employee drill-down (monthly breakdown) ── */}
+            {drillEmpId && (
+                <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--border)", background: "var(--surface2)", flexWrap: "wrap" }}>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", flex: 1 }}>
+                            {drillEmployee?.name ?? "Employee"} — Monthly Breakdown
+                        </p>
+                        <select value={drillYear} onChange={e => setDrillYear(parseInt(e.target.value))}
+                            style={{ height: 30, borderRadius: 7, border: "1px solid var(--border)", background: "white", padding: "0 8px", fontSize: 12, outline: "none" }}>
+                            {drillYears.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+                    {drillLoading ? (
+                        <div style={{ display: "flex", justifyContent: "center", padding: 36 }}>
+                            <Loader2 size={18} className="animate-spin" style={{ color: "var(--text3)" }} />
+                        </div>
+                    ) : drillData && (
+                        <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                                <thead>
+                                    <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                                        <th style={{ textAlign: "left", padding: "8px 16px", fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>Month</th>
+                                        {TEAM_COLS.map(c => (
+                                            <th key={c.key} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
+                                        ))}
+                                        <th style={{ textAlign: "right", padding: "8px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {drillData.rows.map((row: any) => (
+                                        <tr key={row.month} style={{ borderBottom: "1px solid var(--border)", background: row.total > 0 ? "white" : "var(--surface2)" }}>
+                                            <td style={{ padding: "9px 16px", fontWeight: row.total > 0 ? 600 : 400, color: row.total > 0 ? "var(--text)" : "var(--text3)", whiteSpace: "nowrap" }}>
+                                                {row.label}
+                                            </td>
+                                            {TEAM_COLS.map(c => {
+                                                const amt: number = row[c.key] || 0
+                                                const items = row.items?.[c.key] || []
+                                                return (
+                                                    <td key={c.key} style={{ textAlign: "right", padding: "9px 10px" }}>
+                                                        {amt > 0 ? (
+                                                            <button onClick={() => setModal({ title: `${c.label} — ${row.label}`, subtitle: drillData.employee.name, items })}
+                                                                style={{ background: c.bg, color: c.color, border: "none", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                                                                {formatINR(amt)}
+                                                            </button>
+                                                        ) : <span style={{ color: "var(--text3)" }}>—</span>}
+                                                    </td>
+                                                )
+                                            })}
+                                            <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 700, color: row.total > 0 ? "var(--text)" : "var(--text3)" }}>
+                                                {row.total > 0 ? formatINR(row.total) : "—"}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
+                                        <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }}>Total</td>
+                                        {TEAM_COLS.map(c => (
+                                            <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: drillData.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
+                                                {drillData.totals[c.key] > 0 ? formatINR(drillData.totals[c.key]) : "—"}
+                                            </td>
+                                        ))}
+                                        <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 800, color: "var(--text)", fontSize: 14 }}>
+                                            {formatINR(drillData.totals.total)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── Detail Modal ─────────────────────────── */}
+            {modal && (
+                <ExpenseDetailModal
+                    title={modal.title}
+                    subtitle={modal.subtitle}
+                    items={modal.items}
+                    onClose={() => setModal(null)}
+                />
             )}
         </div>
     )
@@ -1337,7 +1452,7 @@ export default function ExpensesPage() {
 
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<ActiveTab>("mine")
+    const [activeTab, setActiveTab] = useState<ActiveTab>(isPrivileged ? "employee" : "mine")
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL")
     const [categoryFilter, setCategoryFilter] = useState<string>("ALL")
     const [projectFilter, setProjectFilter] = useState<string>("ALL")
@@ -1544,39 +1659,42 @@ export default function ExpensesPage() {
             </div>
 
             {/* Tabs */}
-            {isPrivileged && (
-                <div className="flex gap-1 mb-4 border-b border-[var(--border)]">
-                    {(["mine", "all", "accounts", "analytics"] as ActiveTab[]).map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => {
-                                setActiveTab(tab)
-                                if (tab === "accounts" && !monthFilter) {
-                                    setMonthFilter(format(new Date(), "yyyy-MM"))
-                                    setStatusFilter("ALL")
-                                }
-                            }}
-                            className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${activeTab === tab
-                                ? "border-[var(--accent)] text-[var(--accent)]"
-                                : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
+            <div className="flex gap-1 mb-4 border-b border-[var(--border)]">
+                {isPrivileged ? (
+                    /* ── Admin / Manager tabs ── */
+                    <>
+                        {([
+                            { id: "employee", label: "👥 Employee Summary" },
+                            { id: "accounts", label: "💰 Accounts" },
+                            { id: "analytics", label: "📊 Analytics" },
+                            { id: "mine",     label: "My Claims" },
+                        ] as { id: ActiveTab; label: string }[]).map(({ id, label }) => (
+                            <button
+                                key={id}
+                                onClick={() => {
+                                    setActiveTab(id)
+                                    if (id === "accounts" && !monthFilter) {
+                                        setMonthFilter(format(new Date(), "yyyy-MM"))
+                                        setStatusFilter("ALL")
+                                    }
+                                }}
+                                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+                                    activeTab === id
+                                        ? "border-[var(--accent)] text-[var(--accent)]"
+                                        : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
                                 }`}
-                        >
-                            {tab === "mine" ? "My Expenses" : tab === "all" ? "All Expenses" : tab === "accounts" ? "💰 Accounts" : tab === "analytics" ? "📊 Analytics" : "👤 By Employee"}
-                        </button>
-                    ))}
-                    {isPrivileged && (
-                        <button
-                            onClick={() => setActiveTab("employee")}
-                            className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${activeTab === "employee"
-                                ? "border-[var(--accent)] text-[var(--accent)]"
-                                : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
-                            }`}
-                        >
-                            👤 By Employee
-                        </button>
-                    )}
-                </div>
-            )}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </>
+                ) : (
+                    /* ── Regular employee: single tab ── */
+                    <button className="px-4 py-2 text-[13px] font-medium border-b-2 border-[var(--accent)] text-[var(--accent)] -mb-px">
+                        My Expenses
+                    </button>
+                )}
+            </div>
 
             {/* Analytics Tab */}
             {activeTab === "analytics" && (

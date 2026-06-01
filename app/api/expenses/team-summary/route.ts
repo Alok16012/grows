@@ -99,6 +99,7 @@ export async function GET(req: Request) {
                 const total = Object.values(t).reduce((s, v) => s + v, 0)
                 const row: Record<string, any> = {
                     id:          emp.id,
+                    userId:      emp.user?.id ?? null,
                     name:        `${emp.firstName} ${emp.lastName}`,
                     employeeId:  emp.employeeId,
                     designation: emp.designation ?? "—",
