@@ -33,12 +33,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
             prisma.user.findMany({
                 where: {
                     isActive: true,
-                    customRole: {
-                        is: {
-                            isActive: true,
-                            name: { contains: "recruit", mode: "insensitive" },
-                        },
-                    },
+                    role: { in: ["ADMIN", "MANAGER", "HR_MANAGER"] },
                 },
                 select: {
                     id: true,

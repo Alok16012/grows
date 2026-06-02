@@ -7,6 +7,7 @@ import { checkAccess } from "@/lib/permissions"
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
+        if (!session) return new NextResponse("Unauthorized", { status: 401 })
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "onboarding.manage")) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
@@ -81,12 +82,12 @@ export async function POST(req: Request) {
                 return NextResponse.json({ success: true, salary: upsertedSalary })
 
             case "ACTIVATE":
-                // Finalize Employee
+                // Finalize Employee — preserve dateOfJoining if already set by HR/employee
                 const finalEmployee = await prisma.employee.update({
                     where: { id: employeeId },
                     data: {
                         status: "ACTIVE",
-                        dateOfJoining: new Date(),
+                        dateOfJoining: employee.dateOfJoining ?? new Date(),
                     }
                 })
 

@@ -113,7 +113,7 @@ export default function JoinPage() {
     const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
     const [loading, setLoading] = useState(false)
     const [submitted, setSubmitted] = useState(false)
-    const [result, setResult] = useState<{ employeeId: string } | null>(null)
+    const [result, setResult] = useState<{ employeeId: string; uploadWarning?: number } | null>(null)
     const [copied, setCopied] = useState(false)
     // Site + HR dropdown options, loaded from /api/join (public GET)
     const [sites, setSites] = useState<{ id: string; name: string; code?: string | null }[]>([])
@@ -283,11 +283,12 @@ export default function JoinPage() {
 
             const token: string = data.onboardingToken
 
-            // 2. Upload selected documents in parallel
+            // 2. Upload selected documents in parallel — track failures
             const filledDocs = docs.map((d, i) => ({ ...d, idx: i })).filter(d => d.file)
-            await Promise.all(filledDocs.map(d => uploadDoc(d.idx, token)))
+            const uploadResults = await Promise.all(filledDocs.map(d => uploadDoc(d.idx, token)))
+            const failedUploads = uploadResults.filter(r => !r).length
 
-            setResult({ employeeId: data.employeeId })
+            setResult({ employeeId: data.employeeId, ...(failedUploads > 0 ? { uploadWarning: failedUploads } : {}) })
             setSubmitted(true)
         } catch {
             setErrors({ firstName: "Network error. Check your connection." })
@@ -322,6 +323,14 @@ export default function JoinPage() {
                         </div>
                         <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>Save this ID for future reference</div>
                     </div>
+                    {result.uploadWarning ? (
+                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#fff8e1", border: "1px solid #f9a825", borderRadius: 10, padding: "12px 14px", marginBottom: 16, textAlign: "left" }}>
+                            <AlertCircle size={16} color="#f9a825" style={{ marginTop: 1, flexShrink: 0 }} />
+                            <span style={{ fontSize: 13, color: "#5d4037", lineHeight: 1.5 }}>
+                                {result.uploadWarning} document{result.uploadWarning > 1 ? "s" : ""} could not be uploaded. Please re-submit your documents using the link HR will share with you.
+                            </span>
+                        </div>
+                    ) : null}
                     {["HR will verify your documents and complete onboarding tasks", "You'll be contacted on your registered phone", "Keep your ID card and documents ready"].map((t, i) => (
                         <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", textAlign: "left", marginBottom: 8 }}>
                             <CheckCircle2 size={14} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />

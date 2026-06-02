@@ -157,10 +157,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
             // TRIGGER ONBOARDING if JOINED
             if (body.status === "JOINED") {
-                // Determine a safe branch to attach to
-                const branch = await prisma.branch.findFirst({ select: { id: true } })
-                
-                if (branch) {
+                try {
                     // Generate EMP-XXXX ID
                     const lastEmployee = await prisma.employee.findFirst({
                         orderBy: { createdAt: "desc" },
@@ -172,13 +169,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         if (match) nextNum = parseInt(match[0]) + 1
                     }
                     const newEmployeeId = `EMP-${String(nextNum).padStart(4, "0")}`
-                    
+
                     // Split name
                     const nameParts = (body.candidateName || prev.candidateName || "Candidate").split(" ")
                     const firstName = nameParts[0]
                     const lastName = nameParts.slice(1).join(" ") || " "
 
                     const token = crypto.randomUUID()
+
+                    // Optional: attach to first branch if one exists
+                    const branch = await prisma.branch.findFirst({ select: { id: true } })
 
                     const employee = await prisma.employee.create({
                         data: {
@@ -189,7 +189,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             email: body.email || prev.email || null,
                             city: body.city || prev.city || null,
                             designation: body.position || prev.position || null,
-                            branchId: branch.id,
+                            ...(branch ? { branchId: branch.id } : {}),
                             status: "INACTIVE",
                             onboardingToken: token,
                             // Copy profile photo from lead if available
@@ -204,9 +204,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             notes: "Auto-generated from Recruitment"
                         }
                     })
-                    
+
+                    // Update lead with converted employee reference
+                    await prisma.lead.update({
+                        where: { id: params.id },
+                        data: { convertedEmployeeId: employee.id },
+                    }).catch(() => {/* non-fatal */})
+
                     console.log(`[ONBOARDING TRIGGER] Link generated: /onboarding/${token}`)
                     // NOTE: In production, trigger WhatsApp / Email API here using 'token' and candidate 'phone'
+                } catch (onboardErr) {
+                    console.error("[ONBOARDING TRIGGER] Failed to create employee record:", onboardErr)
+                    // Non-fatal: status is already updated; log error but don't fail the response
                 }
             }
         }
