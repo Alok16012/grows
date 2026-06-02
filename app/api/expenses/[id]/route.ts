@@ -60,7 +60,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate } = body
+        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate, travelEntries } = body
 
         const updateData: Record<string, unknown> = {}
 
@@ -75,6 +75,7 @@ export async function PUT(
             if (projectId !== undefined) updateData.projectId = projectId || null
             if (travelDays !== undefined) updateData.travelDays = travelDays ? parseInt(String(travelDays)) : null
             if (travelDailyRate !== undefined) updateData.travelDailyRate = travelDailyRate ? parseFloat(String(travelDailyRate)) : null
+            if (travelEntries !== undefined) updateData.travelEntries = travelEntries ?? null
         }
 
         // Action-based transitions

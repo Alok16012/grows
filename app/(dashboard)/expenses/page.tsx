@@ -29,6 +29,15 @@ type ExpenseUser = { id: string; name: string; email: string }
 
 type ExpenseProject = { id: string; name: string; company?: { id: string; name: string } | null }
 
+// A single leg of a travel journey
+type TravelEntry = {
+    date: string   // "yyyy-MM-dd"
+    from: string
+    to: string
+    kms: number
+    amount: number // kms × perKmRate at submission time
+}
+
 type Expense = {
     id: string
     expenseNo: string
@@ -52,6 +61,7 @@ type Expense = {
     transactionId: string | null
     travelDays: number | null
     travelDailyRate: number | null
+    travelEntries: TravelEntry[] | null
     status: ExpenseStatus
     createdAt: string
     updatedAt: string
@@ -147,6 +157,13 @@ function UserAvatar({ name, size = 28 }: { name: string; size?: number }) {
 
 // ─── Add Expense Modal ─────────────────────────────────────────────────────────
 
+// ─── Travel entry row type used only inside AddExpenseModal ──────────────────
+type TravelRow = { _id: string; date: string; from: string; to: string; kms: string }
+
+function mkRow(date: string): TravelRow {
+    return { _id: Math.random().toString(36).slice(2), date, from: "", to: "", kms: "" }
+}
+
 function AddExpenseModal({
     open, onClose, onSaved, editExpense
 }: {
@@ -160,9 +177,7 @@ function AddExpenseModal({
     const [receiptUploading, setReceiptUploading] = useState(false)
     const receiptInputRef = useRef<HTMLInputElement>(null)
     const [projects, setProjects] = useState<ExpenseProject[]>([])
-    const [travelDays, setTravelDays] = useState("")
-    const [travelRate, setTravelRate] = useState(0)
-    const [travelRateLoaded, setTravelRateLoaded] = useState(false)
+    const [perKmRate, setPerKmRate] = useState(0)
     const [form, setForm] = useState({
         title: "",
         category: "TRAVEL" as ExpenseCategory,
@@ -171,10 +186,12 @@ function AddExpenseModal({
         description: "",
         projectId: "",
     })
+    // Travel journey rows
+    const today = format(new Date(), "yyyy-MM-dd")
+    const [travelRows, setTravelRows] = useState<TravelRow[]>([mkRow(today)])
 
     useEffect(() => {
         if (!open) return
-        // Load projects once per open
         fetch("/api/projects")
             .then(r => r.ok ? r.json() : [])
             .then((data: any) => {
@@ -182,38 +199,40 @@ function AddExpenseModal({
                 setProjects(list.map((p: any) => ({ id: p.id, name: p.name, company: p.company ?? null })))
             })
             .catch(() => setProjects([]))
-        // Load travel daily rate from settings
-        fetch("/api/settings?key=TRAVEL_DAILY_RATE")
+        fetch("/api/settings?key=TRAVEL_PER_KM_RATE")
             .then(r => r.ok ? r.json() : { value: "0" })
-            .then(d => { setTravelRate(parseFloat(d.value || "0")); setTravelRateLoaded(true) })
-            .catch(() => setTravelRateLoaded(true))
+            .then(d => setPerKmRate(parseFloat(d.value || "0")))
+            .catch(() => {})
     }, [open])
 
     useEffect(() => {
-        if (open) {
-            if (editExpense) {
-                setForm({
-                    title: editExpense.title,
-                    category: editExpense.category,
-                    amount: String(editExpense.amount),
-                    date: format(new Date(editExpense.date), "yyyy-MM-dd"),
-                    description: editExpense.description || "",
-                    projectId: editExpense.projectId || "",
-                })
-                setReceiptUrl(editExpense.receiptUrl || "")
-                setTravelDays(editExpense.travelDays ? String(editExpense.travelDays) : "")
+        if (!open) return
+        if (editExpense) {
+            setForm({
+                title: editExpense.title,
+                category: editExpense.category,
+                amount: String(editExpense.amount),
+                date: format(new Date(editExpense.date), "yyyy-MM-dd"),
+                description: editExpense.description || "",
+                projectId: editExpense.projectId || "",
+            })
+            setReceiptUrl(editExpense.receiptUrl || "")
+            // Restore travel rows from saved entries
+            if (editExpense.category === "TRAVEL" && editExpense.travelEntries?.length) {
+                setTravelRows(editExpense.travelEntries.map(e => ({
+                    _id: Math.random().toString(36).slice(2),
+                    date: e.date,
+                    from: e.from,
+                    to: e.to,
+                    kms: String(e.kms),
+                })))
             } else {
-                setForm({
-                    title: "",
-                    category: "TRAVEL",
-                    amount: "",
-                    date: format(new Date(), "yyyy-MM-dd"),
-                    description: "",
-                    projectId: "",
-                })
-                setReceiptUrl("")
-                setTravelDays("")
+                setTravelRows([mkRow(format(new Date(editExpense.date), "yyyy-MM-dd"))])
             }
+        } else {
+            setForm({ title: "", category: "TRAVEL", amount: "", date: today, description: "", projectId: "" })
+            setReceiptUrl("")
+            setTravelRows([mkRow(today)])
         }
     }, [open, editExpense])
 
@@ -231,23 +250,51 @@ function AddExpenseModal({
         finally { setReceiptUploading(false) }
     }
 
+    const updateRow = (id: string, field: keyof TravelRow, val: string) =>
+        setTravelRows(rows => rows.map(r => r._id === id ? { ...r, [field]: val } : r))
+
+    // Derived totals for TRAVEL
+    const travelTotals = travelRows.reduce((acc, r) => {
+        const k = parseFloat(r.kms) || 0
+        acc.kms += k
+        acc.amount += k * perKmRate
+        return acc
+    }, { kms: 0, amount: 0 })
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        // Validate travel rows
+        if (form.category === "TRAVEL") {
+            const incomplete = travelRows.some(r => !r.from.trim() || !r.to.trim() || !parseFloat(r.kms))
+            if (incomplete) { toast.error("Fill From, To, and KMs for every journey row"); return }
+        }
         setLoading(true)
         try {
             const url = editExpense ? `/api/expenses/${editExpense.id}` : "/api/expenses"
             const method = editExpense ? "PUT" : "POST"
+
+            let payload: any = { ...form, receiptUrl: receiptUrl || null, projectId: form.projectId || null }
+
+            if (form.category === "TRAVEL") {
+                const entries: TravelEntry[] = travelRows.map(r => ({
+                    date: r.date,
+                    from: r.from.trim(),
+                    to: r.to.trim(),
+                    kms: parseFloat(r.kms) || 0,
+                    amount: (parseFloat(r.kms) || 0) * perKmRate,
+                }))
+                // Use date of first entry as the expense date
+                payload.date = entries[0].date
+                payload.amount = travelTotals.amount
+                payload.travelEntries = entries
+            } else {
+                payload.amount = parseFloat(form.amount)
+            }
+
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...form,
-                    amount: form.category === "TRAVEL" && travelDays ? travelRate * parseInt(travelDays) : parseFloat(form.amount),
-                    travelDays: form.category === "TRAVEL" && travelDays ? parseInt(travelDays) : undefined,
-                    travelDailyRate: form.category === "TRAVEL" && travelDays ? travelRate : undefined,
-                    receiptUrl: receiptUrl || null,
-                    projectId: form.projectId || null,
-                }),
+                body: JSON.stringify(payload),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(editExpense ? "Expense updated!" : "Expense created!")
@@ -264,15 +311,12 @@ function AddExpenseModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-xl shadow-xl max-h-[92vh] overflow-y-auto">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-white rounded-t-[16px]">
                     <h2 className="text-[15px] font-semibold text-[var(--text)]">
                         {editExpense ? "Edit Expense" : "Add Expense"}
                     </h2>
-                    <button
-                        onClick={onClose}
-                        className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors"
-                    >
+                    <button onClick={onClose} className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
                         <X size={18} />
                     </button>
                 </div>
@@ -282,7 +326,7 @@ function AddExpenseModal({
                         <input
                             value={form.title}
                             onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                            placeholder="e.g. Business trip to Mumbai"
+                            placeholder="e.g. Client visit — Delhi"
                             className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                             required
                         />
@@ -309,63 +353,96 @@ function AddExpenseModal({
                                     value={form.amount}
                                     onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
                                     placeholder="0.00"
-                                    min="0"
-                                    step="0.01"
+                                    min="0" step="0.01"
                                     className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                                     required
                                 />
                             </div>
                         )}
                     </div>
+
+                    {/* ── TRAVEL section ──────────────────────────── */}
                     {form.category === "TRAVEL" && (
-                        <div style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 10, padding: "12px 14px" }}>
-                            <p style={{ fontSize: 11, fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>Monthly Travel Allowance</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[12px] text-[var(--text2)] mb-1">Travel Days *</label>
-                                    <input
-                                        type="number"
-                                        value={travelDays}
-                                        onChange={e => setTravelDays(e.target.value)}
-                                        placeholder="e.g. 22"
-                                        min="1" max="31"
-                                        className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[12px] text-[var(--text2)] mb-1">Daily Rate (₹)</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            value={travelRate || ""}
-                                            onChange={e => setTravelRate(parseFloat(e.target.value) || 0)}
-                                            placeholder="0"
-                                            min="0"
-                                            className="flex-1 h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                        />
-                                    </div>
-                                </div>
+                        <div style={{ border: "1.5px solid #bfdbfe", borderRadius: 12, overflow: "hidden" }}>
+                            {/* Header */}
+                            <div style={{ background: "#eff6ff", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <p style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                    🚗 Travel Journeys
+                                </p>
+                                <span style={{ fontSize: 12, color: "#3b82f6", fontWeight: 600 }}>
+                                    {perKmRate > 0 ? `₹${perKmRate}/km` : "Rate not set"}
+                                </span>
                             </div>
-                            {travelDays && travelRate > 0 && (
-                                <div style={{ marginTop: 8, padding: "6px 10px", background: "white", borderRadius: 6, border: "1px solid rgba(59,130,246,0.2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <span style={{ fontSize: 12, color: "#6b7280" }}>{travelDays} days × ₹{travelRate}/day</span>
-                                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1d4ed8" }}>₹{(parseInt(travelDays) * travelRate).toLocaleString("en-IN")}</span>
+
+                            {/* Rows */}
+                            <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                                {/* Column headers */}
+                                <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, padding: "0 2px" }}>
+                                    {["Date", "From", "To", "KMs", "Amount", ""].map(h => (
+                                        <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>{h}</span>
+                                    ))}
                                 </div>
-                            )}
+
+                                {travelRows.map((row, idx) => {
+                                    const amt = (parseFloat(row.kms) || 0) * perKmRate
+                                    return (
+                                        <div key={row._id} style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, alignItems: "center" }}>
+                                            <input type="date" value={row.date}
+                                                onChange={e => updateRow(row._id, "date", e.target.value)}
+                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%" }} />
+                                            <input value={row.from} onChange={e => updateRow(row._id, "from", e.target.value)}
+                                                placeholder="From" required
+                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
+                                            <input value={row.to} onChange={e => updateRow(row._id, "to", e.target.value)}
+                                                placeholder="To" required
+                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
+                                            <input type="number" value={row.kms} onChange={e => updateRow(row._id, "kms", e.target.value)}
+                                                placeholder="0" min="0" step="0.1" required
+                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%", textAlign: "right" }} />
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: amt > 0 ? "#1d4ed8" : "#9ca3af", textAlign: "right" }}>
+                                                {amt > 0 ? `₹${amt.toLocaleString("en-IN")}` : "—"}
+                                            </span>
+                                            <button type="button" onClick={() => setTravelRows(r => r.filter(x => x._id !== row._id))}
+                                                disabled={travelRows.length === 1}
+                                                style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: travelRows.length === 1 ? "not-allowed" : "pointer", color: travelRows.length === 1 ? "#d1d5db" : "#ef4444", borderRadius: 5 }}>
+                                                <X size={13} />
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            {/* Add row */}
+                            <div style={{ padding: "4px 12px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <button type="button"
+                                    onClick={() => setTravelRows(r => [...r, mkRow(r[r.length - 1]?.date || today)])}
+                                    style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 12px", background: "#eff6ff", color: "#1d4ed8", border: "1px dashed #93c5fd", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                                    <Plus size={13} /> Add Journey
+                                </button>
+                                {travelTotals.kms > 0 && (
+                                    <div style={{ textAlign: "right" }}>
+                                        <span style={{ fontSize: 11, color: "#6b7280" }}>{travelTotals.kms.toFixed(1)} km  </span>
+                                        <span style={{ fontSize: 14, fontWeight: 800, color: "#1d4ed8" }}>₹{travelTotals.amount.toLocaleString("en-IN")}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-[12px] text-[var(--text2)] mb-1">Date *</label>
-                            <input
-                                type="date"
-                                value={form.date}
-                                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                required
-                            />
-                        </div>
-                        <div>
+                        {/* For TRAVEL the date comes from the first journey row; hide standalone date */}
+                        {form.category !== "TRAVEL" && (
+                            <div>
+                                <label className="block text-[12px] text-[var(--text2)] mb-1">Date *</label>
+                                <input
+                                    type="date"
+                                    value={form.date}
+                                    onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                                    className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                    required
+                                />
+                            </div>
+                        )}
+                        <div className={form.category === "TRAVEL" ? "col-span-2" : ""}>
                             <label className="block text-[12px] text-[var(--text2)] mb-1">Project / Client</label>
                             <select
                                 value={form.projectId}
@@ -1116,7 +1193,7 @@ function ExpenseDetailModal({ title, subtitle, items, onClose }: {
     const total = items.reduce((s: number, i: any) => s + (i.amount || 0), 0)
     return (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 16, width: "100%", maxWidth: 540, maxHeight: "82vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
+            <div style={{ background: "white", borderRadius: 16, width: "100%", maxWidth: 600, maxHeight: "84vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--border)" }}>
                     <div>
                         <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{title}</p>
@@ -1127,24 +1204,56 @@ function ExpenseDetailModal({ title, subtitle, items, onClose }: {
                 <div style={{ overflowY: "auto", flex: 1 }}>
                     {items.length === 0 ? (
                         <p style={{ textAlign: "center", padding: 32, color: "var(--text3)", fontSize: 13 }}>No expenses found</p>
-                    ) : items.map((item: any) => (
-                        <div key={item.id} style={{ display: "flex", gap: 12, padding: "11px 20px", borderBottom: "1px solid var(--border)" }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{item.title}</p>
-                                <p style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.5 }}>
-                                    {format(new Date(item.date), "dd MMM yyyy")}
-                                    {item.travelDays ? ` · ${item.travelDays} days × ₹${item.travelDailyRate}/day` : ""}
-                                    {item.description ? ` · ${item.description}` : ""}
-                                </p>
+                    ) : items.map((item: any) => {
+                        const journeys: TravelEntry[] = Array.isArray(item.travelEntries) ? item.travelEntries : []
+                        return (
+                            <div key={item.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                                {/* Expense header row */}
+                                <div style={{ display: "flex", gap: 12, padding: "11px 20px 8px" }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{item.title}</p>
+                                        <p style={{ fontSize: 11, color: "var(--text3)" }}>
+                                            {format(new Date(item.date), "dd MMM yyyy")}
+                                            {item.description ? ` · ${item.description}` : ""}
+                                        </p>
+                                    </div>
+                                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{formatINR(item.amount)}</p>
+                                        <span style={{ background: statusStyle(item.status).bg, color: statusStyle(item.status).color, fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                                            {statusStyle(item.status).label}
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* Journey breakdown for travel expenses */}
+                                {journeys.length > 0 && (
+                                    <div style={{ margin: "0 20px 10px", background: "#eff6ff", borderRadius: 8, overflow: "hidden", border: "1px solid #bfdbfe" }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", background: "#dbeafe", gap: 8 }}>
+                                            {["Date", "From", "To", "KMs", "Amount"].map(h => (
+                                                <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#1e40af", textTransform: "uppercase" }}>{h}</span>
+                                            ))}
+                                        </div>
+                                        {journeys.map((j, ji) => (
+                                            <div key={ji} style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", gap: 8, borderTop: ji > 0 ? "1px solid #bfdbfe" : "none" }}>
+                                                <span style={{ fontSize: 12, color: "#374151" }}>{format(new Date(j.date), "dd MMM")}</span>
+                                                <span style={{ fontSize: 12, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.from}</span>
+                                                <span style={{ fontSize: 12, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.to}</span>
+                                                <span style={{ fontSize: 12, color: "#374151", textAlign: "right" }}>{j.kms}</span>
+                                                <span style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8", textAlign: "right" }}>{formatINR(j.amount)}</span>
+                                            </div>
+                                        ))}
+                                        {journeys.length > 1 && (
+                                            <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", gap: 8, borderTop: "1px solid #93c5fd", background: "#dbeafe" }}>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#1e40af" }}>Total</span>
+                                                <span /><span />
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#1e40af", textAlign: "right" }}>{journeys.reduce((s, j) => s + j.kms, 0)}</span>
+                                                <span style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", textAlign: "right" }}>{formatINR(journeys.reduce((s, j) => s + j.amount, 0))}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                            <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{formatINR(item.amount)}</p>
-                                <span style={{ background: statusStyle(item.status).bg, color: statusStyle(item.status).color, fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
-                                    {statusStyle(item.status).label}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
                 <div style={{ padding: "10px 20px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--surface2)" }}>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>{items.length} expense{items.length !== 1 ? "s" : ""}</span>
@@ -1187,7 +1296,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     }, [month])
 
     useEffect(() => {
-        fetch("/api/settings?key=TRAVEL_DAILY_RATE")
+        fetch("/api/settings?key=TRAVEL_PER_KM_RATE")
             .then(r => r.ok ? r.json() : { value: "0" })
             .then(d => { const v = parseFloat(d.value || "0"); setTravelRate(v); setRateInput(String(v)) })
             .catch(() => {})
@@ -1209,7 +1318,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
             await fetch("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key: "TRAVEL_DAILY_RATE", value: rateInput }),
+                body: JSON.stringify({ key: "TRAVEL_PER_KM_RATE", value: rateInput }),
             })
             setTravelRate(parseFloat(rateInput) || 0)
             setShowRateSetting(false)
@@ -1240,11 +1349,11 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                     <>
                         <button onClick={() => setShowRateSetting(s => !s)}
                             style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-                            ⚙️ Travel: ₹{travelRate}/day
+                            ⚙️ Travel: ₹{travelRate}/km
                         </button>
                         {showRateSetting && (
                             <div style={{ display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "3px 10px" }}>
-                                <span style={{ fontSize: 12, color: "var(--text3)" }}>₹/day</span>
+                                <span style={{ fontSize: 12, color: "var(--text3)" }}>₹/km</span>
                                 <input type="number" value={rateInput} onChange={e => setRateInput(e.target.value)}
                                     style={{ width: 72, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
                                 <button onClick={saveRate} disabled={savingRate}

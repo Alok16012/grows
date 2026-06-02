@@ -1634,8 +1634,9 @@ model Expense {
   paymentDate     DateTime?       // actual date the payment was made (accounts-entered)
   paymentMode     String?         // Cash, NEFT, etc.
   transactionId   String?         // UTR / transaction reference number
-  travelDays      Int?            // TRAVEL expenses: number of days travelled in the month
-  travelDailyRate Float?          // TRAVEL expenses: ₹-per-day rate locked at submission time
+  travelDays      Int?            // legacy – kept for backward compat
+  travelDailyRate Float?          // legacy – kept for backward compat
+  travelEntries   Json?           // [{date,from,to,kms,amount}] per-journey breakdown
   status          ExpenseStatus   @default(DRAFT)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt

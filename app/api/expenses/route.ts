@@ -141,7 +141,7 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { title, category, amount, date, description, employeeId, receiptUrl, projectId, travelDays, travelDailyRate } = body
+        const { title, category, amount, date, description, employeeId, receiptUrl, projectId, travelDays, travelDailyRate, travelEntries } = body
 
         if (!title || !category || !amount || !date) {
             return new NextResponse("title, category, amount, and date are required", { status: 400 })
@@ -164,6 +164,7 @@ export async function POST(req: Request) {
             status: "DRAFT",
             travelDays: travelDays ? parseInt(String(travelDays)) : null,
             travelDailyRate: travelDailyRate ? parseFloat(String(travelDailyRate)) : null,
+            travelEntries: travelEntries ?? null,
         }
         let expense
         try {
