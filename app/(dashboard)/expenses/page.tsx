@@ -1648,6 +1648,7 @@ export default function ExpensesPage() {
     const [addOpen, setAddOpen] = useState(false)
     const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
     const [projectsList, setProjectsList] = useState<ExpenseProject[]>([])
+    const [pendingCount, setPendingCount] = useState(0)
 
     // Load projects once for the filter dropdown
     useEffect(() => {
@@ -1659,6 +1660,17 @@ export default function ExpensesPage() {
             })
             .catch(() => setProjectsList([]))
     }, [])
+
+    // Load pending-approval count for admin badge
+    const refreshPendingCount = useCallback(() => {
+        if (!isPrivileged) return
+        fetch("/api/expenses?status=SUBMITTED")
+            .then(r => r.ok ? r.json() : [])
+            .then((data: Expense[]) => setPendingCount(Array.isArray(data) ? data.length : 0))
+            .catch(() => {})
+    }, [isPrivileged])
+
+    useEffect(() => { refreshPendingCount() }, [refreshPendingCount])
 
     // Once session is known, flip sessionReady and set the correct starting tab.
     // Must run BEFORE the fetch effect (defined below) so that when sessionReady becomes
@@ -1862,6 +1874,7 @@ export default function ExpensesPage() {
                     <>
                         {([
                             { id: "employee", label: "👥 Employee Summary" },
+                            { id: "all",      label: "📋 All Expenses" },
                             { id: "accounts", label: "💰 Accounts" },
                             { id: "analytics", label: "📊 Analytics" },
                             { id: "mine",     label: "My Claims" },
@@ -1870,18 +1883,27 @@ export default function ExpensesPage() {
                                 key={id}
                                 onClick={() => {
                                     setActiveTab(id)
+                                    if (id === "all") {
+                                        setStatusFilter("SUBMITTED")
+                                        setMonthFilter("")
+                                    }
                                     if (id === "accounts" && !monthFilter) {
                                         setMonthFilter(format(new Date(), "yyyy-MM"))
                                         setStatusFilter("ALL")
                                     }
                                 }}
-                                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+                                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
                                     activeTab === id
                                         ? "border-[var(--accent)] text-[var(--accent)]"
                                         : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
                                 }`}
                             >
                                 {label}
+                                {id === "all" && pendingCount > 0 && (
+                                    <span style={{ background: "#ef4444", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>
+                                        {pendingCount}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </>
@@ -2074,12 +2096,12 @@ export default function ExpensesPage() {
             <AddExpenseModal
                 open={addOpen}
                 onClose={() => setAddOpen(false)}
-                onSaved={fetchExpenses}
+                onSaved={() => { fetchExpenses(); refreshPendingCount() }}
             />
             <ExpenseDrawer
                 expense={selectedExpense}
                 onClose={() => setSelectedExpense(null)}
-                onRefresh={fetchExpenses}
+                onRefresh={() => { fetchExpenses(); refreshPendingCount() }}
                 isPrivileged={isPrivileged}
                 currentUserId={userId}
             />

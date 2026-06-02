@@ -177,7 +177,8 @@ export async function POST(req: Request) {
         const body = await req.json()
         const { title, category, amount, date, description, employeeId, receiptUrl, projectId, travelDays, travelDailyRate, travelEntries } = body
 
-        if (!title || !category || !amount || !date) {
+        const parsedAmount = parseFloat(String(amount))
+        if (!title || !category || amount == null || isNaN(parsedAmount) || !date) {
             return new NextResponse("title, category, amount, and date are required", { status: 400 })
         }
 
@@ -189,7 +190,7 @@ export async function POST(req: Request) {
             expenseNo,
             title,
             category,
-            amount: parseFloat(String(amount)),
+            amount: parsedAmount,
             date: new Date(date),
             description: description || null,
             receiptUrl: receiptUrl || null,
