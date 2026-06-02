@@ -84,23 +84,57 @@ export async function GET(req: Request) {
             } catch {
                 // Ultimate fallback: raw SQL selecting only stable columns.
                 // Safe even before travelDays / travelDailyRate migration runs.
+                // IMPORTANT: always enforce submittedBy filter for non-privileged users.
                 try {
                     const { Prisma } = await import("@prisma/client")
-                    const rows: any[] = await (prisma as any).$queryRaw(
-                        Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
-                                   description, "receiptUrl", "submittedBy", "employeeId",
-                                   "projectId", "approvedBy", "approvedAt", "rejectedAt",
-                                   "rejectionReason", "paidAt", "paymentDate", "paymentMode",
-                                   "transactionId", status, "createdAt", "updatedAt"
-                                   FROM "Expense"
-                                   ORDER BY "createdAt" DESC`
-                    )
+                    let rows: any[]
+                    if (!isPrivileged) {
+                        // Non-privileged: hard-filter to own expenses only
+                        rows = await (prisma as any).$queryRaw(
+                            Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
+                                       description, "receiptUrl", "submittedBy", "employeeId",
+                                       "projectId", "approvedBy", "approvedAt", "rejectedAt",
+                                       "rejectionReason", "paidAt", "paymentDate", "paymentMode",
+                                       "transactionId", status, "createdAt", "updatedAt"
+                                       FROM "Expense"
+                                       WHERE "submittedBy" = ${session.user.id}
+                                       ORDER BY "createdAt" DESC`
+                        )
+                    } else {
+                        const sbFilter = where.submittedBy as string | undefined
+                        rows = sbFilter
+                            ? await (prisma as any).$queryRaw(
+                                Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
+                                           description, "receiptUrl", "submittedBy", "employeeId",
+                                           "projectId", "approvedBy", "approvedAt", "rejectedAt",
+                                           "rejectionReason", "paidAt", "paymentDate", "paymentMode",
+                                           "transactionId", status, "createdAt", "updatedAt"
+                                           FROM "Expense"
+                                           WHERE "submittedBy" = ${sbFilter}
+                                           ORDER BY "createdAt" DESC`
+                            )
+                            : await (prisma as any).$queryRaw(
+                                Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
+                                           description, "receiptUrl", "submittedBy", "employeeId",
+                                           "projectId", "approvedBy", "approvedAt", "rejectedAt",
+                                           "rejectionReason", "paidAt", "paymentDate", "paymentMode",
+                                           "transactionId", status, "createdAt", "updatedAt"
+                                           FROM "Expense"
+                                           ORDER BY "createdAt" DESC`
+                            )
+                    }
                     expenses = rows
                 } catch (rawErr) {
                     console.error("[EXPENSES_GET] $queryRaw fallback failed:", rawErr)
                     expenses = []  // return empty list rather than 500
                 }
             }
+        }
+
+        // Final safety net: regardless of which query path ran,
+        // non-privileged users must NEVER receive another user's expense.
+        if (!isPrivileged) {
+            expenses = expenses.filter((e: any) => e.submittedBy === session.user.id)
         }
 
         // Fetch user info for submittedBy and approvedBy
