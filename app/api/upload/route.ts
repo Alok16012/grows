@@ -10,11 +10,30 @@ export async function POST(req: Request) {
 
     // Allow requests that carry a valid onboarding token (unauthenticated employees)
     const onboardingToken = req.headers.get("x-onboarding-token")
+    // Allow uploads from the public recruitment apply form (validated by slug)
+    const formSlug        = req.headers.get("x-form-slug")
+    // Allow uploads from the public /join self-registration page
+    const isJoinForm      = req.headers.get("x-join-form") === "true"
+
     let isAuthorized = !!session
 
     if (!isAuthorized && onboardingToken) {
         const employee = await prisma.employee.findUnique({ where: { onboardingToken } })
         if (employee) isAuthorized = true
+    }
+
+    // Validate apply-form slug — must be an active lead form
+    if (!isAuthorized && formSlug) {
+        const form = await prisma.leadForm.findFirst({
+            where: { slug: formSlug, isActive: true },
+            select: { id: true },
+        })
+        if (form) isAuthorized = true
+    }
+
+    // Allow self-registration join form (public, no token exists yet pre-submit)
+    if (!isAuthorized && isJoinForm) {
+        isAuthorized = true
     }
 
     if (!isAuthorized) {

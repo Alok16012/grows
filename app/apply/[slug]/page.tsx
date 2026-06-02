@@ -78,7 +78,12 @@ export default function ApplyPage() {
         try {
             const fd = new FormData()
             fd.append("file", file)
-            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            // Pass form slug so the upload API can verify this is a valid active form
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                headers: { "x-form-slug": slug },
+                body: fd,
+            })
             const data = await res.json()
             if (data.url) setPhoto(data.url)
             else setError("Photo upload failed")

@@ -146,7 +146,12 @@ export default function JoinPage() {
         try {
             const fd = new FormData()
             fd.append("file", file)
-            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            // Pass x-join-form header so the upload API allows this public form
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                headers: { "x-join-form": "true" },
+                body: fd,
+            })
             const data = await res.json()
             if (data.url) setPhoto(data.url)
         } catch { /* silent */ }
