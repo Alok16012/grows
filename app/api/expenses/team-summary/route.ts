@@ -5,8 +5,13 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { Prisma } from "@prisma/client"
 
-// Categories shown as columns in the dashboard table
-const COLS = ["TRAVEL", "FUEL", "FOOD", "HOTEL", "MATERIAL", "MOBILE_RECHARGE", "OFFICE_SUPPLIES", "OTHER"] as const
+// Key categories shown as columns in the dashboard summary table.
+// All categories still contribute to each employee's total.
+const COLS = [
+    "TRAVEL", "TRANSPORTATION", "FUEL", "FOOD",
+    "ACCOMMODATION", "SALARY_WAGES", "LABOUR", "CLIENT_PROJECT",
+    "SAFETY_PPE", "REPAIR_MAINTENANCE", "MISCELLANEOUS",
+] as const
 
 /**
  * GET /api/expenses/team-summary?month=YYYY-MM

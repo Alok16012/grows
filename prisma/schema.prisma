@@ -1598,18 +1598,45 @@ enum ExpenseStatus {
 }
 
 enum ExpenseCategory {
+  // ── Travel ──────────────────────────────────────────
   TRAVEL
-  FOOD
-  ACCOMMODATION
+  TRANSPORTATION
   FUEL
+  ACCOMMODATION
+  // ── Daily Ops ───────────────────────────────────────
+  FOOD
+  HOTEL
+  MATERIAL
   OFFICE_SUPPLIES
+  OFFICE_CONSUMABLES
+  STATIONERY_PRINTING
+  HOUSEKEEPING_CLEANING
+  UTILITY_ELECTRICAL
+  REPAIR_MAINTENANCE
+  // ── People & HR ─────────────────────────────────────
+  SALARY_WAGES
+  EMPLOYEE_ADVANCE
+  RECRUITMENT_EXPENSE
+  CANDIDATE_EXPENSE
+  HR_OPERATIONS
+  SAFETY_PPE
+  // ── Business / Client ───────────────────────────────
+  CLIENT_PROJECT
+  LABOUR
+  INSPECTION_QUALITY
+  COMPLIANCE_AUDIT
+  CELEBRATION
+  // ── Tech & Admin ────────────────────────────────────
+  IT_ACCESSORIES
+  COURIER
+  DOCUMENTATION_LEGAL
+  MOBILE_RECHARGE
+  // ── Legacy / Catch-all ──────────────────────────────
   COMMUNICATION
   MEDICAL
   UNIFORM
   TRAINING
-  HOTEL
-  MATERIAL
-  MOBILE_RECHARGE
+  MISCELLANEOUS
   OTHER
 }
 

@@ -19,11 +19,20 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 
 type ExpenseStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "PAID"
 type ExpenseCategory =
-    | "TRAVEL" | "FOOD" | "ACCOMMODATION" | "FUEL"
-    | "OFFICE_SUPPLIES" | "COMMUNICATION" | "MEDICAL"
-    | "UNIFORM" | "TRAINING"
-    | "HOTEL" | "MATERIAL" | "MOBILE_RECHARGE"
-    | "OTHER"
+    // Travel
+    | "TRAVEL" | "TRANSPORTATION" | "FUEL" | "ACCOMMODATION"
+    // Daily Ops
+    | "FOOD" | "HOTEL" | "MATERIAL" | "OFFICE_SUPPLIES" | "OFFICE_CONSUMABLES"
+    | "STATIONERY_PRINTING" | "HOUSEKEEPING_CLEANING" | "UTILITY_ELECTRICAL" | "REPAIR_MAINTENANCE"
+    // People & HR
+    | "SALARY_WAGES" | "EMPLOYEE_ADVANCE" | "RECRUITMENT_EXPENSE" | "CANDIDATE_EXPENSE"
+    | "HR_OPERATIONS" | "SAFETY_PPE"
+    // Business / Client
+    | "CLIENT_PROJECT" | "LABOUR" | "INSPECTION_QUALITY" | "COMPLIANCE_AUDIT" | "CELEBRATION"
+    // Tech & Admin
+    | "IT_ACCESSORIES" | "COURIER" | "DOCUMENTATION_LEGAL" | "MOBILE_RECHARGE"
+    // Legacy / Catch-all
+    | "COMMUNICATION" | "MEDICAL" | "UNIFORM" | "TRAINING" | "MISCELLANEOUS" | "OTHER"
 
 type ExpenseUser = { id: string; name: string; email: string }
 
@@ -71,12 +80,22 @@ type Expense = {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-// Categories shown in create / filter dropdowns (Growus spec).
-// Legacy categories (ACCOMMODATION, OFFICE_SUPPLIES, COMMUNICATION, MEDICAL,
-// UNIFORM, TRAINING) still render correctly for historical entries.
+// All 26 active categories — in display order.
 const CATEGORIES: ExpenseCategory[] = [
-    "TRAVEL", "FUEL", "FOOD", "HOTEL",
-    "MATERIAL", "MOBILE_RECHARGE", "OFFICE_SUPPLIES", "OTHER",
+    // Travel
+    "TRAVEL", "TRANSPORTATION", "FUEL", "ACCOMMODATION",
+    // Daily Ops
+    "FOOD", "HOTEL", "MATERIAL", "OFFICE_SUPPLIES", "OFFICE_CONSUMABLES",
+    "STATIONERY_PRINTING", "HOUSEKEEPING_CLEANING", "UTILITY_ELECTRICAL", "REPAIR_MAINTENANCE",
+    // People & HR
+    "SALARY_WAGES", "EMPLOYEE_ADVANCE", "RECRUITMENT_EXPENSE", "CANDIDATE_EXPENSE",
+    "HR_OPERATIONS", "SAFETY_PPE",
+    // Business / Client
+    "CLIENT_PROJECT", "LABOUR", "INSPECTION_QUALITY", "COMPLIANCE_AUDIT", "CELEBRATION",
+    // Tech & Admin
+    "IT_ACCESSORIES", "COURIER", "DOCUMENTATION_LEGAL", "MOBILE_RECHARGE",
+    // Catch-all
+    "MISCELLANEOUS",
 ]
 
 const PAYMENT_MODES = ["Cash", "NEFT", "RTGS", "UPI", "Cheque", "Bank Transfer"]
@@ -89,38 +108,92 @@ function formatINR(amount: number): string {
 
 function categoryLabel(cat: ExpenseCategory): string {
     const map: Record<ExpenseCategory, string> = {
-        TRAVEL: "Travel",
-        FOOD: "Food",
-        ACCOMMODATION: "Accommodation",
-        FUEL: "Fuel",
-        OFFICE_SUPPLIES: "Office Expense",
-        COMMUNICATION: "Communication",
-        MEDICAL: "Medical",
-        UNIFORM: "Uniform",
-        TRAINING: "Training",
-        HOTEL: "Hotel",
-        MATERIAL: "Material",
-        MOBILE_RECHARGE: "Mobile Recharge",
-        OTHER: "Other",
+        // Travel
+        TRAVEL:               "Travel",
+        TRANSPORTATION:       "Transportation",
+        FUEL:                 "Fuel",
+        ACCOMMODATION:        "Accommodation / Room Rent",
+        // Daily Ops
+        FOOD:                 "Food & Refreshment",
+        HOTEL:                "Hotel",
+        MATERIAL:             "Material",
+        OFFICE_SUPPLIES:      "Office Supplies",
+        OFFICE_CONSUMABLES:   "Office Consumables",
+        STATIONERY_PRINTING:  "Stationery & Printing",
+        HOUSEKEEPING_CLEANING:"Housekeeping & Cleaning",
+        UTILITY_ELECTRICAL:   "Office Utility & Electrical",
+        REPAIR_MAINTENANCE:   "Repair & Maintenance",
+        // People & HR
+        SALARY_WAGES:         "Salary & Wages",
+        EMPLOYEE_ADVANCE:     "Employee Advance",
+        RECRUITMENT_EXPENSE:  "Recruitment Expense",
+        CANDIDATE_EXPENSE:    "Candidate Expense",
+        HR_OPERATIONS:        "Attendance & HR Operations",
+        SAFETY_PPE:           "Safety Shoes & PPE",
+        // Business / Client
+        CLIENT_PROJECT:       "Client / Project Expense",
+        LABOUR:               "Labour Expense",
+        INSPECTION_QUALITY:   "Inspection & Quality Operations",
+        COMPLIANCE_AUDIT:     "Compliance & Audit Expense",
+        CELEBRATION:          "Celebration & Employee Engagement",
+        // Tech & Admin
+        IT_ACCESSORIES:       "IT Accessories",
+        COURIER:              "Courier Charges",
+        DOCUMENTATION_LEGAL:  "Documentation & Legal",
+        MOBILE_RECHARGE:      "Mobile Recharge",
+        // Legacy / Catch-all
+        COMMUNICATION:        "Communication",
+        MEDICAL:              "Medical",
+        UNIFORM:              "Uniform",
+        TRAINING:             "Training",
+        MISCELLANEOUS:        "Miscellaneous Expense",
+        OTHER:                "Other",
     }
     return map[cat] || cat
 }
 
 function categoryStyle(cat: ExpenseCategory): { bg: string; color: string } {
     const map: Record<ExpenseCategory, { bg: string; color: string }> = {
-        TRAVEL: { bg: "#eff6ff", color: "#3b82f6" },
-        FOOD: { bg: "#fff7ed", color: "#f97316" },
-        ACCOMMODATION: { bg: "#fdf4ff", color: "#a855f7" },
-        FUEL: { bg: "#fefce8", color: "#ca8a04" },
-        OFFICE_SUPPLIES: { bg: "#f0fdfa", color: "#0d9488" },
-        COMMUNICATION: { bg: "#ecfeff", color: "#0891b2" },
-        MEDICAL: { bg: "#fef2f2", color: "#ef4444" },
-        UNIFORM: { bg: "#eef2ff", color: "#6366f1" },
-        TRAINING: { bg: "#f0fdf4", color: "#22c55e" },
-        HOTEL: { bg: "#fdf4ff", color: "#a855f7" },
-        MATERIAL: { bg: "#fef3c7", color: "#b45309" },
-        MOBILE_RECHARGE: { bg: "#ecfeff", color: "#0891b2" },
-        OTHER: { bg: "#f9fafb", color: "#6b7280" },
+        // Travel
+        TRAVEL:               { bg: "#eff6ff", color: "#3b82f6" },
+        TRANSPORTATION:       { bg: "#eef2ff", color: "#6366f1" },
+        FUEL:                 { bg: "#fefce8", color: "#ca8a04" },
+        ACCOMMODATION:        { bg: "#fdf4ff", color: "#a855f7" },
+        // Daily Ops
+        FOOD:                 { bg: "#fff7ed", color: "#f97316" },
+        HOTEL:                { bg: "#fdf4ff", color: "#a855f7" },
+        MATERIAL:             { bg: "#fef3c7", color: "#b45309" },
+        OFFICE_SUPPLIES:      { bg: "#f0fdfa", color: "#0d9488" },
+        OFFICE_CONSUMABLES:   { bg: "#f0fdfa", color: "#0f766e" },
+        STATIONERY_PRINTING:  { bg: "#f1f5f9", color: "#475569" },
+        HOUSEKEEPING_CLEANING:{ bg: "#ecfeff", color: "#0891b2" },
+        UTILITY_ELECTRICAL:   { bg: "#fffbeb", color: "#d97706" },
+        REPAIR_MAINTENANCE:   { bg: "#fef3c7", color: "#92400e" },
+        // People & HR
+        SALARY_WAGES:         { bg: "#f0fdf4", color: "#16a34a" },
+        EMPLOYEE_ADVANCE:     { bg: "#f0fdf4", color: "#15803d" },
+        RECRUITMENT_EXPENSE:  { bg: "#f5f3ff", color: "#7c3aed" },
+        CANDIDATE_EXPENSE:    { bg: "#fdf2f8", color: "#db2777" },
+        HR_OPERATIONS:        { bg: "#ecfdf5", color: "#059669" },
+        SAFETY_PPE:           { bg: "#fef2f2", color: "#dc2626" },
+        // Business / Client
+        CLIENT_PROJECT:       { bg: "#eff6ff", color: "#1d4ed8" },
+        LABOUR:               { bg: "#f7fee7", color: "#65a30d" },
+        INSPECTION_QUALITY:   { bg: "#f0f9ff", color: "#0284c7" },
+        COMPLIANCE_AUDIT:     { bg: "#f4f4f5", color: "#52525b" },
+        CELEBRATION:          { bg: "#fff1f2", color: "#f43f5e" },
+        // Tech & Admin
+        IT_ACCESSORIES:       { bg: "#eef2ff", color: "#4f46e5" },
+        COURIER:              { bg: "#f0f9ff", color: "#0ea5e9" },
+        DOCUMENTATION_LEGAL:  { bg: "#f8fafc", color: "#334155" },
+        MOBILE_RECHARGE:      { bg: "#ecfeff", color: "#0891b2" },
+        // Legacy
+        COMMUNICATION:        { bg: "#ecfeff", color: "#0891b2" },
+        MEDICAL:              { bg: "#fef2f2", color: "#ef4444" },
+        UNIFORM:              { bg: "#eef2ff", color: "#6366f1" },
+        TRAINING:             { bg: "#f0fdf4", color: "#22c55e" },
+        MISCELLANEOUS:        { bg: "#f9fafb", color: "#6b7280" },
+        OTHER:                { bg: "#f9fafb", color: "#6b7280" },
     }
     return map[cat] || { bg: "#f9fafb", color: "#6b7280" }
 }
@@ -1168,22 +1241,20 @@ function StatCard({
 
 // ─── Employee Summary Tab ──────────────────────────────────────────────────────
 
-const EMP_CATS: ExpenseCategory[] = ["TRAVEL","FOOD","FUEL","HOTEL","MATERIAL","MOBILE_RECHARGE","OFFICE_SUPPLIES","OTHER"]
-const CAT_LABELS: Record<string, string> = {
-    TRAVEL: "Travel", FOOD: "Food", FUEL: "Fuel", HOTEL: "Hotel",
-    MATERIAL: "Material", MOBILE_RECHARGE: "Mobile", OFFICE_SUPPLIES: "Office", OTHER: "Other"
-}
-
-// Column config for the team table
+// Column config for the team summary table — top categories shown as columns.
+// All other categories contribute to the row total but aren't shown individually.
 const TEAM_COLS = [
-    { key: "TRAVEL",          label: "Travel",         color: "#3b82f6", bg: "#eff6ff" },
-    { key: "FUEL",            label: "Fuel",           color: "#ca8a04", bg: "#fefce8" },
-    { key: "FOOD",            label: "Food",           color: "#f97316", bg: "#fff7ed" },
-    { key: "HOTEL",           label: "Hotel",          color: "#a855f7", bg: "#fdf4ff" },
-    { key: "MATERIAL",        label: "Material",       color: "#b45309", bg: "#fef3c7" },
-    { key: "MOBILE_RECHARGE", label: "Mobile",         color: "#0891b2", bg: "#ecfeff" },
-    { key: "OFFICE_SUPPLIES", label: "Office",         color: "#0d9488", bg: "#f0fdfa" },
-    { key: "OTHER",           label: "Other",          color: "#6b7280", bg: "#f9fafb" },
+    { key: "TRAVEL",               label: "Travel",         color: "#3b82f6", bg: "#eff6ff" },
+    { key: "TRANSPORTATION",       label: "Transport",      color: "#6366f1", bg: "#eef2ff" },
+    { key: "FUEL",                 label: "Fuel",           color: "#ca8a04", bg: "#fefce8" },
+    { key: "FOOD",                 label: "Food",           color: "#f97316", bg: "#fff7ed" },
+    { key: "ACCOMMODATION",        label: "Stay",           color: "#a855f7", bg: "#fdf4ff" },
+    { key: "SALARY_WAGES",         label: "Salary",         color: "#16a34a", bg: "#f0fdf4" },
+    { key: "LABOUR",               label: "Labour",         color: "#65a30d", bg: "#f7fee7" },
+    { key: "CLIENT_PROJECT",       label: "Client/Proj",   color: "#1d4ed8", bg: "#eff6ff" },
+    { key: "SAFETY_PPE",           label: "Safety/PPE",    color: "#dc2626", bg: "#fef2f2" },
+    { key: "REPAIR_MAINTENANCE",   label: "Repair",         color: "#92400e", bg: "#fef3c7" },
+    { key: "MISCELLANEOUS",        label: "Misc",           color: "#6b7280", bg: "#f9fafb" },
 ]
 
 // ─── Detail modal (shared) ────────────────────────────────────────────────────
