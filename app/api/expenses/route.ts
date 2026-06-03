@@ -186,19 +186,19 @@ export async function POST(req: Request) {
         const count = await prisma.expense.count()
         const expenseNo = `EXP-${String(count + 1).padStart(4, "0")}`
 
-        // Try inserting with progressively fewer columns to handle
-        // databases where newer migrations haven't run yet.
         const id = crypto.randomUUID()
         let expense: any = null
 
-        // Attempt 1 — all columns (fully migrated DB)
+        // Helper: check if the row landed in DB despite Prisma throwing on result parsing.
+        // This happens when the INSERT committed but Prisma couldn't deserialise a new column.
+        const findInserted = () =>
+            (prisma as any).expense.findUnique({ where: { id } }).catch(() => null)
+
+        // Attempt 1 — all columns
         try {
             expense = await prisma.expense.create({
                 data: {
-                    id,
-                    expenseNo,
-                    title,
-                    category,
+                    id, expenseNo, title, category,
                     amount: parsedAmount,
                     date: new Date(date),
                     description: description || null,
@@ -214,17 +214,16 @@ export async function POST(req: Request) {
             })
         } catch (e1: any) {
             console.warn("[EXPENSES_POST] attempt 1 failed:", e1?.message)
+            // Row may have inserted but result parsing threw — check before retrying
+            expense = await findInserted()
         }
 
-        // Attempt 2 — without travel columns (pre-travel-migration DB)
+        // Attempt 2 — without travel columns
         if (!expense) {
             try {
                 expense = await prisma.expense.create({
                     data: {
-                        id,
-                        expenseNo,
-                        title,
-                        category,
+                        id, expenseNo, title, category,
                         amount: parsedAmount,
                         date: new Date(date),
                         description: description || null,
@@ -237,32 +236,36 @@ export async function POST(req: Request) {
                 })
             } catch (e2: any) {
                 console.warn("[EXPENSES_POST] attempt 2 failed:", e2?.message)
+                expense = await findInserted()
             }
         }
 
-        // Attempt 3 — raw SQL with only the guaranteed original columns
+        // Attempt 3 — raw SQL, guaranteed to work on any DB state
         if (!expense) {
-            const { Prisma } = await import("@prisma/client")
-            const rows: any[] = await (prisma as any).$queryRaw(
-                Prisma.sql`INSERT INTO "Expense"
-                    (id, "expenseNo", title, category, amount, date, description,
-                     "receiptUrl", "submittedBy", "employeeId", status, "createdAt", "updatedAt")
-                    VALUES (
-                        ${id}, ${expenseNo}, ${title}, ${category}::"ExpenseCategory",
-                        ${parsedAmount}, ${new Date(date)}, ${description || null},
-                        ${receiptUrl || null}, ${session.user.id}, ${employeeId || null},
-                        'DRAFT'::"ExpenseStatus", now(), now()
-                    )
-                    RETURNING id, "expenseNo", title, category, amount, date,
-                              description, "receiptUrl", "submittedBy", "employeeId",
-                              status, "createdAt", "updatedAt"`
-            )
-            expense = rows[0]
+            try {
+                const { Prisma } = await import("@prisma/client")
+                const rows: any[] = await (prisma as any).$queryRaw(
+                    Prisma.sql`INSERT INTO "Expense"
+                        (id, "expenseNo", title, category, amount, date, description,
+                         "receiptUrl", "submittedBy", "employeeId", status, "createdAt", "updatedAt")
+                        VALUES (
+                            ${id}, ${expenseNo}, ${title}, ${category}::"ExpenseCategory",
+                            ${parsedAmount}, ${new Date(date)}, ${description || null},
+                            ${receiptUrl || null}, ${session.user.id}, ${employeeId || null},
+                            'DRAFT'::"ExpenseStatus", now(), now()
+                        )
+                        RETURNING id, "expenseNo", title, category, amount, date,
+                                  description, "receiptUrl", "submittedBy", "employeeId",
+                                  status, "createdAt", "updatedAt"`
+                )
+                expense = rows[0]
+            } catch (e3: any) {
+                console.warn("[EXPENSES_POST] attempt 3 failed:", e3?.message)
+                expense = await findInserted()
+            }
         }
 
-        if (!expense) {
-            throw new Error("All insert attempts failed")
-        }
+        if (!expense) throw new Error("All insert attempts failed")
 
         return NextResponse.json(expense)
     } catch (error) {
