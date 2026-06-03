@@ -338,6 +338,10 @@ function AddExpenseModal({
         e.preventDefault()
         // Validate travel rows
         if (form.category === "TRAVEL") {
+            if (perKmRate === 0) {
+                toast.error("Travel per-km rate is not configured. Ask your admin to set it via Employee Summary → ⚙️ Travel rate.")
+                return
+            }
             const incomplete = travelRows.some(r => !r.from.trim() || !r.to.trim() || !parseFloat(r.kms))
             if (incomplete) { toast.error("Fill From, To, and KMs for every journey row"); return }
         }
@@ -436,14 +440,14 @@ function AddExpenseModal({
 
                     {/* ── TRAVEL section ──────────────────────────── */}
                     {form.category === "TRAVEL" && (
-                        <div style={{ border: "1.5px solid #bfdbfe", borderRadius: 12, overflow: "hidden" }}>
+                        <div style={{ border: `1.5px solid ${perKmRate > 0 ? "#bfdbfe" : "#fecaca"}`, borderRadius: 12, overflow: "hidden" }}>
                             {/* Header */}
-                            <div style={{ background: "#eff6ff", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <p style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            <div style={{ background: perKmRate > 0 ? "#eff6ff" : "#fef2f2", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <p style={{ fontSize: 11, fontWeight: 700, color: perKmRate > 0 ? "#1d4ed8" : "#dc2626", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                                     🚗 Travel Journeys
                                 </p>
-                                <span style={{ fontSize: 12, color: "#3b82f6", fontWeight: 600 }}>
-                                    {perKmRate > 0 ? `₹${perKmRate}/km` : "Rate not set"}
+                                <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600 }}>
+                                    {perKmRate > 0 ? `₹${perKmRate}/km` : "⚠️ Rate not set — ask admin"}
                                 </span>
                             </div>
 
