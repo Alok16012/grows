@@ -338,10 +338,6 @@ function AddExpenseModal({
         e.preventDefault()
         // Validate travel rows
         if (form.category === "TRAVEL") {
-            if (perKmRate === 0) {
-                toast.error("Travel per-km rate is not configured. Ask your admin to set it via Employee Summary → ⚙️ Travel rate.")
-                return
-            }
             const incomplete = travelRows.some(r => !r.from.trim() || !r.to.trim() || !parseFloat(r.kms))
             if (incomplete) { toast.error("Fill From, To, and KMs for every journey row"); return }
         }
