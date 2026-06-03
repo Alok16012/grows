@@ -186,41 +186,82 @@ export async function POST(req: Request) {
         const count = await prisma.expense.count()
         const expenseNo = `EXP-${String(count + 1).padStart(4, "0")}`
 
-        const coreData: any = {
-            expenseNo,
-            title,
-            category,
-            amount: parsedAmount,
-            date: new Date(date),
-            description: description || null,
-            receiptUrl: receiptUrl || null,
-            employeeId: employeeId || null,
-            submittedBy: session.user.id,
-            status: "DRAFT",
-            travelDays: travelDays ? parseInt(String(travelDays)) : null,
-            travelDailyRate: travelDailyRate ? parseFloat(String(travelDailyRate)) : null,
-            travelEntries: travelEntries ?? null,
-        }
-        let expense
+        // Try inserting with progressively fewer columns to handle
+        // databases where newer migrations haven't run yet.
+        const id = crypto.randomUUID()
+        let expense: any = null
+
+        // Attempt 1 — all columns (fully migrated DB)
         try {
             expense = await prisma.expense.create({
-                data: { ...coreData, projectId: projectId || null },
+                data: {
+                    id,
+                    expenseNo,
+                    title,
+                    category,
+                    amount: parsedAmount,
+                    date: new Date(date),
+                    description: description || null,
+                    receiptUrl: receiptUrl || null,
+                    employeeId: employeeId || null,
+                    projectId: projectId || null,
+                    submittedBy: session.user.id,
+                    status: "DRAFT",
+                    travelDays: travelDays ? parseInt(String(travelDays)) : null,
+                    travelDailyRate: travelDailyRate ? parseFloat(String(travelDailyRate)) : null,
+                    travelEntries: travelEntries ?? null,
+                },
             })
-        } catch (err: any) {
-            const msg = String(err?.message || "").toLowerCase()
-            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
-            if (!missingColumn) throw err
-            // Strip any columns that may not exist yet in the DB and retry
-            console.warn("[EXPENSES_POST] some columns not yet migrated, retrying with core fields only")
-            const { travelDays: _td, travelDailyRate: _tdr, travelEntries: _te, ...baseData } = coreData
+        } catch (e1: any) {
+            console.warn("[EXPENSES_POST] attempt 1 failed:", e1?.message)
+        }
+
+        // Attempt 2 — without travel columns (pre-travel-migration DB)
+        if (!expense) {
             try {
                 expense = await prisma.expense.create({
-                    data: { ...baseData, projectId: projectId || null },
+                    data: {
+                        id,
+                        expenseNo,
+                        title,
+                        category,
+                        amount: parsedAmount,
+                        date: new Date(date),
+                        description: description || null,
+                        receiptUrl: receiptUrl || null,
+                        employeeId: employeeId || null,
+                        projectId: projectId || null,
+                        submittedBy: session.user.id,
+                        status: "DRAFT",
+                    },
                 })
-            } catch {
-                // Last resort: drop projectId too
-                expense = await prisma.expense.create({ data: baseData })
+            } catch (e2: any) {
+                console.warn("[EXPENSES_POST] attempt 2 failed:", e2?.message)
             }
+        }
+
+        // Attempt 3 — raw SQL with only the guaranteed original columns
+        if (!expense) {
+            const { Prisma } = await import("@prisma/client")
+            const rows: any[] = await (prisma as any).$queryRaw(
+                Prisma.sql`INSERT INTO "Expense"
+                    (id, "expenseNo", title, category, amount, date, description,
+                     "receiptUrl", "submittedBy", "employeeId", status, "createdAt", "updatedAt")
+                    VALUES (
+                        ${id}, ${expenseNo}, ${title}, ${category}::"ExpenseCategory",
+                        ${parsedAmount}, ${new Date(date)}, ${description || null},
+                        ${receiptUrl || null}, ${session.user.id}, ${employeeId || null},
+                        'DRAFT'::"ExpenseStatus", now(), now()
+                    )
+                    RETURNING id, "expenseNo", title, category, amount, date,
+                              description, "receiptUrl", "submittedBy", "employeeId",
+                              status, "createdAt", "updatedAt"`
+            )
+            expense = rows[0]
+        }
+
+        if (!expense) {
+            throw new Error("All insert attempts failed")
         }
 
         return NextResponse.json(expense)
