@@ -31,7 +31,43 @@ interface ImportRow {
 const str  = (v?: Sv): string       => v !== undefined && v !== null ? String(v).trim() : ""
 const strN = (v?: Sv): string|null  => { const s = str(v); return s || null }
 const num  = (v?: Sv, def = 0): number => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? def : n }
-const dt   = (v?: Sv): Date|null    => { if (!v) return null; const d = new Date(String(v)); return isNaN(d.getTime()) ? null : d }
+
+// Convert Excel serial numbers (e.g. 45166) or date strings to JS Date.
+// Excel serials: day 1 = 1900-01-01; Unix epoch offset = 25569 days.
+// Node.js parses bare numeric strings as years (+045166-01-01) — this function avoids that.
+const dt = (v?: Sv): Date | null => {
+    if (v === undefined || v === null || v === "") return null
+
+    // Numeric value (from xlsx parser) — treat as Excel serial
+    if (typeof v === "number") {
+        if (v < 1 || v > 2958465) return null          // outside 1900–9999 range
+        const d = new Date(Math.round((v - 25569) * 86400000))
+        return isNaN(d.getTime()) ? null : d
+    }
+
+    const s = String(v).trim()
+    if (!s) return null
+
+    // Pure numeric string like "45166" → also an Excel serial
+    if (/^\d{4,6}$/.test(s)) {
+        const n = parseInt(s, 10)
+        if (n >= 1 && n <= 2958465) {
+            const d = new Date(Math.round((n - 25569) * 86400000))
+            if (!isNaN(d.getTime())) return d
+        }
+    }
+
+    // DD/MM/YYYY or DD-MM-YYYY (common Indian format in spreadsheets)
+    const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/)
+    if (dmy) {
+        const d = new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]))
+        if (!isNaN(d.getTime())) return d
+    }
+
+    // ISO / other formats
+    const d = new Date(s)
+    return isNaN(d.getTime()) ? null : d
+}
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
