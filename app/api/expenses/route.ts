@@ -210,8 +210,17 @@ export async function POST(req: Request) {
             const msg = String(err?.message || "").toLowerCase()
             const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
             if (!missingColumn) throw err
-            console.warn("[EXPENSES_POST] project column not yet migrated, creating without projectId")
-            expense = await prisma.expense.create({ data: coreData })
+            // Strip any columns that may not exist yet in the DB and retry
+            console.warn("[EXPENSES_POST] some columns not yet migrated, retrying with core fields only")
+            const { travelDays: _td, travelDailyRate: _tdr, travelEntries: _te, ...baseData } = coreData
+            try {
+                expense = await prisma.expense.create({
+                    data: { ...baseData, projectId: projectId || null },
+                })
+            } catch {
+                // Last resort: drop projectId too
+                expense = await prisma.expense.create({ data: baseData })
+            }
         }
 
         return NextResponse.json(expense)
