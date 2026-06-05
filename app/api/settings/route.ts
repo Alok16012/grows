@@ -18,11 +18,19 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session || !["ADMIN", "MANAGER", "HR_MANAGER"].includes(session.user.role)) {
-    return new NextResponse("Forbidden", { status: 403 })
-  }
+  if (!session) return new NextResponse("Forbidden", { status: 403 })
+
   const { key, value } = await req.json()
   if (!key) return new NextResponse("key required", { status: 400 })
+
+  // Permission-driven (no hardcoded MANAGER/HR_MANAGER). ADMIN can write any
+  // setting; travel per-km rates may also be set by anyone who can manage
+  // expenses (the expense rate-setting UI is gated on expenses.manage).
+  const perms = session.user.permissions ?? []
+  const canWrite =
+    session.user.role === "ADMIN" ||
+    (key.startsWith("TRAVEL_PER_KM_RATE") && perms.includes("expenses.manage"))
+  if (!canWrite) return new NextResponse("Forbidden", { status: 403 })
   try {
     const s = await (prisma as any).appSetting.upsert({
       where: { key },

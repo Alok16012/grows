@@ -1432,7 +1432,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     const saveRate = async () => {
         setSavingRate(true)
         try {
-            await Promise.all([
+            const responses = await Promise.all([
                 fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1451,11 +1451,18 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                     body: JSON.stringify({ key: "TRAVEL_PER_KM_RATE", value: rate4WInput || rate2WInput || "0" }),
                 }),
             ])
+            // fetch() does NOT throw on HTTP errors — explicitly verify each POST
+            // persisted, otherwise we'd show a false "saved" and the value would
+            // vanish on refresh.
+            if (responses.some(r => !r.ok)) {
+                const failed = responses.find(r => !r.ok)
+                throw new Error(failed?.status === 403 ? "Not allowed to change travel rates" : "Save failed")
+            }
             setTravelRate2W(parseFloat(rate2WInput) || 0)
             setTravelRate4W(parseFloat(rate4WInput) || 0)
             setShowRateSetting(false)
             toast.success("Travel rates updated!")
-        } catch { toast.error("Failed to save rates") }
+        } catch (e) { toast.error((e as Error).message || "Failed to save rates") }
         finally { setSavingRate(false) }
     }
 
