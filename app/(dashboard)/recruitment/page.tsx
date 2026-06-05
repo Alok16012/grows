@@ -478,7 +478,8 @@ export default function RecruitmentPage() {
             const res = await fetch("/api/sites")
             if (!res.ok) return
             const data = await res.json()
-            setFormSites((data.sites ?? data).map((s: any) => ({ id: s.id, name: s.name })))
+            const arr = Array.isArray(data) ? data : (Array.isArray(data?.sites) ? data.sites : [])
+            setFormSites(arr.map((s: any) => ({ id: s.id, name: s.name })))
         } catch {}
     }
 
@@ -547,6 +548,10 @@ export default function RecruitmentPage() {
     useEffect(() => {
         if (isAuthorized) {
             fetchUsers()
+            // Load sites up-front so the Site dropdown in the View/Edit
+            // Employee modal (and Convert form) is populated even when the
+            // user hasn't opened the Form Links tab yet.
+            fetchSites()
         }
     }, [isAuthorized])
 
@@ -2698,8 +2703,14 @@ function ConvertModal({ lead, onClose, onConverted }: {
     })
 
     useEffect(() => {
-        fetch("/api/sites").then(r => r.json()).then(d => setSites((d.sites ?? d).map((s: any) => ({ id: s.id, name: s.name })))).catch(() => {})
-        fetch("/api/departments").then(r => r.json()).then(d => setDepartments((d.departments ?? d).map((dep: any) => ({ id: dep.id, name: dep.name })))).catch(() => {})
+        fetch("/api/sites").then(r => r.json()).then(d => {
+            const arr = Array.isArray(d) ? d : (Array.isArray(d?.sites) ? d.sites : [])
+            setSites(arr.map((s: any) => ({ id: s.id, name: s.name })))
+        }).catch(() => {})
+        fetch("/api/departments").then(r => r.json()).then(d => {
+            const arr = Array.isArray(d) ? d : (Array.isArray(d?.departments) ? d.departments : [])
+            setDepartments(arr.map((dep: any) => ({ id: dep.id, name: dep.name })))
+        }).catch(() => {})
     }, [])
 
     const set = (k: keyof ConvertForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
