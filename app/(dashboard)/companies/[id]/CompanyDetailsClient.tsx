@@ -7,6 +7,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Plus, ChevronLeft, MapPin, User, Phone, Calendar, Pencil, Trash2, Loader2, LayoutTemplate } from "lucide-react"
+import { can } from "@/lib/can"
 
 type Project = {
     id: string
@@ -46,7 +47,7 @@ export default function CompanyDetailsClient({
     const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
     const [deletingCompany, setDeletingCompany] = useState(false)
 
-    const isAdminOrManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+    const isAdminOrManager = can(session, "companies.manage")
 
     const fetchCompany = async () => {
         try {

@@ -11,7 +11,7 @@ export async function POST(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = session.user.role === "ADMIN" || (session.user.permissions ?? []).includes("billing.manage")
         if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
 
         const invoice = await prisma.invoice.findUnique({

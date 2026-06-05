@@ -20,7 +20,9 @@ export async function GET(req: Request) {
         const submittedBy = searchParams.get("submittedBy")
         const accountsView = searchParams.get("accountsView") === "true"
 
-        const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.view")
+        // Privileged = can manage expenses (see everyone, approve/pay). The weaker
+        // `expenses.view` is NOT sufficient — keep this in sync with the page gate.
+        const isPrivileged = checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.manage")
 
         const where: Record<string, unknown> = {}
 

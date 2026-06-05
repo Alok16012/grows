@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Search, Loader2, RefreshCw, FileSpreadsheet, Filter, Pencil, X, Save, Trash2, CheckSquare } from "lucide-react"
 import * as XLSX from "xlsx"
+import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Employee = {
@@ -764,7 +765,7 @@ export default function EmployeeMasterPage() {
         .filter(g => visibleGroups.has(g.group))
         .flatMap(g => g.cols.map(c => ({ ...c, groupColor: g.color, groupName: g.group })))
 
-    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER" || session?.user?.role === "HR_MANAGER"
+    const isAdmin = can(session, "employees.view")
 
     if (!isAdmin) return (
         <div className="flex items-center justify-center h-64 text-[var(--text3)] text-[13px]">Access denied</div>

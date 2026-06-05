@@ -7,6 +7,7 @@ import {
     FolderOpen, Plus, Loader2, X, Pencil, Trash2, FileText,
     CheckCircle2, AlertCircle, ToggleLeft, ToggleRight, ChevronRight
 } from "lucide-react"
+import { can } from "@/lib/can"
 
 type DocType = {
     id: string
@@ -239,7 +240,7 @@ export default function DocumentTypesPage() {
     const [editingType, setEditingType] = useState<DocType | null>(null)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const role = session?.user?.role as string | undefined
-    const isAdmin = role === "ADMIN" || role === "HR_MANAGER"
+    const isAdmin = can(session, "documents.view")
 
     const loadTypes = useCallback(async () => {
         setLoading(true)

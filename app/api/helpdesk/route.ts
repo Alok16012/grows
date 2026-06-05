@@ -17,7 +17,7 @@ export async function GET(req: Request) {
         const search = searchParams.get("search")
         const raisedBy = searchParams.get("raisedBy")
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = session.user.role === "ADMIN" || (session.user.permissions ?? []).includes("helpdesk.manage")
 
         const where: Record<string, unknown> = {}
 

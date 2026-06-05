@@ -11,7 +11,7 @@ export async function GET(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = session.user.role === "ADMIN" || (session.user.permissions ?? []).includes("contracts.view")
         if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
 
         const contract = await prisma.clientContract.findUnique({
@@ -45,7 +45,7 @@ export async function PUT(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = session.user.role === "ADMIN" || (session.user.permissions ?? []).includes("contracts.manage")
         if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
 
         const existing = await prisma.clientContract.findUnique({ where: { id: params.id } })

@@ -51,8 +51,6 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
         return () => clearInterval(interval)
     }, [])
 
-    const isAdminOrManager = session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER"
-
     useEffect(() => {
         const timer = setTimeout(async () => {
             if (query.length >= 2) {
@@ -120,11 +118,6 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                 <button onClick={onMenuClick} className="inline-flex items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] md:hidden transition-colors">
                     <Menu size={20} />
                 </button>
-                <div className="hidden md:flex items-center gap-2 text-[13px]">
-                    <span className="text-[var(--text2)]">Safety records</span>
-                    <span className="text-[var(--text3)] text-[10px]">›</span>
-                    <span className="text-[var(--text)] font-medium">Inspections</span>
-                </div>
             </div>
 
             {/* Center: Search */}

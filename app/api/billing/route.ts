@@ -9,7 +9,7 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = session.user.role === "ADMIN" || (session.user.permissions ?? []).includes("billing.view")
         if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
 
         const { searchParams } = new URL(req.url)
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
         const actorId = await resolveUserId(session)
         if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = session.user.role === "ADMIN" || (session.user.permissions ?? []).includes("billing.manage")
         if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
 
         const body = await req.json()

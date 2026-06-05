@@ -36,7 +36,15 @@ export async function GET(req: Request) {
     let companyId: string | null = null
     let inspectorId: string | null = null
 
-    if (role === "CLIENT") {
+    // Full-report access is driven by the reports.view permission (custom roles)
+    // or ADMIN — NOT by the hardcoded MANAGER role. This is checked before the
+    // base-role scoping so a permission-holder always gets the privileged view.
+    const canViewAllReports = role === "ADMIN" || (session.user.permissions ?? []).includes("reports.view")
+
+    if (canViewAllReports) {
+        companyId = searchParams.get("companyId") || null
+        inspectorId = searchParams.get("inspectorId") || null
+    } else if (role === "CLIENT") {
         const user = await prisma.user.findUnique({ where: { id: session.user.id } })
         companyId = user?.companyId ?? null
     } else if (role === "INSPECTION_BOY") {
@@ -46,9 +54,6 @@ export async function GET(req: Request) {
         const requestedCompanyId = searchParams.get("companyId")
         if (requestedCompanyId) companyId = requestedCompanyId
         // If no company selected, companyId stays null → shows all their data across companies
-    } else if (role === "ADMIN" || role === "MANAGER") {
-        companyId = searchParams.get("companyId") || null
-        inspectorId = searchParams.get("inspectorId") || null
     } else {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

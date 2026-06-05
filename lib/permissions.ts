@@ -282,9 +282,17 @@ export function checkAccess(
 ): boolean {
     if (!session) return false
     const role = session.user.role
+    // ADMIN is the only superuser.
     if (role === "ADMIN") return true
 
-    const roleAllowed = allowedRoles.includes(role)
+    // Access is driven PURELY by custom-role permissions now. The legacy
+    // MANAGER / HR_MANAGER system-role bypass has been removed so the roles
+    // configured in Admin → Roles are the single source of truth. Base roles
+    // (INSPECTION_BOY / CLIENT) that genuinely need role-gated access are still
+    // honoured via allowedRoles, but the privileged manager roles are not.
+    const roleAllowed = allowedRoles
+        .filter(r => r !== "MANAGER" && r !== "HR_MANAGER")
+        .includes(role)
     const permissionAllowed = !!(permission && session.user.permissions?.includes(permission))
     return roleAllowed || permissionAllowed
 }

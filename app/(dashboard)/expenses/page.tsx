@@ -45,6 +45,7 @@ type TravelEntry = {
     to: string
     kms: number
     amount: number // kms × perKmRate at submission time
+    vehicleType?: "2W" | "4W"  // 2-wheeler / 4-wheeler used for this journey
 }
 
 type Expense = {
@@ -250,7 +251,11 @@ function AddExpenseModal({
     const [receiptUploading, setReceiptUploading] = useState(false)
     const receiptInputRef = useRef<HTMLInputElement>(null)
     const [projects, setProjects] = useState<ExpenseProject[]>([])
-    const [perKmRate, setPerKmRate] = useState(0)
+    // Admin-set per-km rates per vehicle type (employee can't edit these)
+    const [rate2W, setRate2W] = useState(0)
+    const [rate4W, setRate4W] = useState(0)
+    const [vehicleType, setVehicleType] = useState<"2W" | "4W">("2W")
+    const perKmRate = vehicleType === "2W" ? rate2W : rate4W
     const [form, setForm] = useState({
         title: "",
         category: "TRAVEL" as ExpenseCategory,
@@ -272,10 +277,17 @@ function AddExpenseModal({
                 setProjects(list.map((p: any) => ({ id: p.id, name: p.name, company: p.company ?? null })))
             })
             .catch(() => setProjects([]))
-        fetch("/api/settings?key=TRAVEL_PER_KM_RATE")
-            .then(r => r.ok ? r.json() : { value: "0" })
-            .then(d => setPerKmRate(parseFloat(d.value || "0")))
-            .catch(() => {})
+        // Load both vehicle rates; fall back to legacy single rate if a
+        // specific one isn't configured yet.
+        Promise.all([
+            fetch("/api/settings?key=TRAVEL_PER_KM_RATE_2W").then(r => r.ok ? r.json() : { value: null }).catch(() => ({ value: null })),
+            fetch("/api/settings?key=TRAVEL_PER_KM_RATE_4W").then(r => r.ok ? r.json() : { value: null }).catch(() => ({ value: null })),
+            fetch("/api/settings?key=TRAVEL_PER_KM_RATE").then(r => r.ok ? r.json() : { value: null }).catch(() => ({ value: null })),
+        ]).then(([d2, d4, dLegacy]) => {
+            const legacy = parseFloat(dLegacy?.value || "0") || 0
+            setRate2W(parseFloat(d2?.value || "0") || legacy)
+            setRate4W(parseFloat(d4?.value || "0") || legacy)
+        }).catch(() => {})
     }, [open])
 
     useEffect(() => {
@@ -299,6 +311,9 @@ function AddExpenseModal({
                     to: e.to,
                     kms: String(e.kms),
                 })))
+                // Recover the vehicle type stored on the first entry (if any)
+                const savedVt = (editExpense.travelEntries[0] as any)?.vehicleType
+                if (savedVt === "2W" || savedVt === "4W") setVehicleType(savedVt)
             } else {
                 setTravelRows([mkRow(format(new Date(editExpense.date), "yyyy-MM-dd"))])
             }
@@ -306,6 +321,7 @@ function AddExpenseModal({
             setForm({ title: "", category: "TRAVEL", amount: "", date: today, description: "", projectId: "" })
             setReceiptUrl("")
             setTravelRows([mkRow(today)])
+            setVehicleType("2W")
         }
     }, [open, editExpense])
 
@@ -355,6 +371,7 @@ function AddExpenseModal({
                     to: r.to.trim(),
                     kms: parseFloat(r.kms) || 0,
                     amount: (parseFloat(r.kms) || 0) * perKmRate,
+                    vehicleType,
                 }))
                 // Use date of first entry as the expense date
                 payload.date = entries[0].date
@@ -438,13 +455,28 @@ function AddExpenseModal({
                     {form.category === "TRAVEL" && (
                         <div style={{ border: `1.5px solid ${perKmRate > 0 ? "#bfdbfe" : "#fecaca"}`, borderRadius: 12, overflow: "hidden" }}>
                             {/* Header */}
-                            <div style={{ background: perKmRate > 0 ? "#eff6ff" : "#fef2f2", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ background: perKmRate > 0 ? "#eff6ff" : "#fef2f2", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                                 <p style={{ fontSize: 11, fontWeight: 700, color: perKmRate > 0 ? "#1d4ed8" : "#dc2626", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                                     🚗 Travel Journeys
                                 </p>
-                                <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600 }}>
-                                    {perKmRate > 0 ? `₹${perKmRate}/km` : "⚠️ Rate not set — ask admin"}
-                                </span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    {/* Vehicle type selector — rate is fixed by admin, not editable here */}
+                                    <div style={{ display: "flex", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, overflow: "hidden" }}>
+                                        {([["2W", "🏍️ 2-Wheeler"], ["4W", "🚗 4-Wheeler"]] as const).map(([vt, label]) => (
+                                            <button key={vt} type="button" onClick={() => setVehicleType(vt)}
+                                                style={{
+                                                    padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none",
+                                                    background: vehicleType === vt ? "#1d4ed8" : "transparent",
+                                                    color: vehicleType === vt ? "#fff" : "#3b82f6",
+                                                }}>
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600 }}>
+                                        {perKmRate > 0 ? `₹${perKmRate}/km` : "⚠️ Rate not set — ask admin"}
+                                    </span>
+                                </div>
                             </div>
 
                             {/* Rows */}
@@ -1298,6 +1330,11 @@ function ExpenseDetailModal({ title, subtitle, items, onClose }: {
                                 {/* Journey breakdown for travel expenses */}
                                 {journeys.length > 0 && (
                                     <div style={{ margin: "0 20px 10px", background: "#eff6ff", borderRadius: 8, overflow: "hidden", border: "1px solid #bfdbfe" }}>
+                                        {(journeys[0] as any)?.vehicleType && (
+                                            <div style={{ padding: "4px 10px", background: "#dbeafe", borderBottom: "1px solid #bfdbfe", fontSize: 11, fontWeight: 700, color: "#1e40af" }}>
+                                                {(journeys[0] as any).vehicleType === "2W" ? "🏍️ 2-Wheeler" : "🚗 4-Wheeler"}
+                                            </div>
+                                        )}
                                         <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", background: "#dbeafe", gap: 8 }}>
                                             {["Date", "From", "To", "KMs", "Amount"].map(h => (
                                                 <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#1e40af", textTransform: "uppercase" }}>{h}</span>
@@ -1351,9 +1388,11 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     // Detail item modal
     const [modal, setModal] = useState<{ title: string; subtitle: string; items: any[] } | null>(null)
 
-    // Travel rate setting
-    const [travelRate, setTravelRate]     = useState(0)
-    const [rateInput, setRateInput]       = useState("")
+    // Travel rate setting — separate per-km rate for 2-wheeler & 4-wheeler
+    const [travelRate2W, setTravelRate2W] = useState(0)
+    const [travelRate4W, setTravelRate4W] = useState(0)
+    const [rate2WInput, setRate2WInput]   = useState("")
+    const [rate4WInput, setRate4WInput]   = useState("")
     const [showRateSetting, setShowRateSetting] = useState(false)
     const [savingRate, setSavingRate]     = useState(false)
 
@@ -1367,10 +1406,17 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     }, [month])
 
     useEffect(() => {
-        fetch("/api/settings?key=TRAVEL_PER_KM_RATE")
-            .then(r => r.ok ? r.json() : { value: "0" })
-            .then(d => { const v = parseFloat(d.value || "0"); setTravelRate(v); setRateInput(String(v)) })
-            .catch(() => {})
+        Promise.all([
+            fetch("/api/settings?key=TRAVEL_PER_KM_RATE_2W").then(r => r.ok ? r.json() : { value: null }).catch(() => ({ value: null })),
+            fetch("/api/settings?key=TRAVEL_PER_KM_RATE_4W").then(r => r.ok ? r.json() : { value: null }).catch(() => ({ value: null })),
+            fetch("/api/settings?key=TRAVEL_PER_KM_RATE").then(r => r.ok ? r.json() : { value: null }).catch(() => ({ value: null })),
+        ]).then(([d2, d4, dLegacy]) => {
+            const legacy = parseFloat(dLegacy?.value || "0") || 0
+            const v2 = parseFloat(d2?.value || "0") || legacy
+            const v4 = parseFloat(d4?.value || "0") || legacy
+            setTravelRate2W(v2); setRate2WInput(String(v2))
+            setTravelRate4W(v4); setRate4WInput(String(v4))
+        }).catch(() => {})
     }, [])
 
     // Per-employee drill-down
@@ -1386,15 +1432,30 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     const saveRate = async () => {
         setSavingRate(true)
         try {
-            await fetch("/api/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key: "TRAVEL_PER_KM_RATE", value: rateInput }),
-            })
-            setTravelRate(parseFloat(rateInput) || 0)
+            await Promise.all([
+                fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ key: "TRAVEL_PER_KM_RATE_2W", value: rate2WInput || "0" }),
+                }),
+                fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ key: "TRAVEL_PER_KM_RATE_4W", value: rate4WInput || "0" }),
+                }),
+                // Keep legacy key in sync (use 4W as the general default) so any
+                // older code path still reads a sensible rate.
+                fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ key: "TRAVEL_PER_KM_RATE", value: rate4WInput || rate2WInput || "0" }),
+                }),
+            ])
+            setTravelRate2W(parseFloat(rate2WInput) || 0)
+            setTravelRate4W(parseFloat(rate4WInput) || 0)
             setShowRateSetting(false)
-            toast.success("Travel daily rate updated!")
-        } catch { toast.error("Failed to save rate") }
+            toast.success("Travel rates updated!")
+        } catch { toast.error("Failed to save rates") }
         finally { setSavingRate(false) }
     }
 
@@ -1420,15 +1481,18 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                     <>
                         <button onClick={() => setShowRateSetting(s => !s)}
                             style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-                            ⚙️ Travel: ₹{travelRate}/km
+                            ⚙️ Travel: 🏍️ ₹{travelRate2W} · 🚗 ₹{travelRate4W} /km
                         </button>
                         {showRateSetting && (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "3px 10px" }}>
-                                <span style={{ fontSize: 12, color: "var(--text3)" }}>₹/km</span>
-                                <input type="number" value={rateInput} onChange={e => setRateInput(e.target.value)}
-                                    style={{ width: 72, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "4px 10px", flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 3 }}>🏍️ 2-Wheeler ₹/km</span>
+                                <input type="number" min="0" step="0.5" value={rate2WInput} onChange={e => setRate2WInput(e.target.value)}
+                                    style={{ width: 64, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
+                                <span style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 3 }}>🚗 4-Wheeler ₹/km</span>
+                                <input type="number" min="0" step="0.5" value={rate4WInput} onChange={e => setRate4WInput(e.target.value)}
+                                    style={{ width: 64, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
                                 <button onClick={saveRate} disabled={savingRate}
-                                    style={{ height: 26, padding: "0 10px", background: "var(--accent)", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                                    style={{ height: 26, padding: "0 12px", background: "var(--accent)", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                                     {savingRate ? "…" : "Save"}
                                 </button>
                             </div>
@@ -1628,7 +1692,11 @@ export default function ExpensesPage() {
     const { data: session, status: sessionStatus } = useSession()
     const role = session?.user?.role
     const userId = session?.user?.id || ""
-    const isPrivileged = can(session, "expenses.view")
+    // Admin/Manager full view (All Expenses, Accounts, Analytics, Employee Summary,
+    // approve/reject, set global rates) requires the *manage* capability — not the
+    // weaker `expenses.view`, which may be granted broadly. A regular employee, even
+    // if their role carries a stray `expenses.view`, only sees their own "My Expenses".
+    const isPrivileged = can(session, "expenses.manage")
 
     // sessionReady flips true exactly once — after the first non-loading session status.
     // This prevents fetchExpenses from firing before we know the user's role and have

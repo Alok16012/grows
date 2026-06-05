@@ -1048,7 +1048,7 @@ function EmployeesPage() {
     const [bulkDeleting, setBulkDeleting] = useState(false)
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
-    const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "HR_MANAGER"
+    const isAdmin = can(session, "employees.edit")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")

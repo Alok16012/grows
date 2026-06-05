@@ -18,7 +18,7 @@ export async function POST(
         const ticket = await prisma.ticket.findUnique({ where: { id: params.id } })
         if (!ticket) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        const isPrivileged = session.user.role === "ADMIN" || (session.user.permissions ?? []).includes("helpdesk.manage")
         if (!isPrivileged && ticket.raisedBy !== actorId) {
             return new NextResponse("Forbidden", { status: 403 })
         }

@@ -8,7 +8,10 @@ import bcrypt from "bcryptjs"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER && session.user.role !== "HR_MANAGER")) {
+    // User directory (names/roles) feeds assignee dropdowns across recruitment,
+    // helpdesk, etc. Allow ADMIN or any user with custom-role permissions; plain
+    // base-role users (inspectors/clients with no permissions) are blocked.
+    if (!session || (session.user.role !== Role.ADMIN && (session.user.permissions ?? []).length === 0)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

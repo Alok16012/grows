@@ -18,7 +18,7 @@ function generateTempPassword(): string {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== Role.ADMIN && session.user.role !== Role.MANAGER)) {
+    if (!session || (session.user.role !== Role.ADMIN && !(session.user.permissions ?? []).includes("employees.create"))) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

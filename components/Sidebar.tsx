@@ -293,20 +293,14 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     const filteredLinks = section.links.filter(link => {
                         if (currentRole === "ADMIN") return true
 
-                        // ── Custom Role assigned ───────────────────────────────
-                        // If user has custom role permissions, show ONLY items
-                        // matching those permissions. System role is ignored for
-                        // nav visibility so "HR RECRUITER" doesn't see everything
-                        // a MANAGER sees.
-                        if (userPermissions.length > 0) {
-                            // Links with no permission key (e.g. Dashboard) →
-                            // show only if their system role is in the roles list
-                            if (!link.permission) return link.roles.includes(currentRole)
-                            // Links with permission key → must be in custom role
-                            return userPermissions.includes(link.permission)
-                        }
+                        // Feature pages are gated PURELY by custom-role permissions.
+                        // The legacy MANAGER / HR_MANAGER role fallback has been
+                        // removed — Admin → Roles is the single source of truth, so a
+                        // privileged user sees exactly what their custom role grants.
+                        if (link.permission) return userPermissions.includes(link.permission)
 
-                        // ── No custom role → standard system-role access ───────
+                        // Permission-less items (Dashboard, My Work, Client Portal)
+                        // remain gated by base system role (INSPECTION_BOY / CLIENT).
                         return link.roles.includes(currentRole)
                     })
 

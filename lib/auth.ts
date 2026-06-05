@@ -4,8 +4,6 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { Role } from "@prisma/client"
-import { MANAGER_DEFAULT_PERMISSIONS, HR_MANAGER_DEFAULT_PERMISSIONS } from "@/lib/permissions"
-
 // Normalize a phone-like string to last 10 digits
 const phoneDigits = (s: string | null | undefined): string => {
     if (!s) return ""
@@ -14,11 +12,12 @@ const phoneDigits = (s: string | null | undefined): string => {
 }
 
 // Resolve effective permissions for a user object from the DB.
-// Custom role → use its permissions. MANAGER/HR_MANAGER without custom role → defaults.
+// Permissions come EXCLUSIVELY from an assigned custom role (Admin → Roles).
+// System roles like MANAGER / HR_MANAGER no longer carry any hardcoded default
+// permissions — the custom roles configured in the app are the single source of
+// truth. ADMIN remains a superuser (handled separately in checkAccess / can()).
 function resolvePermissions(user: { role: string; customRole?: { isActive: boolean; permissions: string[] } | null }): string[] {
     if (user.customRole?.isActive) return user.customRole.permissions
-    if (user.role === "MANAGER") return MANAGER_DEFAULT_PERMISSIONS
-    if (user.role === "HR_MANAGER") return HR_MANAGER_DEFAULT_PERMISSIONS
     return []
 }
 
