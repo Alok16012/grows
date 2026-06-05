@@ -123,6 +123,18 @@ export async function GET(req: Request) {
             orderBy: { createdAt: "desc" },
         })
 
+        // Backfill profile photo from the latest PHOTO document if the
+        // employee's `photo` column is still empty (older records only).
+        for (const r of records) {
+            const emp: any = r.employee
+            if (emp && !emp.photo && Array.isArray(emp.documents)) {
+                const photoDoc = emp.documents
+                    .filter((d: any) => d.type === "PHOTO")
+                    .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0]
+                if (photoDoc?.fileUrl) emp.photo = photoDoc.fileUrl
+            }
+        }
+
         return NextResponse.json(records)
     } catch (error) {
         console.error("[ONBOARDING_GET]", error)

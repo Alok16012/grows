@@ -162,6 +162,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 safetyJacket:   !!safetyJacket,
                 safetyEarMuffs: !!safetyEarMuffs,
                 safetyShoes:    !!safetyShoes,
+                // Carry the candidate's profile photo over to the employee
+                photo:          lead.profileUrl || null,
             },
         })
 

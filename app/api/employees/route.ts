@@ -90,6 +90,29 @@ export async function GET(req: Request) {
             prisma.employee.count({ where }),
         ])
 
+        // Backfill profile photo from the latest PHOTO document for any
+        // employee whose `photo` column is still empty (older records were
+        // saved as documents only). Keeps avatars consistent everywhere.
+        try {
+            const missing = employees.filter(e => !e.photo).map(e => e.id)
+            if (missing.length > 0) {
+                const photos = await prisma.employeeDocument.findMany({
+                    where: { employeeId: { in: missing }, type: "PHOTO" },
+                    select: { employeeId: true, fileUrl: true },
+                    orderBy: { uploadedAt: "desc" },
+                })
+                const photoMap = new Map<string, string>()
+                for (const p of photos) {
+                    if (!photoMap.has(p.employeeId)) photoMap.set(p.employeeId, p.fileUrl)
+                }
+                for (const e of employees) {
+                    if (!e.photo && photoMap.has(e.id)) e.photo = photoMap.get(e.id)!
+                }
+            }
+        } catch (e) {
+            console.error("[EMPLOYEES_PHOTO_BACKFILL]", e)
+        }
+
         return NextResponse.json({ employees, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }, {
             headers: {
                 // Browser-cache for 10s — back-button / list re-renders within

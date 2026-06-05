@@ -1673,7 +1673,18 @@ function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lea
             )}
             <div className="p-3">
                 <div className="flex items-start justify-between gap-1 mb-1">
-                    <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[12px] overflow-hidden" style={{ position: "relative" }}>
+                            {lead.candidateName.charAt(0).toUpperCase()}
+                            {lead.profileUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover"
+                                    style={{ position: "absolute", inset: 0 }}
+                                    onError={e => (e.currentTarget.style.display = "none")} />
+                            )}
+                        </div>
+                        <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
+                    </div>
                     <div className="flex items-center gap-1 shrink-0">
                         <PriorityDot priority={lead.priority} />
                     </div>

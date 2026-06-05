@@ -33,6 +33,16 @@ export async function GET(
         })
 
         if (!employee) return new NextResponse("Not Found", { status: 404 })
+
+        // Backfill profile photo from the latest PHOTO document if the
+        // `photo` column is empty (older records stored it as a document).
+        if (!employee.photo && Array.isArray(employee.documents)) {
+            const photoDoc = employee.documents
+                .filter((d: any) => d.type === "PHOTO")
+                .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0]
+            if (photoDoc?.fileUrl) (employee as any).photo = photoDoc.fileUrl
+        }
+
         return NextResponse.json(employee)
     } catch (error) {
         console.error("[EMPLOYEE_GET]", error)
