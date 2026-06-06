@@ -2175,7 +2175,25 @@ export default function ExpensesPage() {
             <AddExpenseModal
                 open={addOpen}
                 onClose={() => setAddOpen(false)}
-                onSaved={() => { fetchExpenses(); refreshPendingCount() }}
+                onSaved={() => {
+                    // A freshly created expense is a DRAFT. The Employee Summary
+                    // (admin's default tab) and the "All Expenses" tab both hide
+                    // drafts, so jump to "My Claims" with filters cleared — that's
+                    // where the user's own draft is visible. The fetch effect
+                    // re-runs on these state changes.
+                    setStatusFilter("ALL")
+                    setCategoryFilter("ALL")
+                    setProjectFilter("ALL")
+                    setMonthFilter("")
+                    setDateFrom("")
+                    setDateTo("")
+                    setSearch("")
+                    setActiveTab("mine")
+                    refreshPendingCount()
+                    // Covers the case where the user was already on "My Claims"
+                    // with no filters (no state change → effect wouldn't refire).
+                    fetchExpenses()
+                }}
             />
             <ExpenseDrawer
                 expense={selectedExpense}
