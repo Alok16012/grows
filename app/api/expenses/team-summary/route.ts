@@ -81,23 +81,30 @@ export async function GET(req: Request) {
             byEmpId[emp.id] = emp
         }
 
-        // Aggregate per employee × category
+        // Aggregate per employee × category. Submitters without an Employee
+        // record (e.g. ADMIN) are grouped separately by their user id so they
+        // still appear in the summary under their own name.
         const totals: Record<string, Record<string, number>> = {}
+        const userTotals: Record<string, Record<string, number>> = {}
 
         for (const exp of rawExpenses) {
             // Resolve employee: prefer explicit employeeId, fall back to submittedBy userId
             const emp = exp.employeeId
                 ? byEmpId[exp.employeeId]
                 : byUserId[exp.submittedBy]
-            if (!emp) continue
-
-            if (!totals[emp.id]) totals[emp.id] = {}
             const cat = exp.category as string
-            totals[emp.id][cat] = (totals[emp.id][cat] ?? 0) + (exp.amount ?? 0)
+            if (emp) {
+                if (!totals[emp.id]) totals[emp.id] = {}
+                totals[emp.id][cat] = (totals[emp.id][cat] ?? 0) + (exp.amount ?? 0)
+            } else if (exp.submittedBy) {
+                // No Employee record → group under the submitting user account.
+                if (!userTotals[exp.submittedBy]) userTotals[exp.submittedBy] = {}
+                userTotals[exp.submittedBy][cat] = (userTotals[exp.submittedBy][cat] ?? 0) + (exp.amount ?? 0)
+            }
         }
 
-        // Build rows (only employees who have at least one expense)
-        const rows = employees
+        // Build employee rows (only employees who have at least one expense)
+        const employeeRows = employees
             .filter(emp => totals[emp.id])
             .map(emp => {
                 const t = totals[emp.id] || {}
@@ -114,7 +121,35 @@ export async function GET(req: Request) {
                 for (const col of COLS) row[col] = t[col] ?? 0
                 return row
             })
-            .sort((a, b) => b.total - a.total) // highest spender first
+
+        // Build rows for non-employee submitters (e.g. ADMIN) using their user info
+        const userIds = Object.keys(userTotals)
+        let userRows: Record<string, any>[] = []
+        if (userIds.length) {
+            const users = await prisma.user.findMany({
+                where: { id: { in: userIds } },
+                select: { id: true, name: true, email: true },
+            })
+            const userById = Object.fromEntries(users.map(u => [u.id, u]))
+            userRows = userIds.map(uid => {
+                const t = userTotals[uid]
+                const u = userById[uid]
+                const total = Object.values(t).reduce((s, v) => s + v, 0)
+                const row: Record<string, any> = {
+                    id:          uid,        // userId doubles as the row id (drill-down uses submittedBy)
+                    userId:      uid,
+                    name:        u?.name || u?.email || "Unknown",
+                    employeeId:  "—",
+                    designation: "—",
+                    department:  "—",
+                    total,
+                }
+                for (const col of COLS) row[col] = t[col] ?? 0
+                return row
+            })
+        }
+
+        const rows = [...employeeRows, ...userRows].sort((a, b) => b.total - a.total) // highest spender first
 
         // Column totals row
         const colTotals: Record<string, number> = { total: 0 }

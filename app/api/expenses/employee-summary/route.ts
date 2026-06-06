@@ -22,17 +22,30 @@ export async function GET(req: Request) {
       where: { id: employeeId },
       select: { id: true, firstName: true, lastName: true, user: { select: { id: true } } }
     })
-    if (!employee) return new NextResponse("Employee not found", { status: 404 })
 
-    const userId = employee.user?.id
+    // The id may not be an Employee — team-summary also emits rows for
+    // non-employee submitters (e.g. ADMIN) keyed by their user id. In that
+    // case treat the id as a userId and match expenses by submittedBy.
+    const displayId = employeeId
+    let displayName: string
+    const orConditions: any[] = []
+    if (employee) {
+      displayName = `${employee.firstName} ${employee.lastName}`
+      orConditions.push({ employeeId: employee.id })
+      if (employee.user?.id) orConditions.push({ submittedBy: employee.user.id })
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { id: employeeId },
+        select: { id: true, name: true, email: true },
+      })
+      if (!user) return new NextResponse("Employee not found", { status: 404 })
+      displayName = user.name || user.email || "Unknown"
+      orConditions.push({ submittedBy: user.id })
+    }
 
-    // Fetch all expenses for this employee in the given year
-    // Match on employeeId OR submittedBy (employee's own user account)
+    // Fetch all expenses for this employee/user in the given year
     const yearStart = new Date(year, 0, 1)
     const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999)
-
-    const orConditions: any[] = [{ employeeId }]
-    if (userId) orConditions.push({ submittedBy: userId })
 
     const expenses = await prisma.expense.findMany({
       where: {
@@ -93,7 +106,7 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      employee: { id: employee.id, name: `${employee.firstName} ${employee.lastName}` },
+      employee: { id: displayId, name: displayName },
       year,
       rows,
       totals,
