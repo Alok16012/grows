@@ -4,6 +4,33 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 
+// All ExpenseCategory enum values (mirrors prisma/schema.prisma). Used to (a)
+// whitelist the incoming category before any raw SQL, and (b) self-heal the
+// Postgres enum when newer values were never migrated into prod (this project's
+// migrations don't run on deploy — DIRECT_URL isn't configured on Vercel).
+const EXPENSE_CATEGORIES = [
+    "TRAVEL", "TRANSPORTATION", "FUEL", "ACCOMMODATION",
+    "FOOD", "HOTEL", "MATERIAL", "OFFICE_SUPPLIES", "OFFICE_CONSUMABLES",
+    "STATIONERY_PRINTING", "HOUSEKEEPING_CLEANING", "UTILITY_ELECTRICAL", "REPAIR_MAINTENANCE",
+    "SALARY_WAGES", "EMPLOYEE_ADVANCE", "RECRUITMENT_EXPENSE", "CANDIDATE_EXPENSE",
+    "HR_OPERATIONS", "SAFETY_PPE",
+    "CLIENT_PROJECT", "LABOUR", "INSPECTION_QUALITY", "COMPLIANCE_AUDIT", "CELEBRATION",
+    "IT_ACCESSORIES", "COURIER", "DOCUMENTATION_LEGAL", "MOBILE_RECHARGE",
+    "COMMUNICATION", "MEDICAL", "UNIFORM", "TRAINING", "MISCELLANEOUS", "OTHER",
+] as const
+
+// Add any missing values to the Postgres ExpenseCategory enum. Each ADD VALUE is
+// idempotent (IF NOT EXISTS) and runs as its own auto-committed statement.
+async function ensureExpenseCategoryEnum() {
+    for (const c of EXPENSE_CATEGORIES) {
+        try {
+            await (prisma as any).$executeRawUnsafe(
+                `ALTER TYPE "ExpenseCategory" ADD VALUE IF NOT EXISTS '${c}'`
+            )
+        } catch { /* value may already exist or race — safe to ignore */ }
+    }
+}
+
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -183,6 +210,9 @@ export async function POST(req: Request) {
         if (!title || !category || amount == null || isNaN(parsedAmount) || !date) {
             return new NextResponse("title, category, amount, and date are required", { status: 400 })
         }
+        if (!EXPENSE_CATEGORIES.includes(category)) {
+            return new NextResponse(`Unknown category: ${category}`, { status: 400 })
+        }
 
         // Generate expense number
         const count = await prisma.expense.count()
@@ -190,11 +220,25 @@ export async function POST(req: Request) {
 
         const id = crypto.randomUUID()
         let expense: any = null
+        let lastError: any = null
+        let healedEnum = false
 
         // Helper: check if the row landed in DB despite Prisma throwing on result parsing.
         // This happens when the INSERT committed but Prisma couldn't deserialise a new column.
         const findInserted = () =>
             (prisma as any).expense.findUnique({ where: { id } }).catch(() => null)
+
+        // If a failure looks like a missing enum value, add the missing values
+        // (once) and let the caller retry.
+        const maybeHealEnum = async (err: any) => {
+            const msg = String(err?.message ?? "")
+            if (!healedEnum && /enum|invalid input value/i.test(msg)) {
+                healedEnum = true
+                await ensureExpenseCategoryEnum()
+                return true
+            }
+            return false
+        }
 
         // Attempt 1 — all columns
         try {
@@ -216,8 +260,10 @@ export async function POST(req: Request) {
             })
         } catch (e1: any) {
             console.warn("[EXPENSES_POST] attempt 1 failed:", e1?.message)
+            lastError = e1
             // Row may have inserted but result parsing threw — check before retrying
             expense = await findInserted()
+            if (!expense) await maybeHealEnum(e1)
         }
 
         // Attempt 2 — without travel columns
@@ -238,40 +284,65 @@ export async function POST(req: Request) {
                 })
             } catch (e2: any) {
                 console.warn("[EXPENSES_POST] attempt 2 failed:", e2?.message)
+                lastError = e2
                 expense = await findInserted()
+                if (!expense) await maybeHealEnum(e2)
             }
         }
 
-        // Attempt 3 — raw SQL, guaranteed to work on any DB state
+        // Attempt 3 — raw SQL, guaranteed to work on any DB state. Runs up to
+        // twice: once normally, and once more after healing a missing enum value.
+        const rawInsert = async () => {
+            const { Prisma } = await import("@prisma/client")
+            const rows: any[] = await (prisma as any).$queryRaw(
+                Prisma.sql`INSERT INTO "Expense"
+                    (id, "expenseNo", title, category, amount, date, description,
+                     "receiptUrl", "submittedBy", "employeeId", status, "createdAt", "updatedAt")
+                    VALUES (
+                        ${id}, ${expenseNo}, ${title}, ${category}::"ExpenseCategory",
+                        ${parsedAmount}, ${new Date(date)}, ${description || null},
+                        ${receiptUrl || null}, ${session.user.id}, ${employeeId || null},
+                        'DRAFT'::"ExpenseStatus", now(), now()
+                    )
+                    RETURNING id, "expenseNo", title, category, amount, date,
+                              description, "receiptUrl", "submittedBy", "employeeId",
+                              status, "createdAt", "updatedAt"`
+            )
+            return rows[0]
+        }
+
         if (!expense) {
             try {
-                const { Prisma } = await import("@prisma/client")
-                const rows: any[] = await (prisma as any).$queryRaw(
-                    Prisma.sql`INSERT INTO "Expense"
-                        (id, "expenseNo", title, category, amount, date, description,
-                         "receiptUrl", "submittedBy", "employeeId", status, "createdAt", "updatedAt")
-                        VALUES (
-                            ${id}, ${expenseNo}, ${title}, ${category}::"ExpenseCategory",
-                            ${parsedAmount}, ${new Date(date)}, ${description || null},
-                            ${receiptUrl || null}, ${session.user.id}, ${employeeId || null},
-                            'DRAFT'::"ExpenseStatus", now(), now()
-                        )
-                        RETURNING id, "expenseNo", title, category, amount, date,
-                                  description, "receiptUrl", "submittedBy", "employeeId",
-                                  status, "createdAt", "updatedAt"`
-                )
-                expense = rows[0]
+                expense = await rawInsert()
             } catch (e3: any) {
                 console.warn("[EXPENSES_POST] attempt 3 failed:", e3?.message)
+                lastError = e3
                 expense = await findInserted()
+                // If it was a missing enum value, add it and retry the raw insert once.
+                if (!expense && await maybeHealEnum(e3)) {
+                    try {
+                        expense = await rawInsert()
+                    } catch (e4: any) {
+                        console.warn("[EXPENSES_POST] attempt 3 (post-heal) failed:", e4?.message)
+                        lastError = e4
+                        expense = await findInserted()
+                    }
+                }
             }
         }
 
-        if (!expense) throw new Error("All insert attempts failed")
+        if (!expense) {
+            const detail = lastError?.code
+                ? `${lastError.code} ${lastError?.message ?? ""}`.trim()
+                : (lastError?.message ?? "All insert attempts failed")
+            console.error("[EXPENSES_POST] all attempts failed:", detail)
+            return new NextResponse(detail, { status: 500 })
+        }
 
         return NextResponse.json(expense)
-    } catch (error) {
+    } catch (error: any) {
         console.error("[EXPENSES_POST]", error)
-        return new NextResponse("Internal Error", { status: 500 })
+        const detail = error?.code ? `${error.code} ${error?.message ?? ""}`.trim() : (error?.message ?? "Internal Error")
+        return new NextResponse(detail, { status: 500 })
     }
 }
