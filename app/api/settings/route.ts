@@ -3,15 +3,46 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 
+// Prod migrations don't always run on this project (DIRECT_URL isn't configured
+// on Vercel, so `prisma migrate deploy` is skipped at build time). To stay
+// consistent with the rest of the codebase's self-healing approach, make sure
+// the AppSetting table exists before we touch it. CREATE TABLE IF NOT EXISTS is
+// idempotent and matches migration 20260601100000.
+async function ensureAppSettingTable() {
+  await (prisma as any).$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "AppSetting" (
+      "key"       TEXT NOT NULL,
+      "value"     TEXT NOT NULL DEFAULT '',
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedBy" TEXT,
+      CONSTRAINT "AppSetting_pkey" PRIMARY KEY ("key")
+    );
+  `)
+}
+
+// Run a Prisma op; if it fails because the table is missing (P2021), create the
+// table once and retry.
+async function withTable<T>(op: () => Promise<T>): Promise<T> {
+  try {
+    return await op()
+  } catch (e: any) {
+    if (e?.code === "P2021") {
+      await ensureAppSettingTable()
+      return await op()
+    }
+    throw e
+  }
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const key = searchParams.get("key")
   try {
     if (key) {
-      const s = await (prisma as any).appSetting.findUnique({ where: { key } })
+      const s = await withTable<any>(() => (prisma as any).appSetting.findUnique({ where: { key } }))
       return NextResponse.json({ key, value: s?.value ?? null })
     }
-    const all = await (prisma as any).appSetting.findMany()
+    const all = await withTable<any>(() => (prisma as any).appSetting.findMany())
     return NextResponse.json(all)
   } catch { return NextResponse.json({ key, value: null }) }
 }
@@ -32,11 +63,11 @@ export async function POST(req: Request) {
     (key.startsWith("TRAVEL_PER_KM_RATE") && perms.includes("expenses.manage"))
   if (!canWrite) return new NextResponse("Forbidden", { status: 403 })
   try {
-    const s = await (prisma as any).appSetting.upsert({
+    const s = await withTable<any>(() => (prisma as any).appSetting.upsert({
       where: { key },
       update: { value: String(value), updatedBy: session.user.id },
       create: { key, value: String(value), updatedBy: session.user.id },
-    })
+    }))
     return NextResponse.json(s)
   } catch (e: any) {
     console.error("[SETTINGS_POST]", e)
