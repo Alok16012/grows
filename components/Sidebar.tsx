@@ -64,6 +64,10 @@ type NavSection = {
     links: NavLink[]
 }
 
+// Permission-less pages every signed-in user always has access to (their own
+// data). Everything else is governed solely by custom-role permissions.
+const PERSONAL_HREFS = ["/profile", "/self-onboarding"]
+
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const pathname = usePathname()
     const { data: session } = useSession()
@@ -74,7 +78,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     // Approval count poll — pauses when tab is hidden to avoid wasted fetches.
     // Interval bumped 60s → 5min; the badge isn't time-critical.
     useEffect(() => {
-        if (role !== "ADMIN" && role !== "MANAGER") return
+        const perms = (session?.user as any)?.permissions || []
+        if (role !== "ADMIN" && !perms.includes("approvals.view")) return
         let stopped = false
         const fetchCount = async () => {
             if (document.hidden) return
@@ -90,30 +95,27 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     }, [role])
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
-    const customRoleName = (session?.user as any)?.customRoleName as string | null
 
-    // Land custom-role users on a page they actually have access to,
-    // instead of routing them by their system role (which is often INSPECTION_BOY).
+    // Land users purely by what their custom role grants — system roles
+    // (INSPECTION_BOY/CLIENT/MANAGER/HR_MANAGER) no longer drive routing.
+    // ADMIN → admin home; everyone else → first page their permissions allow;
+    // fallback → their own profile (the one page every user always has).
     function landingForUser(): string {
         if (role === "ADMIN") return "/admin"
-        if (role === "CLIENT") return "/client"
 
-        // Custom role → pick first page they have permission for
-        if (customRoleName) {
-            if (userPermissions.includes("recruitment.view")) return "/recruitment"
-            if (userPermissions.includes("assignments.view")) return "/assignments"
-            if (userPermissions.includes("projects.view")) return "/projects"
-            if (userPermissions.includes("sites.view")) return "/sites"
-            if (userPermissions.includes("employees.view")) return "/employees"
-            if (userPermissions.includes("attendance.view")) return "/attendance"
-            if (userPermissions.includes("payroll.view")) return "/payroll"
-            if (userPermissions.includes("helpdesk.view")) return "/helpdesk"
-            if (userPermissions.includes("lms.view")) return "/lms/learn"
-            return "/manager"
-        }
+        if (userPermissions.includes("recruitment.view")) return "/recruitment"
+        if (userPermissions.includes("assignments.view")) return "/assignments"
+        if (userPermissions.includes("projects.view")) return "/projects"
+        if (userPermissions.includes("sites.view")) return "/sites"
+        if (userPermissions.includes("employees.view")) return "/employees"
+        if (userPermissions.includes("attendance.view")) return "/attendance"
+        if (userPermissions.includes("payroll.view")) return "/payroll"
+        if (userPermissions.includes("expenses.view") || userPermissions.includes("expenses.manage")) return "/expenses"
+        if (userPermissions.includes("helpdesk.view")) return "/helpdesk"
+        if (userPermissions.includes("lms.view")) return "/lms/learn"
+        if (userPermissions.includes("reports.view")) return "/reports"
 
-        if (role === "MANAGER" || role === "HR_MANAGER") return "/manager"
-        return "/inspection"
+        return "/profile"
     }
     const dashboardHref = landingForUser()
 
@@ -293,15 +295,15 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     const filteredLinks = section.links.filter(link => {
                         if (currentRole === "ADMIN") return true
 
-                        // Feature pages are gated PURELY by custom-role permissions.
-                        // The legacy MANAGER / HR_MANAGER role fallback has been
-                        // removed — Admin → Roles is the single source of truth, so a
-                        // privileged user sees exactly what their custom role grants.
+                        // Everything is gated PURELY by custom-role permissions now.
+                        // No hardcoded role (MANAGER/HR_MANAGER/INSPECTION_BOY/CLIENT)
+                        // grants anything — Admin → Roles is the single source of truth.
                         if (link.permission) return userPermissions.includes(link.permission)
 
-                        // Permission-less items (Dashboard, My Work, Client Portal)
-                        // remain gated by base system role (INSPECTION_BOY / CLIENT).
-                        return link.roles.includes(currentRole)
+                        // Permission-less links are hidden, EXCEPT the universal
+                        // personal pages every signed-in user owns (their own profile
+                        // and self-onboarding). All other base-role nav is gone.
+                        return PERSONAL_HREFS.includes(link.href)
                     })
 
                     if (filteredLinks.length === 0) return null
