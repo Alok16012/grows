@@ -3,6 +3,38 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { Prisma } from "@prisma/client"
+
+// Prod DB sometimes lags behind migrations (DIRECT_URL not set on Vercel, so
+// `prisma migrate deploy` is skipped). Reading a row via the Prisma client
+// selects every scalar column, which throws P2022 when a column is missing.
+// Fall back to a raw `SELECT *`, which only returns columns that actually
+// exist and never fails on schema drift.
+async function findExpenseSafe(id: string): Promise<any | null> {
+    try {
+        return await prisma.expense.findUnique({ where: { id } })
+    } catch (err: any) {
+        const msg = String(err?.message || "").toLowerCase()
+        if (!(msg.includes("does not exist") || err?.code === "P2022")) throw err
+        const rows = await (prisma as any).$queryRaw(
+            Prisma.sql`SELECT * FROM "Expense" WHERE id = ${id} LIMIT 1`
+        )
+        return rows?.[0] ?? null
+    }
+}
+
+// Map an updateData object to a raw, parameterised UPDATE. The Prisma client's
+// update() returns all scalar columns (failing on missing ones); a raw UPDATE
+// only touches the columns we set, so it survives schema drift.
+async function rawUpdateExpense(id: string, data: Record<string, unknown>): Promise<void> {
+    const assignments = Object.entries(data).map(([col, val]) =>
+        Prisma.sql`${Prisma.raw(`"${col}"`)} = ${val as any}`
+    )
+    if (assignments.length === 0) return
+    await (prisma as any).$executeRaw(
+        Prisma.sql`UPDATE "Expense" SET ${Prisma.join(assignments)} WHERE id = ${id}`
+    )
+}
 
 export async function GET(
     req: Request,
@@ -12,7 +44,7 @@ export async function GET(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const expense = await prisma.expense.findUnique({ where: { id: params.id } })
+        const expense = await findExpenseSafe(params.id)
         if (!expense) return new NextResponse("Not Found", { status: 404 })
 
         const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.view")
@@ -49,7 +81,7 @@ export async function PUT(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const expense = await prisma.expense.findUnique({ where: { id: params.id } })
+        const expense = await findExpenseSafe(params.id)
         if (!expense) return new NextResponse("Not Found", { status: 404 })
 
         const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.manage")
@@ -115,16 +147,18 @@ export async function PUT(
             return new NextResponse("No valid updates", { status: 400 })
         }
 
-        let updated
+        let updated: any
         try {
             updated = await prisma.expense.update({ where: { id: params.id }, data: updateData })
         } catch (err: any) {
             const msg = String(err?.message || "").toLowerCase()
             const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
             if (!missingColumn) throw err
-            // Drop columns that may not be migrated yet, then retry
-            const { projectId: _p, transactionId: _t, paymentDate: _d, ...safeUpdate } = updateData as any
-            updated = await prisma.expense.update({ where: { id: params.id }, data: safeUpdate })
+            // Schema drift: the Prisma client update() selects back every scalar
+            // column and fails on missing ones. Do a raw UPDATE (which only sets
+            // the columns we changed) then re-read with the safe SELECT *.
+            await rawUpdateExpense(params.id, updateData)
+            updated = await findExpenseSafe(params.id)
         }
 
         // ── Fire in-app notifications ──
@@ -184,9 +218,11 @@ export async function PUT(
         }
 
         return NextResponse.json(updated)
-    } catch (error) {
+    } catch (error: any) {
         console.error("[EXPENSE_PUT]", error)
-        return new NextResponse("Internal Error", { status: 500 })
+        // Internal admin app — surface the real reason so the client can show it.
+        const detail = error?.code ? `${error.code} ${error?.message ?? ""}`.trim() : (error?.message ?? "Internal Error")
+        return new NextResponse(detail, { status: 500 })
     }
 }
 
