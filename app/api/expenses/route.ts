@@ -111,8 +111,9 @@ export async function GET(req: Request) {
                     orderBy: { createdAt: "desc" },
                 }) as any[]
             } catch {
-                // Ultimate fallback: raw SQL selecting only stable columns.
-                // Safe even before travelDays / travelDailyRate migration runs.
+                // Ultimate fallback: raw SQL with SELECT * so it can never fail on
+                // a column the prod DB hasn't migrated yet (this project's
+                // migrations don't run on deploy). Returns whatever columns exist.
                 // IMPORTANT: always enforce submittedBy filter for non-privileged users.
                 try {
                     const { Prisma } = await import("@prisma/client")
@@ -120,12 +121,7 @@ export async function GET(req: Request) {
                     if (!isPrivileged) {
                         // Non-privileged: hard-filter to own expenses only
                         rows = await (prisma as any).$queryRaw(
-                            Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
-                                       description, "receiptUrl", "submittedBy", "employeeId",
-                                       "projectId", "approvedBy", "approvedAt", "rejectedAt",
-                                       "rejectionReason", "paidAt", "paymentDate", "paymentMode",
-                                       "transactionId", status, "createdAt", "updatedAt"
-                                       FROM "Expense"
+                            Prisma.sql`SELECT * FROM "Expense"
                                        WHERE "submittedBy" = ${session.user.id}
                                        ORDER BY "createdAt" DESC`
                         )
@@ -133,22 +129,12 @@ export async function GET(req: Request) {
                         const sbFilter = where.submittedBy as string | undefined
                         rows = sbFilter
                             ? await (prisma as any).$queryRaw(
-                                Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
-                                           description, "receiptUrl", "submittedBy", "employeeId",
-                                           "projectId", "approvedBy", "approvedAt", "rejectedAt",
-                                           "rejectionReason", "paidAt", "paymentDate", "paymentMode",
-                                           "transactionId", status, "createdAt", "updatedAt"
-                                           FROM "Expense"
+                                Prisma.sql`SELECT * FROM "Expense"
                                            WHERE "submittedBy" = ${sbFilter}
                                            ORDER BY "createdAt" DESC`
                             )
                             : await (prisma as any).$queryRaw(
-                                Prisma.sql`SELECT id, "expenseNo", title, category, amount, date,
-                                           description, "receiptUrl", "submittedBy", "employeeId",
-                                           "projectId", "approvedBy", "approvedAt", "rejectedAt",
-                                           "rejectionReason", "paidAt", "paymentDate", "paymentMode",
-                                           "transactionId", status, "createdAt", "updatedAt"
-                                           FROM "Expense"
+                                Prisma.sql`SELECT * FROM "Expense"
                                            ORDER BY "createdAt" DESC`
                             )
                     }
