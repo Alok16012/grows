@@ -1455,8 +1455,12 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
             // persisted, otherwise we'd show a false "saved" and the value would
             // vanish on refresh.
             if (responses.some(r => !r.ok)) {
-                const failed = responses.find(r => !r.ok)
-                throw new Error(failed?.status === 403 ? "Not allowed to change travel rates" : "Save failed")
+                const failed = responses.find(r => !r.ok)!
+                if (failed.status === 403) throw new Error("Not allowed to change travel rates")
+                // Surface the real server message (e.g. a 500) instead of a vague
+                // "Save failed", so the actual cause is visible.
+                const body = await failed.text().catch(() => "")
+                throw new Error(body?.trim() ? `Save failed: ${body.trim()}` : "Save failed")
             }
             setTravelRate2W(parseFloat(rate2WInput) || 0)
             setTravelRate4W(parseFloat(rate4WInput) || 0)

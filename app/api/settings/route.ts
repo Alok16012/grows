@@ -38,8 +38,11 @@ export async function POST(req: Request) {
       create: { key, value: String(value), updatedBy: session.user.id },
     })
     return NextResponse.json(s)
-  } catch (e) {
+  } catch (e: any) {
     console.error("[SETTINGS_POST]", e)
-    return new NextResponse("Internal Error", { status: 500 })
+    // Return the real reason (Prisma code/message) so the client can show it
+    // — this is an internal admin app, not public-facing.
+    const detail = e?.code ? `${e.code} ${e?.message ?? ""}`.trim() : (e?.message ?? "Internal Error")
+    return new NextResponse(detail, { status: 500 })
   }
 }
