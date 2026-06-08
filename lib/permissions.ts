@@ -80,6 +80,14 @@ export const PERMISSION_GROUPS = [
         ]
     },
     {
+        group: "Jobs",
+        key: "jobs",
+        permissions: [
+            { key: "jobs.view",   label: "View Job Postings" },
+            { key: "jobs.manage", label: "Post / Edit / Close Jobs" },
+        ]
+    },
+    {
         group: "Onboarding",
         key: "onboarding",
         permissions: [
@@ -233,6 +241,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "field.view", "field.manage",
     "employees.view", "employees.create", "employees.edit", "employees.delete",
     "recruitment.view", "recruitment.manage",
+    "jobs.view", "jobs.manage",
     "onboarding.view", "onboarding.manage",
     "documents.view", "documents.upload", "documents.verify",
     "attendance.view", "attendance.manage",
@@ -255,6 +264,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
 export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "employees.view", "employees.create", "employees.edit", "employees.delete",
     "recruitment.view", "recruitment.manage",
+    "jobs.view", "jobs.manage",
     "onboarding.view", "onboarding.manage",
     "documents.view", "documents.upload", "documents.verify",
     "attendance.view", "attendance.manage",

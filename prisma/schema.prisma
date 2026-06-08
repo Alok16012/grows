@@ -10,33 +10,34 @@ datasource db {
 }
 
 model User {
-  id                       String           @id @default(uuid())
-  name                     String
-  email                    String           @unique
-  password                 String
-  role                     Role             @default(CLIENT)
-  phone                    String?
-  image                    String?
-  isActive                 Boolean          @default(true)
-  createdAt                DateTime         @default(now())
-  companyId                String?
-  customRoleId             String?
-  assignmentsAsAssigner    Assignment[]     @relation("AssignmentAssigner")
-  assignmentsAsInspector   Assignment[]     @relation("AssignmentInspector")
-  inspections              Inspection[]
-  company                  Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  customRole               CustomRole?      @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
-  managedProjects          ProjectManager[] @relation("ProjectManagers")
-  assignedProjects         ProjectManager[] @relation("ProjectManagerAssigner")
-  notifications            Notification[]
-  leadsAssigned            Lead[]           @relation("LeadAssignee")
-  leadsCreated             Lead[]           @relation("LeadCreator")
-  leadActivities           LeadActivity[]   @relation("LeadActivityUser")
-  leadDocsUploaded         LeadDocument[]   @relation("LeadDocUploader")
-  leadFollowUpsCreated     LeadFollowUp[]   @relation("LeadFollowUpCreator")
-  leadFormsCreated         LeadForm[]       @relation("LeadFormCreator")
-  hrApprovedReviews        PerformanceReview[] @relation("HRApprover")
-  employeeProfile          Employee?           @relation("EmployeeUser")
+  id                     String              @id @default(uuid())
+  name                   String
+  email                  String              @unique
+  password               String
+  role                   Role                @default(CLIENT)
+  phone                  String?
+  image                  String?
+  isActive               Boolean             @default(true)
+  createdAt              DateTime            @default(now())
+  companyId              String?
+  customRoleId           String?
+  assignmentsAsAssigner  Assignment[]        @relation("AssignmentAssigner")
+  assignmentsAsInspector Assignment[]        @relation("AssignmentInspector")
+  inspections            Inspection[]
+  company                Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  customRole             CustomRole?         @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  managedProjects        ProjectManager[]    @relation("ProjectManagers")
+  assignedProjects       ProjectManager[]    @relation("ProjectManagerAssigner")
+  notifications          Notification[]
+  leadsAssigned          Lead[]              @relation("LeadAssignee")
+  leadsCreated           Lead[]              @relation("LeadCreator")
+  leadActivities         LeadActivity[]      @relation("LeadActivityUser")
+  leadDocsUploaded       LeadDocument[]      @relation("LeadDocUploader")
+  leadFollowUpsCreated   LeadFollowUp[]      @relation("LeadFollowUpCreator")
+  leadFormsCreated       LeadForm[]          @relation("LeadFormCreator")
+  hrApprovedReviews      PerformanceReview[] @relation("HRApprover")
+  employeeProfile        Employee?           @relation("EmployeeUser")
+  jobPostingsCreated     JobPosting[]        @relation("JobCreator")
 }
 
 model CustomRole {
@@ -83,10 +84,10 @@ model Project {
 }
 
 model Assignment {
-  id              String       @id @default(uuid())
-  projectId       String
-  inspectionBoyId String
-  assignedBy      String
+  id               String       @id @default(uuid())
+  projectId        String
+  inspectionBoyId  String
+  assignedBy       String
   status           String       @default("active")
   recurrenceType   String       @default("none")
   recurrenceActive Boolean      @default(false)
@@ -244,80 +245,80 @@ enum LeadPriority {
 }
 
 model Lead {
-  id                String        @id @default(uuid())
-  candidateName     String
-  phone             String
-  email             String?
-  city              String?
-  position          String        // Role applied for e.g. Inspector, Security Guard, Supervisor
-  experience        Float?        // Years of experience
-  currentCompany    String?       // Previous/current employer
-  qualification     String?       // 10th, 12th, Graduate, ITI, Diploma, etc.
-  skills            String?       // Driving License, Forklift, First Aid, etc.
-  expectedSalary    Float?
-  currentSalary     Float?
-  interviewDate     DateTime?
-  interviewMode     String?       // In-person, Phone, Video
-  source            String        // Walk-in, LinkedIn, Naukri, Referral, WhatsApp, Agency, Indeed
-  status            LeadStatus    @default(NEW_LEAD)
-  priority          LeadPriority  @default(MEDIUM)
-  score             LeadScore     @default(WARM)
-  interviewerId     String?
-  interviewFeedback String?
-  interviewResult   String?       // PASS / FAIL / HOLD
-  assignedTo        String?
-  notes             String?
-  nextFollowUp      DateTime?
-  locality          String?       // Area/locality within city (WorkIndia "Location")
-  gender            String?       // Male/Female/Other
-  languages         String?       // Known languages
-  age               Int?          // Candidate age
-  course            String?       // BE/BTech/MBA etc
-  specialization    String?       // Mechanical/CS/HR etc
-  collegeName       String?       // College/University name
-  courseStartYear   String?       // e.g. "2015-4"
-  courseEndYear     String?       // e.g. "2019-4"
-  previousDesignation String?     // Previous job title
-  previousCompany   String?       // Previous company name (separate from currentCompany)
-  resumeUrl         String?       // Direct resume download link
-  profileUrl        String?       // WorkIndia/LinkedIn profile URL
-  englishLevel      String?       // Good English / Basic English / No English
-  levelOfExperience String?       // Fresher / Experienced
+  id                  String         @id @default(uuid())
+  candidateName       String
+  phone               String
+  email               String?
+  city                String?
+  position            String // Role applied for e.g. Inspector, Security Guard, Supervisor
+  experience          Float? // Years of experience
+  currentCompany      String? // Previous/current employer
+  qualification       String? // 10th, 12th, Graduate, ITI, Diploma, etc.
+  skills              String? // Driving License, Forklift, First Aid, etc.
+  expectedSalary      Float?
+  currentSalary       Float?
+  interviewDate       DateTime?
+  interviewMode       String? // In-person, Phone, Video
+  source              String // Walk-in, LinkedIn, Naukri, Referral, WhatsApp, Agency, Indeed
+  status              LeadStatus     @default(NEW_LEAD)
+  priority            LeadPriority   @default(MEDIUM)
+  score               LeadScore      @default(WARM)
+  interviewerId       String?
+  interviewFeedback   String?
+  interviewResult     String? // PASS / FAIL / HOLD
+  assignedTo          String?
+  notes               String?
+  nextFollowUp        DateTime?
+  locality            String? // Area/locality within city (WorkIndia "Location")
+  gender              String? // Male/Female/Other
+  languages           String? // Known languages
+  age                 Int? // Candidate age
+  course              String? // BE/BTech/MBA etc
+  specialization      String? // Mechanical/CS/HR etc
+  collegeName         String? // College/University name
+  courseStartYear     String? // e.g. "2015-4"
+  courseEndYear       String? // e.g. "2019-4"
+  previousDesignation String? // Previous job title
+  previousCompany     String? // Previous company name (separate from currentCompany)
+  resumeUrl           String? // Direct resume download link
+  profileUrl          String? // WorkIndia/LinkedIn profile URL
+  englishLevel        String? // Good English / Basic English / No English
+  levelOfExperience   String? // Fresher / Experienced
   // ─── Personal Information Form fields (Growus Candidate template) ────────
-  tshirtSize         String?      // S / M / L / XL / XXL
-  bloodGroup         String?
-  altPhone           String?
-  dateOfBirth        DateTime?
-  fatherName         String?
-  fatherOccupation   String?
-  motherName         String?
-  motherOccupation   String?
-  maritalStatus      String?      // Single / Married / Other
-  nationality        String?
-  aadharNumber       String?
-  presentAddress     String?
-  permanentAddress   String?
-  currentDesignation String?      // Current Designation (separate from position-applied-for)
-  pfEsicNumber       String?
-  reasonForLeaving   String?
-  documentsSubmitted String[]     // ["PAN","Aadhar","Bank Passbook","Educational Certs","Resume","Passport Photo"]
-  hasBike            Boolean?
-  declarationDate    DateTime?
-  declarationPlace   String?
-  educationDetails   Json?        // [{course, stream, institute, year, percentage, location}, ...]
+  tshirtSize          String? // S / M / L / XL / XXL
+  bloodGroup          String?
+  altPhone            String?
+  dateOfBirth         DateTime?
+  fatherName          String?
+  fatherOccupation    String?
+  motherName          String?
+  motherOccupation    String?
+  maritalStatus       String? // Single / Married / Other
+  nationality         String?
+  aadharNumber        String?
+  presentAddress      String?
+  permanentAddress    String?
+  currentDesignation  String? // Current Designation (separate from position-applied-for)
+  pfEsicNumber        String?
+  reasonForLeaving    String?
+  documentsSubmitted  String[] // ["PAN","Aadhar","Bank Passbook","Educational Certs","Resume","Passport Photo"]
+  hasBike             Boolean?
+  declarationDate     DateTime?
+  declarationPlace    String?
+  educationDetails    Json? // [{course, stream, institute, year, percentage, location}, ...]
   // Conversion tracking
-  convertedEmployeeId String?     // Set when lead is converted to employee
-  formSlug          String?       // Which public form was used (if any)
-  siteId            String?       // Target site for deployment after joining
-  createdBy         String
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  assignee          User?         @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
-  creator           User          @relation("LeadCreator", fields: [createdBy], references: [id])
-  site              Site?         @relation("LeadSite", fields: [siteId], references: [id], onDelete: SetNull)
-  activities        LeadActivity[]
-  documents         LeadDocument[]
-  followUps         LeadFollowUp[]
+  convertedEmployeeId String? // Set when lead is converted to employee
+  formSlug            String? // Which public form was used (if any)
+  siteId              String? // Target site for deployment after joining
+  createdBy           String
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  assignee            User?          @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  creator             User           @relation("LeadCreator", fields: [createdBy], references: [id])
+  site                Site?          @relation("LeadSite", fields: [siteId], references: [id], onDelete: SetNull)
+  activities          LeadActivity[]
+  documents           LeadDocument[]
+  followUps           LeadFollowUp[]
 
   @@index([status])
   @@index([assignedTo])
@@ -350,7 +351,7 @@ enum LeadFormType {
 model LeadDocument {
   id         String   @id @default(uuid())
   leadId     String
-  docType    String   // RESUME, AADHAAR, PAN, CERTIFICATE, OTHER
+  docType    String // RESUME, AADHAAR, PAN, CERTIFICATE, OTHER
   fileName   String
   url        String
   verified   String   @default("PENDING") // PENDING / APPROVED / REJECTED
@@ -358,21 +359,23 @@ model LeadDocument {
   createdAt  DateTime @default(now())
   lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   uploader   User     @relation("LeadDocUploader", fields: [uploadedBy], references: [id])
+
   @@index([leadId])
 }
 
 model LeadFollowUp {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   leadId      String
-  type        String   // CALL / INTERVIEW / DOCUMENT / OTHER
+  type        String // CALL / INTERVIEW / DOCUMENT / OTHER
   note        String?
   scheduledAt DateTime
   completedAt DateTime?
-  status      String   @default("PENDING") // PENDING / DONE / SNOOZED
+  status      String    @default("PENDING") // PENDING / DONE / SNOOZED
   createdBy   String
-  createdAt   DateTime @default(now())
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  creator     User     @relation("LeadFollowUpCreator", fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  creator     User      @relation("LeadFollowUpCreator", fields: [createdBy], references: [id])
+
   @@index([leadId])
   @@index([scheduledAt])
 }
@@ -381,7 +384,7 @@ model LeadActivity {
   id        String   @id @default(uuid())
   leadId    String
   userId    String
-  type      String   // note, call, email, meeting, whatsapp, status_change
+  type      String // note, call, email, meeting, whatsapp, status_change
   content   String
   createdAt DateTime @default(now())
   lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -407,21 +410,21 @@ enum TicketPriority {
 }
 
 model Ticket {
-  id          String         @id @default(uuid())
-  ticketNo    String         @unique
+  id          String          @id @default(uuid())
+  ticketNo    String          @unique
   title       String
   description String
   category    String
-  priority    TicketPriority @default(MEDIUM)
-  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority  @default(MEDIUM)
+  status      TicketStatus    @default(OPEN)
   raisedBy    String
   assignedTo  String?
   employeeId  String?
   resolvedAt  DateTime?
   closedAt    DateTime?
   dueDate     DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   comments    TicketComment[]
 
   @@index([status])
@@ -525,8 +528,8 @@ enum PayrollStatus {
 }
 
 model Employee {
-  id                String             @id @default(uuid())
-  employeeId        String             @unique
+  id                String         @id @default(uuid())
+  employeeId        String         @unique
   firstName         String
   lastName          String
   email             String?
@@ -549,50 +552,50 @@ model Employee {
   branchId          String?
   dateOfJoining     DateTime?
   dateOfLeaving     DateTime?
-  status            EmployeeStatus     @default(ACTIVE)
-  employmentType    String             @default("Full-time")
+  status            EmployeeStatus @default(ACTIVE)
+  employmentType    String         @default("Full-time")
   salaryType        String?
-  basicSalary       Float              @default(0)
+  basicSalary       Float          @default(0)
   managerId         String?
   notes             String?
-  isKycVerified     Boolean            @default(false)
+  isKycVerified     Boolean        @default(false)
   kycRejectionNote  String?
-  isHandicap        Boolean            @default(false)
-  onboardingToken   String?            @unique
-  userId            String?            @unique
+  isHandicap        Boolean        @default(false)
+  onboardingToken   String?        @unique
+  userId            String?        @unique
   createdBy         String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   // Identity
-  middleName            String?
-  nameAsPerAadhar       String?
-  fathersName           String?
-  bloodGroup            String?
-  maritalStatus         String?
-  marriageDate          DateTime?
-  nationality           String?   @default("Indian")
-  religion              String?
-  caste                 String?
+  middleName      String?
+  nameAsPerAadhar String?
+  fathersName     String?
+  bloodGroup      String?
+  maritalStatus   String?
+  marriageDate    DateTime?
+  nationality     String?   @default("Indian")
+  religion        String?
+  caste           String?
 
   // Statutory Numbers
-  uan                   String?
-  pfNumber              String?
-  esiNumber             String?
-  labourCardNo          String?
-  labourCardExpDate     DateTime?
+  uan               String?
+  pfNumber          String?
+  esiNumber         String?
+  labourCardNo      String?
+  labourCardExpDate DateTime?
 
   // Contract Details
-  contractFrom          DateTime?
-  contractPeriodDays    Int?
-  contractorCode        String?
-  workOrderNumber       String?
-  workOrderFrom         DateTime?
-  workOrderTo           DateTime?
-  workSkill             String?
-  natureOfWork          String?
-  categoryCode          String?
-  employmentTypeCode    String?
+  contractFrom       DateTime?
+  contractPeriodDays Int?
+  contractorCode     String?
+  workOrderNumber    String?
+  workOrderFrom      DateTime?
+  workOrderTo        DateTime?
+  workSkill          String?
+  natureOfWork       String?
+  categoryCode       String?
+  employmentTypeCode String?
 
   // Emergency Contacts
   emergencyContact1Name  String?
@@ -601,58 +604,58 @@ model Employee {
   emergencyContact2Phone String?
 
   // Permanent Address
-  permanentAddress      String?
-  permanentCity         String?
-  permanentState        String?
-  permanentPincode      String?
+  permanentAddress String?
+  permanentCity    String?
+  permanentState   String?
+  permanentPincode String?
 
   // Background & Medical
-  isBackgroundChecked   Boolean   @default(false)
+  isBackgroundChecked   Boolean @default(false)
   backgroundCheckRemark String?
-  isMedicalDone         Boolean   @default(false)
+  isMedicalDone         Boolean @default(false)
   medicalRemark         String?
 
   // Safety Equipment Issued
-  safetyGoggles         Boolean   @default(false)
-  safetyGogglesDate     DateTime?
-  safetyGloves          Boolean   @default(false)
-  safetyGlovesDate      DateTime?
-  safetyHelmet          Boolean   @default(false)
-  safetyHelmetDate      DateTime?
-  safetyMask            Boolean   @default(false)
-  safetyMaskDate        DateTime?
-  safetyJacket          Boolean   @default(false)
-  safetyJacketDate      DateTime?
-  safetyEarMuffs        Boolean   @default(false)
-  safetyEarMuffsDate    DateTime?
-  safetyShoes           Boolean   @default(false)
-  safetyShoesDate       DateTime?
+  safetyGoggles      Boolean   @default(false)
+  safetyGogglesDate  DateTime?
+  safetyGloves       Boolean   @default(false)
+  safetyGlovesDate   DateTime?
+  safetyHelmet       Boolean   @default(false)
+  safetyHelmetDate   DateTime?
+  safetyMask         Boolean   @default(false)
+  safetyMaskDate     DateTime?
+  safetyJacket       Boolean   @default(false)
+  safetyJacketDate   DateTime?
+  safetyEarMuffs     Boolean   @default(false)
+  safetyEarMuffsDate DateTime?
+  safetyShoes        Boolean   @default(false)
+  safetyShoesDate    DateTime?
 
   // Bank extra
   bankBranch            String?
-  user              User?              @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
-  branch            Branch?            @relation(fields: [branchId], references: [id])
-  department        Department?        @relation(fields: [departmentId], references: [id])
-  deployments       Deployment[]
-  attendances       Attendance[]
-  leaves            Leave[]
-  payrolls          Payroll[]
-  assets            EmployeeAsset[]
-  documents         EmployeeDocument[]
-  onboardingRecord  OnboardingRecord?
-  onboardingTasks   OnboardingTask[]
-  reviews           PerformanceReview[]
-  pips              PIP[]
-  exitRequest       ExitRequest?
-  enrollments       CourseEnrollment[]
-  fieldTasks        FieldTask[]
-  checkIns          FieldCheckIn[]
+  user                  User?                     @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
+  branch                Branch?                   @relation(fields: [branchId], references: [id])
+  department            Department?               @relation(fields: [departmentId], references: [id])
+  deployments           Deployment[]
+  attendances           Attendance[]
+  leaves                Leave[]
+  payrolls              Payroll[]
+  assets                EmployeeAsset[]
+  documents             EmployeeDocument[]
+  onboardingRecord      OnboardingRecord?
+  onboardingTasks       OnboardingTask[]
+  reviews               PerformanceReview[]
+  pips                  PIP[]
+  exitRequest           ExitRequest?
+  enrollments           CourseEnrollment[]
+  fieldTasks            FieldTask[]
+  checkIns              FieldCheckIn[]
   policyAcknowledgments PolicyAcknowledgment[]
-  iltAttendances   ILTAttendance[]
-  courseFeedbacks  CourseFeedback[]
-  employeeSalary   EmployeeSalary?
-  advances         AdvanceAndReimbursement[]
-  hrDocuments      HrDocument[]
+  iltAttendances        ILTAttendance[]
+  courseFeedbacks       CourseFeedback[]
+  employeeSalary        EmployeeSalary?
+  advances              AdvanceAndReimbursement[]
+  hrDocuments           HrDocument[]
 
   @@index([branchId])
   @@index([status])
@@ -678,20 +681,20 @@ model EmployeeSalary {
   employeeId        String   @unique
   // Core salary components (monthly fixed)
   basic             Float    @default(0)
-  da                Float    @default(0)   // Dearness Allowance
-  washing           Float    @default(0)   // Washing Allowance
-  conveyance        Float    @default(0)   // Conveyance Allowance
-  leaveWithWages    Float    @default(0)   // Leave With Wages
-  otherAllowance    Float    @default(0)   // Other Allowance
-  bonus             Float    @default(583)  // Monthly bonus (manual input, default ₹583 = 7000/12)
+  da                Float    @default(0) // Dearness Allowance
+  washing           Float    @default(0) // Washing Allowance
+  conveyance        Float    @default(0) // Conveyance Allowance
+  leaveWithWages    Float    @default(0) // Leave With Wages
+  otherAllowance    Float    @default(0) // Other Allowance
+  bonus             Float    @default(583) // Monthly bonus (manual input, default ₹583 = 7000/12)
   otRatePerHour     Float    @default(170) // OT rate per calculation unit (₹170 default)
-  canteenRatePerDay Float    @default(55)  // Canteen rate per day (₹55 default)
+  canteenRatePerDay Float    @default(55) // Canteen rate per day (₹55 default)
   // Legacy/kept fields
   ctcAnnual         Float    @default(0)
   ctcMonthly        Float    @default(0)
-  hra               Float    @default(0)   // Auto-calculated: (basic+da)*5%, kept for reference
+  hra               Float    @default(0) // Auto-calculated: (basic+da)*5%, kept for reference
   specialAllowance  Float    @default(0)
-  complianceType    String   @default("OR")  // CALL (no PF/ESIC) or OR (full compliance)
+  complianceType    String   @default("OR") // CALL (no PF/ESIC) or OR (full compliance)
   isPfEligible      Boolean  @default(true)
   isEsiEligible     Boolean  @default(true)
   isPtEligible      Boolean  @default(true)
@@ -708,21 +711,21 @@ model EmployeeSalary {
 }
 
 model Deployment {
-  id          String    @id @default(uuid())
-  employeeId  String
-  siteId      String
-  startDate   DateTime
-  endDate     DateTime?
-  shift       String?
-  role        String?
-  isActive    Boolean   @default(true)
-  relievedAt  DateTime?
-  notes       String?
-  createdBy   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  employeeId String
+  siteId     String
+  startDate  DateTime
+  endDate    DateTime?
+  shift      String?
+  role       String?
+  isActive   Boolean   @default(true)
+  relievedAt DateTime?
+  notes      String?
+  createdBy  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  site       Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([siteId])
@@ -779,82 +782,82 @@ model Leave {
 }
 
 model SalaryStructure {
-  id            String   @id @default(uuid())
-  name          String
-  basicPercent  Float    @default(50)
-  hraPercent    Float    @default(20)
-  pfEmployee    Float    @default(12)
-  pfEmployer    Float    @default(12)
-  esiEmployee   Float    @default(0.75)
-  esiEmployer   Float    @default(3.25)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
+  id           String   @id @default(uuid())
+  name         String
+  basicPercent Float    @default(50)
+  hraPercent   Float    @default(20)
+  pfEmployee   Float    @default(12)
+  pfEmployer   Float    @default(12)
+  esiEmployee  Float    @default(0.75)
+  esiEmployer  Float    @default(3.25)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
 }
 
 model Payroll {
-  id              String        @id @default(uuid())
-  employeeId      String
-  payrollRunId    String?
-  month           Int
-  year            Int
+  id                  String        @id @default(uuid())
+  employeeId          String
+  payrollRunId        String?
+  month               Int
+  year                Int
   // --- Full Month Earnings (Section 1) ---
-  basicFull       Float         @default(0)
-  daFull          Float         @default(0)
-  hraFull         Float         @default(0)
-  washingFull     Float         @default(0)
-  conveyanceFull  Float         @default(0)
-  lwwFull         Float         @default(0)
-  bonusFull       Float         @default(0)
-  otherFull       Float         @default(0)
-  grossFullMonth  Float         @default(0)  // Sum of all full-month components
+  basicFull           Float         @default(0)
+  daFull              Float         @default(0)
+  hraFull             Float         @default(0)
+  washingFull         Float         @default(0)
+  conveyanceFull      Float         @default(0)
+  lwwFull             Float         @default(0)
+  bonusFull           Float         @default(0)
+  otherFull           Float         @default(0)
+  grossFullMonth      Float         @default(0) // Sum of all full-month components
   // --- Earned/Prorated Earnings (Section 2) ---
-  basicSalary     Float         @default(0)  // basicEarned
-  da              Float         @default(0)  // daEarned
-  hra             Float         @default(0)  // hraEarned
-  washing         Float         @default(0)  // washingEarned
-  conveyance      Float         @default(0)  // conveyanceEarned
-  lwwEarned       Float         @default(0)
-  bonus           Float         @default(0)  // bonusEarned
-  allowances      Float         @default(0)  // otherEarned
-  otDays          Float         @default(0)
-  overtimePay     Float         @default(0)  // OT pay
-  productionIncentive Float     @default(0)
-  grossSalary     Float         @default(0)  // Total gross earned
+  basicSalary         Float         @default(0) // basicEarned
+  da                  Float         @default(0) // daEarned
+  hra                 Float         @default(0) // hraEarned
+  washing             Float         @default(0) // washingEarned
+  conveyance          Float         @default(0) // conveyanceEarned
+  lwwEarned           Float         @default(0)
+  bonus               Float         @default(0) // bonusEarned
+  allowances          Float         @default(0) // otherEarned
+  otDays              Float         @default(0)
+  overtimePay         Float         @default(0) // OT pay
+  productionIncentive Float         @default(0)
+  grossSalary         Float         @default(0) // Total gross earned
   // --- Deductions ---
-  pfEmployee      Float         @default(0)
-  pfEmployer      Float         @default(0)
-  esiEmployee     Float         @default(0)
-  esiEmployer     Float         @default(0)
-  pt              Float         @default(0)
-  lwf             Float         @default(0)
-  tds             Float         @default(0)
-  canteenDays     Int           @default(0)
-  canteen         Float         @default(0)
-  penalty         Float         @default(0)
-  advance         Float         @default(0)
-  otherDeductions Float         @default(0)
-  totalDeductions Float         @default(0)
+  pfEmployee          Float         @default(0)
+  pfEmployer          Float         @default(0)
+  esiEmployee         Float         @default(0)
+  esiEmployer         Float         @default(0)
+  pt                  Float         @default(0)
+  lwf                 Float         @default(0)
+  tds                 Float         @default(0)
+  canteenDays         Int           @default(0)
+  canteen             Float         @default(0)
+  penalty             Float         @default(0)
+  advance             Float         @default(0)
+  otherDeductions     Float         @default(0)
+  totalDeductions     Float         @default(0)
   // --- Net & CTC ---
-  netSalary       Float         @default(0)
-  ctc             Float         @default(0)  // CTC = fullGross + empPF + empESIC
+  netSalary           Float         @default(0)
+  ctc                 Float         @default(0) // CTC = fullGross + empPF + empESIC
   // --- Attendance ---
-  workingDays     Int           @default(26)
-  presentDays     Int           @default(26)
-  leaveDays       Float         @default(0)
-  lwpDays         Float         @default(0)
-  overtimeHrs     Float         @default(0)
-  overtimeRate    Float         @default(0)
-  siteId          String?
-  status          PayrollStatus @default(DRAFT)
-  processedAt     DateTime?
-  processedBy     String?
-  paidAt          DateTime?
-  paidBy          String?
-  remarks         String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  employee        Employee      @relation(fields: [employeeId], references: [id])
-  payrollRun      PayrollRun?   @relation(fields: [payrollRunId], references: [id], onDelete: SetNull)
+  workingDays         Int           @default(26)
+  presentDays         Int           @default(26)
+  leaveDays           Float         @default(0)
+  lwpDays             Float         @default(0)
+  overtimeHrs         Float         @default(0)
+  overtimeRate        Float         @default(0)
+  siteId              String?
+  status              PayrollStatus @default(DRAFT)
+  processedAt         DateTime?
+  processedBy         String?
+  paidAt              DateTime?
+  paidBy              String?
+  remarks             String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  employee            Employee      @relation(fields: [employeeId], references: [id])
+  payrollRun          PayrollRun?   @relation(fields: [payrollRunId], references: [id], onDelete: SetNull)
 
   @@unique([employeeId, month, year])
   @@index([month, year])
@@ -864,39 +867,39 @@ model Payroll {
 }
 
 model PayrollRun {
-  id                String        @id @default(uuid())
-  month             Int
-  year              Int
-  status            PayrollStatus @default(DRAFT)
-  lockedAt          DateTime?
-  processedBy       String
-  totalGross        Float         @default(0)
-  totalNet          Float         @default(0)
-  totalPfEmployer   Float         @default(0)
-  totalEsiEmployer  Float         @default(0)
-  totalLwf          Float         @default(0)
-  totalTds          Float         @default(0)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  payrolls          Payroll[]
+  id               String        @id @default(uuid())
+  month            Int
+  year             Int
+  status           PayrollStatus @default(DRAFT)
+  lockedAt         DateTime?
+  processedBy      String
+  totalGross       Float         @default(0)
+  totalNet         Float         @default(0)
+  totalPfEmployer  Float         @default(0)
+  totalEsiEmployer Float         @default(0)
+  totalLwf         Float         @default(0)
+  totalTds         Float         @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  payrolls         Payroll[]
 
   @@unique([month, year])
   @@index([status])
 }
 
 model StatutoryChallan {
-  id              String   @id @default(uuid())
-  type            String   // PF, ESI, PT, LWF, TDS
-  month           Int
-  year            Int
-  trrnNumber      String?
-  amount          Float
-  paymentDate     DateTime?
-  status          String   @default("PENDING") // PENDING, PAID, FAILED
-  documentUrl     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id          String    @id @default(uuid())
+  type        String // PF, ESI, PT, LWF, TDS
+  month       Int
+  year        Int
+  trrnNumber  String?
+  amount      Float
+  paymentDate DateTime?
+  status      String    @default("PENDING") // PENDING, PAID, FAILED
+  documentUrl String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@index([type])
   @@index([month, year])
 }
@@ -909,18 +912,18 @@ enum AdvanceStatus {
 }
 
 model AdvanceAndReimbursement {
-  id              String        @id @default(uuid())
-  employeeId      String
-  type            String        // ADVANCE, REIMBURSEMENT, UNIFORM_DEDUCTION
-  amount          Float
-  monthToImpact   Int
-  yearToImpact    Int
-  reason          String?
-  status          AdvanceStatus @default(PENDING)
-  approvedBy      String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  employee        Employee      @relation(fields: [employeeId], references: [id])
+  id            String        @id @default(uuid())
+  employeeId    String
+  type          String // ADVANCE, REIMBURSEMENT, UNIFORM_DEDUCTION
+  amount        Float
+  monthToImpact Int
+  yearToImpact  Int
+  reason        String?
+  status        AdvanceStatus @default(PENDING)
+  approvedBy    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  employee      Employee      @relation(fields: [employeeId], references: [id])
 
   @@index([employeeId])
   @@index([status])
@@ -936,23 +939,23 @@ enum AssetCondition {
 }
 
 model Asset {
-  id           String         @id @default(uuid())
-  assetCode    String         @unique
+  id           String          @id @default(uuid())
+  assetCode    String          @unique
   name         String
   category     String
   description  String?
   serialNo     String?
-  quantity     Int            @default(1)
-  available    Int            @default(1)
-  condition    AssetCondition @default(NEW)
+  quantity     Int             @default(1)
+  available    Int             @default(1)
+  condition    AssetCondition  @default(NEW)
   purchaseDate DateTime?
   purchaseCost Float?
   vendor       String?
   location     String?
-  isActive     Boolean        @default(true)
+  isActive     Boolean         @default(true)
   createdBy    String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
   assignments  EmployeeAsset[]
 
   @@index([category])
@@ -1177,43 +1180,43 @@ enum ExitStatus {
 }
 
 model ExitRequest {
-  id                String     @id @default(uuid())
-  employeeId        String     @unique
-  exitType          ExitType
-  status            ExitStatus @default(INITIATED)
-  resignationDate   DateTime
-  lastWorkingDate   DateTime?
-  noticePeriodDays  Int        @default(30)
-  reason            String?
-  hrComments        String?
-  fnfAmount         Float?
-  fnfPaidAt         DateTime?
-  fnfPaidBy         String?
-  initiatedBy       String
-  approvedBy        String?
-  approvedAt        DateTime?
-  completedAt       DateTime?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  employee          Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  clearanceTasks    ExitClearanceTask[]
+  id               String              @id @default(uuid())
+  employeeId       String              @unique
+  exitType         ExitType
+  status           ExitStatus          @default(INITIATED)
+  resignationDate  DateTime
+  lastWorkingDate  DateTime?
+  noticePeriodDays Int                 @default(30)
+  reason           String?
+  hrComments       String?
+  fnfAmount        Float?
+  fnfPaidAt        DateTime?
+  fnfPaidBy        String?
+  initiatedBy      String
+  approvedBy       String?
+  approvedAt       DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  employee         Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  clearanceTasks   ExitClearanceTask[]
 
   @@index([status])
   @@index([exitType])
 }
 
 model ExitClearanceTask {
-  id           String      @id @default(uuid())
-  exitId       String
-  title        String
-  department   String
-  status       String      @default("PENDING")
-  dueDate      DateTime?
-  completedAt  DateTime?
-  completedBy  String?
-  remarks      String?
-  order        Int         @default(0)
-  exitRequest  ExitRequest @relation(fields: [exitId], references: [id], onDelete: Cascade)
+  id          String      @id @default(uuid())
+  exitId      String
+  title       String
+  department  String
+  status      String      @default("PENDING")
+  dueDate     DateTime?
+  completedAt DateTime?
+  completedBy String?
+  remarks     String?
+  order       Int         @default(0)
+  exitRequest ExitRequest @relation(fields: [exitId], references: [id], onDelete: Cascade)
 
   @@index([exitId])
 }
@@ -1237,7 +1240,7 @@ enum FieldTaskStatus {
 
 model FieldTask {
   id            String          @id @default(uuid())
-  taskNo        String          @unique   // FT-0001
+  taskNo        String          @unique // FT-0001
   title         String
   description   String?
   employeeId    String
@@ -1245,7 +1248,7 @@ model FieldTask {
   priority      TaskPriority    @default(MEDIUM)
   status        FieldTaskStatus @default(ASSIGNED)
   dueDate       DateTime
-  dueTime       String?         // "09:00", "18:00" etc
+  dueTime       String? // "09:00", "18:00" etc
   completedAt   DateTime?
   completedNote String?
   assignedBy    String
@@ -1259,17 +1262,17 @@ model FieldTask {
 }
 
 model FieldCheckIn {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   employeeId       String
   siteId           String?
   latitude         Float
   longitude        Float
   accuracy         Float?
-  checkedInAt      DateTime  @default(now())
+  checkedInAt      DateTime @default(now())
   notes            String?
-  isGeofenced      Boolean   @default(false)
+  isGeofenced      Boolean  @default(false)
   distanceFromSite Float?
-  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([checkedInAt])
@@ -1297,15 +1300,15 @@ enum QuestionType {
 }
 
 model Policy {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  category    String    // SAFETY, HR, COMPLIANCE, SOP
-  fileUrl     String?
-  isRequired  Boolean   @default(true)
-  isActive    Boolean   @default(true)
-  createdBy   String?
-  createdAt   DateTime  @default(now())
+  id              String                 @id @default(uuid())
+  title           String
+  description     String?
+  category        String // SAFETY, HR, COMPLIANCE, SOP
+  fileUrl         String?
+  isRequired      Boolean                @default(true)
+  isActive        Boolean                @default(true)
+  createdBy       String?
+  createdAt       DateTime               @default(now())
   acknowledgments PolicyAcknowledgment[]
 
   @@index([category])
@@ -1313,13 +1316,13 @@ model Policy {
 }
 
 model PolicyAcknowledgment {
-  id           String   @id @default(uuid())
-  policyId     String
-  employeeId   String
+  id             String   @id @default(uuid())
+  policyId       String
+  employeeId     String
   acknowledgedAt DateTime @default(now())
-  ipAddress    String?
-  policy       Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  ipAddress      String?
+  policy         Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([policyId, employeeId])
   @@index([employeeId])
@@ -1334,7 +1337,7 @@ enum ILTStatus {
 }
 
 model ILTSession {
-  id           String      @id @default(uuid())
+  id           String          @id @default(uuid())
   title        String
   description  String?
   instructorId String
@@ -1342,12 +1345,12 @@ model ILTSession {
   location     String?
   startTime    DateTime
   endTime      DateTime
-  maxSeats     Int         @default(20)
-  status       ILTStatus   @default(SCHEDULED)
+  maxSeats     Int             @default(20)
+  status       ILTStatus       @default(SCHEDULED)
   materialsUrl String?
   feedbackForm Json?
   createdBy    String?
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime        @default(now())
   attendances  ILTAttendance[]
 
   @@index([status])
@@ -1356,15 +1359,15 @@ model ILTSession {
 }
 
 model ILTAttendance {
-  id          String    @id @default(uuid())
-  sessionId   String
-  employeeId  String
-  attendedAt  DateTime?
-  status      String    @default("PENDING") // PENDING, PRESENT, ABSENT, LATE
-  feedback    String?
-  rating      Int?      // 1-5
-  session     ILTSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id         String     @id @default(uuid())
+  sessionId  String
+  employeeId String
+  attendedAt DateTime?
+  status     String     @default("PENDING") // PENDING, PRESENT, ABSENT, LATE
+  feedback   String?
+  rating     Int? // 1-5
+  session    ILTSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, employeeId])
   @@index([sessionId])
@@ -1372,70 +1375,70 @@ model ILTAttendance {
 }
 
 model Course {
-  id           String       @id @default(uuid())
-  courseCode   String       @unique
-  title        String
-  description  String?
-  category     String
-  duration     Int          @default(60)
-  passingScore Int          @default(70)
-  isMandatory  Boolean      @default(false)
-  status       CourseStatus @default(DRAFT)
-  createdBy    String?
-  thumbnail    String?
-  validityDays Int?         // null = forever, e.g., 365 for 1 year validity
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  modules      CourseModule[]
-  quiz         Quiz?
-  enrollments  CourseEnrollment[]
+  id              String                 @id @default(uuid())
+  courseCode      String                 @unique
+  title           String
+  description     String?
+  category        String
+  duration        Int                    @default(60)
+  passingScore    Int                    @default(70)
+  isMandatory     Boolean                @default(false)
+  status          CourseStatus           @default(DRAFT)
+  createdBy       String?
+  thumbnail       String?
+  validityDays    Int? // null = forever, e.g., 365 for 1 year validity
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  modules         CourseModule[]
+  quiz            Quiz?
+  enrollments     CourseEnrollment[]
   assignmentRules CourseAssignmentRule[]
-  feedbacks    CourseFeedback[]
+  feedbacks       CourseFeedback[]
 
   @@index([status])
   @@index([category])
 }
 
 model CourseAssignmentRule {
-  id         String   @id @default(uuid())
-  courseId   String
-  assignTo   String   // ROLE, DESIGNATION, SITE, CLIENT, BRANCH, ALL
-  value      String   // e.g., "OPERATOR", "Safety", siteId, clientName, etc.
-  dueDays    Int?     // Days from enrollment to complete
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  courseId  String
+  assignTo  String // ROLE, DESIGNATION, SITE, CLIENT, BRANCH, ALL
+  value     String // e.g., "OPERATOR", "Safety", siteId, clientName, etc.
+  dueDays   Int? // Days from enrollment to complete
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([courseId])
   @@index([assignTo])
 }
 
 model CourseModule {
-  id          String   @id @default(uuid())
-  courseId    String
-  title       String
-  content     String?
-  videoUrl    String?
-  duration    Int      @default(15)
-  order       Int      @default(0)
-  isRequired  Boolean  @default(true)
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id         String  @id @default(uuid())
+  courseId   String
+  title      String
+  content    String?
+  videoUrl   String?
+  duration   Int     @default(15)
+  order      Int     @default(0)
+  isRequired Boolean @default(true)
+  course     Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([courseId])
 }
 
 model Quiz {
-  id           String            @id @default(uuid())
-  courseId     String            @unique
-  title        String            @default("Course Assessment")
+  id           String         @id @default(uuid())
+  courseId     String         @unique
+  title        String         @default("Course Assessment")
   description  String?
-  passingScore Int               @default(70)
-  timeLimit    Int?              // in minutes, null = no limit
-  maxAttempts  Int               @default(3)
-  isActive     Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  course       Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  passingScore Int            @default(70)
+  timeLimit    Int? // in minutes, null = no limit
+  maxAttempts  Int            @default(3)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   questions    QuizQuestion[]
   attempts     QuizAttempt[]
 
@@ -1456,47 +1459,47 @@ model QuizQuestion {
 }
 
 model QuizOption {
-  id         String        @id @default(uuid())
+  id         String       @id @default(uuid())
   questionId String
   text       String
-  isCorrect  Boolean       @default(false)
-  order      Int           @default(0)
-  question   QuizQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  isCorrect  Boolean      @default(false)
+  order      Int          @default(0)
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@index([questionId])
 }
 
 model QuizAttempt {
-  id           String       @id @default(uuid())
-  quizId       String
-  employeeId   String
-  score        Float?
-  passed       Boolean?
-  startedAt    DateTime     @default(now())
-  submittedAt  DateTime?
-  answers      Json?       // { questionId: optionId }
-  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  quizId      String
+  employeeId  String
+  score       Float?
+  passed      Boolean?
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  answers     Json? // { questionId: optionId }
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
   @@index([quizId])
   @@index([employeeId])
 }
 
 model CourseEnrollment {
-  id           String           @id @default(uuid())
-  courseId     String
-  employeeId   String
-  enrolledAt   DateTime         @default(now())
-  enrolledBy   String?
-  startedAt    DateTime?
-  completedAt  DateTime?
-  dueDate      DateTime?
-  score        Float?
-  status       EnrollmentStatus @default(ENROLLED)
-  attempts     Int              @default(0)
-  certificate  String?
-  progress     Int              @default(0)
-  course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id          String           @id @default(uuid())
+  courseId    String
+  employeeId  String
+  enrolledAt  DateTime         @default(now())
+  enrolledBy  String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  dueDate     DateTime?
+  score       Float?
+  status      EnrollmentStatus @default(ENROLLED)
+  attempts    Int              @default(0)
+  certificate String?
+  progress    Int              @default(0)
+  course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee    Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, employeeId])
   @@index([employeeId])
@@ -1505,15 +1508,15 @@ model CourseEnrollment {
 }
 
 model CourseFeedback {
-  id           String           @id @default(uuid())
+  id           String   @id @default(uuid())
   courseId     String
   employeeId   String
   enrollmentId String?
-  rating       Int              // 1-5 stars
+  rating       Int // 1-5 stars
   comment      String?
-  submittedAt  DateTime         @default(now())
-  course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  submittedAt  DateTime @default(now())
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, employeeId])
   @@index([courseId])
@@ -1533,19 +1536,19 @@ enum InvoiceStatus {
 
 model Invoice {
   id            String        @id @default(uuid())
-  invoiceNo     String        @unique   // INV-2024-0001
+  invoiceNo     String        @unique // INV-2024-0001
   clientName    String
   clientEmail   String?
   clientAddress String?
   clientGST     String?
   companyId     String?
-  billingMonth  Int           // 1-12
+  billingMonth  Int // 1-12
   billingYear   Int
   issueDate     DateTime      @default(now())
   dueDate       DateTime
   status        InvoiceStatus @default(DRAFT)
   subtotal      Float         @default(0)
-  taxRate       Float         @default(18)  // GST %
+  taxRate       Float         @default(18) // GST %
   taxAmount     Float         @default(0)
   totalAmount   Float         @default(0)
   paidAmount    Float         @default(0)
@@ -1573,16 +1576,16 @@ model InvoiceItem {
 }
 
 model Payment {
-  id            String   @id @default(uuid())
-  invoiceId     String
-  amount        Float
-  paymentDate   DateTime
-  paymentMode   String   // Cash, Cheque, NEFT, RTGS, UPI
-  referenceNo   String?
-  remarks       String?
-  recordedBy    String
-  createdAt     DateTime @default(now())
-  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  invoiceId   String
+  amount      Float
+  paymentDate DateTime
+  paymentMode String // Cash, Cheque, NEFT, RTGS, UPI
+  referenceNo String?
+  remarks     String?
+  recordedBy  String
+  createdAt   DateTime @default(now())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
 }
@@ -1642,28 +1645,28 @@ enum ExpenseCategory {
 
 model Expense {
   id              String          @id @default(uuid())
-  expenseNo       String          @unique   // EXP-0001
+  expenseNo       String          @unique // EXP-0001
   title           String
   category        ExpenseCategory
   amount          Float
   date            DateTime
   description     String?
-  receiptUrl      String?         // file upload URL
-  submittedBy     String          // userId
-  employeeId      String?         // optional: on behalf of employee
-  projectId       String?         // optional: link to project/client
+  receiptUrl      String? // file upload URL
+  submittedBy     String // userId
+  employeeId      String? // optional: on behalf of employee
+  projectId       String? // optional: link to project/client
   project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  approvedBy      String?         // userId
+  approvedBy      String? // userId
   approvedAt      DateTime?
   rejectedAt      DateTime?
   rejectionReason String?
-  paidAt          DateTime?       // when it was marked paid (timestamp)
-  paymentDate     DateTime?       // actual date the payment was made (accounts-entered)
-  paymentMode     String?         // Cash, NEFT, etc.
-  transactionId   String?         // UTR / transaction reference number
-  travelDays      Int?            // legacy – kept for backward compat
-  travelDailyRate Float?          // legacy – kept for backward compat
-  travelEntries   Json?           // [{date,from,to,kms,amount}] per-journey breakdown
+  paidAt          DateTime? // when it was marked paid (timestamp)
+  paymentDate     DateTime? // actual date the payment was made (accounts-entered)
+  paymentMode     String? // Cash, NEFT, etc.
+  transactionId   String? // UTR / transaction reference number
+  travelDays      Int? // legacy – kept for backward compat
+  travelDailyRate Float? // legacy – kept for backward compat
+  travelEntries   Json? // [{date,from,to,kms,amount}] per-journey breakdown
   status          ExpenseStatus   @default(DRAFT)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -1692,29 +1695,29 @@ enum ContractType {
 }
 
 model ClientContract {
-  id               String         @id @default(uuid())
-  contractNo       String         @unique   // CTR-0001
-  clientName       String
-  clientCompanyId  String?        // optional link to existing Company
-  contactPerson    String?
-  contactEmail     String?
-  contactPhone     String?
-  contractType     ContractType   @default(FIXED_TERM)
-  status           ContractStatus @default(DRAFT)
-  startDate        DateTime
-  endDate          DateTime?
-  value            Float?         // total contract value
-  monthlyValue     Float?         // monthly billing amount
-  manpowerCount    Int?           // number of employees to deploy
-  serviceType      String?        // Security, Housekeeping, Facility Mgmt, etc.
-  slaTerms         String?        // SLA description
-  billingCycle     String?        // Monthly, Bi-monthly, etc.
-  paymentTerms     String?        // Net 30, Net 15, etc.
-  notes            String?
-  createdBy        String
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  renewals         ContractRenewal[]
+  id              String            @id @default(uuid())
+  contractNo      String            @unique // CTR-0001
+  clientName      String
+  clientCompanyId String? // optional link to existing Company
+  contactPerson   String?
+  contactEmail    String?
+  contactPhone    String?
+  contractType    ContractType      @default(FIXED_TERM)
+  status          ContractStatus    @default(DRAFT)
+  startDate       DateTime
+  endDate         DateTime?
+  value           Float? // total contract value
+  monthlyValue    Float? // monthly billing amount
+  manpowerCount   Int? // number of employees to deploy
+  serviceType     String? // Security, Housekeeping, Facility Mgmt, etc.
+  slaTerms        String? // SLA description
+  billingCycle    String? // Monthly, Bi-monthly, etc.
+  paymentTerms    String? // Net 30, Net 15, etc.
+  notes           String?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  renewals        ContractRenewal[]
 
   @@index([status])
   @@index([clientName])
@@ -1722,14 +1725,14 @@ model ClientContract {
 }
 
 model ContractRenewal {
-  id           String         @id @default(uuid())
-  contractId   String
-  renewedAt    DateTime       @default(now())
-  newEndDate   DateTime
-  newValue     Float?
-  notes        String?
-  renewedBy    String
-  contract     ClientContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  id         String         @id @default(uuid())
+  contractId String
+  renewedAt  DateTime       @default(now())
+  newEndDate DateTime
+  newValue   Float?
+  notes      String?
+  renewedBy  String
+  contract   ClientContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
   @@index([contractId])
 }
@@ -1738,7 +1741,7 @@ model HrDocumentType {
   id               String       @id @default(uuid())
   name             String       @unique
   description      String?
-  templateContent  String?      // HTML/text template with {{variables}}
+  templateContent  String? // HTML/text template with {{variables}}
   autoGenerate     Boolean      @default(false)
   requiresApproval Boolean      @default(true)
   isActive         Boolean      @default(true)
@@ -1759,31 +1762,92 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
-  updatedBy String?  // userId who last updated
+  updatedBy String? // userId who last updated
 }
 
 model HrDocument {
-  id             String          @id @default(uuid())
-  docNumber      String          @unique // e.g. DOC-2026-0001
+  id             String         @id @default(uuid())
+  docNumber      String         @unique // e.g. DOC-2026-0001
   employeeId     String
   typeId         String
   effectiveDate  DateTime?
-  content        String          // Filled template content
-  status         HrDocStatus     @default(DRAFT)
+  content        String // Filled template content
+  status         HrDocStatus    @default(DRAFT)
   remarks        String?
   rejectionNote  String?
-  createdBy      String          // userId
-  approvedBy     String?         // userId
-  issuedBy       String?         // userId
+  createdBy      String // userId
+  approvedBy     String? // userId
+  issuedBy       String? // userId
   approvedAt     DateTime?
   issuedAt       DateTime?
-  acknowledged   Boolean         @default(false)
+  acknowledged   Boolean        @default(false)
   acknowledgedAt DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  type           HrDocumentType  @relation(fields: [typeId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  employee       Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type           HrDocumentType @relation(fields: [typeId], references: [id])
 
   @@index([employeeId])
   @@index([status])
+}
+
+enum JobStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+model JobPosting {
+  id    String @id @default(uuid())
+  title String
+
+  // Step 1 — Job details
+  workExpMin      Int?
+  workExpMax      Int?
+  freshersAllowed Boolean  @default(false)
+  salaryMin       Int?
+  salaryMax       Int?
+  salaryPeriod    String   @default("month")
+  perks           String[] @default([])
+
+  // Step 2 — Candidate preferences
+  department        String?
+  jobRole           String?
+  jobLocation       String?
+  qualifications    String[] @default([])
+  educationDegree   String?
+  genderPreference  String   @default("Any")
+  skills            String[] @default([])
+  candidateIndustry String?
+  languages         String[] @default([])
+
+  // Step 3 — Screening questions: [{ question, mandatory, type, options[], preferredAnswer }]
+  screeningQuestions Json?
+
+  // Step 4 — Job description
+  description String?
+  companyName String?
+
+  // Meta
+  employmentType String?
+  industryType   String?
+  roleCategory   String?
+  openings       Int     @default(1)
+
+  // Step 5 — Communication preferences
+  allowCalls    Boolean @default(false)
+  contactName   String?
+  contactPhone  String?
+  callStartTime String?
+  callEndTime   String?
+  callDays      String?
+
+  status    JobStatus @default(DRAFT)
+  createdBy String?
+  creator   User?     @relation("JobCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdBy])
 }
