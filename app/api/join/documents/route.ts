@@ -37,6 +37,19 @@ export async function POST(req: Request) {
             },
         })
 
+        // Keep the employee's profile photo in sync so the avatar shows up
+        // everywhere (list view, board view, detail page, HR logins, etc.)
+        if (type === "PHOTO") {
+            try {
+                await prisma.employee.update({
+                    where: { id: employee.id },
+                    data: { photo: fileUrl },
+                })
+            } catch (e) {
+                console.error("[JOIN_DOCS_PHOTO_SYNC]", e)
+            }
+        }
+
         return NextResponse.json({ success: true, docId: doc.id })
     } catch (error: any) {
         console.error("[JOIN_DOCUMENTS_POST]", error)
