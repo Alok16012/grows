@@ -64,10 +64,6 @@ type NavSection = {
     links: NavLink[]
 }
 
-// Permission-less pages every signed-in user always has access to (their own
-// data). Everything else is governed solely by custom-role permissions.
-const PERSONAL_HREFS = ["/profile", "/self-onboarding"]
-
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const pathname = usePathname()
     const { data: session } = useSession()
@@ -301,10 +297,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                         // grants anything — Admin → Roles is the single source of truth.
                         if (link.permission) return userPermissions.includes(link.permission)
 
-                        // Permission-less links are hidden, EXCEPT the universal
-                        // personal pages every signed-in user owns (their own profile
-                        // and self-onboarding). All other base-role nav is gone.
-                        return PERSONAL_HREFS.includes(link.href)
+                        // No universal exceptions: a link without a permission is
+                        // hidden for everyone except ADMIN. Access is governed
+                        // solely by custom-role permissions.
+                        return false
                     })
 
                     if (filteredLinks.length === 0) return null
