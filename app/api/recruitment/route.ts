@@ -29,14 +29,32 @@ export async function GET(req: Request) {
     const andClauses: any[] = []
 
     // ADMIN sees all leads.
-    // MANAGER / HR_MANAGER see only leads they created OR are assigned to.
+    // MANAGER / HR_MANAGER see leads they created, are assigned to, OR that
+    // arrived through one of THEIR own recruitment form links.
     if (session.user.role !== Role.ADMIN) {
-        andClauses.push({
-            OR: [
-                { createdBy:  session.user.id },
-                { assignedTo: session.user.id },
-            ]
+        // Resolve real user id — session.user.id may be a demo-xxx string in
+        // some setups, while the stored createdBy is always the DB uuid.
+        const realUser = await prisma.user.findUnique({ where: { id: session.user.id } })
+            ?? await prisma.user.findUnique({ where: { email: session.user.email ?? "" } })
+        const uid = realUser?.id ?? session.user.id
+
+        // Slugs of form links this user created. Any candidate who applied
+        // through their link belongs in their portal, even for legacy leads
+        // that were historically stamped with a different owner (e.g. admin
+        // — leads captured before the 1-Jun ownership fix).
+        const myForms = await prisma.leadForm.findMany({
+            where: { createdBy: uid },
+            select: { slug: true },
         })
+        const mySlugs = myForms.map((f) => f.slug)
+
+        const ownership: any[] = [
+            { createdBy:  uid },
+            { assignedTo: uid },
+        ]
+        if (mySlugs.length) ownership.push({ formSlug: { in: mySlugs } })
+
+        andClauses.push({ OR: ownership })
     }
 
     if (search) {
