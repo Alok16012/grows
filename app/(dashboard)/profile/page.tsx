@@ -6,7 +6,7 @@ import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
-    UserCircle2, MapPin, CreditCard, Contact, Camera
+    UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut
 } from "lucide-react"
 
 // ─── Self-service Details Tab ────────────────────────────────────────────────
@@ -595,10 +595,130 @@ function LettersTab() {
     )
 }
 
+// ─── Tab: My Attendance (self check-in / check-out + history) ─────────────────
+function fmtTime(v: string | null) {
+    if (!v) return "—"
+    return new Date(v).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+}
+
+function AttendanceTab() {
+    const [today, setToday] = useState<any>(null)
+    const [history, setHistory] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [punching, setPunching] = useState(false)
+
+    const monthParam = (() => {
+        const d = new Date()
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    })()
+
+    const load = async () => {
+        const [t, h] = await Promise.all([
+            fetch("/api/me/attendance").then(r => r.json()).catch(() => null),
+            fetch(`/api/attendance?month=${monthParam}`).then(r => r.json()).catch(() => []),
+        ])
+        setToday(t?.today ?? null)
+        setHistory(Array.isArray(h) ? h : [])
+        setLoading(false)
+    }
+
+    useEffect(() => { load() }, [])
+
+    const getLocation = (): Promise<{ lat: number; lng: number } | null> =>
+        new Promise(resolve => {
+            if (!navigator.geolocation) return resolve(null)
+            navigator.geolocation.getCurrentPosition(
+                p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                () => resolve(null),
+                { timeout: 5000 }
+            )
+        })
+
+    const punch = async (action: "in" | "out") => {
+        setPunching(true)
+        try {
+            const loc = await getLocation()
+            const res = await fetch("/api/me/attendance", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action, ...(loc ?? {}) }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(action === "in" ? "Checked in!" : "Checked out!")
+            await load()
+        } catch (e) {
+            toast.error((e as Error).message || "Failed")
+        } finally { setPunching(false) }
+    }
+
+    if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-[var(--accent)]" /></div>
+
+    const checkedIn = !!today?.checkIn
+    const checkedOut = !!today?.checkOut
+
+    return (
+        <div className="space-y-4">
+            {/* Today's punch card */}
+            <div className="bg-white border border-[var(--border)] rounded-2xl p-5">
+                <p className="text-[13px] font-semibold text-[var(--text)] mb-3">Today · {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}</p>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-[var(--surface)] rounded-xl p-3 text-center">
+                        <p className="text-[11px] text-[var(--text3)]">Check In</p>
+                        <p className="text-[18px] font-bold text-[var(--text)]">{fmtTime(today?.checkIn)}</p>
+                    </div>
+                    <div className="bg-[var(--surface)] rounded-xl p-3 text-center">
+                        <p className="text-[11px] text-[var(--text3)]">Check Out</p>
+                        <p className="text-[18px] font-bold text-[var(--text)]">{fmtTime(today?.checkOut)}</p>
+                    </div>
+                </div>
+                {!checkedIn && (
+                    <button onClick={() => punch("in")} disabled={punching}
+                        className="w-full py-2.5 bg-[var(--accent)] text-white rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60">
+                        {punching ? <Loader2 size={14} className="animate-spin" /> : <LogIn size={14} />} Check In
+                    </button>
+                )}
+                {checkedIn && !checkedOut && (
+                    <button onClick={() => punch("out")} disabled={punching}
+                        className="w-full py-2.5 bg-red-600 text-white rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60">
+                        {punching ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />} Check Out
+                    </button>
+                )}
+                {checkedIn && checkedOut && (
+                    <div className="flex items-center justify-center gap-2 py-2.5 text-[13px] font-medium text-green-700 bg-green-50 rounded-lg">
+                        <CheckCircle2 size={15} /> Done for today · {today.workingHrs}h worked
+                    </div>
+                )}
+            </div>
+
+            {/* History */}
+            <div className="bg-white border border-[var(--border)] rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-[var(--border)]">
+                    <p className="text-[13px] font-semibold text-[var(--text)]">This Month</p>
+                </div>
+                {history.length === 0 ? (
+                    <div className="text-center py-10 text-[var(--text3)]">
+                        <Clock size={32} className="mx-auto mb-2 opacity-30" />
+                        <p className="text-[13px]">No attendance records yet.</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-[var(--border)]">
+                        {history.map((a: any) => (
+                            <div key={a.id} className="px-4 py-2.5 flex items-center justify-between text-[13px]">
+                                <span className="text-[var(--text)]">{new Date(a.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", weekday: "short" })}</span>
+                                <span className="text-[var(--text3)]">{fmtTime(a.checkIn)} – {fmtTime(a.checkOut)}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${a.status === "PRESENT" ? "bg-green-100 text-green-700" : a.status === "ABSENT" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>{a.status}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 export default function ProfilePage() {
     const { data: session, update } = useSession()
-    const [activeTab, setActiveTab] = useState<"profile"|"documents"|"onboarding"|"payslip"|"letters">("profile")
+    const [activeTab, setActiveTab] = useState<"profile"|"attendance"|"documents"|"onboarding"|"payslip"|"letters">("profile")
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [formData, setFormData] = useState({ name: "", email: "", phone: "", role: "", image: "" })
@@ -673,6 +793,7 @@ export default function ProfilePage() {
     const tabs = [
         { key: "profile",    label: "Profile",       icon: User },
         ...(isEmployee ? [
+            { key: "attendance", label: "My Attendance", icon: Clock },
             { key: "documents",  label: "My Documents",  icon: FileText },
             { key: "letters",    label: "My Letters",    icon: BookOpen },
             { key: "onboarding", label: "My Onboarding", icon: ClipboardList },
@@ -768,6 +889,7 @@ export default function ProfilePage() {
                 </form>
             )}
 
+            {activeTab === "attendance" && <AttendanceTab />}
             {activeTab === "documents"  && <DocsTab />}
             {activeTab === "letters"    && <LettersTab />}
             {activeTab === "onboarding" && <OnboardingTab />}
