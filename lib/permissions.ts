@@ -214,6 +214,14 @@ export const PERMISSION_GROUPS = [
 
     // ── OPERATIONS ───────────────────────────────────────────────────────────
     {
+        group: "Announcements",
+        key: "announcements",
+        permissions: [
+            { key: "announcements.view",   label: "View Announcements & Holidays" },
+            { key: "announcements.manage", label: "Post / Edit Announcements & Holidays" },
+        ]
+    },
+    {
         group: "Approvals",
         key: "approvals",
         permissions: [

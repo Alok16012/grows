@@ -47,6 +47,7 @@ import {
     Layers,
     CheckSquare,
     UserCog,
+    Megaphone,
 } from "lucide-react"
 
 type NavLink = {
@@ -200,8 +201,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "OPERATIONS",
             links: [
-                { name: "Approvals",    href: "/approvals",  icon: CheckSquare,  roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: true },
-                { name: "Helpdesk",     href: "/helpdesk",   icon: Headphones,   roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
+                { name: "Approvals",    href: "/approvals",     icon: CheckSquare,  roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: true },
+                { name: "Announcements", href: "/announcements", icon: Megaphone,   roles: ["ADMIN", "MANAGER"], permission: "announcements.view" },
+                { name: "Helpdesk",     href: "/helpdesk",      icon: Headphones,   roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
             ],
         },
 
@@ -251,6 +253,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             links: [
                 { name: "My Profile",       href: "/profile",        icon: UserCheck,    roles: ["INSPECTION_BOY"], permission: "self.view" },
                 { name: "My Onboarding",    href: "/self-onboarding", icon: BadgeCheck,  roles: ["INSPECTION_BOY"], permission: "self.view" },
+                { name: "Announcements",    href: "/announcements",  icon: Megaphone,    roles: ["INSPECTION_BOY"], permission: "self.view" },
                 { name: "Help & Support",   href: "/helpdesk",       icon: Headphones,   roles: ["INSPECTION_BOY"], permission: "self.view" },
             ],
         },

@@ -17,8 +17,15 @@ const phoneDigits = (s: string | null | undefined): string => {
 // permissions — the custom roles configured in the app are the single source of
 // truth. ADMIN remains a superuser (handled separately in checkAccess / can()).
 function resolvePermissions(user: { role: string; customRole?: { isActive: boolean; permissions: string[] } | null }): string[] {
-    if (user.customRole?.isActive) return user.customRole.permissions
-    return []
+    // Every authenticated user gets employee self-service by default — access to
+    // their OWN data only (profile, payslip, leaves, attendance, helpdesk). This
+    // is a universal baseline, NOT a privilege bypass, so it needs no manual role
+    // assignment. All other access still comes solely from the custom role.
+    const base = ["self.view"]
+    if (user.customRole?.isActive) {
+        return Array.from(new Set([...base, ...user.customRole.permissions]))
+    }
+    return base
 }
 
 // Demo users + phone-as-password auto-heal are only enabled in development

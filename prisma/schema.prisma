@@ -1851,3 +1851,34 @@ model JobPosting {
   @@index([status])
   @@index([createdBy])
 }
+
+// ─── Company Announcements (employee self-service) ───────────────────────────
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  body        String
+  category    String   @default("NOTICE") // NOTICE | EVENT | POLICY | URGENT
+  pinned      Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([publishedAt])
+}
+
+// ─── Holiday calendar (employee self-service) ────────────────────────────────
+model Holiday {
+  id          String   @id @default(uuid())
+  name        String
+  date        DateTime
+  type        String   @default("PUBLIC") // PUBLIC | RESTRICTED | COMPANY
+  description String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+}
