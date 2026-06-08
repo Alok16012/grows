@@ -14,7 +14,7 @@ const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 // PT slab — Maharashtra (standard month, not February)
 function calcPT(gross: number, gender?: string | null): number {
     // Female employees: exempt up to ₹25,000 (Maharashtra notification)
-    if (gender === "Female" && gross <= 25000) return 0
+    if (gender?.toLowerCase() === "female" && gross <= 25000) return 0
     if (gross > 10000) return 200
     if (gross >= 7500) return 175
     return 0

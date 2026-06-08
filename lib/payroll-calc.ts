@@ -71,7 +71,7 @@ export function calcGrowusPayroll(sal: {
 
     const isCALL    = complianceType === "CALL"
     const isFeb     = month === 2
-    const isFemale  = gender === "Female"
+    const isFemale  = gender?.toLowerCase() === "female"
 
     // ─── Full month components ────────────────────────────────────────────────
     // HRA: use manually stored value from salary structure (no auto-calculation)
@@ -101,12 +101,9 @@ export function calcGrowusPayroll(sal: {
     // ─── Deductions ───────────────────────────────────────────────────────────
 
     // PF base = min(Basic + DA, ₹15,000) — capped at statutory ceiling
-    // Employee PF: IF(WorkedDays >= 26, pfBase × 12%, ROUND(pfBase/26 × WorkedDays × 12%))
+    // Employee PF: pfBase × 12% (no proration — full PF regardless of worked days)
     const pfBase     = Math.min(basic + da, 15000)
-    const pfEmployee = isCALL ? 0
-        : (workedDays >= 26
-            ? Math.round(pfBase * 0.12)
-            : Math.round((pfBase / 26) * workedDays * 0.12))
+    const pfEmployee = isCALL ? 0 : Math.round(pfBase * 0.12)
 
     // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
     // Contribution base = EarnedGross − Washing − Bonus (OT included; washing & bonus excluded)
