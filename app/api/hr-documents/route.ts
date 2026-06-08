@@ -26,8 +26,9 @@ export async function GET(req: Request) {
         if (status) where.status = status
         if (employeeId) where.employeeId = employeeId
         if (typeId) where.typeId = typeId
-        // Employees only see their own documents
-        if (session.user.role === "INSPECTION_BOY") {
+        // Self-service: anyone WITHOUT the management permission sees only their
+        // own ISSUED documents (scoped to their linked employee). Role-independent.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
             const emp = await prisma.employee.findFirst({ where: { userId: session.user.id } })
             if (!emp) return NextResponse.json([])
             where.employeeId = emp.id

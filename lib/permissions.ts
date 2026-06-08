@@ -9,6 +9,18 @@
 
 export const PERMISSION_GROUPS = [
 
+    // ── MY WORKSPACE (employee self-service) ─────────────────────────────────
+    // Grants an employee access to their OWN data only: profile, payslip,
+    // documents, attendance, leaves, and raising helpdesk tickets. All these
+    // surfaces scope strictly to the user's linked employee record server-side.
+    {
+        group: "My Workspace (Self-Service)",
+        key: "self",
+        permissions: [
+            { key: "self.view", label: "Employee Self-Service (own profile, payslip, leaves, attendance, helpdesk)" },
+        ]
+    },
+
     // ── INSPECTIONS ──────────────────────────────────────────────────────────
     {
         group: "Projects",

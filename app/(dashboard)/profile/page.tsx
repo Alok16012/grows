@@ -604,12 +604,17 @@ export default function ProfilePage() {
     const [formData, setFormData] = useState({ name: "", email: "", phone: "", role: "", image: "" })
     const [photoUploading, setPhotoUploading] = useState(false)
 
-    const isEmployee = session?.user?.role === "INSPECTION_BOY"
+    // Self-service tabs (Documents / Letters / Onboarding / Payslip) are shown to
+    // anyone who has a linked employee record — role-independent. Their own data.
+    const [isEmployee, setIsEmployee] = useState(false)
 
     useEffect(() => {
         fetch("/api/profile").then(r => r.json()).then(d => {
             setFormData({ name: d.name||"", email: d.email||"", phone: d.phone||"", role: d.role||"", image: d.image||"" })
         }).finally(() => setLoading(false))
+        fetch("/api/me/employee").then(r => r.json()).then(d => {
+            setIsEmployee(!!d && !!d.id)
+        }).catch(() => setIsEmployee(false))
     }, [])
 
     const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {

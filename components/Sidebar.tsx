@@ -232,8 +232,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "MY WORK",
             links: [
                 { name: "My Assignments",   href: "/assignments",    icon: HardHat,      roles: ["INSPECTION_BOY"] },
-                { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"] },
-                { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"] },
+                { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"], permission: "self.view" },
+                { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"], permission: "self.view" },
             ],
         },
 
@@ -249,8 +249,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "MY ACCOUNT",
             links: [
-                { name: "My Profile",       href: "/profile",        icon: UserCheck,    roles: ["INSPECTION_BOY"] },
-                { name: "My Onboarding",    href: "/self-onboarding", icon: BadgeCheck,  roles: ["INSPECTION_BOY"] },
+                { name: "My Profile",       href: "/profile",        icon: UserCheck,    roles: ["INSPECTION_BOY"], permission: "self.view" },
+                { name: "My Onboarding",    href: "/self-onboarding", icon: BadgeCheck,  roles: ["INSPECTION_BOY"], permission: "self.view" },
+                { name: "Help & Support",   href: "/helpdesk",       icon: Headphones,   roles: ["INSPECTION_BOY"], permission: "self.view" },
             ],
         },
 

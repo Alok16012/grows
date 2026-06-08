@@ -9,10 +9,10 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isInspector = session.user.role === "INSPECTION_BOY"
-
-        // INSPECTION_BOY can only view their own leaves
-        if (isInspector) {
+        // Self-service: anyone WITHOUT the management permission falls back to
+        // their own leaves only (scoped to their linked employee record). This
+        // is role-independent — every employee sees their own data.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
             const linkedEmployee = await prisma.employee.findUnique({ where: { userId: session.user.id } })
             if (!linkedEmployee) return NextResponse.json([])
             const { searchParams } = new URL(req.url)
@@ -28,10 +28,6 @@ export async function GET(req: Request) {
                 orderBy: { createdAt: "desc" },
             })
             return NextResponse.json(leaves)
-        }
-
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
-            return new NextResponse("Forbidden", { status: 403 })
         }
 
         const { searchParams } = new URL(req.url)
@@ -94,10 +90,9 @@ export async function POST(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isInspector = session.user.role === "INSPECTION_BOY"
-
-        // INSPECTION_BOY can apply leave only for their own linked employee
-        if (isInspector) {
+        // Self-service: anyone WITHOUT the management permission can apply leave
+        // only for their own linked employee. Role-independent.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
             const linkedEmployee = await prisma.employee.findUnique({ where: { userId: session.user.id } })
             if (!linkedEmployee) return new NextResponse("No employee record linked", { status: 400 })
             const body = await req.json()
@@ -113,10 +108,6 @@ export async function POST(req: Request) {
                 },
             })
             return NextResponse.json(leave)
-        }
-
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
-            return new NextResponse("Forbidden", { status: 403 })
         }
 
         const body = await req.json()

@@ -9,10 +9,10 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
-        const isInspector = session.user.role === "INSPECTION_BOY"
-
-        // INSPECTION_BOY can only view their own attendance
-        if (isInspector) {
+        // Self-service: anyone WITHOUT the management permission falls back to
+        // their own attendance only (scoped to their linked employee record).
+        // Role-independent — every employee sees their own data.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "attendance.view")) {
             const linkedEmployee = await prisma.employee.findUnique({ where: { userId: session.user.id } })
             if (!linkedEmployee) return NextResponse.json([])
             const { searchParams } = new URL(req.url)
@@ -32,10 +32,6 @@ export async function GET(req: Request) {
                 orderBy: { date: "desc" },
             })
             return NextResponse.json(attendances)
-        }
-
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "attendance.view")) {
-            return new NextResponse("Forbidden", { status: 403 })
         }
 
         const { searchParams } = new URL(req.url)
