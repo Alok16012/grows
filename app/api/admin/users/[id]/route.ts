@@ -18,7 +18,7 @@ export async function PATCH(
 
     try {
         const body = await req.json()
-        const { isActive, password, name, email, role } = body
+        const { isActive, password, name, email, role, customRoleId } = body
 
         const updateData: any = {}
 
@@ -41,6 +41,9 @@ export async function PATCH(
         }
         if (role && Object.values(Role).includes(role as Role)) {
             updateData.role = role as Role
+        }
+        if (customRoleId !== undefined) {
+            updateData.customRoleId = customRoleId || null
         }
 
         if (Object.keys(updateData).length === 0) {

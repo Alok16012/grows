@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
+import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
@@ -265,9 +267,46 @@ export async function POST(req: Request) {
             data: { employeeId: employee.id, status: "NOT_STARTED" }
         })
 
+        // Auto-provision a login (User account) so every employee gets an id/password
+        // the moment they're created. Non-fatal: if it fails the employee still exists.
+        let _login: { email: string; password: string } | null = null
+        try {
+            const loginEmail = buildLoginEmail({ email, phone, employeeId: finalId })
+            const existingUser = await prisma.user.findUnique({
+                where: { email: loginEmail },
+                include: { employeeProfile: { select: { id: true } } },
+            })
+            if (existingUser) {
+                // Link the existing account instead of creating a duplicate,
+                // but only if it isn't already tied to another employee.
+                if (!existingUser.employeeProfile) {
+                    await prisma.employee.update({ where: { id: employee.id }, data: { userId: existingUser.id } })
+                }
+                _login = { email: loginEmail, password: existingUser.plainPassword || "(unchanged)" }
+            } else {
+                const plain = defaultPassword({ phone })
+                const hashed = await bcrypt.hash(plain, 10)
+                const user = await prisma.user.create({
+                    data: {
+                        name: `${firstName} ${lastName || ""}`.trim(),
+                        email: loginEmail,
+                        password: hashed,
+                        plainPassword: plain,
+                        phone: phone || null,
+                        role: "INSPECTION_BOY",
+                    },
+                })
+                await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } })
+                _login = { email: loginEmail, password: plain }
+            }
+        } catch (loginErr) {
+            console.error("[EMPLOYEE_AUTO_LOGIN]", loginErr)
+        }
+
         return NextResponse.json({
             ...employee,
             _onboardingLink: `/onboarding/${onboardingToken}`,
+            _login,
         })
     } catch (error) {
         console.error("[EMPLOYEES_POST]", error)

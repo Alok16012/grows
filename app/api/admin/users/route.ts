@@ -22,7 +22,7 @@ export async function GET(req: Request) {
                     select: { name: true }
                 },
                 customRole: {
-                    select: { name: true, color: true }
+                    select: { id: true, name: true, color: true }
                 }
             },
             orderBy: {
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const { name, email, password, role, companyId } = body
+        const { name, email, password, role, companyId, customRoleId } = body
 
         if (!name || !email || !password || !role) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -76,6 +76,7 @@ export async function POST(req: Request) {
                 email,
                 password: hashedPassword,
                 role: role as any,
+                customRoleId: customRoleId || null,
                 company: finalCompanyId ? { connect: { id: finalCompanyId } } : undefined
             }
         })

@@ -51,6 +51,7 @@ import BulkImportInspectors from "@/components/BulkImportInspectors"
 export default function UserManagementPage() {
     const [users, setUsers] = useState<any[]>([])
     const [companies, setCompanies] = useState<any[]>([])
+    const [customRoles, setCustomRoles] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [roleFilter, setRoleFilter] = useState("ALL")
@@ -61,7 +62,7 @@ export default function UserManagementPage() {
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [newPassword, setNewPassword] = useState("")
     const [submitting, setSubmitting] = useState(false)
-    const [editData, setEditData] = useState({ name: "", email: "", role: "" })
+    const [editData, setEditData] = useState({ name: "", email: "", role: "", customRoleId: "" })
 
     const [managers, setManagers] = useState<any[]>([])
     const [groupProjects, setGroupProjects] = useState<any[]>([])
@@ -79,27 +80,31 @@ export default function UserManagementPage() {
         name: "",
         email: "",
         password: "",
-        role: "CLIENT",
+        role: "ADMIN",
+        customRoleId: "",
         companyId: ""
     })
 
     const fetchData = async () => {
         setLoading(true)
         try {
-            const [usersRes, companiesRes, managersRes] = await Promise.all([
+            const [usersRes, companiesRes, managersRes, rolesRes] = await Promise.all([
                 fetch("/api/admin/users"),
                 fetch("/api/companies"),
-                fetch("/api/users?role=MANAGER")
+                fetch("/api/users?role=MANAGER"),
+                fetch("/api/admin/roles")
             ])
-            const [usersData, companiesData, managersData] = await Promise.all([
+            const [usersData, companiesData, managersData, rolesData] = await Promise.all([
                 usersRes.json(),
                 companiesRes.json(),
-                managersRes.json()
+                managersRes.json(),
+                rolesRes.ok ? rolesRes.json() : []
             ])
             setUsers(Array.isArray(usersData) ? usersData : [])
             setCompanies(Array.isArray(companiesData) ? companiesData : [])
             setGroupCompanies(Array.isArray(companiesData) ? companiesData : [])
             setManagers(Array.isArray(managersData) ? managersData : [])
+            setCustomRoles(Array.isArray(rolesData) ? rolesData : [])
         } catch (error) {
             console.error("Failed to fetch admin data", error)
             toast.error("Failed to load user data")
@@ -165,7 +170,7 @@ export default function UserManagementPage() {
             }
 
             setIsCreateModalOpen(false)
-            setFormData({ name: "", email: "", password: "", role: "CLIENT", companyId: "" })
+            setFormData({ name: "", email: "", password: "", role: "ADMIN", customRoleId: "", companyId: "" })
             setGroupMode("none")
             setGroupCompanyId("")
             setGroupProjectId("")
@@ -268,7 +273,8 @@ export default function UserManagementPage() {
     const filteredUsers = users.filter(u => {
         const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
             u.email.toLowerCase().includes(search.toLowerCase())
-        const matchesRole = roleFilter === "ALL" || u.role === roleFilter
+        const matchesRole = roleFilter === "ALL"
+            || (roleFilter === "ADMIN" ? u.role === "ADMIN" : u.customRole?.id === roleFilter)
         return matchesSearch && matchesRole
     })
 
@@ -340,10 +346,9 @@ export default function UserManagementPage() {
                 >
                     <option value="ALL">All Roles</option>
                     <option value="ADMIN">Admin</option>
-                    <option value="MANAGER">Manager</option>
-                    <option value="HR_MANAGER">HR Manager</option>
-                    <option value="INSPECTION_BOY">Inspector</option>
-                    <option value="CLIENT">Client</option>
+                    {customRoles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
                 </select>
             </div>
 
@@ -402,7 +407,7 @@ export default function UserManagementPage() {
                             <button
                                 onClick={() => {
                                     setSelectedUserId(user.id)
-                                    setEditData({ name: user.name, email: user.email, role: user.role })
+                                    setEditData({ name: user.name, email: user.email, role: user.role, customRoleId: user.customRole?.id || "" })
                                     setIsEditModalOpen(true)
                                 }}
                                 className="h-[30px] w-[30px] rounded-[7px] bg-[#f9f8f5] border border-[#e8e6e1] flex items-center justify-center hover:bg-[#eff6ff] hover:text-[#1d4ed8] hover:border-[#93c5fd] transition-colors"
@@ -478,35 +483,22 @@ export default function UserManagementPage() {
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Assignment Role</label>
+                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Role</label>
                             <select
-                                value={formData.role}
-                                onChange={e => setFormData({ ...formData, role: e.target.value })}
+                                value={formData.role === "ADMIN" ? "ADMIN" : formData.customRoleId}
+                                onChange={e => {
+                                    const v = e.target.value
+                                    if (v === "ADMIN") setFormData({ ...formData, role: "ADMIN", customRoleId: "" })
+                                    else setFormData({ ...formData, role: "MANAGER", customRoleId: v })
+                                }}
                                 className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
                             >
                                 <option value="ADMIN">Administrator</option>
-                                <option value="MANAGER">Manager</option>
-                                <option value="HR_MANAGER">HR Manager</option>
-                                <option value="INSPECTION_BOY">Inspector</option>
-                                <option value="CLIENT">Client Portal User</option>
+                                {customRoles.map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
                             </select>
                         </div>
-                        {formData.role === "CLIENT" && (
-                            <div className="space-y-1.5">
-                                <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Designated Company</label>
-                                <select
-                                    value={formData.companyId}
-                                    onChange={e => setFormData({ ...formData, companyId: e.target.value })}
-                                    required
-                                    className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
-                                >
-                                    <option value="">Select a company</option>
-                                    {companies.map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
 
                         <div className="border-t border-[#e8e6e1] mt-1 pt-4">
                             <button
@@ -618,15 +610,19 @@ export default function UserManagementPage() {
                         <div className="space-y-1.5">
                             <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Role</label>
                             <select
-                                value={editData.role}
-                                onChange={e => setEditData({ ...editData, role: e.target.value })}
+                                value={editData.role === "ADMIN" ? "ADMIN" : editData.customRoleId}
+                                onChange={e => {
+                                    const v = e.target.value
+                                    if (v === "ADMIN") setEditData({ ...editData, role: "ADMIN", customRoleId: "" })
+                                    else setEditData({ ...editData, role: "MANAGER", customRoleId: v })
+                                }}
                                 className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
                             >
+                                <option value="" disabled>— Select role —</option>
                                 <option value="ADMIN">Administrator</option>
-                                <option value="MANAGER">Manager</option>
-                                <option value="HR_MANAGER">HR Manager</option>
-                                <option value="INSPECTION_BOY">Inspector</option>
-                                <option value="CLIENT">Client Portal User</option>
+                                {customRoles.map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
                             </select>
                         </div>
                         <div className="border-t border-[#e8e6e1] pt-4">
