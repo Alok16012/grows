@@ -1,1 +1,1 @@
-ALTER TABLE "User" ADD COLUMN "plainPassword" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "plainPassword" TEXT;
