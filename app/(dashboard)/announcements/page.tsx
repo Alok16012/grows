@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { format } from "date-fns"
 import {
     Megaphone, CalendarDays, Pin, Plus, X, Loader2,
-    Trash2, AlertCircle, PartyPopper, FileText, Bell,
+    Trash2, AlertCircle, PartyPopper, FileText, Bell, Users,
 } from "lucide-react"
 import { can } from "@/lib/can"
 
@@ -21,6 +21,8 @@ type Announcement = {
     isActive: boolean
     publishedAt: string
     createdAt: string
+    targetSiteIds?: string[]
+    targetRoleIds?: string[]
 }
 
 type Holiday = {
@@ -29,7 +31,12 @@ type Holiday = {
     date: string
     type: string
     description?: string | null
+    targetSiteIds?: string[]
+    targetRoleIds?: string[]
 }
+
+type Site = { id: string; name: string }
+type Role = { id: string; name: string }
 
 // ─── Category styling ─────────────────────────────────────────────────────────
 
@@ -80,6 +87,8 @@ export default function AnnouncementsPage() {
 
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [holidays, setHolidays] = useState<Holiday[]>([])
+    const [sites, setSites] = useState<Site[]>([])
+    const [roles, setRoles] = useState<Role[]>([])
     const [loading, setLoading] = useState(true)
 
     const [showAnnForm, setShowAnnForm] = useState(false)
@@ -102,6 +111,22 @@ export default function AnnouncementsPage() {
     }, [])
 
     useEffect(() => { load() }, [load])
+
+    // Managers need the site/role lists to target notices & holidays.
+    useEffect(() => {
+        if (!canManage) return
+        fetch("/api/sites").then(r => r.ok ? r.json() : []).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {})
+        fetch("/api/admin/roles").then(r => r.ok ? r.json() : []).then(d => setRoles(Array.isArray(d) ? d : [])).catch(() => {})
+    }, [canManage])
+
+    const siteName = (id: string) => sites.find(s => s.id === id)?.name || "site"
+    const roleName = (id: string) => roles.find(r => r.id === id)?.name || "role"
+    const audienceLabel = (siteIds?: string[], roleIds?: string[]) => {
+        const parts: string[] = []
+        if (siteIds?.length) parts.push(siteIds.map(siteName).join(", "))
+        if (roleIds?.length) parts.push(roleIds.map(roleName).join(", "))
+        return parts.length ? parts.join(" · ") : "Everyone"
+    }
 
     if (loading) {
         return (
@@ -165,9 +190,16 @@ export default function AnnouncementsPage() {
                                         )}
                                     </div>
                                     <p className="text-[13px] text-[var(--text2)] mt-2 whitespace-pre-wrap leading-relaxed">{a.body}</p>
-                                    <p className="text-[11px] text-[var(--text3)] mt-3">
-                                        {format(new Date(a.publishedAt), "dd MMM yyyy, h:mm a")}
-                                    </p>
+                                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                                        <p className="text-[11px] text-[var(--text3)]">
+                                            {format(new Date(a.publishedAt), "dd MMM yyyy, h:mm a")}
+                                        </p>
+                                        {canManage && (
+                                            <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text3)]">
+                                                <Users size={11} /> {audienceLabel(a.targetSiteIds, a.targetRoleIds)}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -200,6 +232,11 @@ export default function AnnouncementsPage() {
                                                 <HolidayTypeBadge type={h.type} />
                                             </div>
                                             <p className="text-[11px] text-[var(--text3)]">{format(d, "EEEE")}{h.description ? ` · ${h.description}` : ""}</p>
+                                            {canManage && (
+                                                <p className="inline-flex items-center gap-1 text-[11px] text-[var(--text3)] mt-0.5">
+                                                    <Users size={11} /> {audienceLabel(h.targetSiteIds, h.targetRoleIds)}
+                                                </p>
+                                            )}
                                         </div>
                                         {canManage && (
                                             <button onClick={() => handleDeleteHoliday(h.id)}
@@ -215,8 +252,8 @@ export default function AnnouncementsPage() {
                 </div>
             </div>
 
-            {showAnnForm && <AnnouncementForm onClose={() => setShowAnnForm(false)} onSaved={() => { setShowAnnForm(false); load() }} />}
-            {showHolForm && <HolidayForm onClose={() => setShowHolForm(false)} onSaved={() => { setShowHolForm(false); load() }} />}
+            {showAnnForm && <AnnouncementForm sites={sites} roles={roles} onClose={() => setShowAnnForm(false)} onSaved={() => { setShowAnnForm(false); load() }} />}
+            {showHolForm && <HolidayForm sites={sites} roles={roles} onClose={() => setShowHolForm(false)} onSaved={() => { setShowHolForm(false); load() }} />}
         </div>
     )
 
@@ -237,11 +274,13 @@ export default function AnnouncementsPage() {
 
 // ─── Announcement create form ─────────────────────────────────────────────────
 
-function AnnouncementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function AnnouncementForm({ sites, roles, onClose, onSaved }: { sites: Site[]; roles: Role[]; onClose: () => void; onSaved: () => void }) {
     const [title, setTitle] = useState("")
     const [body, setBody] = useState("")
     const [category, setCategory] = useState("NOTICE")
     const [pinned, setPinned] = useState(false)
+    const [targetSiteIds, setTargetSiteIds] = useState<string[]>([])
+    const [targetRoleIds, setTargetRoleIds] = useState<string[]>([])
     const [saving, setSaving] = useState(false)
 
     async function submit() {
@@ -251,7 +290,7 @@ function AnnouncementForm({ onClose, onSaved }: { onClose: () => void; onSaved: 
             const res = await fetch("/api/announcements", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title, body, category, pinned }),
+                body: JSON.stringify({ title, body, category, pinned, targetSiteIds, targetRoleIds }),
             })
             if (res.ok) { toast.success("Announcement posted"); onSaved() }
             else toast.error((await res.text()) || "Failed to post")
@@ -281,6 +320,11 @@ function AnnouncementForm({ onClose, onSaved }: { onClose: () => void; onSaved: 
                     <input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)} className="accent-[var(--accent)]" />
                     <span className="text-[13px] text-[var(--text2)]">Pin to top</span>
                 </label>
+                <AudiencePicker
+                    sites={sites} roles={roles}
+                    siteIds={targetSiteIds} roleIds={targetRoleIds}
+                    setSiteIds={setTargetSiteIds} setRoleIds={setTargetRoleIds}
+                />
             </div>
             <FormFooter saving={saving} onClose={onClose} onSubmit={submit} label="Post Announcement" />
         </Drawer>
@@ -289,11 +333,13 @@ function AnnouncementForm({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
 // ─── Holiday create form ──────────────────────────────────────────────────────
 
-function HolidayForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function HolidayForm({ sites, roles, onClose, onSaved }: { sites: Site[]; roles: Role[]; onClose: () => void; onSaved: () => void }) {
     const [name, setName] = useState("")
     const [date, setDate] = useState("")
     const [type, setType] = useState("PUBLIC")
     const [description, setDescription] = useState("")
+    const [targetSiteIds, setTargetSiteIds] = useState<string[]>([])
+    const [targetRoleIds, setTargetRoleIds] = useState<string[]>([])
     const [saving, setSaving] = useState(false)
 
     async function submit() {
@@ -303,7 +349,7 @@ function HolidayForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
             const res = await fetch("/api/holidays", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, date, type, description }),
+                body: JSON.stringify({ name, date, type, description, targetSiteIds, targetRoleIds }),
             })
             if (res.ok) { toast.success("Holiday added"); onSaved() }
             else toast.error((await res.text()) || "Failed to add")
@@ -333,6 +379,11 @@ function HolidayForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional note"
                         className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
                 </Field>
+                <AudiencePicker
+                    sites={sites} roles={roles}
+                    siteIds={targetSiteIds} roleIds={targetRoleIds}
+                    setSiteIds={setTargetSiteIds} setRoleIds={setTargetRoleIds}
+                />
             </div>
             <FormFooter saving={saving} onClose={onClose} onSubmit={submit} label="Add Holiday" />
         </Drawer>
@@ -353,6 +404,46 @@ function Drawer({ title, onClose, children }: { title: string; onClose: () => vo
                 <div className="flex-1 overflow-y-auto p-5">{children}</div>
             </div>
         </>
+    )
+}
+
+// Audience targeting picker — choose which sites/roles a notice or holiday is
+// limited to. Nothing selected on a dimension = visible to everyone there.
+function AudiencePicker({
+    sites, roles, siteIds, roleIds, setSiteIds, setRoleIds,
+}: {
+    sites: Site[]; roles: Role[]
+    siteIds: string[]; roleIds: string[]
+    setSiteIds: (v: string[]) => void; setRoleIds: (v: string[]) => void
+}) {
+    const toggle = (arr: string[], id: string, set: (v: string[]) => void) =>
+        set(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id])
+
+    const Group = ({ label, items, selected, set }: { label: string; items: { id: string; name: string }[]; selected: string[]; set: (v: string[]) => void }) => (
+        <Field label={`${label} ${selected.length ? `(${selected.length})` : "— Everyone"}`}>
+            {items.length === 0 ? (
+                <p className="text-[12px] text-[var(--text3)]">None available</p>
+            ) : (
+                <div className="max-h-[140px] overflow-y-auto rounded-[8px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+                    {items.map(it => (
+                        <label key={it.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface2)]">
+                            <input type="checkbox" checked={selected.includes(it.id)} onChange={() => toggle(selected, it.id, set)} className="accent-[var(--accent)]" />
+                            <span className="text-[13px] text-[var(--text2)]">{it.name}</span>
+                        </label>
+                    ))}
+                </div>
+            )}
+        </Field>
+    )
+
+    return (
+        <div className="space-y-4 pt-2 mt-2 border-t border-[var(--border)]">
+            <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text2)]">
+                <Users size={13} /> Audience <span className="font-normal text-[var(--text3)]">— leave blank for everyone</span>
+            </div>
+            <Group label="Sites" items={sites} selected={siteIds} set={setSiteIds} />
+            <Group label="Roles" items={roles} selected={roleIds} set={setRoleIds} />
+        </div>
     )
 }
 

@@ -4,8 +4,10 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
+import { audienceWhere, cleanIdArray } from "@/lib/audience"
 
-// GET — any signed-in user sees the holiday calendar. Optional ?year=YYYY.
+// GET — users see holidays targeted at their site/role. Optional ?year=YYYY.
+// Managers/admins see all (audienceWhere → null).
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
@@ -17,6 +19,8 @@ export async function GET(req: Request) {
         const y = parseInt(year)
         where.date = { gte: new Date(y, 0, 1), lt: new Date(y + 1, 0, 1) }
     }
+    const aud = await audienceWhere(session)
+    if (aud) Object.assign(where, aud)
 
     try {
         const holidays = await prisma.holiday.findMany({ where, orderBy: { date: "asc" } })
@@ -38,7 +42,7 @@ export async function POST(req: Request) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     const body = await req.json().catch(() => ({}))
-    const { name, date, type, description } = body
+    const { name, date, type, description, targetSiteIds, targetRoleIds } = body
     if (!name || !date) {
         return new NextResponse("name and date are required", { status: 400 })
     }
@@ -50,6 +54,8 @@ export async function POST(req: Request) {
             type: type || "PUBLIC",
             description: description || null,
             createdBy: createdBy ?? null,
+            targetSiteIds: cleanIdArray(targetSiteIds),
+            targetRoleIds: cleanIdArray(targetRoleIds),
         },
     })
     return NextResponse.json(holiday)

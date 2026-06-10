@@ -4,15 +4,18 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
+import { audienceWhere, cleanIdArray } from "@/lib/audience"
 
-// GET — any signed-in user sees active announcements (newest / pinned first).
+// GET — signed-in users see active announcements targeted at their site/role
+// (newest / pinned first). Managers/admins see all (audienceWhere → null).
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     try {
+        const aud = await audienceWhere(session)
         const announcements = await prisma.announcement.findMany({
-            where: { isActive: true },
+            where: aud ? { isActive: true, ...aud } : { isActive: true },
             orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
         })
         return NextResponse.json(announcements)
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { title, body: text, category, pinned } = body
+    const { title, body: text, category, pinned, targetSiteIds, targetRoleIds } = body
     if (!title || !text) {
         return new NextResponse("title and body are required", { status: 400 })
     }
@@ -49,6 +52,8 @@ export async function POST(req: Request) {
             category: category || "NOTICE",
             pinned: !!pinned,
             createdBy: createdBy ?? null,
+            targetSiteIds: cleanIdArray(targetSiteIds),
+            targetRoleIds: cleanIdArray(targetRoleIds),
         },
     })
     return NextResponse.json(announcement)

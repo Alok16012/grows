@@ -1866,6 +1866,12 @@ model Announcement {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Audience targeting. Empty array = visible to everyone on that dimension.
+  // An employee sees it when (no site target OR their site matches) AND
+  // (no role target OR their custom role matches). Managers/admins see all.
+  targetSiteIds String[] @default([]) // Site ids this notice is limited to
+  targetRoleIds String[] @default([]) // CustomRole ids this notice is limited to
+
   @@index([isActive])
   @@index([publishedAt])
 }
@@ -1880,6 +1886,10 @@ model Holiday {
   createdBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Audience targeting — same semantics as Announcement (empty = everyone).
+  targetSiteIds String[] @default([])
+  targetRoleIds String[] @default([])
 
   @@index([date])
 }
