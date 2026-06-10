@@ -24,12 +24,30 @@ async function findExpenseSafe(id: string): Promise<any | null> {
 }
 
 // Map an updateData object to a raw, parameterised UPDATE. The Prisma client's
-// update() returns all scalar columns (failing on missing ones); a raw UPDATE
-// only touches the columns we set, so it survives schema drift.
+// update() does `UPDATE ... RETURNING *`, which selects every scalar column and
+// fails with P2022 when prod is missing a migrated column — and on a pooled
+// connection a failed write can leave a lock that makes the retry hang (the
+// observed FUNCTION_INVOCATION_TIMEOUT). A single raw UPDATE only touches the
+// columns we set and returns nothing, so it survives schema drift cleanly.
+//
+// Enum/JSON columns need explicit casts since values are bound as text params.
+const COLUMN_CASTS: Record<string, string> = {
+    status: '"ExpenseStatus"',
+    category: '"ExpenseCategory"',
+}
 async function rawUpdateExpense(id: string, data: Record<string, unknown>): Promise<void> {
-    const assignments = Object.entries(data).map(([col, val]) =>
-        Prisma.sql`${Prisma.raw(`"${col}"`)} = ${val as any}`
-    )
+    const assignments = Object.entries(data).map(([col, val]) => {
+        const colSql = Prisma.raw(`"${col}"`)
+        if (col === "travelEntries") {
+            return val == null
+                ? Prisma.sql`${colSql} = ${null}`
+                : Prisma.sql`${colSql} = ${JSON.stringify(val)}::jsonb`
+        }
+        const cast = COLUMN_CASTS[col]
+        return cast
+            ? Prisma.sql`${colSql} = ${val as any}::${Prisma.raw(cast)}`
+            : Prisma.sql`${colSql} = ${val as any}`
+    })
     if (assignments.length === 0) return
     await (prisma as any).$executeRaw(
         Prisma.sql`UPDATE "Expense" SET ${Prisma.join(assignments)} WHERE id = ${id}`
@@ -147,19 +165,11 @@ export async function PUT(
             return new NextResponse("No valid updates", { status: 400 })
         }
 
-        let updated: any
-        try {
-            updated = await prisma.expense.update({ where: { id: params.id }, data: updateData })
-        } catch (err: any) {
-            const msg = String(err?.message || "").toLowerCase()
-            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
-            if (!missingColumn) throw err
-            // Schema drift: the Prisma client update() selects back every scalar
-            // column and fails on missing ones. Do a raw UPDATE (which only sets
-            // the columns we changed) then re-read with the safe SELECT *.
-            await rawUpdateExpense(params.id, updateData)
-            updated = await findExpenseSafe(params.id)
-        }
+        // Always write via raw UPDATE then re-read with a safe SELECT *. This is
+        // robust whether or not prod has every migrated column, and avoids the
+        // failing-then-retrying double write that was hanging the function.
+        await rawUpdateExpense(params.id, updateData)
+        const updated = await findExpenseSafe(params.id)
 
         // ── Fire in-app notifications ──
         try {
