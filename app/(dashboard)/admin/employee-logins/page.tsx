@@ -63,18 +63,35 @@ export default function EmployeeLoginsPage() {
 
     const generateMissing = async () => {
         setGenerating(true)
+        let created = 0, linked = 0, reset = 0, failed = 0
+        let prevRemaining = Infinity
         try {
-            const res = await fetch("/api/admin/employee-logins", { method: "POST" })
-            const raw = await res.text()
-            let data: any = {}
-            try { data = raw ? JSON.parse(raw) : {} } catch { data = {} }
-            if (!res.ok) {
-                throw new Error(data.error || data.message || raw.slice(0, 160) || `Failed (${res.status})`)
+            // The server processes one batch per call and reports how many
+            // employees still need a login. Keep calling until none remain so a
+            // large list (hundreds) completes without hitting the function timeout.
+            while (true) {
+                const res = await fetch("/api/admin/employee-logins", { method: "POST" })
+                const raw = await res.text()
+                let data: any = {}
+                try { data = raw ? JSON.parse(raw) : {} } catch { data = {} }
+                if (!res.ok) {
+                    throw new Error(data.error || data.message || raw.slice(0, 160) || `Failed (${res.status})`)
+                }
+                created += data.created || 0
+                linked += data.linked || 0
+                reset += data.reset || 0
+                failed += data.failed || 0
+                const remaining = data.remaining ?? 0
+                if (remaining <= 0) break
+                // Safety: if a batch made no dent (all failures), stop instead of looping forever.
+                if (remaining >= prevRemaining) break
+                prevRemaining = remaining
+                toast.loading(`Generating logins… ${remaining} left`, { id: "gen-logins" })
             }
-            toast.success(`Created ${data.created}, linked ${data.linked}, ${data.reset} password${data.reset === 1 ? "" : "s"} reset${data.failed ? `, ${data.failed} failed` : ""}`)
+            toast.success(`Created ${created}, linked ${linked}, ${reset} password${reset === 1 ? "" : "s"} reset${failed ? `, ${failed} failed` : ""}`, { id: "gen-logins" })
             fetchData()
         } catch (e: any) {
-            toast.error(e.message)
+            toast.error(e.message, { id: "gen-logins" })
         } finally {
             setGenerating(false)
         }

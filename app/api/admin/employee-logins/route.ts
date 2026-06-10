@@ -64,12 +64,42 @@ export async function GET() {
     }
 }
 
+// Employees that still need work: no login yet, or a login without a visible
+// (plaintext) password. Used both to fetch a batch and to count what's left.
+const NEEDS_WORK = {
+    OR: [
+        { userId: null },
+        { user: { is: { plainPassword: null } } },
+    ],
+} as const
+
+// Process at most BATCH employees per request so a big list never blows the
+// serverless time budget; the client calls repeatedly until `remaining` is 0.
+const BATCH = 75
+// Overlap the DB round-trips (find/create/update) so each batch finishes fast.
+const CONCURRENCY = 12
+
+// Run async work over a list with a bounded number of concurrent workers.
+async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
+    let cursor = 0
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (cursor < items.length) {
+            const item = items[cursor++]
+            await worker(item)
+        }
+    })
+    await Promise.all(workers)
+}
+
 // Ensure every employee has a login with a *visible* password.
 //  - No user account      → create one (default Grow@<last4> password).
 //  - User but no visible   → reset password to a fresh default so admin can see it.
 //    plainPassword
 //  - Already has visible   → leave untouched.
 //    password
+//
+// Processes one BATCH per call and reports `remaining`; the client loops until
+// everything is done, so the operation can't time out regardless of headcount.
 export async function POST() {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== Role.ADMIN) {
@@ -78,11 +108,13 @@ export async function POST() {
 
     try {
         const employees = await prisma.employee.findMany({
+            where: NEEDS_WORK as any,
             select: {
                 id: true, employeeId: true, firstName: true, lastName: true, email: true, phone: true,
                 userId: true,
                 user: { select: { id: true, plainPassword: true } },
             },
+            take: BATCH,
         })
 
         let created = 0
@@ -90,12 +122,12 @@ export async function POST() {
         let reset = 0
         let failed = 0
 
-        for (const e of employees) {
+        await runPool(employees, CONCURRENCY, async (e) => {
             try {
                 // Already has a login.
                 if (e.user) {
                     // Password already visible → nothing to do.
-                    if (e.user.plainPassword) continue
+                    if (e.user.plainPassword) return
                     // Visible password missing → reset to a fresh default so it shows.
                     const plain = defaultPassword({ phone: e.phone })
                     await prisma.user.update({
@@ -103,7 +135,7 @@ export async function POST() {
                         data: { password: await bcrypt.hash(plain, 8), plainPassword: plain },
                     })
                     reset++
-                    continue
+                    return
                 }
 
                 const loginEmail = buildLoginEmail({ email: e.email, phone: e.phone, employeeId: e.employeeId })
@@ -125,7 +157,7 @@ export async function POST() {
                         })
                         reset++
                     }
-                    continue
+                    return
                 }
 
                 const plain = defaultPassword({ phone: e.phone })
@@ -146,9 +178,12 @@ export async function POST() {
                 console.error("BULK_LOGIN_FAIL", e.id, err)
                 failed++
             }
-        }
+        })
 
-        return NextResponse.json({ created, linked, reset, failed, total: employees.length })
+        // How many employees still need a login/visible password after this batch.
+        const remaining = await prisma.employee.count({ where: NEEDS_WORK as any })
+
+        return NextResponse.json({ created, linked, reset, failed, processed: employees.length, remaining })
     } catch (error) {
         console.error("POST_EMPLOYEE_LOGINS_ERROR", error)
         return NextResponse.json({ error: "Internal Error" }, { status: 500 })
