@@ -65,8 +65,12 @@ export default function EmployeeLoginsPage() {
         setGenerating(true)
         try {
             const res = await fetch("/api/admin/employee-logins", { method: "POST" })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || "Failed")
+            const raw = await res.text()
+            let data: any = {}
+            try { data = raw ? JSON.parse(raw) : {} } catch { data = {} }
+            if (!res.ok) {
+                throw new Error(data.error || data.message || raw.slice(0, 160) || `Failed (${res.status})`)
+            }
             toast.success(`Created ${data.created}, linked ${data.linked}, ${data.reset} password${data.reset === 1 ? "" : "s"} reset${data.failed ? `, ${data.failed} failed` : ""}`)
             fetchData()
         } catch (e: any) {

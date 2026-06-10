@@ -6,6 +6,11 @@ import { Role } from "@prisma/client"
 import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
 import bcrypt from "bcryptjs"
 
+// Bulk login generation hashes many passwords + writes to Supabase in a loop;
+// give it the max serverless budget so big employee lists don't time out.
+export const maxDuration = 60
+export const dynamic = "force-dynamic"
+
 // List every employee alongside their login credentials (id + password + role).
 export async function GET() {
     const session = await getServerSession(authOptions)
@@ -95,7 +100,7 @@ export async function POST() {
                     const plain = defaultPassword({ phone: e.phone })
                     await prisma.user.update({
                         where: { id: e.user.id },
-                        data: { password: await bcrypt.hash(plain, 10), plainPassword: plain },
+                        data: { password: await bcrypt.hash(plain, 8), plainPassword: plain },
                     })
                     reset++
                     continue
@@ -116,7 +121,7 @@ export async function POST() {
                         const plain = defaultPassword({ phone: e.phone })
                         await prisma.user.update({
                             where: { id: existing.id },
-                            data: { password: await bcrypt.hash(plain, 10), plainPassword: plain },
+                            data: { password: await bcrypt.hash(plain, 8), plainPassword: plain },
                         })
                         reset++
                     }
@@ -124,7 +129,7 @@ export async function POST() {
                 }
 
                 const plain = defaultPassword({ phone: e.phone })
-                const hashed = await bcrypt.hash(plain, 10)
+                const hashed = await bcrypt.hash(plain, 8)
                 const user = await prisma.user.create({
                     data: {
                         name: `${e.firstName} ${e.lastName || ""}`.trim(),
