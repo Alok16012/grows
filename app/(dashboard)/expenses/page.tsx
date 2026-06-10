@@ -941,15 +941,19 @@ function ExpenseDrawer({
 
                         {/* Actions */}
                         <div className="space-y-3 pt-1">
-                            {/* Owner + DRAFT */}
+                            {/* Owner can edit while still editable (DRAFT or SUBMITTED — i.e. before approval) */}
+                            {isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED") && (
+                                <button
+                                    onClick={() => setShowEditModal(true)}
+                                    className="w-full h-9 rounded-[8px] border border-[var(--border)] text-[13px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <Edit2 size={14} /> Edit Expense
+                                </button>
+                            )}
+
+                            {/* Owner + DRAFT — submit / delete */}
                             {isOwner && expense.status === "DRAFT" && (
                                 <>
-                                    <button
-                                        onClick={() => setShowEditModal(true)}
-                                        className="w-full h-9 rounded-[8px] border border-[var(--border)] text-[13px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center justify-center gap-2 transition-colors"
-                                    >
-                                        <Edit2 size={14} /> Edit Expense
-                                    </button>
                                     <button
                                         onClick={() => doAction("SUBMIT")}
                                         disabled={actionLoading}
@@ -1213,21 +1217,22 @@ function ExpenseRow({
                                 >
                                     <ChevronRight size={14} /> View Details
                                 </button>
+                                {/* Owner can edit before approval (DRAFT or SUBMITTED) */}
+                                {isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED") && (
+                                    <button
+                                        onClick={() => { setEditOpen(true); setMenuOpen(false) }}
+                                        className="w-full text-left px-3 py-2 text-[13px] text-[var(--text)] hover:bg-[var(--surface2)] flex items-center gap-2"
+                                    >
+                                        <Edit2 size={14} /> Edit
+                                    </button>
+                                )}
                                 {isOwner && expense.status === "DRAFT" && (
-                                    <>
-                                        <button
-                                            onClick={() => { setEditOpen(true); setMenuOpen(false) }}
-                                            className="w-full text-left px-3 py-2 text-[13px] text-[var(--text)] hover:bg-[var(--surface2)] flex items-center gap-2"
-                                        >
-                                            <Edit2 size={14} /> Edit
-                                        </button>
-                                        <button
-                                            onClick={() => { doDelete(); setMenuOpen(false) }}
-                                            className="w-full text-left px-3 py-2 text-[13px] text-[#ef4444] hover:bg-[#fef2f2] flex items-center gap-2"
-                                        >
-                                            <Trash2 size={14} /> Delete
-                                        </button>
-                                    </>
+                                    <button
+                                        onClick={() => { doDelete(); setMenuOpen(false) }}
+                                        className="w-full text-left px-3 py-2 text-[13px] text-[#ef4444] hover:bg-[#fef2f2] flex items-center gap-2"
+                                    >
+                                        <Trash2 size={14} /> Delete
+                                    </button>
                                 )}
                                 {(isPrivileged || (isOwner && expense.status === "DRAFT")) && isOwner && expense.status === "DRAFT" && null}
                             </div>

@@ -114,8 +114,9 @@ export async function PUT(
 
         const updateData: Record<string, unknown> = {}
 
-        if (isOwner && expense.status === "DRAFT") {
-            // Owner can edit DRAFT fields
+        if (isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED")) {
+            // Owner can edit fields while the expense is still DRAFT or SUBMITTED
+            // (i.e. before a manager approves/rejects it).
             if (title !== undefined) updateData.title = title
             if (category !== undefined) updateData.category = category
             if (amount !== undefined) updateData.amount = parseFloat(String(amount))
