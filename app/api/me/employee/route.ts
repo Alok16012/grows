@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { authOptions } from "@/lib/auth"
+import { getApiSession } from "@/lib/apiSession"
 
 // Fields employee can self-edit (safe list — no salary, no role, no IDs)
 const EDITABLE_FIELDS = [
@@ -24,8 +23,8 @@ const EDITABLE_FIELDS = [
 
 const DATE_FIELDS = new Set(["dateOfBirth", "marriageDate"])
 
-export async function GET() {
-    const session = await getServerSession(authOptions)
+export async function GET(req: Request) {
+    const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     const emp = await prisma.employee.findFirst({
@@ -36,7 +35,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-    const session = await getServerSession(authOptions)
+    const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     const emp = await prisma.employee.findFirst({ where: { userId: session.user.id } })

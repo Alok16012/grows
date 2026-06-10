@@ -1,10 +1,9 @@
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { authOptions } from "@/lib/auth"
+import { getApiSession } from "@/lib/apiSession"
 
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions)
+    const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     const emp = await prisma.employee.findFirst({

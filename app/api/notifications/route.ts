@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { getApiSession } from "@/lib/apiSession"
 
-export async function GET() {
-    const session = await getServerSession(authOptions)
+export async function GET(req: Request) {
+    const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const notifications = await prisma.notification.findMany({
@@ -18,7 +17,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-    const session = await getServerSession(authOptions)
+    const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { markAllRead, id } = await req.json()

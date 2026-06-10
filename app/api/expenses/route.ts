@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { authOptions } from "@/lib/auth"
+import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
 
 // All ExpenseCategory enum values (mirrors prisma/schema.prisma). Used to (a)
@@ -33,7 +32,7 @@ async function ensureExpenseCategoryEnum() {
 
 export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const session = await getApiSession(req)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const { searchParams } = new URL(req.url)
@@ -186,7 +185,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const session = await getApiSession(req)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()

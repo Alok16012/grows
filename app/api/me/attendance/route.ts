@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { authOptions } from "@/lib/auth"
+import { getApiSession } from "@/lib/apiSession"
 
 // Self-service attendance punch — any logged-in user with a linked employee
 // record can check in / out for THEMSELVES only. No management permission needed
@@ -18,13 +17,15 @@ async function linkedEmployee(userId: string) {
     return prisma.employee.findFirst({ where: { userId }, select: { id: true } })
 }
 
-// GET — today's attendance record for the signed-in employee (or null)
-export async function GET() {
-    const session = await getServerSession(authOptions)
+// GET — today's attendance record for the signed-in employee (or null), plus
+// the last 14 days of records so the mobile app can render a weekly summary
+// and history list. `recent` is additive; the web view ignores it.
+export async function GET(req: Request) {
+    const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     const emp = await linkedEmployee(session.user.id)
-    if (!emp) return NextResponse.json({ employee: null, today: null })
+    if (!emp) return NextResponse.json({ employee: null, today: null, recent: [] })
 
     const { start, end } = dayRange()
     const today = await prisma.attendance.findFirst({
@@ -32,12 +33,20 @@ export async function GET() {
         select: { id: true, date: true, checkIn: true, checkOut: true, status: true, workingHrs: true },
     })
 
-    return NextResponse.json({ employee: emp, today })
+    const since = new Date(start)
+    since.setDate(since.getDate() - 14)
+    const recent = await prisma.attendance.findMany({
+        where: { employeeId: emp.id, date: { gte: since } },
+        orderBy: { date: "desc" },
+        select: { id: true, date: true, checkIn: true, checkOut: true, status: true, workingHrs: true },
+    })
+
+    return NextResponse.json({ employee: emp, today, recent })
 }
 
 // POST — punch in/out. Body: { action: "in" | "out", lat?, lng? }
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
+    const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     const emp = await linkedEmployee(session.user.id)

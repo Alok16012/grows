@@ -1,12 +1,11 @@
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { authOptions } from "@/lib/auth"
+import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const session = await getApiSession(req)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         // Self-service: anyone WITHOUT the management permission falls back to
@@ -87,7 +86,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
+        const session = await getApiSession(req)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         // Self-service: anyone WITHOUT the management permission can apply leave

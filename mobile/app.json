@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Growus",
+    "slug": "growus",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "growus",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "backgroundColor": "#FFFFFF",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "extra": {
+      "apiBaseUrl": "https://growuserp.com"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.growus.employee",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Growus uses your location to record where you check in and out for attendance."
+      }
+    },
+    "android": {
+      "package": "com.growus.employee",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Growus uses your location to record attendance check-in / check-out."
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { authOptions } from "@/lib/auth"
+import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
 import { Prisma } from "@prisma/client"
 
@@ -59,7 +58,7 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession(authOptions)
+        const session = await getApiSession(req)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const expense = await findExpenseSafe(params.id)
@@ -96,7 +95,7 @@ export async function PUT(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession(authOptions)
+        const session = await getApiSession(req)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const expense = await findExpenseSafe(params.id)
@@ -251,7 +250,7 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession(authOptions)
+        const session = await getApiSession(req)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const expense = await prisma.expense.findUnique({ where: { id: params.id } })
