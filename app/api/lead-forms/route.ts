@@ -4,16 +4,27 @@ import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { nanoid } from "nanoid"
 import { checkAccess } from "@/lib/permissions"
+import { Role } from "@prisma/client"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.view")) {
+    if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    // Use raw SQL to avoid Prisma SELECT-ing the `formType` column when the
-    // migration hasn't been applied yet on the deployed DB. Fall back if needed.
+
+    // Each recruiter manages only THEIR OWN form links so the links (and the
+    // leads that arrive through them) stay attributed to that recruiter. ADMIN
+    // sees every form. Mirrors the ownership filter in /api/recruitment.
+    const where: any = {}
+    if (session.user.role !== Role.ADMIN) {
+        const realUser = await prisma.user.findUnique({ where: { id: session.user.id } })
+            ?? await prisma.user.findUnique({ where: { email: session.user.email ?? "" } })
+        where.createdBy = realUser?.id ?? session.user.id
+    }
+
     try {
         const forms = await prisma.leadForm.findMany({
+            where,
             select: {
                 id: true, title: true, description: true, slug: true,
                 isActive: true, siteId: true, createdBy: true, createdAt: true, updatedAt: true,
