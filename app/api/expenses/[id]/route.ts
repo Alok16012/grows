@@ -165,11 +165,20 @@ export async function PUT(
             return new NextResponse("No valid updates", { status: 400 })
         }
 
-        // Always write via raw UPDATE then re-read with a safe SELECT *. This is
-        // robust whether or not prod has every migrated column, and avoids the
-        // failing-then-retrying double write that was hanging the function.
-        await rawUpdateExpense(params.id, updateData)
-        const updated = await findExpenseSafe(params.id)
+        // Primary path: the Prisma client, which casts enums (status/category)
+        // and other column types correctly. The schema is now synced in prod, so
+        // this just works. Only if a column is genuinely missing (schema drift on
+        // some other environment) do we fall back to a raw UPDATE + safe re-read.
+        let updated: any
+        try {
+            updated = await prisma.expense.update({ where: { id: params.id }, data: updateData })
+        } catch (err: any) {
+            const msg = String(err?.message || "").toLowerCase()
+            const missingColumn = msg.includes("does not exist") || err?.code === "P2022"
+            if (!missingColumn) throw err
+            await rawUpdateExpense(params.id, updateData)
+            updated = await findExpenseSafe(params.id)
+        }
 
         // ── Fire in-app notifications ──
         try {
