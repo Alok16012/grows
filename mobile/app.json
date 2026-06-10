@@ -17,7 +17,7 @@
       "**/*"
     ],
     "extra": {
-      "apiBaseUrl": "https://growuserp.com"
+      "apiBaseUrl": "https://grows-tau.vercel.app"
     },
     "ios": {
       "supportsTablet": true,

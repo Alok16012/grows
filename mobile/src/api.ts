@@ -41,13 +41,24 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   }
 
   const raw = await res.text();
+  const looksLikeHtml = /^\s*<(?:!doctype|html)/i.test(raw);
   let data: unknown = null;
-  if (raw) {
+  if (raw && !looksLikeHtml) {
     try {
       data = JSON.parse(raw);
     } catch {
       data = raw;
     }
+  }
+
+  // The server returned an HTML page instead of JSON — almost always a wrong
+  // API URL, a Vercel "deployment protection" / login wall, or a 404/500 page.
+  // Surface it clearly so it never silently corrupts the auth state.
+  if (looksLikeHtml) {
+    throw new ApiError(
+      `Server returned a web page, not data (HTTP ${res.status}). Check the API URL or that the backend is reachable.`,
+      res.status || 502
+    );
   }
 
   if (!res.ok) {

@@ -36,7 +36,7 @@ or press `i` / `a` for a simulator / emulator.
 
 ## Pointing it at your backend
 
-The app defaults to `https://growuserp.com`. Override without editing code:
+The app defaults to `https://grows-tau.vercel.app`. Override without editing code:
 
 - **Env var:** `EXPO_PUBLIC_API_BASE_URL=https://your-domain.com npx expo start`
 - **app.json:** add `expo.extra.apiBaseUrl`
