@@ -15,7 +15,15 @@ export async function GET() {
             prisma.user.findMany({
                 where: {
                     isActive: true,
-                    role: { in: ["ADMIN", "MANAGER", "HR_MANAGER"] },
+                    OR: [
+                        // System admins/managers
+                        { role: { in: ["ADMIN", "MANAGER", "HR_MANAGER"] } },
+                        // Anyone with an active custom role that can handle
+                        // recruitment (e.g. "HR RECRUITER", "HR EXECUTIVE").
+                        // HR RECRUITER is a custom role, not a system role, so a
+                        // plain role filter misses most recruiters.
+                        { customRole: { is: { isActive: true, permissions: { has: "recruitment.view" } } } },
+                    ],
                 },
                 select: {
                     id: true,
