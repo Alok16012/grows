@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 import {
-    ArrowLeft, ArrowRight, Check, Loader2, Plus, Trash2, ChevronLeft,
+    ArrowLeft, ArrowRight, Check, Loader2, Plus, Trash2, ChevronLeft, ImagePlus,
 } from "lucide-react"
 import { ChipInput } from "@/components/jobs/ChipInput"
 import { JobPreview } from "@/components/jobs/JobPreview"
@@ -14,6 +14,8 @@ import {
     WIZARD_STEPS, EXPERIENCE_YEARS, QUALIFICATIONS, GENDER_OPTIONS,
     EMPLOYMENT_TYPES, PERK_SUGGESTIONS, LANGUAGE_SUGGESTIONS, SKILL_SUGGESTIONS,
     SUGGESTED_QUESTIONS, CALL_DAYS_OPTIONS, ScreeningQuestion,
+    SHIFT_OPTIONS, WEEKLY_OFF_OPTIONS, INSPECTION_TYPE_SUGGESTIONS,
+    QUALITY_STANDARD_SUGGESTIONS, MATERIAL_SUGGESTIONS,
 } from "@/components/jobs/constants"
 
 type Form = {
@@ -46,6 +48,25 @@ type Form = {
     callStartTime: string
     callEndTime: string
     callDays: string
+    // Sample / inspection part
+    partSectionLabel: string
+    partName: string
+    partMaterial: string
+    partPhotoUrl: string
+    inspectionType: string
+    qualityStandard: string
+    // Customer & plant location
+    customerName: string
+    plantLocation: string
+    plantAddress: string
+    // Facility / amenities
+    shiftType: string
+    weeklyOff: string
+    overtimePolicy: string
+    canteenAvailable: boolean
+    transportAvailable: boolean
+    accommodationAvailable: boolean
+    busFacility: boolean
 }
 
 const initialForm: Form = {
@@ -57,6 +78,11 @@ const initialForm: Form = {
     employmentType: "Full Time, Permanent", industryType: "", roleCategory: "", openings: "1",
     allowCalls: false, contactName: "", contactPhone: "", callStartTime: "09:30",
     callEndTime: "18:30", callDays: "Everyday",
+    partSectionLabel: "", partName: "", partMaterial: "", partPhotoUrl: "",
+    inspectionType: "", qualityStandard: "",
+    customerName: "", plantLocation: "", plantAddress: "",
+    shiftType: "Rotational", weeklyOff: "Sunday", overtimePolicy: "",
+    canteenAvailable: false, transportAvailable: false, accommodationAvailable: false, busFacility: false,
 }
 
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -198,8 +224,9 @@ export default function NewJobPage() {
                     </div>
 
                     {step === 0 && <StepJobDetails form={form} set={set} />}
-                    {step === 1 && <StepCandidate form={form} set={set} toggleArray={toggleArray} />}
-                    {step === 2 && (
+                    {step === 1 && <StepCustomerSite form={form} set={set} />}
+                    {step === 2 && <StepCandidate form={form} set={set} toggleArray={toggleArray} />}
+                    {step === 3 && (
                         <StepScreening
                             form={form}
                             addQuestion={addQuestion}
@@ -207,8 +234,8 @@ export default function NewJobPage() {
                             removeQuestion={removeQuestion}
                         />
                     )}
-                    {step === 3 && <StepDescription form={form} set={set} />}
-                    {step === 4 && <StepCommunication form={form} set={set} />}
+                    {step === 4 && <StepDescription form={form} set={set} />}
+                    {step === 5 && <StepCommunication form={form} set={set} />}
 
                     {/* ── Nav buttons ── */}
                     <div className="flex items-center justify-between mt-8 pt-4 border-t border-[var(--border)]">
@@ -352,7 +379,151 @@ function TextOnlyNumber({ value, onChange, placeholder }: { value: string; onCha
     )
 }
 
-// ─── Step 2: Candidate preferences ───────────────────────────────────────────
+// ─── Step 2: Customer & site details ─────────────────────────────────────────
+function StepCustomerSite({ form, set }: { form: Form; set: <K extends keyof Form>(k: K, v: Form[K]) => void }) {
+    return (
+        <div className="space-y-7">
+            {/* Sample / inspection part */}
+            <div className="space-y-4">
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-[var(--accent-text)]">Work sample / part</h3>
+                <PartPhotoUpload value={form.partPhotoUrl} onChange={(v) => set("partPhotoUrl", v)} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <TextField label="Section heading" value={form.partSectionLabel} onChange={(v) => set("partSectionLabel", v)} placeholder="Inspection Part (Sample)" optional />
+                    <TextField label="Part / sample name" value={form.partName} onChange={(v) => set("partName", v)} placeholder="e.g. Door Inner Panel" optional />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <DatalistField label="Material" value={form.partMaterial} onChange={(v) => set("partMaterial", v)} options={MATERIAL_SUGGESTIONS} placeholder="e.g. Sheet Metal" />
+                    <DatalistField label="Inspection type" value={form.inspectionType} onChange={(v) => set("inspectionType", v)} options={INSPECTION_TYPE_SUGGESTIONS} placeholder="e.g. Visual & Dimension" />
+                </div>
+                <DatalistField label="Quality standard" value={form.qualityStandard} onChange={(v) => set("qualityStandard", v)} options={QUALITY_STANDARD_SUGGESTIONS} placeholder="e.g. OEM" />
+            </div>
+
+            {/* Customer & location */}
+            <div className="space-y-4 border-t border-[var(--border)] pt-6">
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-[var(--accent-text)]">Customer & location</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <TextField label="Customer name" value={form.customerName} onChange={(v) => set("customerName", v)} placeholder="e.g. Tata Motors" optional />
+                    <TextField label="Plant location" value={form.plantLocation} onChange={(v) => set("plantLocation", v)} placeholder="e.g. Chakan, Pune" optional />
+                </div>
+                <div>
+                    <FieldLabel optional>Plant address</FieldLabel>
+                    <textarea
+                        value={form.plantAddress}
+                        onChange={(e) => set("plantAddress", e.target.value)}
+                        rows={2}
+                        placeholder="e.g. Tata Motors Plant, Chakan MIDC, Pune, Maharashtra 410501"
+                        className={`${inputCls} resize-y`}
+                    />
+                    <p className="text-[11px] text-[var(--text3)] mt-1">Used to show the location map on the job page.</p>
+                </div>
+            </div>
+
+            {/* Facility */}
+            <div className="space-y-4 border-t border-[var(--border)] pt-6">
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-[var(--accent-text)]">Facility details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <FieldLabel optional>Shift timing</FieldLabel>
+                        <select value={form.shiftType} onChange={(e) => set("shiftType", e.target.value)} className={inputCls}>
+                            {SHIFT_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <FieldLabel optional>Weekly off</FieldLabel>
+                        <select value={form.weeklyOff} onChange={(e) => set("weeklyOff", e.target.value)} className={inputCls}>
+                            {WEEKLY_OFF_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <TextField label="Overtime policy" value={form.overtimePolicy} onChange={(v) => set("overtimePolicy", v)} placeholder="e.g. As per Company Policy" optional />
+                <div className="grid grid-cols-2 gap-2.5">
+                    <ToggleRow label="Bus / transport facility" on={form.busFacility} onChange={(v) => set("busFacility", v)} />
+                    <ToggleRow label="Canteen available" on={form.canteenAvailable} onChange={(v) => set("canteenAvailable", v)} />
+                    <ToggleRow label="Pick & drop (transportation)" on={form.transportAvailable} onChange={(v) => set("transportAvailable", v)} />
+                    <ToggleRow label="Accommodation available" on={form.accommodationAvailable} onChange={(v) => set("accommodationAvailable", v)} />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function DatalistField({ label, value, onChange, options, placeholder }: {
+    label: string; value: string; onChange: (v: string) => void; options: string[]; placeholder?: string
+}) {
+    const listId = `dl-${label.replace(/\s+/g, "-").toLowerCase()}`
+    return (
+        <div>
+            <FieldLabel optional>{label}</FieldLabel>
+            <input
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                list={listId}
+                className={inputCls}
+            />
+            <datalist id={listId}>
+                {options.map((o) => <option key={o} value={o} />)}
+            </datalist>
+        </div>
+    )
+}
+
+function ToggleRow({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <label className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-[13px] cursor-pointer transition-colors ${
+            on ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent-text)] font-medium" : "border-[var(--border)] text-[var(--text2)]"
+        }`}>
+            <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} className="accent-[var(--accent)]" />
+            {label}
+        </label>
+    )
+}
+
+function PartPhotoUpload({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    const [uploading, setUploading] = useState(false)
+
+    const upload = async (file: File) => {
+        if (file.size > 5 * 1024 * 1024) { toast.error("Image too large (max 5 MB)"); return }
+        setUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            const data = await res.json()
+            if (!res.ok || !data.url) throw new Error(data.error || "Upload failed")
+            onChange(data.url)
+        } catch (e: any) {
+            toast.error(e.message || "Upload failed")
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    return (
+        <div>
+            <FieldLabel optional>Part / sample photo</FieldLabel>
+            <div className="flex items-center gap-4">
+                <div className="h-24 w-32 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface2)] overflow-hidden flex items-center justify-center">
+                    {value
+                        ? <img src={value} alt="Part" className="h-full w-full object-cover" />
+                        : <span className="text-[11px] text-[var(--text3)]">No photo</span>}
+                </div>
+                <div className="space-y-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] cursor-pointer">
+                        {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                        {value ? "Replace photo" : "Upload photo"}
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = "" }} />
+                    </label>
+                    {value && (
+                        <button type="button" onClick={() => onChange("")} className="block text-[12px] text-red-600 hover:underline">Remove</button>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Step 3: Candidate preferences ───────────────────────────────────────────
 function StepCandidate({ form, set, toggleArray }: {
     form: Form; set: <K extends keyof Form>(k: K, v: Form[K]) => void; toggleArray: (k: "qualifications", v: string) => void
 }) {

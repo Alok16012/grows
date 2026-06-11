@@ -43,6 +43,25 @@ export type JobPosting = {
     callStartTime: string | null
     callEndTime: string | null
     callDays: string | null
+    // Sample / inspection part
+    partSectionLabel: string | null
+    partName: string | null
+    partMaterial: string | null
+    partPhotoUrl: string | null
+    inspectionType: string | null
+    qualityStandard: string | null
+    // Customer & plant location
+    customerName: string | null
+    plantLocation: string | null
+    plantAddress: string | null
+    // Facility / amenities
+    shiftType: string | null
+    weeklyOff: string | null
+    overtimePolicy: string | null
+    canteenAvailable: boolean
+    transportAvailable: boolean
+    accommodationAvailable: boolean
+    busFacility: boolean
     status: JobStatus
     createdBy: string | null
     creator?: { id: string; name: string } | null
@@ -52,6 +71,7 @@ export type JobPosting = {
 
 export const WIZARD_STEPS = [
     "Job details",
+    "Customer & site",
     "Candidate preferences",
     "Screening questions",
     "Job description",
@@ -100,6 +120,16 @@ export const SUGGESTED_QUESTIONS = [
 ]
 
 export const CALL_DAYS_OPTIONS = ["Everyday", "Weekdays (Mon-Fri)", "Weekends (Sat-Sun)"]
+
+export const SHIFT_OPTIONS = ["General / Day", "Rotational", "Fixed Night", "Two Shifts", "Three Shifts"]
+
+export const WEEKLY_OFF_OPTIONS = ["Sunday", "Saturday", "Rotational", "Any one day", "Sunday + alternate Sat"]
+
+export const INSPECTION_TYPE_SUGGESTIONS = ["Visual", "Dimensional", "Visual & Dimension", "Functional", "Final Inspection"]
+
+export const QUALITY_STANDARD_SUGGESTIONS = ["OEM", "ISO 9001", "IATF 16949", "AQL", "Customer Specific"]
+
+export const MATERIAL_SUGGESTIONS = ["Sheet Metal", "Aluminium", "Plastic / Polymer", "Casting", "Forged", "Rubber"]
 
 export const STATUS_META: Record<JobStatus, { label: string; cls: string }> = {
     DRAFT: { label: "Draft", cls: "bg-amber-100 text-amber-700" },

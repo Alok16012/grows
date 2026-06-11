@@ -1843,6 +1843,28 @@ model JobPosting {
   callEndTime   String?
   callDays      String?
 
+  // Sample / inspection part — generic "work sample" block (label is editable per job)
+  partSectionLabel String?
+  partName         String?
+  partMaterial     String?
+  partPhotoUrl     String?
+  inspectionType   String?
+  qualityStandard  String?
+
+  // Customer & plant location (drives the map embed via plantAddress)
+  customerName  String?
+  plantLocation String?
+  plantAddress  String?
+
+  // Facility / amenities
+  shiftType              String?
+  weeklyOff              String?
+  overtimePolicy         String?
+  canteenAvailable       Boolean @default(false)
+  transportAvailable     Boolean @default(false)
+  accommodationAvailable Boolean @default(false)
+  busFacility            Boolean @default(false)
+
   status    JobStatus @default(DRAFT)
   createdBy String?
   creator   User?     @relation("JobCreator", fields: [createdBy], references: [id], onDelete: SetNull)

@@ -42,6 +42,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             "educationDegree", "genderPreference", "candidateIndustry", "description",
             "companyName", "employmentType", "industryType", "roleCategory",
             "contactName", "contactPhone", "callStartTime", "callEndTime", "callDays",
+            "partSectionLabel", "partName", "partMaterial", "partPhotoUrl",
+            "inspectionType", "qualityStandard", "customerName", "plantLocation",
+            "plantAddress", "shiftType", "weeklyOff", "overtimePolicy",
         ]
         for (const k of passthrough) if (k in body) data[k] = body[k] || null
         if ("title" in body) {
@@ -53,7 +56,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             if (k in body) data[k] = toInt(body[k])
         for (const k of ["perks", "qualifications", "skills", "languages"])
             if (k in body) data[k] = toStrArray(body[k])
-        for (const k of ["freshersAllowed", "allowCalls"])
+        for (const k of ["freshersAllowed", "allowCalls", "canteenAvailable", "transportAvailable", "accommodationAvailable", "busFacility"])
             if (k in body) data[k] = !!body[k]
         if ("screeningQuestions" in body)
             data.screeningQuestions = Array.isArray(body.screeningQuestions) ? body.screeningQuestions : []

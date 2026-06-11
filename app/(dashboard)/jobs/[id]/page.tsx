@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 import { ChevronLeft, Loader2, Send, Ban, RotateCcw, Trash2 } from "lucide-react"
-import { JobPreview } from "@/components/jobs/JobPreview"
+import { JobDetailView } from "@/components/jobs/JobDetailView"
 import { JobPosting, STATUS_META, JobStatus } from "@/components/jobs/constants"
 
 export default function JobDetailPage() {
@@ -73,19 +73,13 @@ export default function JobDetailPage() {
         return <div className="p-8 text-center text-[var(--text2)]">Job not found.</div>
     }
 
-    const meta = STATUS_META[job.status]
-
     return (
         <div className="p-4 lg:p-0">
             <button onClick={() => router.push("/jobs")} className="inline-flex items-center gap-1.5 text-[13px] text-[var(--text2)] hover:text-[var(--text)] mb-4">
                 <ChevronLeft size={16} /> Back to Jobs
             </button>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-xl font-bold text-[var(--text)]">{job.title}</h1>
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
-                </div>
+            <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
                 {canManage && (
                     <div className="flex items-center gap-2">
                         {job.status !== "PUBLISHED" && (
@@ -110,8 +104,11 @@ export default function JobDetailPage() {
                 )}
             </div>
 
-            <div className="max-w-2xl">
-                <JobPreview job={job} />
+            <div className="max-w-5xl">
+                <JobDetailView
+                    job={job}
+                    onApply={() => toast.info("Candidate application flow isn't enabled yet.")}
+                />
                 {job.creator && (
                     <p className="text-[12px] text-[var(--text3)] mt-3">
                         Posted by {job.creator.name} · {new Date(job.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
