@@ -30,6 +30,20 @@ async function ensureExpenseCategoryEnum() {
     }
 }
 
+// `categoryItems` was added after prod was provisioned; since migrations don't
+// run on deploy (DIRECT_URL unset), ensure the column exists before we try to
+// write it. Idempotent and cached per warm instance.
+let categoryItemsColumnEnsured = false
+async function ensureCategoryItemsColumn() {
+    if (categoryItemsColumnEnsured) return
+    try {
+        await (prisma as any).$executeRawUnsafe(
+            `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "categoryItems" JSONB`
+        )
+        categoryItemsColumnEnsured = true
+    } catch { /* best effort — insert will fall back to legacy single category */ }
+}
+
 export async function GET(req: Request) {
     try {
         const session = await getApiSession(req)
@@ -189,7 +203,7 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { title, category, amount, date, description, employeeId, receiptUrl, projectId, travelDays, travelDailyRate, travelEntries } = body
+        const { title, category, amount, date, description, employeeId, receiptUrl, projectId, travelDays, travelDailyRate, travelEntries, categoryItems } = body
 
         const parsedAmount = parseFloat(String(amount))
         if (!title || !category || amount == null || isNaN(parsedAmount) || !date) {
@@ -197,6 +211,16 @@ export async function POST(req: Request) {
         }
         if (!EXPENSE_CATEGORIES.includes(category)) {
             return new NextResponse(`Unknown category: ${category}`, { status: 400 })
+        }
+        // Validate every line-item category too (multi-category expenses).
+        if (Array.isArray(categoryItems)) {
+            for (const it of categoryItems) {
+                if (it?.category && !EXPENSE_CATEGORIES.includes(it.category)) {
+                    return new NextResponse(`Unknown category: ${it.category}`, { status: 400 })
+                }
+            }
+            // Make sure the column exists before the insert tries to write it.
+            await ensureCategoryItemsColumn()
         }
 
         // Generate expense number
@@ -241,6 +265,7 @@ export async function POST(req: Request) {
                     travelDays: travelDays ? parseInt(String(travelDays)) : null,
                     travelDailyRate: travelDailyRate ? parseFloat(String(travelDailyRate)) : null,
                     travelEntries: travelEntries ?? null,
+                    categoryItems: (Array.isArray(categoryItems) ? categoryItems : null) as any,
                 },
             })
         } catch (e1: any) {
@@ -248,7 +273,12 @@ export async function POST(req: Request) {
             lastError = e1
             // Row may have inserted but result parsing threw — check before retrying
             expense = await findInserted()
-            if (!expense) await maybeHealEnum(e1)
+            if (!expense) {
+                await maybeHealEnum(e1)
+                // A missing categoryItems column also lands here — add it so the
+                // retry below can persist the line items instead of dropping them.
+                if (Array.isArray(categoryItems)) await ensureCategoryItemsColumn()
+            }
         }
 
         // Attempt 2 — without travel columns
@@ -265,6 +295,7 @@ export async function POST(req: Request) {
                         projectId: projectId || null,
                         submittedBy: session.user.id,
                         status: "DRAFT",
+                        categoryItems: (Array.isArray(categoryItems) ? categoryItems : null) as any,
                     },
                 })
             } catch (e2: any) {

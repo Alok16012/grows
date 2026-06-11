@@ -55,10 +55,29 @@ export async function GET(req: Request) {
       select: {
         id: true, expenseNo: true, title: true, category: true, amount: true,
         date: true, status: true, description: true, receiptUrl: true,
-        travelDays: true, travelDailyRate: true
+        travelDays: true, travelDailyRate: true, travelEntries: true, categoryItems: true
       },
       orderBy: { date: "asc" }
     } as any)
+
+    // Split an expense into per-category parts. Multi-category expenses yield one
+    // synthesized item per line (with that line's amount + journeys); legacy
+    // single-category expenses yield the whole expense unchanged.
+    const partsOf = (exp: any): { category: string; item: any }[] => {
+      const items = (exp as any).categoryItems
+      if (Array.isArray(items) && items.length > 0) {
+        return items.map((it: any) => ({
+          category: String(it?.category ?? exp.category),
+          item: {
+            ...exp,
+            category: String(it?.category ?? exp.category),
+            amount: Number(it?.amount) || 0,
+            travelEntries: it?.travelEntries ?? null,
+          },
+        }))
+      }
+      return [{ category: exp.category as string, item: exp }]
+    }
 
     // Group by month × category
     const monthMap: Record<string, Record<string, { total: number; items: any[] }>> = {}
@@ -73,10 +92,12 @@ export async function GET(req: Request) {
       const d = new Date(exp.date)
       const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
       if (!monthMap[monthKey]) continue
-      const cat = exp.category as string
-      if (!monthMap[monthKey][cat]) monthMap[monthKey][cat] = { total: 0, items: [] }
-      monthMap[monthKey][cat].total += exp.amount
-      monthMap[monthKey][cat].items.push(exp)
+      for (const part of partsOf(exp)) {
+        const cat = part.category
+        if (!monthMap[monthKey][cat]) monthMap[monthKey][cat] = { total: 0, items: [] }
+        monthMap[monthKey][cat].total += Number(part.item.amount) || 0
+        monthMap[monthKey][cat].items.push(part.item)
+      }
     }
 
     const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]

@@ -34,10 +34,23 @@ const COLUMN_CASTS: Record<string, string> = {
     status: '"ExpenseStatus"',
     category: '"ExpenseCategory"',
 }
+// `categoryItems` was added after prod was provisioned; ensure it exists before
+// an UPDATE references it (migrations don't run on deploy — DIRECT_URL unset).
+let categoryItemsColumnEnsured = false
+async function ensureCategoryItemsColumn() {
+    if (categoryItemsColumnEnsured) return
+    try {
+        await (prisma as any).$executeRawUnsafe(
+            `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "categoryItems" JSONB`
+        )
+        categoryItemsColumnEnsured = true
+    } catch { /* best effort */ }
+}
+
 async function rawUpdateExpense(id: string, data: Record<string, unknown>): Promise<void> {
     const assignments = Object.entries(data).map(([col, val]) => {
         const colSql = Prisma.raw(`"${col}"`)
-        if (col === "travelEntries") {
+        if (col === "travelEntries" || col === "categoryItems") {
             return val == null
                 ? Prisma.sql`${colSql} = ${null}`
                 : Prisma.sql`${colSql} = ${JSON.stringify(val)}::jsonb`
@@ -109,7 +122,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate, travelEntries } = body
+        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate, travelEntries, categoryItems } = body
 
         const updateData: Record<string, unknown> = {}
 
@@ -126,6 +139,10 @@ export async function PUT(
             if (travelDays !== undefined) updateData.travelDays = travelDays ? parseInt(String(travelDays)) : null
             if (travelDailyRate !== undefined) updateData.travelDailyRate = travelDailyRate ? parseFloat(String(travelDailyRate)) : null
             if (travelEntries !== undefined) updateData.travelEntries = travelEntries ?? null
+            if (categoryItems !== undefined) {
+                updateData.categoryItems = Array.isArray(categoryItems) ? categoryItems : null
+                await ensureCategoryItemsColumn()
+            }
         }
 
         // Action-based transitions

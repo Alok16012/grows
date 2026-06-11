@@ -48,12 +48,21 @@ type TravelEntry = {
     vehicleType?: "2W" | "4W"  // 2-wheeler / 4-wheeler used for this journey
 }
 
+// One line-item inside an expense. A single expense (one title) can hold many.
+type CategoryItem = {
+    category: ExpenseCategory
+    amount: number
+    travelEntries?: TravelEntry[] | null  // only for TRAVEL lines
+    vehicleType?: "2W" | "4W"
+}
+
 type Expense = {
     id: string
     expenseNo: string
     title: string
     category: ExpenseCategory
     amount: number
+    categoryItems: CategoryItem[] | null
     date: string
     description: string | null
     receiptUrl: string | null
@@ -210,6 +219,25 @@ function statusStyle(status: ExpenseStatus): { bg: string; color: string; label:
     return map[status]
 }
 
+// Flatten an expense into per-category items. Multi-category expenses yield one
+// synthesized item per line (with that line's amount + journeys); legacy
+// single-category expenses yield the whole expense unchanged.
+function expenseParts(exp: any): { category: ExpenseCategory; item: any }[] {
+    const items = exp?.categoryItems
+    if (Array.isArray(items) && items.length > 0) {
+        return items.map((it: any) => ({
+            category: (it?.category ?? exp.category) as ExpenseCategory,
+            item: {
+                ...exp,
+                category: (it?.category ?? exp.category) as ExpenseCategory,
+                amount: Number(it?.amount) || 0,
+                travelEntries: it?.travelEntries ?? null,
+            },
+        }))
+    }
+    return [{ category: exp.category as ExpenseCategory, item: exp }]
+}
+
 function avatarColor(name: string): string {
     const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
     return name ? colors[name.charCodeAt(0) % colors.length] : colors[0]
@@ -238,6 +266,156 @@ function mkRow(date: string): TravelRow {
     return { _id: Math.random().toString(36).slice(2), date, from: "", to: "", kms: "" }
 }
 
+const rid = () => Math.random().toString(36).slice(2)
+
+// A single category line inside the Add Expense modal. Each line = a category +
+// an amount; when the category is TRAVEL the amount is computed from a km-based
+// journey calculator instead of being typed in.
+type LineItem = {
+    _id: string
+    category: ExpenseCategory
+    amount: string                 // typed amount (non-travel)
+    vehicleType: "2W" | "4W"       // travel only
+    travelRows: TravelRow[]        // travel only
+}
+
+function mkLine(category: ExpenseCategory, date: string): LineItem {
+    return { _id: rid(), category, amount: "", vehicleType: "2W", travelRows: [mkRow(date)] }
+}
+
+function CategoryLine({
+    line, index, canRemove, rate2W, rate4W, today, onPatch, onRemove,
+}: {
+    line: LineItem
+    index: number
+    canRemove: boolean
+    rate2W: number
+    rate4W: number
+    today: string
+    onPatch: (patch: Partial<LineItem>) => void
+    onRemove: () => void
+}) {
+    const perKmRate = line.vehicleType === "2W" ? rate2W : rate4W
+    const isTravel = line.category === "TRAVEL"
+    const travelTotals = line.travelRows.reduce((acc, r) => {
+        const k = parseFloat(r.kms) || 0
+        acc.kms += k
+        acc.amount += k * perKmRate
+        return acc
+    }, { kms: 0, amount: 0 })
+
+    const updateRow = (rowId: string, field: keyof TravelRow, val: string) =>
+        onPatch({ travelRows: line.travelRows.map(r => r._id === rowId ? { ...r, [field]: val } : r) })
+    const addRow = () =>
+        onPatch({ travelRows: [...line.travelRows, mkRow(line.travelRows[line.travelRows.length - 1]?.date || today)] })
+    const removeRow = (rowId: string) =>
+        onPatch({ travelRows: line.travelRows.filter(r => r._id !== rowId) })
+
+    const style = categoryStyle(line.category)
+
+    return (
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--surface)" }}>
+            {/* Line header: category select + amount/remove */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: style.bg, color: style.color, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {index + 1}
+                </span>
+                <select
+                    value={line.category}
+                    onChange={e => onPatch({ category: e.target.value as ExpenseCategory })}
+                    style={{ flex: 1, height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none" }}
+                >
+                    {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+                </select>
+                {!isTravel && (
+                    <input
+                        type="number" min="0" step="0.01"
+                        value={line.amount}
+                        onChange={e => onPatch({ amount: e.target.value })}
+                        placeholder="Amount ₹" required
+                        style={{ width: 120, height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none", textAlign: "right" }}
+                    />
+                )}
+                <button type="button" onClick={onRemove} disabled={!canRemove}
+                    title="Remove category"
+                    style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: canRemove ? "pointer" : "not-allowed", color: canRemove ? "#ef4444" : "#d1d5db", borderRadius: 6, flexShrink: 0 }}>
+                    <Trash2 size={15} />
+                </button>
+            </div>
+
+            {/* TRAVEL km-calculator (only for travel lines) */}
+            {isTravel && (
+                <div>
+                    <div style={{ background: perKmRate > 0 ? "#eff6ff" : "#fef2f2", padding: "7px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, overflow: "hidden" }}>
+                            {([["2W", "🏍️ 2-Wheeler"], ["4W", "🚗 4-Wheeler"]] as const).map(([vt, label]) => (
+                                <button key={vt} type="button" onClick={() => onPatch({ vehicleType: vt })}
+                                    style={{
+                                        padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none",
+                                        background: line.vehicleType === vt ? "#1d4ed8" : "transparent",
+                                        color: line.vehicleType === vt ? "#fff" : "#3b82f6",
+                                    }}>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600 }}>
+                            {perKmRate > 0 ? `₹${perKmRate}/km` : "⚠️ Rate not set — ask admin"}
+                        </span>
+                    </div>
+
+                    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, padding: "0 2px" }}>
+                            {["Date", "From", "To", "KMs", "Amount", ""].map(h => (
+                                <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>{h}</span>
+                            ))}
+                        </div>
+                        {line.travelRows.map(row => {
+                            const amt = (parseFloat(row.kms) || 0) * perKmRate
+                            return (
+                                <div key={row._id} style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, alignItems: "center" }}>
+                                    <input type="date" value={row.date}
+                                        onChange={e => updateRow(row._id, "date", e.target.value)}
+                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%" }} />
+                                    <input value={row.from} onChange={e => updateRow(row._id, "from", e.target.value)}
+                                        placeholder="From" required
+                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
+                                    <input value={row.to} onChange={e => updateRow(row._id, "to", e.target.value)}
+                                        placeholder="To" required
+                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
+                                    <input type="number" value={row.kms} onChange={e => updateRow(row._id, "kms", e.target.value)}
+                                        placeholder="0" min="0" step="0.1" required
+                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%", textAlign: "right" }} />
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: amt > 0 ? "#1d4ed8" : "#9ca3af", textAlign: "right" }}>
+                                        {amt > 0 ? `₹${amt.toLocaleString("en-IN")}` : "—"}
+                                    </span>
+                                    <button type="button" onClick={() => removeRow(row._id)}
+                                        disabled={line.travelRows.length === 1}
+                                        style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: line.travelRows.length === 1 ? "not-allowed" : "pointer", color: line.travelRows.length === 1 ? "#d1d5db" : "#ef4444", borderRadius: 5 }}>
+                                        <X size={13} />
+                                    </button>
+                                </div>
+                            )
+                        })}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <button type="button" onClick={addRow}
+                                style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 12px", background: "#eff6ff", color: "#1d4ed8", border: "1px dashed #93c5fd", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                                <Plus size={13} /> Add Journey
+                            </button>
+                            {travelTotals.kms > 0 && (
+                                <div style={{ textAlign: "right" }}>
+                                    <span style={{ fontSize: 11, color: "#6b7280" }}>{travelTotals.kms.toFixed(1)} km  </span>
+                                    <span style={{ fontSize: 14, fontWeight: 800, color: "#1d4ed8" }}>₹{travelTotals.amount.toLocaleString("en-IN")}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
 function AddExpenseModal({
     open, onClose, onSaved, editExpense
 }: {
@@ -254,19 +432,29 @@ function AddExpenseModal({
     // Admin-set per-km rates per vehicle type (employee can't edit these)
     const [rate2W, setRate2W] = useState(0)
     const [rate4W, setRate4W] = useState(0)
-    const [vehicleType, setVehicleType] = useState<"2W" | "4W">("2W")
-    const perKmRate = vehicleType === "2W" ? rate2W : rate4W
+    const today = format(new Date(), "yyyy-MM-dd")
     const [form, setForm] = useState({
         title: "",
-        category: "TRAVEL" as ExpenseCategory,
-        amount: "",
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: today,
         description: "",
         projectId: "",
     })
-    // Travel journey rows
-    const today = format(new Date(), "yyyy-MM-dd")
-    const [travelRows, setTravelRows] = useState<TravelRow[]>([mkRow(today)])
+    // One or more category line-items under this single expense.
+    const [lines, setLines] = useState<LineItem[]>([mkLine("TRAVEL", today)])
+
+    const rateFor = (vt: "2W" | "4W") => (vt === "2W" ? rate2W : rate4W)
+    const lineAmount = (l: LineItem) =>
+        l.category === "TRAVEL"
+            ? l.travelRows.reduce((s, r) => s + (parseFloat(r.kms) || 0) * rateFor(l.vehicleType), 0)
+            : (parseFloat(l.amount) || 0)
+    const grandTotal = lines.reduce((s, l) => s + lineAmount(l), 0)
+
+    const patchLine = (id: string, patch: Partial<LineItem>) =>
+        setLines(ls => ls.map(l => l._id === id ? { ...l, ...patch } : l))
+    const removeLine = (id: string) =>
+        setLines(ls => ls.length === 1 ? ls : ls.filter(l => l._id !== id))
+    const addLine = () =>
+        setLines(ls => [...ls, mkLine("FOOD", today)])
 
     useEffect(() => {
         if (!open) return
@@ -293,35 +481,44 @@ function AddExpenseModal({
     useEffect(() => {
         if (!open) return
         if (editExpense) {
+            const expDate = format(new Date(editExpense.date), "yyyy-MM-dd")
             setForm({
                 title: editExpense.title,
-                category: editExpense.category,
-                amount: String(editExpense.amount),
-                date: format(new Date(editExpense.date), "yyyy-MM-dd"),
+                date: expDate,
                 description: editExpense.description || "",
                 projectId: editExpense.projectId || "",
             })
             setReceiptUrl(editExpense.receiptUrl || "")
-            // Restore travel rows from saved entries
-            if (editExpense.category === "TRAVEL" && editExpense.travelEntries?.length) {
-                setTravelRows(editExpense.travelEntries.map(e => ({
-                    _id: Math.random().toString(36).slice(2),
-                    date: e.date,
-                    from: e.from,
-                    to: e.to,
-                    kms: String(e.kms),
+
+            const rowsFromEntries = (entries?: TravelEntry[] | null) =>
+                (entries && entries.length)
+                    ? entries.map(e => ({ _id: rid(), date: e.date, from: e.from, to: e.to, kms: String(e.kms) }))
+                    : [mkRow(expDate)]
+
+            if (Array.isArray(editExpense.categoryItems) && editExpense.categoryItems.length) {
+                // Multi-category expense — restore each saved line.
+                setLines(editExpense.categoryItems.map(it => ({
+                    _id: rid(),
+                    category: it.category,
+                    amount: it.category === "TRAVEL" ? "" : String(it.amount),
+                    vehicleType: (it.vehicleType === "4W" ? "4W" : "2W"),
+                    travelRows: it.category === "TRAVEL" ? rowsFromEntries(it.travelEntries) : [mkRow(expDate)],
                 })))
-                // Recover the vehicle type stored on the first entry (if any)
-                const savedVt = (editExpense.travelEntries[0] as any)?.vehicleType
-                if (savedVt === "2W" || savedVt === "4W") setVehicleType(savedVt)
             } else {
-                setTravelRows([mkRow(format(new Date(editExpense.date), "yyyy-MM-dd"))])
+                // Legacy single-category expense — one line from category + amount.
+                const cat = editExpense.category
+                setLines([{
+                    _id: rid(),
+                    category: cat,
+                    amount: cat === "TRAVEL" ? "" : String(editExpense.amount),
+                    vehicleType: ((editExpense.travelEntries?.[0] as any)?.vehicleType === "4W" ? "4W" : "2W"),
+                    travelRows: cat === "TRAVEL" ? rowsFromEntries(editExpense.travelEntries) : [mkRow(expDate)],
+                }])
             }
         } else {
-            setForm({ title: "", category: "TRAVEL", amount: "", date: today, description: "", projectId: "" })
+            setForm({ title: "", date: today, description: "", projectId: "" })
             setReceiptUrl("")
-            setTravelRows([mkRow(today)])
-            setVehicleType("2W")
+            setLines([mkLine("TRAVEL", today)])
         }
     }, [open, editExpense])
 
@@ -339,46 +536,56 @@ function AddExpenseModal({
         finally { setReceiptUploading(false) }
     }
 
-    const updateRow = (id: string, field: keyof TravelRow, val: string) =>
-        setTravelRows(rows => rows.map(r => r._id === id ? { ...r, [field]: val } : r))
-
-    // Derived totals for TRAVEL
-    const travelTotals = travelRows.reduce((acc, r) => {
-        const k = parseFloat(r.kms) || 0
-        acc.kms += k
-        acc.amount += k * perKmRate
-        return acc
-    }, { kms: 0, amount: 0 })
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        // Validate travel rows
-        if (form.category === "TRAVEL") {
-            const incomplete = travelRows.some(r => !r.from.trim() || !r.to.trim() || !parseFloat(r.kms))
-            if (incomplete) { toast.error("Fill From, To, and KMs for every journey row"); return }
+        // Validate every category line.
+        for (const line of lines) {
+            if (line.category === "TRAVEL") {
+                if (line.travelRows.some(r => !r.from.trim() || !r.to.trim() || !parseFloat(r.kms))) {
+                    toast.error("Fill From, To, and KMs for every journey row"); return
+                }
+            } else if (!(parseFloat(line.amount) > 0)) {
+                toast.error(`Enter an amount for "${categoryLabel(line.category)}"`); return
+            }
         }
         setLoading(true)
         try {
             const url = editExpense ? `/api/expenses/${editExpense.id}` : "/api/expenses"
             const method = editExpense ? "PUT" : "POST"
 
-            let payload: any = { ...form, receiptUrl: receiptUrl || null, projectId: form.projectId || null }
+            // Build one item per category line.
+            const items: CategoryItem[] = lines.map(line => {
+                if (line.category === "TRAVEL") {
+                    const entries: TravelEntry[] = line.travelRows.map(r => ({
+                        date: r.date,
+                        from: r.from.trim(),
+                        to: r.to.trim(),
+                        kms: parseFloat(r.kms) || 0,
+                        amount: (parseFloat(r.kms) || 0) * rateFor(line.vehicleType),
+                        vehicleType: line.vehicleType,
+                    }))
+                    return {
+                        category: "TRAVEL",
+                        amount: entries.reduce((s, en) => s + en.amount, 0),
+                        travelEntries: entries,
+                        vehicleType: line.vehicleType,
+                    }
+                }
+                return { category: line.category, amount: parseFloat(line.amount) || 0 }
+            })
 
-            if (form.category === "TRAVEL") {
-                const entries: TravelEntry[] = travelRows.map(r => ({
-                    date: r.date,
-                    from: r.from.trim(),
-                    to: r.to.trim(),
-                    kms: parseFloat(r.kms) || 0,
-                    amount: (parseFloat(r.kms) || 0) * perKmRate,
-                    vehicleType,
-                }))
-                // Use date of first entry as the expense date
-                payload.date = entries[0].date
-                payload.amount = travelTotals.amount
-                payload.travelEntries = entries
-            } else {
-                payload.amount = parseFloat(form.amount)
+            const firstTravel = items.find(i => i.category === "TRAVEL")
+            const payload: any = {
+                title: form.title,
+                description: form.description,
+                projectId: form.projectId || null,
+                receiptUrl: receiptUrl || null,
+                date: form.date,
+                // Legacy columns kept populated for filters/list/back-compat.
+                category: items[0].category,
+                amount: items.reduce((s, i) => s + i.amount, 0),
+                categoryItems: items,
+                travelEntries: firstTravel?.travelEntries ?? null,
             }
 
             const res = await fetch(url, {
@@ -421,133 +628,45 @@ function AddExpenseModal({
                             required
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-[12px] text-[var(--text2)] mb-1">Category *</label>
-                            <select
-                                value={form.category}
-                                onChange={e => setForm(f => ({ ...f, category: e.target.value as ExpenseCategory }))}
-                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                required
-                            >
-                                {CATEGORIES.map(c => (
-                                    <option key={c} value={c}>{categoryLabel(c)}</option>
-                                ))}
-                            </select>
+                    {/* ── Category line-items ─────────────────────── */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-[12px] text-[var(--text2)]">Categories *</label>
+                            <span className="text-[12px] font-semibold text-[var(--text2)]">
+                                Total: <span className="text-[var(--text)] font-bold">{formatINR(grandTotal)}</span>
+                            </span>
                         </div>
-                        {form.category !== "TRAVEL" && (
-                            <div>
-                                <label className="block text-[12px] text-[var(--text2)] mb-1">Amount (₹) *</label>
-                                <input
-                                    type="number"
-                                    value={form.amount}
-                                    onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-                                    placeholder="0.00"
-                                    min="0" step="0.01"
-                                    className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                    required
-                                />
-                            </div>
-                        )}
+                        {lines.map((line, idx) => (
+                            <CategoryLine
+                                key={line._id}
+                                line={line}
+                                index={idx}
+                                canRemove={lines.length > 1}
+                                rate2W={rate2W}
+                                rate4W={rate4W}
+                                today={today}
+                                onPatch={patch => patchLine(line._id, patch)}
+                                onRemove={() => removeLine(line._id)}
+                            />
+                        ))}
+                        <button type="button" onClick={addLine}
+                            className="w-full h-9 rounded-[8px] border border-dashed border-[var(--accent)] text-[13px] font-semibold text-[var(--accent)] hover:bg-[var(--surface2)] flex items-center justify-center gap-1.5 transition-colors">
+                            <Plus size={14} /> Add Category
+                        </button>
                     </div>
 
-                    {/* ── TRAVEL section ──────────────────────────── */}
-                    {form.category === "TRAVEL" && (
-                        <div style={{ border: `1.5px solid ${perKmRate > 0 ? "#bfdbfe" : "#fecaca"}`, borderRadius: 12, overflow: "hidden" }}>
-                            {/* Header */}
-                            <div style={{ background: perKmRate > 0 ? "#eff6ff" : "#fef2f2", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                                <p style={{ fontSize: 11, fontWeight: 700, color: perKmRate > 0 ? "#1d4ed8" : "#dc2626", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                    🚗 Travel Journeys
-                                </p>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    {/* Vehicle type selector — rate is fixed by admin, not editable here */}
-                                    <div style={{ display: "flex", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, overflow: "hidden" }}>
-                                        {([["2W", "🏍️ 2-Wheeler"], ["4W", "🚗 4-Wheeler"]] as const).map(([vt, label]) => (
-                                            <button key={vt} type="button" onClick={() => setVehicleType(vt)}
-                                                style={{
-                                                    padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none",
-                                                    background: vehicleType === vt ? "#1d4ed8" : "transparent",
-                                                    color: vehicleType === vt ? "#fff" : "#3b82f6",
-                                                }}>
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600 }}>
-                                        {perKmRate > 0 ? `₹${perKmRate}/km` : "⚠️ Rate not set — ask admin"}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Rows */}
-                            <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                                {/* Column headers */}
-                                <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, padding: "0 2px" }}>
-                                    {["Date", "From", "To", "KMs", "Amount", ""].map(h => (
-                                        <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>{h}</span>
-                                    ))}
-                                </div>
-
-                                {travelRows.map((row, idx) => {
-                                    const amt = (parseFloat(row.kms) || 0) * perKmRate
-                                    return (
-                                        <div key={row._id} style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, alignItems: "center" }}>
-                                            <input type="date" value={row.date}
-                                                onChange={e => updateRow(row._id, "date", e.target.value)}
-                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%" }} />
-                                            <input value={row.from} onChange={e => updateRow(row._id, "from", e.target.value)}
-                                                placeholder="From" required
-                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
-                                            <input value={row.to} onChange={e => updateRow(row._id, "to", e.target.value)}
-                                                placeholder="To" required
-                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
-                                            <input type="number" value={row.kms} onChange={e => updateRow(row._id, "kms", e.target.value)}
-                                                placeholder="0" min="0" step="0.1" required
-                                                style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%", textAlign: "right" }} />
-                                            <span style={{ fontSize: 12, fontWeight: 700, color: amt > 0 ? "#1d4ed8" : "#9ca3af", textAlign: "right" }}>
-                                                {amt > 0 ? `₹${amt.toLocaleString("en-IN")}` : "—"}
-                                            </span>
-                                            <button type="button" onClick={() => setTravelRows(r => r.filter(x => x._id !== row._id))}
-                                                disabled={travelRows.length === 1}
-                                                style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: travelRows.length === 1 ? "not-allowed" : "pointer", color: travelRows.length === 1 ? "#d1d5db" : "#ef4444", borderRadius: 5 }}>
-                                                <X size={13} />
-                                            </button>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-
-                            {/* Add row */}
-                            <div style={{ padding: "4px 12px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <button type="button"
-                                    onClick={() => setTravelRows(r => [...r, mkRow(r[r.length - 1]?.date || today)])}
-                                    style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 12px", background: "#eff6ff", color: "#1d4ed8", border: "1px dashed #93c5fd", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                                    <Plus size={13} /> Add Journey
-                                </button>
-                                {travelTotals.kms > 0 && (
-                                    <div style={{ textAlign: "right" }}>
-                                        <span style={{ fontSize: 11, color: "#6b7280" }}>{travelTotals.kms.toFixed(1)} km  </span>
-                                        <span style={{ fontSize: 14, fontWeight: 800, color: "#1d4ed8" }}>₹{travelTotals.amount.toLocaleString("en-IN")}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
                     <div className="grid grid-cols-2 gap-3">
-                        {/* For TRAVEL the date comes from the first journey row; hide standalone date */}
-                        {form.category !== "TRAVEL" && (
-                            <div>
-                                <label className="block text-[12px] text-[var(--text2)] mb-1">Date *</label>
-                                <input
-                                    type="date"
-                                    value={form.date}
-                                    onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                                    className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                                    required
-                                />
-                            </div>
-                        )}
-                        <div className={form.category === "TRAVEL" ? "col-span-2" : ""}>
+                        <div>
+                            <label className="block text-[12px] text-[var(--text2)] mb-1">Date *</label>
+                            <input
+                                type="date"
+                                value={form.date}
+                                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                                required
+                            />
+                        </div>
+                        <div>
                             <label className="block text-[12px] text-[var(--text2)] mb-1">Project / Client</label>
                             <select
                                 value={form.projectId}
@@ -785,12 +904,18 @@ function ExpenseDrawer({
                         <div className="grid grid-cols-2 gap-3">
                             <div className="bg-[var(--surface2)] rounded-[10px] p-3">
                                 <p className="text-[11px] text-[var(--text3)] mb-1">Category</p>
-                                <span
-                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                                    style={{ background: catStyle.bg, color: catStyle.color }}
-                                >
-                                    {categoryLabel(expense.category)}
-                                </span>
+                                {Array.isArray(expense.categoryItems) && expense.categoryItems.length > 1 ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#eef2ff] text-[#4338ca]">
+                                        {expense.categoryItems.length} categories
+                                    </span>
+                                ) : (
+                                    <span
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                                        style={{ background: catStyle.bg, color: catStyle.color }}
+                                    >
+                                        {categoryLabel(expense.category)}
+                                    </span>
+                                )}
                             </div>
                             <div className="bg-[var(--surface2)] rounded-[10px] p-3">
                                 <p className="text-[11px] text-[var(--text3)] mb-1">Amount</p>
@@ -812,6 +937,40 @@ function ExpenseDrawer({
                                 </div>
                             </div>
                         </div>
+
+                        {/* Category breakdown (multi-category expenses) */}
+                        {Array.isArray(expense.categoryItems) && expense.categoryItems.length > 0 && (
+                            <div>
+                                <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Breakdown</p>
+                                <div className="rounded-[10px] border border-[var(--border)] overflow-hidden">
+                                    {expense.categoryItems.map((it, i) => {
+                                        const cs = categoryStyle(it.category)
+                                        const journeys: TravelEntry[] = Array.isArray(it.travelEntries) ? it.travelEntries : []
+                                        return (
+                                            <div key={i} className={i > 0 ? "border-t border-[var(--border)]" : ""}>
+                                                <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[var(--surface2)]">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                                                        style={{ background: cs.bg, color: cs.color }}>
+                                                        {categoryLabel(it.category)}
+                                                    </span>
+                                                    <span className="text-[13px] font-bold text-[var(--text)]">{formatINR(it.amount)}</span>
+                                                </div>
+                                                {journeys.length > 0 && (
+                                                    <div className="px-3 py-1.5 space-y-1 bg-white">
+                                                        {journeys.map((j, ji) => (
+                                                            <div key={ji} className="flex items-center justify-between gap-2 text-[11px] text-[var(--text3)]">
+                                                                <span className="truncate">{j.from} → {j.to}</span>
+                                                                <span className="shrink-0">{j.kms} km · {formatINR(j.amount)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Project / Client */}
                         {expense.project && (
@@ -1159,6 +1318,11 @@ function ExpenseRow({
                         >
                             {categoryLabel(expense.category)}
                         </span>
+                        {Array.isArray(expense.categoryItems) && expense.categoryItems.length > 1 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#eef2ff] text-[#4338ca]">
+                                +{expense.categoryItems.length - 1}
+                            </span>
+                        )}
                         {expense.project?.name && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#eef2ff] text-[#4338ca]">
                                 <Briefcase size={9} />
@@ -1574,9 +1738,19 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                                                     const mEnd   = new Date(y, m2, 0, 23, 59, 59).toISOString()
                                                                     // row.userId is the linked user account ID (used by submittedBy filter)
                                                                     const uid = row.userId || row.id
-                                                                    fetch(`/api/expenses?submittedBy=${uid}&category=${c.key}&dateFrom=${mStart.slice(0,10)}&dateTo=${mEnd.slice(0,10)}`)
+                                                                    // Fetch ALL of the employee's expenses for the month (no category
+                                                                    // filter) and split them per-category client-side, so multi-category
+                                                                    // expenses contribute their matching line item (with that line's
+                                                                    // amount) rather than the whole expense under its legacy category.
+                                                                    fetch(`/api/expenses?submittedBy=${uid}&dateFrom=${mStart.slice(0,10)}&dateTo=${mEnd.slice(0,10)}`)
                                                                         .then(r => r.ok ? r.json() : [])
-                                                                        .then((items: any[]) => setModal({ title: `${row.name} — ${c.label}`, subtitle: teamData.monthLabel, items }))
+                                                                        .then((items: any[]) => {
+                                                                            const matching = (Array.isArray(items) ? items : [])
+                                                                                .flatMap(exp => expenseParts(exp))
+                                                                                .filter(p => p.category === c.key)
+                                                                                .map(p => p.item)
+                                                                            setModal({ title: `${row.name} — ${c.label}`, subtitle: teamData.monthLabel, items: matching })
+                                                                        })
                                                                         .catch(() => {})
                                                                 }}
                                                                 style={{ background: c.bg, color: c.color, border: "none", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>

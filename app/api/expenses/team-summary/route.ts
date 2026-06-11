@@ -47,7 +47,7 @@ export async function GET(req: Request) {
                     status: { notIn: ["DRAFT", "REJECTED"] },
                 },
                 select: {
-                    id: true, category: true, amount: true,
+                    id: true, category: true, amount: true, categoryItems: true,
                     submittedBy: true, employeeId: true, status: true,
                 },
             })
@@ -59,6 +59,20 @@ export async function GET(req: Request) {
                            WHERE date >= ${monthStart} AND date <= ${monthEnd}
                            AND status NOT IN ('DRAFT','REJECTED')`
             )
+        }
+
+        // Flatten each expense into {category, amount} parts. Multi-category
+        // expenses contribute one part per line item; legacy/single-category
+        // expenses contribute a single part from category + amount.
+        const partsOf = (exp: any): { category: string; amount: number }[] => {
+            const items = exp.categoryItems
+            if (Array.isArray(items) && items.length > 0) {
+                return items.map((it: any) => ({
+                    category: String(it?.category ?? exp.category),
+                    amount: Number(it?.amount) || 0,
+                }))
+            }
+            return [{ category: exp.category as string, amount: exp.amount ?? 0 }]
         }
 
         // Fetch all active employees with their user ids
@@ -92,14 +106,16 @@ export async function GET(req: Request) {
             const emp = exp.employeeId
                 ? byEmpId[exp.employeeId]
                 : byUserId[exp.submittedBy]
-            const cat = exp.category as string
-            if (emp) {
-                if (!totals[emp.id]) totals[emp.id] = {}
-                totals[emp.id][cat] = (totals[emp.id][cat] ?? 0) + (exp.amount ?? 0)
-            } else if (exp.submittedBy) {
-                // No Employee record → group under the submitting user account.
-                if (!userTotals[exp.submittedBy]) userTotals[exp.submittedBy] = {}
-                userTotals[exp.submittedBy][cat] = (userTotals[exp.submittedBy][cat] ?? 0) + (exp.amount ?? 0)
+            for (const part of partsOf(exp)) {
+                const cat = part.category
+                if (emp) {
+                    if (!totals[emp.id]) totals[emp.id] = {}
+                    totals[emp.id][cat] = (totals[emp.id][cat] ?? 0) + part.amount
+                } else if (exp.submittedBy) {
+                    // No Employee record → group under the submitting user account.
+                    if (!userTotals[exp.submittedBy]) userTotals[exp.submittedBy] = {}
+                    userTotals[exp.submittedBy][cat] = (userTotals[exp.submittedBy][cat] ?? 0) + part.amount
+                }
             }
         }
 

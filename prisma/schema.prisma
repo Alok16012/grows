@@ -1668,6 +1668,7 @@ model Expense {
   travelDays      Int? // legacy – kept for backward compat
   travelDailyRate Float? // legacy – kept for backward compat
   travelEntries   Json? // [{date,from,to,kms,amount}] per-journey breakdown
+  categoryItems   Json? // [{category,amount,travelEntries?,vehicleType?}] multi-category line items
   status          ExpenseStatus   @default(DRAFT)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
