@@ -154,6 +154,7 @@ export async function POST(req: Request) {
             safetyHelmet, safetyHelmetDate, safetyMask, safetyMaskDate,
             safetyJacket, safetyJacketDate, safetyEarMuffs, safetyEarMuffsDate,
             safetyShoes, safetyShoesDate, bankBranch,
+            customRoleId,
         } = body
 
         if (!firstName) {
@@ -272,6 +273,9 @@ export async function POST(req: Request) {
         let _login: { email: string; password: string } | null = null
         try {
             const loginEmail = buildLoginEmail({ email, phone, employeeId: finalId })
+            // Custom role assigned → system role MANAGER (manager dashboard/sidebar);
+            // no custom role → INSPECTION_BOY (field worker default). Mirrors fix-login.
+            const systemRole = customRoleId ? "MANAGER" : "INSPECTION_BOY"
             const existingUser = await prisma.user.findUnique({
                 where: { email: loginEmail },
                 include: { employeeProfile: { select: { id: true } } },
@@ -281,6 +285,10 @@ export async function POST(req: Request) {
                 // but only if it isn't already tied to another employee.
                 if (!existingUser.employeeProfile) {
                     await prisma.employee.update({ where: { id: employee.id }, data: { userId: existingUser.id } })
+                    await prisma.user.update({
+                        where: { id: existingUser.id },
+                        data: { customRoleId: customRoleId || null, role: systemRole as any },
+                    })
                 }
                 _login = { email: loginEmail, password: existingUser.plainPassword || "(unchanged)" }
             } else {
@@ -293,7 +301,8 @@ export async function POST(req: Request) {
                         password: hashed,
                         plainPassword: plain,
                         phone: phone || null,
-                        role: "INSPECTION_BOY",
+                        role: systemRole as any,
+                        customRoleId: customRoleId || null,
                     },
                 })
                 await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } })
