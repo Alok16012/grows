@@ -9,20 +9,64 @@ const toInt = (v: any) =>
 const toStrArray = (v: any) =>
     Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim()) : []
 
+// Prod migrations don't run on deploy (DIRECT_URL unset on Vercel), so the
+// customer/part/facility columns from 20260611120000 may be missing on the live
+// DB and selecting them via the Prisma client throws P2022. Self-heal at runtime.
+let jobColumnsEnsured = false
+async function ensureJobPostingColumns() {
+    if (jobColumnsEnsured) return
+    try {
+        await (prisma as any).$executeRawUnsafe(`
+            ALTER TABLE "JobPosting"
+                ADD COLUMN IF NOT EXISTS "partSectionLabel"       TEXT,
+                ADD COLUMN IF NOT EXISTS "partName"               TEXT,
+                ADD COLUMN IF NOT EXISTS "partMaterial"           TEXT,
+                ADD COLUMN IF NOT EXISTS "partPhotoUrl"           TEXT,
+                ADD COLUMN IF NOT EXISTS "inspectionType"         TEXT,
+                ADD COLUMN IF NOT EXISTS "qualityStandard"        TEXT,
+                ADD COLUMN IF NOT EXISTS "customerName"           TEXT,
+                ADD COLUMN IF NOT EXISTS "plantLocation"          TEXT,
+                ADD COLUMN IF NOT EXISTS "plantAddress"           TEXT,
+                ADD COLUMN IF NOT EXISTS "shiftType"              TEXT,
+                ADD COLUMN IF NOT EXISTS "weeklyOff"              TEXT,
+                ADD COLUMN IF NOT EXISTS "overtimePolicy"         TEXT,
+                ADD COLUMN IF NOT EXISTS "canteenAvailable"       BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "transportAvailable"     BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "accommodationAvailable" BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "busFacility"            BOOLEAN NOT NULL DEFAULT false
+        `)
+        jobColumnsEnsured = true
+    } catch { /* best effort */ }
+}
+
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
     if (!session || !checkAccess(session, [], "jobs.view")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    try {
-        const job = await prisma.jobPosting.findUnique({
+    const loadJob = () =>
+        prisma.jobPosting.findUnique({
             where: { id: params.id },
             include: { creator: { select: { id: true, name: true } } },
         })
+    try {
+        const job = await loadJob()
         if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 })
         return NextResponse.json(job)
-    } catch (err) {
-        console.error("[JOB_GET]", err)
+    } catch (err: any) {
+        const msg = String(err?.message || "").toLowerCase()
+        if (msg.includes("does not exist") || err?.code === "P2022") {
+            await ensureJobPostingColumns()
+            try {
+                const job = await loadJob()
+                if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 })
+                return NextResponse.json(job)
+            } catch (retryErr) {
+                console.error("[JOB_GET_RETRY]", retryErr)
+            }
+        } else {
+            console.error("[JOB_GET]", err)
+        }
         return NextResponse.json({ error: "Failed to load job" }, { status: 500 })
     }
 }
@@ -62,6 +106,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             data.screeningQuestions = Array.isArray(body.screeningQuestions) ? body.screeningQuestions : []
         if ("status" in body && ["DRAFT", "PUBLISHED", "CLOSED"].includes(body.status))
             data.status = body.status
+
+        // Ensure the customer/part/facility columns exist before updating them.
+        await ensureJobPostingColumns()
 
         const job = await prisma.jobPosting.update({
             where: { id: params.id },

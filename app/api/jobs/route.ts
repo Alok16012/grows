@@ -10,6 +10,37 @@ const toInt = (v: any) =>
 const toStrArray = (v: any) =>
     Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim()) : []
 
+// Prod migrations don't run on deploy (DIRECT_URL unset on Vercel), so the
+// customer/part/facility columns from 20260611120000 may be missing on the live
+// DB. Selecting them via the Prisma client then throws P2022. Self-heal at
+// runtime by adding the columns on demand (mirrors the expense-route pattern).
+let jobColumnsEnsured = false
+async function ensureJobPostingColumns() {
+    if (jobColumnsEnsured) return
+    try {
+        await (prisma as any).$executeRawUnsafe(`
+            ALTER TABLE "JobPosting"
+                ADD COLUMN IF NOT EXISTS "partSectionLabel"       TEXT,
+                ADD COLUMN IF NOT EXISTS "partName"               TEXT,
+                ADD COLUMN IF NOT EXISTS "partMaterial"           TEXT,
+                ADD COLUMN IF NOT EXISTS "partPhotoUrl"           TEXT,
+                ADD COLUMN IF NOT EXISTS "inspectionType"         TEXT,
+                ADD COLUMN IF NOT EXISTS "qualityStandard"        TEXT,
+                ADD COLUMN IF NOT EXISTS "customerName"           TEXT,
+                ADD COLUMN IF NOT EXISTS "plantLocation"          TEXT,
+                ADD COLUMN IF NOT EXISTS "plantAddress"           TEXT,
+                ADD COLUMN IF NOT EXISTS "shiftType"              TEXT,
+                ADD COLUMN IF NOT EXISTS "weeklyOff"              TEXT,
+                ADD COLUMN IF NOT EXISTS "overtimePolicy"         TEXT,
+                ADD COLUMN IF NOT EXISTS "canteenAvailable"       BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "transportAvailable"     BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "accommodationAvailable" BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "busFacility"            BOOLEAN NOT NULL DEFAULT false
+        `)
+        jobColumnsEnsured = true
+    } catch { /* best effort */ }
+}
+
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session || !checkAccess(session, [], "jobs.view")) {
@@ -31,15 +62,29 @@ export async function GET(req: Request) {
         ]
     }
 
-    try {
-        const jobs = await prisma.jobPosting.findMany({
+    const loadJobs = () =>
+        prisma.jobPosting.findMany({
             where,
             include: { creator: { select: { id: true, name: true } } },
             orderBy: { createdAt: "desc" },
         })
-        return NextResponse.json(jobs)
-    } catch (err) {
-        console.error("[JOBS_GET]", err)
+
+    try {
+        return NextResponse.json(await loadJobs())
+    } catch (err: any) {
+        // Schema drift on prod: a column the client selects doesn't exist yet.
+        // Add the missing columns, then retry once before giving up.
+        const msg = String(err?.message || "").toLowerCase()
+        if (msg.includes("does not exist") || err?.code === "P2022") {
+            await ensureJobPostingColumns()
+            try {
+                return NextResponse.json(await loadJobs())
+            } catch (retryErr) {
+                console.error("[JOBS_GET_RETRY]", retryErr)
+            }
+        } else {
+            console.error("[JOBS_GET]", err)
+        }
         return NextResponse.json({ error: "Failed to load jobs" }, { status: 500 })
     }
 }
@@ -57,6 +102,9 @@ export async function POST(req: Request) {
         if (!title || !String(title).trim()) {
             return NextResponse.json({ error: "Job title is required" }, { status: 400 })
         }
+
+        // Make sure the customer/part/facility columns exist before writing them.
+        await ensureJobPostingColumns()
 
         // Resolve real user ID (session.user.id may be a demo-xxx string).
         const realUser =
