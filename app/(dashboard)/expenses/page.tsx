@@ -54,6 +54,7 @@ type CategoryItem = {
     amount: number
     travelEntries?: TravelEntry[] | null  // only for TRAVEL lines
     vehicleType?: "2W" | "4W"
+    receiptUrl?: string | null            // per-category receipt / bill
 }
 
 type Expense = {
@@ -277,10 +278,11 @@ type LineItem = {
     amount: string                 // typed amount (non-travel)
     vehicleType: "2W" | "4W"       // travel only
     travelRows: TravelRow[]        // travel only
+    receiptUrl: string | null      // per-category receipt / bill
 }
 
 function mkLine(category: ExpenseCategory, date: string): LineItem {
-    return { _id: rid(), category, amount: "", vehicleType: "2W", travelRows: [mkRow(date)] }
+    return { _id: rid(), category, amount: "", vehicleType: "2W", travelRows: [mkRow(date)], receiptUrl: null }
 }
 
 function CategoryLine({
@@ -297,6 +299,21 @@ function CategoryLine({
 }) {
     const perKmRate = line.vehicleType === "2W" ? rate2W : rate4W
     const isTravel = line.category === "TRAVEL"
+    const fileRef = useRef<HTMLInputElement>(null)
+    const [uploading, setUploading] = useState(false)
+    const uploadReceipt = async (file: File) => {
+        if (file.size > 5 * 1024 * 1024) { toast.error("Receipt must be under 5MB"); return }
+        setUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("file", file)
+            const res = await fetch("/api/upload", { method: "POST", body: fd })
+            const data = await res.json()
+            if (data.url) onPatch({ receiptUrl: data.url })
+            else toast.error("Receipt upload failed")
+        } catch { toast.error("Receipt upload error") }
+        finally { setUploading(false) }
+    }
     const travelTotals = line.travelRows.reduce((acc, r) => {
         const k = parseFloat(r.kms) || 0
         acc.kms += k
@@ -412,6 +429,33 @@ function CategoryLine({
                     </div>
                 </div>
             )}
+
+            {/* Per-category receipt / bill */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: "1px solid var(--border)", background: "#fff" }}>
+                <Paperclip size={13} style={{ color: "#9ca3af", flexShrink: 0 }} />
+                {line.receiptUrl ? (
+                    <a href={line.receiptUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "var(--accent)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", textDecoration: "none" }}>
+                        View receipt
+                    </a>
+                ) : (
+                    <span style={{ flex: 1, fontSize: 11.5, color: "#9ca3af" }}>No receipt · JPG / PNG / PDF</span>
+                )}
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                    style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 700, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, cursor: uploading ? "default" : "pointer", color: "var(--text2)", display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                    {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                    {uploading ? "Uploading…" : line.receiptUrl ? "Change" : "Upload"}
+                </button>
+                {line.receiptUrl && (
+                    <button type="button" onClick={() => onPatch({ receiptUrl: null })}
+                        title="Remove receipt"
+                        style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", color: "#ef4444", borderRadius: 5, flexShrink: 0 }}>
+                        <Trash2 size={13} />
+                    </button>
+                )}
+                <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = "" }} />
+            </div>
         </div>
     )
 }
@@ -425,9 +469,6 @@ function AddExpenseModal({
     editExpense?: Expense | null
 }) {
     const [loading, setLoading] = useState(false)
-    const [receiptUrl, setReceiptUrl] = useState("")
-    const [receiptUploading, setReceiptUploading] = useState(false)
-    const receiptInputRef = useRef<HTMLInputElement>(null)
     const [projects, setProjects] = useState<ExpenseProject[]>([])
     // Admin-set per-km rates per vehicle type (employee can't edit these)
     const [rate2W, setRate2W] = useState(0)
@@ -488,8 +529,6 @@ function AddExpenseModal({
                 description: editExpense.description || "",
                 projectId: editExpense.projectId || "",
             })
-            setReceiptUrl(editExpense.receiptUrl || "")
-
             const rowsFromEntries = (entries?: TravelEntry[] | null) =>
                 (entries && entries.length)
                     ? entries.map(e => ({ _id: rid(), date: e.date, from: e.from, to: e.to, kms: String(e.kms) }))
@@ -497,12 +536,14 @@ function AddExpenseModal({
 
             if (Array.isArray(editExpense.categoryItems) && editExpense.categoryItems.length) {
                 // Multi-category expense — restore each saved line.
-                setLines(editExpense.categoryItems.map(it => ({
+                setLines(editExpense.categoryItems.map((it, i) => ({
                     _id: rid(),
                     category: it.category,
                     amount: it.category === "TRAVEL" ? "" : String(it.amount),
                     vehicleType: (it.vehicleType === "4W" ? "4W" : "2W"),
                     travelRows: it.category === "TRAVEL" ? rowsFromEntries(it.travelEntries) : [mkRow(expDate)],
+                    // Fall back to the legacy single receipt on the first line.
+                    receiptUrl: it.receiptUrl ?? (i === 0 ? (editExpense.receiptUrl || null) : null),
                 })))
             } else {
                 // Legacy single-category expense — one line from category + amount.
@@ -513,28 +554,14 @@ function AddExpenseModal({
                     amount: cat === "TRAVEL" ? "" : String(editExpense.amount),
                     vehicleType: ((editExpense.travelEntries?.[0] as any)?.vehicleType === "4W" ? "4W" : "2W"),
                     travelRows: cat === "TRAVEL" ? rowsFromEntries(editExpense.travelEntries) : [mkRow(expDate)],
+                    receiptUrl: editExpense.receiptUrl || null,
                 }])
             }
         } else {
             setForm({ title: "", date: today, description: "", projectId: "" })
-            setReceiptUrl("")
             setLines([mkLine("TRAVEL", today)])
         }
     }, [open, editExpense])
-
-    const uploadReceipt = async (file: File) => {
-        if (file.size > 5 * 1024 * 1024) { toast.error("Receipt must be under 5MB"); return }
-        setReceiptUploading(true)
-        try {
-            const fd = new FormData()
-            fd.append("file", file)
-            const res = await fetch("/api/upload", { method: "POST", body: fd })
-            const data = await res.json()
-            if (data.url) setReceiptUrl(data.url)
-            else toast.error("Receipt upload failed")
-        } catch { toast.error("Receipt upload error") }
-        finally { setReceiptUploading(false) }
-    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -569,17 +596,20 @@ function AddExpenseModal({
                         amount: entries.reduce((s, en) => s + en.amount, 0),
                         travelEntries: entries,
                         vehicleType: line.vehicleType,
+                        receiptUrl: line.receiptUrl || null,
                     }
                 }
-                return { category: line.category, amount: parseFloat(line.amount) || 0 }
+                return { category: line.category, amount: parseFloat(line.amount) || 0, receiptUrl: line.receiptUrl || null }
             })
 
             const firstTravel = items.find(i => i.category === "TRAVEL")
+            // Legacy single receipt column = the first line that has one.
+            const legacyReceipt = items.find(i => i.receiptUrl)?.receiptUrl ?? null
             const payload: any = {
                 title: form.title,
                 description: form.description,
                 projectId: form.projectId || null,
-                receiptUrl: receiptUrl || null,
+                receiptUrl: legacyReceipt,
                 date: form.date,
                 // Legacy columns kept populated for filters/list/back-compat.
                 category: items[0].category,
@@ -691,50 +721,6 @@ function AddExpenseModal({
                             className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none"
                             rows={3}
                         />
-                    </div>
-                    <div>
-                        <label className="block text-[12px] text-[var(--text2)] mb-1">Receipt / Bill</label>
-                        <div className="rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] p-3 flex items-center gap-3">
-                            {receiptUrl ? (
-                                /\.(jpe?g|png|gif|webp)$/i.test(receiptUrl) ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={receiptUrl} alt="Receipt" className="w-14 h-14 rounded-[6px] object-cover border border-[var(--border)]" />
-                                ) : (
-                                    <div className="w-14 h-14 rounded-[6px] bg-white border border-[var(--border)] flex items-center justify-center">
-                                        <FileText size={20} className="text-[var(--accent)]" />
-                                    </div>
-                                )
-                            ) : (
-                                <div className="w-14 h-14 rounded-[6px] bg-white border border-dashed border-[var(--border)] flex items-center justify-center">
-                                    <Upload size={18} className="text-[var(--text3)]" />
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                {receiptUrl ? (
-                                    <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
-                                        className="text-[12px] font-medium text-[var(--accent)] hover:underline block truncate">
-                                        View attached receipt
-                                    </a>
-                                ) : (
-                                    <p className="text-[12px] text-[var(--text2)]">JPG / PNG / PDF • max 5MB</p>
-                                )}
-                                <div className="flex items-center gap-2 mt-1">
-                                    <button type="button" onClick={() => receiptInputRef.current?.click()} disabled={receiptUploading}
-                                        className="h-7 px-3 text-[11px] font-semibold bg-white border border-[var(--border)] rounded-[6px] hover:bg-[var(--surface)] disabled:opacity-60 inline-flex items-center gap-1.5">
-                                        {receiptUploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
-                                        {receiptUploading ? "Uploading…" : receiptUrl ? "Change" : "Upload"}
-                                    </button>
-                                    {receiptUrl && (
-                                        <button type="button" onClick={() => setReceiptUrl("")}
-                                            className="h-7 px-3 text-[11px] font-semibold text-red-500 border border-red-200 rounded-[6px] hover:bg-red-50 inline-flex items-center gap-1.5">
-                                            <Trash2 size={11} /> Remove
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                            <input ref={receiptInputRef} type="file" accept="image/*,application/pdf" className="hidden"
-                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = "" }} />
-                        </div>
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                         <button
@@ -965,6 +951,14 @@ function ExpenseDrawer({
                                                         ))}
                                                     </div>
                                                 )}
+                                                {it.receiptUrl && (
+                                                    <div className="px-3 py-1.5 bg-white">
+                                                        <a href={it.receiptUrl} target="_blank" rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)] hover:underline">
+                                                            <Paperclip size={11} /> View receipt
+                                                        </a>
+                                                    </div>
+                                                )}
                                             </div>
                                         )
                                     })}
@@ -994,8 +988,8 @@ function ExpenseDrawer({
                             </div>
                         )}
 
-                        {/* Receipt */}
-                        {expense.receiptUrl && (
+                        {/* Receipt (single-category; multi-category receipts show per-line in Breakdown) */}
+                        {expense.receiptUrl && !(Array.isArray(expense.categoryItems) && expense.categoryItems.length > 1) && (
                             <div>
                                 <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Receipt / Bill</p>
                                 {/\.(jpe?g|png|gif|webp)$/i.test(expense.receiptUrl) ? (
