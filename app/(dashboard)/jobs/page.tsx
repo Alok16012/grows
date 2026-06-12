@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 import {
     Plus, Search, Loader2, Briefcase, MapPin, IndianRupee, Users, Target,
+    Pencil, Copy, Trash2,
 } from "lucide-react"
 import {
     JobPosting, STATUS_META, formatExperience, formatSalary,
@@ -15,6 +17,7 @@ import {
 const STATUS_FILTERS = ["ALL", "PUBLISHED", "DRAFT", "CLOSED"] as const
 
 export default function JobsPage() {
+    const router = useRouter()
     const { data: session } = useSession()
     const canView = can(session, "jobs.view")
     const canManage = can(session, "jobs.manage")
@@ -23,6 +26,7 @@ export default function JobsPage() {
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>("ALL")
+    const [deletingId, setDeletingId] = useState<string | null>(null)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -45,6 +49,28 @@ export default function JobsPage() {
         const t = setTimeout(load, 250)
         return () => clearTimeout(t)
     }, [load, canView])
+
+    // Card actions. Each lives inside the card's <Link>, so stop the click from
+    // navigating to the detail page before running.
+    const goTo = (e: React.MouseEvent, href: string) => {
+        e.preventDefault(); e.stopPropagation()
+        router.push(href)
+    }
+    const removeJob = async (e: React.MouseEvent, id: string, title: string) => {
+        e.preventDefault(); e.stopPropagation()
+        if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
+        setDeletingId(id)
+        try {
+            const res = await fetch(`/api/jobs/${id}`, { method: "DELETE" })
+            if (!res.ok) throw new Error()
+            toast.success("Job deleted")
+            setJobs((prev) => prev.filter((j) => j.id !== id))
+        } catch {
+            toast.error("Delete failed")
+        } finally {
+            setDeletingId(null)
+        }
+    }
 
     if (!canView) {
         return <div className="p-8 text-center text-[var(--text2)]">You don&apos;t have access to job postings.</div>
@@ -156,6 +182,31 @@ export default function JobsPage() {
                                     <span className="inline-flex items-center gap-1"><Users size={12} /> {job.openings} opening{job.openings === 1 ? "" : "s"}</span>
                                     <span>{new Date(job.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
                                 </div>
+
+                                {canManage && (
+                                    <div className="flex items-center gap-1.5 mt-2.5">
+                                        <button
+                                            onClick={(e) => goTo(e, `/jobs/new?id=${job.id}`)}
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]"
+                                        >
+                                            <Pencil size={13} /> Edit
+                                        </button>
+                                        <button
+                                            onClick={(e) => goTo(e, `/jobs/new?duplicate=${job.id}`)}
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]"
+                                        >
+                                            <Copy size={13} /> Duplicate
+                                        </button>
+                                        <button
+                                            onClick={(e) => removeJob(e, job.id, job.title)}
+                                            disabled={deletingId === job.id}
+                                            title="Delete"
+                                            className="inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                        >
+                                            {deletingId === job.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                                        </button>
+                                    </div>
+                                )}
                             </Link>
                         )
                     })}

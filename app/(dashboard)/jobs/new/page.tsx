@@ -59,6 +59,7 @@ type Form = {
     customerName: string
     plantLocation: string
     plantAddress: string
+    mapUrl: string
     // Facility / amenities
     shiftType: string
     weeklyOff: string
@@ -80,7 +81,7 @@ const initialForm: Form = {
     callEndTime: "18:30", callDays: "Everyday",
     partSectionLabel: "", partName: "", partMaterial: "", partPhotoUrl: "",
     inspectionType: "", qualityStandard: "",
-    customerName: "", plantLocation: "", plantAddress: "",
+    customerName: "", plantLocation: "", plantAddress: "", mapUrl: "",
     shiftType: "Rotational", weeklyOff: "Sunday", overtimePolicy: "",
     canteenAvailable: false, transportAvailable: false, accommodationAvailable: false, busFacility: false,
 }
@@ -113,6 +114,7 @@ function jobToForm(j: JobPosting): Form {
         partSectionLabel: s(j.partSectionLabel), partName: s(j.partName), partMaterial: s(j.partMaterial),
         partPhotoUrl: s(j.partPhotoUrl), inspectionType: s(j.inspectionType), qualityStandard: s(j.qualityStandard),
         customerName: s(j.customerName), plantLocation: s(j.plantLocation), plantAddress: s(j.plantAddress),
+        mapUrl: s(j.mapUrl),
         shiftType: s(j.shiftType) || "Rotational", weeklyOff: s(j.weeklyOff) || "Sunday",
         overtimePolicy: s(j.overtimePolicy), canteenAvailable: !!j.canteenAvailable,
         transportAvailable: !!j.transportAvailable, accommodationAvailable: !!j.accommodationAvailable,
@@ -504,6 +506,16 @@ function StepCustomerSite({ form, set }: { form: Form; set: <K extends keyof For
                         className={`${inputCls} resize-y`}
                     />
                     <p className="text-[11px] text-[var(--text3)] mt-1">Used to show the location map on the job page.</p>
+                </div>
+                <div>
+                    <FieldLabel optional>Google Maps link</FieldLabel>
+                    <input
+                        value={form.mapUrl}
+                        onChange={(e) => set("mapUrl", e.target.value)}
+                        placeholder="Paste a Google Maps link (e.g. https://maps.app.goo.gl/…)"
+                        className={inputCls}
+                    />
+                    <p className="text-[11px] text-[var(--text3)] mt-1">Paste a direct link for the exact pin. The “Open in Google Maps” button uses this; if it contains coordinates the map shows that exact spot.</p>
                 </div>
             </div>
 

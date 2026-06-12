@@ -27,6 +27,7 @@ async function ensureJobPostingColumns() {
                 ADD COLUMN IF NOT EXISTS "customerName"           TEXT,
                 ADD COLUMN IF NOT EXISTS "plantLocation"          TEXT,
                 ADD COLUMN IF NOT EXISTS "plantAddress"           TEXT,
+                ADD COLUMN IF NOT EXISTS "mapUrl"                 TEXT,
                 ADD COLUMN IF NOT EXISTS "shiftType"              TEXT,
                 ADD COLUMN IF NOT EXISTS "weeklyOff"              TEXT,
                 ADD COLUMN IF NOT EXISTS "overtimePolicy"         TEXT,
@@ -88,7 +89,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             "contactName", "contactPhone", "callStartTime", "callEndTime", "callDays",
             "partSectionLabel", "partName", "partMaterial", "partPhotoUrl",
             "inspectionType", "qualityStandard", "customerName", "plantLocation",
-            "plantAddress", "shiftType", "weeklyOff", "overtimePolicy",
+            "plantAddress", "mapUrl", "shiftType", "weeklyOff", "overtimePolicy",
         ]
         for (const k of passthrough) if (k in body) data[k] = body[k] || null
         if ("title" in body) {

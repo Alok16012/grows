@@ -54,6 +54,7 @@ export type JobPosting = {
     customerName: string | null
     plantLocation: string | null
     plantAddress: string | null
+    mapUrl: string | null
     // Facility / amenities
     shiftType: string | null
     weeklyOff: string | null

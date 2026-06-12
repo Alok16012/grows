@@ -29,6 +29,7 @@ async function ensureJobPostingColumns() {
                 ADD COLUMN IF NOT EXISTS "customerName"           TEXT,
                 ADD COLUMN IF NOT EXISTS "plantLocation"          TEXT,
                 ADD COLUMN IF NOT EXISTS "plantAddress"           TEXT,
+                ADD COLUMN IF NOT EXISTS "mapUrl"                 TEXT,
                 ADD COLUMN IF NOT EXISTS "shiftType"              TEXT,
                 ADD COLUMN IF NOT EXISTS "weeklyOff"              TEXT,
                 ADD COLUMN IF NOT EXISTS "overtimePolicy"         TEXT,
@@ -154,6 +155,7 @@ export async function POST(req: Request) {
                 customerName: body.customerName || null,
                 plantLocation: body.plantLocation || null,
                 plantAddress: body.plantAddress || null,
+                mapUrl: body.mapUrl || null,
                 // Facility / amenities
                 shiftType: body.shiftType || null,
                 weeklyOff: body.weeklyOff || null,

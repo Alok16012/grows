@@ -15,15 +15,36 @@ function mapEmbedSrc(q: string) {
 function mapLink(q: string) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
 }
+// Pull lat,lng out of a pasted Google Maps URL so the embed lands on the exact
+// pin. Handles the common URL shapes; returns null when no coords are present.
+function coordsFromMapUrl(url: string): string | null {
+    if (!url) return null
+    const patterns = [
+        /@(-?\d+\.\d+),(-?\d+\.\d+)/,                 // .../@18.59,73.74,15z
+        /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,             // ...!3d18.59!4d73.74
+        /[?&](?:q|query|ll|center)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/, // ?q=18.59,73.74
+    ]
+    for (const re of patterns) {
+        const m = url.match(re)
+        if (m) return `${m[1]},${m[2]}`
+    }
+    return null
+}
 
 export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () => void }) {
     const meta = STATUS_META[job.status]
     const company = job.companyName || "Growus Auto India"
     const partLabel = job.partSectionLabel || "Inspection Part (Sample)"
     const mapQuery = job.plantAddress || job.plantLocation || ""
+    // Prefer the exact pin from a pasted Google Maps link; fall back to address text.
+    const mapUrl = job.mapUrl || ""
+    const mapCoords = coordsFromMapUrl(mapUrl)
+    const embedSrc = mapCoords ? mapEmbedSrc(mapCoords) : (mapQuery ? mapEmbedSrc(mapQuery) : "")
+    const openMapHref = mapUrl || (mapQuery ? mapLink(mapQuery) : "")
+    const hasMap = !!(embedSrc || openMapHref)
 
     const hasPart = !!(job.partPhotoUrl || job.partName || job.partMaterial || job.inspectionType || job.qualityStandard)
-    const hasCustomer = !!(job.customerName || job.plantLocation || job.plantAddress || job.shiftType ||
+    const hasCustomer = !!(job.customerName || job.plantLocation || job.plantAddress || job.mapUrl || job.shiftType ||
         job.canteenAvailable || job.transportAvailable || job.accommodationAvailable)
     const hasFacility = !!(job.busFacility || job.canteenAvailable || job.accommodationAvailable ||
         job.shiftType || job.weeklyOff || job.overtimePolicy)
@@ -67,7 +88,7 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
 
             <div className="p-6 space-y-6">
                 {/* ── Sample part + Customer location ── */}
-                {(hasPart || mapQuery) && (
+                {(hasPart || hasMap) && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {(job.partPhotoUrl || job.partName) && (
                             <div>
@@ -87,25 +108,33 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
                             </div>
                         )}
 
-                        {mapQuery && (
+                        {hasMap && (
                             <div>
                                 <SectionTitle>Customer Location</SectionTitle>
                                 <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-                                    <iframe
-                                        title="Customer location"
-                                        src={mapEmbedSrc(mapQuery)}
-                                        className="w-full h-64 border-0"
-                                        loading="lazy"
-                                        referrerPolicy="no-referrer-when-downgrade"
-                                    />
+                                    {embedSrc ? (
+                                        <iframe
+                                            title="Customer location"
+                                            src={embedSrc}
+                                            className="w-full h-64 border-0"
+                                            loading="lazy"
+                                            referrerPolicy="no-referrer-when-downgrade"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-64 bg-[var(--surface2)] flex items-center justify-center text-[var(--text3)] text-[13px]">
+                                            Map preview unavailable — open the link below
+                                        </div>
+                                    )}
                                     <div className="bg-emerald-50 px-4 py-2.5 flex items-center justify-between gap-3">
                                         <span className="text-[12px] text-emerald-900 inline-flex items-center gap-1.5 min-w-0">
-                                            <MapPin size={13} className="shrink-0" /> <span className="truncate">{job.plantAddress || job.plantLocation}</span>
+                                            <MapPin size={13} className="shrink-0" /> <span className="truncate">{job.plantAddress || job.plantLocation || "Customer location"}</span>
                                         </span>
-                                        <a href={mapLink(mapQuery)} target="_blank" rel="noopener noreferrer"
-                                            className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]">
-                                            Open in Google Maps <ExternalLink size={12} />
-                                        </a>
+                                        {openMapHref && (
+                                            <a href={openMapHref} target="_blank" rel="noopener noreferrer"
+                                                className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]">
+                                                Open in Google Maps <ExternalLink size={12} />
+                                            </a>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -124,12 +153,12 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
                             {job.plantLocation && <Field icon={<MapPin size={14} />} label="Plant Location" value={job.plantLocation} />}
                             <Field icon={<Bus size={14} />} label="Transportation" value={yn(job.transportAvailable)} />
                             <Field icon={<Home size={14} />} label="Accommodation" value={yn(job.accommodationAvailable)} />
-                            {mapQuery && (
+                            {openMapHref && (
                                 <div className="flex items-start gap-2">
                                     <span className="text-[var(--text3)] mt-0.5"><MapPin size={14} /></span>
                                     <div>
                                         <p className="text-[12px] text-[var(--text3)]">Google Map</p>
-                                        <a href={mapLink(mapQuery)} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[var(--accent-text)] hover:underline">View Location</a>
+                                        <a href={openMapHref} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[var(--accent-text)] hover:underline">View Location</a>
                                     </div>
                                 </div>
                             )}
