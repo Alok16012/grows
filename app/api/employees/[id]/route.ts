@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
+import { randomUUID } from "crypto"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
@@ -209,10 +210,13 @@ export async function DELETE(
         }
 
         const employee = await prisma.employee.findUnique({
-            where: { id: params.id }
+            where: { id: params.id },
+            select: { id: true, userId: true },
         })
 
         if (!employee) return new NextResponse("Not Found", { status: 404 })
+
+        const userId = employee.userId
 
         // Hard delete: Clean up relations without onDelete: Cascade first in a transaction
         await prisma.$transaction([
@@ -224,8 +228,50 @@ export async function DELETE(
             prisma.employee.delete({ where: { id: params.id } })
         ])
 
+        // ── Remove the linked login account too ──
+        // Deleting the employee should also remove their ability to log in.
+        // Best-effort hard delete of the User; if they own operational records
+        // (inspections, assignments, leads, etc.) that the DB won't let us drop,
+        // fall back to fully disabling the login: wipe the password and free the
+        // email so it can be reused, and flag the account inactive.
+        let loginRemoved = false
+        if (userId) {
+            try {
+                // Notifications cascade on User delete, but remove explicitly in
+                // case the prod FK predates the cascade rule.
+                await prisma.notification.deleteMany({ where: { userId } }).catch(() => {})
+                await prisma.user.delete({ where: { id: userId } })
+                loginRemoved = true
+            } catch (delErr) {
+                console.warn("[EMPLOYEE_DELETE] user hard-delete blocked, disabling login instead", delErr)
+                try {
+                    const tombstone = `deleted_${userId}@deleted.local`
+                    await prisma.user.update({
+                        where: { id: userId },
+                        data: {
+                            isActive: false,
+                            password: `disabled-${randomUUID()}`,
+                            plainPassword: null,
+                            email: tombstone,
+                            customRoleId: null,
+                        },
+                    })
+                    loginRemoved = true
+                } catch (disableErr) {
+                    console.error("[EMPLOYEE_DELETE] failed to disable login", disableErr)
+                }
+            }
+        }
 
-        return NextResponse.json({ success: true, message: "Employee and all associated records deleted successfully" })
+        return NextResponse.json({
+            success: true,
+            loginRemoved,
+            message: userId
+                ? (loginRemoved
+                    ? "Employee, login account and all associated records deleted successfully"
+                    : "Employee deleted, but the login account could not be fully removed")
+                : "Employee and all associated records deleted successfully",
+        })
     } catch (error) {
         console.error("[EMPLOYEE_DELETE]", error)
         return new NextResponse("Internal Error", { status: 500 })

@@ -336,6 +336,13 @@ export async function DELETE(req: Request) {
             return new NextResponse("ids array required", { status: 400 })
         }
 
+        // Capture the linked login accounts before the employees are removed.
+        const linkedUsers = await prisma.employee.findMany({
+            where: { id: { in: ids }, userId: { not: null } },
+            select: { userId: true },
+        })
+        const userIds = linkedUsers.map(u => u.userId).filter(Boolean) as string[]
+
         await prisma.$transaction([
             prisma.attendance.deleteMany({ where: { employeeId: { in: ids } } }),
             prisma.leave.deleteMany({ where: { employeeId: { in: ids } } }),
@@ -345,7 +352,34 @@ export async function DELETE(req: Request) {
             prisma.employee.deleteMany({ where: { id: { in: ids } } }),
         ])
 
-        return NextResponse.json({ success: true, deleted: ids.length })
+        // Remove each linked login too (hard delete, or disable if the account
+        // owns operational records that block deletion).
+        let loginsRemoved = 0
+        for (const userId of userIds) {
+            try {
+                await prisma.notification.deleteMany({ where: { userId } }).catch(() => {})
+                await prisma.user.delete({ where: { id: userId } })
+                loginsRemoved++
+            } catch {
+                try {
+                    await prisma.user.update({
+                        where: { id: userId },
+                        data: {
+                            isActive: false,
+                            password: `disabled-${crypto.randomUUID()}`,
+                            plainPassword: null,
+                            email: `deleted_${userId}@deleted.local`,
+                            customRoleId: null,
+                        },
+                    })
+                    loginsRemoved++
+                } catch (e) {
+                    console.error("[EMPLOYEES_BULK_DELETE] could not remove login", userId, e)
+                }
+            }
+        }
+
+        return NextResponse.json({ success: true, deleted: ids.length, loginsRemoved })
     } catch (error) {
         console.error("[EMPLOYEES_BULK_DELETE]", error)
         return new NextResponse("Internal Error", { status: 500 })
