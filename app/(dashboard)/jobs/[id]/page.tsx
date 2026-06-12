@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
-import { ChevronLeft, Loader2, Send, Ban, RotateCcw, Trash2 } from "lucide-react"
+import { ChevronLeft, Loader2, Send, Ban, RotateCcw, Trash2, Pencil, Copy } from "lucide-react"
 import { JobDetailView } from "@/components/jobs/JobDetailView"
 import { JobPosting, STATUS_META, JobStatus } from "@/components/jobs/constants"
 
@@ -82,6 +82,12 @@ export default function JobDetailPage() {
             <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
                 {canManage && (
                     <div className="flex items-center gap-2">
+                        <button onClick={() => router.push(`/jobs/new?id=${id}`)} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
+                            <Pencil size={14} /> Edit
+                        </button>
+                        <button onClick={() => router.push(`/jobs/new?duplicate=${id}`)} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
+                            <Copy size={14} /> Duplicate
+                        </button>
                         {job.status !== "PUBLISHED" && (
                             <button onClick={() => setStatus("PUBLISHED")} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-50">
                                 <Send size={14} /> Publish

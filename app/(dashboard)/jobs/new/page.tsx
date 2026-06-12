@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
@@ -15,7 +15,7 @@ import {
     EMPLOYMENT_TYPES, PERK_SUGGESTIONS, LANGUAGE_SUGGESTIONS, SKILL_SUGGESTIONS,
     SUGGESTED_QUESTIONS, CALL_DAYS_OPTIONS, ScreeningQuestion,
     SHIFT_OPTIONS, WEEKLY_OFF_OPTIONS, INSPECTION_TYPE_SUGGESTIONS,
-    QUALITY_STANDARD_SUGGESTIONS, MATERIAL_SUGGESTIONS,
+    QUALITY_STANDARD_SUGGESTIONS, MATERIAL_SUGGESTIONS, JobPosting,
 } from "@/components/jobs/constants"
 
 type Form = {
@@ -87,14 +87,83 @@ const initialForm: Form = {
 
 const uid = () => Math.random().toString(36).slice(2, 9)
 
+const s = (v: string | null | undefined) => v ?? ""
+const n = (v: number | null | undefined) => (v == null ? "" : String(v))
+
+// Map a saved job back into the editable wizard form (for Edit / Duplicate).
+function jobToForm(j: JobPosting): Form {
+    return {
+        title: s(j.title),
+        workExpMin: n(j.workExpMin), workExpMax: n(j.workExpMax), freshersAllowed: !!j.freshersAllowed,
+        salaryMin: n(j.salaryMin), salaryMax: n(j.salaryMax), perks: j.perks ?? [],
+        department: s(j.department), jobRole: s(j.jobRole), jobLocation: s(j.jobLocation),
+        qualifications: j.qualifications ?? [], educationDegree: s(j.educationDegree),
+        genderPreference: s(j.genderPreference) || "Any", skills: j.skills ?? [],
+        candidateIndustry: s(j.candidateIndustry), languages: j.languages ?? [],
+        screeningQuestions: (j.screeningQuestions ?? []).map((q) => ({
+            id: q.id || uid(), question: q.question || "", mandatory: q.mandatory ?? true,
+            type: q.type || "text", options: q.options ?? [], preferredAnswer: q.preferredAnswer ?? null,
+        })),
+        description: s(j.description), companyName: s(j.companyName) || "Growus Auto India",
+        employmentType: s(j.employmentType) || "Full Time, Permanent",
+        industryType: s(j.industryType), roleCategory: s(j.roleCategory), openings: n(j.openings) || "1",
+        allowCalls: !!j.allowCalls, contactName: s(j.contactName), contactPhone: s(j.contactPhone),
+        callStartTime: s(j.callStartTime) || "09:30", callEndTime: s(j.callEndTime) || "18:30",
+        callDays: s(j.callDays) || "Everyday",
+        partSectionLabel: s(j.partSectionLabel), partName: s(j.partName), partMaterial: s(j.partMaterial),
+        partPhotoUrl: s(j.partPhotoUrl), inspectionType: s(j.inspectionType), qualityStandard: s(j.qualityStandard),
+        customerName: s(j.customerName), plantLocation: s(j.plantLocation), plantAddress: s(j.plantAddress),
+        shiftType: s(j.shiftType) || "Rotational", weeklyOff: s(j.weeklyOff) || "Sunday",
+        overtimePolicy: s(j.overtimePolicy), canteenAvailable: !!j.canteenAvailable,
+        transportAvailable: !!j.transportAvailable, accommodationAvailable: !!j.accommodationAvailable,
+        busFacility: !!j.busFacility,
+    }
+}
+
 export default function NewJobPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center py-24 text-[var(--text3)]"><Loader2 className="animate-spin" /></div>}>
+            <NewJobWizard />
+        </Suspense>
+    )
+}
+
+function NewJobWizard() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const editId = searchParams.get("id")
+    const dupId = searchParams.get("duplicate")
+    const mode: "create" | "edit" | "duplicate" = editId ? "edit" : dupId ? "duplicate" : "create"
     const { data: session } = useSession()
     const allowed = can(session, "jobs.manage")
 
     const [step, setStep] = useState(0)
     const [form, setForm] = useState<Form>(initialForm)
     const [saving, setSaving] = useState(false)
+    const [loadingJob, setLoadingJob] = useState<boolean>(!!(editId || dupId))
+
+    // Prefill the wizard when editing or duplicating an existing job.
+    useEffect(() => {
+        const srcId = editId || dupId
+        if (!srcId) return
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await fetch(`/api/jobs/${srcId}`)
+                if (!res.ok) throw new Error()
+                const j = (await res.json()) as JobPosting
+                if (cancelled) return
+                const f = jobToForm(j)
+                if (dupId) f.title = `${f.title} (Copy)`.trim()
+                setForm(f)
+            } catch {
+                if (!cancelled) toast.error(`Couldn't load the job to ${editId ? "edit" : "duplicate"}`)
+            } finally {
+                if (!cancelled) setLoadingJob(false)
+            }
+        })()
+        return () => { cancelled = true }
+    }, [editId, dupId])
 
     const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -104,6 +173,10 @@ export default function NewJobPage() {
                 You don&apos;t have permission to post jobs.
             </div>
         )
+    }
+
+    if (loadingJob) {
+        return <div className="flex items-center justify-center py-24 text-[var(--text3)]"><Loader2 className="animate-spin" /></div>
     }
 
     const toggleArray = (key: "qualifications", v: string) => {
@@ -137,27 +210,41 @@ export default function NewJobPage() {
     }
     const back = () => setStep((s) => Math.max(s - 1, 0))
 
-    const submit = async (status: "DRAFT" | "PUBLISHED") => {
+    // status === undefined → keep the existing status (edit mode "Save changes").
+    const submit = async (status?: "DRAFT" | "PUBLISHED") => {
         const err = validateStep(0)
         if (err) { toast.error(err); setStep(0); return }
         setSaving(true)
         try {
-            const payload = {
+            const payload: any = {
                 ...form,
                 screeningQuestions: form.screeningQuestions.filter((q) => q.question.trim()),
-                status,
             }
-            const res = await fetch("/api/jobs", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || "Failed to create job")
-            toast.success(status === "PUBLISHED" ? "Job published" : "Draft saved")
-            router.push("/jobs")
+            if (mode === "edit") {
+                if (status) payload.status = status   // only change status when explicitly publishing
+                const res = await fetch(`/api/jobs/${editId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                })
+                const data = await res.json()
+                if (!res.ok) throw new Error(data.error || "Failed to save changes")
+                toast.success(status === "PUBLISHED" ? "Job published" : "Changes saved")
+                router.push(`/jobs/${editId}`)
+            } else {
+                payload.status = status || "DRAFT"
+                const res = await fetch("/api/jobs", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                })
+                const data = await res.json()
+                if (!res.ok) throw new Error(data.error || "Failed to create job")
+                toast.success(payload.status === "PUBLISHED" ? "Job published" : "Draft saved")
+                router.push("/jobs")
+            }
         } catch (e: any) {
-            toast.error(e.message || "Failed to create job")
+            toast.error(e.message || "Failed to save job")
         } finally {
             setSaving(false)
         }
@@ -184,7 +271,9 @@ export default function NewJobPage() {
             </button>
 
             <div className="flex items-center gap-3 mb-6">
-                <h1 className="text-2xl font-bold text-[var(--text)]">Post a job</h1>
+                <h1 className="text-2xl font-bold text-[var(--text)]">
+                    {mode === "edit" ? "Edit job" : mode === "duplicate" ? "Duplicate job" : "Post a job"}
+                </h1>
                 <span className="text-[12px] font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">Internal</span>
             </div>
 
@@ -248,11 +337,11 @@ export default function NewJobPage() {
                         </button>
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => submit("DRAFT")}
+                                onClick={() => (mode === "edit" ? submit() : submit("DRAFT"))}
                                 disabled={saving}
                                 className="px-4 py-2 rounded-lg border border-[var(--border)] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50"
                             >
-                                Save draft
+                                {mode === "edit" ? "Save changes" : "Save draft"}
                             </button>
                             {step < WIZARD_STEPS.length - 1 ? (
                                 <button
@@ -268,7 +357,7 @@ export default function NewJobPage() {
                                     className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-emerald-600 text-white text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
                                 >
                                     {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                                    Publish job
+                                    {mode === "edit" ? "Save & publish" : "Publish job"}
                                 </button>
                             )}
                         </div>
