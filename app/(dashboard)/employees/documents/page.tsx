@@ -36,6 +36,10 @@ const DOC_COLS = [
     { key: "OTHER",        label: "Other",        color: "#6b7280", bg: "#f3f4f6" },
 ]
 
+// Sentinel id for a PHOTO cell synthesised from the employee's profile photo
+// (no real EmployeeDocument row). Delete is hidden for these.
+const PROFILE_PHOTO_ID = "__profile_photo__"
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = ["#1a9e6e","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#06b6d4","#f97316"]
 function avatarColor(name: string) {
@@ -138,7 +142,7 @@ function DocCell({
                     className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-green-50 text-green-700 hover:bg-green-100">
                     <Download size={9} /> Download
                 </a>
-                {isAdmin && (
+                {isAdmin && doc.id !== PROFILE_PHOTO_ID && (
                     <button onClick={handleDelete} disabled={deleting}
                         className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">
                         {deleting ? <Loader2 size={9} className="animate-spin" /> : <Trash2 size={9} />} Delete
@@ -204,10 +208,11 @@ export default function MasterDocumentsPage() {
     // Summary
     const totalEmployees = employees.length
     const totalDocs = docs.length
-    const fullyVerified = employees.filter(e => {
-        const empDocs = docMap.get(e.id)
-        return empDocs && DOC_COLS.every(c => empDocs.has(c.key))
-    }).length
+    // A doc "exists" if there's an EmployeeDocument row — or, for PHOTO, if the
+    // employee simply has a profile photo set (onboarding/modal upload path).
+    const hasDoc = (emp: Employee, key: string) =>
+        !!docMap.get(emp.id)?.has(key) || (key === "PHOTO" && !!emp.photo)
+    const fullyVerified = employees.filter(e => DOC_COLS.every(c => hasDoc(e, c.key))).length
     const missingAny = totalEmployees - fullyVerified
 
     // Filtered rows
@@ -221,12 +226,10 @@ export default function MasterDocumentsPage() {
                 !siteName.toLowerCase().includes(q)) return false
         }
         if (statusFilter === "COMPLETE") {
-            const empDocs = docMap.get(emp.id)
-            if (!empDocs || !DOC_COLS.every(c => empDocs.has(c.key))) return false
+            if (!DOC_COLS.every(c => hasDoc(emp, c.key))) return false
         }
         if (statusFilter === "MISSING") {
-            const empDocs = docMap.get(emp.id)
-            if (empDocs && DOC_COLS.every(c => empDocs.has(c.key))) return false
+            if (DOC_COLS.every(c => hasDoc(emp, c.key))) return false
         }
         return true
     })
@@ -350,7 +353,24 @@ export default function MasterDocumentsPage() {
                                         <td className="px-4 py-2 align-top pt-3 text-[11px] text-[#6b6860] whitespace-nowrap">{emp.deployments?.[0]?.site?.name || "Unassigned"}</td>
                                         {/* Doc columns */}
                                         {DOC_COLS.map(col => {
-                                            const doc = empDocs?.get(col.key)
+                                            let doc = empDocs?.get(col.key)
+                                            // Many employees have a profile photo (set via the onboarding
+                                            // form / employee modal) without a matching PHOTO document row.
+                                            // Surface that photo here so the column isn't wrongly "Not Uploaded".
+                                            if (!doc && col.key === "PHOTO" && emp.photo) {
+                                                doc = {
+                                                    id: PROFILE_PHOTO_ID,
+                                                    type: "PHOTO",
+                                                    fileName: "Profile photo",
+                                                    fileUrl: emp.photo,
+                                                    status: "VERIFIED",
+                                                    uploadedAt: new Date().toISOString(),
+                                                    employee: {
+                                                        id: emp.id, employeeId: emp.employeeId,
+                                                        firstName: emp.firstName, lastName: emp.lastName,
+                                                    },
+                                                }
+                                            }
                                             return (
                                                 <td key={col.key}
                                                     className={`px-1 py-1 align-top border-l border-[#f0efec] ${doc ? "bg-[#f0fdf4]/40" : "bg-[#fff5f5]/60"}`}>
