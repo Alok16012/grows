@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { can } from "@/lib/can"
 import {
     Plus, Search, Loader2, X, CreditCard,
-    ChevronRight, CheckCircle2, Clock,
+    ChevronRight, ChevronLeft, CheckCircle2, Clock,
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
     Upload, FileText, Paperclip, Briefcase, Download,
@@ -238,6 +238,28 @@ function expenseParts(exp: any): { category: ExpenseCategory; item: any }[] {
     }
     return [{ category: exp.category as ExpenseCategory, item: exp }]
 }
+
+// Flatten an expense into the list of receipts a verifier should check one by
+// one. Multi-category expenses contribute one entry per line that has a
+// receipt; a legacy single-category expense contributes its single receipt.
+function receiptEntriesOf(exp: any): { category: ExpenseCategory; amount: number; receiptUrl: string }[] {
+    if (!exp) return []
+    const items = exp.categoryItems
+    if (Array.isArray(items) && items.length > 0) {
+        return items
+            .filter((it: any) => it?.receiptUrl)
+            .map((it: any) => ({
+                category: (it?.category ?? exp.category) as ExpenseCategory,
+                amount: Number(it?.amount) || 0,
+                receiptUrl: String(it.receiptUrl),
+            }))
+    }
+    return exp.receiptUrl
+        ? [{ category: exp.category as ExpenseCategory, amount: Number(exp.amount) || 0, receiptUrl: String(exp.receiptUrl) }]
+        : []
+}
+
+const isImageUrl = (u: string) => /\.(jpe?g|png|gif|webp|avif)$/i.test(u)
 
 function avatarColor(name: string): string {
     const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
@@ -768,6 +790,10 @@ function ExpenseDrawer({
     const [transactionId, setTransactionId] = useState("")
     const [paymentDate, setPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"))
     const [showEditModal, setShowEditModal] = useState(false)
+    // Receipt verification: which receipts the approver has viewed + verified,
+    // and which one is open in the one-by-one viewer (null = closed).
+    const [verified, setVerified] = useState<boolean[]>([])
+    const [verifierIdx, setVerifierIdx] = useState<number | null>(null)
 
     useEffect(() => {
         setShowRejectBox(false)
@@ -776,11 +802,31 @@ function ExpenseDrawer({
         setPaymentMode("NEFT")
         setTransactionId("")
         setPaymentDate(format(new Date(), "yyyy-MM-dd"))
+        setVerified(Array(receiptEntriesOf(expense).length).fill(false))
+        setVerifierIdx(null)
     }, [expense?.id])
 
     if (!expense) return null
 
     const isOwner = expense.submittedBy === currentUserId
+
+    // Receipts the approver must check one by one before approving.
+    const receipts = receiptEntriesOf(expense)
+    const verifiedCount = verified.filter(Boolean).length
+    const allVerified = receipts.length === 0 || verifiedCount >= receipts.length
+    const verifyAndNext = () => {
+        if (verifierIdx === null) return
+        const nv = Array.from({ length: receipts.length }, (_, k) => verified[k] || false)
+        nv[verifierIdx] = true
+        setVerified(nv)
+        // Jump to the next receipt that still needs verifying; close if done.
+        let next = -1
+        for (let k = 1; k <= receipts.length; k++) {
+            const idx = (verifierIdx + k) % receipts.length
+            if (!nv[idx]) { next = idx; break }
+        }
+        setVerifierIdx(next === -1 ? null : next)
+    }
 
     const doAction = async (action: string, extra?: Record<string, string>) => {
         setActionLoading(true)
@@ -1128,13 +1174,54 @@ function ExpenseDrawer({
                             {/* Admin/Manager + SUBMITTED */}
                             {isPrivileged && expense.status === "SUBMITTED" && (
                                 <>
+                                    {receipts.length > 0 && (
+                                        <div className="rounded-[10px] border border-[var(--border)] overflow-hidden">
+                                            <div className="flex items-center justify-between px-3 py-2 bg-[var(--surface2)]">
+                                                <span className="text-[12px] font-semibold text-[var(--text2)]">Verify receipts</span>
+                                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${allVerified ? "bg-[#e8f7f1] text-[#1a9e6e]" : "bg-[#fff7ed] text-[#c2410c]"}`}>
+                                                    {verifiedCount}/{receipts.length} verified
+                                                </span>
+                                            </div>
+                                            <div>
+                                                {receipts.map((r, i) => {
+                                                    const cs = categoryStyle(r.category)
+                                                    const ok = !!verified[i]
+                                                    return (
+                                                        <div key={i} className={`flex items-center gap-2.5 px-3 py-2 ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
+                                                            <span className="w-6 h-6 shrink-0 rounded-full flex items-center justify-center"
+                                                                style={{ background: ok ? "#e8f7f1" : "var(--surface2)" }}>
+                                                                {ok ? <CheckCircle2 size={14} className="text-[#1a9e6e]" /> : <span className="text-[11px] font-bold text-[var(--text3)]">{i + 1}</span>}
+                                                            </span>
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
+                                                                style={{ background: cs.bg, color: cs.color }}>
+                                                                {categoryLabel(r.category)}
+                                                            </span>
+                                                            <span className="text-[12px] font-semibold text-[var(--text)] flex-1 text-right">{formatINR(r.amount)}</span>
+                                                            <button
+                                                                onClick={() => setVerifierIdx(i)}
+                                                                className="shrink-0 h-7 px-2.5 text-[11px] font-semibold rounded-[6px] border border-[var(--border)] bg-white hover:bg-[var(--surface2)] inline-flex items-center gap-1"
+                                                            >
+                                                                <FileText size={12} /> {ok ? "Re-view" : "View"}
+                                                            </button>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                            {!allVerified && (
+                                                <p className="px-3 py-2 text-[11px] text-[var(--text3)] bg-[var(--surface2)] border-t border-[var(--border)]">
+                                                    View &amp; verify every receipt to enable Approve.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                     <button
                                         onClick={() => doAction("APPROVE")}
-                                        disabled={actionLoading}
-                                        className="w-full h-9 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+                                        disabled={actionLoading || !allVerified}
+                                        title={!allVerified ? "Verify all receipts first" : ""}
+                                        className="w-full h-9 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                        Approve
+                                        Approve{receipts.length > 0 ? ` (${verifiedCount}/${receipts.length})` : ""}
                                     </button>
                                     {!showRejectBox ? (
                                         <button
@@ -1241,6 +1328,75 @@ function ExpenseDrawer({
                     </div>
                 </div>
             </div>
+
+            {/* One-by-one receipt viewer (verify each receipt before approving) */}
+            {verifierIdx !== null && receipts[verifierIdx] && (() => {
+                const r = receipts[verifierIdx]
+                const cs = categoryStyle(r.category)
+                const ok = !!verified[verifierIdx]
+                return (
+                    <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col" onClick={() => setVerifierIdx(null)}>
+                        {/* Top bar */}
+                        <div className="flex items-center justify-between gap-3 px-4 py-3 text-white" onClick={e => e.stopPropagation()}>
+                            <div className="min-w-0">
+                                <p className="text-[12px] text-white/70">Receipt {verifierIdx + 1} of {receipts.length}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ background: cs.bg, color: cs.color }}>
+                                        {categoryLabel(r.category)}
+                                    </span>
+                                    <span className="text-[13px] font-bold">{formatINR(r.amount)}</span>
+                                    {ok && <span className="inline-flex items-center gap-1 text-[11px] text-[#6ee7b7]"><CheckCircle2 size={12} /> Verified</span>}
+                                </div>
+                            </div>
+                            <button onClick={() => setVerifierIdx(null)} className="p-1.5 rounded-md hover:bg-white/10 text-white/80">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Receipt body */}
+                        <div className="flex-1 min-h-0 px-4 pb-2 flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                            {isImageUrl(r.receiptUrl) ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={r.receiptUrl} alt="Receipt" className="max-h-full max-w-full object-contain rounded-lg" />
+                            ) : (
+                                <div className="w-full h-full max-w-3xl flex flex-col">
+                                    <iframe title="Receipt" src={r.receiptUrl} className="flex-1 w-full rounded-lg bg-white border-0" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Controls */}
+                        <div className="px-4 py-3 flex items-center justify-between gap-2" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setVerifierIdx(Math.max(0, verifierIdx - 1))}
+                                    disabled={verifierIdx === 0}
+                                    className="h-9 px-3 rounded-[8px] bg-white/10 text-white text-[13px] hover:bg-white/20 disabled:opacity-40 inline-flex items-center gap-1"
+                                >
+                                    <ChevronLeft size={15} /> Prev
+                                </button>
+                                <button
+                                    onClick={() => setVerifierIdx(Math.min(receipts.length - 1, verifierIdx + 1))}
+                                    disabled={verifierIdx === receipts.length - 1}
+                                    className="h-9 px-3 rounded-[8px] bg-white/10 text-white text-[13px] hover:bg-white/20 disabled:opacity-40 inline-flex items-center gap-1"
+                                >
+                                    Next <ChevronRight size={15} />
+                                </button>
+                                <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer"
+                                    className="h-9 px-3 rounded-[8px] bg-white/10 text-white text-[13px] hover:bg-white/20 inline-flex items-center gap-1">
+                                    <Download size={14} /> Open
+                                </a>
+                            </div>
+                            <button
+                                onClick={verifyAndNext}
+                                className="h-9 px-4 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90 inline-flex items-center gap-1.5"
+                            >
+                                <CheckCircle2 size={15} /> {verifiedCount >= receipts.length - (ok ? 0 : 1) ? "Verify & finish" : "Verify & next"}
+                            </button>
+                        </div>
+                    </div>
+                )
+            })()}
         </>
     )
 }
