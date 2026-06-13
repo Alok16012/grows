@@ -8,7 +8,7 @@ import {
     ChevronRight, ChevronLeft, CheckCircle2, Clock,
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
-    Upload, FileText, Paperclip, Briefcase, Download,
+    Upload, FileText, Paperclip, Briefcase, Download, Eye, AlertCircle,
     type LucideIcon
 } from "lucide-react"
 import { format } from "date-fns"
@@ -239,24 +239,33 @@ function expenseParts(exp: any): { category: ExpenseCategory; item: any }[] {
     return [{ category: exp.category as ExpenseCategory, item: exp }]
 }
 
-// Flatten an expense into the list of receipts a verifier should check one by
-// one. Multi-category expenses contribute one entry per line that has a
-// receipt; a legacy single-category expense contributes its single receipt.
-function receiptEntriesOf(exp: any): { category: ExpenseCategory; amount: number; receiptUrl: string }[] {
+// Every category line-item the approver should verify one by one — WITH or
+// WITHOUT a receipt. Multi-category expenses yield one entry per line; a legacy
+// single-category expense yields one entry. Each carries its receipt (if any)
+// and travel journeys (for travel lines) so the viewer can show the details.
+type VerifyItem = {
+    category: ExpenseCategory
+    amount: number
+    receiptUrl: string | null
+    travelEntries: TravelEntry[] | null
+}
+function verifyItemsOf(exp: any): VerifyItem[] {
     if (!exp) return []
     const items = exp.categoryItems
     if (Array.isArray(items) && items.length > 0) {
-        return items
-            .filter((it: any) => it?.receiptUrl)
-            .map((it: any) => ({
-                category: (it?.category ?? exp.category) as ExpenseCategory,
-                amount: Number(it?.amount) || 0,
-                receiptUrl: String(it.receiptUrl),
-            }))
+        return items.map((it: any) => ({
+            category: (it?.category ?? exp.category) as ExpenseCategory,
+            amount: Number(it?.amount) || 0,
+            receiptUrl: it?.receiptUrl ? String(it.receiptUrl) : null,
+            travelEntries: Array.isArray(it?.travelEntries) ? it.travelEntries : null,
+        }))
     }
-    return exp.receiptUrl
-        ? [{ category: exp.category as ExpenseCategory, amount: Number(exp.amount) || 0, receiptUrl: String(exp.receiptUrl) }]
-        : []
+    return [{
+        category: exp.category as ExpenseCategory,
+        amount: Number(exp.amount) || 0,
+        receiptUrl: exp.receiptUrl ? String(exp.receiptUrl) : null,
+        travelEntries: Array.isArray(exp.travelEntries) ? exp.travelEntries : null,
+    }]
 }
 
 const isImageUrl = (u: string) => /\.(jpe?g|png|gif|webp|avif)$/i.test(u)
@@ -810,7 +819,7 @@ function ExpenseDrawer({
         setPaymentMode("NEFT")
         setTransactionId("")
         setPaymentDate(format(new Date(), "yyyy-MM-dd"))
-        setVerified(Array(receiptEntriesOf(expense).length).fill(false))
+        setVerified(Array(verifyItemsOf(expense).length).fill(false))
         setVerifierIdx(null)
     }, [expense?.id])
 
@@ -818,19 +827,20 @@ function ExpenseDrawer({
 
     const isOwner = expense.submittedBy === currentUserId
 
-    // Receipts the approver must check one by one before approving.
-    const receipts = receiptEntriesOf(expense)
+    // Every line-item the approver must check one by one before approving —
+    // whether or not it has a receipt.
+    const verifyItems = verifyItemsOf(expense)
     const verifiedCount = verified.filter(Boolean).length
-    const allVerified = receipts.length === 0 || verifiedCount >= receipts.length
+    const allVerified = verifyItems.length === 0 || verifiedCount >= verifyItems.length
     const verifyAndNext = () => {
         if (verifierIdx === null) return
-        const nv = Array.from({ length: receipts.length }, (_, k) => verified[k] || false)
+        const nv = Array.from({ length: verifyItems.length }, (_, k) => verified[k] || false)
         nv[verifierIdx] = true
         setVerified(nv)
-        // Jump to the next receipt that still needs verifying; close if done.
+        // Jump to the next item that still needs verifying; close if done.
         let next = -1
-        for (let k = 1; k <= receipts.length; k++) {
-            const idx = (verifierIdx + k) % receipts.length
+        for (let k = 1; k <= verifyItems.length; k++) {
+            const idx = (verifierIdx + k) % verifyItems.length
             if (!nv[idx]) { next = idx; break }
         }
         setVerifierIdx(next === -1 ? null : next)
@@ -1208,16 +1218,16 @@ function ExpenseDrawer({
                             {/* Admin/Manager + SUBMITTED */}
                             {isPrivileged && expense.status === "SUBMITTED" && (
                                 <>
-                                    {receipts.length > 0 && (
+                                    {verifyItems.length > 0 && (
                                         <div className="rounded-[10px] border border-[var(--border)] overflow-hidden">
                                             <div className="flex items-center justify-between px-3 py-2 bg-[var(--surface2)]">
-                                                <span className="text-[12px] font-semibold text-[var(--text2)]">Verify receipts</span>
+                                                <span className="text-[12px] font-semibold text-[var(--text2)]">Verify items</span>
                                                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${allVerified ? "bg-[#e8f7f1] text-[#1a9e6e]" : "bg-[#fff7ed] text-[#c2410c]"}`}>
-                                                    {verifiedCount}/{receipts.length} verified
+                                                    {verifiedCount}/{verifyItems.length} verified
                                                 </span>
                                             </div>
                                             <div>
-                                                {receipts.map((r, i) => {
+                                                {verifyItems.map((r, i) => {
                                                     const cs = categoryStyle(r.category)
                                                     const ok = !!verified[i]
                                                     return (
@@ -1230,12 +1240,18 @@ function ExpenseDrawer({
                                                                 style={{ background: cs.bg, color: cs.color }}>
                                                                 {categoryLabel(r.category)}
                                                             </span>
-                                                            <span className="text-[12px] font-semibold text-[var(--text)] flex-1 text-right">{formatINR(r.amount)}</span>
+                                                            <span className="flex-1 min-w-0 flex items-center gap-1.5 justify-end">
+                                                                {!r.receiptUrl && (
+                                                                    <span className="text-[10px] text-[var(--text3)] italic shrink-0">no receipt</span>
+                                                                )}
+                                                                <span className="text-[12px] font-semibold text-[var(--text)]">{formatINR(r.amount)}</span>
+                                                            </span>
                                                             <button
                                                                 onClick={() => setVerifierIdx(i)}
-                                                                className="shrink-0 h-7 px-2.5 text-[11px] font-semibold rounded-[6px] border border-[var(--border)] bg-white hover:bg-[var(--surface2)] inline-flex items-center gap-1"
+                                                                className={`shrink-0 h-7 px-2.5 text-[11px] font-semibold rounded-[6px] border inline-flex items-center gap-1 ${ok ? "border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)]" : "border-[var(--accent)] bg-[var(--accent)] text-white hover:opacity-90"}`}
                                                             >
-                                                                <FileText size={12} /> {ok ? "Re-view" : "View"}
+                                                                {r.receiptUrl ? <FileText size={12} /> : <Eye size={12} />}
+                                                                {ok ? "Re-view" : "View & verify"}
                                                             </button>
                                                         </div>
                                                     )
@@ -1243,7 +1259,7 @@ function ExpenseDrawer({
                                             </div>
                                             {!allVerified && (
                                                 <p className="px-3 py-2 text-[11px] text-[var(--text3)] bg-[var(--surface2)] border-t border-[var(--border)]">
-                                                    View &amp; verify every receipt to enable Approve.
+                                                    View &amp; verify every item (receipt or not) to enable Approve.
                                                 </p>
                                             )}
                                         </div>
@@ -1251,11 +1267,11 @@ function ExpenseDrawer({
                                     <button
                                         onClick={() => doAction("APPROVE")}
                                         disabled={actionLoading || !allVerified}
-                                        title={!allVerified ? "Verify all receipts first" : ""}
+                                        title={!allVerified ? "Verify all items first" : ""}
                                         className="w-full h-9 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                        Approve{receipts.length > 0 ? ` (${verifiedCount}/${receipts.length})` : ""}
+                                        Approve{verifyItems.length > 0 ? ` (${verifiedCount}/${verifyItems.length})` : ""}
                                     </button>
                                     {!showRejectBox ? (
                                         <button
@@ -1363,17 +1379,18 @@ function ExpenseDrawer({
                 </div>
             </div>
 
-            {/* One-by-one receipt viewer (verify each receipt before approving) */}
-            {verifierIdx !== null && receipts[verifierIdx] && (() => {
-                const r = receipts[verifierIdx]
+            {/* One-by-one item viewer (verify each line item before approving) */}
+            {verifierIdx !== null && verifyItems[verifierIdx] && (() => {
+                const r = verifyItems[verifierIdx]
                 const cs = categoryStyle(r.category)
                 const ok = !!verified[verifierIdx]
+                const journeys: TravelEntry[] = Array.isArray(r.travelEntries) ? r.travelEntries : []
                 return (
                     <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col" onClick={() => setVerifierIdx(null)}>
                         {/* Top bar */}
                         <div className="flex items-center justify-between gap-3 px-4 py-3 text-white" onClick={e => e.stopPropagation()}>
                             <div className="min-w-0">
-                                <p className="text-[12px] text-white/70">Receipt {verifierIdx + 1} of {receipts.length}</p>
+                                <p className="text-[12px] text-white/70">Item {verifierIdx + 1} of {verifyItems.length}</p>
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ background: cs.bg, color: cs.color }}>
                                         {categoryLabel(r.category)}
@@ -1387,14 +1404,41 @@ function ExpenseDrawer({
                             </button>
                         </div>
 
-                        {/* Receipt body */}
+                        {/* Body: receipt if present, else the line's details */}
                         <div className="flex-1 min-h-0 px-4 pb-2 flex items-center justify-center" onClick={e => e.stopPropagation()}>
-                            {isImageUrl(r.receiptUrl) ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={r.receiptUrl} alt="Receipt" className="max-h-full max-w-full object-contain rounded-lg" />
+                            {r.receiptUrl ? (
+                                isImageUrl(r.receiptUrl) ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={r.receiptUrl} alt="Receipt" className="max-h-full max-w-full object-contain rounded-lg" />
+                                ) : (
+                                    <div className="w-full h-full max-w-3xl flex flex-col">
+                                        <iframe title="Receipt" src={r.receiptUrl} className="flex-1 w-full rounded-lg bg-white border-0" />
+                                    </div>
+                                )
                             ) : (
-                                <div className="w-full h-full max-w-3xl flex flex-col">
-                                    <iframe title="Receipt" src={r.receiptUrl} className="flex-1 w-full rounded-lg bg-white border-0" />
+                                <div className="w-full max-w-md bg-white rounded-xl p-5">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium" style={{ background: cs.bg, color: cs.color }}>
+                                            {categoryLabel(r.category)}
+                                        </span>
+                                        <span className="text-[16px] font-bold text-[var(--text)]">{formatINR(r.amount)}</span>
+                                    </div>
+                                    {journeys.length > 0 ? (
+                                        <div className="space-y-1.5">
+                                            <p className="text-[11px] font-semibold text-[var(--text3)] uppercase">Journeys</p>
+                                            {journeys.map((j, ji) => (
+                                                <div key={ji} className="flex items-center justify-between gap-2 text-[12px] text-[var(--text2)] border-t border-[var(--border)] pt-1.5">
+                                                    <span className="truncate">{j.from} → {j.to}</span>
+                                                    <span className="shrink-0">{j.kms} km · {formatINR(j.amount)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-[12px] text-[var(--text3)]">No receipt attached for this item. Review the amount above and verify.</p>
+                                    )}
+                                    <div className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-medium text-[#c2410c] bg-[#fff7ed] px-2.5 py-1 rounded-full">
+                                        <AlertCircle size={12} /> No receipt
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1410,22 +1454,24 @@ function ExpenseDrawer({
                                     <ChevronLeft size={15} /> Prev
                                 </button>
                                 <button
-                                    onClick={() => setVerifierIdx(Math.min(receipts.length - 1, verifierIdx + 1))}
-                                    disabled={verifierIdx === receipts.length - 1}
+                                    onClick={() => setVerifierIdx(Math.min(verifyItems.length - 1, verifierIdx + 1))}
+                                    disabled={verifierIdx === verifyItems.length - 1}
                                     className="h-9 px-3 rounded-[8px] bg-white/10 text-white text-[13px] hover:bg-white/20 disabled:opacity-40 inline-flex items-center gap-1"
                                 >
                                     Next <ChevronRight size={15} />
                                 </button>
-                                <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer"
-                                    className="h-9 px-3 rounded-[8px] bg-white/10 text-white text-[13px] hover:bg-white/20 inline-flex items-center gap-1">
-                                    <Download size={14} /> Open
-                                </a>
+                                {r.receiptUrl && (
+                                    <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer"
+                                        className="h-9 px-3 rounded-[8px] bg-white/10 text-white text-[13px] hover:bg-white/20 inline-flex items-center gap-1">
+                                        <Download size={14} /> Open
+                                    </a>
+                                )}
                             </div>
                             <button
                                 onClick={verifyAndNext}
                                 className="h-9 px-4 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90 inline-flex items-center gap-1.5"
                             >
-                                <CheckCircle2 size={15} /> {verifiedCount >= receipts.length - (ok ? 0 : 1) ? "Verify & finish" : "Verify & next"}
+                                <CheckCircle2 size={15} /> {verifiedCount >= verifyItems.length - (ok ? 0 : 1) ? "Verify & finish" : "Verify & next"}
                             </button>
                         </div>
                     </div>
