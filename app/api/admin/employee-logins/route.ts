@@ -29,6 +29,12 @@ export async function GET() {
                 email: true,
                 phone: true,
                 designation: true,
+                department: { select: { name: true } },
+                deployments: {
+                    select: { site: { select: { name: true } } },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                },
                 user: {
                     select: {
                         id: true,
@@ -48,6 +54,8 @@ export async function GET() {
             name: `${e.firstName} ${e.lastName || ""}`.trim(),
             designation: e.designation,
             phone: e.phone,
+            department: e.department?.name || null,
+            site: e.deployments?.[0]?.site?.name || null,
             hasLogin: !!e.user,
             userId: e.user?.id || null,
             loginEmail: e.user?.email || null,

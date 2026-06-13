@@ -12,6 +12,8 @@ type Row = {
     name: string
     designation: string | null
     phone: string | null
+    department: string | null
+    site: string | null
     hasLogin: boolean
     userId: string | null
     loginEmail: string | null
@@ -28,6 +30,9 @@ export default function EmployeeLoginsPage() {
     const [roles, setRoles] = useState<CustomRole[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
+    const [roleFilter, setRoleFilter] = useState("ALL")
+    const [siteFilter, setSiteFilter] = useState("ALL")
+    const [deptFilter, setDeptFilter] = useState("ALL")
     const [reveal, setReveal] = useState<Record<string, boolean>>({})
     const [generating, setGenerating] = useState(false)
 
@@ -141,11 +146,26 @@ export default function EmployeeLoginsPage() {
         return <span className="px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium bg-[#f9f8f5] text-[#9e9b95]">No role</span>
     }
 
-    const filtered = rows.filter(r =>
-        r.name.toLowerCase().includes(search.toLowerCase()) ||
-        (r.loginEmail || "").toLowerCase().includes(search.toLowerCase()) ||
-        (r.empCode || "").toLowerCase().includes(search.toLowerCase())
-    )
+    // Filter option lists derived from the loaded rows.
+    const siteOptions = Array.from(new Set(rows.map(r => r.site).filter(Boolean) as string[])).sort()
+    const deptOptions = Array.from(new Set(rows.map(r => r.department).filter(Boolean) as string[])).sort()
+
+    const filtered = rows.filter(r => {
+        const q = search.toLowerCase()
+        const matchesSearch = !q ||
+            r.name.toLowerCase().includes(q) ||
+            (r.loginEmail || "").toLowerCase().includes(q) ||
+            (r.empCode || "").toLowerCase().includes(q)
+        if (!matchesSearch) return false
+
+        if (roleFilter !== "ALL") {
+            if (roleFilter === "NONE") { if (r.customRole) return false }
+            else if (r.customRole?.id !== roleFilter) return false
+        }
+        if (siteFilter !== "ALL" && (r.site || "") !== siteFilter) return false
+        if (deptFilter !== "ALL" && (r.department || "") !== deptFilter) return false
+        return true
+    })
 
     const missingCount = rows.filter(r => !r.hasLogin || !r.password).length
 
@@ -174,8 +194,8 @@ export default function EmployeeLoginsPage() {
                 </button>
             </div>
 
-            <div className="flex items-center gap-3 mb-4">
-                <div className="relative flex-1 max-w-[400px]">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="relative flex-1 min-w-[220px] max-w-[400px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95]" />
                     <input
                         placeholder="Search name, login id or code..."
@@ -184,6 +204,35 @@ export default function EmployeeLoginsPage() {
                         onChange={e => setSearch(e.target.value)}
                     />
                 </div>
+                {(() => {
+                    const selCls = "h-9 px-2.5 bg-white border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] cursor-pointer max-w-[170px]"
+                    return (
+                        <>
+                            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className={selCls} title="Filter by role">
+                                <option value="ALL">All roles</option>
+                                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                <option value="NONE">No role</option>
+                            </select>
+                            <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)} className={selCls} title="Filter by site">
+                                <option value="ALL">All sites</option>
+                                {siteOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className={selCls} title="Filter by department">
+                                <option value="ALL">All departments</option>
+                                {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                        </>
+                    )
+                })()}
+                {(roleFilter !== "ALL" || siteFilter !== "ALL" || deptFilter !== "ALL" || search) && (
+                    <button
+                        onClick={() => { setSearch(""); setRoleFilter("ALL"); setSiteFilter("ALL"); setDeptFilter("ALL") }}
+                        className="h-9 px-3 rounded-[9px] bg-white border border-[#e8e6e1] text-[12px] font-medium text-[#6b6860] hover:bg-[#f9f8f5] transition-colors"
+                    >
+                        Clear
+                    </button>
+                )}
+                <span className="text-[12px] text-[#9e9b95] ml-auto">{filtered.length} of {rows.length}</span>
                 <button onClick={fetchData} className="h-9 w-9 rounded-[9px] bg-white border border-[#e8e6e1] flex items-center justify-center hover:bg-[#f9f8f5] transition-colors" title="Refresh">
                     <RefreshCw className="h-4 w-4 text-[#6b6860]" />
                 </button>
