@@ -775,12 +775,20 @@ function ExpenseDrawer({
     onRefresh,
     isPrivileged,
     currentUserId,
+    queuePos,
+    onPrev,
+    onNext,
 }: {
     expense: Expense | null
     onClose: () => void
     onRefresh: () => void
     isPrivileged: boolean
     currentUserId: string
+    // When set, the drawer is in "review one-by-one" mode over a queue of
+    // pending expenses; shows position + Prev/Next and auto-advances on action.
+    queuePos?: { index: number; total: number }
+    onPrev?: () => void
+    onNext?: () => void
 }) {
     const [actionLoading, setActionLoading] = useState(false)
     const [showRejectBox, setShowRejectBox] = useState(false)
@@ -846,6 +854,11 @@ function ExpenseDrawer({
             onRefresh()
             setShowRejectBox(false)
             setShowPayBox(false)
+            // In review mode, jump straight to the next pending expense once this
+            // one is approved/rejected so the approver flows through the queue.
+            if (queuePos && onNext && (action === "APPROVE" || action === "REJECT")) {
+                onNext()
+            }
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : "Action failed")
         } finally {
@@ -909,6 +922,27 @@ function ExpenseDrawer({
             <div className="fixed inset-0 z-40 flex">
                 <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
                 <div className="w-full max-w-md bg-white border-l border-[var(--border)] h-full overflow-y-auto flex flex-col shadow-xl">
+                    {/* Review-mode navigation (one-by-one over pending expenses) */}
+                    {queuePos && (
+                        <div className="flex items-center justify-between gap-2 px-4 py-2 bg-[var(--accent)] text-white sticky top-0 z-20">
+                            <span className="text-[12px] font-semibold">Reviewing {queuePos.index + 1} of {queuePos.total}</span>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={onPrev}
+                                    disabled={queuePos.index === 0}
+                                    className="h-7 px-2 rounded-md bg-white/15 hover:bg-white/25 text-[12px] font-medium inline-flex items-center gap-1 disabled:opacity-40"
+                                >
+                                    <ChevronLeft size={14} /> Prev
+                                </button>
+                                <button
+                                    onClick={onNext}
+                                    className="h-7 px-2 rounded-md bg-white/15 hover:bg-white/25 text-[12px] font-medium inline-flex items-center gap-1"
+                                >
+                                    {queuePos.index === queuePos.total - 1 ? "Finish" : "Skip / Next"} <ChevronRight size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     {/* Header */}
                     <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-white z-10">
                         <div>
@@ -2057,6 +2091,11 @@ export default function ExpensesPage() {
     const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
     const [projectsList, setProjectsList] = useState<ExpenseProject[]>([])
     const [pendingCount, setPendingCount] = useState(0)
+    // Review one-by-one: a queue of pending (SUBMITTED) expenses the approver
+    // steps through, approving/rejecting each (with or without a receipt).
+    const [reviewQueue, setReviewQueue] = useState<Expense[] | null>(null)
+    const [reviewIdx, setReviewIdx] = useState(0)
+    const [reviewLoading, setReviewLoading] = useState(false)
 
     // Load projects once for the filter dropdown
     useEffect(() => {
@@ -2120,6 +2159,49 @@ export default function ExpensesPage() {
             setLoading(false)
         }
     }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId, selectedExpense])
+
+    // ── Review one-by-one over all pending expenses ──
+    const startReview = useCallback(async () => {
+        setReviewLoading(true)
+        try {
+            const res = await fetch("/api/expenses?status=SUBMITTED")
+            const data: Expense[] = res.ok ? await res.json() : []
+            if (!Array.isArray(data) || data.length === 0) {
+                toast.info("No pending expenses to review")
+                return
+            }
+            setReviewQueue(data)
+            setReviewIdx(0)
+            setSelectedExpense(data[0])
+        } catch {
+            toast.error("Couldn't load pending expenses")
+        } finally {
+            setReviewLoading(false)
+        }
+    }, [])
+
+    const exitReview = useCallback(() => {
+        setReviewQueue(null)
+        setReviewIdx(0)
+        setSelectedExpense(null)
+    }, [])
+
+    const reviewGo = useCallback((idx: number) => {
+        if (!reviewQueue) return
+        if (idx < 0) { setReviewIdx(0); setSelectedExpense(reviewQueue[0]); return }
+        if (idx >= reviewQueue.length) {
+            // Reached the end — close the queue and refresh the list/badge.
+            toast.success("Review complete")
+            setReviewQueue(null)
+            setReviewIdx(0)
+            setSelectedExpense(null)
+            fetchExpenses()
+            refreshPendingCount()
+            return
+        }
+        setReviewIdx(idx)
+        setSelectedExpense(reviewQueue[idx])
+    }, [reviewQueue, refreshPendingCount, fetchExpenses])
 
     useEffect(() => {
         // Wait until we know the session (avoids the "mine" flash for privileged users
@@ -2234,6 +2316,17 @@ export default function ExpensesPage() {
                     >
                         <Download size={13} /> CSV
                     </button>
+                    {isPrivileged && (
+                        <button
+                            onClick={startReview}
+                            disabled={reviewLoading || pendingCount === 0}
+                            title={pendingCount === 0 ? "No pending expenses" : "Review pending expenses one by one"}
+                            className="h-9 px-4 bg-[#8b5cf6] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {reviewLoading ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
+                            Review pending{pendingCount > 0 ? ` (${pendingCount})` : ""}
+                        </button>
+                    )}
                     <button
                         onClick={() => setAddOpen(true)}
                         className="h-9 px-4 bg-[var(--accent)] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity"
@@ -2526,10 +2619,15 @@ export default function ExpensesPage() {
             />
             <ExpenseDrawer
                 expense={selectedExpense}
-                onClose={() => setSelectedExpense(null)}
-                onRefresh={() => { fetchExpenses(); refreshPendingCount() }}
+                onClose={() => { if (reviewQueue) exitReview(); else setSelectedExpense(null) }}
+                // In review mode, don't refetch the list (it would reset the queue
+                // selection); just keep the pending badge in sync.
+                onRefresh={reviewQueue ? refreshPendingCount : () => { fetchExpenses(); refreshPendingCount() }}
                 isPrivileged={isPrivileged}
                 currentUserId={userId}
+                queuePos={reviewQueue ? { index: reviewIdx, total: reviewQueue.length } : undefined}
+                onPrev={() => reviewGo(reviewIdx - 1)}
+                onNext={() => reviewGo(reviewIdx + 1)}
             />
         </div>
     )
