@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Search, Download, Trash2, Loader2, Eye, Upload, Users, FileText, CheckCircle2, AlertCircle, Filter } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Doc = {
@@ -234,7 +235,9 @@ export default function MasterDocumentsPage() {
         return true
     })
 
-    const isAdmin = ["ADMIN", "MANAGER", "HR_MANAGER"].includes(session?.user?.role || "")
+    // Upload/manage rights are permission-driven: ADMIN, or any custom role that
+    // has been granted "Upload Documents". Base roles get nothing implicitly.
+    const isAdmin = can(session, "documents.upload")
 
     return (
         <div className="p-4 lg:p-6 max-w-full mx-auto">
