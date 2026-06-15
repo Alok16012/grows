@@ -49,6 +49,7 @@ import {
     UserCog,
     Megaphone,
     KeyRound,
+    SendHorizontal,
 } from "lucide-react"
 
 type NavLink = {
@@ -163,6 +164,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Jobs",             href: "/jobs",                icon: Briefcase,    roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "jobs.view" },
                 { name: "Onboarding",       href: "/onboarding",          icon: ClipboardList, roles: ["ADMIN", "MANAGER"], permission: "onboarding.view" },
                 { name: "Documents",        href: "/employees/documents", icon: Files,        roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
+                { name: "Send Documents",   href: "/documents/send",      icon: SendHorizontal, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
             ],
         },
 

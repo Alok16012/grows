@@ -579,15 +579,14 @@ function LettersTab() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Issued</span>
-                        {letter.content && (
-                            <a
-                                href={`data:text/plain;charset=utf-8,${encodeURIComponent(letter.content)}`}
-                                download={`${letter.type?.name ?? "Document"}-${letter.docNumber}.txt`}
-                                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent)] hover:underline"
-                            >
-                                <Download size={12} /> Download
-                            </a>
-                        )}
+                        <a
+                            href={`/api/hr-documents/${letter.id}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent)] hover:underline"
+                        >
+                            <Download size={12} /> PDF
+                        </a>
                     </div>
                 </div>
             ))}
