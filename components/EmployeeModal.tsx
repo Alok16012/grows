@@ -223,6 +223,7 @@ export function EmployeeModal({
             interviewResult: string | null; leadStatus: string
             activities: { id: string; type: string; content: string; at: string; by: string | null }[]
         } | null
+        onboarding: { onboardedByName: string | null; status: string; startedAt: string | null; completedAt: string | null } | null
         cameThroughRecruitment: boolean
     }
     const [history, setHistory] = useState<HistoryData | null>(null)
@@ -1282,11 +1283,26 @@ export function EmployeeModal({
                                         <div className="p-4 bg-[var(--surface2)] rounded-[10px] border border-[var(--border)]">
                                             <p className="text-[12px] font-semibold text-[var(--text2)] uppercase tracking-wide mb-2">Employee record</p>
                                             <div className="divide-y divide-[var(--border)]">
-                                                <Row label="Created by" value={history.employee.createdByName} />
+                                                <Row label="Created by (HR)" value={history.employee.createdByName} />
                                                 <Row label="Employee created on" value={fmt(history.employee.createdAt)} />
                                                 <Row label="Date of joining" value={fmtD(history.employee.dateOfJoining)} />
                                                 <Row label="Current status" value={history.employee.status} />
                                             </div>
+                                        </div>
+
+                                        {/* Onboarding */}
+                                        <div className="p-4 bg-[var(--surface2)] rounded-[10px] border border-[var(--border)]">
+                                            <p className="text-[12px] font-semibold text-[var(--text2)] uppercase tracking-wide mb-2">Onboarding</p>
+                                            {history.onboarding ? (
+                                                <div className="divide-y divide-[var(--border)]">
+                                                    <Row label="Onboarded by" value={history.onboarding.onboardedByName} />
+                                                    <Row label="Onboarding status" value={history.onboarding.status?.replace(/_/g, " ")} />
+                                                    <Row label="Onboarding started" value={fmtD(history.onboarding.startedAt)} />
+                                                    <Row label="Onboarding completed" value={fmtD(history.onboarding.completedAt)} />
+                                                </div>
+                                            ) : (
+                                                <p className="text-[13px] text-[var(--text3)]">No onboarding record for this employee.</p>
+                                            )}
                                         </div>
 
                                         {/* Activity timeline */}

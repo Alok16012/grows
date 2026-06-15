@@ -31,6 +31,27 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
             createdByName = u?.name || u?.email || null
         }
 
+        // Onboarding: who handled it (assigned HR), falling back to whoever
+        // actually completed the most recent task.
+        const onboarding = await prisma.onboardingRecord.findUnique({
+            where: { employeeId: params.id },
+            select: {
+                status: true, startedAt: true, completedAt: true, assignedTo: true,
+                tasks: {
+                    where: { completedBy: { not: null } },
+                    orderBy: { completedAt: "desc" },
+                    take: 1,
+                    select: { completedBy: true },
+                },
+            },
+        })
+        let onboardedByName: string | null = null
+        const onboarderId = onboarding?.assignedTo || onboarding?.tasks?.[0]?.completedBy || null
+        if (onboarderId) {
+            const u = await prisma.user.findUnique({ where: { id: onboarderId }, select: { name: true, email: true } })
+            onboardedByName = u?.name || u?.email || null
+        }
+
         // The source recruitment lead (if this employee came through recruitment).
         const lead = await prisma.lead.findFirst({
             where: { convertedEmployeeId: params.id },
@@ -89,6 +110,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
                 dateOfJoining: employee.dateOfJoining,
             },
             recruitment,
+            onboarding: onboarding ? {
+                onboardedByName,
+                status: onboarding.status,
+                startedAt: onboarding.startedAt,
+                completedAt: onboarding.completedAt,
+            } : null,
             cameThroughRecruitment: !!lead,
         })
     } catch (error) {
