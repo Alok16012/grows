@@ -3,13 +3,15 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
+import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
+import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 type Sv = string | number | undefined
 
 interface ImportRow {
     firstName?: Sv; lastName?: Sv; phone?: Sv; email?: Sv
-    designation?: Sv; employmentType?: Sv; status?: Sv
+    designation?: Sv; role?: Sv; employmentType?: Sv; status?: Sv
     dateOfJoining?: Sv; dateOfLeaving?: Sv
     department?: Sv; site?: Sv
     basicSalary?: Sv; da?: Sv; hra?: Sv; washing?: Sv; conveyance?: Sv
@@ -85,10 +87,12 @@ export async function POST(req: Request) {
 
     try {
         // ── Pre-load lookup tables once ───────────────────────────────────────
-        const [allSites, allDepartments] = await Promise.all([
+        const [allSites, allDepartments, allRoles] = await Promise.all([
             prisma.site.findMany({ select: { id: true, name: true } }),
             prisma.department.findMany({ select: { id: true, name: true } }),
+            prisma.customRole.findMany({ select: { id: true, name: true } }),
         ])
+        const roleByName = new Map(allRoles.map(r => [r.name.toLowerCase(), r.id]))
 
         // ── Pre-load ALL existing employee IDs to avoid per-row DB lookups ───
         const existingEmpIds = await prisma.employee.findMany({
@@ -261,6 +265,8 @@ export async function POST(req: Request) {
                     })
                 }
 
+                let warning: string | undefined
+
                 // Site deployment
                 if (siteId && newEmp) {
                     await prisma.deployment.create({
@@ -272,14 +278,55 @@ export async function POST(req: Request) {
                         },
                     })
                 } else if (siteName && !siteId && newEmp) {
-                    return {
-                        skip: false, rowNum,
-                        warning: `Site "${siteName}" not found — employee created without site assignment`
+                    warning = `Site "${siteName}" not found — employee created without site assignment`
+                }
+
+                // ── Auto-create a login for the imported employee ──
+                // Mirrors single-employee creation: every employee gets an account
+                // they can log in with. The optional "Role" column maps to a custom
+                // role (access is driven purely by that role's permissions).
+                if (newEmp) {
+                    try {
+                        const roleName = str(row.role)
+                        const customRoleId = roleName ? (roleByName.get(roleName.toLowerCase()) ?? null) : null
+                        if (roleName && !customRoleId) {
+                            warning = `Role "${roleName}" not found — employee created without a role`
+                        }
+
+                        const loginEmail = buildLoginEmail({ email: strN(row.email), phone, employeeId: finalId })
+                        const existingUser = await prisma.user.findUnique({
+                            where: { email: loginEmail },
+                            select: { id: true, employeeProfile: { select: { id: true } } },
+                        })
+                        if (existingUser) {
+                            // Only adopt an account that isn't already tied to someone else.
+                            if (!existingUser.employeeProfile) {
+                                await prisma.employee.update({ where: { id: newEmp.id }, data: { userId: existingUser.id } })
+                            }
+                        } else {
+                            const plain = defaultPassword({ phone })
+                            const user = await prisma.user.create({
+                                data: {
+                                    name: `${firstName} ${str(row.lastName)}`.trim(),
+                                    email: loginEmail,
+                                    password: await bcrypt.hash(plain, 8),
+                                    plainPassword: plain,
+                                    phone: phone || null,
+                                    role: customRoleId ? "MANAGER" : "INSPECTION_BOY",
+                                    customRoleId,
+                                },
+                            })
+                            await prisma.employee.update({ where: { id: newEmp.id }, data: { userId: user.id } })
+                        }
+                    } catch (loginErr) {
+                        // Non-fatal: employee is imported; login can be generated later
+                        // from the Employee Logins page.
+                        console.error("[EMPLOYEE_IMPORT] login creation failed", finalId, loginErr)
                     }
                 }
 
                 if (phone) existingPhones.add(phone)
-                return { skip: false, rowNum }
+                return { skip: false, rowNum, ...(warning ? { warning } : {}) }
             })
         )
 

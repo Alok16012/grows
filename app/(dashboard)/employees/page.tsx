@@ -1142,7 +1142,7 @@ function EmployeesPage() {
             // ── Required ──────────────────────────────────────────────────────
             "First Name*", "Middle Name", "Last Name", "Fathers Name", "Phone*", "Email",
             // ── Employment ────────────────────────────────────────────────────
-            "Designation", "Employment Type", "Status", "Date Of Joining",
+            "Designation", "Role", "Employment Type", "Status", "Date Of Joining",
             "Date Of Leaving", "Department", "Site",
             // ── Salary ────────────────────────────────────────────────────────
             "Basic Salary", "DA", "HRA", "Bonus",
@@ -1170,7 +1170,7 @@ function EmployeesPage() {
 
         const sample = [
             "Ramesh", "", "Kumar", "Suresh Kumar", "9876543210", "ramesh@example.com",
-            "Guard", "Full-time", "ACTIVE", "2024-01-15",
+            "Guard", "", "Full-time", "ACTIVE", "2024-01-15",
             "", "", "Site Name Here",
             "12000", "1000", "0", "583",
             "500", "500",
@@ -1198,6 +1198,7 @@ function EmployeesPage() {
             ["Phone*",             "Yes",  "10-digit mobile number",               "9876543210"],
             ["Email",              "No",   "Valid email",                          "ramesh@example.com"],
             ["Designation",        "No",   "Any text",                             "Security Guard"],
+            ["Role",               "No",   "Must match a role name from the Roles page (login is created for every employee; blank = no role)", "Supervisor"],
             ["Employment Type",    "No",   "Full-time / Part-time / Contract / Daily Wage", "Full-time"],
             ["Status",             "No",   "ACTIVE / INACTIVE",                    "ACTIVE"],
             ["Date Of Joining",    "No",   "YYYY-MM-DD",                           "2024-01-15"],
@@ -1262,6 +1263,7 @@ function EmployeesPage() {
                     else if (lk === "phone")                   entry.phone = val
                     else if (lk === "email")                   entry.email = val
                     else if (lk === "designation")             entry.designation = val
+                    else if (lk === "role")                    entry.role = val
                     else if (lk === "employmenttype")          entry.employmentType = val
                     else if (lk === "status")                  entry.status = val
                     else if (lk === "dateofjoining")           entry.dateOfJoining = val
