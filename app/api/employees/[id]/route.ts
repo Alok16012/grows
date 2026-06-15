@@ -1,9 +1,9 @@
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
-import { randomUUID } from "crypto"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 
 export async function GET(
     req: Request,
@@ -220,57 +220,23 @@ export async function DELETE(
 
         if (!employee) return new NextResponse("Not Found", { status: 404 })
 
-        const userId = employee.userId
+        // Hard delete the employee along with every dependent record and the
+        // linked login. See lib/employee-delete for why we purge dependents
+        // explicitly instead of trusting DB cascade rules.
+        const { deleted, loginsRemoved } = await deleteEmployeesAndLogins([params.id])
 
-        // Hard delete: Clean up relations without onDelete: Cascade first in a transaction
-        await prisma.$transaction([
-            prisma.attendance.deleteMany({ where: { employeeId: params.id } }),
-            prisma.leave.deleteMany({ where: { employeeId: params.id } }),
-            prisma.payroll.deleteMany({ where: { employeeId: params.id } }),
-            prisma.advanceAndReimbursement.deleteMany({ where: { employeeId: params.id } }),
-            prisma.quizAttempt.deleteMany({ where: { employeeId: params.id } }),
-            prisma.employee.delete({ where: { id: params.id } })
-        ])
-
-        // ── Remove the linked login account too ──
-        // Deleting the employee should also remove their ability to log in.
-        // Best-effort hard delete of the User; if they own operational records
-        // (inspections, assignments, leads, etc.) that the DB won't let us drop,
-        // fall back to fully disabling the login: wipe the password and free the
-        // email so it can be reused, and flag the account inactive.
-        let loginRemoved = false
-        if (userId) {
-            try {
-                // Notifications cascade on User delete, but remove explicitly in
-                // case the prod FK predates the cascade rule.
-                await prisma.notification.deleteMany({ where: { userId } }).catch(() => {})
-                await prisma.user.delete({ where: { id: userId } })
-                loginRemoved = true
-            } catch (delErr) {
-                console.warn("[EMPLOYEE_DELETE] user hard-delete blocked, disabling login instead", delErr)
-                try {
-                    const tombstone = `deleted_${userId}@deleted.local`
-                    await prisma.user.update({
-                        where: { id: userId },
-                        data: {
-                            isActive: false,
-                            password: `disabled-${randomUUID()}`,
-                            plainPassword: null,
-                            email: tombstone,
-                            customRoleId: null,
-                        },
-                    })
-                    loginRemoved = true
-                } catch (disableErr) {
-                    console.error("[EMPLOYEE_DELETE] failed to disable login", disableErr)
-                }
-            }
+        if (deleted === 0) {
+            return NextResponse.json(
+                { error: "Employee could not be deleted" },
+                { status: 500 },
+            )
         }
 
+        const loginRemoved = !employee.userId || loginsRemoved > 0
         return NextResponse.json({
             success: true,
             loginRemoved,
-            message: userId
+            message: employee.userId
                 ? (loginRemoved
                     ? "Employee, login account and all associated records deleted successfully"
                     : "Employee deleted, but the login account could not be fully removed")
