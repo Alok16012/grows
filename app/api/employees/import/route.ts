@@ -176,6 +176,7 @@ export async function POST(req: Request) {
                 await prisma.employee.create({
                     data: {
                         employeeId:    finalId,
+                        createdBy:     session!.user.id,
                         firstName,
                         lastName:      str(row.lastName) || "",
                         phone:         phone || "",

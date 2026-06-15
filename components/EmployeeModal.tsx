@@ -214,7 +214,19 @@ export function EmployeeModal({
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
     const sites = allSites
-    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents">("personal")
+    const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents" | "history">("personal")
+    type HistoryData = {
+        employee: { name: string; status: string; createdAt: string; createdByName: string | null; dateOfJoining: string | null }
+        recruitment: {
+            positionAppliedFor: string; source: string; recruitedBy: string | null; handledByHr: string | null
+            targetSite: string | null; enteredRecruitmentAt: string; interviewDate: string | null
+            interviewResult: string | null; leadStatus: string
+            activities: { id: string; type: string; content: string; at: string; by: string | null }[]
+        } | null
+        cameThroughRecruitment: boolean
+    }
+    const [history, setHistory] = useState<HistoryData | null>(null)
+    const [historyLoading, setHistoryLoading] = useState(false)
     const [form, setForm] = useState<ModalForm>(EMPTY_FORM)
     const [draftEmpId, setDraftEmpId] = useState<string | null>(null)
     type PendingDoc = { type: string; fileName: string; fileUrl: string }
@@ -245,6 +257,17 @@ export function EmployeeModal({
         if (activeTab === "documents" && employee) {
             fetchExistingDocs(employee.id)
         }
+    }, [activeTab, employee])
+
+    useEffect(() => {
+        if (activeTab !== "history" || !employee) return
+        setHistoryLoading(true)
+        setHistory(null)
+        fetch(`/api/employees/${employee.id}/history`)
+            .then(r => r.ok ? r.json() : null)
+            .then(setHistory)
+            .catch(() => {})
+            .finally(() => setHistoryLoading(false))
     }, [activeTab, employee])
 
     useEffect(() => {
@@ -497,9 +520,9 @@ export function EmployeeModal({
 
                 {/* Tabs */}
                 <div className="flex gap-1 border-b border-[var(--border)] px-4 py-3 overflow-x-auto bg-[var(--surface2)]/40">
-                    {(["personal", "employment", "salary", "bank", "compliance", "safety", "documents"] as const).map(t => (
+                    {(["personal", "employment", "salary", "bank", "compliance", "safety", "documents", ...(employee ? ["history"] as const : [])] as const).map(t => (
                         <button type="button" key={t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
-                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
+                            {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : t === "history" ? "History" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
                         </button>
                     ))}
                 </div>
@@ -1215,6 +1238,84 @@ export function EmployeeModal({
                             </div>
                         )
                     })()}
+
+                    {/* History Tab */}
+                    {activeTab === "history" && (
+                        <div className="space-y-4">
+                            {historyLoading && (
+                                <div className="flex items-center justify-center py-10 text-[var(--text3)]">
+                                    <Loader2 size={20} className="animate-spin" />
+                                </div>
+                            )}
+                            {!historyLoading && history && (() => {
+                                const fmt = (d?: string | null) => d ? new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
+                                const fmtD = (d?: string | null) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+                                const r = history.recruitment
+                                const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
+                                    <div className="flex items-start justify-between gap-3 py-1.5">
+                                        <span className="text-[12px] text-[var(--text3)]">{label}</span>
+                                        <span className="text-[13px] text-[var(--text)] font-medium text-right">{value || "—"}</span>
+                                    </div>
+                                )
+                                return (
+                                    <>
+                                        {/* Recruitment summary */}
+                                        <div className="p-4 bg-[var(--surface2)] rounded-[10px] border border-[var(--border)]">
+                                            <p className="text-[12px] font-semibold text-[var(--text2)] uppercase tracking-wide mb-2">Recruitment</p>
+                                            {history.cameThroughRecruitment && r ? (
+                                                <div className="divide-y divide-[var(--border)]">
+                                                    <Row label="Recruited by (HR)" value={r.recruitedBy} />
+                                                    <Row label="Handled by (assigned HR)" value={r.handledByHr} />
+                                                    <Row label="Source" value={r.source} />
+                                                    <Row label="Position applied for" value={r.positionAppliedFor} />
+                                                    <Row label="Target site" value={r.targetSite} />
+                                                    <Row label="Entered recruitment on" value={fmtD(r.enteredRecruitmentAt)} />
+                                                    <Row label="Interview date" value={fmtD(r.interviewDate)} />
+                                                    <Row label="Interview result" value={r.interviewResult} />
+                                                </div>
+                                            ) : (
+                                                <p className="text-[13px] text-[var(--text3)]">This employee was added directly (not through the recruitment module).</p>
+                                            )}
+                                        </div>
+
+                                        {/* Employee record */}
+                                        <div className="p-4 bg-[var(--surface2)] rounded-[10px] border border-[var(--border)]">
+                                            <p className="text-[12px] font-semibold text-[var(--text2)] uppercase tracking-wide mb-2">Employee record</p>
+                                            <div className="divide-y divide-[var(--border)]">
+                                                <Row label="Created by" value={history.employee.createdByName} />
+                                                <Row label="Employee created on" value={fmt(history.employee.createdAt)} />
+                                                <Row label="Date of joining" value={fmtD(history.employee.dateOfJoining)} />
+                                                <Row label="Current status" value={history.employee.status} />
+                                            </div>
+                                        </div>
+
+                                        {/* Activity timeline */}
+                                        {r && r.activities.length > 0 && (
+                                            <div className="p-4 bg-[var(--surface2)] rounded-[10px] border border-[var(--border)]">
+                                                <p className="text-[12px] font-semibold text-[var(--text2)] uppercase tracking-wide mb-3">Recruitment timeline</p>
+                                                <div className="space-y-3">
+                                                    {r.activities.map(a => (
+                                                        <div key={a.id} className="flex gap-3">
+                                                            <div className="mt-1 w-2 h-2 rounded-full bg-[var(--accent)] shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-[13px] text-[var(--text)]">{a.content}</p>
+                                                                <p className="text-[11px] text-[var(--text3)] mt-0.5">
+                                                                    {fmt(a.at)}{a.by ? ` · ${a.by}` : ""}{a.type ? ` · ${a.type.replace(/_/g, " ")}` : ""}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )
+                            })()}
+                            {!historyLoading && !history && (
+                                <p className="text-[13px] text-[var(--text3)] text-center py-10">Could not load history.</p>
+                            )}
+                        </div>
+                    )}
                 </form>
 
                 {/* Footer */}

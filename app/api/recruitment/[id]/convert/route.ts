@@ -119,6 +119,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 notes:         notes      || null,
                 onboardingToken,
                 userId,
+                createdBy:     session.user.id,
                 // Personal
                 dateOfBirth:   dateOfBirth ? new Date(dateOfBirth) : null,
                 aadharNumber:  aadharNumber  || null,

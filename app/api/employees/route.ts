@@ -190,6 +190,7 @@ export async function POST(req: Request) {
             data: {
                 employeeId: finalId,
                 onboardingToken,
+                createdBy: session.user.id,
                 firstName,
                 lastName: lastName || "",
                 email,
