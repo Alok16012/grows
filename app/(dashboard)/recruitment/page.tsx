@@ -138,6 +138,26 @@ interface Lead {
     englishLevel?: string
     levelOfExperience?: string
     convertedEmployeeId?: string | null
+    // Candidate Personal Information Form fields
+    altPhone?: string
+    dateOfBirth?: string
+    tshirtSize?: string
+    bloodGroup?: string
+    maritalStatus?: string
+    nationality?: string
+    aadharNumber?: string
+    fatherName?: string
+    fatherOccupation?: string
+    motherName?: string
+    motherOccupation?: string
+    presentAddress?: string
+    permanentAddress?: string
+    currentDesignation?: string
+    pfEsicNumber?: string
+    reasonForLeaving?: string
+    hasBike?: boolean
+    documentsSubmitted?: string[]
+    educationDetails?: { course?: string; stream?: string; institute?: string; year?: string; percentage?: string; location?: string }[]
     createdAt: string
     updatedAt: string
     assignee?: { id: string; name: string; email: string }
@@ -2305,7 +2325,98 @@ function DetailDrawer({
                                 {lead.interviewDate && <InfoRow icon={Calendar} label="Interview" value={`${fmt(lead.interviewDate)}${lead.interviewMode ? ` · ${lead.interviewMode}` : ""}`} />}
                                 {lead.nextFollowUp && <InfoRow icon={Clock} label="Follow-up" value={fmt(lead.nextFollowUp)} />}
                                 {lead.assignee && <InfoRow icon={UserCheck} label="Assigned To" value={lead.assignee.name} />}
+                                {/* Personal information from the candidate form */}
+                                {lead.altPhone && <InfoRow icon={Phone} label="Alt. Number" value={lead.altPhone} />}
+                                {lead.dateOfBirth && <InfoRow icon={Calendar} label="Date of Birth" value={fmt(lead.dateOfBirth)} />}
+                                {lead.bloodGroup && <InfoRow icon={Users} label="Blood Group" value={lead.bloodGroup} />}
+                                {lead.tshirtSize && <InfoRow icon={Users} label="T-Shirt Size" value={lead.tshirtSize} />}
+                                {lead.maritalStatus && <InfoRow icon={Users} label="Marital Status" value={lead.maritalStatus} />}
+                                {lead.nationality && <InfoRow icon={MapPin} label="Nationality" value={lead.nationality} />}
+                                {lead.aadharNumber && <InfoRow icon={FileText} label="Aadhar" value={lead.aadharNumber} />}
+                                {lead.currentDesignation && <InfoRow icon={Briefcase} label="Current Designation" value={lead.currentDesignation} />}
+                                {lead.pfEsicNumber && <InfoRow icon={FileText} label="PF / ESIC No." value={lead.pfEsicNumber} />}
+                                {lead.reasonForLeaving && <InfoRow icon={MessageSquare} label="Reason for Leaving" value={lead.reasonForLeaving} />}
+                                {lead.hasBike != null && <InfoRow icon={Target} label="Owns Bike" value={lead.hasBike ? "Yes" : "No"} />}
                             </div>
+
+                            {/* Family details */}
+                            {(lead.fatherName || lead.fatherOccupation || lead.motherName || lead.motherOccupation) && (
+                                <div className="mt-4">
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Family Details</p>
+                                    <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                                        {lead.fatherName && <InfoRow icon={Users} label="Father's Name" value={lead.fatherName} />}
+                                        {lead.fatherOccupation && <InfoRow icon={Briefcase} label="Father's Occupation" value={lead.fatherOccupation} />}
+                                        {lead.motherName && <InfoRow icon={Users} label="Mother's Name" value={lead.motherName} />}
+                                        {lead.motherOccupation && <InfoRow icon={Briefcase} label="Mother's Occupation" value={lead.motherOccupation} />}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Address */}
+                            {(lead.presentAddress || lead.permanentAddress) && (
+                                <div className="mt-4 space-y-2">
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-1">Address</p>
+                                    {lead.presentAddress && (
+                                        <div className="p-3 bg-[var(--surface2)] rounded-[8px]">
+                                            <p className="text-[11px] font-semibold text-[var(--text3)] mb-0.5">Present Address</p>
+                                            <p className="text-[12px] text-[var(--text2)]">{lead.presentAddress}</p>
+                                        </div>
+                                    )}
+                                    {lead.permanentAddress && (
+                                        <div className="p-3 bg-[var(--surface2)] rounded-[8px]">
+                                            <p className="text-[11px] font-semibold text-[var(--text3)] mb-0.5">Permanent Address</p>
+                                            <p className="text-[12px] text-[var(--text2)]">{lead.permanentAddress}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Education details table */}
+                            {Array.isArray(lead.educationDetails) && lead.educationDetails.length > 0 && (
+                                <div className="mt-4">
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Educational Details</p>
+                                    <div className="border border-[var(--border)] rounded-[8px] overflow-hidden overflow-x-auto">
+                                        <table className="w-full text-[11.5px]">
+                                            <thead>
+                                                <tr className="bg-[var(--surface2)] text-[var(--text3)]">
+                                                    <th className="text-left font-medium px-2.5 py-1.5">Course</th>
+                                                    <th className="text-left font-medium px-2.5 py-1.5">Stream</th>
+                                                    <th className="text-left font-medium px-2.5 py-1.5">Institute</th>
+                                                    <th className="text-left font-medium px-2.5 py-1.5">Year</th>
+                                                    <th className="text-left font-medium px-2.5 py-1.5">%/CGPA</th>
+                                                    <th className="text-left font-medium px-2.5 py-1.5">Location</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border)]">
+                                                {lead.educationDetails.filter(e => e && (e.course || e.stream || e.institute || e.year || e.percentage || e.location)).map((e, i) => (
+                                                    <tr key={i} className="text-[var(--text2)]">
+                                                        <td className="px-2.5 py-1.5">{e.course || "—"}</td>
+                                                        <td className="px-2.5 py-1.5">{e.stream || "—"}</td>
+                                                        <td className="px-2.5 py-1.5">{e.institute || "—"}</td>
+                                                        <td className="px-2.5 py-1.5">{e.year || "—"}</td>
+                                                        <td className="px-2.5 py-1.5">{e.percentage || "—"}</td>
+                                                        <td className="px-2.5 py-1.5">{e.location || "—"}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Documents submitted */}
+                            {Array.isArray(lead.documentsSubmitted) && lead.documentsSubmitted.length > 0 && (
+                                <div className="mt-4">
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-2">Documents Submitted</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {lead.documentsSubmitted.map((d, i) => (
+                                            <span key={i} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+                                                <CheckSquare size={11} /> {d}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             {lead.notes && (
                                 <div className="mt-4 p-3 bg-[var(--surface2)] rounded-[8px]">
                                     <p className="text-[11px] font-semibold text-[var(--text3)] mb-1">Notes</p>
