@@ -11,6 +11,8 @@ export type ScreeningQuestion = {
 
 export type JobStatus = "DRAFT" | "PUBLISHED" | "CLOSED"
 
+export type JobContact = { name: string; phone: string }
+
 export type JobPosting = {
     id: string
     title: string
@@ -68,6 +70,9 @@ export type JobPosting = {
     deadline: string | null
     siteId: string | null
     siteName: string | null
+    // Project contacts
+    projectManagers: JobContact[] | null
+    projectSupervisors: JobContact[] | null
     status: JobStatus
     createdBy: string | null
     creator?: { id: string; name: string } | null

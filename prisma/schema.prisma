@@ -1874,6 +1874,10 @@ model JobPosting {
   siteId   String?
   siteName String?
 
+  // Project contacts — arrays of { name, phone }. Multiple allowed.
+  projectManagers    Json?
+  projectSupervisors Json?
+
   status    JobStatus @default(DRAFT)
   createdBy String?
   creator   User?     @relation("JobCreator", fields: [createdBy], references: [id], onDelete: SetNull)

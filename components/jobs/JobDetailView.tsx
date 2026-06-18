@@ -3,9 +3,9 @@
 import {
     Briefcase, MapPin, IndianRupee, Users, Building2, Bus, UtensilsCrossed,
     Home, Clock, ExternalLink, Send, Layers, ShieldCheck,
-    Languages as LanguagesIcon, Sparkles, CheckCircle2, CalendarClock,
+    Languages as LanguagesIcon, Sparkles, CheckCircle2, CalendarClock, Phone,
 } from "lucide-react"
-import { JobPosting, STATUS_META, formatExperience, formatSalary, priorityStyle } from "./constants"
+import { JobPosting, JobContact, STATUS_META, formatExperience, formatSalary, priorityStyle } from "./constants"
 
 const yn = (v: boolean) => (v ? "Available" : "Not Available")
 
@@ -44,16 +44,21 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
     const hasMap = !!(embedSrc || openMapHref)
 
     const hasPart = !!(job.partPhotoUrl || job.partName || job.partMaterial || job.inspectionType || job.qualityStandard)
-    const hasCustomer = !!(job.customerName || job.plantLocation || job.plantAddress || job.mapUrl || job.shiftType ||
-        job.canteenAvailable || job.transportAvailable || job.accommodationAvailable)
-    const hasFacility = !!(job.busFacility || job.canteenAvailable || job.accommodationAvailable ||
+    // Project Details now holds only project/customer + location info; all
+    // amenities live in Facility Details (no duplication).
+    const hasCustomer = !!(job.customerName || job.plantLocation || job.plantAddress || job.mapUrl)
+    const hasFacility = !!(job.busFacility || job.canteenAvailable || job.transportAvailable || job.accommodationAvailable ||
         job.shiftType || job.weeklyOff || job.overtimePolicy)
+
+    const managers = Array.isArray(job.projectManagers) ? job.projectManagers : []
+    const supervisors = Array.isArray(job.projectSupervisors) ? job.projectSupervisors : []
+    const hasContacts = managers.length > 0 || supervisors.length > 0
 
     return (
         <div className="rounded-2xl border border-[var(--border)] bg-white overflow-hidden">
             {/* ── Header ── */}
             <div className="p-6 border-b border-[var(--border)]">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2.5 flex-wrap">
                             <h1 className="text-2xl font-bold text-[var(--text)]">{job.title}</h1>
@@ -97,8 +102,17 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
                             )}
                         </div>
                     </div>
-                    <div className="h-12 w-12 shrink-0 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center font-bold text-lg">
-                        {company.charAt(0).toUpperCase()}
+                    <div className="flex flex-col items-end gap-3 w-full sm:w-auto sm:max-w-[17rem] shrink-0">
+                        <div className="h-12 w-12 shrink-0 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center font-bold text-lg">
+                            {company.charAt(0).toUpperCase()}
+                        </div>
+                        {hasContacts && (
+                            <div className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-3.5 space-y-3">
+                                <ContactGroup title="Project Manager" contacts={managers} />
+                                {managers.length > 0 && supervisors.length > 0 && <div className="border-t border-[var(--border)]" />}
+                                <ContactGroup title="Project Supervisor" contacts={supervisors} />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -159,17 +173,13 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
                     </div>
                 )}
 
-                {/* ── Customer details ── */}
+                {/* ── Project details ── (project + location only; amenities live in Facility) */}
                 {hasCustomer && (
-                    <Card icon={<Building2 size={16} />} title="Customer Details">
+                    <Card icon={<Building2 size={16} />} title="Project Details">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
                             {job.customerName && <Field icon={<Building2 size={14} />} label="Customer Name" value={job.customerName} accent />}
-                            {job.shiftType && <Field icon={<Clock size={14} />} label="Shift" value={job.shiftType} />}
-                            <Field icon={<UtensilsCrossed size={14} />} label="Canteen" value={yn(job.canteenAvailable)} />
-                            {job.plantAddress && <Field icon={<MapPin size={14} />} label="Plant Address" value={job.plantAddress} />}
                             {job.plantLocation && <Field icon={<MapPin size={14} />} label="Plant Location" value={job.plantLocation} />}
-                            <Field icon={<Bus size={14} />} label="Transportation" value={yn(job.transportAvailable)} />
-                            <Field icon={<Home size={14} />} label="Accommodation" value={yn(job.accommodationAvailable)} />
+                            {job.plantAddress && <Field icon={<MapPin size={14} />} label="Plant Address" value={job.plantAddress} />}
                             {openMapHref && (
                                 <div className="flex items-start gap-2">
                                     <span className="text-[var(--text3)] mt-0.5"><MapPin size={14} /></span>
@@ -212,6 +222,7 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
                         <Card icon={<ShieldCheck size={16} />} title="Facility Details" compact>
                             <Stack>
                                 <KVIcon ok={job.busFacility} label="Bus Facility" value={yn(job.busFacility)} />
+                                <KVIcon ok={job.transportAvailable} label="Transportation" value={yn(job.transportAvailable)} />
                                 <KVIcon ok={job.canteenAvailable} label="Canteen" value={yn(job.canteenAvailable)} />
                                 <KVIcon ok={job.accommodationAvailable} label="Accommodation" value={yn(job.accommodationAvailable)} />
                                 {job.shiftType && <KV label="Shift Timing" value={job.shiftType} />}
@@ -264,6 +275,28 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
 // ─── Primitives ──────────────────────────────────────────────────────────────
 function SectionTitle({ children }: { children: React.ReactNode }) {
     return <h3 className="text-[12px] font-bold uppercase tracking-wide text-emerald-700 mb-2.5">{children}</h3>
+}
+
+// Top-right contact group (Project Manager / Supervisor), each with name + tel.
+function ContactGroup({ title, contacts }: { title: string; contacts: JobContact[] }) {
+    if (!contacts || contacts.length === 0) return null
+    return (
+        <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700 mb-1.5">{title}</p>
+            <div className="space-y-2">
+                {contacts.map((c, i) => (
+                    <div key={i} className="text-left">
+                        <p className="text-[13px] font-medium text-[var(--text)] leading-tight">{c.name || "—"}</p>
+                        {c.phone && (
+                            <a href={`tel:${c.phone}`} className="text-[12px] text-[var(--accent-text)] inline-flex items-center gap-1 hover:underline">
+                                <Phone size={11} /> {c.phone}
+                            </a>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
 }
 
 function Card({ icon, title, children, compact }: { icon: React.ReactNode; title: string; children: React.ReactNode; compact?: boolean }) {

@@ -9,6 +9,13 @@ const toInt = (v: any) =>
     v === "" || v === null || v === undefined ? null : Number.isFinite(parseInt(v)) ? parseInt(v) : null
 const toStrArray = (v: any) =>
     Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim()) : []
+// Project contacts → clean array of { name, phone } (drops fully-empty rows).
+const toContacts = (v: any) =>
+    Array.isArray(v)
+        ? v
+            .map((c) => ({ name: String(c?.name ?? "").trim(), phone: String(c?.phone ?? "").trim() }))
+            .filter((c) => c.name || c.phone)
+        : []
 
 // Prod migrations don't run on deploy (DIRECT_URL unset on Vercel), so the
 // customer/part/facility columns from 20260611120000 may be missing on the live
@@ -40,7 +47,9 @@ async function ensureJobPostingColumns() {
                 ADD COLUMN IF NOT EXISTS "priority"               TEXT NOT NULL DEFAULT 'MEDIUM',
                 ADD COLUMN IF NOT EXISTS "deadline"               TIMESTAMP(3),
                 ADD COLUMN IF NOT EXISTS "siteId"                 TEXT,
-                ADD COLUMN IF NOT EXISTS "siteName"               TEXT
+                ADD COLUMN IF NOT EXISTS "siteName"               TEXT,
+                ADD COLUMN IF NOT EXISTS "projectManagers"        JSONB,
+                ADD COLUMN IF NOT EXISTS "projectSupervisors"     JSONB
         `)
         jobColumnsEnsured = true
     } catch { /* best effort */ }
@@ -173,6 +182,8 @@ export async function POST(req: Request) {
                 deadline: body.deadline ? new Date(body.deadline) : null,
                 siteId: body.siteId || null,
                 siteName: body.siteName || null,
+                projectManagers: toContacts(body.projectManagers),
+                projectSupervisors: toContacts(body.projectSupervisors),
                 status: status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
                 createdBy: realUser?.id ?? null,
             },

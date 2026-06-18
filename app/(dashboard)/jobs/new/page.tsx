@@ -15,7 +15,7 @@ import {
     EMPLOYMENT_TYPES, PERK_SUGGESTIONS, LANGUAGE_SUGGESTIONS, SKILL_SUGGESTIONS,
     SUGGESTED_QUESTIONS, CALL_DAYS_OPTIONS, ScreeningQuestion,
     SHIFT_OPTIONS, WEEKLY_OFF_OPTIONS, INSPECTION_TYPE_SUGGESTIONS,
-    QUALITY_STANDARD_SUGGESTIONS, MATERIAL_SUGGESTIONS, JobPosting,
+    QUALITY_STANDARD_SUGGESTIONS, MATERIAL_SUGGESTIONS, JobPosting, JobContact,
 } from "@/components/jobs/constants"
 
 type Form = {
@@ -73,6 +73,9 @@ type Form = {
     deadline: string
     siteId: string
     siteName: string
+    // Project contacts
+    projectManagers: JobContact[]
+    projectSupervisors: JobContact[]
 }
 
 const initialForm: Form = {
@@ -90,6 +93,7 @@ const initialForm: Form = {
     shiftType: "Rotational", weeklyOff: "Sunday", overtimePolicy: "",
     canteenAvailable: false, transportAvailable: false, accommodationAvailable: false, busFacility: false,
     priority: "MEDIUM", deadline: "", siteId: "", siteName: "",
+    projectManagers: [], projectSupervisors: [],
 }
 
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -128,6 +132,8 @@ function jobToForm(j: JobPosting): Form {
         priority: s(j.priority) || "MEDIUM",
         deadline: j.deadline ? String(j.deadline).slice(0, 10) : "",
         siteId: s(j.siteId), siteName: s(j.siteName),
+        projectManagers: Array.isArray(j.projectManagers) ? j.projectManagers.map(c => ({ name: s(c.name), phone: s(c.phone) })) : [],
+        projectSupervisors: Array.isArray(j.projectSupervisors) ? j.projectSupervisors.map(c => ({ name: s(c.name), phone: s(c.phone) })) : [],
     }
 }
 
@@ -480,6 +486,30 @@ function StepJobDetails({ form, set }: { form: Form; set: <K extends keyof Form>
     )
 }
 
+// Editable list of { name, phone } contacts with add / remove.
+function ContactList({ label, contacts, onChange }: { label: string; contacts: JobContact[]; onChange: (c: JobContact[]) => void }) {
+    const update = (i: number, patch: Partial<JobContact>) => onChange(contacts.map((c, idx) => (idx === i ? { ...c, ...patch } : c)))
+    const add = () => onChange([...contacts, { name: "", phone: "" }])
+    const remove = (i: number) => onChange(contacts.filter((_, idx) => idx !== i))
+    return (
+        <div>
+            <FieldLabel optional>{label}</FieldLabel>
+            <div className="space-y-2">
+                {contacts.map((c, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                        <input value={c.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="Name" className={inputCls} />
+                        <input value={c.phone} onChange={(e) => update(i, { phone: e.target.value.replace(/[^\d+]/g, "") })} placeholder="Mobile number" inputMode="tel" className={inputCls} />
+                        <button type="button" onClick={() => remove(i)} className="shrink-0 p-2 text-[var(--text3)] hover:text-red-500" aria-label="Remove"><Trash2 size={15} /></button>
+                    </div>
+                ))}
+                <button type="button" onClick={add} className="inline-flex items-center gap-1.5 text-[13px] text-[var(--accent-text)] font-medium hover:underline">
+                    <Plus size={14} /> Add More
+                </button>
+            </div>
+        </div>
+    )
+}
+
 function TextOnlyNumber({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
     return (
         <div className="relative flex-1">
@@ -524,6 +554,13 @@ function StepCustomerSite({ form, set }: { form: Form; set: <K extends keyof For
                     {sites.map(s => <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
                 </select>
                 <p className="text-[11px] text-[var(--text3)]">Selected when the job goes live, so applicants/recruiters know the deployment site.</p>
+            </div>
+
+            {/* Project contacts */}
+            <div className="space-y-4 border-t border-[var(--border)] pt-6">
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-[var(--accent-text)]">Project contacts</h3>
+                <ContactList label="Project Manager(s)" contacts={form.projectManagers} onChange={(c) => set("projectManagers", c)} />
+                <ContactList label="Project Supervisor(s)" contacts={form.projectSupervisors} onChange={(c) => set("projectSupervisors", c)} />
             </div>
 
             {/* Sample / inspection part */}

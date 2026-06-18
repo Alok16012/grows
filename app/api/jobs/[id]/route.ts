@@ -8,6 +8,12 @@ const toInt = (v: any) =>
     v === "" || v === null || v === undefined ? null : Number.isFinite(parseInt(v)) ? parseInt(v) : null
 const toStrArray = (v: any) =>
     Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim()) : []
+const toContacts = (v: any) =>
+    Array.isArray(v)
+        ? v
+            .map((c) => ({ name: String(c?.name ?? "").trim(), phone: String(c?.phone ?? "").trim() }))
+            .filter((c) => c.name || c.phone)
+        : []
 
 // Prod migrations don't run on deploy (DIRECT_URL unset on Vercel), so the
 // customer/part/facility columns from 20260611120000 may be missing on the live
@@ -38,7 +44,9 @@ async function ensureJobPostingColumns() {
                 ADD COLUMN IF NOT EXISTS "priority"               TEXT NOT NULL DEFAULT 'MEDIUM',
                 ADD COLUMN IF NOT EXISTS "deadline"               TIMESTAMP(3),
                 ADD COLUMN IF NOT EXISTS "siteId"                 TEXT,
-                ADD COLUMN IF NOT EXISTS "siteName"               TEXT
+                ADD COLUMN IF NOT EXISTS "siteName"               TEXT,
+                ADD COLUMN IF NOT EXISTS "projectManagers"        JSONB,
+                ADD COLUMN IF NOT EXISTS "projectSupervisors"     JSONB
         `)
         jobColumnsEnsured = true
     } catch { /* best effort */ }
@@ -100,6 +108,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         if ("priority" in body && ["LOW", "MEDIUM", "HIGH"].includes(body.priority))
             data.priority = body.priority
         if ("deadline" in body) data.deadline = body.deadline ? new Date(body.deadline) : null
+        if ("projectManagers" in body) data.projectManagers = toContacts(body.projectManagers)
+        if ("projectSupervisors" in body) data.projectSupervisors = toContacts(body.projectSupervisors)
         if ("title" in body) {
             if (!body.title || !String(body.title).trim())
                 return NextResponse.json({ error: "Job title is required" }, { status: 400 })
