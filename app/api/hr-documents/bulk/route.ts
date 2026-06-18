@@ -18,19 +18,26 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { typeId, scope, roleId, employeeIds, effectiveDate, remarks } = await req.json() as {
+        const { typeId, scope, roleId, employeeIds, effectiveDate, remarks, templateOverride } = await req.json() as {
             typeId?: string
             scope?: "role" | "employees" | "all"
             roleId?: string
             employeeIds?: string[]
             effectiveDate?: string
             remarks?: string
+            templateOverride?: string
         }
 
         if (!typeId || !scope) return new NextResponse("typeId and scope required", { status: 400 })
 
         const docType = await prisma.hrDocumentType.findUnique({ where: { id: typeId } })
         if (!docType) return new NextResponse("Document type not found", { status: 404 })
+
+        // Use the edited template if the sender tweaked it in the preview, else
+        // the stored template. Variables are still filled per employee.
+        const template = (templateOverride !== undefined && templateOverride !== null)
+            ? templateOverride
+            : (docType.templateContent || "")
 
         // Resolve target employees.
         let where: Record<string, unknown>
@@ -59,7 +66,7 @@ export async function POST(req: Request) {
 
         for (const employee of employees) {
             try {
-                const content = fillTemplate(docType.templateContent || "", buildDocVars(employee, eff))
+                const content = fillTemplate(template, buildDocVars(employee, eff))
                 await prisma.hrDocument.create({
                     data: {
                         docNumber: generateDocNumber(),

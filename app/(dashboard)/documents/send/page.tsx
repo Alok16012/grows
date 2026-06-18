@@ -3,10 +3,15 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search } from "lucide-react"
+import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X } from "lucide-react"
 import { can } from "@/lib/can"
 
-type DocType = { id: string; name: string; requiresApproval: boolean }
+type DocType = { id: string; name: string; requiresApproval: boolean; templateContent?: string }
+
+const TEMPLATE_VARS = [
+    "{{employee_name}}", "{{employee_id}}", "{{designation}}", "{{department}}",
+    "{{joining_date}}", "{{effective_date}}", "{{salary}}", "{{company_name}}", "{{date}}",
+]
 type Role = { id: string; name: string; color?: string }
 type Emp = {
     id: string; firstName: string; lastName: string | null; employeeId: string; designation: string | null
@@ -38,6 +43,12 @@ export default function SendDocumentsPage() {
     const [effectiveDate, setEffectiveDate] = useState("")
     const [remarks, setRemarks] = useState("")
     const [sending, setSending] = useState(false)
+
+    const [template, setTemplate] = useState("")
+    const [previewOpen, setPreviewOpen] = useState(false)
+    const [previewLoading, setPreviewLoading] = useState(false)
+    const [previewContent, setPreviewContent] = useState("")
+    const [previewSample, setPreviewSample] = useState<string | null>(null)
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -83,6 +94,42 @@ export default function SendDocumentsPage() {
         return selectedEmp.size
     }, [scope, roleId, employees, selectedEmp])
 
+    // Load the editable template whenever the document type changes.
+    useEffect(() => {
+        const t = docTypes.find(d => d.id === typeId)
+        setTemplate(t?.templateContent || "")
+    }, [typeId, docTypes])
+
+    // Pick a representative employee to preview the filled document with.
+    const sampleEmployeeId = useCallback((): string | undefined => {
+        if (scope === "employees") return Array.from(selectedEmp)[0]
+        if (scope === "role") return employees.find(e => e.user?.customRole?.id === roleId)?.id
+        return employees[0]?.id
+    }, [scope, selectedEmp, employees, roleId])
+
+    const openPreview = async () => {
+        if (!typeId) return toast.error("Select a document type")
+        setPreviewOpen(true)
+        setPreviewLoading(true)
+        setPreviewContent("")
+        try {
+            const res = await fetch("/api/hr-documents/preview", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ typeId, templateOverride: template, employeeId: sampleEmployeeId(), effectiveDate: effectiveDate || undefined }),
+            })
+            if (!res.ok) throw new Error(await res.text() || "Failed")
+            const data = await res.json()
+            setPreviewContent(data.content || "")
+            setPreviewSample(data.sampleEmployee || null)
+        } catch (e) {
+            toast.error((e as Error).message)
+            setPreviewOpen(false)
+        } finally {
+            setPreviewLoading(false)
+        }
+    }
+
     const toggleEmp = (id: string) => {
         setSelectedEmp(prev => {
             const next = new Set(prev)
@@ -110,6 +157,7 @@ export default function SendDocumentsPage() {
                     employeeIds: scope === "employees" ? Array.from(selectedEmp) : undefined,
                     effectiveDate: effectiveDate || undefined,
                     remarks: remarks || undefined,
+                    templateOverride: template,
                 }),
             })
             if (!res.ok) throw new Error(await res.text() || "Failed")
@@ -214,16 +262,52 @@ export default function SendDocumentsPage() {
                     </div>
                 </div>
 
+                {typeId && (
+                    <div>
+                        <label className={labelCls}>Document content — edit before sending</label>
+                        <textarea
+                            value={template}
+                            onChange={e => setTemplate(e.target.value)}
+                            rows={8}
+                            placeholder="This document type has no template yet. Type the content here…"
+                            className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] font-mono leading-relaxed"
+                        />
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            <span className="text-[11px] text-[var(--text3)] mr-1">Insert:</span>
+                            {TEMPLATE_VARS.map(v => (
+                                <button
+                                    key={v}
+                                    type="button"
+                                    onClick={() => setTemplate(t => `${t}${t && !t.endsWith(" ") && !t.endsWith("\n") ? " " : ""}${v}`)}
+                                    className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)] font-mono"
+                                >
+                                    {v}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[11px] text-[var(--text3)] mt-1.5">{"{{...}}"} placeholders are filled automatically for each employee. Edits here apply to this send only — the saved template is unchanged.</p>
+                    </div>
+                )}
+
                 <div className="flex items-center justify-between pt-1">
                     <p className="text-[13px] text-[var(--text2)]">Target: <span className="font-semibold text-[var(--text)]">{targetCount}</span> employee(s)</p>
-                    <button
-                        onClick={send}
-                        disabled={sending || !typeId || targetCount === 0}
-                        className="inline-flex items-center gap-2 px-4 h-9 bg-[var(--accent)] text-white rounded-[9px] text-[13px] font-medium hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                        Send document
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={openPreview}
+                            disabled={!typeId}
+                            className="inline-flex items-center gap-2 px-4 h-9 bg-[var(--surface)] text-[var(--text2)] border border-[var(--border)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Eye size={14} /> Preview
+                        </button>
+                        <button
+                            onClick={send}
+                            disabled={sending || !typeId || targetCount === 0}
+                            className="inline-flex items-center gap-2 px-4 h-9 bg-[var(--accent)] text-white rounded-[9px] text-[13px] font-medium hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                            Send document
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -263,6 +347,48 @@ export default function SendDocumentsPage() {
                     )}
                 </div>
             </div>
+
+            {/* Preview modal */}
+            {previewOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setPreviewOpen(false)}>
+                    <div className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] w-full max-w-2xl max-h-[88vh] overflow-hidden flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                            <div>
+                                <h2 className="text-[16px] font-semibold text-[var(--text)]">Document preview</h2>
+                                <p className="text-[12px] text-[var(--text3)] mt-0.5">{previewSample ? `Filled for: ${previewSample}` : "Sample"} · other employees get their own details</p>
+                            </div>
+                            <button onClick={() => setPreviewOpen(false)} className="text-[var(--text3)] hover:text-[var(--text)] p-1 rounded-md hover:bg-[var(--surface2)]"><X size={18} /></button>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-6">
+                            {previewLoading ? (
+                                <div className="flex items-center justify-center py-12"><Loader2 className="h-7 w-7 animate-spin text-[var(--accent)]" /></div>
+                            ) : (
+                                <div className="bg-white border border-[var(--border)] rounded-[10px] p-6">
+                                    <div className="border-b-2 border-[#e23b3b] pb-3 mb-4">
+                                        <p className="text-[18px] font-bold text-[#1a1a18]">Growus Auto India Pvt. Ltd.</p>
+                                        <p className="text-[11px] italic text-[#e23b3b]">Pioneer in outsourcing</p>
+                                    </div>
+                                    <pre className="whitespace-pre-wrap font-sans text-[13px] text-[#1a1a18] leading-relaxed">{previewContent || "(empty)"}</pre>
+                                    <div className="mt-8">
+                                        <p className="text-[12px] font-semibold text-[#1a1a18]">For Growus Auto India Pvt. Ltd.</p>
+                                        <p className="text-[11px] text-[#555] mt-6">Authorised Signatory</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-end gap-2">
+                            <button onClick={() => setPreviewOpen(false)} className="px-4 h-9 text-[13px] font-medium text-[var(--text2)] hover:text-[var(--text)] rounded-[8px] hover:bg-[var(--surface2)]">Close & edit</button>
+                            <button
+                                onClick={() => { setPreviewOpen(false); send() }}
+                                disabled={sending || targetCount === 0}
+                                className="inline-flex items-center gap-2 px-4 h-9 bg-[var(--accent)] text-white rounded-[9px] text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
+                            >
+                                <Send size={14} /> Send to {targetCount}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
