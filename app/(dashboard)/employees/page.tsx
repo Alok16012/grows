@@ -181,13 +181,14 @@ function OnboardingCard({ employee }: { employee: Employee }) {
 // ─── Employee Detail Drawer ────────────────────────────────────────────────────
 
 function EmployeeDrawer({
-    employee, onClose, onEdit, onStatusChange, isAdmin,
+    employee, onClose, onEdit, onStatusChange, isAdmin, canViewSalary,
 }: {
     employee: Employee | null
     onClose: () => void
     onEdit: (e: Employee) => void
     onStatusChange: (id: string, status: string) => void
     isAdmin: boolean
+    canViewSalary: boolean
 }) {
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "documents">("personal")
     const [detail, setDetail] = useState<Record<string, unknown> | null>(null)
@@ -451,7 +452,7 @@ function EmployeeDrawer({
                                 label: "Joined",
                                 value: employee.dateOfJoining ? format(new Date(employee.dateOfJoining), "dd MMM yyyy") : "—"
                             },
-                            { icon: <IndianRupee size={12} />, label: "Salary", value: fmtRupee(employee.basicSalary) },
+                            ...(canViewSalary ? [{ icon: <IndianRupee size={12} />, label: "Salary", value: fmtRupee(employee.basicSalary) }] : []),
                         ].map(s => (
                             <div key={s.label} className="flex items-center gap-1.5 bg-[var(--surface2)]/40 rounded-[8px] px-2.5 py-2 border border-[var(--border)]">
                                 <span className="text-[var(--text3)]">{s.icon}</span>
@@ -466,7 +467,7 @@ function EmployeeDrawer({
 
                 {/* Tabs */}
                 <div className="flex border-b border-[var(--border)] px-5 overflow-x-auto">
-                    {(["personal", "employment", "salary", "bank", "documents"] as const).map(t => (
+                    {(["personal", "employment", ...(canViewSalary ? ["salary"] as const : []), "bank", "documents"] as const).map(t => (
                         <button key={t} onClick={() => {
                             setActiveTab(t)
                             if (t === "documents" && employee && documents.length === 0 && !docsLoading) {
@@ -508,8 +509,8 @@ function EmployeeDrawer({
                         <div className="space-y-2">
                             <div className="grid grid-cols-2 gap-2">
                                 <InfoItem label="Employment Type" value={emp.employmentType} icon={<Briefcase size={13} />} />
-                                <InfoItem label="Salary Type" value={emp.salaryType || "—"} icon={<IndianRupee size={13} />} />
-                                <InfoItem label="Basic Salary" value={fmtRupee(emp.basicSalary)} icon={<IndianRupee size={13} />} />
+                                {canViewSalary && <InfoItem label="Salary Type" value={emp.salaryType || "—"} icon={<IndianRupee size={13} />} />}
+                                {canViewSalary && <InfoItem label="Basic Salary" value={fmtRupee(emp.basicSalary)} icon={<IndianRupee size={13} />} />}
                                 <InfoItem label="Manager" value={emp.managerId || "—"} icon={<User size={13} />} />
                                 <InfoItem
                                     label="Date of Joining"
@@ -1049,6 +1050,7 @@ function EmployeesPage() {
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
     const isAdmin = can(session, "employees.edit")
+    const canViewSalary = can(session, "employees.viewSalary")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -1804,6 +1806,7 @@ function EmployeesPage() {
                 onEdit={(e) => { setDrawerEmployee(null); setEditEmployee(e); setShowModal(true) }}
                 onStatusChange={handleStatusChange}
                 isAdmin={isAdmin}
+                canViewSalary={canViewSalary}
             />
 
             {/* Import Modal */}

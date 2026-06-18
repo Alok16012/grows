@@ -1,11 +1,13 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
     X, Loader2, CheckCircle, User, MapPin,
     Eye, Download, Trash2, Upload, Camera,
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -213,6 +215,8 @@ export function EmployeeModal({
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
+    const { data: session } = useSession()
+    const canViewSalary = can(session, "employees.viewSalary")
     const sites = allSites
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents" | "history">("personal")
     type HistoryData = {
@@ -521,7 +525,7 @@ export function EmployeeModal({
 
                 {/* Tabs */}
                 <div className="flex gap-1 border-b border-[var(--border)] px-4 py-3 overflow-x-auto bg-[var(--surface2)]/40">
-                    {(["personal", "employment", "salary", "bank", "compliance", "safety", "documents", ...(employee ? ["history"] as const : [])] as const).map(t => (
+                    {(["personal", "employment", ...(canViewSalary ? ["salary"] as const : []), "bank", "compliance", "safety", "documents", ...(employee ? ["history"] as const : [])] as const).map(t => (
                         <button type="button" key={t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
                             {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : t === "history" ? "History" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
                         </button>
@@ -1337,7 +1341,7 @@ export function EmployeeModal({
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between">
                     <div className="flex gap-1">
-                        {(["personal", "employment", "salary", "bank", "compliance", "safety", "documents"] as const).map((t) => (
+                        {(["personal", "employment", ...(canViewSalary ? ["salary"] as const : []), "bank", "compliance", "safety", "documents"] as const).map((t) => (
                             <div
                                 key={t}
                                 onClick={() => setActiveTab(t)}
@@ -1362,8 +1366,8 @@ export function EmployeeModal({
                             <button
                                 type="button"
                                 onClick={() => {
-                                    const order = ["personal", "employment", "salary", "bank", "compliance", "safety", "documents"] as const
-                                    const idx = order.indexOf(activeTab as typeof order[number])
+                                    const order = ["personal", "employment", ...(canViewSalary ? ["salary"] as const : []), "bank", "compliance", "safety", "documents"] as const
+                                    const idx = order.indexOf(activeTab as never)
                                     if (idx < order.length - 1) setActiveTab(order[idx + 1])
                                 }}
                                 className="inline-flex items-center gap-2 px-5 py-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 transition-opacity"

@@ -77,10 +77,11 @@ export const PERMISSION_GROUPS = [
         group: "Employees",
         key: "employees",
         permissions: [
-            { key: "employees.view",   label: "View Employees" },
-            { key: "employees.create", label: "Add Employee" },
-            { key: "employees.edit",   label: "Edit Employee" },
-            { key: "employees.delete", label: "Delete Employee" },
+            { key: "employees.view",       label: "View Employees" },
+            { key: "employees.create",     label: "Add Employee" },
+            { key: "employees.edit",       label: "Edit Employee" },
+            { key: "employees.delete",     label: "Delete Employee" },
+            { key: "employees.viewSalary", label: "View Salary & CTC" },
         ]
     },
     {
@@ -259,7 +260,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "sites.view", "sites.manage",
     "groups.view", "groups.manage",
     "field.view", "field.manage",
-    "employees.view", "employees.create", "employees.edit", "employees.delete",
+    "employees.view", "employees.create", "employees.edit", "employees.delete", "employees.viewSalary",
     "recruitment.view", "recruitment.manage",
     "jobs.view", "jobs.manage",
     "onboarding.view", "onboarding.manage",
@@ -282,7 +283,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
 ]
 
 export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
-    "employees.view", "employees.create", "employees.edit", "employees.delete",
+    "employees.view", "employees.create", "employees.edit", "employees.delete", "employees.viewSalary",
     "recruitment.view", "recruitment.manage",
     "jobs.view", "jobs.manage",
     "onboarding.view", "onboarding.manage",
