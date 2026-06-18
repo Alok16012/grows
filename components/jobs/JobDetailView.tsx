@@ -3,9 +3,9 @@
 import {
     Briefcase, MapPin, IndianRupee, Users, Building2, Bus, UtensilsCrossed,
     Home, Clock, ExternalLink, Send, Layers, ShieldCheck,
-    Languages as LanguagesIcon, Sparkles, CheckCircle2,
+    Languages as LanguagesIcon, Sparkles, CheckCircle2, CalendarClock,
 } from "lucide-react"
-import { JobPosting, STATUS_META, formatExperience, formatSalary } from "./constants"
+import { JobPosting, STATUS_META, formatExperience, formatSalary, priorityStyle } from "./constants"
 
 const yn = (v: boolean) => (v ? "Available" : "Not Available")
 
@@ -57,6 +57,11 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
                     <div className="min-w-0">
                         <div className="flex items-center gap-2.5 flex-wrap">
                             <h1 className="text-2xl font-bold text-[var(--text)]">{job.title}</h1>
+                            {(() => { const p = priorityStyle(job.priority); return (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: p.bg, color: p.text }}>
+                                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.dot }} /> {p.label} priority
+                                </span>
+                            ) })()}
                             <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
                         </div>
                         <p className="text-[15px] text-[var(--text2)] mt-1">{company}</p>
@@ -76,8 +81,20 @@ export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () 
                                 </span>
                             )}
                         </div>
-                        <div className="mt-3 text-[13px] text-[var(--text2)] inline-flex items-center gap-1.5">
-                            <Users size={14} className="text-[var(--text3)]" /> Openings: <b className="text-[var(--text)]">{job.openings}</b>
+                        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-[var(--text2)]">
+                            <span className="inline-flex items-center gap-1.5">
+                                <Users size={14} className="text-[var(--text3)]" /> Openings: <b className="text-[var(--text)]">{job.openings}</b>
+                            </span>
+                            {job.siteName && (
+                                <span className="inline-flex items-center gap-1.5">
+                                    <MapPin size={14} className="text-[var(--text3)]" /> Site: <b className="text-[var(--text)]">{job.siteName}</b>
+                                </span>
+                            )}
+                            {job.deadline && (
+                                <span className="inline-flex items-center gap-1.5">
+                                    <CalendarClock size={14} className="text-[var(--text3)]" /> Open till: <b className="text-[var(--text)]">{new Date(job.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</b>
+                                </span>
+                            )}
                         </div>
                     </div>
                     <div className="h-12 w-12 shrink-0 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center font-bold text-lg">

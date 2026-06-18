@@ -68,6 +68,11 @@ type Form = {
     transportAvailable: boolean
     accommodationAvailable: boolean
     busFacility: boolean
+    // Priority / deadline / target site
+    priority: string
+    deadline: string
+    siteId: string
+    siteName: string
 }
 
 const initialForm: Form = {
@@ -84,6 +89,7 @@ const initialForm: Form = {
     customerName: "", plantLocation: "", plantAddress: "", mapUrl: "",
     shiftType: "Rotational", weeklyOff: "Sunday", overtimePolicy: "",
     canteenAvailable: false, transportAvailable: false, accommodationAvailable: false, busFacility: false,
+    priority: "MEDIUM", deadline: "", siteId: "", siteName: "",
 }
 
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -119,6 +125,9 @@ function jobToForm(j: JobPosting): Form {
         overtimePolicy: s(j.overtimePolicy), canteenAvailable: !!j.canteenAvailable,
         transportAvailable: !!j.transportAvailable, accommodationAvailable: !!j.accommodationAvailable,
         busFacility: !!j.busFacility,
+        priority: s(j.priority) || "MEDIUM",
+        deadline: j.deadline ? String(j.deadline).slice(0, 10) : "",
+        siteId: s(j.siteId), siteName: s(j.siteName),
     }
 }
 
@@ -451,6 +460,22 @@ function StepJobDetails({ form, set }: { form: Form; set: <K extends keyof Form>
                 </div>
                 <TextField label="No. of openings" value={form.openings} onChange={(v) => set("openings", v.replace(/\D/g, ""))} placeholder="1" />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <FieldLabel>Priority</FieldLabel>
+                    <select value={form.priority} onChange={(e) => set("priority", e.target.value)} className={inputCls}>
+                        <option value="HIGH">🔴 High</option>
+                        <option value="MEDIUM">🟡 Medium</option>
+                        <option value="LOW">🟢 Low</option>
+                    </select>
+                </div>
+                <div>
+                    <FieldLabel optional>Application deadline</FieldLabel>
+                    <input type="date" value={form.deadline} onChange={(e) => set("deadline", e.target.value)} className={inputCls} />
+                    <p className="text-[11px] text-[var(--text3)] mt-1">Last date this opening stays open.</p>
+                </div>
+            </div>
         </div>
     )
 }
@@ -472,8 +497,35 @@ function TextOnlyNumber({ value, onChange, placeholder }: { value: string; onCha
 
 // ─── Step 2: Customer & site details ─────────────────────────────────────────
 function StepCustomerSite({ form, set }: { form: Form; set: <K extends keyof Form>(k: K, v: Form[K]) => void }) {
+    const [sites, setSites] = useState<{ id: string; name: string; code?: string }[]>([])
+    useEffect(() => {
+        fetch("/api/sites?isActive=true")
+            .then(r => r.ok ? r.json() : [])
+            .then(d => setSites(Array.isArray(d) ? d : []))
+            .catch(() => {})
+    }, [])
+
     return (
         <div className="space-y-7">
+            {/* Target site — where this job goes live */}
+            <div className="space-y-2">
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-[var(--accent-text)]">Target site</h3>
+                <FieldLabel optional>Site this opening is for</FieldLabel>
+                <select
+                    value={form.siteId}
+                    onChange={(e) => {
+                        const id = e.target.value
+                        set("siteId", id)
+                        set("siteName", sites.find(s => s.id === id)?.name || "")
+                    }}
+                    className={inputCls}
+                >
+                    <option value="">— No specific site —</option>
+                    {sites.map(s => <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
+                </select>
+                <p className="text-[11px] text-[var(--text3)]">Selected when the job goes live, so applicants/recruiters know the deployment site.</p>
+            </div>
+
             {/* Sample / inspection part */}
             <div className="space-y-4">
                 <h3 className="text-[13px] font-bold uppercase tracking-wide text-[var(--accent-text)]">Work sample / part</h3>

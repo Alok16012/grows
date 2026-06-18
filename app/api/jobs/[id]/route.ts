@@ -34,7 +34,11 @@ async function ensureJobPostingColumns() {
                 ADD COLUMN IF NOT EXISTS "canteenAvailable"       BOOLEAN NOT NULL DEFAULT false,
                 ADD COLUMN IF NOT EXISTS "transportAvailable"     BOOLEAN NOT NULL DEFAULT false,
                 ADD COLUMN IF NOT EXISTS "accommodationAvailable" BOOLEAN NOT NULL DEFAULT false,
-                ADD COLUMN IF NOT EXISTS "busFacility"            BOOLEAN NOT NULL DEFAULT false
+                ADD COLUMN IF NOT EXISTS "busFacility"            BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "priority"               TEXT NOT NULL DEFAULT 'MEDIUM',
+                ADD COLUMN IF NOT EXISTS "deadline"               TIMESTAMP(3),
+                ADD COLUMN IF NOT EXISTS "siteId"                 TEXT,
+                ADD COLUMN IF NOT EXISTS "siteName"               TEXT
         `)
         jobColumnsEnsured = true
     } catch { /* best effort */ }
@@ -90,8 +94,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             "partSectionLabel", "partName", "partMaterial", "partPhotoUrl",
             "inspectionType", "qualityStandard", "customerName", "plantLocation",
             "plantAddress", "mapUrl", "shiftType", "weeklyOff", "overtimePolicy",
+            "siteId", "siteName",
         ]
         for (const k of passthrough) if (k in body) data[k] = body[k] || null
+        if ("priority" in body && ["LOW", "MEDIUM", "HIGH"].includes(body.priority))
+            data.priority = body.priority
+        if ("deadline" in body) data.deadline = body.deadline ? new Date(body.deadline) : null
         if ("title" in body) {
             if (!body.title || !String(body.title).trim())
                 return NextResponse.json({ error: "Job title is required" }, { status: 400 })

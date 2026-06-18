@@ -63,11 +63,27 @@ export type JobPosting = {
     transportAvailable: boolean
     accommodationAvailable: boolean
     busFacility: boolean
+    // Priority / deadline / target site
+    priority: string | null
+    deadline: string | null
+    siteId: string | null
+    siteName: string | null
     status: JobStatus
     createdBy: string | null
     creator?: { id: string; name: string } | null
     createdAt: string
     updatedAt: string
+}
+
+// Priority levels + their colour styling (used on cards, detail, preview).
+export const JOB_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const
+
+export function priorityStyle(priority?: string | null): { label: string; bg: string; text: string; dot: string } {
+    switch ((priority || "MEDIUM").toUpperCase()) {
+        case "HIGH": return { label: "High", bg: "#fee2e2", text: "#b91c1c", dot: "#dc2626" }
+        case "LOW": return { label: "Low", bg: "#dcfce7", text: "#15803d", dot: "#16a34a" }
+        default: return { label: "Medium", bg: "#fef3c7", text: "#b45309", dot: "#d97706" }
+    }
 }
 
 export const WIZARD_STEPS = [

@@ -1867,6 +1867,13 @@ model JobPosting {
   accommodationAvailable Boolean @default(false)
   busFacility            Boolean @default(false)
 
+  // Priority, application deadline and target site (site stored denormalised —
+  // no FK — to stay safe against prod schema drift, like the other job fields).
+  priority String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  deadline DateTime?
+  siteId   String?
+  siteName String?
+
   status    JobStatus @default(DRAFT)
   createdBy String?
   creator   User?     @relation("JobCreator", fields: [createdBy], references: [id], onDelete: SetNull)

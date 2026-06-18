@@ -8,10 +8,10 @@ import { toast } from "sonner"
 import { can } from "@/lib/can"
 import {
     Plus, Search, Loader2, Briefcase, MapPin, IndianRupee, Users, Target,
-    Pencil, Copy, Trash2,
+    Pencil, Copy, Trash2, CalendarClock,
 } from "lucide-react"
 import {
-    JobPosting, STATUS_META, formatExperience, formatSalary,
+    JobPosting, STATUS_META, formatExperience, formatSalary, priorityStyle,
 } from "@/components/jobs/constants"
 
 const STATUS_FILTERS = ["ALL", "PUBLISHED", "DRAFT", "CLOSED"] as const
@@ -149,7 +149,14 @@ export default function JobsPage() {
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <h3 className="font-semibold text-[var(--text)] truncate">{job.title}</h3>
-                                    <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {(() => { const p = priorityStyle(job.priority); return (
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: p.bg, color: p.text }}>
+                                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.dot }} /> {p.label}
+                                            </span>
+                                        ) })()}
+                                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
+                                    </div>
                                 </div>
                                 {job.department && <p className="text-[12px] text-[var(--text3)] mt-0.5 truncate">{job.department}</p>}
 
@@ -175,6 +182,22 @@ export default function JobsPage() {
                                             <span key={s} className="px-2 py-0.5 rounded-full border border-[var(--border)] text-[11px] text-[var(--text2)]">{s}</span>
                                         ))}
                                         {job.skills.length > 4 && <span className="text-[11px] text-[var(--text3)]">+{job.skills.length - 4}</span>}
+                                    </div>
+                                )}
+
+                                {(job.siteName || job.deadline) && (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 text-[11px] text-[var(--text2)]">
+                                        {job.siteName && <span className="inline-flex items-center gap-1"><MapPin size={12} /> {job.siteName}</span>}
+                                        {job.deadline && (() => {
+                                            const days = Math.ceil((new Date(job.deadline!).getTime() - Date.now()) / 86400000)
+                                            const over = days < 0
+                                            return (
+                                                <span className="inline-flex items-center gap-1" style={{ color: over ? "#dc2626" : days <= 3 ? "#d97706" : undefined }}>
+                                                    <CalendarClock size={12} /> {over ? "Closed " : "Open till "}{new Date(job.deadline!).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                                    {!over && days <= 7 && ` · ${days}d left`}
+                                                </span>
+                                            )
+                                        })()}
                                     </div>
                                 )}
 

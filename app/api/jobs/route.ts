@@ -36,7 +36,11 @@ async function ensureJobPostingColumns() {
                 ADD COLUMN IF NOT EXISTS "canteenAvailable"       BOOLEAN NOT NULL DEFAULT false,
                 ADD COLUMN IF NOT EXISTS "transportAvailable"     BOOLEAN NOT NULL DEFAULT false,
                 ADD COLUMN IF NOT EXISTS "accommodationAvailable" BOOLEAN NOT NULL DEFAULT false,
-                ADD COLUMN IF NOT EXISTS "busFacility"            BOOLEAN NOT NULL DEFAULT false
+                ADD COLUMN IF NOT EXISTS "busFacility"            BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "priority"               TEXT NOT NULL DEFAULT 'MEDIUM',
+                ADD COLUMN IF NOT EXISTS "deadline"               TIMESTAMP(3),
+                ADD COLUMN IF NOT EXISTS "siteId"                 TEXT,
+                ADD COLUMN IF NOT EXISTS "siteName"               TEXT
         `)
         jobColumnsEnsured = true
     } catch { /* best effort */ }
@@ -164,6 +168,11 @@ export async function POST(req: Request) {
                 transportAvailable: !!body.transportAvailable,
                 accommodationAvailable: !!body.accommodationAvailable,
                 busFacility: !!body.busFacility,
+                // Priority / deadline / target site
+                priority: ["LOW", "MEDIUM", "HIGH"].includes(body.priority) ? body.priority : "MEDIUM",
+                deadline: body.deadline ? new Date(body.deadline) : null,
+                siteId: body.siteId || null,
+                siteName: body.siteName || null,
                 status: status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
                 createdBy: realUser?.id ?? null,
             },
