@@ -7,6 +7,7 @@ import { format } from "date-fns"
 import {
     Megaphone, CalendarDays, Pin, Plus, X, Loader2,
     Trash2, AlertCircle, PartyPopper, FileText, Bell, Users,
+    Cake, Gift, ArrowRight, Clock,
 } from "lucide-react"
 import { can } from "@/lib/can"
 
@@ -35,8 +36,23 @@ type Holiday = {
     targetRoleIds?: string[]
 }
 
+type Birthday = {
+    id: string
+    name: string
+    photo: string | null
+    designation: string | null
+    department: string | null
+    phone: string | null
+    day: number
+    month: number
+    isToday: boolean
+    inDays: number
+}
+
 type Site = { id: string; name: string }
 type Role = { id: string; name: string }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 // ─── Category styling ─────────────────────────────────────────────────────────
 
@@ -87,6 +103,7 @@ export default function AnnouncementsPage() {
 
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [holidays, setHolidays] = useState<Holiday[]>([])
+    const [birthdays, setBirthdays] = useState<Birthday[]>([])
     const [sites, setSites] = useState<Site[]>([])
     const [roles, setRoles] = useState<Role[]>([])
     const [loading, setLoading] = useState(true)
@@ -96,15 +113,19 @@ export default function AnnouncementsPage() {
 
     const load = useCallback(async () => {
         try {
-            const [aRes, hRes] = await Promise.all([
+            const [aRes, hRes, bRes] = await Promise.all([
                 fetch("/api/announcements"),
                 fetch(`/api/holidays?year=${new Date().getFullYear()}`),
+                fetch("/api/birthdays?days=21"),
             ])
             setAnnouncements(aRes.ok ? await aRes.json() : [])
             setHolidays(hRes.ok ? await hRes.json() : [])
+            const bData = bRes.ok ? await bRes.json() : { birthdays: [] }
+            setBirthdays(Array.isArray(bData?.birthdays) ? bData.birthdays : [])
         } catch {
             setAnnouncements([])
             setHolidays([])
+            setBirthdays([])
         } finally {
             setLoading(false)
         }
@@ -136,8 +157,13 @@ export default function AnnouncementsPage() {
         )
     }
 
+    const startOfToday = new Date(new Date().setHours(0, 0, 0, 0))
+    const todaysBirthdays = birthdays.filter(b => b.isToday)
+    const criticalAnns = announcements.filter(a => a.category === "URGENT" || a.pinned)
+    const upcomingHolidays = holidays.filter(h => new Date(h.date) >= startOfToday)
+
     return (
-        <div className="max-w-[1100px] mx-auto px-1">
+        <div className="max-w-[1180px] mx-auto px-1">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -159,6 +185,31 @@ export default function AnnouncementsPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── Stat cards ── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                <StatCard icon={<Megaphone size={18} />} tint="#3b82f6" value={announcements.length} label="Total Announcements" sub="All notices" />
+                <StatCard icon={<AlertCircle size={18} />} tint="#dc2626" value={criticalAnns.length} label="Critical / Pinned" sub="Need attention" />
+                <StatCard icon={<Cake size={18} />} tint="#d97706" value={todaysBirthdays.length} label="Birthdays Today" sub="Wish your colleagues" />
+                <StatCard icon={<CalendarDays size={18} />} tint="#1a9e6e" value={upcomingHolidays.length} label="Upcoming Holidays" sub={`${new Date().getFullYear()}`} />
+            </div>
+
+            {/* ── Critical banner ── */}
+            {criticalAnns.length > 0 && (
+                <div className="mb-5 rounded-[12px] border border-[#fecaca] bg-[#fef2f2] px-4 py-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <AlertCircle size={15} className="text-[#dc2626]" />
+                        <span className="text-[12px] font-bold text-[#dc2626] uppercase tracking-[0.5px]">Critical Announcements</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                        {criticalAnns.slice(0, 4).map(a => (
+                            <span key={a.id} className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text2)]">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626]" /> {a.title}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5">
                 {/* ── Company Notices ── */}
@@ -200,6 +251,56 @@ export default function AnnouncementsPage() {
                                             </span>
                                         )}
                                     </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Right column: Birthday Corner + Holidays ── */}
+                <div className="space-y-5">
+
+                {/* Birthday Corner */}
+                <div>
+                    <h2 className="text-[13px] font-semibold text-[var(--text2)] uppercase tracking-[0.5px] mb-3 flex items-center gap-1.5">
+                        <Cake size={14} className="text-[#d97706]" /> Birthday Corner
+                    </h2>
+                    {birthdays.length === 0 ? (
+                        <div className="rounded-[12px] border border-dashed border-[var(--border)] py-10 text-center">
+                            <Gift size={26} className="mx-auto text-[var(--text3)] mb-2" />
+                            <p className="text-[13px] text-[var(--text3)]">No birthdays in the next 3 weeks.</p>
+                        </div>
+                    ) : (
+                        <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+                            {birthdays.slice(0, 8).map(b => (
+                                <div key={b.id} className={`flex items-center gap-3 p-3 ${b.isToday ? "bg-[#fff8ec]" : ""}`}>
+                                    <div className="relative shrink-0">
+                                        {b.photo ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={b.photo} alt={b.name} className="w-10 h-10 rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center text-[13px] font-bold text-[var(--accent-text)]">
+                                                {b.name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("")}
+                                            </div>
+                                        )}
+                                        {b.isToday && <span className="absolute -top-1 -right-1 text-[12px]">🎂</span>}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-medium text-[var(--text)] truncate">{b.name}</p>
+                                        <p className="text-[11px] text-[var(--text3)] truncate">
+                                            {b.designation || b.department || "Employee"} · {b.day} {MONTHS[b.month]}
+                                        </p>
+                                    </div>
+                                    {b.isToday ? (
+                                        <button onClick={() => wish(b)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-[var(--accent)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shrink-0">
+                                            <PartyPopper size={12} /> Wish
+                                        </button>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text3)] shrink-0">
+                                            <Clock size={11} /> {b.inDays}d
+                                        </span>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -250,6 +351,7 @@ export default function AnnouncementsPage() {
                         </div>
                     )}
                 </div>
+                </div>{/* /right column */}
             </div>
 
             {showAnnForm && <AnnouncementForm sites={sites} roles={roles} onClose={() => setShowAnnForm(false)} onSaved={() => { setShowAnnForm(false); load() }} />}
@@ -270,6 +372,37 @@ export default function AnnouncementsPage() {
         if (res.ok) { toast.success("Holiday deleted"); load() }
         else toast.error("Failed to delete")
     }
+
+    // Wish a colleague — open WhatsApp with a prefilled message when a phone is
+    // available (managers/HR), otherwise just a cheerful confirmation toast.
+    function wish(b: Birthday) {
+        const msg = `Happy Birthday ${b.name}! 🎉🎂 Wishing you a wonderful year ahead.`
+        if (b.phone) {
+            const digits = b.phone.replace(/\D/g, "")
+            const num = digits.length === 10 ? `91${digits}` : digits
+            window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank")
+        } else {
+            toast.success(`🎉 Birthday wish sent to ${b.name}!`)
+        }
+    }
+}
+
+// ─── Stat card ────────────────────────────────────────────────────────────────
+
+function StatCard({ icon, tint, value, label, sub }: { icon: React.ReactNode; tint: string; value: number; label: string; sub: string }) {
+    return (
+        <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 flex items-center gap-3">
+            <div className="w-11 h-11 rounded-[10px] flex items-center justify-center shrink-0"
+                style={{ color: tint, backgroundColor: tint + "1a" }}>
+                {icon}
+            </div>
+            <div className="min-w-0">
+                <p className="text-[22px] font-bold text-[var(--text)] leading-none">{value}</p>
+                <p className="text-[12px] font-medium text-[var(--text2)] mt-1 truncate">{label}</p>
+                <p className="text-[11px] text-[var(--text3)] truncate">{sub}</p>
+            </div>
+        </div>
+    )
 }
 
 // ─── Announcement create form ─────────────────────────────────────────────────
