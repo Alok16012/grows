@@ -10,6 +10,8 @@ export async function GET() {
     if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
+    // Salary leaves the building only for users allowed to see it.
+    const canViewSalary = checkAccess(session, [], "employees.viewSalary")
 
     const employees = await prisma.employee.findMany({
         include: {
@@ -32,7 +34,7 @@ export async function GET() {
         "Branch": e.branch?.name ?? "",
         "Department": e.department?.name ?? "",
         "Employment Type": e.employmentType,
-        "Basic Salary": e.basicSalary,
+        ...(canViewSalary ? { "Basic Salary": e.basicSalary } : {}),
         "Status": e.status,
         "Date of Joining": e.dateOfJoining ? new Date(e.dateOfJoining).toISOString().split("T")[0] : "",
         "City": e.city ?? "",

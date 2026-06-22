@@ -116,7 +116,20 @@ export async function GET(req: Request) {
             console.error("[EMPLOYEES_PHOTO_BACKFILL]", e)
         }
 
-        return NextResponse.json({ employees, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }, {
+        // Salary is sensitive — strip it for anyone without the dedicated
+        // `employees.viewSalary` permission (ADMIN always passes). Defense in
+        // depth: the UI also hides these columns, but the server must never ship
+        // salary data to a client that isn't allowed to see it.
+        const canViewSalary = checkAccess(session, [], "employees.viewSalary")
+        if (!canViewSalary) {
+            for (const e of employees as any[]) {
+                e.basicSalary = null
+                e.salaryType = null
+                e.employeeSalary = null
+            }
+        }
+
+        return NextResponse.json({ employees, total, page, pageSize, totalPages: Math.ceil(total / pageSize), canViewSalary }, {
             headers: {
                 // Browser-cache for 10s — back-button / list re-renders within
                 // 10s reuse the cached response instead of re-querying.

@@ -1604,7 +1604,7 @@ function EmployeesPage() {
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Type</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Phone</th>
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Joined</th>
-                                    {isAdmin && (
+                                    {canViewSalary && (
                                         <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Salary</th>
                                     )}
                                     <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Status</th>
@@ -1685,7 +1685,7 @@ function EmployeesPage() {
                                             <td className="px-4 py-3 text-[13px] text-[var(--text2)] whitespace-nowrap">
                                                 {emp.dateOfJoining ? format(new Date(emp.dateOfJoining), "dd MMM yyyy") : "—"}
                                             </td>
-                                            {isAdmin && (
+                                            {canViewSalary && (
                                                 <td className="px-4 py-3 text-[13px] text-[var(--text2)] whitespace-nowrap">
                                                     {fmtRupee(emp.basicSalary)}
                                                 </td>

@@ -699,8 +699,12 @@ export default function EmployeeMasterPage() {
         const selected = filteredEmployees.filter(e => selectedIds.has(e.id))
         if (!selected.length) return
         try {
-            const headers = ALL_COLS.map(c => c.label)
-            const rows = selected.map(emp => ALL_COLS.map(c => c.get(emp)))
+            // Exclude salary columns from the export for users without permission.
+            const exportCols = can(session, "employees.viewSalary")
+                ? ALL_COLS
+                : ALL_COLS.filter(c => !["basicSalary", "ctc", "salaryType"].includes(c.key))
+            const headers = exportCols.map(c => c.label)
+            const rows = selected.map(emp => exportCols.map(c => c.get(emp)))
             const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
             ws["!cols"] = headers.map((h, i) => ({
                 wch: Math.max(h.length, ...rows.map(r => String(r[i] || "").length), 10)
@@ -761,7 +765,13 @@ export default function EmployeeMasterPage() {
         }
     }
 
-    const visibleCols = COLUMN_GROUPS
+    const canViewSalary = can(session, "employees.viewSalary")
+    // Salary is sensitive — drop the whole Salary column group (Basic Salary,
+    // CTC Annual, Salary Type) for anyone without the dedicated permission.
+    // The /api/employees response also nulls these fields server-side.
+    const columnGroups = canViewSalary ? COLUMN_GROUPS : COLUMN_GROUPS.filter(g => g.group !== "Salary")
+
+    const visibleCols = columnGroups
         .filter(g => visibleGroups.has(g.group))
         .flatMap(g => g.cols.map(c => ({ ...c, groupColor: g.color, groupName: g.group })))
 
@@ -845,7 +855,7 @@ export default function EmployeeMasterPage() {
                 {/* Column group toggles */}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                     <Filter size={12} style={{ color: "var(--text3)" }} />
-                    {COLUMN_GROUPS.map(g => (
+                    {columnGroups.map(g => (
                         <button key={g.group} onClick={() => toggleGroup(g.group)}
                             style={{ padding: "3px 8px", borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: "pointer", border: `1px solid ${g.color}40`,
                                 background: visibleGroups.has(g.group) ? g.color + "22" : "transparent",
@@ -881,7 +891,7 @@ export default function EmployeeMasterPage() {
                                 <th colSpan={3} style={{ position: "sticky", left: 0, zIndex: 3, background: "#f8fafc", padding: "6px 10px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>
                                     Actions
                                 </th>
-                                {COLUMN_GROUPS.filter(g => visibleGroups.has(g.group)).map(g => (
+                                {columnGroups.filter(g => visibleGroups.has(g.group)).map(g => (
                                     <th key={g.group} colSpan={g.cols.length}
                                         style={{ padding: "6px 12px", borderBottom: "1px solid var(--border)", borderRight: "1px solid " + g.color + "40",
                                             background: g.color + "12", color: g.color, fontSize: 10, fontWeight: 700,
