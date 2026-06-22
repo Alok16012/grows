@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 
 export async function GET(
@@ -86,6 +87,15 @@ export async function PUT(
             safetyShoes, safetyShoesDate, bankBranch,
             systemRole, customRoleId,
         } = body
+
+        // Block edits that would collide with ANOTHER employee's Aadhaar / PAN /
+        // mobile / email (self is excluded). Only check fields actually present.
+        if (aadharNumber !== undefined || panNumber !== undefined || phone !== undefined || email !== undefined) {
+            const conflicts = await findEmployeeDuplicates({ aadharNumber, panNumber, phone, email }, params.id)
+            if (conflicts.length > 0) {
+                return NextResponse.json({ error: duplicateMessage(conflicts), conflicts }, { status: 409 })
+            }
+        }
 
         const updateData: Record<string, unknown> = {}
         if (firstName !== undefined) updateData.firstName = firstName

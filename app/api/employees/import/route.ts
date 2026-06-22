@@ -135,6 +135,14 @@ export async function POST(req: Request) {
             return `${e.firstName.toLowerCase()}|${(e.lastName || "").toLowerCase()}|${sId}`
         })))
 
+        // ── Pre-load existing Aadhaar / PAN / email for system-wide dedupe ──────
+        const idDocs = await prisma.employee.findMany({
+            select: { aadharNumber: true, panNumber: true, email: true },
+        })
+        const existingAadhar = new Set(idDocs.map(e => (e.aadharNumber || "").replace(/\D/g, "")).filter(v => v.length >= 12))
+        const existingPan    = new Set(idDocs.map(e => (e.panNumber || "").trim().toUpperCase()).filter(v => v.length >= 10))
+        const existingEmail  = new Set(idDocs.map(e => (e.email || "").trim().toLowerCase()).filter(Boolean))
+
         // ── Process all rows in parallel (parallel bcrypt + parallel DB) ──────
         const results = await Promise.allSettled(
             rows.map(async (row, i) => {
@@ -150,6 +158,24 @@ export async function POST(req: Request) {
                 if (phone && existingPhones.has(phone)) {
                     return { skip: true, rowNum, reason: `Duplicate: phone ${phone} already exists` }
                 }
+                // System-wide dedupe: Aadhaar / PAN / email (also reserves
+                // in-memory so two rows in the same file can't both import).
+                const aadharN = str(row.aadharNumber).replace(/\D/g, "")
+                if (aadharN.length >= 12) {
+                    if (existingAadhar.has(aadharN)) return { skip: true, rowNum, reason: `Duplicate: Aadhaar ${aadharN} already exists` }
+                    existingAadhar.add(aadharN)
+                }
+                const panN = str(row.panNumber).trim().toUpperCase()
+                if (panN.length >= 10) {
+                    if (existingPan.has(panN)) return { skip: true, rowNum, reason: `Duplicate: PAN ${panN} already exists` }
+                    existingPan.add(panN)
+                }
+                const emailN = str(row.email).trim().toLowerCase()
+                if (emailN.includes("@")) {
+                    if (existingEmail.has(emailN)) return { skip: true, rowNum, reason: `Duplicate: email ${emailN} already exists` }
+                    existingEmail.add(emailN)
+                }
+                if (phone) existingPhones.add(phone) // reserve to catch in-file phone dupes
                 if (!phone) {
                     const siteName = str(row.site)
                     const siteId = siteName ? (allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase())?.id ?? "") : ""

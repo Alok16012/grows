@@ -394,7 +394,24 @@ export function EmployeeModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...form, designation: form.role, photo: photo || undefined }),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) {
+                // Surface clean error messages — the API returns JSON
+                // ({ error, conflicts }) for duplicates (409) and plain text
+                // elsewhere. A 409 means a same Aadhaar / PAN / mobile / email
+                // already exists, so flag it loudly and stop.
+                const raw = await res.text()
+                let msg = raw
+                try {
+                    const j = JSON.parse(raw)
+                    if (j?.error) msg = j.error
+                } catch { /* plain-text error */ }
+                if (res.status === 409) {
+                    // `finally` below resets the loading state on return.
+                    toast.error(msg || "This employee already exists.")
+                    return
+                }
+                throw new Error(msg)
+            }
             const data = await res.json()
             const empId = data.id || existingId
 

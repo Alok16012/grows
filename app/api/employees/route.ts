@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import bcrypt from "bcryptjs"
@@ -177,6 +178,16 @@ export async function POST(req: Request) {
 
         if (!firstName) {
             return new NextResponse("firstName is required", { status: 400 })
+        }
+
+        // Block duplicates — same Aadhaar / PAN / mobile / email as an existing
+        // employee. Returns 409 with the conflicting fields so the UI can flag it.
+        const conflicts = await findEmployeeDuplicates({ aadharNumber, panNumber, phone, email })
+        if (conflicts.length > 0) {
+            return NextResponse.json(
+                { error: duplicateMessage(conflicts), conflicts },
+                { status: 409 }
+            )
         }
 
         // Auto-generate employeeId as EMP-NNNN

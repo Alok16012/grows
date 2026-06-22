@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
@@ -75,6 +76,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const nameParts = lead.candidateName.trim().split(/\s+/)
         const firstName = formFirstName?.trim() || nameParts[0]
         const lastName  = formLastName?.trim()  || nameParts.slice(1).join(" ") || ""
+
+        // Block converting a candidate whose Aadhaar / PAN / mobile / email
+        // already belongs to an existing employee.
+        const dupConflicts = await findEmployeeDuplicates({
+            aadharNumber,
+            panNumber,
+            phone: formPhone?.trim() || lead.phone,
+            email: formEmail?.trim() || lead.email,
+        })
+        if (dupConflicts.length > 0) {
+            return NextResponse.json({ error: duplicateMessage(dupConflicts), conflicts: dupConflicts }, { status: 409 })
+        }
 
         // ── Create / reuse User account ───────────────────────────────────────
         const resolvedEmail = formEmail?.trim() || lead.email || `${lead.phone}@cims.local`
