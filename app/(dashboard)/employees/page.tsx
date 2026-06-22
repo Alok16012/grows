@@ -961,6 +961,7 @@ function EmployeeDrawer({
 function RowActions({
     emp,
     isAdmin,
+    canDelete,
     onView,
     onEdit,
     onTerminate,
@@ -968,6 +969,7 @@ function RowActions({
 }: {
     emp: Employee
     isAdmin: boolean
+    canDelete: boolean
     onView: () => void
     onEdit: () => void
     onTerminate: () => void
@@ -1005,7 +1007,7 @@ function RowActions({
                             <ShieldOff size={14} /> Terminate
                         </button>
                     )}
-                    {isAdmin && (
+                    {canDelete && (
                         <button onClick={() => { onDelete(); setOpen(false) }} className="w-full text-left px-4 py-2 text-[13px] flex items-center gap-2.5 hover:bg-[#fef2f2] text-[#dc2626] transition-colors">
                             <Trash2 size={14} /> Delete
                         </button>
@@ -1051,6 +1053,7 @@ function EmployeesPage() {
 
     const isAdmin = can(session, "employees.edit")
     const canViewSalary = can(session, "employees.viewSalary")
+    const canDelete = can(session, "employees.delete")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -1563,7 +1566,7 @@ function EmployeesPage() {
             ) : (
                 <>
                 {/* Bulk action bar */}
-                {isAdmin && selectedIds.size > 0 && (
+                {canDelete && selectedIds.size > 0 && (
                     <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-[10px]">
                         <span className="text-[13px] font-semibold text-[var(--accent)]">{selectedIds.size} employee{selectedIds.size !== 1 ? "s" : ""} selected</span>
                         <button
@@ -1585,7 +1588,7 @@ function EmployeesPage() {
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
-                                    {isAdmin && (
+                                    {canDelete && (
                                         <th className="px-4 py-3 w-10">
                                             <input
                                                 type="checkbox"
@@ -1619,7 +1622,7 @@ function EmployeesPage() {
                                             key={emp.id}
                                             className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/30 transition-colors ${selectedIds.has(emp.id) ? "bg-[var(--accent)]/5" : ""} ${i === employees.length - 1 ? "border-b-0" : ""}`}
                                         >
-                                            {isAdmin && (
+                                            {canDelete && (
                                                 <td className="px-4 py-3 w-10">
                                                     <input
                                                         type="checkbox"
@@ -1703,6 +1706,7 @@ function EmployeesPage() {
                                                     <RowActions
                                                         emp={emp}
                                                         isAdmin={isAdmin}
+                                                        canDelete={canDelete}
                                                         onView={() => setDrawerEmployee(emp)}
                                                         onEdit={() => { setEditEmployee(emp); setShowModal(true) }}
                                                         onTerminate={() => handleStatusChange(emp.id, "TERMINATED")}

@@ -766,6 +766,7 @@ export default function EmployeeMasterPage() {
     }
 
     const canViewSalary = can(session, "employees.viewSalary")
+    const canDelete = can(session, "employees.delete")
     // Salary is sensitive — drop the whole Salary column group (Basic Salary,
     // CTC Annual, Salary Type) for anyone without the dedicated permission.
     // The /api/employees response also nulls these fields server-side.
@@ -1017,7 +1018,7 @@ export default function EmployeeMasterPage() {
                     style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                     <FileSpreadsheet size={12} /> Download
                 </button>
-                {confirmDelete ? (
+                {canDelete && (confirmDelete ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 11, color: "#fca5a5" }}>Sure? This cannot be undone.</span>
                         <button onClick={handleBulkDelete} disabled={deleting}
@@ -1035,7 +1036,7 @@ export default function EmployeeMasterPage() {
                         style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                         <Trash2 size={11} /> Delete
                     </button>
-                )}
+                ))}
             </div>
         )}
 
