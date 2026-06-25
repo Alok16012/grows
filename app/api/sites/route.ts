@@ -9,7 +9,14 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "sites.view")) {
+        // Reading the site list feeds several filter dropdowns (Employees,
+        // Attendance, Deployments…), so anyone who can view those modules may list
+        // sites — not just users with the dedicated sites.view permission.
+        const canListSites =
+            checkAccess(session, ["MANAGER", "HR_MANAGER"], "sites.view") ||
+            checkAccess(session, [], "employees.view") ||
+            checkAccess(session, [], "attendance.view")
+        if (!canListSites) {
             return NextResponse.json({
                 error: "Forbidden - missing sites.view permission",
                 debug: {
