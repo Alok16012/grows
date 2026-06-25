@@ -595,6 +595,10 @@ export default function EmployeeMasterPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [deleting, setDeleting] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
+    // Individual columns the user has unchecked (within visible groups). Export
+    // and the table both honor this so you download exactly the columns you pick.
+    const [hiddenColKeys, setHiddenColKeys] = useState<Set<string>>(new Set())
+    const [showColPicker, setShowColPicker] = useState(false)
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -643,6 +647,14 @@ export default function EmployeeMasterPage() {
         setVisibleGroups(prev => {
             const next = new Set(prev)
             next.has(group) ? next.delete(group) : next.add(group)
+            return next
+        })
+    }
+
+    const toggleCol = (key: string) => {
+        setHiddenColKeys(prev => {
+            const next = new Set(prev)
+            next.has(key) ? next.delete(key) : next.add(key)
             return next
         })
     }
@@ -698,11 +710,11 @@ export default function EmployeeMasterPage() {
     const handleDownloadSelected = () => {
         const selected = filteredEmployees.filter(e => selectedIds.has(e.id))
         if (!selected.length) return
+        if (visibleCols.length === 0) { toast.error("Pick at least one column to export"); return }
         try {
-            // Exclude salary columns from the export for users without permission.
-            const exportCols = can(session, "employees.viewSalary")
-                ? ALL_COLS
-                : ALL_COLS.filter(c => !["basicSalary", "ctc", "salaryType"].includes(c.key))
+            // Export exactly the columns currently visible (group + column picker),
+            // which already excludes salary for users without permission.
+            const exportCols = visibleCols
             const headers = exportCols.map(c => c.label)
             const rows = selected.map(emp => exportCols.map(c => c.get(emp)))
             const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
@@ -738,10 +750,12 @@ export default function EmployeeMasterPage() {
 
     // ── Excel export ──────────────────────────────────────────────────────────
     const handleExport = () => {
+        if (visibleCols.length === 0) { toast.error("Pick at least one column to export"); return }
         setExporting(true)
         try {
-            const headers = ALL_COLS.map(c => c.label)
-            const rows = filteredEmployees.map(emp => ALL_COLS.map(c => c.get(emp)))
+            // Honor the column selection — export only the visible columns.
+            const headers = visibleCols.map(c => c.label)
+            const rows = filteredEmployees.map(emp => visibleCols.map(c => c.get(emp)))
             const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
             ws["!cols"] = headers.map((h, i) => ({
                 wch: Math.max(h.length, ...rows.map(r => String(r[i] || "").length), 10)
@@ -774,7 +788,9 @@ export default function EmployeeMasterPage() {
 
     const visibleCols = columnGroups
         .filter(g => visibleGroups.has(g.group))
-        .flatMap(g => g.cols.map(c => ({ ...c, groupColor: g.color, groupName: g.group })))
+        .flatMap(g => g.cols
+            .filter(c => !hiddenColKeys.has(c.key))
+            .map(c => ({ ...c, groupColor: g.color, groupName: g.group })))
 
     const isAdmin = can(session, "employees.view")
 
@@ -852,6 +868,44 @@ export default function EmployeeMasterPage() {
                         <X size={12} /> Clear
                     </button>
                 )}
+
+                {/* Per-column picker */}
+                <div style={{ position: "relative" }}>
+                    <button onClick={() => setShowColPicker(v => !v)}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: showColPicker ? "var(--surface2)" : "transparent", color: "var(--text2)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                        <CheckSquare size={13} /> Columns ({visibleCols.length})
+                    </button>
+                    {showColPicker && (
+                        <>
+                            <div onClick={() => setShowColPicker(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, width: 280, maxHeight: 420, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 12px 40px rgba(11,27,51,0.18)", padding: 12 }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>Choose columns to export</span>
+                                </div>
+                                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                                    <button onClick={() => setHiddenColKeys(new Set())}
+                                        style={{ flex: 1, padding: "5px 0", borderRadius: 7, border: "1px solid var(--border)", background: "transparent", color: "var(--accent-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Select all</button>
+                                    <button onClick={() => setHiddenColKeys(new Set(columnGroups.flatMap(g => g.cols.map(c => c.key))))}
+                                        style={{ flex: 1, padding: "5px 0", borderRadius: 7, border: "1px solid var(--border)", background: "transparent", color: "var(--text3)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Clear all</button>
+                                </div>
+                                {columnGroups.filter(g => visibleGroups.has(g.group)).map(g => (
+                                    <div key={g.group} style={{ marginBottom: 10 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: g.color, marginBottom: 4 }}>{g.group}</div>
+                                        {g.cols.map(c => (
+                                            <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px", cursor: "pointer", fontSize: 12.5, color: "var(--text2)" }}>
+                                                <input type="checkbox" checked={!hiddenColKeys.has(c.key)} onChange={() => toggleCol(c.key)} style={{ accentColor: "var(--accent)" }} />
+                                                {c.label}
+                                            </label>
+                                        ))}
+                                    </div>
+                                ))}
+                                <p style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 4, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+                                    Tip: hide a whole group from the chips, or untick single columns here. Excel downloads exactly these {visibleCols.length} columns.
+                                </p>
+                            </div>
+                        </>
+                    )}
+                </div>
 
                 {/* Column group toggles */}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
