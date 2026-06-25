@@ -7,7 +7,7 @@ import { format } from "date-fns"
 import {
     Megaphone, CalendarDays, Pin, Plus, X, Loader2,
     Trash2, AlertCircle, PartyPopper, FileText, Bell, Users,
-    Cake, Gift, ArrowRight, Clock,
+    Cake, Gift, ArrowRight, Clock, Award,
 } from "lucide-react"
 import { can } from "@/lib/can"
 
@@ -45,6 +45,20 @@ type Birthday = {
     phone: string | null
     day: number
     month: number
+    isToday: boolean
+    inDays: number
+}
+
+type Anniversary = {
+    id: string
+    name: string
+    photo: string | null
+    designation: string | null
+    department: string | null
+    phone: string | null
+    day: number
+    month: number
+    years: number
     isToday: boolean
     inDays: number
 }
@@ -104,6 +118,7 @@ export default function AnnouncementsPage() {
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [holidays, setHolidays] = useState<Holiday[]>([])
     const [birthdays, setBirthdays] = useState<Birthday[]>([])
+    const [anniversaries, setAnniversaries] = useState<Anniversary[]>([])
     const [sites, setSites] = useState<Site[]>([])
     const [roles, setRoles] = useState<Role[]>([])
     const [loading, setLoading] = useState(true)
@@ -113,19 +128,23 @@ export default function AnnouncementsPage() {
 
     const load = useCallback(async () => {
         try {
-            const [aRes, hRes, bRes] = await Promise.all([
+            const [aRes, hRes, bRes, anRes] = await Promise.all([
                 fetch("/api/announcements"),
                 fetch(`/api/holidays?year=${new Date().getFullYear()}`),
                 fetch("/api/birthdays?days=21"),
+                fetch("/api/anniversaries?days=21"),
             ])
             setAnnouncements(aRes.ok ? await aRes.json() : [])
             setHolidays(hRes.ok ? await hRes.json() : [])
             const bData = bRes.ok ? await bRes.json() : { birthdays: [] }
             setBirthdays(Array.isArray(bData?.birthdays) ? bData.birthdays : [])
+            const anData = anRes.ok ? await anRes.json() : { anniversaries: [] }
+            setAnniversaries(Array.isArray(anData?.anniversaries) ? anData.anniversaries : [])
         } catch {
             setAnnouncements([])
             setHolidays([])
             setBirthdays([])
+            setAnniversaries([])
         } finally {
             setLoading(false)
         }
@@ -307,6 +326,54 @@ export default function AnnouncementsPage() {
                     )}
                 </div>
 
+                {/* Work Anniversaries */}
+                <div>
+                    <h2 className="text-[13px] font-semibold text-[var(--text2)] uppercase tracking-[0.5px] mb-3 flex items-center gap-1.5">
+                        <Award size={14} className="text-[#7c3aed]" /> Work Anniversaries
+                    </h2>
+                    {anniversaries.length === 0 ? (
+                        <div className="rounded-[12px] border border-dashed border-[var(--border)] py-10 text-center">
+                            <Award size={26} className="mx-auto text-[var(--text3)] mb-2" />
+                            <p className="text-[13px] text-[var(--text3)]">No work anniversaries in the next 3 weeks.</p>
+                        </div>
+                    ) : (
+                        <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+                            {anniversaries.slice(0, 8).map(a => (
+                                <div key={a.id} className={`flex items-center gap-3 p-3 ${a.isToday ? "bg-[#f6f1ff]" : ""}`}>
+                                    <div className="relative shrink-0">
+                                        {a.photo ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={a.photo} alt={a.name} className="w-10 h-10 rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-[#efe7fb] flex items-center justify-center text-[13px] font-bold text-[#7c3aed]">
+                                                {a.name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("")}
+                                            </div>
+                                        )}
+                                        {a.isToday && <span className="absolute -top-1 -right-1 text-[12px]">🎉</span>}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-medium text-[var(--text)] truncate">{a.name}</p>
+                                        <p className="text-[11px] text-[var(--text3)] truncate">
+                                            <span className="font-semibold text-[#7c3aed]">{a.years} {a.years === 1 ? "year" : "years"}</span> · {a.designation || a.department || "Employee"}
+                                        </p>
+                                    </div>
+                                    {a.isToday ? (
+                                        <button onClick={() => congratulate(a)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shrink-0"
+                                            style={{ backgroundColor: "#7c3aed" }}>
+                                            <PartyPopper size={12} /> Congrats
+                                        </button>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text3)] shrink-0">
+                                            <Clock size={11} /> {a.inDays}d
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 {/* ── Holiday List ── */}
                 <div>
                     <h2 className="text-[13px] font-semibold text-[var(--text2)] uppercase tracking-[0.5px] mb-3 flex items-center gap-1.5">
@@ -383,6 +450,18 @@ export default function AnnouncementsPage() {
             window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank")
         } else {
             toast.success(`🎉 Birthday wish sent to ${b.name}!`)
+        }
+    }
+
+    // Congratulate a colleague on their work anniversary.
+    function congratulate(a: Anniversary) {
+        const msg = `Congratulations ${a.name} on completing ${a.years} ${a.years === 1 ? "year" : "years"} with Growus! 🎉 Thank you for your contribution.`
+        if (a.phone) {
+            const digits = a.phone.replace(/\D/g, "")
+            const num = digits.length === 10 ? `91${digits}` : digits
+            window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank")
+        } else {
+            toast.success(`🎉 Anniversary wish sent to ${a.name}!`)
         }
     }
 }
