@@ -258,14 +258,14 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                 {/* Profile */}
                 <div className="relative" ref={profileRef}>
                     <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--surface2)] transition-all">
-                        <div className="h-[34px] w-[34px] rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-[13px] font-bold overflow-hidden shadow-sm">
+                        <div className="h-[42px] w-[42px] rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-[15px] font-bold overflow-hidden shadow-sm">
                             {mounted && (session?.user as any)?.photo ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={(session?.user as any).photo} alt={session?.user?.name || "Profile"} className="h-full w-full object-cover" />
                             ) : mounted && session?.user?.name ? (
                                 session.user.name.charAt(0).toUpperCase()
                             ) : (
-                                <UserCircle size={20} />
+                                <UserCircle size={24} />
                             )}
                         </div>
                         <ChevronDown size={14} className={cn("text-[var(--text3)] transition-transform duration-200", isProfileOpen && "rotate-180")} />
