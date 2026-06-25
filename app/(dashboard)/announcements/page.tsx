@@ -296,9 +296,9 @@ export default function AnnouncementsPage() {
                                     <div className="relative shrink-0">
                                         {b.photo ? (
                                             // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={b.photo} alt={b.name} className="w-10 h-10 rounded-full object-cover" />
+                                            <img src={b.photo} alt={b.name} className="w-12 h-12 rounded-full object-cover" />
                                         ) : (
-                                            <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center text-[13px] font-bold text-[var(--accent-text)]">
+                                            <div className="w-12 h-12 rounded-full bg-[var(--accent-light)] flex items-center justify-center text-[13px] font-bold text-[var(--accent-text)]">
                                                 {b.name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("")}
                                             </div>
                                         )}
@@ -343,9 +343,9 @@ export default function AnnouncementsPage() {
                                     <div className="relative shrink-0">
                                         {a.photo ? (
                                             // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={a.photo} alt={a.name} className="w-10 h-10 rounded-full object-cover" />
+                                            <img src={a.photo} alt={a.name} className="w-12 h-12 rounded-full object-cover" />
                                         ) : (
-                                            <div className="w-10 h-10 rounded-full bg-[#efe7fb] flex items-center justify-center text-[13px] font-bold text-[#7c3aed]">
+                                            <div className="w-12 h-12 rounded-full bg-[#efe7fb] flex items-center justify-center text-[13px] font-bold text-[#7c3aed]">
                                                 {a.name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("")}
                                             </div>
                                         )}

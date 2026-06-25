@@ -805,7 +805,7 @@ export default function ProfilePage() {
             {/* Header card */}
             <div className="bg-white border border-[var(--border)] rounded-2xl p-6 flex items-center gap-4">
                 <div className="relative shrink-0">
-                    <div className="w-16 h-16 rounded-full overflow-hidden bg-[#1a1a18] text-white flex items-center justify-center text-[22px] font-bold border-2 border-[var(--border)]">
+                    <div className="w-20 h-20 rounded-full overflow-hidden bg-[#1a1a18] text-white flex items-center justify-center text-[26px] font-bold border-2 border-[var(--border)]">
                         {formData.image ? (
                             <img src={formData.image} alt={formData.name} className="w-full h-full object-cover" />
                         ) : (
