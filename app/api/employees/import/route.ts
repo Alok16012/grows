@@ -137,11 +137,12 @@ export async function POST(req: Request) {
 
         // ── Pre-load existing Aadhaar / PAN / email for system-wide dedupe ──────
         const idDocs = await prisma.employee.findMany({
-            select: { aadharNumber: true, panNumber: true, email: true },
+            select: { aadharNumber: true, panNumber: true, email: true, bankAccountNumber: true },
         })
         const existingAadhar = new Set(idDocs.map(e => (e.aadharNumber || "").replace(/\D/g, "")).filter(v => v.length >= 12))
         const existingPan    = new Set(idDocs.map(e => (e.panNumber || "").trim().toUpperCase()).filter(v => v.length >= 10))
         const existingEmail  = new Set(idDocs.map(e => (e.email || "").trim().toLowerCase()).filter(Boolean))
+        const existingBank   = new Set(idDocs.map(e => (e.bankAccountNumber || "").replace(/\s+/g, "")).filter(v => v.length >= 5))
 
         // ── Process all rows in parallel (parallel bcrypt + parallel DB) ──────
         const results = await Promise.allSettled(
@@ -174,6 +175,11 @@ export async function POST(req: Request) {
                 if (emailN.includes("@")) {
                     if (existingEmail.has(emailN)) return { skip: true, rowNum, reason: `Duplicate: email ${emailN} already exists` }
                     existingEmail.add(emailN)
+                }
+                const bankN = str(row.bankAccountNumber).replace(/\s+/g, "")
+                if (bankN.length >= 5) {
+                    if (existingBank.has(bankN)) return { skip: true, rowNum, reason: `Duplicate: bank account ${bankN} already exists` }
+                    existingBank.add(bankN)
                 }
                 if (phone) existingPhones.add(phone) // reserve to catch in-file phone dupes
                 if (!phone) {

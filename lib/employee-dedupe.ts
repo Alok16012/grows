@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 // normalized before comparison so trivial formatting differences (spaces in
 // Aadhaar, +91 on the phone, email casing) still count as a match.
 
-export type DupField = "aadhar" | "pan" | "phone" | "email"
+export type DupField = "aadhar" | "pan" | "phone" | "email" | "bankAccount"
 
 export interface DuplicateConflict {
     field: DupField
@@ -25,7 +25,10 @@ interface DupInput {
     panNumber?: string | null
     phone?: string | null
     email?: string | null
+    bankAccountNumber?: string | null
 }
+
+const noSpace = (s?: string | null) => (s || "").replace(/\s+/g, "")
 
 const fullName = (e: { firstName: string; lastName: string | null }) =>
     `${e.firstName} ${e.lastName ?? ""}`.trim()
@@ -40,6 +43,7 @@ export async function findEmployeeDuplicates(input: DupInput, excludeId?: string
     const pan = (input.panNumber || "").trim().toUpperCase()
     const phone = last10(input.phone)
     const email = (input.email || "").trim().toLowerCase()
+    const bankAccount = noSpace(input.bankAccountNumber)
 
     const notSelf = excludeId ? { NOT: { id: excludeId } } : {}
     const select = { id: true, employeeId: true, firstName: true, lastName: true } as const
@@ -79,6 +83,16 @@ export async function findEmployeeDuplicates(input: DupInput, excludeId?: string
             select,
         })
         if (hit) conflicts.push({ field: "email", label: "email", value: email, employee: { id: hit.id, employeeId: hit.employeeId, name: fullName(hit) } })
+    }
+
+    // Bank account number — exact (match the raw input or its space-stripped
+    // form). Skip very short values to avoid false positives.
+    if (bankAccount.length >= 5) {
+        const hit = await prisma.employee.findFirst({
+            where: { ...notSelf, OR: [{ bankAccountNumber: input.bankAccountNumber ?? undefined }, { bankAccountNumber: bankAccount }] },
+            select,
+        })
+        if (hit) conflicts.push({ field: "bankAccount", label: "bank account number", value: bankAccount, employee: { id: hit.id, employeeId: hit.employeeId, name: fullName(hit) } })
     }
 
     return conflicts

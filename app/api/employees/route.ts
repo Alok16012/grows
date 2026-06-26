@@ -182,7 +182,7 @@ export async function POST(req: Request) {
 
         // Block duplicates — same Aadhaar / PAN / mobile / email as an existing
         // employee. Returns 409 with the conflicting fields so the UI can flag it.
-        const conflicts = await findEmployeeDuplicates({ aadharNumber, panNumber, phone, email })
+        const conflicts = await findEmployeeDuplicates({ aadharNumber, panNumber, phone, email, bankAccountNumber })
         if (conflicts.length > 0) {
             return NextResponse.json(
                 { error: duplicateMessage(conflicts), conflicts },
