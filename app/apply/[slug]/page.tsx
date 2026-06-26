@@ -6,6 +6,9 @@ import { Loader2, CheckCircle2, AlertCircle, Send, Briefcase, User, MapPin, Came
 const POSITIONS = [
     "Quality Inspector",
     "Quality Supervisor",
+    "QRE",
+    "CMM Operator",
+    "Designer",
     "Security Guard",
     "Security Supervisor",
     "Driver",

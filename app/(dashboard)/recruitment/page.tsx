@@ -64,6 +64,9 @@ const ACTIVITY_TYPES = [
 const POSITIONS = [
     "Quality Inspector",
     "Quality Supervisor",
+    "QRE",
+    "CMM Operator",
+    "Designer",
     "Security Guard",
     "Security Supervisor",
     "Driver",
