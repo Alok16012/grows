@@ -17,6 +17,17 @@ import { format } from "date-fns"
 // and import. Eager import would bloat the post-login landing bundle.
 const loadXLSX = () => import("xlsx")
 import { EmployeeModal, Employee, STATUS_CONFIG } from "@/components/EmployeeModal"
+
+// Columns offered in the Export picker — mirrors the server export
+// (app/api/employees/export). "Basic Salary" is hidden without salary access.
+const EXPORT_COLUMNS = [
+    "Employee ID", "First Name", "Middle Name", "Last Name", "Name As Per Aadhar",
+    "Father's Name", "Phone", "Email", "Designation", "Branch", "Department",
+    "Employment Type", "Basic Salary", "Status", "Date of Joining", "City",
+    "Blood Group", "UAN", "PF No", "ESI No", "Aadhar No", "PAN No", "Labour Card No",
+    "Contract From", "Contractor Code", "Work Order Number",
+    "Bank Name", "Bank Branch", "Bank IFSC", "Bank Account",
+]
 import { DocumentViewer } from "@/components/DocumentViewer"
 
 // ─── Local Types ──────────────────────────────────────────────────────────────
@@ -1050,6 +1061,9 @@ function EmployeesPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [bulkDeleting, setBulkDeleting] = useState(false)
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+    const [exportOpen, setExportOpen] = useState(false)
+    const [exporting, setExporting] = useState(false)
+    const [exportCols, setExportCols] = useState<Set<string>>(new Set(EXPORT_COLUMNS))
 
     const isAdmin = can(session, "employees.edit")
     const canViewSalary = can(session, "employees.viewSalary")
@@ -1124,8 +1138,16 @@ function EmployeesPage() {
     }, [searchParams, employees, loading])
 
     async function handleExport() {
+        const cols = EXPORT_COLUMNS.filter(c => exportCols.has(c) && (c !== "Basic Salary" || canViewSalary))
+        if (cols.length === 0) { toast.error("Pick at least one column"); return }
+        const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined
+        setExporting(true)
         try {
-            const res = await fetch("/api/employees/export")
+            const res = await fetch("/api/employees/export", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids, cols }),
+            })
             if (!res.ok) { toast.error("Export failed"); return }
             const blob = await res.blob()
             const url = URL.createObjectURL(blob)
@@ -1136,8 +1158,12 @@ function EmployeesPage() {
             a.click()
             a.remove()
             URL.revokeObjectURL(url)
+            toast.success(`Exported ${ids ? `${ids.length} selected` : "all"} employees`)
+            setExportOpen(false)
         } catch {
             toast.error("Export failed")
+        } finally {
+            setExporting(false)
         }
     }
 
@@ -1450,14 +1476,54 @@ function EmployeesPage() {
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage your workforce</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <button
-                        onClick={handleExport}
-                        title="Export to Excel"
-                        style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
-                    >
-                        <Download size={15} />
-                        Export
-                    </button>
+                    <div style={{ position: "relative" }}>
+                        <button
+                            onClick={() => setExportOpen(o => !o)}
+                            title="Export to Excel — pick rows & columns"
+                            style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                        >
+                            <Download size={15} />
+                            Export{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+                        </button>
+                        {exportOpen && (
+                            <>
+                                <div onClick={() => setExportOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                                <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", width: 280, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 10px 32px rgba(0,0,0,0.15)", zIndex: 50, padding: 12 }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>Export to Excel</span>
+                                        <span style={{ fontSize: 11, color: "var(--text3)" }}>
+                                            {selectedIds.size > 0 ? `${selectedIds.size} row(s)` : `All rows (${totalCount})`}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                                        <button onClick={() => setExportCols(new Set(EXPORT_COLUMNS))} style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Select all</button>
+                                        <button onClick={() => setExportCols(new Set())} style={{ fontSize: 11, color: "var(--text3)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear</button>
+                                    </div>
+                                    <div style={{ maxHeight: 240, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 8, padding: 6, marginBottom: 10 }}>
+                                        {EXPORT_COLUMNS.filter(c => c !== "Basic Salary" || canViewSalary).map(c => (
+                                            <label key={c} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 4px", fontSize: 12.5, color: "var(--text2)", cursor: "pointer" }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={exportCols.has(c)}
+                                                    onChange={() => setExportCols(prev => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n })}
+                                                    style={{ accentColor: "var(--accent)" }}
+                                                />
+                                                {c}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={handleExport}
+                                        disabled={exporting}
+                                        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: 34, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: exporting ? 0.6 : 1 }}
+                                    >
+                                        {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                                        {exporting ? "Exporting…" : `Download ${selectedIds.size > 0 ? `${selectedIds.size} selected` : "all"}`}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                     <button
                         onClick={() => { setShowImportModal(true); setImportRows([]); setImportResult(null); if (importFileRef.current) importFileRef.current.value = "" }}
                         title="Import from Excel"
