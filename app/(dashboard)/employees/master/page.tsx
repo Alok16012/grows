@@ -820,10 +820,11 @@ export default function EmployeeMasterPage() {
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
-                    <button onClick={handleExport} disabled={exporting || filteredEmployees.length === 0}
+                    <button onClick={selectedIds.size > 0 ? handleDownloadSelected : handleExport} disabled={exporting || filteredEmployees.length === 0}
+                        title={selectedIds.size > 0 ? "Downloads only the selected rows, with the columns you've picked" : "Downloads all rows, with the columns you've picked"}
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1 }}>
                         {exporting ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
-                        {exporting ? "Exporting…" : `Download Excel (${filteredEmployees.length})`}
+                        {exporting ? "Exporting…" : selectedIds.size > 0 ? `Download Excel (${selectedIds.size} selected)` : `Download Excel (${filteredEmployees.length})`}
                     </button>
                 </div>
             </div>
