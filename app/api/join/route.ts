@@ -15,14 +15,14 @@ export async function GET() {
             prisma.user.findMany({
                 where: {
                     isActive: true,
+                    // Only HR people belong in the "Select your HR contact" list —
+                    // not every role that happens to have recruitment.view (Ops
+                    // Manager, Payroll, MIS, etc.). Match the HR_MANAGER system role
+                    // and any active custom role whose name contains "HR"
+                    // (HR Recruiter, HR Executive, HR Manager…).
                     OR: [
-                        // System admins/managers
-                        { role: { in: ["ADMIN", "MANAGER", "HR_MANAGER"] } },
-                        // Anyone with an active custom role that can handle
-                        // recruitment (e.g. "HR RECRUITER", "HR EXECUTIVE").
-                        // HR RECRUITER is a custom role, not a system role, so a
-                        // plain role filter misses most recruiters.
-                        { customRole: { is: { isActive: true, permissions: { has: "recruitment.view" } } } },
+                        { role: "HR_MANAGER" },
+                        { customRole: { is: { isActive: true, name: { contains: "HR", mode: "insensitive" } } } },
                     ],
                 },
                 select: {

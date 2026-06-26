@@ -33,7 +33,11 @@ export async function GET(_req: Request, { params }: { params: { token: string }
             prisma.user.findMany({
                 where: {
                     isActive: true,
-                    role: { in: ["ADMIN", "MANAGER", "HR_MANAGER"] },
+                    // Only HR people in the "Select your HR contact" list.
+                    OR: [
+                        { role: "HR_MANAGER" },
+                        { customRole: { is: { isActive: true, name: { contains: "HR", mode: "insensitive" } } } },
+                    ],
                 },
                 select: {
                     id: true,
