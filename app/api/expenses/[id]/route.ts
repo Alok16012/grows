@@ -40,9 +40,12 @@ let categoryItemsColumnEnsured = false
 async function ensureCategoryItemsColumn() {
     if (categoryItemsColumnEnsured) return
     try {
-        await (prisma as any).$executeRawUnsafe(
-            `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "categoryItems" JSONB`
-        )
+        await (prisma as any).$executeRawUnsafe(`
+            ALTER TABLE "Expense"
+                ADD COLUMN IF NOT EXISTS "categoryItems" JSONB,
+                ADD COLUMN IF NOT EXISTS "siteId"   TEXT,
+                ADD COLUMN IF NOT EXISTS "siteName" TEXT
+        `)
         categoryItemsColumnEnsured = true
     } catch { /* best effort */ }
 }
@@ -122,7 +125,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { action, title, category, amount, date, description, receiptUrl, projectId, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate, travelEntries, categoryItems } = body
+        const { action, title, category, amount, date, description, receiptUrl, projectId, siteId, siteName, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate, travelEntries, categoryItems } = body
 
         const updateData: Record<string, unknown> = {}
 
@@ -136,6 +139,11 @@ export async function PUT(
             if (description !== undefined) updateData.description = description || null
             if (receiptUrl !== undefined) updateData.receiptUrl = receiptUrl || null
             if (projectId !== undefined) updateData.projectId = projectId || null
+            if (siteId !== undefined || siteName !== undefined) {
+                if (siteId !== undefined) updateData.siteId = siteId || null
+                if (siteName !== undefined) updateData.siteName = siteName || null
+                await ensureCategoryItemsColumn() // adds siteId/siteName columns too
+            }
             if (travelDays !== undefined) updateData.travelDays = travelDays ? parseInt(String(travelDays)) : null
             if (travelDailyRate !== undefined) updateData.travelDailyRate = travelDailyRate ? parseFloat(String(travelDailyRate)) : null
             if (travelEntries !== undefined) updateData.travelEntries = travelEntries ?? null

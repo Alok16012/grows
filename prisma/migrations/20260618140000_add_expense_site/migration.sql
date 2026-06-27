@@ -1,0 +1,3 @@
+ALTER TABLE "Expense"
+    ADD COLUMN IF NOT EXISTS "siteId"   TEXT,
+    ADD COLUMN IF NOT EXISTS "siteName" TEXT;

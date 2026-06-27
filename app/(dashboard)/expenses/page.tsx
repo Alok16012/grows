@@ -8,7 +8,7 @@ import {
     ChevronRight, ChevronLeft, CheckCircle2, Clock,
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
-    Upload, FileText, Paperclip, Briefcase, Download, Eye, AlertCircle,
+    Upload, FileText, Paperclip, Briefcase, MapPin, Download, Eye, AlertCircle,
     type LucideIcon
 } from "lucide-react"
 import { format } from "date-fns"
@@ -71,6 +71,8 @@ type Expense = {
     employeeId: string | null
     projectId: string | null
     project: ExpenseProject | null
+    siteId: string | null
+    siteName: string | null
     approvedBy: string | null
     approvedAt: string | null
     rejectedAt: string | null
@@ -500,7 +502,7 @@ function AddExpenseModal({
     editExpense?: Expense | null
 }) {
     const [loading, setLoading] = useState(false)
-    const [projects, setProjects] = useState<ExpenseProject[]>([])
+    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
     // Admin-set per-km rates per vehicle type (employee can't edit these)
     const [rate2W, setRate2W] = useState(0)
     const [rate4W, setRate4W] = useState(0)
@@ -509,7 +511,8 @@ function AddExpenseModal({
         title: "",
         date: today,
         description: "",
-        projectId: "",
+        siteId: "",
+        siteName: "",
     })
     // One or more category line-items under this single expense.
     const [lines, setLines] = useState<LineItem[]>([mkLine("TRAVEL", today)])
@@ -530,13 +533,13 @@ function AddExpenseModal({
 
     useEffect(() => {
         if (!open) return
-        fetch("/api/projects")
+        fetch("/api/sites?isActive=true")
             .then(r => r.ok ? r.json() : [])
             .then((data: any) => {
-                const list = Array.isArray(data) ? data : (data.projects ?? [])
-                setProjects(list.map((p: any) => ({ id: p.id, name: p.name, company: p.company ?? null })))
+                const list = Array.isArray(data) ? data : (data.sites ?? [])
+                setSites(list.map((s: any) => ({ id: s.id, name: s.name })))
             })
-            .catch(() => setProjects([]))
+            .catch(() => setSites([]))
         // Load both vehicle rates; fall back to legacy single rate if a
         // specific one isn't configured yet.
         Promise.all([
@@ -558,7 +561,8 @@ function AddExpenseModal({
                 title: editExpense.title,
                 date: expDate,
                 description: editExpense.description || "",
-                projectId: editExpense.projectId || "",
+                siteId: editExpense.siteId || "",
+                siteName: editExpense.siteName || "",
             })
             const rowsFromEntries = (entries?: TravelEntry[] | null) =>
                 (entries && entries.length)
@@ -589,7 +593,7 @@ function AddExpenseModal({
                 }])
             }
         } else {
-            setForm({ title: "", date: today, description: "", projectId: "" })
+            setForm({ title: "", date: today, description: "", siteId: "", siteName: "" })
             setLines([mkLine("TRAVEL", today)])
         }
     }, [open, editExpense])
@@ -639,7 +643,8 @@ function AddExpenseModal({
             const payload: any = {
                 title: form.title,
                 description: form.description,
-                projectId: form.projectId || null,
+                siteId: form.siteId || null,
+                siteName: form.siteName || null,
                 receiptUrl: legacyReceipt,
                 date: form.date,
                 // Legacy columns kept populated for filters/list/back-compat.
@@ -728,17 +733,18 @@ function AddExpenseModal({
                             />
                         </div>
                         <div>
-                            <label className="block text-[12px] text-[var(--text2)] mb-1">Project / Client</label>
+                            <label className="block text-[12px] text-[var(--text2)] mb-1">Site</label>
                             <select
-                                value={form.projectId}
-                                onChange={e => setForm(f => ({ ...f, projectId: e.target.value }))}
+                                value={form.siteId}
+                                onChange={e => {
+                                    const id = e.target.value
+                                    setForm(f => ({ ...f, siteId: id, siteName: sites.find(s => s.id === id)?.name || "" }))
+                                }}
                                 className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                             >
                                 <option value="">— None —</option>
-                                {projects.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name}{p.company?.name ? ` · ${p.company.name}` : ""}
-                                    </option>
+                                {sites.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
                                 ))}
                             </select>
                         </div>
@@ -1062,14 +1068,14 @@ function ExpenseDrawer({
                             </div>
                         )}
 
-                        {/* Project / Client */}
-                        {expense.project && (
+                        {/* Site (falls back to legacy project for old expenses) */}
+                        {(expense.siteName || expense.project) && (
                             <div>
-                                <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Project / Client</p>
+                                <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">{expense.siteName ? "Site" : "Project / Client"}</p>
                                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#eef2ff] text-[#4338ca] text-[12px] font-medium">
-                                    <Briefcase size={12} />
-                                    {expense.project.name}
-                                    {expense.project.company?.name ? <span className="opacity-70">· {expense.project.company.name}</span> : null}
+                                    {expense.siteName ? <MapPin size={12} /> : <Briefcase size={12} />}
+                                    {expense.siteName || expense.project?.name}
+                                    {!expense.siteName && expense.project?.company?.name ? <span className="opacity-70">· {expense.project.company.name}</span> : null}
                                 </div>
                             </div>
                         )}
@@ -1559,10 +1565,10 @@ function ExpenseRow({
                                 +{expense.categoryItems.length - 1}
                             </span>
                         )}
-                        {expense.project?.name && (
+                        {(expense.siteName || expense.project?.name) && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#eef2ff] text-[#4338ca]">
-                                <Briefcase size={9} />
-                                <span className="truncate max-w-[100px]">{expense.project.name}</span>
+                                {expense.siteName ? <MapPin size={9} /> : <Briefcase size={9} />}
+                                <span className="truncate max-w-[100px]">{expense.siteName || expense.project?.name}</span>
                             </span>
                         )}
                     </div>
@@ -2149,13 +2155,13 @@ export default function ExpensesPage() {
     const [reviewIdx, setReviewIdx] = useState(0)
     const [reviewLoading, setReviewLoading] = useState(false)
 
-    // Load projects once for the filter dropdown
+    // Load sites once for the filter dropdown (the filter is by Site now)
     useEffect(() => {
-        fetch("/api/projects")
+        fetch("/api/sites?isActive=true")
             .then(r => r.ok ? r.json() : [])
             .then((data: any) => {
-                const list = Array.isArray(data) ? data : (data.projects ?? [])
-                setProjectsList(list.map((p: any) => ({ id: p.id, name: p.name, company: p.company ?? null })))
+                const list = Array.isArray(data) ? data : (data.sites ?? [])
+                setProjectsList(list.map((s: any) => ({ id: s.id, name: s.name, company: null })))
             })
             .catch(() => setProjectsList([]))
     }, [])
@@ -2187,7 +2193,7 @@ export default function ExpensesPage() {
             if (activeTab === "accounts") params.set("accountsView", "true")
             if (statusFilter !== "ALL") params.set("status", statusFilter)
             if (categoryFilter !== "ALL") params.set("category", categoryFilter)
-            if (projectFilter !== "ALL") params.set("projectId", projectFilter)
+            if (projectFilter !== "ALL") params.set("siteId", projectFilter)
             if (monthFilter) params.set("month", monthFilter)
             if (!monthFilter && dateFrom) params.set("dateFrom", dateFrom)
             if (!monthFilter && dateTo) params.set("dateTo", dateTo)
@@ -2546,7 +2552,7 @@ export default function ExpensesPage() {
                         onChange={e => setProjectFilter(e.target.value)}
                         className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors max-w-[180px]"
                     >
-                        <option value="ALL">All Projects</option>
+                        <option value="ALL">All Sites</option>
                         {projectsList.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                         ))}

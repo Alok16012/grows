@@ -1655,8 +1655,10 @@ model Expense {
   receiptUrl      String? // file upload URL
   submittedBy     String // userId
   employeeId      String? // optional: on behalf of employee
-  projectId       String? // optional: link to project/client
+  projectId       String? // legacy: link to project/client (kept for old data)
   project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  siteId          String? // site this expense relates to (replaces project in the form)
+  siteName        String? // denormalised site name for display
   approvedBy      String? // userId
   approvedAt      DateTime?
   rejectedAt      DateTime?

@@ -37,9 +37,12 @@ let categoryItemsColumnEnsured = false
 async function ensureCategoryItemsColumn() {
     if (categoryItemsColumnEnsured) return
     try {
-        await (prisma as any).$executeRawUnsafe(
-            `ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "categoryItems" JSONB`
-        )
+        await (prisma as any).$executeRawUnsafe(`
+            ALTER TABLE "Expense"
+                ADD COLUMN IF NOT EXISTS "categoryItems" JSONB,
+                ADD COLUMN IF NOT EXISTS "siteId"   TEXT,
+                ADD COLUMN IF NOT EXISTS "siteName" TEXT
+        `)
         categoryItemsColumnEnsured = true
     } catch { /* best effort — insert will fall back to legacy single category */ }
 }
@@ -56,6 +59,7 @@ export async function GET(req: Request) {
         const dateTo = searchParams.get("dateTo")
         const month = searchParams.get("month")          // "YYYY-MM"
         const projectId = searchParams.get("projectId")
+        const siteId = searchParams.get("siteId")
         const search = searchParams.get("search")
         const submittedBy = searchParams.get("submittedBy")
         const accountsView = searchParams.get("accountsView") === "true"
@@ -80,6 +84,7 @@ export async function GET(req: Request) {
         } else if (status && status !== "ALL") where.status = status
         if (category && category !== "ALL") where.category = category
         if (projectId && projectId !== "ALL") where.projectId = projectId
+        if (siteId && siteId !== "ALL") where.siteId = siteId
 
         // Month filter wins over date range when both are present
         if (month && /^\d{4}-\d{2}$/.test(month)) {
@@ -203,7 +208,7 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { title, category, amount, date, description, employeeId, receiptUrl, projectId, travelDays, travelDailyRate, travelEntries, categoryItems } = body
+        const { title, category, amount, date, description, employeeId, receiptUrl, projectId, siteId, siteName, travelDays, travelDailyRate, travelEntries, categoryItems } = body
 
         const parsedAmount = parseFloat(String(amount))
         if (!title || !category || amount == null || isNaN(parsedAmount) || !date) {
@@ -226,6 +231,10 @@ export async function POST(req: Request) {
         // Generate expense number
         const count = await prisma.expense.count()
         const expenseNo = `EXP-${String(count + 1).padStart(4, "0")}`
+
+        // Ensure the newer columns (categoryItems, siteId, siteName) exist before
+        // the insert tries to write them — migrations don't run on deploy.
+        await ensureCategoryItemsColumn()
 
         const id = crypto.randomUUID()
         let expense: any = null
@@ -260,6 +269,8 @@ export async function POST(req: Request) {
                     receiptUrl: receiptUrl || null,
                     employeeId: employeeId || null,
                     projectId: projectId || null,
+                    siteId: siteId || null,
+                    siteName: siteName || null,
                     submittedBy: session.user.id,
                     status: "DRAFT",
                     travelDays: travelDays ? parseInt(String(travelDays)) : null,
@@ -293,6 +304,8 @@ export async function POST(req: Request) {
                         receiptUrl: receiptUrl || null,
                         employeeId: employeeId || null,
                         projectId: projectId || null,
+                        siteId: siteId || null,
+                        siteName: siteName || null,
                         submittedBy: session.user.id,
                         status: "DRAFT",
                         categoryItems: (Array.isArray(categoryItems) ? categoryItems : null) as any,
