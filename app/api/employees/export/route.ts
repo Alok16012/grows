@@ -7,7 +7,9 @@ import * as XLSX from "xlsx"
 
 // Ordered column list for the employee export. "Basic Salary" is only included
 // for users allowed to see salary. The Employees page column picker mirrors this.
-export const EXPORT_COLUMNS = [
+// NOTE: kept local (not exported) — a Next.js route file may only export the
+// HTTP handlers + route config, otherwise the production build fails.
+const EXPORT_COLUMNS = [
     "Employee ID", "First Name", "Middle Name", "Last Name", "Name As Per Aadhar",
     "Father's Name", "Phone", "Email", "Designation", "Branch", "Department",
     "Employment Type", "Basic Salary", "Status", "Date of Joining", "City",
