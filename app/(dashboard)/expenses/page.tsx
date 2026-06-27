@@ -1012,6 +1012,12 @@ function ExpenseDrawer({
                                     </p>
                                 </div>
                             </div>
+                            <div className="bg-[var(--surface2)] rounded-[10px] p-3">
+                                <p className="text-[11px] text-[var(--text3)] mb-1">Date Filed</p>
+                                <p className="text-[13px] font-medium text-[var(--text)]">
+                                    {expense.createdAt ? format(new Date(expense.createdAt), "dd MMM yyyy, hh:mm a") : "—"}
+                                </p>
+                            </div>
                         </div>
 
                         {/* Category breakdown (multi-category expenses) */}
@@ -2232,6 +2238,31 @@ export default function ExpensesPage() {
         setSelectedExpense(null)
     }, [])
 
+    const [approveAllLoading, setApproveAllLoading] = useState(false)
+    const approveAll = useCallback(async () => {
+        if (!confirm(`Approve all ${pendingCount} pending expense(s)? This cannot be undone.`)) return
+        setApproveAllLoading(true)
+        try {
+            const res = await fetch("/api/expenses?status=SUBMITTED")
+            const data: Expense[] = res.ok ? await res.json() : []
+            if (!Array.isArray(data) || data.length === 0) { toast.info("No pending expenses"); return }
+            await Promise.all(data.map(e =>
+                fetch(`/api/expenses/${e.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "APPROVE" }),
+                })
+            ))
+            toast.success(`Approved ${data.length} expense(s)`)
+            fetchExpenses()
+            refreshPendingCount()
+        } catch {
+            toast.error("Failed to approve all expenses")
+        } finally {
+            setApproveAllLoading(false)
+        }
+    }, [pendingCount, fetchExpenses, refreshPendingCount])
+
     const reviewGo = useCallback((idx: number) => {
         if (!reviewQueue) return
         if (idx < 0) { setReviewIdx(0); setSelectedExpense(reviewQueue[0]); return }
@@ -2363,15 +2394,26 @@ export default function ExpensesPage() {
                         <Download size={13} /> CSV
                     </button>
                     {isPrivileged && (
-                        <button
-                            onClick={startReview}
-                            disabled={reviewLoading || pendingCount === 0}
-                            title={pendingCount === 0 ? "No pending expenses" : "Review pending expenses one by one"}
-                            className="h-9 px-4 bg-[#8b5cf6] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {reviewLoading ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
-                            Review pending{pendingCount > 0 ? ` (${pendingCount})` : ""}
-                        </button>
+                        <>
+                            <button
+                                onClick={startReview}
+                                disabled={reviewLoading || pendingCount === 0}
+                                title={pendingCount === 0 ? "No pending expenses" : "Review pending expenses one by one"}
+                                className="h-9 px-4 bg-[#8b5cf6] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {reviewLoading ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
+                                Review pending{pendingCount > 0 ? ` (${pendingCount})` : ""}
+                            </button>
+                            <button
+                                onClick={approveAll}
+                                disabled={approveAllLoading || pendingCount === 0}
+                                title={pendingCount === 0 ? "No pending expenses" : "Approve all pending expenses at once"}
+                                className="h-9 px-4 bg-[#1a9e6e] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {approveAllLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                                Approve all{pendingCount > 0 ? ` (${pendingCount})` : ""}
+                            </button>
+                        </>
                     )}
                     <button
                         onClick={() => setAddOpen(true)}
