@@ -1632,15 +1632,25 @@ function EmployeesPage() {
             ) : (
                 <>
                 {/* Bulk action bar */}
-                {canDelete && selectedIds.size > 0 && (
+                {selectedIds.size > 0 && (
                     <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-[10px]">
                         <span className="text-[13px] font-semibold text-[var(--accent)]">{selectedIds.size} employee{selectedIds.size !== 1 ? "s" : ""} selected</span>
                         <button
-                            onClick={() => setShowBulkDeleteConfirm(true)}
-                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-[7px] text-[12px] font-semibold hover:bg-red-700 transition-colors"
+                            onClick={handleExport}
+                            disabled={exporting}
+                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#16a34a] text-white rounded-[7px] text-[12px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
                         >
-                            <Trash2 size={13} /> Delete Selected
+                            {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                            {exporting ? "Exporting…" : "Export Selected"}
                         </button>
+                        {canDelete && (
+                            <button
+                                onClick={() => setShowBulkDeleteConfirm(true)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-[7px] text-[12px] font-semibold hover:bg-red-700 transition-colors"
+                            >
+                                <Trash2 size={13} /> Delete Selected
+                            </button>
+                        )}
                         <button
                             onClick={() => setSelectedIds(new Set())}
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--surface)] border border-[var(--border)] text-[var(--text2)] rounded-[7px] text-[12px] font-medium hover:bg-[var(--surface2)] transition-colors"
