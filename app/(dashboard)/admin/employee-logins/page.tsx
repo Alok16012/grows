@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import {
-    KeyRound, Search, Loader2, Copy, Eye, EyeOff, Pencil, Check, X, UserPlus, ShieldCheck, RefreshCw,
+    KeyRound, Search, Loader2, Copy, Eye, EyeOff, Pencil, Check, X, UserPlus, ShieldCheck, RefreshCw, Smartphone,
 } from "lucide-react"
 
 type Row = {
@@ -35,6 +35,7 @@ export default function EmployeeLoginsPage() {
     const [deptFilter, setDeptFilter] = useState("ALL")
     const [reveal, setReveal] = useState<Record<string, boolean>>({})
     const [generating, setGenerating] = useState(false)
+    const [resettingMobile, setResettingMobile] = useState(false)
 
     // Edit modal
     const [editing, setEditing] = useState<Row | null>(null)
@@ -99,6 +100,24 @@ export default function EmployeeLoginsPage() {
             toast.error(e.message, { id: "gen-logins" })
         } finally {
             setGenerating(false)
+        }
+    }
+
+    const resetAllMobile = async () => {
+        if (!confirm("Set EVERY employee's Login ID and Password to their mobile number? This overwrites existing passwords (employees who changed theirs will be reset too).")) return
+        setResettingMobile(true)
+        try {
+            const res = await fetch("/api/admin/employee-logins/reset-mobile", { method: "POST" })
+            const raw = await res.text()
+            let data: any = {}
+            try { data = raw ? JSON.parse(raw) : {} } catch { data = {} }
+            if (!res.ok) throw new Error(data.error || raw.slice(0, 160) || `Failed (${res.status})`)
+            toast.success(`Set to mobile — ${data.updated} updated, ${data.created} created${data.skipped ? `, ${data.skipped} skipped (no phone)` : ""}${data.failed ? `, ${data.failed} failed` : ""}`)
+            fetchData()
+        } catch (e: any) {
+            toast.error(e.message)
+        } finally {
+            setResettingMobile(false)
         }
     }
 
@@ -184,14 +203,25 @@ export default function EmployeeLoginsPage() {
                     <h1 className="text-[22px] font-semibold tracking-tight text-[#1a1a18]">Employee Logins</h1>
                     <p className="text-[13px] text-[#6b6860] mt-[3px]">Every employee&apos;s login id, password and role — view, copy and update</p>
                 </div>
-                <button
-                    onClick={generateMissing}
-                    disabled={generating || missingCount === 0}
-                    className="px-3.5 h-9 bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#158a5e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                    Generate logins &amp; passwords{missingCount > 0 ? ` (${missingCount})` : ""}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={resetAllMobile}
+                        disabled={resettingMobile || generating}
+                        title="Set every employee's Login ID and Password to their mobile number"
+                        className="px-3.5 h-9 bg-white border border-[#1a9e6e] text-[#1a9e6e] rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#f0faf5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {resettingMobile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
+                        Set all to mobile number
+                    </button>
+                    <button
+                        onClick={generateMissing}
+                        disabled={generating || resettingMobile || missingCount === 0}
+                        className="px-3.5 h-9 bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#158a5e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                        Generate logins &amp; passwords{missingCount > 0 ? ` (${missingCount})` : ""}
+                    </button>
+                </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 mb-4">
