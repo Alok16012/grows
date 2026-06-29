@@ -715,6 +715,65 @@ function AttendanceTab() {
 }
 
 // ─── Main Profile Page ────────────────────────────────────────────────────────
+// ─── Change Password (self-service) ──────────────────────────────────────────
+function ChangePasswordCard() {
+    const [current, setCurrent] = useState("")
+    const [next, setNext] = useState("")
+    const [confirm, setConfirm] = useState("")
+    const [saving, setSaving] = useState(false)
+
+    const submit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (next.length < 6) { toast.error("New password must be at least 6 characters"); return }
+        if (next !== confirm) { toast.error("New passwords do not match"); return }
+        setSaving(true)
+        try {
+            const res = await fetch("/api/me/password", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPassword: current, newPassword: next }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(data.error || "Failed to change password")
+            toast.success("Password changed")
+            setCurrent(""); setNext(""); setConfirm("")
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const inputCls = "w-full px-4 py-2.5 border border-[var(--border)] rounded-lg text-[13px] outline-none focus:border-[var(--accent)]"
+    const labelCls = "text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide block mb-1.5"
+
+    return (
+        <form onSubmit={submit} className="bg-white border border-[var(--border)] rounded-2xl p-6 space-y-4 mt-5">
+            <div>
+                <h3 className="text-[14px] font-semibold text-[var(--text)]">Change Password</h3>
+                <p className="text-[12px] text-[var(--text3)] mt-0.5">Your default password is your mobile number — change it after first login.</p>
+            </div>
+            <div>
+                <label className={labelCls}>Current Password</label>
+                <input type="password" value={current} onChange={e => setCurrent(e.target.value)} className={inputCls} autoComplete="current-password" />
+            </div>
+            <div>
+                <label className={labelCls}>New Password</label>
+                <input type="password" value={next} onChange={e => setNext(e.target.value)} className={inputCls} autoComplete="new-password" />
+            </div>
+            <div>
+                <label className={labelCls}>Confirm New Password</label>
+                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} className={inputCls} autoComplete="new-password" />
+            </div>
+            <button type="submit" disabled={saving || !current || !next}
+                className="w-full py-2.5 bg-[var(--accent)] text-white rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Update Password
+            </button>
+        </form>
+    )
+}
+
 export default function ProfilePage() {
     const { data: session, update } = useSession()
     const [activeTab, setActiveTab] = useState<"profile"|"attendance"|"documents"|"onboarding"|"payslip"|"letters">("profile")
@@ -887,6 +946,8 @@ export default function ProfilePage() {
                     </button>
                 </form>
             )}
+
+            {activeTab === "profile" && <ChangePasswordCard />}
 
             {activeTab === "attendance" && <AttendanceTab />}
             {activeTab === "documents"  && <DocsTab />}
