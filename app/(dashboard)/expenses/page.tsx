@@ -52,6 +52,7 @@ type TravelEntry = {
 type CategoryItem = {
     category: ExpenseCategory
     amount: number
+    date?: string | null                  // when this specific expense happened
     travelEntries?: TravelEntry[] | null  // only for TRAVEL lines
     vehicleType?: "2W" | "4W"
     receiptUrl?: string | null            // per-category receipt / bill
@@ -309,13 +310,14 @@ type LineItem = {
     _id: string
     category: ExpenseCategory
     amount: string                 // typed amount (non-travel)
+    date: string                   // when this expense happened (non-travel)
     vehicleType: "2W" | "4W"       // travel only
     travelRows: TravelRow[]        // travel only
     receiptUrl: string | null      // per-category receipt / bill
 }
 
 function mkLine(category: ExpenseCategory, date: string): LineItem {
-    return { _id: rid(), category, amount: "", vehicleType: "2W", travelRows: [mkRow(date)], receiptUrl: null }
+    return { _id: rid(), category, amount: "", date, vehicleType: "2W", travelRows: [mkRow(date)], receiptUrl: null }
 }
 
 function CategoryLine({
@@ -379,11 +381,20 @@ function CategoryLine({
                 </select>
                 {!isTravel && (
                     <input
+                        type="date"
+                        value={line.date}
+                        onChange={e => onPatch({ date: e.target.value })}
+                        title="Date of this expense"
+                        style={{ width: 140, height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 8px", fontSize: 12.5, color: "var(--text)", outline: "none" }}
+                    />
+                )}
+                {!isTravel && (
+                    <input
                         type="number" min="0" step="0.01"
                         value={line.amount}
                         onChange={e => onPatch({ amount: e.target.value })}
                         placeholder="Amount ₹" required
-                        style={{ width: 120, height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none", textAlign: "right" }}
+                        style={{ width: 110, height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none", textAlign: "right" }}
                     />
                 )}
                 <button type="button" onClick={onRemove} disabled={!canRemove}
@@ -575,6 +586,7 @@ function AddExpenseModal({
                     _id: rid(),
                     category: it.category,
                     amount: it.category === "TRAVEL" ? "" : String(it.amount),
+                    date: it.date || expDate,
                     vehicleType: (it.vehicleType === "4W" ? "4W" : "2W"),
                     travelRows: it.category === "TRAVEL" ? rowsFromEntries(it.travelEntries) : [mkRow(expDate)],
                     // Fall back to the legacy single receipt on the first line.
@@ -587,6 +599,7 @@ function AddExpenseModal({
                     _id: rid(),
                     category: cat,
                     amount: cat === "TRAVEL" ? "" : String(editExpense.amount),
+                    date: expDate,
                     vehicleType: ((editExpense.travelEntries?.[0] as any)?.vehicleType === "4W" ? "4W" : "2W"),
                     travelRows: cat === "TRAVEL" ? rowsFromEntries(editExpense.travelEntries) : [mkRow(expDate)],
                     receiptUrl: editExpense.receiptUrl || null,
@@ -629,12 +642,14 @@ function AddExpenseModal({
                     return {
                         category: "TRAVEL",
                         amount: entries.reduce((s, en) => s + en.amount, 0),
+                        // Travel date = the first journey's date.
+                        date: entries[0]?.date || line.date || null,
                         travelEntries: entries,
                         vehicleType: line.vehicleType,
                         receiptUrl: line.receiptUrl || null,
                     }
                 }
-                return { category: line.category, amount: parseFloat(line.amount) || 0, receiptUrl: line.receiptUrl || null }
+                return { category: line.category, amount: parseFloat(line.amount) || 0, date: line.date || null, receiptUrl: line.receiptUrl || null }
             })
 
             const firstTravel = items.find(i => i.category === "TRAVEL")
@@ -1037,11 +1052,19 @@ function ExpenseDrawer({
                                         return (
                                             <div key={i} className={i > 0 ? "border-t border-[var(--border)]" : ""}>
                                                 <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[var(--surface2)]">
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                                                        style={{ background: cs.bg, color: cs.color }}>
-                                                        {categoryLabel(it.category)}
+                                                    <span className="inline-flex items-center gap-2 min-w-0">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
+                                                            style={{ background: cs.bg, color: cs.color }}>
+                                                            {categoryLabel(it.category)}
+                                                        </span>
+                                                        {(it.date || journeys[0]?.date) && (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text3)] shrink-0">
+                                                                <Calendar size={10} />
+                                                                {format(new Date((it.date || journeys[0]?.date) as string), "dd MMM yyyy")}
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                    <span className="text-[13px] font-bold text-[var(--text)]">{formatINR(it.amount)}</span>
+                                                    <span className="text-[13px] font-bold text-[var(--text)] shrink-0">{formatINR(it.amount)}</span>
                                                 </div>
                                                 {journeys.length > 0 && (
                                                     <div className="px-3 py-1.5 space-y-1 bg-white">
