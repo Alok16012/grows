@@ -24,7 +24,10 @@ function landingForCustomRole(permissions: string[]): string | null {
     if (permissions.includes("helpdesk.view")) return "/helpdesk"
     if (permissions.includes("lms.view")) return "/lms/learn"
     if (permissions.includes("users.manage")) return "/admin/employee-logins"
-    return null
+    // Last resort: every user can always see their own profile. This guarantees a
+    // custom-role user is never left on a page they can't load (e.g. /manager,
+    // which needs reports.view).
+    return "/profile"
 }
 
 export default withAuth(
@@ -65,9 +68,17 @@ export default withAuth(
                 return NextResponse.redirect(new URL(ownDashboard, req.url))
             }
         }
-        // /manager → MANAGER or ADMIN
-        if (path.startsWith("/manager") && role !== "MANAGER" && role !== "ADMIN") {
-            return NextResponse.redirect(new URL(ownDashboard, req.url))
+        // /manager → MANAGER or ADMIN. The manager dashboard also needs the
+        // reports.view permission to load its data, so a custom-role MANAGER that
+        // lacks it is sent to their own landing page instead of a broken dashboard.
+        if (path.startsWith("/manager")) {
+            if (role !== "MANAGER" && role !== "ADMIN") {
+                return NextResponse.redirect(new URL(ownDashboard, req.url))
+            }
+            if (role === "MANAGER" && customRoleName && !permissions.includes("reports.view")) {
+                const safe = customLanding && customLanding !== "/manager" ? customLanding : "/profile"
+                return NextResponse.redirect(new URL(safe, req.url))
+            }
         }
         // /inspection → INSPECTION_BOY or ADMIN
         if (path.startsWith("/inspection") && role !== "INSPECTION_BOY" && role !== "ADMIN") {
