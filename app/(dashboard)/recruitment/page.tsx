@@ -1763,6 +1763,12 @@ function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lea
                         ) : null}
                     </div>
                 </div>
+                {lead.creator?.name && (
+                    <div className="flex items-center gap-1 mt-1.5 text-[10px] text-[var(--text3)]" title="Recruited by">
+                        <UserCheck size={10} className="shrink-0" />
+                        <span className="truncate">{lead.creator.name}</span>
+                    </div>
+                )}
             </div>
         </div>
     )
