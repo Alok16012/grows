@@ -1811,7 +1811,20 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
                             <tr key={lead.id} onClick={() => onCard(lead)}
                                 className="cursor-pointer hover:bg-[var(--accent-light)]/40 transition-colors">
                                 <td className={td + " text-[var(--text3)] text-center"}>{i + 1}</td>
-                                <td className={td + " font-semibold"}>{lead.candidateName}</td>
+                                <td className={td + " font-semibold"}>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[11px] overflow-hidden" style={{ position: "relative" }}>
+                                            {lead.candidateName.charAt(0).toUpperCase()}
+                                            {lead.profileUrl && (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover"
+                                                    style={{ position: "absolute", inset: 0 }}
+                                                    onError={e => (e.currentTarget.style.display = "none")} />
+                                            )}
+                                        </div>
+                                        <span className="truncate">{lead.candidateName}</span>
+                                    </div>
+                                </td>
                                 <td className={td + " text-[var(--text2)]"}>{lead.position}</td>
                                 <td className={td + " text-[var(--text2)]"}>{lead.experience != null ? `${lead.experience}y` : "—"}</td>
                                 <td className={td + " text-[var(--text2)]"}>{lead.phone || "—"}</td>
