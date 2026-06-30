@@ -144,7 +144,9 @@ export async function PUT(
             //  2. Flip status to ACTIVE so they show up in the Employee Master.
             //  3. Provision a login so they appear in Employee Logins.
             const currentCode = onboardingRecord.employee?.employeeId || ""
-            const needsCode = !currentCode || currentCode.startsWith("PENDING-")
+            // Treat placeholder (PENDING-) and legacy self-registration (EXT-) codes
+            // as "not a real code yet" so approval assigns a clean EMP-NNNN.
+            const needsCode = !currentCode || currentCode.startsWith("PENDING-") || currentCode.startsWith("EXT-")
             const newCode = needsCode ? await generateEmployeeCode() : currentCode
 
             await prisma.employee.update({

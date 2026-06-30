@@ -111,14 +111,14 @@ export async function POST(req: Request) {
         const byPhone = await prisma.employee.findFirst({ where: { phone: phone.trim() } })
         if (byPhone) return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 })
 
-        // Auto-generate unique employeeId: EXT-YYYYMMDD-XXXX
-        const today = new Date()
-        const datePart = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`
-        const randPart = crypto.randomInt(1000, 9999)
-        const employeeId = `EXT-${datePart}-${randPart}`
-
         // Generate onboarding token for the external form link
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
+
+        // Self-registered candidates are PENDING approval — they don't get a real
+        // EMP-NNNN code until their onboarding is approved (a real code is assigned
+        // then). Until then they carry a temporary PENDING-xxxx placeholder so all
+        // approved employees share one consistent EMP-NNNN format.
+        const employeeId = `PENDING-${onboardingToken.slice(0, 10).toUpperCase()}`
 
         // Create employee
         const employee = await prisma.employee.create({

@@ -17,7 +17,7 @@ import { DocumentViewer } from "@/components/DocumentViewer"
 // onboarding is approved (a real EMP-NNNN code is assigned then). Show a clean
 // "Pending" label instead of the raw placeholder so the UI has one format.
 function displayEmpId(id?: string | null): string {
-    if (!id || id.startsWith("PENDING-")) return "Pending"
+    if (!id || id.startsWith("PENDING-") || id.startsWith("EXT-")) return "Pending"
     return id
 }
 
