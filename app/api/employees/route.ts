@@ -38,6 +38,12 @@ export async function GET(req: Request) {
             // Exclude ONBOARDING employees from the default list — they only appear in Onboarding module
             where.status = { not: "ONBOARDING" }
         }
+
+        // Hide anyone still pending onboarding (placeholder EMP code / not yet
+        // approved) regardless of employee.status — covers legacy records whose
+        // status may be ACTIVE but whose onboarding was never completed. They only
+        // live in the Onboarding module until approved.
+        where.NOT = { onboardingRecord: { is: { status: { not: "COMPLETED" } } } }
         if (employmentType) where.employmentType = employmentType
         if (companyId) {
             // filter via branch -> company
