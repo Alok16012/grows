@@ -1782,71 +1782,68 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
     onDelete: (id: string) => void
     session: any
 }) {
+    // Excel-style grid: bordered cells, sticky header, hover row highlight.
+    const th = "text-left font-semibold text-[var(--text2)] px-3 py-2 border border-[var(--border)] whitespace-nowrap bg-[var(--surface2)]"
+    const td = "px-3 py-2 border border-[var(--border)] whitespace-nowrap text-[var(--text)] align-middle"
     return (
-        <div className="px-4 lg:px-0 flex flex-col gap-2">
-            {leads.map(lead => (
-                <div key={lead.id} onClick={() => onCard(lead)}
-                    className="bg-white border border-[var(--border)] rounded-[12px] p-4 cursor-pointer hover:shadow-sm hover:border-[var(--accent)] transition-all flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[14px] overflow-hidden" style={{ position: "relative" }}>
-                        {lead.candidateName.charAt(0).toUpperCase()}
-                        {lead.profileUrl && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover"
-                                style={{ position: "absolute", inset: 0 }}
-                                onError={e => (e.currentTarget.style.display = "none")} />
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <p className="text-[14px] font-semibold text-[var(--text)] truncate">{lead.candidateName}</p>
-                            <PriorityDot priority={lead.priority} />
-                            <ScoreBadge score={lead.score} />
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                            <span className="text-[12px] text-[var(--text2)] flex items-center gap-1">
-                                <Briefcase size={11} />{lead.position}
-                            </span>
-                            {lead.experience != null && (
-                                <span className="text-[12px] text-[var(--text3)]">{lead.experience}y exp</span>
-                            )}
-                            {lead.city && (
-                                <span className="text-[12px] text-[var(--text3)] flex items-center gap-1">
-                                    <MapPin size={11} />{lead.city}
-                                </span>
-                            )}
-                            {lead.phone && (
-                                <span className="text-[12px] text-[var(--text3)] flex items-center gap-1">
-                                    <Phone size={11} />{lead.phone}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                        {lead.interviewDate && (
-                            <span className="text-[11px] text-[#f59e0b] hidden sm:flex items-center gap-1">
-                                <Calendar size={11} />{fmt(lead.interviewDate)}
-                            </span>
-                        )}
-                        <StatusBadge status={lead.status} />
-                        <span className="text-[11px] text-[var(--text3)] hidden md:block">{lead.source}</span>
-                        {lead.creator?.name && (
-                            <span className="text-[11px] text-[var(--text3)] hidden lg:flex items-center gap-1" title="Recruited by">
-                                <UserCheck size={11} />{lead.creator.name}
-                            </span>
-                        )}
-                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
-                                <Edit2 size={13} />
-                            </button>
-                            {can(session, "recruitment.view") && (
-                                <button onClick={() => onDelete(lead.id)} className="p-1.5 rounded-[6px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
-                                    <Trash2 size={13} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            ))}
+        <div className="px-4 lg:px-0">
+            <div className="overflow-x-auto border border-[var(--border)] rounded-[10px] bg-white">
+                <table className="w-full text-[12.5px]" style={{ borderCollapse: "collapse" }}>
+                    <thead className="sticky top-0 z-10">
+                        <tr>
+                            <th className={th} style={{ width: 44 }}>#</th>
+                            <th className={th}>Candidate</th>
+                            <th className={th}>Position</th>
+                            <th className={th}>Exp</th>
+                            <th className={th}>Phone</th>
+                            <th className={th}>City</th>
+                            <th className={th}>Source</th>
+                            <th className={th}>Score</th>
+                            <th className={th}>Priority</th>
+                            <th className={th}>Status</th>
+                            <th className={th}>Interview</th>
+                            <th className={th}>Recruited By</th>
+                            <th className={th} style={{ textAlign: "center" }}>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {leads.map((lead, i) => (
+                            <tr key={lead.id} onClick={() => onCard(lead)}
+                                className="cursor-pointer hover:bg-[var(--accent-light)]/40 transition-colors">
+                                <td className={td + " text-[var(--text3)] text-center"}>{i + 1}</td>
+                                <td className={td + " font-semibold"}>{lead.candidateName}</td>
+                                <td className={td + " text-[var(--text2)]"}>{lead.position}</td>
+                                <td className={td + " text-[var(--text2)]"}>{lead.experience != null ? `${lead.experience}y` : "—"}</td>
+                                <td className={td + " text-[var(--text2)]"}>{lead.phone || "—"}</td>
+                                <td className={td + " text-[var(--text2)]"}>{lead.city || "—"}</td>
+                                <td className={td + " text-[var(--text2)]"}>{lead.source}</td>
+                                <td className={td}><ScoreBadge score={lead.score} /></td>
+                                <td className={td}>
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <PriorityDot priority={lead.priority} />
+                                        <span className="text-[var(--text2)] capitalize">{(lead.priority || "").toLowerCase()}</span>
+                                    </span>
+                                </td>
+                                <td className={td}><StatusBadge status={lead.status} /></td>
+                                <td className={td + " text-[var(--text2)]"}>{lead.interviewDate ? fmt(lead.interviewDate) : "—"}</td>
+                                <td className={td + " text-[var(--text2)]"}>{lead.creator?.name || "—"}</td>
+                                <td className={td} onClick={e => e.stopPropagation()}>
+                                    <div className="flex items-center justify-center gap-1">
+                                        <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
+                                            <Edit2 size={13} />
+                                        </button>
+                                        {can(session, "recruitment.view") && (
+                                            <button onClick={() => onDelete(lead.id)} className="p-1.5 rounded-[6px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
+                                                <Trash2 size={13} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     )
 }
