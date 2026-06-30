@@ -1132,10 +1132,11 @@ export default function AttendancePage() {
         )
     }
 
-    const isPrivileged =
-        session?.user?.role === "ADMIN" ||
-        ((session?.user?.permissions as string[] | undefined) ?? []).includes("attendance.view")
+    // Only ADMIN gets the full management view (mark/edit everyone's attendance).
+    // Every other login — including custom roles like MIS Executive that may hold
+    // attendance.view — gets their own self-service check-in/out dashboard.
+    const isAdmin = session?.user?.role === "ADMIN"
 
-    if (isPrivileged) return <AdminView />
+    if (isAdmin) return <AdminView />
     return <SelfServiceView />
 }
