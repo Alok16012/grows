@@ -248,6 +248,18 @@ export const PERMISSION_GROUPS = [
             { key: "reports.export", label: "Export Reports" },
         ]
     },
+
+    // ── ADMINISTRATION ───────────────────────────────────────────────────────
+    // Grants access to the Employee Logins screen: view, copy and update every
+    // employee's login id / password and assigned role. Sensitive — give only
+    // to trusted roles (e.g. HR / IT admins).
+    {
+        group: "User & Login Management",
+        key: "users",
+        permissions: [
+            { key: "users.manage", label: "Employee Login Management (view & edit login IDs, passwords, roles)" },
+        ]
+    },
 ]
 
 // ─── Default Permissions per System Role ─────────────────────────────────────

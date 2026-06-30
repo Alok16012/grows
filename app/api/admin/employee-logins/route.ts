@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
+import { checkAccess } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
 
 // Bulk login generation hashes many passwords + writes to Supabase in a loop;
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic"
 // List every employee alongside their login credentials (id + password + role).
 export async function GET() {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== Role.ADMIN) {
+    if (!checkAccess(session, [], "users.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -110,7 +111,7 @@ async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promis
 // everything is done, so the operation can't time out regardless of headcount.
 export async function POST() {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== Role.ADMIN) {
+    if (!checkAccess(session, [], "users.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

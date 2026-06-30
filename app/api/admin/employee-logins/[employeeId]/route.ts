@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
+import { checkAccess } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
 
 // Update (or create) the login for a single employee: email, password, role, status.
@@ -12,7 +13,7 @@ export async function PATCH(
     { params }: { params: { employeeId: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== Role.ADMIN) {
+    if (!checkAccess(session, [], "users.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

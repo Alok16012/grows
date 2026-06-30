@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
 
 export const maxDuration = 60
@@ -19,7 +19,7 @@ const tenDigit = (phone?: string | null) => {
 // without a 10-digit phone are skipped (can't derive mobile credentials).
 export async function POST() {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== Role.ADMIN) {
+    if (!checkAccess(session, [], "users.manage")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
