@@ -21,6 +21,9 @@ export async function GET() {
 
     try {
         const employees = await prisma.employee.findMany({
+            // Pending-onboarding candidates aren't real employees yet — no login
+            // and no real EMP code until approved, so keep them off this screen.
+            where: { status: { not: "ONBOARDING" } },
             orderBy: { createdAt: "desc" },
             select: {
                 id: true,
@@ -76,6 +79,9 @@ export async function GET() {
 // Employees that still need work: no login yet, or a login without a visible
 // (plaintext) password. Used both to fetch a batch and to count what's left.
 const NEEDS_WORK = {
+    // Never auto-provision logins for pending-onboarding candidates — they only
+    // get a login once their onboarding is approved.
+    status: { not: "ONBOARDING" },
     OR: [
         { userId: null },
         { user: { is: { plainPassword: null } } },

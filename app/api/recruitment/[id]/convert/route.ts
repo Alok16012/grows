@@ -55,22 +55,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             safetyMask, safetyJacket, safetyEarMuffs, safetyShoes,
         } = body
 
-        // ── Generate Employee ID ───────────────────────────────────────────────
-        const allEmpIds = await prisma.employee.findMany({ select: { employeeId: true } })
-            .then(r => new Set(r.map(e => e.employeeId)))
-        const lastEmployee = await prisma.employee.findFirst({
-            orderBy: { createdAt: "desc" }, select: { employeeId: true }
-        })
-        let nextNum = 1
-        if (lastEmployee?.employeeId) {
-            const m = lastEmployee.employeeId.match(/\d+$/)
-            if (m) nextNum = parseInt(m[0]) + 1
-        }
-        let finalId = `EMP-${String(nextNum).padStart(4, "0")}`
-        while (allEmpIds.has(finalId)) {
-            nextNum++
-            finalId = `EMP-${String(nextNum).padStart(4, "0")}`
-        }
+        // ── Employee ID (temporary until onboarding approval) ──────────────────
+        // A converted candidate is in ONBOARDING status — they don't get a real
+        // EMP-NNNN code until their onboarding is approved. Until then they carry
+        // a PENDING-xxxx placeholder (swapped for the real code on approval).
+        const finalId = `PENDING-${crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`
 
         // ── Resolve name — form overrides lead ────────────────────────────────
         const nameParts = lead.candidateName.trim().split(/\s+/)

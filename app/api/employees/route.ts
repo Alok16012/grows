@@ -4,9 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
-import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
-import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
@@ -173,7 +171,6 @@ export async function POST(req: Request) {
             safetyHelmet, safetyHelmetDate, safetyMask, safetyMaskDate,
             safetyJacket, safetyJacketDate, safetyEarMuffs, safetyEarMuffsDate,
             safetyShoes, safetyShoesDate, bankBranch,
-            customRoleId,
         } = body
 
         if (!firstName) {
@@ -190,25 +187,13 @@ export async function POST(req: Request) {
             )
         }
 
-        // Auto-generate employeeId as EMP-NNNN
-        const lastEmployee = await prisma.employee.findFirst({
-            orderBy: { createdAt: "desc" },
-            select: { employeeId: true },
-        })
-        let nextNum = 1
-        if (lastEmployee?.employeeId) {
-            const match = lastEmployee.employeeId.match(/\d+$/)
-            if (match) nextNum = parseInt(match[0]) + 1
-        }
-        const employeeId = `EMP-${String(nextNum).padStart(4, "0")}`
-
-        // Check uniqueness (race condition safety)
-        const existing = await prisma.employee.findUnique({ where: { employeeId } })
-        const finalId = existing
-            ? `EMP-${String(nextNum + 1).padStart(4, "0")}`
-            : employeeId
-
+        // Onboarding employees are PENDING approval. They DON'T consume a real
+        // EMP-NNNN code and DON'T get a login until an admin approves their
+        // onboarding. Until then they carry a temporary placeholder id (which is
+        // swapped for the real EMP-NNNN code at approval time) and stay out of
+        // the Employee Master and Employee Logins lists.
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
+        const finalId = `PENDING-${onboardingToken.slice(0, 10).toUpperCase()}`
 
         const employee = await prisma.employee.create({
             data: {
@@ -298,49 +283,12 @@ export async function POST(req: Request) {
             data: { employeeId: employee.id, status: "NOT_STARTED" }
         })
 
-        // Auto-provision a login (User account) so every employee gets an id/password
-        // the moment they're created. Non-fatal: if it fails the employee still exists.
-        let _login: { email: string; password: string } | null = null
-        try {
-            const loginEmail = buildLoginEmail({ email, phone, employeeId: finalId })
-            // Custom role assigned → system role MANAGER (manager dashboard/sidebar);
-            // no custom role → INSPECTION_BOY (field worker default). Mirrors fix-login.
-            const systemRole = customRoleId ? "MANAGER" : "INSPECTION_BOY"
-            const existingUser = await prisma.user.findUnique({
-                where: { email: loginEmail },
-                include: { employeeProfile: { select: { id: true } } },
-            })
-            if (existingUser) {
-                // Link the existing account instead of creating a duplicate,
-                // but only if it isn't already tied to another employee.
-                if (!existingUser.employeeProfile) {
-                    await prisma.employee.update({ where: { id: employee.id }, data: { userId: existingUser.id } })
-                    await prisma.user.update({
-                        where: { id: existingUser.id },
-                        data: { customRoleId: customRoleId || null, role: systemRole as any },
-                    })
-                }
-                _login = { email: loginEmail, password: existingUser.plainPassword || "(unchanged)" }
-            } else {
-                const plain = defaultPassword({ phone })
-                const hashed = await bcrypt.hash(plain, 10)
-                const user = await prisma.user.create({
-                    data: {
-                        name: `${firstName} ${lastName || ""}`.trim(),
-                        email: loginEmail,
-                        password: hashed,
-                        plainPassword: plain,
-                        phone: phone || null,
-                        role: systemRole as any,
-                        customRoleId: customRoleId || null,
-                    },
-                })
-                await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } })
-                _login = { email: loginEmail, password: plain }
-            }
-        } catch (loginErr) {
-            console.error("[EMPLOYEE_AUTO_LOGIN]", loginErr)
-        }
+        // NOTE: No login is provisioned at creation time anymore. A login (User
+        // account) with a real password is only created once the employee's
+        // onboarding is APPROVED (see PUT /api/onboarding/[id] action="approve").
+        // This keeps pending candidates out of the Employee Logins screen until
+        // they're cleared.
+        const _login: { email: string; password: string } | null = null
 
         return NextResponse.json({
             ...employee,
