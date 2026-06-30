@@ -6,6 +6,33 @@ import { checkAccess } from "@/lib/permissions"
 
 const VALID_STATUSES = ["PENDING", "VERIFIED", "REJECTED"]
 
+// On-demand fetch of a single document's file blob. The master documents grid
+// no longer ships base64 `fileUrl` in its bulk list (that made it ~15s slow);
+// View/Download call this only for the one document the user actually opened.
+export async function GET(
+    _req: Request,
+    { params }: { params: { id: string; docId: string } }
+) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (session.user.role === "CLIENT") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+
+        const doc = await prisma.employeeDocument.findFirst({
+            where: { id: params.docId, employeeId: params.id },
+            select: { fileUrl: true, fileName: true },
+        })
+        if (!doc) return new NextResponse("Document not found", { status: 404 })
+
+        return NextResponse.json(doc)
+    } catch (error) {
+        console.error("[EMPLOYEE_DOC_GET]", error)
+        return new NextResponse("Internal Error", { status: 500 })
+    }
+}
+
 export async function PATCH(
     req: Request,
     { params }: { params: { id: string; docId: string } }

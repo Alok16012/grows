@@ -9,7 +9,11 @@ import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Doc = {
-    id: string; type: string; fileName: string; fileUrl: string
+    id: string; type: string; fileName: string
+    // fileUrl is NOT shipped in the bulk list (base64 blobs were too heavy).
+    // Present only on the synthesised profile-photo cell, otherwise fetched
+    // on demand via GET /api/employees/[id]/documents/[docId].
+    fileUrl?: string
     status: string; uploadedAt: string
     employee: {
         id: string; employeeId: string; firstName: string; lastName: string
@@ -59,7 +63,44 @@ function DocCell({
 }) {
     const [uploading, setUploading] = useState(false)
     const [deleting, setDeleting]   = useState(false)
+    const [fetchingFile, setFetchingFile] = useState(false)
     const fileRef = useRef<HTMLInputElement>(null)
+
+    // The bulk list omits the base64 `fileUrl` for speed. Resolve it lazily the
+    // first time the user views/downloads a document. Profile-photo cells carry
+    // their url inline (no DB row), so those resolve instantly.
+    const resolveFileUrl = async (): Promise<string | null> => {
+        if (!doc) return null
+        if (doc.fileUrl) return doc.fileUrl
+        try {
+            const r = await fetch(`/api/employees/${empId}/documents/${doc.id}`)
+            if (!r.ok) { toast.error("Could not load file"); return null }
+            const data = await r.json()
+            return data.fileUrl ?? null
+        } catch { toast.error("Could not load file"); return null }
+    }
+
+    const handleView = async () => {
+        setFetchingFile(true)
+        try {
+            const url = await resolveFileUrl()
+            if (url && doc) onView(url, doc.fileName)
+        } finally { setFetchingFile(false) }
+    }
+
+    const handleDownload = async () => {
+        setFetchingFile(true)
+        try {
+            const url = await resolveFileUrl()
+            if (!url || !doc) return
+            const a = document.createElement("a")
+            a.href = url
+            a.download = doc.fileName
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+        } finally { setFetchingFile(false) }
+    }
 
     const handleUpload = async (ev: React.ChangeEvent<HTMLInputElement>) => {
         const file = ev.target.files?.[0]
@@ -135,14 +176,14 @@ function DocCell({
             <p className="text-[11px] text-[#1a1a18] truncate max-w-[120px]" title={doc.fileName}>{doc.fileName}</p>
             {/* actions */}
             <div className="flex items-center gap-1 flex-wrap mt-0.5">
-                <button onClick={() => onView(doc.fileUrl, doc.fileName)}
-                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-blue-50 text-blue-600 hover:bg-blue-100">
-                    <Eye size={9} /> View
+                <button onClick={handleView} disabled={fetchingFile}
+                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50">
+                    {fetchingFile ? <Loader2 size={9} className="animate-spin" /> : <Eye size={9} />} View
                 </button>
-                <a href={doc.fileUrl} download={doc.fileName}
-                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-green-50 text-green-700 hover:bg-green-100">
+                <button onClick={handleDownload} disabled={fetchingFile}
+                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">
                     <Download size={9} /> Download
-                </a>
+                </button>
                 {isAdmin && doc.id !== PROFILE_PHOTO_ID && (
                     <button onClick={handleDelete} disabled={deleting}
                         className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">

@@ -11,21 +11,20 @@ export async function GET() {
     }
 
     try {
+        // IMPORTANT: never select `fileUrl` here. Documents are stored as base64
+        // data URLs, so shipping the blob for every document made this endpoint
+        // return hundreds of MB and load times hit ~15s. The master documents
+        // grid only needs to know WHICH doc types exist per employee (+ name /
+        // status). The actual file is fetched on demand when the user clicks
+        // View/Download (GET /api/employees/[id]/documents/[docId]).
         const docs = await prisma.employeeDocument.findMany({
-            include: {
-                employee: {
-                    select: {
-                        id: true,
-                        employeeId: true,
-                        firstName: true,
-                        lastName: true,
-                        phone: true,
-                        email: true,
-                        designation: true,
-                        branch: { select: { name: true } },
-                        department: { select: { name: true } },
-                    }
-                }
+            select: {
+                id: true,
+                type: true,
+                fileName: true,
+                status: true,
+                uploadedAt: true,
+                employee: { select: { id: true } },
             },
             orderBy: { uploadedAt: "desc" },
         })

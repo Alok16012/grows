@@ -612,6 +612,9 @@ export default function EmployeeMasterPage() {
             if (siteFilter) params.set("siteId", siteFilter)
             if (search) params.set("search", search)
             params.set("pageSize", "500")
+            // Master grid never renders avatars — skip the heavy base64 photo
+            // payload so the list loads fast (was ~15s with photos inlined).
+            params.set("lite", "1")
             const res = await fetch(`/api/employees?${params.toString()}`)
             const data = await res.json()
             setEmployees(Array.isArray(data) ? data : (data.employees ?? []))

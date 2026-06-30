@@ -28,6 +28,11 @@ export async function GET(req: Request) {
         const companyId = searchParams.get("companyId")
         const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
         const pageSize = Math.min(1000, parseInt(searchParams.get("pageSize") ?? "50"))
+        // `lite=1` strips the base64 `photo` blob from each row. Profile photos
+        // are stored as data URLs, so a 500-row list shipped tens of MB and took
+        // ~15s. Callers that don't render avatars (e.g. Employee Master) opt in;
+        // a `hasPhoto` boolean is kept so presence is still known.
+        const lite = searchParams.get("lite") === "1"
 
         const where: Record<string, any> = {}
         if (branchId) where.branchId = branchId
@@ -102,7 +107,7 @@ export async function GET(req: Request) {
         // employee whose `photo` column is still empty (older records were
         // saved as documents only). Keeps avatars consistent everywhere.
         try {
-            const missing = employees.filter(e => !e.photo).map(e => e.id)
+            const missing = lite ? [] : employees.filter(e => !e.photo).map(e => e.id)
             if (missing.length > 0) {
                 const photos = await prisma.employeeDocument.findMany({
                     where: { employeeId: { in: missing }, type: "PHOTO" },
@@ -131,6 +136,15 @@ export async function GET(req: Request) {
                 e.basicSalary = null
                 e.salaryType = null
                 e.employeeSalary = null
+            }
+        }
+
+        // Drop the heavy base64 photo payload for lite callers, but expose a
+        // boolean so the UI can still tell whether a photo exists.
+        if (lite) {
+            for (const e of employees as any[]) {
+                e.hasPhoto = !!e.photo
+                e.photo = null
             }
         }
 
