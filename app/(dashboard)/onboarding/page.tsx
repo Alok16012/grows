@@ -11,6 +11,16 @@ import {
 import { format } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Pending candidates carry a temporary PENDING-xxxx placeholder id until their
+// onboarding is approved (a real EMP-NNNN code is assigned then). Show a clean
+// "Pending" label instead of the raw placeholder so the UI has one format.
+function displayEmpId(id?: string | null): string {
+    if (!id || id.startsWith("PENDING-")) return "Pending"
+    return id
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type OnboardingStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD"
@@ -222,7 +232,7 @@ function DetailModal({ record, onClose, onAction }: {
                             <div>
                                 <div style={{ fontSize: 17, fontWeight: 800, color: "var(--text)" }}>{fullName}</div>
                                 <div style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                                    <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--accent)" }}>{e.employeeId}</span>
+                                    <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--accent)" }}>{displayEmpId(e.employeeId)}</span>
                                     {e.designation && <><span>·</span><span>{e.designation}</span></>}
                                     {site && <><span>·</span><MapPin size={11} /><span>{site}</span></>}
                                 </div>
@@ -292,7 +302,7 @@ function DetailModal({ record, onClose, onAction }: {
                     {tab === "employment" && (
                         <>
                             <Section title="Job Details">
-                                <Field label="Employee ID" value={e.employeeId} />
+                                <Field label="Employee ID" value={displayEmpId(e.employeeId)} />
                                 <Field label="Designation" value={e.designation} />
                                 <Field label="Department" value={e.department?.name} />
                                 <Field label="Site" value={site} />
@@ -683,7 +693,7 @@ export default function OnboardingPage() {
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 2 }}>{fullName}</div>
                                     <div style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                                        <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--accent)" }}>{e.employeeId}</span>
+                                        <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--accent)" }}>{displayEmpId(e.employeeId)}</span>
                                         {e.designation && <span>{e.designation}</span>}
                                         {e.department?.name && <><Building2 size={11} /><span>{e.department.name}</span></>}
                                         {site && <><MapPin size={11} /><span>{site}</span></>}
