@@ -1,14 +1,15 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     CheckCircle, XCircle, Clock, Loader2,
     ChevronLeft, ChevronRight, Search,
-    Edit2, X, Plus, Users, CalendarDays
+    Edit2, X, Plus, Users, CalendarDays,
+    MapPin, LogIn, LogOut
 } from "lucide-react"
-import { format } from "date-fns"
+import { format, getDaysInMonth } from "date-fns"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,10 @@ type AttendanceRecord = {
     date: string
     checkIn?: string
     checkOut?: string
+    checkInLat?: number | null
+    checkInLng?: number | null
+    checkOutLat?: number | null
+    checkOutLng?: number | null
     workingHrs: number
     status: string
     overtimeHrs: number
@@ -31,6 +36,22 @@ type AttendanceRecord = {
         photo?: string
     }
     site?: { id: string; name: string }
+}
+
+type SelfAttendanceRecord = {
+    id: string
+    employeeId: string
+    date: string
+    checkIn?: string | null
+    checkOut?: string | null
+    checkInLat?: number | null
+    checkInLng?: number | null
+    checkOutLat?: number | null
+    checkOutLng?: number | null
+    workingHrs: number
+    status: string
+    remarks?: string | null
+    site?: { id: string; name: string } | null
 }
 
 type Employee = {
@@ -58,6 +79,8 @@ const STATUS_COLORS: Record<string, { label: string; color: string; bg: string; 
 }
 
 const BULK_STATUSES = ["PRESENT", "ABSENT", "HALF_DAY", "LATE", "LEAVE"]
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -384,12 +407,371 @@ function AttendancePct({ pct }: { pct: number }) {
     )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Self-Service Check-In/Out Card ──────────────────────────────────────────
 
-export default function AttendancePage() {
-    const { data: session, status } = useSession()
-    const router = useRouter()
+function SelfCheckCard({
+    todayRecord,
+    onAction,
+    actionLoading,
+}: {
+    todayRecord: SelfAttendanceRecord | null
+    onAction: (action: "checkin" | "checkout") => void
+    actionLoading: boolean
+}) {
+    const now = new Date()
+    const checkedIn = !!todayRecord?.checkIn
+    const checkedOut = !!todayRecord?.checkOut
+    const complete = checkedIn && checkedOut
 
+    const formatTime = (dt: string) => format(new Date(dt), "HH:mm")
+    const formatCoords = (lat?: number | null, lng?: number | null) =>
+        lat != null && lng != null ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : null
+
+    return (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <p className="text-[12px] font-medium text-[var(--text3)] uppercase tracking-[0.5px] mb-1">Today</p>
+                    <p className="text-[22px] font-semibold text-[var(--text)] tracking-[-0.3px]">
+                        {format(now, "EEEE, dd MMM yyyy")}
+                    </p>
+                    <p className="text-[13px] text-[var(--text3)] mt-0.5">{format(now, "HH:mm")} local time</p>
+                </div>
+
+                {/* Action button */}
+                <div className="flex flex-col items-end gap-2">
+                    {complete ? (
+                        <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[13px] font-semibold"
+                            style={{ background: "#e8f7f1", color: "#1a9e6e", border: "1px solid #6ee7b7" }}>
+                            <CheckCircle size={16} />
+                            Complete ✓
+                        </div>
+                    ) : checkedIn ? (
+                        <button
+                            onClick={() => onAction("checkout")}
+                            disabled={actionLoading}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                            style={{ background: "#f59e0b" }}>
+                            {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
+                            Check Out
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => onAction("checkin")}
+                            disabled={actionLoading}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                            style={{ background: "#1a9e6e" }}>
+                            {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />}
+                            Check In
+                        </button>
+                    )}
+                    {actionLoading && (
+                        <p className="text-[11px] text-[var(--text3)]">Getting location...</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Status details */}
+            {(checkedIn || checkedOut) && (
+                <div className="mt-5 pt-5 border-t border-[var(--border)] grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {checkedIn && (
+                        <div className="flex items-start gap-3 p-3 rounded-[10px]" style={{ background: "#e8f7f1" }}>
+                            <div className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "#1a9e6e" }}>
+                                <LogIn size={15} className="text-white" />
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.4px]" style={{ color: "#1a9e6e" }}>Checked In</p>
+                                <p className="text-[15px] font-bold" style={{ color: "#1a9e6e" }}>{formatTime(todayRecord!.checkIn!)}</p>
+                                {formatCoords(todayRecord?.checkInLat, todayRecord?.checkInLng) && (
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                        <MapPin size={10} style={{ color: "#1a9e6e" }} />
+                                        <span className="text-[10px]" style={{ color: "#1a9e6e", opacity: 0.8 }}>
+                                            {formatCoords(todayRecord?.checkInLat, todayRecord?.checkInLng)}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {checkedOut && (
+                        <div className="flex items-start gap-3 p-3 rounded-[10px]" style={{ background: "#fffbeb" }}>
+                            <div className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "#f59e0b" }}>
+                                <LogOut size={15} className="text-white" />
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.4px]" style={{ color: "#b45309" }}>Checked Out</p>
+                                <p className="text-[15px] font-bold" style={{ color: "#b45309" }}>{formatTime(todayRecord!.checkOut!)}</p>
+                                <p className="text-[11px]" style={{ color: "#b45309", opacity: 0.8 }}>
+                                    {todayRecord?.workingHrs ? `${todayRecord.workingHrs} hrs worked` : ""}
+                                </p>
+                                {formatCoords(todayRecord?.checkOutLat, todayRecord?.checkOutLng) && (
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                        <MapPin size={10} style={{ color: "#b45309" }} />
+                                        <span className="text-[10px]" style={{ color: "#b45309", opacity: 0.8 }}>
+                                            {formatCoords(todayRecord?.checkOutLat, todayRecord?.checkOutLng)}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {!checkedIn && !checkedOut && (
+                <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                    <p className="text-[13px] text-[var(--text3)]">You haven&apos;t checked in yet today. Tap &quot;Check In&quot; to record your attendance with GPS location.</p>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── Self-Service Month Table ─────────────────────────────────────────────────
+
+function SelfMonthTable({ monthRecords, selectedMonth }: {
+    monthRecords: SelfAttendanceRecord[]
+    selectedMonth: string
+}) {
+    const [yr, mo] = selectedMonth.split("-").map(Number)
+    const daysInMonth = getDaysInMonth(new Date(yr, mo - 1, 1))
+
+    const recordMap = new Map<number, SelfAttendanceRecord>()
+    monthRecords.forEach(r => {
+        const d = new Date(r.date)
+        recordMap.set(d.getDate(), r)
+    })
+
+    // Summary stats
+    const present = monthRecords.filter(r => r.status === "PRESENT").length
+    const absent = monthRecords.filter(r => r.status === "ABSENT").length
+    const late = monthRecords.filter(r => r.status === "LATE").length
+    const leave = monthRecords.filter(r => r.status === "LEAVE").length
+    const totalHrs = monthRecords.reduce((s, r) => s + (r.workingHrs || 0), 0)
+
+    const formatTime = (dt?: string | null) => dt ? format(new Date(dt), "HH:mm") : "—"
+    const formatCoords = (lat?: number | null, lng?: number | null) =>
+        lat != null && lng != null ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : null
+
+    return (
+        <div className="space-y-4">
+            {/* Summary chips */}
+            <div className="flex flex-wrap gap-2">
+                {[
+                    { label: "Present", value: present, color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
+                    { label: "Absent", value: absent, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
+                    { label: "Late", value: late, color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
+                    { label: "Leave", value: leave, color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
+                    { label: "Working Hrs", value: `${totalHrs.toFixed(1)}h`, color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
+                ].map(s => (
+                    <div key={s.label} className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] border text-[12px] font-semibold"
+                        style={{ color: s.color, background: s.bg, borderColor: s.border }}>
+                        <span>{s.label}</span>
+                        <span className="text-[14px]">{s.value}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Table */}
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3 w-16">Date</th>
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-3 py-3 w-12">Day</th>
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-3 py-3">Status</th>
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-3 py-3">Check In</th>
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-3 py-3">Check Out</th>
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-3 py-3">Working Hrs</th>
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-3 py-3">Location</th>
+                                <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                                const record = recordMap.get(day)
+                                const dateObj = new Date(yr, mo - 1, day)
+                                const dayName = DAY_NAMES[dateObj.getDay()]
+                                const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
+                                const isToday = format(dateObj, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                                const coordsIn = record ? formatCoords(record.checkInLat, record.checkInLng) : null
+                                const coordsOut = record ? formatCoords(record.checkOutLat, record.checkOutLng) : null
+                                const locationStr = coordsIn || coordsOut
+                                    ? (coordsIn ?? coordsOut)
+                                    : null
+
+                                return (
+                                    <tr key={day}
+                                        className={`border-b border-[var(--border)] transition-colors
+                                            ${day === daysInMonth ? "border-b-0" : ""}
+                                            ${isToday ? "bg-[var(--accent)]/5" : isWeekend ? "bg-[var(--surface2)]/30" : "hover:bg-[var(--surface2)]/20"}`}>
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center gap-1.5">
+                                                {isToday && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />}
+                                                <span className={`text-[13px] font-${isToday ? "bold" : "medium"} ${isToday ? "text-[var(--accent)]" : "text-[var(--text)]"}`}>
+                                                    {String(day).padStart(2, "0")}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2.5">
+                                            <span className={`text-[12px] ${isWeekend ? "text-[#dc2626] font-medium" : "text-[var(--text3)]"}`}>{dayName}</span>
+                                        </td>
+                                        <td className="px-3 py-2.5">
+                                            {record ? <StatusBadge status={record.status} /> : (
+                                                <span className="text-[12px] text-[var(--text3)]">Not Marked</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-[13px] text-[var(--text2)]">
+                                            {formatTime(record?.checkIn)}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-[13px] text-[var(--text2)]">
+                                            {formatTime(record?.checkOut)}
+                                        </td>
+                                        <td className="px-3 py-2.5">
+                                            {record?.workingHrs ? (
+                                                <span className="text-[13px] font-medium text-[var(--text)]">{record.workingHrs}h</span>
+                                            ) : (
+                                                <span className="text-[13px] text-[var(--text3)]">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2.5">
+                                            {locationStr ? (
+                                                <div className="flex items-center gap-1">
+                                                    <MapPin size={11} className="text-[var(--accent)] shrink-0" />
+                                                    <span className="text-[11px] text-[var(--text3)] font-mono">{locationStr}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[13px] text-[var(--text3)]">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-[12px] text-[var(--text3)]">
+                                            {record?.remarks || "—"}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Self-Service View ────────────────────────────────────────────────────────
+
+function SelfServiceView() {
+    const [todayRecord, setTodayRecord] = useState<SelfAttendanceRecord | null>(null)
+    const [monthRecords, setMonthRecords] = useState<SelfAttendanceRecord[]>([])
+    const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"))
+    const [loading, setLoading] = useState(true)
+    const [actionLoading, setActionLoading] = useState(false)
+    const clockRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const [, forceUpdate] = useState(0)
+
+    // Live clock tick every minute
+    useEffect(() => {
+        clockRef.current = setInterval(() => forceUpdate(n => n + 1), 60_000)
+        return () => { if (clockRef.current) clearInterval(clockRef.current) }
+    }, [])
+
+    const fetchSelf = useCallback(async (month?: string) => {
+        setLoading(true)
+        try {
+            const params = new URLSearchParams()
+            if (month) params.set("month", month)
+            const res = await fetch(`/api/attendance/self?${params}`)
+            if (!res.ok) throw new Error(await res.text())
+            const data = await res.json()
+            setTodayRecord(data.todayRecord ?? null)
+            setMonthRecords(Array.isArray(data.monthRecords) ? data.monthRecords : [])
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Failed to load attendance")
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        fetchSelf(selectedMonth)
+    }, [selectedMonth, fetchSelf])
+
+    const handleAction = useCallback((action: "checkin" | "checkout") => {
+        setActionLoading(true)
+
+        const doPost = async (lat?: number, lng?: number) => {
+            try {
+                const res = await fetch("/api/attendance/self", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action, lat, lng }),
+                })
+                if (!res.ok) throw new Error(await res.text())
+                const label = action === "checkin" ? "Checked in" : "Checked out"
+                toast.success(`${label} successfully!`)
+                await fetchSelf(selectedMonth)
+            } catch (err: unknown) {
+                toast.error(err instanceof Error ? err.message : "Action failed")
+            } finally {
+                setActionLoading(false)
+            }
+        }
+
+        if (typeof navigator !== "undefined" && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => doPost(pos.coords.latitude, pos.coords.longitude),
+                () => doPost(), // proceed without location if denied
+                { timeout: 8000, maximumAge: 30000 }
+            )
+        } else {
+            doPost()
+        }
+    }, [selectedMonth, fetchSelf])
+
+    return (
+        <div className="space-y-5">
+            {/* Header */}
+            <div>
+                <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">My Attendance</h1>
+                <p className="text-[13px] text-[var(--text3)] mt-0.5">Track your daily check-in and check-out</p>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
+                </div>
+            ) : (
+                <>
+                    {/* Today card */}
+                    <SelfCheckCard
+                        todayRecord={todayRecord}
+                        onAction={handleAction}
+                        actionLoading={actionLoading}
+                    />
+
+                    {/* Month selector */}
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                        <h2 className="text-[16px] font-semibold text-[var(--text)]">Monthly Record</h2>
+                        <input
+                            type="month"
+                            value={selectedMonth}
+                            onChange={e => setSelectedMonth(e.target.value)}
+                            className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        />
+                    </div>
+
+                    {/* Month table */}
+                    <SelfMonthTable monthRecords={monthRecords} selectedMonth={selectedMonth} />
+                </>
+            )}
+        </div>
+    )
+}
+
+// ─── Admin / Manager View ─────────────────────────────────────────────────────
+
+function AdminView() {
     const [tab, setTab] = useState<"daily" | "monthly">("daily")
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"))
@@ -404,11 +786,6 @@ export default function AttendancePage() {
     const [bulkModal, setBulkModal] = useState(false)
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
     const [existingRecord, setExistingRecord] = useState<AttendanceRecord | null>(null)
-
-    useEffect(() => {
-        if (status !== "unauthenticated") return
-        router.push("/login")
-    }, [status, router])
 
     useEffect(() => {
         fetch("/api/sites").then(r => r.json()).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {})
@@ -455,16 +832,12 @@ export default function AttendancePage() {
         }
     }, [selectedMonth, siteFilter])
 
-    useEffect(() => {
-        if (status !== "authenticated") return
-        fetchEmployees()
-    }, [status, fetchEmployees])
+    useEffect(() => { fetchEmployees() }, [fetchEmployees])
 
     useEffect(() => {
-        if (status !== "authenticated") return
         if (tab === "daily") fetchAttendances()
         else fetchMonthlyAttendances()
-    }, [status, tab, fetchAttendances, fetchMonthlyAttendances])
+    }, [tab, fetchAttendances, fetchMonthlyAttendances])
 
     // Stats for daily view
     const attendanceMap = new Map(attendances.map(a => [a.employeeId, a]))
@@ -492,10 +865,10 @@ export default function AttendancePage() {
     })
 
     const statsCards = [
-        { label: "Present",        value: presentCount,   color: "#1a9e6e", bg: "#e8f7f1", icon: <CheckCircle size={18} /> },
-        { label: "Absent",         value: absentCount,    color: "#dc2626", bg: "#fef2f2", icon: <XCircle size={18} /> },
-        { label: "Late / Half Day",value: lateHalfCount,  color: "#f59e0b", bg: "#fffbeb", icon: <Clock size={18} /> },
-        { label: "On Leave",       value: onLeaveCount,   color: "#8b5cf6", bg: "#f5f3ff", icon: <Users size={18} /> },
+        { label: "Present",         value: presentCount,   color: "#1a9e6e", bg: "#e8f7f1", icon: <CheckCircle size={18} /> },
+        { label: "Absent",          value: absentCount,    color: "#dc2626", bg: "#fef2f2", icon: <XCircle size={18} /> },
+        { label: "Late / Half Day", value: lateHalfCount,  color: "#f59e0b", bg: "#fffbeb", icon: <Clock size={18} /> },
+        { label: "On Leave",        value: onLeaveCount,   color: "#8b5cf6", bg: "#f5f3ff", icon: <Users size={18} /> },
     ]
 
     return (
@@ -738,4 +1111,31 @@ export default function AttendancePage() {
             />
         </div>
     )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function AttendancePage() {
+    const { data: session, status } = useSession()
+    const router = useRouter()
+
+    useEffect(() => {
+        if (status !== "unauthenticated") return
+        router.push("/login")
+    }, [status, router])
+
+    if (status === "loading") {
+        return (
+            <div className="flex items-center justify-center py-24">
+                <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
+            </div>
+        )
+    }
+
+    const isPrivileged =
+        session?.user?.role === "ADMIN" ||
+        ((session?.user?.permissions as string[] | undefined) ?? []).includes("attendance.view")
+
+    if (isPrivileged) return <AdminView />
+    return <SelfServiceView />
 }
