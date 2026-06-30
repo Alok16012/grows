@@ -136,6 +136,109 @@ function AdminExpenseTable() {
     )
 }
 
+// ─── Recruitment scoreboard (per-HR) ─────────────────────────────────────────
+function AdminRecruitmentTable() {
+    const now = new Date()
+    const [month, setMonth] = useState("ALL")
+    const [data, setData] = useState<any>(null)
+    const [loadingRec, setLoadingRec] = useState(true)
+
+    useEffect(() => {
+        setLoadingRec(true)
+        const qs = month === "ALL" ? "" : `?month=${month}`
+        fetch(`/api/admin/recruitment-summary${qs}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { setData(d); setLoadingRec(false) })
+            .catch(() => setLoadingRec(false))
+    }, [month])
+
+    const monthOptions = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+        return { val, label: d.toLocaleString("en-IN", { month: "short", year: "numeric" }) }
+    })
+
+    const REC_COLS = [
+        { key: "recruited", label: "Recruited", color: "#3b82f6" },
+        { key: "interviewed", label: "Interviewed", color: "#f59e0b" },
+        { key: "selected", label: "Selected", color: "#8b5cf6" },
+        { key: "onboarded", label: "Onboarded", color: "#047857" },
+    ]
+
+    return (
+        <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
+            <div className="p-4 border-b border-[var(--border)] flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-1">
+                    <Users className="h-4 w-4 text-[var(--accent)]" />
+                    <span className="text-[13.5px] font-semibold text-[var(--text)]">Recruitment by HR</span>
+                    <span className="text-[11px] text-[var(--text3)]">Who recruited & onboarded how many</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <select value={month} onChange={e => setMonth(e.target.value)}
+                        className="h-8 rounded-[7px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none">
+                        <option value="ALL">All time</option>
+                        {monthOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
+                    </select>
+                    <Link href="/recruitment" className="text-[12.5px] font-medium text-[var(--accent)] hover:underline whitespace-nowrap">View All →</Link>
+                </div>
+            </div>
+            {loadingRec ? (
+                <div className="p-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-[var(--text3)]" /></div>
+            ) : !data || !data.rows || data.rows.length === 0 ? (
+                <div className="p-8 text-center">
+                    <Users className="h-8 w-8 text-[var(--text3)] mx-auto mb-3" />
+                    <p className="text-[13px] text-[var(--text3)]">No recruitment activity for this period.</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full" style={{ fontSize: 12 }}>
+                        <thead>
+                            <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
+                                <th style={{ textAlign: "left", padding: "8px 16px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>HR / Recruiter</th>
+                                {REC_COLS.map(c => (
+                                    <th key={c.key} style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
+                                ))}
+                                <th style={{ textAlign: "right", padding: "8px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Conv.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.rows.map((row: any) => (
+                                <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }} className="hover:bg-[var(--surface2)] transition-colors">
+                                    <td style={{ padding: "9px 16px", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>{row.name}</td>
+                                    {REC_COLS.map(c => (
+                                        <td key={c.key} style={{ textAlign: "right", padding: "9px 12px", color: row[c.key] > 0 ? c.color : "var(--text3)", fontWeight: row[c.key] > 0 ? 600 : 400 }}>
+                                            {row[c.key] || "—"}
+                                        </td>
+                                    ))}
+                                    <td style={{ textAlign: "right", padding: "9px 16px" }}>
+                                        <span className={cn(
+                                            "px-2 py-0.5 rounded-full text-[11px] font-semibold",
+                                            row.conversion >= 50 ? "bg-green-100 text-green-700" : row.conversion >= 20 ? "bg-amber-100 text-amber-700" : "bg-[var(--surface2)] text-[var(--text3)]"
+                                        )}>{row.conversion}%</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
+                                <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }}>Total</td>
+                                {REC_COLS.map(c => (
+                                    <td key={c.key} style={{ textAlign: "right", padding: "9px 12px", fontWeight: 700, color: data.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
+                                        {data.totals[c.key] || "—"}
+                                    </td>
+                                ))}
+                                <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 800, color: "var(--text)" }}>
+                                    {data.totals.recruited > 0 ? Math.round((data.totals.onboarded / data.totals.recruited) * 100) : 0}%
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export default function AdminDashboard() {
     const { data: session } = useSession()
     const [stats, setStats] = useState<any>(null)
@@ -251,6 +354,9 @@ export default function AdminDashboard() {
                     </div>
                 ))}
             </div>
+
+            {/* Recruitment scoreboard (per-HR) — placed up top per request */}
+            <AdminRecruitmentTable />
 
             {/* ALERT CARDS — Mobile quick-action row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-[14px]">

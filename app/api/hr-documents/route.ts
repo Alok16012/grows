@@ -42,7 +42,20 @@ export async function GET(req: Request) {
             },
             orderBy: { createdAt: "desc" }
         })
-        return NextResponse.json(docs)
+
+        // HrDocument stores the sender as a bare userId (createdBy/issuedBy) with
+        // no relation, so resolve those ids to display names in one extra query
+        // and stitch the sender's name onto each row.
+        const senderIds = Array.from(new Set(docs.flatMap(d => [d.issuedBy, d.createdBy].filter(Boolean) as string[])))
+        const senders = senderIds.length
+            ? await prisma.user.findMany({ where: { id: { in: senderIds } }, select: { id: true, name: true, email: true } })
+            : []
+        const senderById = new Map(senders.map(u => [u.id, u.name || u.email || "—"]))
+        const withSender = docs.map(d => ({
+            ...d,
+            sentByName: senderById.get((d.issuedBy || d.createdBy) as string) || null,
+        }))
+        return NextResponse.json(withSender)
     } catch (e) {
         console.error("[HR_DOCS_GET]", e)
         return new NextResponse("Internal Error", { status: 500 })

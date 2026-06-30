@@ -1823,6 +1823,11 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
                         )}
                         <StatusBadge status={lead.status} />
                         <span className="text-[11px] text-[var(--text3)] hidden md:block">{lead.source}</span>
+                        {lead.creator?.name && (
+                            <span className="text-[11px] text-[var(--text3)] hidden lg:flex items-center gap-1" title="Recruited by">
+                                <UserCheck size={11} />{lead.creator.name}
+                            </span>
+                        )}
                         <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                             <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                                 <Edit2 size={13} />
@@ -2328,6 +2333,7 @@ function DetailDrawer({
                                 {lead.interviewDate && <InfoRow icon={Calendar} label="Interview" value={`${fmt(lead.interviewDate)}${lead.interviewMode ? ` · ${lead.interviewMode}` : ""}`} />}
                                 {lead.nextFollowUp && <InfoRow icon={Clock} label="Follow-up" value={fmt(lead.nextFollowUp)} />}
                                 {lead.assignee && <InfoRow icon={UserCheck} label="Assigned To" value={lead.assignee.name} />}
+                                {lead.creator?.name && <InfoRow icon={UserCheck} label="Recruited By" value={lead.creator.name} />}
                                 {/* Personal information from the candidate form */}
                                 {lead.altPhone && <InfoRow icon={Phone} label="Alt. Number" value={lead.altPhone} />}
                                 {lead.dateOfBirth && <InfoRow icon={Calendar} label="Date of Birth" value={fmt(lead.dateOfBirth)} />}

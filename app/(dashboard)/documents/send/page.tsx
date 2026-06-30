@@ -19,9 +19,13 @@ type Emp = {
 }
 type IssuedDoc = {
     id: string; docNumber: string; status: string; issuedAt: string | null; createdAt: string
+    sentByName?: string | null
     employee: { firstName: string; lastName: string; employeeId: string }
     type: { name: string }
 }
+
+const fmtDate = (s: string | null | undefined) =>
+    s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
 
 type Scope = "role" | "employees" | "all"
 
@@ -324,6 +328,8 @@ export default function SendDocumentsPage() {
                                     <th className="text-left font-medium px-4 py-2.5">Employee</th>
                                     <th className="text-left font-medium px-4 py-2.5">Document</th>
                                     <th className="text-left font-medium px-4 py-2.5">Ref</th>
+                                    <th className="text-left font-medium px-4 py-2.5">Sent by</th>
+                                    <th className="text-left font-medium px-4 py-2.5">Date</th>
                                     <th className="text-left font-medium px-4 py-2.5">Status</th>
                                     <th className="text-right font-medium px-4 py-2.5">PDF</th>
                                 </tr>
@@ -334,6 +340,8 @@ export default function SendDocumentsPage() {
                                         <td className="px-4 py-2.5 text-[var(--text)]">{d.employee.firstName} {d.employee.lastName} <span className="text-[var(--text3)]">· {d.employee.employeeId}</span></td>
                                         <td className="px-4 py-2.5 text-[var(--text2)]">{d.type.name}</td>
                                         <td className="px-4 py-2.5 text-[var(--text3)]">{d.docNumber}</td>
+                                        <td className="px-4 py-2.5 text-[var(--text2)]">{d.sentByName || "—"}</td>
+                                        <td className="px-4 py-2.5 text-[var(--text3)]">{fmtDate(d.issuedAt || d.createdAt)}</td>
                                         <td className="px-4 py-2.5"><span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">{d.status}</span></td>
                                         <td className="px-4 py-2.5 text-right">
                                             <a href={`/api/hr-documents/${d.id}/pdf`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[var(--accent)] hover:underline">
