@@ -23,6 +23,7 @@ function landingForCustomRole(permissions: string[]): string | null {
     if (permissions.includes("payroll.view")) return "/payroll"
     if (permissions.includes("helpdesk.view")) return "/helpdesk"
     if (permissions.includes("lms.view")) return "/lms/learn"
+    if (permissions.includes("users.manage")) return "/admin/employee-logins"
     return null
 }
 
@@ -55,9 +56,14 @@ export default withAuth(
         const ownDashboard = customLanding || rolePaths[role] || "/"
 
         // Role-gated route trees
-        // /admin → ADMIN only
+        // /admin → ADMIN only, EXCEPT the Employee Logins screen which any custom
+        // role holding the `users.manage` permission may access.
         if (path.startsWith("/admin") && role !== "ADMIN") {
-            return NextResponse.redirect(new URL(ownDashboard, req.url))
+            const canManageLogins =
+                path.startsWith("/admin/employee-logins") && permissions.includes("users.manage")
+            if (!canManageLogins) {
+                return NextResponse.redirect(new URL(ownDashboard, req.url))
+            }
         }
         // /manager → MANAGER or ADMIN
         if (path.startsWith("/manager") && role !== "MANAGER" && role !== "ADMIN") {
