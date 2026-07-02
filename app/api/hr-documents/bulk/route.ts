@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { generateDocNumber, fillTemplate, buildDocVars } from "@/lib/hr-document"
+import { ensureHrDocRecallSchema } from "@/lib/hr-doc-schema"
 
 export const maxDuration = 60
 
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
     }
 
     try {
+        await ensureHrDocRecallSchema()
         const { typeId, scope, roleId, employeeIds, effectiveDate, remarks, templateOverride } = await req.json() as {
             typeId?: string
             scope?: "role" | "employees" | "all"

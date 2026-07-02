@@ -3,11 +3,13 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { ensureHrDocRecallSchema, type HrDocHistoryEvent } from "@/lib/hr-doc-schema"
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
     try {
+        await ensureHrDocRecallSchema()
         const doc = await prisma.hrDocument.findUnique({
             where: { id: params.id },
             include: {
@@ -25,6 +27,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
+    // Any HrDocument read/write below selects the recall audit columns, so make
+    // sure they exist first (prod migrations don't auto-run).
+    await ensureHrDocRecallSchema()
     if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
         // Allow employees to acknowledge their own documents
         if (session) {
@@ -43,8 +48,61 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         return new NextResponse("Forbidden", { status: 403 })
     }
     try {
-        const { action, rejectionNote, content, remarks } = await req.json()
+        const { action, rejectionNote, content, remarks, reason } = await req.json()
         const now = new Date()
+
+        // ── Recall / Re-issue ────────────────────────────────────────────────
+        // Pull back a document sent by mistake, or re-issue a recalled one. Both
+        // append to the per-document history so the full trail is preserved.
+        if (action === "recall" || action === "reissue") {
+            const existing = await prisma.hrDocument.findUnique({ where: { id: params.id } })
+            if (!existing) return new NextResponse("Not found", { status: 404 })
+
+            if (action === "recall" && existing.status !== "ISSUED") {
+                return new NextResponse("Only issued documents can be recalled", { status: 400 })
+            }
+            if (action === "reissue" && existing.status !== "RECALLED") {
+                return new NextResponse("Only recalled documents can be re-issued", { status: 400 })
+            }
+
+            const byName = session.user.name || session.user.email || "—"
+            const prior: HrDocHistoryEvent[] = Array.isArray((existing as any).history) ? (existing as any).history : []
+            const event: HrDocHistoryEvent = {
+                action,
+                by: session.user.id,
+                byName,
+                at: now.toISOString(),
+                ...(action === "recall" && reason ? { reason } : {}),
+            }
+
+            const data: Record<string, unknown> =
+                action === "recall"
+                    ? {
+                        status: "RECALLED",
+                        recalledBy: session.user.id,
+                        recalledAt: now,
+                        recallReason: reason || null,
+                        recallCount: { increment: 1 },
+                        history: [...prior, event],
+                        updatedAt: now,
+                    }
+                    : {
+                        status: "ISSUED",
+                        issuedBy: session.user.id,
+                        issuedAt: now,
+                        // clear the "currently recalled" markers; recallCount +
+                        // history keep the audit trail intact
+                        recalledBy: null,
+                        recalledAt: null,
+                        recallReason: null,
+                        history: [...prior, event],
+                        updatedAt: now,
+                    }
+
+            const updated = await prisma.hrDocument.update({ where: { id: params.id }, data })
+            return NextResponse.json(updated)
+        }
+
         let data: Record<string, unknown> = { updatedAt: now }
 
         if (action === "approve") {

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
+import { ensureHrDocRecallSchema } from "@/lib/hr-doc-schema"
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer"
 import { createElement, type ReactElement } from "react"
 import { LetterheadDocumentPDF } from "@/components/LetterheadDocumentPDF"
@@ -29,6 +30,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     try {
+        await ensureHrDocRecallSchema()
         const doc = await prisma.hrDocument.findUnique({
             where: { id: params.id },
             include: {

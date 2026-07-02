@@ -1760,6 +1760,7 @@ enum HrDocStatus {
   APPROVED
   REJECTED
   ISSUED
+  RECALLED
 }
 
 model AppSetting {
@@ -1786,6 +1787,14 @@ model HrDocument {
   issuedAt       DateTime?
   acknowledged   Boolean        @default(false)
   acknowledgedAt DateTime?
+  // Recall: an issued document sent by mistake can be pulled back (status →
+  // RECALLED, hidden from the employee) and later re-issued. `recallCount` and
+  // `history` keep a full audit trail of every recall / re-issue event.
+  recalledBy     String? // userId who recalled
+  recalledAt     DateTime?
+  recallReason   String?
+  recallCount    Int            @default(0)
+  history        Json? // [{ action, by, byName, at, reason? }]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   employee       Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)

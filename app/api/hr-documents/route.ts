@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { ensureHrDocRecallSchema } from "@/lib/hr-doc-schema"
 
 function generateDocNumber() {
     const y = new Date().getFullYear()
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
     const employeeId = searchParams.get("employeeId")
     const typeId = searchParams.get("typeId")
     try {
+        await ensureHrDocRecallSchema()
         const where: Record<string, unknown> = {}
         if (status) where.status = status
         if (employeeId) where.employeeId = employeeId
@@ -46,7 +48,9 @@ export async function GET(req: Request) {
         // HrDocument stores the sender as a bare userId (createdBy/issuedBy) with
         // no relation, so resolve those ids to display names in one extra query
         // and stitch the sender's name onto each row.
-        const senderIds = Array.from(new Set(docs.flatMap(d => [d.issuedBy, d.createdBy].filter(Boolean) as string[])))
+        const senderIds = Array.from(new Set(
+            docs.flatMap(d => [d.issuedBy, d.createdBy, (d as any).recalledBy].filter(Boolean) as string[])
+        ))
         const senders = senderIds.length
             ? await prisma.user.findMany({ where: { id: { in: senderIds } }, select: { id: true, name: true, email: true } })
             : []
@@ -54,6 +58,7 @@ export async function GET(req: Request) {
         const withSender = docs.map(d => ({
             ...d,
             sentByName: senderById.get((d.issuedBy || d.createdBy) as string) || null,
+            recalledByName: (d as any).recalledBy ? (senderById.get((d as any).recalledBy) || null) : null,
         }))
         return NextResponse.json(withSender)
     } catch (e) {
@@ -68,6 +73,7 @@ export async function POST(req: Request) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     try {
+        await ensureHrDocRecallSchema()
         const { employeeId, typeId, effectiveDate, remarks, action } = await req.json()
         if (!employeeId || !typeId) return new NextResponse("employeeId and typeId required", { status: 400 })
 

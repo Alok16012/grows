@@ -3,10 +3,12 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X } from "lucide-react"
+import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X, Undo2, RotateCcw, History } from "lucide-react"
 import { can } from "@/lib/can"
 
 type DocType = { id: string; name: string; requiresApproval: boolean; templateContent?: string }
+
+type HistoryEvent = { action: string; by: string; byName: string; at: string; reason?: string }
 
 const TEMPLATE_VARS = [
     "{{employee_name}}", "{{employee_id}}", "{{designation}}", "{{department}}",
@@ -20,6 +22,11 @@ type Emp = {
 type IssuedDoc = {
     id: string; docNumber: string; status: string; issuedAt: string | null; createdAt: string
     sentByName?: string | null
+    recalledByName?: string | null
+    recalledAt?: string | null
+    recallReason?: string | null
+    recallCount?: number | null
+    history?: HistoryEvent[] | null
     employee: { firstName: string; lastName: string; employeeId: string }
     type: { name: string }
 }
@@ -174,6 +181,54 @@ export default function SendDocumentsPage() {
             toast.error((e as Error).message)
         } finally {
             setSending(false)
+        }
+    }
+
+    // Recall a mistakenly-sent document, or re-issue a recalled one. Both hit
+    // the same PUT endpoint and refresh the list; history is kept server-side.
+    const [busyId, setBusyId] = useState<string | null>(null)
+    const [historyDoc, setHistoryDoc] = useState<IssuedDoc | null>(null)
+    const canManage = can(session, "documents.upload")
+
+    const recallDoc = async (d: IssuedDoc) => {
+        const reason = window.prompt(
+            `Recall this document from ${d.employee.firstName} ${d.employee.lastName}?\n\nThe employee will no longer see it. Optionally add a reason:`,
+            ""
+        )
+        if (reason === null) return // cancelled
+        setBusyId(d.id)
+        try {
+            const res = await fetch(`/api/hr-documents/${d.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "recall", reason: reason || undefined }),
+            })
+            if (!res.ok) throw new Error(await res.text() || "Failed")
+            toast.success("Document recalled")
+            await fetchIssued()
+        } catch (e) {
+            toast.error((e as Error).message)
+        } finally {
+            setBusyId(null)
+        }
+    }
+
+    const reissueDoc = async (d: IssuedDoc) => {
+        if (!confirm(`Re-send this document to ${d.employee.firstName} ${d.employee.lastName}?`)) return
+        setBusyId(d.id)
+        try {
+            const res = await fetch(`/api/hr-documents/${d.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "reissue" }),
+            })
+            if (!res.ok) throw new Error(await res.text() || "Failed")
+            toast.success("Document re-sent")
+            await fetchIssued()
+        } catch (e) {
+            toast.error((e as Error).message)
+        } finally {
+            setBusyId(null)
         }
     }
 
@@ -332,6 +387,7 @@ export default function SendDocumentsPage() {
                                     <th className="text-left font-medium px-4 py-2.5">Date</th>
                                     <th className="text-left font-medium px-4 py-2.5">Status</th>
                                     <th className="text-right font-medium px-4 py-2.5">PDF</th>
+                                    {canManage && <th className="text-right font-medium px-4 py-2.5">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
@@ -342,12 +398,61 @@ export default function SendDocumentsPage() {
                                         <td className="px-4 py-2.5 text-[var(--text3)]">{d.docNumber}</td>
                                         <td className="px-4 py-2.5 text-[var(--text2)]">{d.sentByName || "—"}</td>
                                         <td className="px-4 py-2.5 text-[var(--text3)]">{fmtDate(d.issuedAt || d.createdAt)}</td>
-                                        <td className="px-4 py-2.5"><span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">{d.status}</span></td>
+                                        <td className="px-4 py-2.5">
+                                            <span
+                                                className={`text-[12px] px-2 py-0.5 rounded-full ${d.status === "RECALLED"
+                                                    ? "bg-red-100 text-red-700"
+                                                    : "bg-[var(--accent)]/10 text-[var(--accent)]"}`}
+                                                title={d.status === "RECALLED" && d.recalledByName
+                                                    ? `Recalled by ${d.recalledByName} on ${fmtDate(d.recalledAt)}${d.recallReason ? ` — ${d.recallReason}` : ""}`
+                                                    : undefined}
+                                            >
+                                                {d.status}
+                                            </span>
+                                            {(d.recallCount ?? 0) > 0 && (
+                                                <span className="ml-1.5 text-[11px] text-[var(--text3)]" title="Times recalled">↺{d.recallCount}</span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-2.5 text-right">
                                             <a href={`/api/hr-documents/${d.id}/pdf`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[var(--accent)] hover:underline">
                                                 <Download size={13} /> PDF
                                             </a>
                                         </td>
+                                        {canManage && (
+                                            <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                                                <div className="inline-flex items-center gap-2 justify-end">
+                                                    {d.status === "ISSUED" && (
+                                                        <button
+                                                            onClick={() => recallDoc(d)}
+                                                            disabled={busyId === d.id}
+                                                            className="inline-flex items-center gap-1 text-[12px] text-red-600 hover:underline disabled:opacity-50"
+                                                            title="Recall this document"
+                                                        >
+                                                            {busyId === d.id ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} Recall
+                                                        </button>
+                                                    )}
+                                                    {d.status === "RECALLED" && (
+                                                        <button
+                                                            onClick={() => reissueDoc(d)}
+                                                            disabled={busyId === d.id}
+                                                            className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline disabled:opacity-50"
+                                                            title="Re-send this document"
+                                                        >
+                                                            {busyId === d.id ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Re-send
+                                                        </button>
+                                                    )}
+                                                    {(d.history?.length ?? 0) > 0 && (
+                                                        <button
+                                                            onClick={() => setHistoryDoc(d)}
+                                                            className="inline-flex items-center gap-1 text-[12px] text-[var(--text3)] hover:text-[var(--text)]"
+                                                            title="View recall / re-send history"
+                                                        >
+                                                            <History size={13} /> History
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -355,6 +460,35 @@ export default function SendDocumentsPage() {
                     )}
                 </div>
             </div>
+
+            {/* History modal */}
+            {historyDoc && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setHistoryDoc(null)}>
+                    <div className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                            <div>
+                                <h2 className="text-[16px] font-semibold text-[var(--text)] flex items-center gap-2"><History size={16} /> Document history</h2>
+                                <p className="text-[12px] text-[var(--text3)] mt-0.5">{historyDoc.employee.firstName} {historyDoc.employee.lastName} · {historyDoc.docNumber}</p>
+                            </div>
+                            <button onClick={() => setHistoryDoc(null)} className="text-[var(--text3)] hover:text-[var(--text)] p-1 rounded-md hover:bg-[var(--surface2)]"><X size={18} /></button>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-6">
+                            <ol className="relative border-l border-[var(--border)] ml-2 space-y-4">
+                                {(historyDoc.history ?? []).slice().reverse().map((h, i) => (
+                                    <li key={i} className="ml-4">
+                                        <span className={`absolute -left-[6px] w-3 h-3 rounded-full ${h.action === "recall" ? "bg-red-500" : "bg-[var(--accent)]"}`} />
+                                        <p className="text-[13px] font-medium text-[var(--text)]">
+                                            {h.action === "recall" ? "Recalled" : "Re-sent"} by {h.byName}
+                                        </p>
+                                        <p className="text-[12px] text-[var(--text3)]">{new Date(h.at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                                        {h.reason && <p className="text-[12px] text-[var(--text2)] mt-0.5 italic">“{h.reason}”</p>}
+                                    </li>
+                                ))}
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Preview modal */}
             {previewOpen && (

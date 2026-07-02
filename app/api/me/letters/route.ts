@@ -2,12 +2,14 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { ensureHrDocRecallSchema } from "@/lib/hr-doc-schema"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     try {
+        await ensureHrDocRecallSchema()
         const emp = await prisma.employee.findFirst({
             where: { userId: session.user.id },
             select: { id: true }
