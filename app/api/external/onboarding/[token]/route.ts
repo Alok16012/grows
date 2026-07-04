@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { getHrContacts } from "@/lib/hr-contacts"
 
 // GET external candidate data using secure token.
 // Also returns the active site + HR user lists so the public onboarding form
@@ -30,24 +31,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
                 select: { id: true, name: true, code: true },
                 orderBy: { name: "asc" },
             }),
-            prisma.user.findMany({
-                where: {
-                    isActive: true,
-                    // Only HR people in the "Select your HR contact" list.
-                    OR: [
-                        { role: "HR_MANAGER" },
-                        { customRole: { is: { isActive: true, name: { contains: "HR", mode: "insensitive" } } } },
-                    ],
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    role: true,
-                    customRole: { select: { name: true } },
-                },
-                orderBy: { name: "asc" },
-            }),
+            getHrContacts(),
         ])
 
         return NextResponse.json({

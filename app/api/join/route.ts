@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { getHrContacts } from "@/lib/hr-contacts"
 import crypto from "crypto"
 
 // Public route — returns site + HR lists so the /join form can render
@@ -12,28 +13,7 @@ export async function GET() {
                 select: { id: true, name: true, code: true },
                 orderBy: { name: "asc" },
             }),
-            prisma.user.findMany({
-                where: {
-                    isActive: true,
-                    // Only HR people belong in the "Select your HR contact" list —
-                    // not every role that happens to have recruitment.view (Ops
-                    // Manager, Payroll, MIS, etc.). Match the HR_MANAGER system role
-                    // and any active custom role whose name contains "HR"
-                    // (HR Recruiter, HR Executive, HR Manager…).
-                    OR: [
-                        { role: "HR_MANAGER" },
-                        { customRole: { is: { isActive: true, name: { contains: "HR", mode: "insensitive" } } } },
-                    ],
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    role: true,
-                    customRole: { select: { name: true } },
-                },
-                orderBy: { name: "asc" },
-            }),
+            getHrContacts(),
         ])
         return NextResponse.json({ sites, hrUsers })
     } catch (error) {
