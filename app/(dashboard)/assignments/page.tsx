@@ -43,6 +43,10 @@ export default function AssignmentsPage() {
     const [loading, setLoading] = useState(false)
     const [fetching, setFetching] = useState(true)
     const [filterStatus, setFilterStatus] = useState("all")
+    // Search boxes for the selection lists + the assignments table
+    const [inspectorSearch, setInspectorSearch] = useState("")
+    const [managerSearch, setManagerSearch] = useState("")
+    const [assignmentSearch, setAssignmentSearch] = useState("")
 
     useEffect(() => {
         if (mounted && isManagerOrAdmin) {
@@ -185,8 +189,31 @@ export default function AssignmentsPage() {
         }
     }
 
+    // Filtered selection lists (search by name or email)
+    const insMatch = inspectorSearch.trim().toLowerCase()
+    const filteredInspectors = insMatch
+        ? inspectors.filter(i =>
+            (i.name || "").toLowerCase().includes(insMatch) ||
+            (i.email || "").toLowerCase().includes(insMatch))
+        : inspectors
+    const mgrMatch = managerSearch.trim().toLowerCase()
+    const filteredManagers = mgrMatch
+        ? managers.filter(m =>
+            (m.name || "").toLowerCase().includes(mgrMatch) ||
+            (m.email || "").toLowerCase().includes(mgrMatch))
+        : managers
+
+    const asgMatch = assignmentSearch.trim().toLowerCase()
     const filteredAssignments = Array.isArray(assignments) ? assignments.filter(a => {
         if (filterStatus !== "all" && a.status !== filterStatus) return false
+        if (asgMatch) {
+            const hay = [
+                a.inspectionBoy?.name,
+                a.project?.name,
+                a.project?.company?.name,
+            ].filter(Boolean).join(" ").toLowerCase()
+            if (!hay.includes(asgMatch)) return false
+        }
         return true
     }) : []
 
@@ -318,11 +345,23 @@ export default function AssignmentsPage() {
                                     </span>
                                 )}
                             </div>
+                            <div className="relative mb-[8px]">
+                                <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[#9e9b95] pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={inspectorSearch}
+                                    onChange={(e) => setInspectorSearch(e.target.value)}
+                                    placeholder="Search inspectors by name or email…"
+                                    className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] pl-[30px] pr-[12px] py-[7px] text-[12.5px] text-[#1a1a18] outline-none focus:border-[#1a9e6e] transition-colors"
+                                />
+                            </div>
                             <div className="bg-[#f9f8f5] border border-[#e8e6e1] rounded-[10px] max-h-[220px] overflow-y-auto">
                                 {inspectors.length === 0 ? (
                                     <div className="p-4 text-center text-[12px] text-[#9e9b95]">No inspectors found.</div>
+                                ) : filteredInspectors.length === 0 ? (
+                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No inspectors match “{inspectorSearch}”.</div>
                                 ) : (
-                                    inspectors.map(inspector => {
+                                    filteredInspectors.map(inspector => {
                                         const isChecked = selectedInspectorIds.includes(inspector.id)
                                         return (
                                             <label key={inspector.id} className={`flex items-center gap-[10px] p-[10px_14px] border-b border-[#e8e6e1] last:border-0 cursor-pointer transition-colors ${isChecked ? 'bg-[#f0fdf4] border-l-[3px] border-l-[#1a9e6e]' : 'hover:bg-[#e8f7f1] border-l-[3px] border-l-transparent'}`}>
@@ -363,11 +402,23 @@ export default function AssignmentsPage() {
                                     </span>
                                 )}
                             </div>
+                            <div className="relative mb-[8px]">
+                                <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[#9e9b95] pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={managerSearch}
+                                    onChange={(e) => setManagerSearch(e.target.value)}
+                                    placeholder="Search managers by name or email…"
+                                    className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] pl-[30px] pr-[12px] py-[7px] text-[12.5px] text-[#1a1a18] outline-none focus:border-[#3b82f6] transition-colors"
+                                />
+                            </div>
                             <div className="bg-[#f9f8f5] border border-[#e8e6e1] rounded-[10px] max-h-[160px] overflow-y-auto">
                                 {managers.length === 0 ? (
                                     <div className="p-4 text-center text-[12px] text-[#9e9b95]">No managers found.</div>
+                                ) : filteredManagers.length === 0 ? (
+                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No managers match “{managerSearch}”.</div>
                                 ) : (
-                                    managers.map(manager => {
+                                    filteredManagers.map(manager => {
                                         const isChecked = selectedManagerIds.includes(manager.id)
                                         return (
                                             <label key={manager.id} className={`flex items-center gap-[10px] p-[10px_14px] border-b border-[#e8e6e1] last:border-0 cursor-pointer transition-colors ${isChecked ? 'bg-[#eff6ff] border-l-[3px] border-l-[#3b82f6]' : 'hover:bg-[#eff6ff] border-l-[3px] border-l-transparent'}`}>
@@ -457,6 +508,17 @@ export default function AssignmentsPage() {
                 <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden lg:sticky lg:top-[24px]">
                     <div className="p-[14px_18px] border-b border-[#e8e6e1] flex justify-between items-center bg-white z-20">
                         <h2 className="text-[13.5px] font-[600] text-[#1a1a18]">Assignments</h2>
+                        <div className="flex items-center gap-[8px]">
+                        <div className="relative">
+                            <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[12px] w-[12px] text-[#9e9b95] pointer-events-none" />
+                            <input
+                                type="text"
+                                value={assignmentSearch}
+                                onChange={(e) => setAssignmentSearch(e.target.value)}
+                                placeholder="Search inspector, project, company…"
+                                className="w-[200px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] pl-[28px] pr-[10px] py-[6px] text-[12px] text-[#1a1a18] outline-none focus:border-[#1a9e6e] transition-colors"
+                            />
+                        </div>
                         <div className="relative">
                             <select
                                 className="w-[120px] appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] p-[6px_12px] text-[12px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] cursor-pointer"
@@ -469,6 +531,7 @@ export default function AssignmentsPage() {
                                 <option value="manager_only">Manager Only</option>
                             </select>
                             <ChevronDown className="absolute right-[10px] top-1/2 -translate-y-1/2 h-[12px] w-[12px] text-[#9e9b95] pointer-events-none" />
+                        </div>
                         </div>
                     </div>
 

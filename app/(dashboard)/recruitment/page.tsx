@@ -290,6 +290,8 @@ export default function RecruitmentPage() {
     const [filterStatus, setFilterStatus] = useState("ALL")
     const [filterPriority, setFilterPriority] = useState("ALL")
     const [filterScore, setFilterScore] = useState("ALL")
+    const [filterRecruiter, setFilterRecruiter] = useState("ALL")
+    const [filterPosition, setFilterPosition] = useState("ALL")
     const [showForm, setShowForm] = useState(false)
     const [editLead, setEditLead] = useState<Lead | null>(null)
     const [detailLead, setDetailLead] = useState<Lead | null>(null)
@@ -784,13 +786,36 @@ export default function RecruitmentPage() {
         }
     }
 
+    // ── Recruiter + position filter options (derived from loaded leads) ──────────
+    const recruiterOptions = useMemo(() => {
+        const map = new Map<string, string>()
+        leads.forEach(l => { if (l.creator?.id) map.set(l.creator.id, l.creator.name || "—") })
+        return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+    }, [leads])
+
+    const positionOptions = useMemo(() => {
+        const set = new Set<string>()
+        leads.forEach(l => { if (l.position?.trim()) set.add(l.position.trim()) })
+        return Array.from(set).sort((a, b) => a.localeCompare(b))
+    }, [leads])
+
+    // Client-side recruiter + position filtering (stage/priority/score/search
+    // are applied server-side in fetchLeads).
+    const filteredLeads = useMemo(() => {
+        return leads.filter(l => {
+            if (filterRecruiter !== "ALL" && l.creator?.id !== filterRecruiter) return false
+            if (filterPosition !== "ALL" && (l.position?.trim() || "") !== filterPosition) return false
+            return true
+        })
+    }, [leads, filterRecruiter, filterPosition])
+
     // ── Kanban grouped leads ────────────────────────────────────────────────────
     const leadsByStatus = useMemo(() => {
         const map: Record<string, Lead[]> = {}
         STATUSES.forEach(s => { map[s.key] = [] })
-        leads.forEach(l => { if (map[l.status]) map[l.status].push(l) })
+        filteredLeads.forEach(l => { if (map[l.status]) map[l.status].push(l) })
         return map
-    }, [leads])
+    }, [filteredLeads])
 
     // All documents across all leads for Documents tab
     const allDocuments = useMemo(() => {
@@ -927,6 +952,18 @@ export default function RecruitmentPage() {
                                 <option value="WARM">Warm</option>
                                 <option value="COLD">Cold</option>
                             </select>
+
+                            <select value={filterRecruiter} onChange={e => setFilterRecruiter(e.target.value)}
+                                className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none max-w-[160px]">
+                                <option value="ALL">All Recruiters</option>
+                                {recruiterOptions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+
+                            <select value={filterPosition} onChange={e => setFilterPosition(e.target.value)}
+                                className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none max-w-[160px]">
+                                <option value="ALL">All Positions</option>
+                                {positionOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
                         </div>
 
                         <div className="relative w-full sm:w-56">
@@ -955,7 +992,7 @@ export default function RecruitmentPage() {
                     ) : viewMode === "kanban" ? (
                         <KanbanView leads={leadsByStatus} onCard={openDetail} onStatusChange={handleStatusChange} />
                     ) : (
-                        <ListView leads={leads} onCard={openDetail} onEdit={openEditForm} onDelete={handleDelete} session={session} />
+                        <ListView leads={filteredLeads} onCard={openDetail} onEdit={openEditForm} onDelete={handleDelete} session={session} />
                     )}
                 </>
             )}

@@ -16,7 +16,9 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder } = body
+        const { fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category } = body
+
+        const allowedCategories = ["FIXED", "DEFECT", "AUTO"]
 
         const field = await prisma.formTemplate.update({
             where: { id: params.id },
@@ -27,6 +29,7 @@ export async function PUT(
                 ...(defaultValue !== undefined && { defaultValue }),
                 ...(isRequired !== undefined && { isRequired }),
                 ...(displayOrder !== undefined && { displayOrder }),
+                ...(allowedCategories.includes(category) && { category }),
             },
         })
 

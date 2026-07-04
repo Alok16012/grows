@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -537,6 +537,10 @@ export default function OnboardingPage() {
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("ALL")
     const [search, setSearch] = useState("")
+    // Debounced copy of `search` — the actual fetch keys off this so we don't
+    // fire a request on every keystroke (which caused out-of-order responses to
+    // overwrite the filtered list).
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [selected, setSelected] = useState<OnboardingRecord | null>(null)
     const [linkCopied, setLinkCopied] = useState(false)
 
@@ -548,22 +552,34 @@ export default function OnboardingPage() {
         toast.success("Join link copied to clipboard!")
     }
 
+    // Debounce the search box so we query 300ms after typing stops.
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search), 300)
+        return () => clearTimeout(t)
+    }, [search])
+
+    // Monotonic request id — only the newest response is allowed to update state,
+    // so a slow earlier request can never overwrite a newer filtered result.
+    const reqIdRef = useRef(0)
+
     const fetchRecords = useCallback(async () => {
+        const reqId = ++reqIdRef.current
         setLoading(true)
         try {
             const params = new URLSearchParams()
             if (filter !== "ALL") params.set("status", filter)
-            if (search.trim()) params.set("search", search.trim())
+            if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim())
             const res = await fetch(`/api/onboarding?${params}`)
             if (!res.ok) throw new Error("Failed")
             const data = await res.json()
+            if (reqId !== reqIdRef.current) return // a newer request superseded this one
             setRecords(Array.isArray(data) ? data : [])
         } catch {
-            toast.error("Failed to load onboarding records")
+            if (reqId === reqIdRef.current) toast.error("Failed to load onboarding records")
         } finally {
-            setLoading(false)
+            if (reqId === reqIdRef.current) setLoading(false)
         }
-    }, [filter, search])
+    }, [filter, debouncedSearch])
 
     useEffect(() => { fetchRecords() }, [fetchRecords])
 

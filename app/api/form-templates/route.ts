@@ -35,11 +35,16 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { projectId, fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder } = body
+        const { projectId, fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category } = body
 
         if (!projectId || !fieldLabel || !fieldType) {
             return new NextResponse("projectId, fieldLabel, and fieldType are required", { status: 400 })
         }
+
+        // Only accept known section categories; anything else (or missing) falls
+        // back to FIXED so a stray value can't land a field in an unknown bucket.
+        const allowedCategories = ["FIXED", "DEFECT", "AUTO"]
+        const safeCategory = allowedCategories.includes(category) ? category : "FIXED"
 
         const field = await prisma.formTemplate.create({
             data: {
@@ -50,6 +55,7 @@ export async function POST(req: Request) {
                 defaultValue: defaultValue || null,
                 isRequired: isRequired ?? false,
                 displayOrder: displayOrder ?? 0,
+                category: safeCategory,
             },
         })
 

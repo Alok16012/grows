@@ -40,8 +40,10 @@ export async function GET(req: Request) {
             where.employee = {
                 OR: [
                     { firstName: { contains: search, mode: "insensitive" } },
+                    { middleName: { contains: search, mode: "insensitive" } },
                     { lastName: { contains: search, mode: "insensitive" } },
                     { employeeId: { contains: search, mode: "insensitive" } },
+                    { phone: { contains: search, mode: "insensitive" } },
                 ],
             }
         }
