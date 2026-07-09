@@ -60,6 +60,9 @@ type NavLink = {
     permission?: string
     badge?: boolean
     subLinks?: { name: string; href: string }[]
+    // Extra path prefixes that should mark this link active (e.g. the
+    // Inspection entry stays highlighted across the whole stepper flow).
+    matchPrefixes?: string[]
 }
 
 type NavSection = {
@@ -146,11 +149,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "INSPECTIONS",
             links: [
-                { name: "Projects",         href: "/projects",     icon: Folder,       roles: ["ADMIN", "MANAGER"], permission: "projects.view" },
-                { name: "Assignments",      href: "/assignments",  icon: HardHat,      roles: ["ADMIN", "MANAGER"], permission: "assignments.view" },
-                { name: "Sites",            href: "/sites",        icon: MapPin,       roles: ["ADMIN", "MANAGER"], permission: "sites.view" },
-                { name: "Groups",           href: "/groups",       icon: Users2,       roles: ["ADMIN", "MANAGER"], permission: "groups.view" },
-                { name: "Field Tasks",      href: "/field",        icon: Navigation,   roles: ["ADMIN", "MANAGER"], permission: "field.view" },
+                // Single entry that opens the guided stepper flow (starts on
+                // Projects). The individual pages — Sites, Groups, Assignments,
+                // Field Tasks — are reached via the stepper rail, not the sidebar.
+                { name: "Inspection", href: "/projects", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/projects", "/sites", "/groups", "/assignments", "/field"] },
             ],
         },
 
@@ -323,7 +325,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                     const Icon = link.icon
                                     const hasSubLinks = !!link.subLinks && link.subLinks.length > 0
                                     const isSubActive  = hasSubLinks && link.subLinks!.some(sub => pathname === sub.href || (sub.href !== "/" && pathname.startsWith(sub.href)))
-                                    const isItemActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href))
+                                    const isItemActive = pathname === link.href
+                                        || (link.href !== "/" && pathname.startsWith(link.href))
+                                        || (link.matchPrefixes?.some(p => pathname === p || pathname.startsWith(p + "/")) ?? false)
                                     const showSub = isSubActive || isItemActive
 
                                     return (
