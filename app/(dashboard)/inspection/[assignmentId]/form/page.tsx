@@ -253,12 +253,21 @@ export default function InspectionFormPage() {
     const defectFields = templates.filter(t => t.category === "DEFECT")
     const autoFields = templates.filter(t => t.category === "AUTO")
 
-    const totalSteps = 4
+    // ── Step-wise wizard (payroll-style) ──────────────────────────────────────
+    // Steps are built dynamically so empty sections (no defects / no auto fields)
+    // are skipped instead of showing a blank step.
+    const steps: { key: string; label: string; fields: any[] }[] = [
+        { key: "basic", label: "Basic Info", fields: fixedFields },
+    ]
+    if (defectFields.length > 0) steps.push({ key: "defect", label: "Defect Entry", fields: defectFields })
+    if (autoFields.length > 0) steps.push({ key: "review", label: "Review", fields: [] })
+    steps.push({ key: "attach", label: "Attachments", fields: [] })
+    const totalSteps = steps.length
+    const stepIndex = Math.min(currentStep, totalSteps - 1)
+    const currentStepDef = steps[stepIndex]
 
     const validateCurrentStep = () => {
-        let currentFields: any[] = []
-        if (currentStep === 0) currentFields = fixedFields
-        if (currentStep === 1) currentFields = defectFields
+        const currentFields = steps[stepIndex]?.fields ?? []
 
         let hasError = false
         const newErrors: Record<string, string> = {}
@@ -282,16 +291,31 @@ export default function InspectionFormPage() {
 
     const handleNextStep = () => {
         if (validateCurrentStep()) {
-            setCurrentStep(prev => Math.min(prev + 1, totalSteps - 1))
+            setCurrentStep(Math.min(stepIndex + 1, totalSteps - 1))
             window.scrollTo({ top: 0, behavior: "smooth" })
             saveForm("draft", true)
         }
     }
 
     const handlePrevStep = () => {
-        setCurrentStep(prev => Math.max(prev - 1, 0))
+        setCurrentStep(Math.max(stepIndex - 1, 0))
         window.scrollTo({ top: 0, behavior: "smooth" })
         saveForm("draft", true)
+    }
+
+    // Jump to a specific step. Going back is free; going forward validates the
+    // current step first (mirrors the Next button).
+    const goToStep = (target: number) => {
+        if (target === stepIndex) return
+        if (target < stepIndex) {
+            setCurrentStep(target)
+            window.scrollTo({ top: 0, behavior: "smooth" })
+            if (canEdit) saveForm("draft", true)
+        } else if (validateCurrentStep()) {
+            setCurrentStep(target)
+            window.scrollTo({ top: 0, behavior: "smooth" })
+            if (canEdit) saveForm("draft", true)
+        }
     }
 
     const saveForm = async (status: string = "draft", holdsSilent = false) => {
@@ -695,12 +719,60 @@ export default function InspectionFormPage() {
                     </div>
                 )}
 
+                {/* ── STEPPER RAIL (payroll-style) ── */}
+                <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-[14px_16px] mb-[20px]">
+                    <div className="flex items-center justify-between mb-[10px]">
+                        <span className="text-[12px] font-[600] text-[#1a1a18]">
+                            Step {stepIndex + 1} of {totalSteps} — {currentStepDef?.label}
+                        </span>
+                        <span className="text-[11px] font-[500] text-[#9e9b95]">
+                            {Math.round((stepIndex / (totalSteps - 1 || 1)) * 100)}%
+                        </span>
+                    </div>
+                    <div className="flex items-center">
+                        {steps.map((s, i) => {
+                            const isDone = i < stepIndex
+                            const isActive = i === stepIndex
+                            return (
+                                <div key={s.key} className="flex items-center flex-1 last:flex-none">
+                                    <button
+                                        type="button"
+                                        onClick={() => goToStep(i)}
+                                        className="flex flex-col items-center gap-[5px] shrink-0 focus:outline-none"
+                                    >
+                                        <span className={cn(
+                                            "flex items-center justify-center w-[26px] h-[26px] rounded-full text-[12px] font-[700] border-[1.5px] transition-colors",
+                                            isActive ? "bg-[#1a9e6e] border-[#1a9e6e] text-white" :
+                                            isDone ? "bg-[#e8f7f1] border-[#1a9e6e] text-[#0d6b4a]" :
+                                            "bg-white border-[#e8e6e1] text-[#9e9b95]"
+                                        )}>
+                                            {isDone ? <CheckCircle2 className="h-[15px] w-[15px]" /> : i + 1}
+                                        </span>
+                                        <span className={cn(
+                                            "text-[10.5px] font-[500] whitespace-nowrap",
+                                            isActive ? "text-[#1a1a18]" : "text-[#9e9b95]"
+                                        )}>{s.label}</span>
+                                    </button>
+                                    {i < steps.length - 1 && (
+                                        <span className={cn(
+                                            "h-[2px] flex-1 mx-[6px] mb-[18px] rounded-full transition-colors",
+                                            i < stepIndex ? "bg-[#1a9e6e]" : "bg-[#e8e6e1]"
+                                        )} />
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {currentStepDef?.key === "basic" && (<>
                 <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px]">
                     Basic Info
                 </div>
                 {fixedFields.map(t => renderBasicField(t))}
+                </>)}
 
-                {defectFields.length > 0 && (
+                {currentStepDef?.key === "defect" && defectFields.length > 0 && (
                     <>
                         <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px] mt-[24px]">
                             Defect Entry
@@ -727,8 +799,9 @@ export default function InspectionFormPage() {
                     </>
                 )}
 
-                {autoFields.length > 0 && renderAutoSection()}
+                {currentStepDef?.key === "review" && autoFields.length > 0 && renderAutoSection()}
 
+                {currentStepDef?.key === "attach" && (<>
                 <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px] mt-[24px]">
                     Attachments & Paper Form
                 </div>
@@ -791,70 +864,91 @@ export default function InspectionFormPage() {
                         </div>
                     )}
                 </div>
+                </>)}
 
             </div>
 
-            {/* STICKY BOTTOM BAR */}
-            {(!isSubmitted || isAdmin) && (
-                <div className="fixed bottom-0 md:left-[220px] left-0 right-0 bg-white border-t border-[#e8e6e1] p-[12px_24px] flex justify-between items-center z-50">
-                    <div className="flex items-center gap-[8px] flex-shrink-0">
-                        {saving ? (
-                            <>
-                                <span className="relative flex h-[8px] w-[8px]">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3b82f6] opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3b82f6]"></span>
-                                </span>
-                                <span className="text-[12.5px] text-[#6b6860] hidden sm:inline">Saving...</span>
-                            </>
-                        ) : isDirty ? (
-                            <>
-                                <div className="h-[8px] w-[8px] rounded-full bg-[#d97706]"></div>
-                                <span className="text-[12.5px] text-[#d97706] hidden sm:inline">Unsaved changes</span>
-                            </>
-                        ) : (
-                            <>
-                                <div className="h-[8px] w-[8px] rounded-full bg-[#1a9e6e]"></div>
-                                <span className="text-[12.5px] text-[#6b6860] hidden sm:inline">
-                                    {lastSaved && !isNaN(lastSaved.getTime()) ? `Saved ${lastSaved.toLocaleTimeString([], { hour12: false })}` : 'Saved'}
-                                </span>
-                            </>
-                        )}
-                    </div>
+            {/* STICKY BOTTOM BAR — wizard navigation + actions */}
+            <div className="fixed bottom-0 md:left-[220px] left-0 right-0 bg-white border-t border-[#e8e6e1] p-[12px_24px] flex justify-between items-center z-50">
+                {/* Left: Back + save status */}
+                <div className="flex items-center gap-[10px] flex-shrink-0">
+                    <button
+                        type="button"
+                        onClick={handlePrevStep}
+                        disabled={stepIndex === 0}
+                        className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[#f9f8f5] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-[6px]"
+                    >
+                        <ChevronLeft size={15} /> <span className="hidden sm:inline">Back</span>
+                    </button>
+                    {(!isSubmitted || isAdmin) && (
+                        <div className="hidden sm:flex items-center gap-[8px]">
+                            {saving ? (
+                                <>
+                                    <span className="relative flex h-[8px] w-[8px]">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3b82f6] opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3b82f6]"></span>
+                                    </span>
+                                    <span className="text-[12.5px] text-[#6b6860]">Saving...</span>
+                                </>
+                            ) : isDirty ? (
+                                <>
+                                    <div className="h-[8px] w-[8px] rounded-full bg-[#d97706]"></div>
+                                    <span className="text-[12.5px] text-[#d97706]">Unsaved changes</span>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="h-[8px] w-[8px] rounded-full bg-[#1a9e6e]"></div>
+                                    <span className="text-[12.5px] text-[#6b6860]">
+                                        {lastSaved && !isNaN(lastSaved.getTime()) ? `Saved ${lastSaved.toLocaleTimeString([], { hour12: false })}` : 'Saved'}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
 
-                    <div className="flex items-center gap-[10px]">
-                        {isAdmin && isSubmitted ? (
+                {/* Right: Next, or final-step actions */}
+                <div className="flex items-center gap-[10px]">
+                    {stepIndex < totalSteps - 1 ? (
+                        <button
+                            type="button"
+                            onClick={handleNextStep}
+                            className="bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#158a5e] flex items-center gap-[6px] transition-colors shadow-sm"
+                        >
+                            Next <ChevronLeft size={15} className="rotate-180" />
+                        </button>
+                    ) : isAdmin && isSubmitted ? (
+                        <button
+                            type="button"
+                            onClick={() => saveForm(inspection?.status || "approved")}
+                            disabled={saving}
+                            className="bg-[#3b82f6] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
+                        >
+                            {saving ? "Saving..." : isDirty ? "Save Admin Changes" : "Saved ✓"}
+                        </button>
+                    ) : (!isSubmitted || isAdmin) ? (
+                        <>
                             <button
                                 type="button"
-                                onClick={() => saveForm(inspection?.status || "approved")}
-                                disabled={saving}
-                                className="bg-[#3b82f6] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
+                                onClick={() => saveForm("draft")}
+                                disabled={saving || !isDirty}
+                                className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[#f9f8f5] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                             >
-                                {saving ? "Saving..." : isDirty ? "Save Admin Changes" : "Saved ✓"}
+                                <span className="hidden sm:inline">Force Save</span>
                             </button>
-                        ) : (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => saveForm("draft")}
-                                    disabled={saving || !isDirty}
-                                    className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[#f9f8f5] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                                >
-                                    <span className="hidden sm:inline">Force Save</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSubmit}
-                                    disabled={saving}
-                                    className="bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#158a5e] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
-                                >
-                                    <span className="hidden sm:inline">Complete Inspection & Submit</span>
-                                    <span className="sm:hidden inline">Complete</span>
-                                </button>
-                            </>
-                        )}
-                    </div>
+                            <button
+                                type="button"
+                                onClick={handleSubmit}
+                                disabled={saving}
+                                className="bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#158a5e] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
+                            >
+                                <span className="hidden sm:inline">Complete Inspection & Submit</span>
+                                <span className="sm:hidden inline">Complete</span>
+                            </button>
+                        </>
+                    ) : null}
                 </div>
-            )}
+            </div>
 
             {cameraFieldId && (
                 <CameraCapture
