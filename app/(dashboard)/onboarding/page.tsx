@@ -1,7 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     Search, Loader2, CheckCircle2, XCircle, Clock,
@@ -532,7 +531,6 @@ function DetailModal({ record, onClose, onAction }: {
 
 export default function OnboardingPage() {
     const { data: session } = useSession()
-    const router = useRouter()
     const [records, setRecords] = useState<OnboardingRecord[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("ALL")
@@ -595,7 +593,8 @@ export default function OnboardingPage() {
                 toast.success("Onboarding Approved! Employee is now Active.")
                 setSelected(null)
                 fetchRecords()
-                setTimeout(() => router.push(`/employees`), 800)
+                // Stay on the onboarding page after approval — the list refresh
+                // above already reflects the new status (no redirect to Employees).
             } else {
                 toast.success("Onboarding Rejected")
                 setSelected(null)
