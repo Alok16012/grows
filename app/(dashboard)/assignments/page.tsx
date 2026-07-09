@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { Loader2, Zap, Check, ChevronDown, Search, Trash2 } from "lucide-react"
+import { Loader2, Zap, Check, ChevronDown, ChevronLeft, Search, Trash2 } from "lucide-react"
 import { can } from "@/lib/can"
 
 export default function AssignmentsPage() {
@@ -39,6 +39,8 @@ export default function AssignmentsPage() {
     const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
     const [selectedGroupId, setSelectedGroupId] = useState("")
     const [recurrenceType, setRecurrenceType] = useState("none")
+    // Step-wise wizard for the New Assignment form
+    const [wizardStep, setWizardStep] = useState(0)
 
     const [loading, setLoading] = useState(false)
     const [fetching, setFetching] = useState(true)
@@ -91,6 +93,7 @@ export default function AssignmentsPage() {
 
                 if (project.managers) setSelectedManagerIds(project.managers.map((m: any) => m.id))
                 if (project.inspectors) setSelectedInspectorIds(project.inspectors.map((i: any) => i.id))
+                setWizardStep(3) // jump to Review — group already fills everything
                 break
             }
         }
@@ -164,6 +167,8 @@ export default function AssignmentsPage() {
                 setSelectedProjectId("")
                 setSelectedCompanyId("")
                 setSelectedGroupId("")
+                setRecurrenceType("none")
+                setWizardStep(0)
             } else {
                 const error = await res.json()
                 alert(error.error || "Failed to assign")
@@ -238,7 +243,32 @@ export default function AssignmentsPage() {
         setSelectedCompanyId("")
         setSelectedGroupId("")
         setRecurrenceType("none")
+        setWizardStep(0)
     }
+
+    // ── Step-wise wizard for the New Assignment form ──
+    const wizardSteps = [
+        { key: "project", label: "Company & Project" },
+        { key: "inspectors", label: "Inspectors" },
+        { key: "managers", label: "Managers" },
+        { key: "review", label: "Type & Review" },
+    ]
+    const canLeaveStep0 = !!selectedCompanyId && !!selectedProjectId
+    const handleWizardNext = () => {
+        if (wizardStep === 0 && !canLeaveStep0) return
+        setWizardStep(s => Math.min(s + 1, wizardSteps.length - 1))
+    }
+    const handleWizardBack = () => setWizardStep(s => Math.max(s - 1, 0))
+    const goToWizardStep = (target: number) => {
+        if (target === wizardStep) return
+        if (target < wizardStep) { setWizardStep(target); return }
+        // moving forward always requires a company + project first
+        if (canLeaveStep0) setWizardStep(target)
+    }
+    const selectedCompany = companies.find(c => c.id === selectedCompanyId)
+    const selectedProject = projects.find(p => p.id === selectedProjectId)
+    const selectedInspectors = inspectors.filter(i => selectedInspectorIds.includes(i.id))
+    const selectedManagers = managers.filter(m => selectedManagerIds.includes(m.id))
 
     if (status === "loading" || fetching) {
         return (
@@ -296,9 +326,45 @@ export default function AssignmentsPage() {
                     {/* CARD 2: NEW ASSIGNMENT */}
                     <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[22px]">
                         <h2 className="text-[15px] font-[600] text-[#1a1a18] mb-[4px]">New Assignment</h2>
-                        <p className="text-[13px] text-[#6b6860] mb-[18px]">Assign members to a specific project.</p>
+                        <p className="text-[13px] text-[#6b6860] mb-[16px]">Assign members to a specific project.</p>
 
-                        {/* STEP 1 */}
+                        {/* STEPPER RAIL */}
+                        <div className="mb-[20px]">
+                            <div className="flex items-center justify-between mb-[10px]">
+                                <span className="text-[12px] font-[600] text-[#1a1a18]">
+                                    Step {wizardStep + 1} of {wizardSteps.length} — {wizardSteps[wizardStep].label}
+                                </span>
+                                <span className="text-[11px] font-[500] text-[#9e9b95]">
+                                    {Math.round((wizardStep / (wizardSteps.length - 1)) * 100)}%
+                                </span>
+                            </div>
+                            <div className="flex items-center">
+                                {wizardSteps.map((s, i) => {
+                                    const isDone = i < wizardStep
+                                    const isActive = i === wizardStep
+                                    return (
+                                        <div key={s.key} className="flex items-center flex-1 last:flex-none">
+                                            <button
+                                                type="button"
+                                                onClick={() => goToWizardStep(i)}
+                                                className="flex flex-col items-center gap-[5px] shrink-0 focus:outline-none"
+                                            >
+                                                <span className={`flex items-center justify-center w-[26px] h-[26px] rounded-full text-[12px] font-[700] border-[1.5px] transition-colors ${isActive ? "bg-[#1a9e6e] border-[#1a9e6e] text-white" : isDone ? "bg-[#e8f7f1] border-[#1a9e6e] text-[#0d6b4a]" : "bg-white border-[#e8e6e1] text-[#9e9b95]"}`}>
+                                                    {isDone ? <Check className="h-[14px] w-[14px]" strokeWidth={3} /> : i + 1}
+                                                </span>
+                                                <span className={`text-[10.5px] font-[500] whitespace-nowrap ${isActive ? "text-[#1a1a18]" : "text-[#9e9b95]"}`}>{s.label}</span>
+                                            </button>
+                                            {i < wizardSteps.length - 1 && (
+                                                <span className={`h-[2px] flex-1 mx-[6px] mb-[18px] rounded-full transition-colors ${i < wizardStep ? "bg-[#1a9e6e]" : "bg-[#e8e6e1]"}`} />
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* STEP 1: COMPANY & PROJECT */}
+                        {wizardStep === 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-[12px] mb-[18px]">
                             <div>
                                 <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[6px]">
@@ -335,7 +401,10 @@ export default function AssignmentsPage() {
                             </div>
                         </div>
 
+                        )}
+
                         {/* STEP 2: INSPECTORS */}
+                        {wizardStep === 1 && (
                         <div className="mb-[18px]">
                             <div className="flex justify-between items-center mb-[8px]">
                                 <label className="text-[12.5px] font-[500] text-[#1a1a18]">Select Inspectors</label>
@@ -392,7 +461,10 @@ export default function AssignmentsPage() {
                             </div>
                         </div>
 
+                        )}
+
                         {/* STEP 3: MANAGERS */}
+                        {wizardStep === 2 && (
                         <div>
                             <div className="flex justify-between items-center mb-[8px]">
                                 <label className="text-[12.5px] font-[500] text-[#1a1a18]">Assign Managers <span className="text-[12.5px] font-[400] text-[#9e9b95]">(Optional)</span></label>
@@ -449,8 +521,12 @@ export default function AssignmentsPage() {
                             </div>
                         </div>
 
-                        {/* STEP 4: RECURRENCE */}
-                        <div className="mt-[18px]">
+                        )}
+
+                        {/* STEP 4: TYPE & REVIEW */}
+                        {wizardStep === 3 && (
+                        <>
+                        <div>
                             <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[8px]">
                                 Assignment Type
                             </label>
@@ -484,22 +560,81 @@ export default function AssignmentsPage() {
                             )}
                         </div>
 
-                        {/* ACTIONS */}
-                        <div className="flex justify-end gap-[10px] mt-[18px] pt-[14px] border-t border-[#e8e6e1]">
+                        {/* REVIEW SUMMARY */}
+                        <div className="mt-[18px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[12px] p-[16px]">
+                            <div className="text-[11px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px] mb-[12px]">Review</div>
+                            <div className="space-y-[10px]">
+                                <div className="flex justify-between items-start gap-[12px]">
+                                    <span className="text-[12.5px] text-[#6b6860]">Company</span>
+                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">{selectedCompany?.name || <span className="text-[#dc2626]">Not selected</span>}</span>
+                                </div>
+                                <div className="flex justify-between items-start gap-[12px]">
+                                    <span className="text-[12.5px] text-[#6b6860]">Project</span>
+                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">{selectedProject?.name || <span className="text-[#dc2626]">Not selected</span>}</span>
+                                </div>
+                                <div className="flex justify-between items-start gap-[12px]">
+                                    <span className="text-[12.5px] text-[#6b6860]">Inspectors</span>
+                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">
+                                        {selectedInspectors.length > 0 ? selectedInspectors.map(i => i.name).join(", ") : <span className="text-[#9e9b95]">None</span>}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-start gap-[12px]">
+                                    <span className="text-[12.5px] text-[#6b6860]">Managers</span>
+                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">
+                                        {selectedManagers.length > 0 ? selectedManagers.map(m => m.name).join(", ") : <span className="text-[#9e9b95]">None</span>}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-start gap-[12px]">
+                                    <span className="text-[12.5px] text-[#6b6860]">Type</span>
+                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right capitalize">{recurrenceType === "none" ? "One-time" : recurrenceType}</span>
+                                </div>
+                            </div>
+                            {selectedInspectorIds.length === 0 && selectedManagerIds.length === 0 && (
+                                <p className="text-[11.5px] text-[#d97706] mt-[12px] bg-[#fef3c7] px-[10px] py-[6px] rounded-[7px]">
+                                    Select at least one inspector or manager to create this assignment.
+                                </p>
+                            )}
+                        </div>
+                        </>
+                        )}
+
+                        {/* WIZARD NAV */}
+                        <div className="flex justify-between items-center gap-[10px] mt-[18px] pt-[14px] border-t border-[#e8e6e1]">
                             <button
-                                onClick={resetForm}
-                                className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#f9f8f5] transition-colors"
+                                onClick={handleWizardBack}
+                                disabled={wizardStep === 0}
+                                className="inline-flex items-center gap-[4px] bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[14px] py-[8px] hover:bg-[#f9f8f5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                                Cancel
+                                <ChevronLeft className="h-[15px] w-[15px]" />
+                                Back
                             </button>
-                            <button
-                                onClick={handleAssign}
-                                disabled={loading || !selectedCompanyId || !selectedProjectId || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}
-                                className="bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-                            >
-                                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                                Create Assignment
-                            </button>
+                            <div className="flex gap-[10px]">
+                                <button
+                                    onClick={resetForm}
+                                    className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#f9f8f5] transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                {wizardStep < wizardSteps.length - 1 ? (
+                                    <button
+                                        onClick={handleWizardNext}
+                                        disabled={wizardStep === 0 && !canLeaveStep0}
+                                        className="inline-flex items-center gap-[4px] bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                                    >
+                                        Next
+                                        <ChevronLeft className="h-[15px] w-[15px] rotate-180" />
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleAssign}
+                                        disabled={loading || !selectedCompanyId || !selectedProjectId || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}
+                                        className="bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                                    >
+                                        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                        Create Assignment
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
