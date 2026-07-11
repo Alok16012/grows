@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { Loader2, Zap, Check, ChevronDown, ChevronLeft, Search, Trash2 } from "lucide-react"
+import { Loader2, Check, ChevronDown, ChevronLeft, Search, Trash2 } from "lucide-react"
 import { can } from "@/lib/can"
 
 export default function AssignmentsPage() {
@@ -31,13 +31,14 @@ export default function AssignmentsPage() {
     const [inspectors, setInspectors] = useState<any[]>([])
     const [managers, setManagers] = useState<any[]>([])
     const [assignments, setAssignments] = useState<any[]>([])
-    const [groups, setGroups] = useState<any[]>([])
 
+    // Site = Company (top-level). Access is granted either to the whole Site
+    // (all its projects, future ones auto-included) or to specific projects.
     const [selectedCompanyId, setSelectedCompanyId] = useState("")
-    const [selectedProjectId, setSelectedProjectId] = useState("")
+    const [wholeSite, setWholeSite] = useState(false)
+    const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
     const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
     const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
-    const [selectedGroupId, setSelectedGroupId] = useState("")
     const [recurrenceType, setRecurrenceType] = useState("none")
     // Step-wise wizard for the New Assignment form
     const [wizardStep, setWizardStep] = useState(0)
@@ -53,7 +54,6 @@ export default function AssignmentsPage() {
     useEffect(() => {
         if (mounted && isManagerOrAdmin) {
             fetchInitialData()
-            fetchGroups()
         }
     }, [isManagerOrAdmin, mounted])
 
@@ -62,42 +62,11 @@ export default function AssignmentsPage() {
             fetchProjects(selectedCompanyId)
         } else {
             setProjects([])
-            setSelectedProjectId("")
         }
+        // Changing Site resets the project selection & access mode.
+        setSelectedProjectIds([])
+        setWholeSite(false)
     }, [selectedCompanyId])
-
-    const fetchGroups = async () => {
-        try {
-            const res = await fetch("/api/groups")
-            if (res.ok) setGroups(await res.json())
-        } catch (error) {
-            console.error("Failed to fetch groups", error)
-        }
-    }
-
-    const handleGroupSelect = async (groupProjectId: string) => {
-        setSelectedGroupId(groupProjectId)
-        if (!groupProjectId) return
-        for (const company of groups) {
-            const project = company.projects?.find((p: any) => p.id === groupProjectId)
-            if (project) {
-                setSelectedCompanyId(company.id)
-                try {
-                    const res = await fetch(`/api/projects?companyId=${company.id}`)
-                    if (res.ok) {
-                        const data = await res.json()
-                        if (Array.isArray(data)) setProjects(data)
-                    }
-                } catch { }
-                setSelectedProjectId(groupProjectId)
-
-                if (project.managers) setSelectedManagerIds(project.managers.map((m: any) => m.id))
-                if (project.inspectors) setSelectedInspectorIds(project.inspectors.map((i: any) => i.id))
-                setWizardStep(3) // jump to Review — group already fills everything
-                break
-            }
-        }
-    }
 
     const fetchInitialData = async () => {
         setFetching(true)
@@ -140,7 +109,8 @@ export default function AssignmentsPage() {
     }
 
     const handleAssign = async () => {
-        if (!selectedProjectId || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)) return
+        const hasProjects = wholeSite ? !!selectedCompanyId : selectedProjectIds.length > 0
+        if (!hasProjects || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)) return
 
         setLoading(true)
         try {
@@ -148,7 +118,9 @@ export default function AssignmentsPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    projectId: selectedProjectId,
+                    companyId: selectedCompanyId,
+                    wholeSite,
+                    projectIds: wholeSite ? undefined : selectedProjectIds,
                     inspectorIds: selectedInspectorIds.length > 0 ? selectedInspectorIds : undefined,
                     managerIds: selectedManagerIds.length > 0 ? selectedManagerIds : undefined,
                     recurrenceType
@@ -160,13 +132,12 @@ export default function AssignmentsPage() {
                 const assRes = await fetch(`/api/assignments?t=${Date.now()}`)
                 const assData = await assRes.json()
                 setAssignments(Array.isArray(assData) ? assData : [])
-                fetchGroups()
 
                 setSelectedInspectorIds([])
                 setSelectedManagerIds([])
-                setSelectedProjectId("")
+                setSelectedProjectIds([])
+                setWholeSite(false)
                 setSelectedCompanyId("")
-                setSelectedGroupId("")
                 setRecurrenceType("none")
                 setWizardStep(0)
             } else {
@@ -239,21 +210,23 @@ export default function AssignmentsPage() {
     const resetForm = () => {
         setSelectedInspectorIds([])
         setSelectedManagerIds([])
-        setSelectedProjectId("")
+        setSelectedProjectIds([])
+        setWholeSite(false)
         setSelectedCompanyId("")
-        setSelectedGroupId("")
         setRecurrenceType("none")
         setWizardStep(0)
     }
 
     // ── Step-wise wizard for the New Assignment form ──
     const wizardSteps = [
-        { key: "project", label: "Company & Project" },
+        { key: "site", label: "Site & Access" },
         { key: "inspectors", label: "Inspectors" },
         { key: "managers", label: "Managers" },
         { key: "review", label: "Type & Review" },
     ]
-    const canLeaveStep0 = !!selectedCompanyId && !!selectedProjectId
+    // Step 0 needs a Site and either "whole site" or at least one project ticked.
+    const hasProjectAccess = wholeSite ? !!selectedCompanyId : selectedProjectIds.length > 0
+    const canLeaveStep0 = !!selectedCompanyId && hasProjectAccess
     const handleWizardNext = () => {
         if (wizardStep === 0 && !canLeaveStep0) return
         setWizardStep(s => Math.min(s + 1, wizardSteps.length - 1))
@@ -262,13 +235,18 @@ export default function AssignmentsPage() {
     const goToWizardStep = (target: number) => {
         if (target === wizardStep) return
         if (target < wizardStep) { setWizardStep(target); return }
-        // moving forward always requires a company + project first
+        // moving forward always requires a Site + project access first
         if (canLeaveStep0) setWizardStep(target)
     }
     const selectedCompany = companies.find(c => c.id === selectedCompanyId)
-    const selectedProject = projects.find(p => p.id === selectedProjectId)
+    const selectedProjectsList = projects.filter(p => selectedProjectIds.includes(p.id))
     const selectedInspectors = inspectors.filter(i => selectedInspectorIds.includes(i.id))
     const selectedManagers = managers.filter(m => selectedManagerIds.includes(m.id))
+    const toggleProject = (id: string) => {
+        setSelectedProjectIds(prev =>
+            prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+        )
+    }
 
     if (status === "loading" || fetching) {
         return (
@@ -290,43 +268,10 @@ export default function AssignmentsPage() {
 
                 {/* LEFT COLUMN: FORM */}
                 <div>
-                    {/* CARD 1: QUICK SELECT */}
-                    <div className="bg-white border border-[#e8e6e1] bg-white rounded-[14px] p-[18px_20px] mb-[14px]">
-                        <div className="flex items-center gap-[8px] mb-[6px]">
-                            <Zap className="h-[14px] w-[14px] text-[#d97706]" />
-                            <h2 className="text-[13.5px] font-[600] text-[#1a1a18]">Quick Select Existing Group</h2>
-                            <span className="bg-[#f9f8f5] border border-[#d4d1ca] text-[#9e9b95] text-[10px] font-[500] px-[8px] py-[2px] rounded-[20px]">Optional</span>
-                        </div>
-                        <p className="text-[12.5px] text-[#6b6860] mb-[12px]">Select an existing group to auto-fill Company and Project below</p>
-
-                        <div className="relative">
-                            <select
-                                className="w-full appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[10px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] focus:bg-white cursor-pointer"
-                                value={selectedGroupId}
-                                onChange={(e) => handleGroupSelect(e.target.value)}
-                            >
-                                <option value="">— Select a group to auto-fill —</option>
-                                {groups.map((company: any) =>
-                                    company.projects?.map((project: any) => (
-                                        <option key={project.id} value={project.id}>
-                                            {company.name} - {project.name}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                            <ChevronDown className="absolute right-[14px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none" />
-                        </div>
-                    </div>
-
-                    <div className="text-center relative my-[14px]">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#e8e6e1]"></div></div>
-                        <span className="relative bg-[#f5f4f0] px-[12px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">OR</span>
-                    </div>
-
-                    {/* CARD 2: NEW ASSIGNMENT */}
+                    {/* NEW ASSIGNMENT */}
                     <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[22px]">
                         <h2 className="text-[15px] font-[600] text-[#1a1a18] mb-[4px]">New Assignment</h2>
-                        <p className="text-[13px] text-[#6b6860] mb-[16px]">Assign members to a specific project.</p>
+                        <p className="text-[13px] text-[#6b6860] mb-[16px]">Pick a Site, then grant access to all its projects or specific ones.</p>
 
                         {/* STEPPER RAIL */}
                         <div className="mb-[20px]">
@@ -363,42 +308,96 @@ export default function AssignmentsPage() {
                             </div>
                         </div>
 
-                        {/* STEP 1: COMPANY & PROJECT */}
+                        {/* STEP 1: SITE & ACCESS */}
                         {wizardStep === 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[12px] mb-[18px]">
-                            <div>
-                                <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[6px]">
-                                    Select Company <span className="text-[#dc2626]">*</span>
-                                </label>
-                                <div className="relative">
-                                    <select
-                                        className="w-full appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[10px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] focus:bg-white cursor-pointer"
-                                        value={selectedCompanyId}
-                                        onChange={(e) => setSelectedCompanyId(e.target.value)}
-                                    >
-                                        <option value="">Select Company</option>
-                                        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
-                                    <ChevronDown className="absolute right-[14px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none" />
-                                </div>
+                        <div className="mb-[18px]">
+                            <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[6px]">
+                                Select Site <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <div className="relative mb-[16px]">
+                                <select
+                                    className="w-full appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[10px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] focus:bg-white cursor-pointer"
+                                    value={selectedCompanyId}
+                                    onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                >
+                                    <option value="">Select Site</option>
+                                    {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                                <ChevronDown className="absolute right-[14px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none" />
                             </div>
-                            <div>
-                                <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[6px]">
-                                    Select Project <span className="text-[#dc2626]">*</span>
-                                </label>
-                                <div className="relative">
-                                    <select
-                                        disabled={!selectedCompanyId}
-                                        className="w-full appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[10px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] focus:bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                        value={selectedProjectId}
-                                        onChange={(e) => setSelectedProjectId(e.target.value)}
-                                    >
-                                        <option value="">{selectedCompanyId ? "Select Project..." : "Select company first"}</option>
-                                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
-                                    <ChevronDown className="absolute right-[14px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none" />
-                                </div>
-                            </div>
+
+                            {selectedCompanyId && (
+                                <>
+                                    <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[8px]">
+                                        Access <span className="text-[#dc2626]">*</span>
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-[10px] mb-[14px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setWholeSite(true); setSelectedProjectIds([]) }}
+                                            className={`text-left p-[12px_14px] rounded-[10px] border-[1.5px] transition-all ${wholeSite ? "border-[#1a9e6e] bg-[#f0fdf4]" : "border-[#e8e6e1] bg-[#f9f8f5] hover:bg-white"}`}
+                                        >
+                                            <div className="flex items-center gap-[6px] mb-[3px]">
+                                                <div className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] ${wholeSite ? "border-[#1a9e6e]" : "border-[#d4d1ca]"}`}>
+                                                    {wholeSite && <span className="w-[8px] h-[8px] rounded-full bg-[#1a9e6e]" />}
+                                                </div>
+                                                <span className="text-[12.5px] font-[600] text-[#1a1a18]">Whole Site</span>
+                                            </div>
+                                            <span className="text-[11px] text-[#6b6860] leading-tight block">All projects — new ones added later are auto-included.</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setWholeSite(false)}
+                                            className={`text-left p-[12px_14px] rounded-[10px] border-[1.5px] transition-all ${!wholeSite ? "border-[#1a9e6e] bg-[#f0fdf4]" : "border-[#e8e6e1] bg-[#f9f8f5] hover:bg-white"}`}
+                                        >
+                                            <div className="flex items-center gap-[6px] mb-[3px]">
+                                                <div className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] ${!wholeSite ? "border-[#1a9e6e]" : "border-[#d4d1ca]"}`}>
+                                                    {!wholeSite && <span className="w-[8px] h-[8px] rounded-full bg-[#1a9e6e]" />}
+                                                </div>
+                                                <span className="text-[12.5px] font-[600] text-[#1a1a18]">Specific Projects</span>
+                                            </div>
+                                            <span className="text-[11px] text-[#6b6860] leading-tight block">Pick only the projects to grant access to.</span>
+                                        </button>
+                                    </div>
+
+                                    {!wholeSite && (
+                                        <>
+                                            <div className="flex justify-between items-center mb-[8px]">
+                                                <label className="text-[12.5px] font-[500] text-[#1a1a18]">Select Projects</label>
+                                                {selectedProjectIds.length > 0 && (
+                                                    <span className="bg-[#e8f7f1] text-[#0d6b4a] px-[8px] py-[2px] rounded-[20px] text-[11px] font-[500]">
+                                                        {selectedProjectIds.length} selected
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="bg-[#f9f8f5] border border-[#e8e6e1] rounded-[10px] max-h-[220px] overflow-y-auto">
+                                                {projects.length === 0 ? (
+                                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No projects under this Site.</div>
+                                                ) : (
+                                                    projects.map(project => {
+                                                        const isChecked = selectedProjectIds.includes(project.id)
+                                                        return (
+                                                            <label key={project.id} className={`flex items-center gap-[10px] p-[10px_14px] border-b border-[#e8e6e1] last:border-0 cursor-pointer transition-colors ${isChecked ? 'bg-[#f0fdf4] border-l-[3px] border-l-[#1a9e6e]' : 'hover:bg-[#e8f7f1] border-l-[3px] border-l-transparent'}`}>
+                                                                <div className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] transition-colors ${isChecked ? 'bg-[#1a9e6e] border-[#1a9e6e]' : 'border-[#d4d1ca] bg-white'}`}>
+                                                                    {isChecked && <Check className="h-[10px] w-[10px] text-white" strokeWidth={3} />}
+                                                                </div>
+                                                                <input type="checkbox" className="hidden" checked={isChecked} onChange={() => toggleProject(project.id)} />
+                                                                <span className="text-[13px] font-[500] text-[#1a1a18]">{project.name}</span>
+                                                            </label>
+                                                        )
+                                                    })
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {wholeSite && (
+                                        <p className="text-[11.5px] text-[#0d6b4a] bg-[#e8f7f1] px-[10px] py-[8px] rounded-[8px]">
+                                            Covers all {projects.length} current project{projects.length === 1 ? "" : "s"} under this Site. Any project added later is automatically included.
+                                        </p>
+                                    )}
+                                </>
+                            )}
                         </div>
 
                         )}
@@ -565,12 +564,18 @@ export default function AssignmentsPage() {
                             <div className="text-[11px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px] mb-[12px]">Review</div>
                             <div className="space-y-[10px]">
                                 <div className="flex justify-between items-start gap-[12px]">
-                                    <span className="text-[12.5px] text-[#6b6860]">Company</span>
+                                    <span className="text-[12.5px] text-[#6b6860]">Site</span>
                                     <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">{selectedCompany?.name || <span className="text-[#dc2626]">Not selected</span>}</span>
                                 </div>
                                 <div className="flex justify-between items-start gap-[12px]">
-                                    <span className="text-[12.5px] text-[#6b6860]">Project</span>
-                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">{selectedProject?.name || <span className="text-[#dc2626]">Not selected</span>}</span>
+                                    <span className="text-[12.5px] text-[#6b6860]">Access</span>
+                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">
+                                        {wholeSite
+                                            ? <span className="text-[#0d6b4a]">Whole Site — all projects (future auto-included)</span>
+                                            : selectedProjectsList.length > 0
+                                                ? selectedProjectsList.map(p => p.name).join(", ")
+                                                : <span className="text-[#dc2626]">No projects selected</span>}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between items-start gap-[12px]">
                                     <span className="text-[12.5px] text-[#6b6860]">Inspectors</span>
@@ -627,7 +632,7 @@ export default function AssignmentsPage() {
                                 ) : (
                                     <button
                                         onClick={handleAssign}
-                                        disabled={loading || !selectedCompanyId || !selectedProjectId || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}
+                                        disabled={loading || !canLeaveStep0 || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}
                                         className="bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
                                     >
                                         {loading && <Loader2 className="h-4 w-4 animate-spin" />}

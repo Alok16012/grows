@@ -149,10 +149,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "INSPECTIONS",
             links: [
-                // Single entry that opens the guided stepper flow (starts on
-                // Projects). The individual pages — Sites, Groups, Assignments,
-                // Field Tasks — are reached via the stepper rail, not the sidebar.
-                { name: "Inspection", href: "/projects", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/projects", "/sites", "/groups", "/assignments", "/field"] },
+                // Single entry that opens the guided stepper flow. The individual
+                // pages — Sites, Projects, Assignments, Field Tasks — are reached
+                // via the stepper rail, not the sidebar. (Groups was removed.)
+                { name: "Inspection", href: "/projects", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/projects", "/sites", "/assignments", "/field"] },
             ],
         },
 

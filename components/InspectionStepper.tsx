@@ -7,10 +7,11 @@ import { Check, ChevronLeft } from "lucide-react"
 // Guided setup flow for the INSPECTIONS module. Each step is still its own
 // independent page (reachable from the sidebar), but this rail ties them into
 // an ordered wizard: click any step to jump, or use Back/Next to go stepwise.
+// New flow: Site → Project → Assignment. "Groups" was removed — managers &
+// inspectors are now added directly at the Project level.
 const STEPS = [
-    { label: "Projects", href: "/projects" },
     { label: "Sites", href: "/sites" },
-    { label: "Groups", href: "/groups" },
+    { label: "Projects", href: "/projects" },
     { label: "Assignments", href: "/assignments" },
     { label: "Field Tasks", href: "/field" },
 ]
