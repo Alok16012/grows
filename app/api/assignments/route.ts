@@ -251,6 +251,28 @@ export async function POST(req: Request) {
             }
         }
 
+        // Persist the "Whole Site" intent so projects added later are
+        // auto-assigned to these inspectors.
+        if (wholeSite && companyId && hasInspectors) {
+            try {
+                for (const inspectionBoyId of inspectorIds) {
+                    await prisma.siteAssignment.upsert({
+                        where: { companyId_inspectionBoyId: { companyId, inspectionBoyId } },
+                        create: {
+                            companyId,
+                            inspectionBoyId,
+                            assignedBy: session!.user.id,
+                            recurrenceType: recurType,
+                            status: "active",
+                        },
+                        update: { recurrenceType: recurType, status: "active" },
+                    })
+                }
+            } catch (siteErr) {
+                console.log("Site assignment persistence skipped:", siteErr)
+            }
+        }
+
         // Attach managers to every target project
         if (mgrIds.length > 0) {
             try {

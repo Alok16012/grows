@@ -39,6 +39,8 @@ model User {
   hrApprovedReviews      PerformanceReview[] @relation("HRApprover")
   employeeProfile        Employee?           @relation("EmployeeUser")
   jobPostingsCreated     JobPosting[]        @relation("JobCreator")
+  siteAssignmentsAsInspector SiteAssignment[] @relation("SiteAssignmentInspector")
+  siteAssignmentsAsAssigner  SiteAssignment[] @relation("SiteAssignmentAssigner")
 }
 
 model CustomRole {
@@ -54,17 +56,38 @@ model CustomRole {
 }
 
 model Company {
-  id            String    @id @default(uuid())
-  name          String
-  address       String?
-  contactPerson String?
-  contactPhone  String?
-  logoUrl       String?
-  createdBy     String
-  createdAt     DateTime  @default(now())
-  projects      Project[]
-  clients       User[]
-  branches      Branch[]
+  id              String           @id @default(uuid())
+  name            String
+  address         String?
+  contactPerson   String?
+  contactPhone    String?
+  logoUrl         String?
+  createdBy       String
+  createdAt       DateTime         @default(now())
+  projects        Project[]
+  clients         User[]
+  branches        Branch[]
+  siteAssignments SiteAssignment[]
+}
+
+// A "Whole Site" grant: an inspector is assigned to a Site (Company) as a
+// whole. All current projects get an Assignment row at creation time, and any
+// project added to the Site later is auto-assigned to these inspectors.
+model SiteAssignment {
+  id              String   @id @default(uuid())
+  companyId       String
+  inspectionBoyId String
+  assignedBy      String
+  recurrenceType  String   @default("none")
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inspectionBoy   User     @relation("SiteAssignmentInspector", fields: [inspectionBoyId], references: [id])
+  assigner        User     @relation("SiteAssignmentAssigner", fields: [assignedBy], references: [id])
+
+  @@unique([companyId, inspectionBoyId])
+  @@index([companyId])
+  @@index([inspectionBoyId])
 }
 
 model Project {

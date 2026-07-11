@@ -63,6 +63,29 @@ export async function POST(req: Request) {
             },
         })
 
+        // Auto-include this new project in any "Whole Site" assignment: create
+        // an Assignment for every inspector who was granted access to the Site.
+        try {
+            const siteAssignments = await prisma.siteAssignment.findMany({
+                where: { companyId, status: "active" },
+                select: { inspectionBoyId: true, assignedBy: true, recurrenceType: true },
+            })
+            for (const sa of siteAssignments) {
+                await prisma.assignment.create({
+                    data: {
+                        projectId: project.id,
+                        inspectionBoyId: sa.inspectionBoyId,
+                        assignedBy: sa.assignedBy,
+                        status: "active",
+                        recurrenceType: sa.recurrenceType,
+                        recurrenceActive: sa.recurrenceType !== "none",
+                    },
+                })
+            }
+        } catch (autoErr) {
+            console.log("Whole-site auto-assign skipped:", autoErr)
+        }
+
         return NextResponse.json(project)
     } catch (error) {
         console.error("[PROJECTS_POST]", error)
