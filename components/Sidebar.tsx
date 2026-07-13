@@ -149,10 +149,11 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "INSPECTIONS",
             links: [
-                // Single entry that opens the guided stepper flow. The individual
-                // pages — Sites, Projects, Assignments, Field Tasks — are reached
-                // via the stepper rail, not the sidebar. (Groups was removed.)
-                { name: "Inspection", href: "/projects", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/projects", "/sites", "/assignments", "/field"] },
+                // Single entry that opens the guided stepper flow (starts on
+                // Sites = /companies). The individual pages — Sites, Projects,
+                // Assignments, Field Tasks — are reached via the stepper rail,
+                // not the sidebar. (Groups was removed.)
+                { name: "Inspection", href: "/companies", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/companies", "/projects", "/assignments", "/field"] },
             ],
         },
 
@@ -196,7 +197,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "CLIENTS & FINANCE",
             links: [
-                { name: "Companies",    href: "/companies", icon: Building2,     roles: ["ADMIN", "MANAGER"], permission: "companies.view" },
+                { name: "Sites",        href: "/companies", icon: Building2,     roles: ["ADMIN", "MANAGER"], permission: "companies.view" },
                 { name: "Billing",      href: "/billing",   icon: Receipt,       roles: ["ADMIN", "MANAGER"], permission: "billing.view" },
                 { name: "Contracts",    href: "/contracts", icon: FileSignature, roles: ["ADMIN", "MANAGER"], permission: "contracts.view" },
             ],

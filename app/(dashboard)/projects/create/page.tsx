@@ -45,7 +45,7 @@ function CreateProjectForm() {
                 const data = await res.json()
                 setCompanies(data)
             } catch {
-                setError("Failed to load companies")
+                setError("Failed to load sites")
             } finally {
                 setLoadingCompanies(false)
             }
@@ -150,14 +150,14 @@ function CreateProjectForm() {
                                 />
                             </div>
 
-                            {/* Field: Company Select */}
+                            {/* Field: Site Select */}
                             <div className="flex flex-col gap-[6px]">
                                 <label htmlFor="companyId" className="text-[13px] font-medium text-[var(--text)] block">
-                                    Company <span className="text-[var(--red)] ml-[2px]">*</span>
+                                    Site <span className="text-[var(--red)] ml-[2px]">*</span>
                                 </label>
                                 {loadingCompanies ? (
                                     <div className="flex items-center gap-2 text-[13px] text-[var(--text3)] h-[44px] px-[14px] rounded-[9px] border border-[var(--border)] bg-[var(--surface2)]">
-                                        <Loader2 className="h-4 w-4 animate-spin" /> Loading companies...
+                                        <Loader2 className="h-4 w-4 animate-spin" /> Loading sites...
                                     </div>
                                 ) : (
                                     <select
@@ -168,7 +168,7 @@ function CreateProjectForm() {
                                         className={`${inputClasses} appearance-none bg-no-repeat bg-[position:right_14px_center] pr-[36px] cursor-pointer`}
                                         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239e9b95' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")" }}
                                     >
-                                        <option value="">Select a company...</option>
+                                        <option value="">Select a site...</option>
                                         {companies.map((c) => (
                                             <option key={c.id} value={c.id}>{c.name}</option>
                                         ))}

@@ -655,7 +655,7 @@ export default function AssignmentsPage() {
                                 type="text"
                                 value={assignmentSearch}
                                 onChange={(e) => setAssignmentSearch(e.target.value)}
-                                placeholder="Search inspector, project, company…"
+                                placeholder="Search inspector, project, site…"
                                 className="w-[200px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] pl-[28px] pr-[10px] py-[6px] text-[12px] text-[#1a1a18] outline-none focus:border-[#1a9e6e] transition-colors"
                             />
                         </div>
@@ -732,7 +732,7 @@ export default function AssignmentsPage() {
                                         <tr className="border-b border-[#e8e6e1]">
                                             <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Inspector</th>
                                             <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Project</th>
-                                            <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Company</th>
+                                            <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Site</th>
                                             <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Status</th>
                                             <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Recurrence</th>
                                             <th className="p-[10px_16px] text-right text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Actions</th>

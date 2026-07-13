@@ -44,7 +44,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
                 setContactPhone(data.contactPhone || "")
                 setLogoUrl(data.logoUrl || "")
             } catch {
-                setError("Company not found")
+                setError("Site not found")
             } finally {
                 setLoading(false)
             }
@@ -83,7 +83,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
     if (!company) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-                <h1 className="text-2xl font-bold">Company not found</h1>
+                <h1 className="text-2xl font-bold">Site not found</h1>
                 <Button asChild><Link href="/companies">Go Back</Link></Button>
             </div>
         )
@@ -97,21 +97,21 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
                         <ChevronLeft className="h-4 w-4" />
                     </Link>
                 </Button>
-                <h1 className="text-3xl font-bold tracking-tight">Edit Company</h1>
+                <h1 className="text-3xl font-bold tracking-tight">Edit Site</h1>
             </div>
 
             <Card>
                 <form onSubmit={handleSubmit}>
                     <CardHeader>
-                        <CardTitle>Company Details</CardTitle>
-                        <CardDescription>Update the information for this company.</CardDescription>
+                        <CardTitle>Site Details</CardTitle>
+                        <CardDescription>Update the information for this site.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {error && (
                             <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">{error}</div>
                         )}
                         <div className="space-y-2">
-                            <Label htmlFor="name">Company Name <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="name">Site Name <span className="text-destructive">*</span></Label>
                             <Input
                                 id="name"
                                 value={name}

@@ -224,7 +224,7 @@ export default function InspectionDashboard() {
                         <line x1="12" y1="20" x2="12" y2="4" />
                         <line x1="6" y1="20" x2="6" y2="14" />
                     </svg>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a18]">Company Wise Reports (Current Month)</h2>
+                    <h2 className="text-[15px] font-semibold text-[#1a1a18]">Site Wise Reports (Current Month)</h2>
                 </div>
 
                 {reportLoading ? (

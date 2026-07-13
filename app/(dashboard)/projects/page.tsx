@@ -92,7 +92,7 @@ export default function ProjectsPage() {
                         Projects
                     </h1>
                     <p className="text-muted-foreground text-sm mt-1">
-                        {projects.length} project{projects.length !== 1 ? "s" : ""} across {companies.length} compan{companies.length !== 1 ? "ies" : "y"}
+                        {projects.length} project{projects.length !== 1 ? "s" : ""} across {companies.length} site{companies.length !== 1 ? "s" : ""}
                     </p>
                 </div>
                 {isAdminOrManager && (
@@ -122,7 +122,7 @@ export default function ProjectsPage() {
                         value={selectedCompanyId}
                         onChange={e => setSelectedCompanyId(e.target.value)}
                     >
-                        <option value="all">All Companies</option>
+                        <option value="all">All Sites</option>
                         {companies.map(c => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
