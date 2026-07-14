@@ -67,32 +67,32 @@ model Company {
   projects        Project[]
   clients         User[]
   branches        Branch[]
-  siteAssignments SiteAssignment[]
 }
 
-// A "Whole Site" grant: an inspector is assigned to a Site (Company) as a
-// whole. All current projects get an Assignment row at creation time, and any
-// project added to the Site later is auto-assigned to these inspectors.
+// A "Whole Site" grant: an inspector is assigned to a real HR Site as a whole.
+// All current projects under that Site get an Assignment row at creation time,
+// and any project added to the Site later is auto-assigned to these inspectors.
 model SiteAssignment {
   id              String   @id @default(uuid())
-  companyId       String
+  siteId          String
   inspectionBoyId String
   assignedBy      String
   recurrenceType  String   @default("none")
   status          String   @default("active")
   createdAt       DateTime @default(now())
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   inspectionBoy   User     @relation("SiteAssignmentInspector", fields: [inspectionBoyId], references: [id])
   assigner        User     @relation("SiteAssignmentAssigner", fields: [assignedBy], references: [id])
 
-  @@unique([companyId, inspectionBoyId])
-  @@index([companyId])
+  @@unique([siteId, inspectionBoyId])
+  @@index([siteId])
   @@index([inspectionBoyId])
 }
 
 model Project {
   id              String           @id @default(uuid())
   companyId       String
+  siteId          String?
   name            String
   description     String?
   createdBy       String
@@ -101,6 +101,7 @@ model Project {
   formTemplates   FormTemplate[]
   expenses        Expense[]
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site            Site?            @relation(fields: [siteId], references: [id])
   projectManagers ProjectManager[]
   defectColumns   Json?
   reportConfig    Json?
@@ -524,6 +525,8 @@ model Site {
   attendances      Attendance[]
   leads            Lead[]       @relation("LeadSite")
   leadForms        LeadForm[]   @relation("LeadFormSite")
+  projects         Project[]
+  siteAssignments  SiteAssignment[]
 
   @@index([isActive])
   @@index([clientId])

@@ -33,7 +33,7 @@ export default function CreateCompanyPage() {
             })
 
             if (!res.ok) {
-                throw new Error("Failed to create site")
+                throw new Error("Failed to create company")
             }
 
             router.push("/companies")
@@ -59,7 +59,7 @@ export default function CreateCompanyPage() {
                         <ChevronLeft className="h-4 w-4 text-[var(--text2)]" />
                     </Link>
                     <h1 className="text-[22px] font-semibold tracking-[-0.4px] text-[var(--text)]">
-                        Create Site
+                        Create Company
                     </h1>
                 </div>
 
@@ -69,10 +69,10 @@ export default function CreateCompanyPage() {
                         {/* Card Header */}
                         <div className="mb-[24px]">
                             <h2 className="text-[16px] font-semibold text-[var(--text)] mb-1">
-                                Site Details
+                                Company Details
                             </h2>
                             <p className="text-[13px] text-[var(--text2)] leading-[1.5]">
-                                Enter the information for the new site.
+                                Enter the information for the new company.
                             </p>
                         </div>
 
@@ -86,7 +86,7 @@ export default function CreateCompanyPage() {
                             {/* Field: Name */}
                             <div className="flex flex-col gap-[6px]">
                                 <label htmlFor="name" className="text-[13px] font-medium text-[var(--text)] block">
-                                    Site Name <span className="text-[var(--red)] ml-[2px]">*</span>
+                                    Company Name <span className="text-[var(--red)] ml-[2px]">*</span>
                                 </label>
                                 <input
                                     id="name"
@@ -163,7 +163,7 @@ export default function CreateCompanyPage() {
                                     className="inline-flex items-center justify-center bg-[var(--accent)] text-white border-0 px-[20px] py-[9px] rounded-[9px] text-[13px] font-medium cursor-pointer hover:bg-[#158a5e] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Create Site
+                                    Create Company
                                 </button>
                             </div>
                         </div>

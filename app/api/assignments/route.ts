@@ -42,6 +42,7 @@ export async function GET(req: Request) {
                     project: {
                         include: {
                             company: true,
+                            site: { select: { id: true, name: true } },
                             projectManagers: {
                                 include: { manager: { select: { id: true, name: true, email: true } } }
                             }
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
                     id: project.id,
                     name: project.name,
                     company: project.company,
+                    site: project.site,
                     managers: project.projectManagers.map(pm => pm.manager)
                 }
             }));
@@ -94,6 +96,7 @@ export async function GET(req: Request) {
                 name: true,
                 createdAt: true,
                 company: { select: { id: true, name: true } },
+                site: { select: { id: true, name: true } },
                 assignments: {
                     where: status && status !== "all" && status !== "manager_only"
                         ? { status }
@@ -132,6 +135,7 @@ export async function GET(req: Request) {
                             id: project.id,
                             name: project.name,
                             company: project.company,
+                            site: project.site,
                             managers
                         }
                     })
@@ -149,6 +153,7 @@ export async function GET(req: Request) {
                         id: project.id,
                         name: project.name,
                         company: project.company,
+                        site: project.site,
                         managers
                     },
                     inspectionBoy: { name: "Pending Inspector" },
@@ -176,7 +181,7 @@ export async function POST(req: Request) {
         const {
             projectId,
             projectIds,
-            companyId,
+            siteId,
             wholeSite,
             inspectorIds,
             managerId,
@@ -186,13 +191,13 @@ export async function POST(req: Request) {
         const recurType: string = ["daily", "weekly"].includes(recurrenceType) ? recurrenceType : "none"
 
         // Resolve the list of target projects.
-        // - wholeSite + companyId  → every current project under that Site (Company)
-        // - projectIds[]           → the specific projects selected via checkboxes
-        // - projectId              → single project (backward-compatible)
+        // - wholeSite + siteId  → every current project under that real HR Site
+        // - projectIds[]        → the specific projects selected via checkboxes
+        // - projectId           → single project (backward-compatible)
         let targetProjectIds: string[] = []
-        if (wholeSite && companyId) {
+        if (wholeSite && siteId) {
             const siteProjects = await prisma.project.findMany({
-                where: { companyId },
+                where: { siteId },
                 select: { id: true },
             })
             targetProjectIds = siteProjects.map(p => p.id)
@@ -253,13 +258,13 @@ export async function POST(req: Request) {
 
         // Persist the "Whole Site" intent so projects added later are
         // auto-assigned to these inspectors.
-        if (wholeSite && companyId && hasInspectors) {
+        if (wholeSite && siteId && hasInspectors) {
             try {
                 for (const inspectionBoyId of inspectorIds) {
                     await prisma.siteAssignment.upsert({
-                        where: { companyId_inspectionBoyId: { companyId, inspectionBoyId } },
+                        where: { siteId_inspectionBoyId: { siteId, inspectionBoyId } },
                         create: {
-                            companyId,
+                            siteId,
                             inspectionBoyId,
                             assignedBy: session!.user.id,
                             recurrenceType: recurType,

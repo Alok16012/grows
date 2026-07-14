@@ -90,7 +90,7 @@ export default function CompanyDetailsClient({
             router.push("/companies")
             router.refresh()
         } catch {
-            alert("Failed to delete site. Please try again.")
+            alert("Failed to delete company. Please try again.")
             setDeletingCompany(false)
         }
     }
@@ -106,7 +106,7 @@ export default function CompanyDetailsClient({
     if (!company) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-                <h1 className="text-2xl font-bold">Site not found</h1>
+                <h1 className="text-2xl font-bold">Company not found</h1>
                 <Button asChild><Link href="/companies">Go Back</Link></Button>
             </div>
         )
@@ -164,7 +164,7 @@ export default function CompanyDetailsClient({
                             className="inline-flex items-center justify-center bg-[var(--red-light)] border border-[#fca5a5] text-[var(--red)] rounded-[9px] text-[12.5px] font-medium h-[34px] px-3 hover:bg-[#fee2e2] transition-colors shrink-0 disabled:opacity-50"
                         >
                             {deletingCompany ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
-                            Delete Site
+                            Delete Company
                         </button>
                     </div>
                 )}
@@ -188,7 +188,7 @@ export default function CompanyDetailsClient({
 
                 {company.projects.length === 0 ? (
                     <div className="flex flex-col items-center justify-center p-8 text-center text-[var(--text2)] border border-dashed border-[var(--border)] rounded-[12px] bg-white">
-                        <p className="text-[13px] mb-2">No projects found for this site.</p>
+                        <p className="text-[13px] mb-2">No projects found for this company.</p>
                         <Link
                             href={`/projects/create?companyId=${company.id}`}
                             className="text-[13px] text-[var(--accent-text)] hover:underline font-medium"

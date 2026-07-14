@@ -8,11 +8,11 @@ import { Check, ChevronLeft } from "lucide-react"
 // independent page (reachable from the sidebar), but this rail ties them into
 // an ordered wizard: click any step to jump, or use Back/Next to go stepwise.
 // New flow: Site → Project → Assignment. "Groups" was removed — managers &
-// inspectors are now added directly at the Project level. NOTE: the inspection
-// "Sites" live on the /companies route (the /sites route is the unrelated HR
-// workforce module), so step 1 links to /companies.
+// inspectors are now added directly at the Project level. The inspection flow
+// now uses the real HR "Site" model, so step 1 links to /sites (a project is
+// created under a real Site, and assignments are granted per Site).
 const STEPS = [
-    { label: "Sites", href: "/companies" },
+    { label: "Sites", href: "/sites" },
     { label: "Projects", href: "/projects" },
     { label: "Assignments", href: "/assignments" },
     { label: "Field Tasks", href: "/field" },

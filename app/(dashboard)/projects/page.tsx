@@ -22,6 +22,19 @@ type Project = {
         id: string
         name: string
     }
+    site: {
+        id: string
+        name: string
+        code?: string | null
+        city?: string | null
+    } | null
+}
+
+// Group key/label for a project: prefer the real HR Site; fall back to the
+// legacy Company for older projects that predate the Site link.
+function groupOf(p: Project): { id: string; name: string } {
+    if (p.site) return { id: `site:${p.site.id}`, name: p.site.name }
+    return { id: `company:${p.company.id}`, name: p.company.name }
 }
 
 export default function ProjectsPage() {
@@ -31,8 +44,8 @@ export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
-    const [selectedCompanyId, setSelectedCompanyId] = useState("all")
-    const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+    const [selectedSiteId, setSelectedSiteId] = useState("all")
+    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
 
     const isAdminOrManager = can(session, "projects.view")
 
@@ -44,10 +57,13 @@ export default function ProjectsPage() {
             const list: Project[] = Array.isArray(data) ? data : []
             setProjects(list)
 
-            // Extract unique companies from projects
-            const companyMap = new Map<string, string>()
-            list.forEach(p => companyMap.set(p.company.id, p.company.name))
-            setCompanies(Array.from(companyMap.entries()).map(([id, name]) => ({ id, name })))
+            // Extract unique sites (grouping keys) from projects
+            const siteMap = new Map<string, string>()
+            list.forEach(p => {
+                const g = groupOf(p)
+                siteMap.set(g.id, g.name)
+            })
+            setSites(Array.from(siteMap.entries()).map(([id, name]) => ({ id, name })))
         } catch {
             setProjects([])
         } finally {
@@ -60,17 +76,19 @@ export default function ProjectsPage() {
     }, [fetchProjects])
 
     const filtered = projects.filter(p => {
+        const g = groupOf(p)
         const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
             (p.description?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-            p.company.name.toLowerCase().includes(search.toLowerCase())
-        const matchCompany = selectedCompanyId === "all" || p.company.id === selectedCompanyId
-        return matchSearch && matchCompany
+            g.name.toLowerCase().includes(search.toLowerCase())
+        const matchSite = selectedSiteId === "all" || g.id === selectedSiteId
+        return matchSearch && matchSite
     })
 
-    // Group by company
-    const grouped = filtered.reduce<Record<string, { company: { id: string; name: string }; projects: Project[] }>>((acc, p) => {
-        if (!acc[p.company.id]) acc[p.company.id] = { company: p.company, projects: [] }
-        acc[p.company.id].projects.push(p)
+    // Group by site (falling back to company for legacy projects)
+    const grouped = filtered.reduce<Record<string, { site: { id: string; name: string }; projects: Project[] }>>((acc, p) => {
+        const g = groupOf(p)
+        if (!acc[g.id]) acc[g.id] = { site: g, projects: [] }
+        acc[g.id].projects.push(p)
         return acc
     }, {})
 
@@ -92,7 +110,7 @@ export default function ProjectsPage() {
                         Projects
                     </h1>
                     <p className="text-muted-foreground text-sm mt-1">
-                        {projects.length} project{projects.length !== 1 ? "s" : ""} across {companies.length} site{companies.length !== 1 ? "s" : ""}
+                        {projects.length} project{projects.length !== 1 ? "s" : ""} across {sites.length} site{sites.length !== 1 ? "s" : ""}
                     </p>
                 </div>
                 {isAdminOrManager && (
@@ -116,15 +134,15 @@ export default function ProjectsPage() {
                         onChange={e => setSearch(e.target.value)}
                     />
                 </div>
-                {companies.length > 1 && (
+                {sites.length > 1 && (
                     <select
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        value={selectedCompanyId}
-                        onChange={e => setSelectedCompanyId(e.target.value)}
+                        value={selectedSiteId}
+                        onChange={e => setSelectedSiteId(e.target.value)}
                     >
                         <option value="all">All Sites</option>
-                        {companies.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                        {sites.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
                 )}
@@ -137,10 +155,10 @@ export default function ProjectsPage() {
                     <div>
                         <p className="text-lg font-semibold">No projects found</p>
                         <p className="text-sm text-muted-foreground mt-1">
-                            {search || selectedCompanyId !== "all" ? "Try adjusting your filters." : "Create your first project to get started."}
+                            {search || selectedSiteId !== "all" ? "Try adjusting your filters." : "Create your first project to get started."}
                         </p>
                     </div>
-                    {isAdminOrManager && !search && selectedCompanyId === "all" && (
+                    {isAdminOrManager && !search && selectedSiteId === "all" && (
                         <Button asChild>
                             <Link href="/projects/create">
                                 <Plus className="mr-2 h-4 w-4" /> Create Project
@@ -151,16 +169,13 @@ export default function ProjectsPage() {
             ) : (
                 <div className="space-y-8">
                     {Object.values(grouped).map(group => (
-                        <div key={group.company.id} className="space-y-3">
-                            {/* Company Group Header */}
+                        <div key={group.site.id} className="space-y-3">
+                            {/* Site Group Header */}
                             <div className="flex items-center gap-2">
                                 <Building2 className="h-4 w-4 text-muted-foreground" />
-                                <Link
-                                    href={`/companies/${group.company.id}`}
-                                    className="text-sm font-semibold text-foreground hover:underline hover:text-primary transition-colors"
-                                >
-                                    {group.company.name}
-                                </Link>
+                                <span className="text-sm font-semibold text-foreground">
+                                    {group.site.name}
+                                </span>
                                 <Badge variant="secondary" className="text-xs">
                                     {group.projects.length}
                                 </Badge>

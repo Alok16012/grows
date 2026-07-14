@@ -6,9 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ChevronLeft, Loader2 } from "lucide-react"
 
-type Company = {
+type Site = {
     id: string
     name: string
+    code?: string | null
+    city?: string | null
 }
 
 function CreateProjectForm() {
@@ -21,36 +23,36 @@ function CreateProjectForm() {
         setIsMounted(true)
     }, [])
 
-    const initialCompanyId = searchParams.get("companyId") || ""
+    const initialSiteId = searchParams.get("siteId") || ""
 
     const [loading, setLoading] = useState(false)
-    const [companies, setCompanies] = useState<Company[]>([])
-    const [loadingCompanies, setLoadingCompanies] = useState(true)
+    const [sites, setSites] = useState<Site[]>([])
+    const [loadingSites, setLoadingSites] = useState(true)
     const [error, setError] = useState("")
 
-    // We only want to set the initial company ID if it's available and we just mounted
-    const [selectedCompanyId, setSelectedCompanyId] = useState("")
+    // We only want to set the initial site ID if it's available and we just mounted
+    const [selectedSiteId, setSelectedSiteId] = useState("")
 
     useEffect(() => {
-        if (isMounted && initialCompanyId && !selectedCompanyId) {
-            setSelectedCompanyId(initialCompanyId)
+        if (isMounted && initialSiteId && !selectedSiteId) {
+            setSelectedSiteId(initialSiteId)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isMounted, initialCompanyId])
+    }, [isMounted, initialSiteId])
 
     useEffect(() => {
-        const fetchCompanies = async () => {
+        const fetchSites = async () => {
             try {
-                const res = await fetch("/api/companies")
+                const res = await fetch("/api/sites?isActive=true")
                 const data = await res.json()
-                setCompanies(data)
+                setSites(Array.isArray(data) ? data : [])
             } catch {
                 setError("Failed to load sites")
             } finally {
-                setLoadingCompanies(false)
+                setLoadingSites(false)
             }
         }
-        fetchCompanies()
+        fetchSites()
     }, [])
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -62,7 +64,7 @@ function CreateProjectForm() {
         const data = {
             name: formData.get("name"),
             description: formData.get("description"),
-            companyId: selectedCompanyId,
+            siteId: selectedSiteId,
         }
 
         try {
@@ -74,7 +76,7 @@ function CreateProjectForm() {
 
             if (!res.ok) throw new Error("Failed to create project")
 
-            router.push(selectedCompanyId ? `/companies/${selectedCompanyId}` : "/companies")
+            router.push("/projects")
             router.refresh()
         } catch {
             setError("Something went wrong. Please try again.")
@@ -85,7 +87,7 @@ function CreateProjectForm() {
 
     const inputClasses = "w-full p-[10px_14px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] outline-none transition-all placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)]"
 
-    const backLink = isMounted && initialCompanyId ? `/companies/${initialCompanyId}` : "/companies"
+    const backLink = "/projects"
 
     return (
         <div className="min-h-[calc(100vh-54px)] bg-[var(--bg)] py-[28px] px-[24px]">
@@ -152,25 +154,31 @@ function CreateProjectForm() {
 
                             {/* Field: Site Select */}
                             <div className="flex flex-col gap-[6px]">
-                                <label htmlFor="companyId" className="text-[13px] font-medium text-[var(--text)] block">
+                                <label htmlFor="siteId" className="text-[13px] font-medium text-[var(--text)] block">
                                     Site <span className="text-[var(--red)] ml-[2px]">*</span>
                                 </label>
-                                {loadingCompanies ? (
+                                {loadingSites ? (
                                     <div className="flex items-center gap-2 text-[13px] text-[var(--text3)] h-[44px] px-[14px] rounded-[9px] border border-[var(--border)] bg-[var(--surface2)]">
                                         <Loader2 className="h-4 w-4 animate-spin" /> Loading sites...
                                     </div>
+                                ) : sites.length === 0 ? (
+                                    <div className="text-[13px] text-[var(--text2)] p-[10px_14px] rounded-[9px] border border-dashed border-[var(--border)] bg-[var(--surface2)]">
+                                        No sites found. Create a Site first, then add a project under it.
+                                    </div>
                                 ) : (
                                     <select
-                                        id="companyId"
-                                        value={selectedCompanyId}
-                                        onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                        id="siteId"
+                                        value={selectedSiteId}
+                                        onChange={(e) => setSelectedSiteId(e.target.value)}
                                         required
                                         className={`${inputClasses} appearance-none bg-no-repeat bg-[position:right_14px_center] pr-[36px] cursor-pointer`}
                                         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239e9b95' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")" }}
                                     >
                                         <option value="">Select a site...</option>
-                                        {companies.map((c) => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        {sites.map((s) => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name}{s.code ? ` (${s.code})` : ""}{s.city ? ` — ${s.city}` : ""}
+                                            </option>
                                         ))}
                                     </select>
                                 )}
@@ -186,7 +194,7 @@ function CreateProjectForm() {
                                 </Link>
                                 <button
                                     type="submit"
-                                    disabled={loading || !selectedCompanyId}
+                                    disabled={loading || !selectedSiteId}
                                     className="inline-flex items-center justify-center bg-[var(--accent)] text-white border-0 px-[20px] py-[9px] rounded-[9px] text-[13px] font-medium cursor-pointer hover:bg-[#158a5e] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -15,7 +15,10 @@ export async function GET(req: Request) {
         const canListSites =
             checkAccess(session, ["MANAGER", "HR_MANAGER"], "sites.view") ||
             checkAccess(session, [], "employees.view") ||
-            checkAccess(session, [], "attendance.view")
+            checkAccess(session, [], "attendance.view") ||
+            // Inspection setup (Site → Project → Assignment) also needs to list
+            // sites when picking one for a project / assignment.
+            checkAccess(session, [], "projects.view")
         if (!canListSites) {
             return NextResponse.json({
                 error: "Forbidden - missing sites.view permission",

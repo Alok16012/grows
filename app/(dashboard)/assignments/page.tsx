@@ -26,15 +26,16 @@ export default function AssignmentsPage() {
         }
     }, [status, session, router, isManagerOrAdmin, mounted])
 
-    const [companies, setCompanies] = useState<any[]>([])
+    const [sites, setSites] = useState<any[]>([])
     const [projects, setProjects] = useState<any[]>([])
     const [inspectors, setInspectors] = useState<any[]>([])
     const [managers, setManagers] = useState<any[]>([])
     const [assignments, setAssignments] = useState<any[]>([])
 
-    // Site = Company (top-level). Access is granted either to the whole Site
-    // (all its projects, future ones auto-included) or to specific projects.
-    const [selectedCompanyId, setSelectedCompanyId] = useState("")
+    // Site is the real HR Site (workforce site). Access is granted either to the
+    // whole Site (all its projects, future ones auto-included) or to specific
+    // projects under it.
+    const [selectedSiteId, setSelectedSiteId] = useState("")
     const [wholeSite, setWholeSite] = useState(false)
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
     const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
@@ -58,27 +59,27 @@ export default function AssignmentsPage() {
     }, [isManagerOrAdmin, mounted])
 
     useEffect(() => {
-        if (selectedCompanyId) {
-            fetchProjects(selectedCompanyId)
+        if (selectedSiteId) {
+            fetchProjects(selectedSiteId)
         } else {
             setProjects([])
         }
         // Changing Site resets the project selection & access mode.
         setSelectedProjectIds([])
         setWholeSite(false)
-    }, [selectedCompanyId])
+    }, [selectedSiteId])
 
     const fetchInitialData = async () => {
         setFetching(true)
         try {
-            const [compRes, insRes, mgrRes, assRes] = await Promise.all([
-                fetch("/api/companies"),
+            const [siteRes, insRes, mgrRes, assRes] = await Promise.all([
+                fetch("/api/sites?isActive=true"),
                 fetch("/api/users?role=INSPECTION_BOY"),
                 fetch("/api/users?role=MANAGER"),
                 fetch(`/api/assignments?t=${Date.now()}`)
             ])
 
-            if (compRes.ok) setCompanies(await compRes.json())
+            if (siteRes.ok) setSites(await siteRes.json())
             if (insRes.ok) setInspectors(await insRes.json())
             if (mgrRes.ok) setManagers(await mgrRes.json())
             if (assRes.ok) {
@@ -93,9 +94,9 @@ export default function AssignmentsPage() {
         }
     }
 
-    const fetchProjects = async (companyId: string) => {
+    const fetchProjects = async (siteId: string) => {
         try {
-            const res = await fetch(`/api/projects?companyId=${companyId}`)
+            const res = await fetch(`/api/projects?siteId=${siteId}`)
             if (res.ok) {
                 const data = await res.json()
                 setProjects(Array.isArray(data) ? data : [])
@@ -109,7 +110,7 @@ export default function AssignmentsPage() {
     }
 
     const handleAssign = async () => {
-        const hasProjects = wholeSite ? !!selectedCompanyId : selectedProjectIds.length > 0
+        const hasProjects = wholeSite ? !!selectedSiteId : selectedProjectIds.length > 0
         if (!hasProjects || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)) return
 
         setLoading(true)
@@ -118,7 +119,7 @@ export default function AssignmentsPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    companyId: selectedCompanyId,
+                    siteId: selectedSiteId,
                     wholeSite,
                     projectIds: wholeSite ? undefined : selectedProjectIds,
                     inspectorIds: selectedInspectorIds.length > 0 ? selectedInspectorIds : undefined,
@@ -137,7 +138,7 @@ export default function AssignmentsPage() {
                 setSelectedManagerIds([])
                 setSelectedProjectIds([])
                 setWholeSite(false)
-                setSelectedCompanyId("")
+                setSelectedSiteId("")
                 setRecurrenceType("none")
                 setWizardStep(0)
             } else {
@@ -186,6 +187,7 @@ export default function AssignmentsPage() {
             const hay = [
                 a.inspectionBoy?.name,
                 a.project?.name,
+                a.project?.site?.name,
                 a.project?.company?.name,
             ].filter(Boolean).join(" ").toLowerCase()
             if (!hay.includes(asgMatch)) return false
@@ -212,7 +214,7 @@ export default function AssignmentsPage() {
         setSelectedManagerIds([])
         setSelectedProjectIds([])
         setWholeSite(false)
-        setSelectedCompanyId("")
+        setSelectedSiteId("")
         setRecurrenceType("none")
         setWizardStep(0)
     }
@@ -225,8 +227,8 @@ export default function AssignmentsPage() {
         { key: "review", label: "Type & Review" },
     ]
     // Step 0 needs a Site and either "whole site" or at least one project ticked.
-    const hasProjectAccess = wholeSite ? !!selectedCompanyId : selectedProjectIds.length > 0
-    const canLeaveStep0 = !!selectedCompanyId && hasProjectAccess
+    const hasProjectAccess = wholeSite ? !!selectedSiteId : selectedProjectIds.length > 0
+    const canLeaveStep0 = !!selectedSiteId && hasProjectAccess
     const handleWizardNext = () => {
         if (wizardStep === 0 && !canLeaveStep0) return
         setWizardStep(s => Math.min(s + 1, wizardSteps.length - 1))
@@ -238,7 +240,7 @@ export default function AssignmentsPage() {
         // moving forward always requires a Site + project access first
         if (canLeaveStep0) setWizardStep(target)
     }
-    const selectedCompany = companies.find(c => c.id === selectedCompanyId)
+    const selectedSite = sites.find(s => s.id === selectedSiteId)
     const selectedProjectsList = projects.filter(p => selectedProjectIds.includes(p.id))
     const selectedInspectors = inspectors.filter(i => selectedInspectorIds.includes(i.id))
     const selectedManagers = managers.filter(m => selectedManagerIds.includes(m.id))
@@ -317,16 +319,16 @@ export default function AssignmentsPage() {
                             <div className="relative mb-[16px]">
                                 <select
                                     className="w-full appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[10px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] focus:bg-white cursor-pointer"
-                                    value={selectedCompanyId}
-                                    onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                    value={selectedSiteId}
+                                    onChange={(e) => setSelectedSiteId(e.target.value)}
                                 >
                                     <option value="">Select Site</option>
-                                    {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    {sites.map(s => <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
                                 </select>
                                 <ChevronDown className="absolute right-[14px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none" />
                             </div>
 
-                            {selectedCompanyId && (
+                            {selectedSiteId && (
                                 <>
                                     <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[8px]">
                                         Access <span className="text-[#dc2626]">*</span>
@@ -565,7 +567,7 @@ export default function AssignmentsPage() {
                             <div className="space-y-[10px]">
                                 <div className="flex justify-between items-start gap-[12px]">
                                     <span className="text-[12.5px] text-[#6b6860]">Site</span>
-                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">{selectedCompany?.name || <span className="text-[#dc2626]">Not selected</span>}</span>
+                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">{selectedSite?.name || <span className="text-[#dc2626]">Not selected</span>}</span>
                                 </div>
                                 <div className="flex justify-between items-start gap-[12px]">
                                     <span className="text-[12.5px] text-[#6b6860]">Access</span>
@@ -696,7 +698,7 @@ export default function AssignmentsPage() {
                                                     <div className="min-w-0 flex-1">
                                                         <p className="text-[13.5px] font-[600] text-[#1a1a18] truncate">{a.inspectionBoy?.name || "System"}</p>
                                                         <p className="text-[12px] text-[#6b6860] font-[500] truncate">{a.project?.name || "Unknown"}</p>
-                                                        <p className="text-[11px] text-[#9e9b95] truncate">{a.project?.company?.name || "Unknown"}</p>
+                                                        <p className="text-[11px] text-[#9e9b95] truncate">{a.project?.site?.name || a.project?.company?.name || "Unknown"}</p>
                                                     </div>
                                                     <span className={`shrink-0 inline-flex items-center px-[10px] py-[3px] rounded-[20px] text-[11px] font-[500] ${statusBadge.classes}`}>
                                                         {statusBadge.label}
@@ -758,7 +760,7 @@ export default function AssignmentsPage() {
                                                         <div className="text-[11.5px] text-[#9e9b95]">{a.manager ? "Manager" : "Inspector Role"}</div>
                                                     </td>
                                                     <td className="p-[12px_16px] text-[13px] text-[#6b6860] font-[500]">{a.project?.name || "Unknown"}</td>
-                                                    <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{a.project?.company?.name || "Unknown"}</td>
+                                                    <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{a.project?.site?.name || a.project?.company?.name || "Unknown"}</td>
                                                     <td className="p-[12px_16px]">
                                                         <span className={`inline-flex items-center px-[12px] py-[3px] rounded-[20px] text-[11.5px] font-[500] ${statusBadge.classes}`}>{statusBadge.label}</span>
                                                     </td>

@@ -12,11 +12,17 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url)
         const companyId = searchParams.get("companyId")
+        const siteId = searchParams.get("siteId")
+
+        const where: Record<string, unknown> = {}
+        if (siteId) where.siteId = siteId
+        else if (companyId) where.companyId = companyId
 
         const projects = await prisma.project.findMany({
-            where: companyId ? { companyId } : {},
+            where,
             include: {
-                company: true
+                company: true,
+                site: { select: { id: true, name: true, code: true, city: true } },
             },
             orderBy: {
                 createdAt: "desc",
@@ -48,17 +54,31 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { name, description, companyId } = body
+        const { name, description, siteId } = body
+        let { companyId } = body
 
-        if (!name || !companyId) {
-            return new NextResponse("Name and Company ID are required", { status: 400 })
+        if (!name || !siteId) {
+            return new NextResponse("Name and Site ID are required", { status: 400 })
         }
+
+        // Inspection projects now hang off a real HR Site. We still keep the
+        // (non-null) companyId column populated for backwards compatibility, so
+        // derive it from the chosen Site's branch → company.
+        const site = await prisma.site.findUnique({
+            where: { id: siteId },
+            select: { branch: { select: { companyId: true } } },
+        })
+        if (!site) {
+            return new NextResponse("Site not found", { status: 400 })
+        }
+        companyId = site.branch.companyId
 
         const project = await prisma.project.create({
             data: {
                 name,
                 description,
                 companyId,
+                siteId,
                 createdBy: actorId!,
             },
         })
@@ -67,7 +87,7 @@ export async function POST(req: Request) {
         // an Assignment for every inspector who was granted access to the Site.
         try {
             const siteAssignments = await prisma.siteAssignment.findMany({
-                where: { companyId, status: "active" },
+                where: { siteId, status: "active" },
                 select: { inspectionBoyId: true, assignedBy: true, recurrenceType: true },
             })
             for (const sa of siteAssignments) {

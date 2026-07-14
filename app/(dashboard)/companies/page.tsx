@@ -45,7 +45,7 @@ export default async function CompaniesPage() {
                         Database Connection Error
                     </h3>
                     <p className="text-sm text-muted-foreground max-w-sm">
-                        Could not connect to the database to retrieve sites. This might be due to a configuration issue on Netlify.
+                        Could not connect to the database to retrieve companies. This might be due to a configuration issue on Netlify.
                     </p>
                     <Button asChild className="mt-4">
                         <Link href="/">Back to Dashboard</Link>
@@ -58,12 +58,12 @@ export default async function CompaniesPage() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Sites</h1>
+                <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Companies</h1>
                 <Link
                     href="/companies/create"
                     className="inline-flex items-center justify-center bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
                 >
-                    <Plus className="mr-1.5 h-4 w-4" /> Add Site
+                    <Plus className="mr-1.5 h-4 w-4" /> Add Company
                 </Link>
             </div>
 
@@ -71,16 +71,16 @@ export default async function CompaniesPage() {
                 <div className="flex min-h-[400px] flex-col items-center justify-center rounded-[14px] bg-white border border-dashed border-[var(--border2)] shadow-sm">
                     <div className="flex flex-col items-center gap-1 text-center">
                         <h3 className="text-xl font-semibold tracking-tight text-[var(--text)]">
-                            No sites added
+                            No companies added
                         </h3>
                         <p className="text-[13px] text-[var(--text2)]">
-                            You can start by adding a new site.
+                            You can start by adding a new company.
                         </p>
                         <Link
                             href="/companies/create"
                             className="mt-4 inline-flex items-center justify-center bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
                         >
-                            Add Site
+                            Add Company
                         </Link>
                     </div>
                 </div>
