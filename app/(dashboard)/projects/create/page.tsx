@@ -13,6 +13,12 @@ type Site = {
     city?: string | null
 }
 
+type Person = {
+    id: string
+    name: string | null
+    email: string | null
+}
+
 function CreateProjectForm() {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -32,6 +38,12 @@ function CreateProjectForm() {
 
     // We only want to set the initial site ID if it's available and we just mounted
     const [selectedSiteId, setSelectedSiteId] = useState("")
+
+    // Managers & Inspectors are added directly at the Project level.
+    const [managers, setManagers] = useState<Person[]>([])
+    const [inspectors, setInspectors] = useState<Person[]>([])
+    const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
+    const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
 
     useEffect(() => {
         if (isMounted && initialSiteId && !selectedSiteId) {
@@ -55,6 +67,29 @@ function CreateProjectForm() {
         fetchSites()
     }, [])
 
+    useEffect(() => {
+        const fetchPeople = async () => {
+            try {
+                const [mRes, iRes] = await Promise.all([
+                    fetch("/api/users?role=MANAGER"),
+                    fetch("/api/users?role=INSPECTION_BOY"),
+                ])
+                const mData = await mRes.json()
+                const iData = await iRes.json()
+                setManagers(Array.isArray(mData) ? mData : [])
+                setInspectors(Array.isArray(iData) ? iData : [])
+            } catch {
+                // Non-fatal: project can still be created without members
+            }
+        }
+        fetchPeople()
+    }, [])
+
+    const toggleId = (
+        id: string,
+        setter: React.Dispatch<React.SetStateAction<string[]>>
+    ) => setter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setLoading(true)
@@ -65,6 +100,8 @@ function CreateProjectForm() {
             name: formData.get("name"),
             description: formData.get("description"),
             siteId: selectedSiteId,
+            managerIds: selectedManagerIds,
+            inspectorIds: selectedInspectorIds,
         }
 
         try {
@@ -181,6 +218,82 @@ function CreateProjectForm() {
                                             </option>
                                         ))}
                                     </select>
+                                )}
+                            </div>
+
+                            {/* Field: Managers */}
+                            <div className="flex flex-col gap-[6px]">
+                                <label className="text-[13px] font-medium text-[var(--text)] block">
+                                    Managers
+                                    {selectedManagerIds.length > 0 && (
+                                        <span className="ml-[6px] text-[12px] text-[var(--text2)]">
+                                            ({selectedManagerIds.length} selected)
+                                        </span>
+                                    )}
+                                </label>
+                                {managers.length === 0 ? (
+                                    <div className="text-[13px] text-[var(--text2)] p-[10px_14px] rounded-[9px] border border-dashed border-[var(--border)] bg-[var(--surface2)]">
+                                        No managers available.
+                                    </div>
+                                ) : (
+                                    <div className="max-h-[160px] overflow-y-auto rounded-[9px] border border-[var(--border)] bg-[var(--surface2)]">
+                                        {managers.map((m) => {
+                                            const checked = selectedManagerIds.includes(m.id)
+                                            return (
+                                                <label
+                                                    key={m.id}
+                                                    className={`flex items-center gap-[10px] p-[9px_14px] border-b border-[var(--border)] last:border-0 cursor-pointer transition-colors ${checked ? "bg-[#f0fdf4]" : "hover:bg-white"}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => toggleId(m.id, setSelectedManagerIds)}
+                                                        className="accent-[var(--accent)] w-[15px] h-[15px]"
+                                                    />
+                                                    <span className="text-[13px] text-[var(--text)]">{m.name || "Unnamed"}</span>
+                                                    {m.email && <span className="text-[12px] text-[var(--text3)]">({m.email})</span>}
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Field: Inspectors */}
+                            <div className="flex flex-col gap-[6px]">
+                                <label className="text-[13px] font-medium text-[var(--text)] block">
+                                    Inspectors
+                                    {selectedInspectorIds.length > 0 && (
+                                        <span className="ml-[6px] text-[12px] text-[var(--text2)]">
+                                            ({selectedInspectorIds.length} selected)
+                                        </span>
+                                    )}
+                                </label>
+                                {inspectors.length === 0 ? (
+                                    <div className="text-[13px] text-[var(--text2)] p-[10px_14px] rounded-[9px] border border-dashed border-[var(--border)] bg-[var(--surface2)]">
+                                        No inspectors available.
+                                    </div>
+                                ) : (
+                                    <div className="max-h-[160px] overflow-y-auto rounded-[9px] border border-[var(--border)] bg-[var(--surface2)]">
+                                        {inspectors.map((i) => {
+                                            const checked = selectedInspectorIds.includes(i.id)
+                                            return (
+                                                <label
+                                                    key={i.id}
+                                                    className={`flex items-center gap-[10px] p-[9px_14px] border-b border-[var(--border)] last:border-0 cursor-pointer transition-colors ${checked ? "bg-[#f0fdf4]" : "hover:bg-white"}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => toggleId(i.id, setSelectedInspectorIds)}
+                                                        className="accent-[var(--accent)] w-[15px] h-[15px]"
+                                                    />
+                                                    <span className="text-[13px] text-[var(--text)]">{i.name || "Unnamed"}</span>
+                                                    {i.email && <span className="text-[12px] text-[var(--text3)]">({i.email})</span>}
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
                                 )}
                             </div>
 

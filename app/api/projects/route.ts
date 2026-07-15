@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { name, description, siteId } = body
+        const { name, description, siteId, managerIds, inspectorIds } = body
         let { companyId } = body
 
         if (!name || !siteId) {
@@ -82,6 +82,43 @@ export async function POST(req: Request) {
                 createdBy: actorId!,
             },
         })
+
+        // Managers & Inspectors are now added directly at the Project level
+        // (the old "Groups" feature, folded into the project). Managers are
+        // stored as ProjectManager rows; each selected Inspector becomes an
+        // active Assignment on this project. Wrapped defensively so a project
+        // is still created even if these follow-up writes fail.
+        try {
+            const mgrIds: string[] = Array.isArray(managerIds) ? managerIds : []
+            if (mgrIds.length > 0) {
+                await prisma.projectManager.createMany({
+                    data: mgrIds.map((managerId) => ({
+                        projectId: project.id,
+                        managerId,
+                        assignedBy: actorId!,
+                    })),
+                    skipDuplicates: true,
+                })
+            }
+        } catch (mgrErr) {
+            console.log("Project manager attach skipped:", mgrErr)
+        }
+
+        try {
+            const insIds: string[] = Array.isArray(inspectorIds) ? inspectorIds : []
+            for (const inspectionBoyId of insIds) {
+                await prisma.assignment.create({
+                    data: {
+                        projectId: project.id,
+                        inspectionBoyId,
+                        assignedBy: actorId!,
+                        status: "active",
+                    },
+                })
+            }
+        } catch (insErr) {
+            console.log("Project inspector attach skipped:", insErr)
+        }
 
         // Auto-include this new project in any "Whole Site" assignment: create
         // an Assignment for every inspector who was granted access to the Site.
