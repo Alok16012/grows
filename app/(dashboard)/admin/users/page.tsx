@@ -63,6 +63,7 @@ export default function UserManagementPage() {
     const [newPassword, setNewPassword] = useState("")
     const [submitting, setSubmitting] = useState(false)
     const [editData, setEditData] = useState({ name: "", email: "", role: "", customRoleId: "" })
+    const [cleaning, setCleaning] = useState(false)
 
     const [managers, setManagers] = useState<any[]>([])
     const [groupProjects, setGroupProjects] = useState<any[]>([])
@@ -116,6 +117,49 @@ export default function UserManagementPage() {
     useEffect(() => {
         fetchData()
     }, [])
+
+    // Remove orphan logins — User rows with no linked Employee record.
+    // Dry-run preview first, then a confirm before anything is deleted.
+    const handleCleanupOrphans = async () => {
+        setCleaning(true)
+        try {
+            const res = await fetch("/api/admin/cleanup-users")
+            if (!res.ok) throw new Error("Preview failed")
+            const preview = await res.json()
+
+            if (preview.deletable === 0) {
+                toast.info(
+                    preview.blocked > 0
+                        ? `No deletable logins. ${preview.blocked} non-employee login(s) were skipped because they have linked records.`
+                        : "All logins are linked to employees — nothing to clean."
+                )
+                return
+            }
+
+            const ok = confirm(
+                `${preview.orphanLogins} login(s) have no employee record.\n\n` +
+                `• ${preview.deletable} will be DELETED permanently\n` +
+                `• ${preview.blocked} will be skipped (linked to inspections/projects/other records)\n\n` +
+                `Admin, Client and demo accounts are never touched. Continue?`
+            )
+            if (!ok) return
+
+            const delRes = await fetch("/api/admin/cleanup-users", { method: "POST" })
+            if (!delRes.ok) throw new Error("Cleanup failed")
+            const result = await delRes.json()
+            toast.success(
+                `Deleted ${result.deleted} login(s). ` +
+                (result.skipped > 0 ? `Skipped ${result.skipped} with linked records. ` : "") +
+                (result.failed > 0 ? `${result.failed} failed. ` : "") +
+                `Total users now: ${result.totalUsers}.`
+            )
+            fetchData()
+        } catch {
+            toast.error("Could not clean up users. Please try again.")
+        } finally {
+            setCleaning(false)
+        }
+    }
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -317,6 +361,15 @@ export default function UserManagementPage() {
                     <p className="text-[13px] text-[#6b6860] mt-[3px]">Manage access, roles, and account security</p>
                 </div>
                 <div className="flex items-center gap-[10px]">
+                    <button
+                        onClick={handleCleanupOrphans}
+                        disabled={cleaning}
+                        className="px-3.5 h-9 bg-white border border-[#e8e6e1] text-[#b91c1c] rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#fef2f2] hover:border-[#fca5a5] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        title="Delete logins that have no linked employee record"
+                    >
+                        {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />}
+                        Clean Non-Employee Logins
+                    </button>
                     <BulkImportInspectors onImportComplete={fetchData} />
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
