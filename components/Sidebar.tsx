@@ -275,7 +275,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     ]
 
     return (
-        <div className="flex h-full w-[230px] flex-col bg-[var(--surface)] border-r border-[var(--border)] overflow-hidden">
+        <div className="sidebar-dark flex h-full w-[230px] flex-col bg-[var(--surface)] border-r border-[var(--border)] overflow-hidden">
 
             {/* ── Logo / Header ── */}
             <div className="flex h-[54px] items-center justify-between px-4 border-b border-[var(--border)] shrink-0">

@@ -28,6 +28,20 @@
     --radius: 0.5rem;
   }
 
+  /* Dark navy sidebar — scoped token override. Applied to the sidebar
+     root so every token-driven child (nav items, section headers, active
+     states) recolors correctly without touching the markup. */
+  .sidebar-dark {
+    --surface: #0e1c2b;
+    --surface2: #1b2f43;
+    --border: #22384c;
+    --text: #eaf1f8;
+    --text2: #a4b7c9;
+    --text3: #647d93;
+    --accent-light: rgba(26, 158, 110, 0.18);
+    --accent-text: #34d399;
+  }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;

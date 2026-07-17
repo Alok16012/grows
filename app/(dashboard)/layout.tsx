@@ -19,7 +19,7 @@ export default function DashboardLayout({
     return (
         <div className="flex min-h-screen w-full bg-muted/10">
             {/* Sidebar Desktop */}
-            <div className="hidden border-r bg-white md:block w-64 shrink-0 transition-all duration-300">
+            <div className="hidden bg-[#0e1c2b] md:block w-64 shrink-0 transition-all duration-300">
                 <Sidebar />
             </div>
 
@@ -32,7 +32,7 @@ export default function DashboardLayout({
             )}
 
             <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-72 bg-white transform transition-transform duration-300 ease-in-out md:hidden",
+                "fixed inset-y-0 left-0 z-50 w-72 bg-[#0e1c2b] transform transition-transform duration-300 ease-in-out md:hidden",
                 isSidebarOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <Sidebar onMobileClose={() => setIsSidebarOpen(false)} />

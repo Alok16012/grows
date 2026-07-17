@@ -7,15 +7,10 @@ import {
     Folder,
     ClipboardCheck,
     Users,
-    ArrowRight,
-    TrendingUp,
-    TrendingDown,
     XCircle,
-    MoreHorizontal,
     ChevronDown,
     ArrowUpRight,
-    Search,
-    Plus,
+    ShieldCheck,
     ClipboardList,
     CreditCard,
     Loader2,
@@ -26,6 +21,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+
+// Sample completion trend — no historical completion API yet, so these are
+// placeholder values for the chart shape. Swap for a real per-day query later.
+const COMPLETION_TOTAL = 12482
+const COMPLETION_BARS = [40, 60, 45, 80, 55, 70, 90, 65, 50, 85, 45, 75, 95, 60, 40]
 
 // ─── Expense Team Summary (reused on admin dashboard) ────────────────────────
 
@@ -371,226 +371,160 @@ export default function AdminDashboard() {
                 ))}
             </div>
 
-            {/* Recruitment scoreboard (per-HR) — placed up top per request */}
-            <AdminRecruitmentTable />
+            {/* ── Row: Recruitment (left) · Completion + Safety/Approvals (right) ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px] items-start">
+                {/* Left: Recruitment scoreboard */}
+                <AdminRecruitmentTable />
 
-            {/* ALERT CARDS — Mobile quick-action row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-[14px]">
-                {/* Card 1: Safety Compliance */}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col justify-between hover:shadow-sm transition-all">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-[13px] font-medium text-[var(--text)] leading-none mb-1">Safety Score</h3>
-                            <p className="text-[11.5px] text-[var(--text2)]">Compliance rate</p>
-                        </div>
-                        <div className="h-8 w-8 rounded-full border border-[var(--border)] bg-[var(--surface2)] flex items-center justify-center text-[var(--text2)]">
-                            <TrendingUp size={16} />
-                        </div>
-                    </div>
-                    <div className="mt-6 mb-6">
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-[28px] font-semibold text-[var(--text)]">98%</span>
-                            <span className="text-[12px] text-[var(--text2)]">Items</span>
-                        </div>
-                        <div className="mt-2 flex items-center gap-1.5 w-fit h-6 px-2.5 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold">
-                            <ArrowUpRight size={12} className="stroke-[3px]" />
-                            +2.4%
-                        </div>
-                    </div>
-                    <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between group cursor-pointer text-[12.5px] font-medium text-[var(--text)]">
-                        Central District
-                        <ArrowRight size={14} className="text-[var(--text3)] group-hover:translate-x-1 transition-transform" />
-                    </div>
-                </div>
-
-                {/* Card 2: Pending Approvals */}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col justify-between hover:shadow-sm transition-all">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-[13px] font-medium text-[var(--text)] leading-none mb-1">Approvals</h3>
-                            <p className="text-[11.5px] text-[var(--text2)]">Action required</p>
-                        </div>
-                        <div className="h-8 w-8 rounded-full border border-[var(--border)] bg-[var(--surface2)] flex items-center justify-center text-[var(--text2)]">
-                            <ClipboardCheck size={16} />
-                        </div>
-                    </div>
-                    <div className="mt-6 mb-6">
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-[28px] font-semibold text-[var(--text)]">{stats.pendingApprovals ?? 0}</span>
-                            <span className="text-[12px] text-[var(--text2)]">Reports</span>
-                        </div>
-                        <div className={cn(
-                            "mt-2 flex items-center gap-1.5 w-fit h-6 px-2.5 rounded-full text-[11px] font-semibold",
-                            (stats.pendingApprovals ?? 0) > 0
-                                ? "bg-[var(--amber-light)] text-[var(--amber)]"
-                                : "bg-[var(--accent-light)] text-[var(--accent-text)]"
-                        )}>
-                            {(stats.pendingApprovals ?? 0) > 0 ? (
-                                <><TrendingUp size={12} className="stroke-[3px]" /> Urgent</>
-                            ) : (
-                                <><ArrowUpRight size={12} className="stroke-[3px]" /> Clear</>
-                            )}
-                        </div>
-                    </div>
-                    <Link href="/approvals" className="pt-4 border-t border-[var(--border)] flex items-center justify-between group text-[12.5px] font-medium text-[var(--text)]">
-                        Process All
-                        <ArrowRight size={14} className="text-[var(--text3)] group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                </div>
-
-                {/* Card 3: Completion Chart placeholder */}
-                <div className="md:col-span-2 bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col hover:shadow-sm transition-all">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            <h3 className="text-[13px] font-medium text-[var(--text)] leading-none">Inspection Completion</h3>
-                            <div className="h-6 flex items-center gap-1 px-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface2)] text-[11px] text-[var(--text2)] font-medium cursor-pointer hover:bg-white transition-all">
+                {/* Right: Inspection Completion + Safety/Approvals */}
+                <div className="flex flex-col gap-[14px]">
+                    {/* Inspection Completion */}
+                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-[13.5px] font-semibold text-[var(--text)] leading-none">Inspection Completion</h3>
+                            <div className="h-6 flex items-center gap-1 px-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface2)] text-[11px] text-[var(--text2)] font-medium">
                                 Last 30 days
                                 <ChevronDown size={12} />
                             </div>
                         </div>
-                        <button className="h-8 w-8 rounded-full hover:bg-[var(--surface2)] flex items-center justify-center text-[var(--text3)] transition-all">
-                            <MoreHorizontal size={18} />
-                        </button>
-                    </div>
 
-                    <div className="flex-1 flex flex-col justify-center">
                         <p className="text-[11.5px] text-[var(--text3)] mb-1">Total Completed</p>
-                        <div className="flex items-baseline gap-4 mb-4">
-                            <div className="text-[32px] font-semibold text-[var(--text)] tabular-nums">12,482</div>
+                        <div className="flex items-baseline gap-3 mb-5">
+                            <div className="text-[30px] font-semibold text-[var(--text)] tabular-nums leading-none">{COMPLETION_TOTAL.toLocaleString("en-IN")}</div>
                             <div className="h-6 flex items-center gap-1 px-2.5 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold">
-                                +12% vs previous period
+                                <ArrowUpRight size={12} className="stroke-[3px]" /> +12% vs prev.
                             </div>
                         </div>
 
-                        {/* Dummy mini-chart bars */}
-                        <div className="flex items-end gap-1.5 h-20 w-full mt-2">
-                            {[40, 60, 45, 80, 55, 70, 90, 65, 50, 85, 45, 75, 95, 60, 40].map((h, i) => (
-                                <div
-                                    key={i}
-                                    style={{ height: `${h}%` }}
-                                    className={cn(
-                                        "flex-1 rounded-t-[3px] transition-all duration-500",
-                                        i === 12 ? "bg-[var(--accent)]" : "bg-[var(--accent-light)] group-hover:bg-[var(--accent)]/30"
-                                    )}
-                                />
-                            ))}
+                        {/* Chart with y-axis + x-axis */}
+                        <div className="flex gap-2">
+                            <div className="flex flex-col justify-between text-[10px] text-[var(--text3)] tabular-nums h-24 py-0.5 shrink-0">
+                                {["16K", "12K", "8K", "4K", "0"].map(l => <span key={l}>{l}</span>)}
+                            </div>
+                            <div className="flex-1 flex items-end gap-[3px] h-24 border-l border-b border-[var(--border)] pl-1.5">
+                                {COMPLETION_BARS.map((h, i) => (
+                                    <div
+                                        key={i}
+                                        style={{ height: `${h}%` }}
+                                        title="Sample data"
+                                        className={cn(
+                                            "flex-1 rounded-t-[2px] transition-all",
+                                            i === 12 ? "bg-[var(--accent)]" : "bg-[color-mix(in_srgb,var(--accent)_28%,transparent)]"
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-[var(--text3)] font-medium mt-1.5 pl-8">
+                            <span>Feb 1</span><span>Feb 8</span><span>Feb 15</span><span>Feb 22</span><span>Mar 1</span>
                         </div>
                     </div>
 
-                    <div className="mt-6 flex items-center justify-between text-[11px] text-[var(--text3)] font-medium uppercase tracking-wider">
-                        <span>Feb 1</span>
-                        <span>Feb 15</span>
-                        <span>Mar 1</span>
+                    {/* Safety Score + Approvals */}
+                    <div className="grid grid-cols-2 gap-[14px]">
+                        {/* Safety Score */}
+                        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[16px] flex flex-col">
+                            <div className="flex items-start justify-between mb-3">
+                                <div>
+                                    <h3 className="text-[12.5px] font-semibold text-[var(--text)] leading-none mb-1">Safety Score</h3>
+                                    <p className="text-[11px] text-[var(--text3)]">Compliance rate</p>
+                                </div>
+                                <div className="h-8 w-8 rounded-full bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent-text)]">
+                                    <ShieldCheck size={16} />
+                                </div>
+                            </div>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-[24px] font-semibold text-[var(--text)] leading-none">98%</span>
+                                <span className="flex items-center gap-0.5 text-[11px] font-semibold text-[var(--accent-text)]"><ArrowUpRight size={11} className="stroke-[3px]" />2.4%</span>
+                            </div>
+                            <svg viewBox="0 0 120 26" preserveAspectRatio="none" className="w-full h-8 mt-2">
+                                <polyline points="0,20 15,18 30,19 45,13 60,15 75,9 90,11 105,5 120,7" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+
+                        {/* Approvals */}
+                        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[16px] flex flex-col">
+                            <div className="flex items-start justify-between mb-3">
+                                <div>
+                                    <h3 className="text-[12.5px] font-semibold text-[var(--text)] leading-none mb-1">Approvals</h3>
+                                    <p className="text-[11px] text-[var(--text3)]">Action required</p>
+                                </div>
+                                <div className="h-8 w-8 rounded-full bg-[var(--amber-light)] flex items-center justify-center text-[var(--amber)]">
+                                    <ClipboardCheck size={16} />
+                                </div>
+                            </div>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-[24px] font-semibold text-[var(--text)] leading-none tabular-nums">{stats.pendingApprovals ?? 0}</span>
+                                <span className="text-[11px] text-[var(--text2)]">Reports</span>
+                            </div>
+                            <svg viewBox="0 0 120 26" preserveAspectRatio="none" className="w-full h-8 mt-2">
+                                <polyline points="0,15 15,17 30,14 45,16 60,13 75,15 90,12 105,14 120,11" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            <Link href="/approvals" className="text-[11px] font-medium text-[var(--accent-text)] hover:underline mt-1">View All →</Link>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Recent Submissions & Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-[14px]">
+            {/* ── Row: Recent Submissions (left) · Quick Actions (right) ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px] items-start">
                 {/* Recent Submissions */}
-                <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
                     <div className="px-4 py-3.5 border-b border-[var(--border)] flex items-center justify-between">
                         <h3 className="text-[14px] font-semibold text-[var(--text)] leading-none">Recent Submissions</h3>
                         <Link href="/approvals" className="text-[12px] font-medium text-[var(--accent-text)] hover:underline">View All</Link>
                     </div>
 
-                    {/* Mobile card list */}
-                    <div className="sm:hidden divide-y divide-[var(--border)]">
-                        {(stats.recentInspections || []).length === 0 ? (
-                            <p className="text-center text-[13px] text-[var(--text3)] py-8">No submissions yet</p>
-                        ) : (stats.recentInspections || []).map((i: any) => (
-                            <Link key={i.id} href={`/approvals/${i.id}`} className="flex items-center justify-between px-4 py-3.5 hover:bg-[var(--surface2)] transition-colors active:bg-[var(--surface2)]">
-                                <div className="min-w-0 mr-3">
-                                    <p className="text-[13px] font-medium text-[var(--text)] truncate">{i.projectName}</p>
-                                    <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{i.inspectorName} · {i.submittedAt ? format(new Date(i.submittedAt), "MMM d, HH:mm") : "—"}</p>
-                                </div>
-                                <span className={cn(
-                                    "shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase",
-                                    i.status === "pending" ? "bg-[var(--amber-light)] text-[var(--amber)]" :
-                                        i.status === "approved" ? "bg-[var(--accent-light)] text-[var(--accent-text)]" :
-                                            "bg-[var(--red-light)] text-[var(--red)]"
-                                )}>
-                                    {i.status}
-                                </span>
-                            </Link>
-                        ))}
-                    </div>
-
-                    {/* Desktop table */}
-                    <div className="hidden sm:block overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-[var(--surface2)]/50 border-b border-[var(--border)]">
-                                <tr>
-                                    <th className="px-5 py-3 text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider">Project</th>
-                                    <th className="px-5 py-3 text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider">Inspector</th>
-                                    <th className="px-5 py-3 text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider">Status</th>
-                                    <th className="px-5 py-3 text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider">Date</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--border)]">
-                                {(stats.recentInspections || []).map((i: any) => (
-                                    <tr key={i.id} className="hover:bg-[var(--surface2)] transition-colors group">
-                                        <td className="px-5 py-3.5">
-                                            <Link href={`/approvals/${i.id}`} className="text-[13px] font-medium text-[var(--text)] group-hover:text-[var(--accent-text)] transition-colors">
-                                                {i.projectName}
-                                            </Link>
-                                        </td>
-                                        <td className="px-5 py-3.5 text-[13px] text-[var(--text2)]">{i.inspectorName}</td>
-                                        <td className="px-5 py-3.5">
+                    {(stats.recentInspections || []).length === 0 ? (
+                        <p className="text-center text-[13px] text-[var(--text3)] py-10">No submissions yet</p>
+                    ) : (
+                        <div className="divide-y divide-[var(--border)]">
+                            {(stats.recentInspections || []).map((i: any) => {
+                                const initials = (i.inspectorName || "?").split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()
+                                return (
+                                    <Link key={i.id} href={`/approvals/${i.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface2)] transition-colors">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-[13px] font-medium text-[var(--text)] truncate">{i.projectName}</p>
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <span className="h-[18px] w-[18px] rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[9px] font-bold flex items-center justify-center shrink-0">{initials}</span>
+                                                <span className="text-[11.5px] text-[var(--text3)] truncate">{i.inspectorName}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1 shrink-0">
                                             <span className={cn(
                                                 "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
                                                 i.status === "pending" ? "bg-[var(--amber-light)] text-[var(--amber)]" :
                                                     i.status === "approved" ? "bg-[var(--accent-light)] text-[var(--accent-text)]" :
                                                         "bg-[var(--red-light)] text-[var(--red)]"
-                                            )}>
-                                                {i.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-3.5 text-[12px] text-[var(--text3)]">
-                                            {i.submittedAt ? format(new Date(i.submittedAt), "MMM d, HH:mm") : "-"}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                            )}>{i.status}</span>
+                                            <span className="text-[10.5px] text-[var(--text3)] tabular-nums">{i.submittedAt ? format(new Date(i.submittedAt), "MMM d, HH:mm") : "—"}</span>
+                                        </div>
+                                    </Link>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
 
-                {/* Quick Actions */}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden h-fit">
+                {/* Quick Actions — 2x2 tiles */}
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
                     <div className="px-4 py-3.5 border-b border-[var(--border)]">
                         <h3 className="text-[14px] font-semibold text-[var(--text)] leading-none">Quick Actions</h3>
                     </div>
-                    {/* Mobile: 2x2 icon grid */}
-                    <div className="sm:hidden p-3 grid grid-cols-2 gap-2">
+                    <div className="p-4 grid grid-cols-2 gap-3">
                         {[
-                            { href: "/companies/create", icon: Plus, label: "Add Company", color: "#1a9e6e", bg: "#e8f7f1" },
-                            { href: "/projects/create", icon: Folder, label: "New Project", color: "#3b82f6", bg: "#eff6ff" },
-                            { href: "/assignments", icon: ClipboardList, label: "Assignments", color: "#d97706", bg: "#fef3c7" },
-                            { href: "/admin/users", icon: Users, label: "Users", color: "#7c3aed", bg: "#f5f3ff" },
+                            { href: "/companies/create", icon: Building2, label: "Add New Company", color: "#1a9e6e", bg: "#e8f7f1" },
+                            { href: "/projects/create", icon: Folder, label: "Create Project", color: "#3b82f6", bg: "#eff6ff" },
+                            { href: "/assignments", icon: ClipboardList, label: "Manage Assignments", color: "#d97706", bg: "#fef3c7" },
+                            { href: "/admin/users", icon: Users, label: "System Users", color: "#7c3aed", bg: "#f5f3ff" },
                         ].map(({ href, icon: Icon, label, color, bg }) => (
-                            <Link key={href} href={href} className="flex flex-col items-center justify-center gap-2 p-4 bg-[var(--surface2)] rounded-[12px] hover:opacity-80 active:scale-95 transition-all">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: bg }}>
+                            <Link key={href} href={href} className="flex flex-col gap-3 p-4 border border-[var(--border)] rounded-[12px] hover:shadow-sm hover:border-[var(--accent)] transition-all group">
+                                <div className="w-10 h-10 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: bg }}>
                                     <Icon size={18} style={{ color }} />
                                 </div>
-                                <span className="text-[12px] font-medium text-[var(--text)] text-center">{label}</span>
+                                <span className="text-[12.5px] font-medium text-[var(--text)] leading-tight">{label}</span>
                             </Link>
                         ))}
-                    </div>
-                    {/* Desktop: list */}
-                    <div className="hidden sm:block p-4 grid grid-cols-1 gap-2">
-                        <Link href="/companies/create" className="h-10 px-4 flex items-center gap-3 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-all">
-                            <Plus size={16} /> Add New Company
-                        </Link>
-                        <Link href="/projects/create" className="h-10 px-4 flex items-center gap-3 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-all">
-                            <Folder size={16} /> Create Project
-                        </Link>
-                        <Link href="/assignments" className="h-10 px-4 flex items-center gap-3 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-all">
-                            <ClipboardList size={16} /> Manage Assignments
-                        </Link>
-                        <Link href="/admin/users" className="h-10 px-4 flex items-center gap-3 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-all">
-                            <Users size={16} /> System Users
-                        </Link>
                     </div>
                 </div>
             </div>
