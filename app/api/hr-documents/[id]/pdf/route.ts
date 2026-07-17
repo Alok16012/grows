@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
-import { ensureHrDocRecallSchema } from "@/lib/hr-doc-schema"
+import { ensureHrDocRecallSchema, getUserSignature } from "@/lib/hr-doc-schema"
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer"
 import { createElement, type ReactElement } from "react"
 import { LetterheadDocumentPDF } from "@/components/LetterheadDocumentPDF"
@@ -53,6 +53,15 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
             day: "2-digit", month: "long", year: "numeric",
         })
 
+        // Signature snapshotted on the document at issue time; older documents
+        // (issued before snapshots existed) fall back to the sender's current
+        // saved signature.
+        let signatureDataUrl = (doc as { signature?: string | null }).signature ?? null
+        if (!signatureDataUrl) {
+            const senderId = doc.issuedBy || doc.createdBy
+            if (senderId) signatureDataUrl = await getUserSignature(senderId)
+        }
+
         // @react-pdf types the root element as <Document>; our wrapper component
         // returns one, so cast through the expected element type.
         const element = createElement(LetterheadDocumentPDF, {
@@ -61,6 +70,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
             content: doc.content,
             dateText,
             logoDataUrl: getLogoDataUrl(),
+            signatureDataUrl,
         }) as unknown as ReactElement<DocumentProps>
 
         const buffer = await renderToBuffer(element)

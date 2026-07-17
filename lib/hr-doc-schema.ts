@@ -24,10 +24,37 @@ export async function ensureHrDocRecallSchema() {
                 ADD COLUMN IF NOT EXISTS "recalledAt"   TIMESTAMP(3),
                 ADD COLUMN IF NOT EXISTS "recallReason" TEXT,
                 ADD COLUMN IF NOT EXISTS "recallCount"  INTEGER NOT NULL DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS "history"      JSONB
+                ADD COLUMN IF NOT EXISTS "history"      JSONB,
+                ADD COLUMN IF NOT EXISTS "signature"    TEXT
+        `)
+        // Per-sender saved signature. Kept OUT of the Prisma User model on
+        // purpose: User rows are read during login, before any ensure runs,
+        // so a schema-modelled column would 500 auth until it exists. All
+        // access goes through the raw helpers below instead.
+        await (prisma as any).$executeRawUnsafe(`
+            ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "signature" TEXT
         `)
         ensured = true
     } catch { /* best effort */ }
+}
+
+// Read a user's saved signature (data URL) — raw because the column is
+// deliberately not in the Prisma User model (see ensureHrDocRecallSchema).
+export async function getUserSignature(userId: string): Promise<string | null> {
+    try {
+        const rows = await (prisma as any).$queryRawUnsafe(
+            `SELECT "signature" FROM "User" WHERE "id" = $1 LIMIT 1`, userId
+        ) as { signature: string | null }[]
+        return rows[0]?.signature ?? null
+    } catch {
+        return null
+    }
+}
+
+export async function setUserSignature(userId: string, signature: string | null): Promise<void> {
+    await (prisma as any).$executeRawUnsafe(
+        `UPDATE "User" SET "signature" = $1 WHERE "id" = $2`, signature, userId
+    )
 }
 
 export type HrDocHistoryEvent = {

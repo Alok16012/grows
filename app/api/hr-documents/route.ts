@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { ensureHrDocRecallSchema } from "@/lib/hr-doc-schema"
+import { ensureHrDocRecallSchema, getUserSignature } from "@/lib/hr-doc-schema"
 
 function generateDocNumber() {
     const y = new Date().getFullYear()
@@ -105,6 +105,9 @@ export async function POST(req: Request) {
         if (action === "issue" && !docType.requiresApproval) status = "ISSUED"
 
         const docNumber = generateDocNumber()
+        // Snapshot the sender's saved signature so the document permanently
+        // carries the signature of whoever issued it.
+        const senderSignature = await getUserSignature(session.user.id)
         const doc = await prisma.hrDocument.create({
             data: {
                 docNumber,
@@ -117,6 +120,7 @@ export async function POST(req: Request) {
                 createdBy: session.user.id,
                 issuedBy: status === "ISSUED" ? session.user.id : null,
                 issuedAt: status === "ISSUED" ? new Date() : null,
+                signature: senderSignature,
             },
             include: {
                 employee: { select: { employeeId: true, firstName: true, lastName: true } },

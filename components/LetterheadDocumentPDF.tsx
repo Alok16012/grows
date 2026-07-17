@@ -18,20 +18,23 @@ const styles = StyleSheet.create({
     body: { fontSize: 11, textAlign: "justify" },
     sign: { marginTop: 44 },
     signCompany: { fontSize: 11, fontFamily: "Helvetica-Bold" },
+    signImage: { width: 110, height: 40, objectFit: "contain", objectPositionX: 0, marginTop: 10 },
     signLabel: { fontSize: 10, color: "#444", marginTop: 34 },
+    signLabelWithImage: { fontSize: 10, color: "#444", marginTop: 4 },
     footer: { position: "absolute", bottom: 30, left: 54, right: 54, textAlign: "center", borderTopWidth: 1, borderTopColor: "#e8e6e1", paddingTop: 8 },
     footerAddr: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#1a1a18" },
     footerWeb: { fontSize: 8, fontFamily: "Helvetica-Bold", color: RED, marginTop: 2 },
 })
 
 export function LetterheadDocumentPDF({
-    docNumber, typeName, content, dateText, logoDataUrl,
+    docNumber, typeName, content, dateText, logoDataUrl, signatureDataUrl,
 }: {
     docNumber: string
     typeName: string
     content: string
     dateText: string
     logoDataUrl?: string | null
+    signatureDataUrl?: string | null
 }) {
     return (
         <Document>
@@ -58,7 +61,14 @@ export function LetterheadDocumentPDF({
 
                 <View style={styles.sign}>
                     <Text style={styles.signCompany}>For Growus Auto India Pvt. Ltd.</Text>
-                    <Text style={styles.signLabel}>Authorised Signatory</Text>
+                    {signatureDataUrl ? (
+                        <>
+                            <Image src={signatureDataUrl} style={styles.signImage} />
+                            <Text style={styles.signLabelWithImage}>Authorised Signatory</Text>
+                        </>
+                    ) : (
+                        <Text style={styles.signLabel}>Authorised Signatory</Text>
+                    )}
                 </View>
 
                 <View style={styles.footer} fixed>

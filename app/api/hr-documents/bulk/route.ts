@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { generateDocNumber, fillTemplate, buildDocVars } from "@/lib/hr-document"
-import { ensureHrDocRecallSchema } from "@/lib/hr-doc-schema"
+import { ensureHrDocRecallSchema, getUserSignature } from "@/lib/hr-doc-schema"
 
 export const maxDuration = 60
 
@@ -66,6 +66,10 @@ export async function POST(req: Request) {
         let issued = 0
         let failed = 0
 
+        // Snapshot the sender's saved signature onto each document, so every
+        // document permanently carries the signature of whoever sent it.
+        const senderSignature = await getUserSignature(session.user.id)
+
         for (const employee of employees) {
             try {
                 const content = fillTemplate(template, buildDocVars(employee, eff))
@@ -81,6 +85,7 @@ export async function POST(req: Request) {
                         createdBy: session.user.id,
                         issuedBy: session.user.id,
                         issuedAt: new Date(),
+                        signature: senderSignature,
                     },
                 })
                 issued++

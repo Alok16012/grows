@@ -1821,6 +1821,9 @@ model HrDocument {
   recallReason   String?
   recallCount    Int            @default(0)
   history        Json? // [{ action, by, byName, at, reason? }]
+  // Sender's signature image (data URL), snapshotted at issue time so the
+  // document keeps the signature it was actually sent with.
+  signature      String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   employee       Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)

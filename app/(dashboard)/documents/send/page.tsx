@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X, Undo2, RotateCcw, History } from "lucide-react"
+import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X, Undo2, RotateCcw, History, PenLine, Trash2, Lock } from "lucide-react"
 import { can } from "@/lib/can"
 
 type DocType = { id: string; name: string; requiresApproval: boolean; templateContent?: string }
@@ -61,6 +61,11 @@ export default function SendDocumentsPage() {
     const [previewContent, setPreviewContent] = useState("")
     const [previewSample, setPreviewSample] = useState<string | null>(null)
 
+    // The sender's personal signature — saved ("locked") once, then stamped on
+    // every document they issue. Each sender has their own.
+    const [signature, setSignature] = useState<string | null>(null)
+    const [sigBusy, setSigBusy] = useState(false)
+
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
         if (status === "authenticated" && !can(session, "documents.view")) router.push("/")
@@ -91,6 +96,64 @@ export default function SendDocumentsPage() {
             }
         })()
     }, [fetchIssued])
+
+    // Load my saved signature once.
+    useEffect(() => {
+        fetch("/api/me/signature")
+            .then(r => (r.ok ? r.json() : null))
+            .then(d => setSignature(d?.signature ?? null))
+            .catch(() => { /* ignore */ })
+    }, [])
+
+    const uploadSignature = async (file: File) => {
+        if (!/^image\/(png|jpe?g)$/.test(file.type)) {
+            toast.error("Signature must be a PNG or JPEG image")
+            return
+        }
+        if (file.size > 200 * 1024) {
+            toast.error("Signature image is too large — keep it under 200 KB")
+            return
+        }
+        setSigBusy(true)
+        try {
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(String(reader.result))
+                reader.onerror = () => reject(new Error("Could not read file"))
+                reader.readAsDataURL(file)
+            })
+            const res = await fetch("/api/me/signature", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ signature: dataUrl }),
+            })
+            if (!res.ok) {
+                const d = await res.json().catch(() => null)
+                throw new Error(d?.error || "Could not save signature")
+            }
+            setSignature(dataUrl)
+            toast.success("Signature saved — it will appear on documents you send")
+        } catch (e) {
+            toast.error((e as Error).message)
+        } finally {
+            setSigBusy(false)
+        }
+    }
+
+    const removeSignature = async () => {
+        if (!confirm("Remove your saved signature? New documents you send will go out without it.")) return
+        setSigBusy(true)
+        try {
+            const res = await fetch("/api/me/signature", { method: "DELETE" })
+            if (!res.ok) throw new Error("Could not remove signature")
+            setSignature(null)
+            toast.success("Signature removed")
+        } catch (e) {
+            toast.error((e as Error).message)
+        } finally {
+            setSigBusy(false)
+        }
+    }
 
     const filteredEmps = useMemo(() => {
         const q = empSearch.trim().toLowerCase()
@@ -321,6 +384,48 @@ export default function SendDocumentsPage() {
                     </div>
                 </div>
 
+                {/* Sender's signature — personal to each sender, stamped on every doc they issue */}
+                <div>
+                    <label className={labelCls + " flex items-center gap-1.5"}>
+                        <PenLine size={12} /> Your signature — appears on documents you send
+                    </label>
+                    {signature ? (
+                        <div className="flex items-center gap-4 border border-[var(--border)] rounded-[10px] bg-[var(--surface2)] p-3">
+                            <div className="bg-white border border-[var(--border)] rounded-[8px] px-3 py-2">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={signature} alt="Your signature" className="h-10 max-w-[160px] object-contain" />
+                            </div>
+                            <span className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] font-medium">
+                                <Lock size={12} /> Locked to your account
+                            </span>
+                            <div className="ml-auto flex items-center gap-2">
+                                <label className={`inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text2)] border border-[var(--border)] rounded-[8px] px-3 h-8 cursor-pointer hover:bg-white transition ${sigBusy ? "opacity-50 pointer-events-none" : ""}`}>
+                                    {sigBusy ? <Loader2 size={13} className="animate-spin" /> : <PenLine size={13} />} Change
+                                    <input type="file" accept="image/png,image/jpeg" className="hidden"
+                                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadSignature(f); e.target.value = "" }} />
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={removeSignature}
+                                    disabled={sigBusy}
+                                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-600 border border-[var(--border)] rounded-[8px] px-3 h-8 hover:bg-red-50 transition disabled:opacity-50"
+                                >
+                                    <Trash2 size={13} /> Remove
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <label className={`flex items-center gap-3 border border-dashed border-[var(--border)] rounded-[10px] bg-[var(--surface2)] p-4 cursor-pointer hover:border-[var(--accent)] transition ${sigBusy ? "opacity-50 pointer-events-none" : ""}`}>
+                            {sigBusy ? <Loader2 size={16} className="animate-spin text-[var(--accent)]" /> : <PenLine size={16} className="text-[var(--text3)]" />}
+                            <span className="text-[13px] text-[var(--text2)]">
+                                Upload your signature — <span className="font-medium">small PNG or JPEG</span>, max 200 KB. Saved once, then applied to every document you send.
+                            </span>
+                            <input type="file" accept="image/png,image/jpeg" className="hidden"
+                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadSignature(f); e.target.value = "" }} />
+                        </label>
+                    )}
+                </div>
+
                 {typeId && (
                     <div>
                         <label className={labelCls}>Document content — edit before sending</label>
@@ -513,7 +618,15 @@ export default function SendDocumentsPage() {
                                     <pre className="whitespace-pre-wrap font-sans text-[13px] text-[#1a1a18] leading-relaxed">{previewContent || "(empty)"}</pre>
                                     <div className="mt-8">
                                         <p className="text-[12px] font-semibold text-[#1a1a18]">For Growus Auto India Pvt. Ltd.</p>
-                                        <p className="text-[11px] text-[#555] mt-6">Authorised Signatory</p>
+                                        {signature ? (
+                                            <>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={signature} alt="Signature" className="h-10 max-w-[160px] object-contain mt-2" />
+                                                <p className="text-[11px] text-[#555] mt-1">Authorised Signatory</p>
+                                            </>
+                                        ) : (
+                                            <p className="text-[11px] text-[#555] mt-6">Authorised Signatory</p>
+                                        )}
                                     </div>
                                 </div>
                             )}
