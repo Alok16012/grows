@@ -29,52 +29,41 @@ type Candidate = { id: string; name: string | null; email: string | null; role: 
 
 // Collect every candidate id that is referenced by operational data. One
 // bulk query per referencing table (instead of per-user counts, which was
-// far too slow for 1,500+ users and timed out the function).
+// far too slow for 1,500+ users). Each check is individually fault-tolerant:
+// prod migrations are manual, so some tables (e.g. SiteAssignment) may not
+// exist there yet — a missing table simply can't reference anyone and must
+// not sink the whole analysis.
 async function findReferencedIds(ids: string[]): Promise<Set<string>> {
     const referenced = new Set<string>()
     if (ids.length === 0) return referenced
 
-    const collect = (rows: Record<string, string | null>[], key: string) => {
-        for (const r of rows) {
-            const v = r[key]
+    const q = { in: ids }
+    const checks: { key: string; run: () => Promise<unknown[]> }[] = [
+        { key: "inspectionBoyId", run: () => prisma.assignment.findMany({ where: { inspectionBoyId: q }, select: { inspectionBoyId: true }, distinct: ["inspectionBoyId"] }) },
+        { key: "assignedBy", run: () => prisma.assignment.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }) },
+        { key: "submittedBy", run: () => prisma.inspection.findMany({ where: { submittedBy: q }, select: { submittedBy: true }, distinct: ["submittedBy"] }) },
+        { key: "managerId", run: () => prisma.projectManager.findMany({ where: { managerId: q }, select: { managerId: true }, distinct: ["managerId"] }) },
+        { key: "assignedBy", run: () => prisma.projectManager.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }) },
+        { key: "inspectionBoyId", run: () => prisma.siteAssignment.findMany({ where: { inspectionBoyId: q }, select: { inspectionBoyId: true }, distinct: ["inspectionBoyId"] }) },
+        { key: "assignedBy", run: () => prisma.siteAssignment.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }) },
+        { key: "assignedTo", run: () => prisma.lead.findMany({ where: { assignedTo: q }, select: { assignedTo: true }, distinct: ["assignedTo"] }) },
+        { key: "createdBy", run: () => prisma.lead.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }) },
+        { key: "userId", run: () => prisma.leadActivity.findMany({ where: { userId: q }, select: { userId: true }, distinct: ["userId"] }) },
+        { key: "uploadedBy", run: () => prisma.leadDocument.findMany({ where: { uploadedBy: q }, select: { uploadedBy: true }, distinct: ["uploadedBy"] }) },
+        { key: "createdBy", run: () => prisma.leadFollowUp.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }) },
+        { key: "createdBy", run: () => prisma.leadForm.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }) },
+        { key: "hrApprovedBy", run: () => prisma.performanceReview.findMany({ where: { hrApprovedBy: q }, select: { hrApprovedBy: true }, distinct: ["hrApprovedBy"] }) },
+        { key: "createdBy", run: () => prisma.jobPosting.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }) },
+    ]
+
+    const results = await Promise.all(checks.map((c) => c.run().catch(() => [] as unknown[])))
+    results.forEach((rows, i) => {
+        const key = checks[i].key
+        for (const row of rows as Record<string, string | null>[]) {
+            const v = row[key]
             if (v) referenced.add(v)
         }
-    }
-
-    const q = { in: ids }
-    const results = await Promise.all([
-        prisma.assignment.findMany({ where: { inspectionBoyId: q }, select: { inspectionBoyId: true }, distinct: ["inspectionBoyId"] }),
-        prisma.assignment.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }),
-        prisma.inspection.findMany({ where: { submittedBy: q }, select: { submittedBy: true }, distinct: ["submittedBy"] }),
-        prisma.projectManager.findMany({ where: { managerId: q }, select: { managerId: true }, distinct: ["managerId"] }),
-        prisma.projectManager.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }),
-        prisma.siteAssignment.findMany({ where: { inspectionBoyId: q }, select: { inspectionBoyId: true }, distinct: ["inspectionBoyId"] }),
-        prisma.siteAssignment.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }),
-        prisma.lead.findMany({ where: { assignedTo: q }, select: { assignedTo: true }, distinct: ["assignedTo"] }),
-        prisma.lead.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }),
-        prisma.leadActivity.findMany({ where: { userId: q }, select: { userId: true }, distinct: ["userId"] }),
-        prisma.leadDocument.findMany({ where: { uploadedBy: q }, select: { uploadedBy: true }, distinct: ["uploadedBy"] }),
-        prisma.leadFollowUp.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }),
-        prisma.leadForm.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }),
-        prisma.performanceReview.findMany({ where: { hrApprovedBy: q }, select: { hrApprovedBy: true }, distinct: ["hrApprovedBy"] }),
-        prisma.jobPosting.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }),
-    ])
-
-    collect(results[0] as any, "inspectionBoyId")
-    collect(results[1] as any, "assignedBy")
-    collect(results[2] as any, "submittedBy")
-    collect(results[3] as any, "managerId")
-    collect(results[4] as any, "assignedBy")
-    collect(results[5] as any, "inspectionBoyId")
-    collect(results[6] as any, "assignedBy")
-    collect(results[7] as any, "assignedTo")
-    collect(results[8] as any, "createdBy")
-    collect(results[9] as any, "userId")
-    collect(results[10] as any, "uploadedBy")
-    collect(results[11] as any, "createdBy")
-    collect(results[12] as any, "createdBy")
-    collect(results[13] as any, "hrApprovedBy")
-    collect(results[14] as any, "createdBy")
+    })
 
     return referenced
 }
