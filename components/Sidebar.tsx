@@ -227,7 +227,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "CONFIGURATION",
             links: [
                 { name: "Departments",      href: "/departments",   icon: Briefcase,  roles: ["ADMIN"] },
-                { name: "Users",            href: "/admin/users",   icon: Users,      roles: ["ADMIN"] },
+                { name: "System Users",     href: "/admin/users",   icon: Users,      roles: ["ADMIN"] },
                 { name: "Employee Logins",  href: "/admin/employee-logins", icon: KeyRound, roles: ["ADMIN"], permission: "users.manage" },
                 { name: "Clients",          href: "/admin/clients", icon: Building2,  roles: ["ADMIN"] },
                 { name: "Roles",            href: "/admin/roles",   icon: Shield,     roles: ["ADMIN"] },
