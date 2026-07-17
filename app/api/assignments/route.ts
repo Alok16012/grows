@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
+import { ensureSiteAssignmentSchema } from "@/lib/site-assignment-schema"
 
 export const dynamic = "force-dynamic"
 
@@ -260,6 +261,7 @@ export async function POST(req: Request) {
         // auto-assigned to these inspectors.
         if (wholeSite && siteId && hasInspectors) {
             try {
+                await ensureSiteAssignmentSchema()
                 for (const inspectionBoyId of inspectorIds) {
                     await prisma.siteAssignment.upsert({
                         where: { siteId_inspectionBoyId: { siteId, inspectionBoyId } },

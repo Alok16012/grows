@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
+import { ensureSiteAssignmentSchema } from "@/lib/site-assignment-schema"
 
 export async function GET(req: Request) {
     try {
@@ -134,6 +135,7 @@ export async function POST(req: Request) {
         // Auto-include this new project in any "Whole Site" assignment: create
         // an Assignment for every inspector who was granted access to the Site.
         try {
+            await ensureSiteAssignmentSchema()
             const siteAssignments = await prisma.siteAssignment.findMany({
                 where: { siteId, status: "active" },
                 select: { inspectionBoyId: true, assignedBy: true, recurrenceType: true },
