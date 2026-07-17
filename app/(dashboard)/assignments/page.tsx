@@ -69,6 +69,26 @@ export default function AssignmentsPage() {
         setWholeSite(false)
     }, [selectedSiteId])
 
+    // Auto-fill inspectors & managers from the chosen projects' existing members.
+    // Runs only when the project selection (or access mode / project list) changes,
+    // so it seeds the defaults without fighting the user's manual edits on later steps.
+    useEffect(() => {
+        const sourceProjects = wholeSite
+            ? projects
+            : projects.filter(p => selectedProjectIds.includes(p.id))
+        if (sourceProjects.length === 0) return
+
+        const mgr = new Set<string>()
+        const ins = new Set<string>()
+        sourceProjects.forEach(p => {
+            (p.managerIds || []).forEach((id: string) => mgr.add(id))
+            ;(p.inspectorIds || []).forEach((id: string) => ins.add(id))
+        })
+        setSelectedManagerIds(Array.from(mgr))
+        setSelectedInspectorIds(Array.from(ins))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedProjectIds, wholeSite, projects])
+
     const fetchInitialData = async () => {
         setFetching(true)
         try {

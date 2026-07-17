@@ -32,6 +32,8 @@ export async function GET(req: Request) {
             const users = await prisma.user.findMany({
                 where: {
                     role: Role.INSPECTION_BOY,
+                    // Only real staff — users with a linked Employee record.
+                    employeeProfile: { isNot: null },
                 },
                 select: {
                     id: true,
@@ -46,6 +48,8 @@ export async function GET(req: Request) {
             const users = await prisma.user.findMany({
                 where: {
                     role: Role.MANAGER,
+                    // Only real staff — users with a linked Employee record.
+                    employeeProfile: { isNot: null },
                 },
                 select: {
                     id: true,

@@ -30,11 +30,13 @@ type Project = {
     } | null
 }
 
-// Group key/label for a project: prefer the real HR Site; fall back to the
-// legacy Company for older projects that predate the Site link.
-function groupOf(p: Project): { id: string; name: string } {
-    if (p.site) return { id: `site:${p.site.id}`, name: p.site.name }
-    return { id: `company:${p.company.id}`, name: p.company.name }
+// Group key/label for a project. Projects are organised by their real HR Site.
+// Legacy projects with no Site link are bucketed under a single neutral
+// "No Site" group instead of their Company — the Site filter must only ever
+// list actual sites, never company names.
+function groupOf(p: Project): { id: string; name: string; isSite: boolean } {
+    if (p.site) return { id: `site:${p.site.id}`, name: p.site.name, isSite: true }
+    return { id: "no-site", name: "No Site", isSite: false }
 }
 
 export default function ProjectsPage() {
@@ -57,11 +59,12 @@ export default function ProjectsPage() {
             const list: Project[] = Array.isArray(data) ? data : []
             setProjects(list)
 
-            // Extract unique sites (grouping keys) from projects
+            // Extract unique real sites for the filter dropdown — company /
+            // "No Site" buckets are deliberately excluded so only sites show.
             const siteMap = new Map<string, string>()
             list.forEach(p => {
                 const g = groupOf(p)
-                siteMap.set(g.id, g.name)
+                if (g.isSite) siteMap.set(g.id, g.name)
             })
             setSites(Array.from(siteMap.entries()).map(([id, name]) => ({ id, name })))
         } catch {
@@ -168,7 +171,14 @@ export default function ProjectsPage() {
                 </div>
             ) : (
                 <div className="space-y-8">
-                    {Object.values(grouped).map(group => (
+                    {Object.values(grouped)
+                        .sort((a, b) => {
+                            // Keep the "No Site" bucket at the very bottom.
+                            if (a.site.id === "no-site") return 1
+                            if (b.site.id === "no-site") return -1
+                            return a.site.name.localeCompare(b.site.name)
+                        })
+                        .map(group => (
                         <div key={group.site.id} className="space-y-3">
                             {/* Site Group Header */}
                             <div className="flex items-center gap-2">

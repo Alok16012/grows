@@ -23,13 +23,24 @@ export async function GET(req: Request) {
             include: {
                 company: true,
                 site: { select: { id: true, name: true, code: true, city: true } },
+                // Current project members, so callers (e.g. the assignment wizard)
+                // can pre-fill a project's existing inspectors & managers.
+                projectManagers: { select: { managerId: true } },
+                assignments: { where: { status: "active" }, select: { inspectionBoyId: true } },
             },
             orderBy: {
                 createdAt: "desc",
             },
         })
 
-        return NextResponse.json(projects)
+        // Flatten member ids alongside the raw relations for convenience.
+        const withMembers = projects.map((p) => ({
+            ...p,
+            managerIds: p.projectManagers.map((m) => m.managerId),
+            inspectorIds: Array.from(new Set(p.assignments.map((a) => a.inspectionBoyId))),
+        }))
+
+        return NextResponse.json(withMembers)
     } catch (error) {
         console.error("[PROJECTS_GET]", error)
         return NextResponse.json({
