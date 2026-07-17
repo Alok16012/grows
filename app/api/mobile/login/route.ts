@@ -47,9 +47,15 @@ async function mintResponse(user: any) {
     const employee = await prisma.employee
         .findFirst({
             where: { userId: user.id },
-            select: { id: true, employeeId: true, firstName: true, lastName: true, designation: true, photo: true },
+            select: { id: true, employeeId: true, firstName: true, lastName: true, designation: true, photo: true, status: true },
         })
         .catch(() => null)
+
+    // Only current staff may sign in — terminated / inactive employees are
+    // locked out of the mobile app just like the web (see lib/auth.ts).
+    if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE")) {
+        return NextResponse.json({ error: "Your account is inactive. Please contact HR." }, { status: 403 })
+    }
 
     const permissions = user.permissions ?? resolvePermissions(user)
     const customRoleName = user.customRoleName ?? (user.customRole?.isActive ? user.customRole.name : null)

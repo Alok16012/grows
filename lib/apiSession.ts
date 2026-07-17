@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import type { Session } from "next-auth"
 import { decode } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
+import prisma from "@/lib/prisma"
 
 const secret = process.env.NEXTAUTH_SECRET
 
@@ -19,6 +20,18 @@ export async function getApiSession(req?: Request): Promise<Session | null> {
             try {
                 const decoded = await decode({ token, secret })
                 if (decoded?.id) {
+                    // Mobile tokens live 30 days — make sure the user still
+                    // exists and is active on every request, so deleting or
+                    // terminating an employee kills their app access at once.
+                    // (Demo users have no DB row — skip them in dev.)
+                    const uid = decoded.id as string
+                    if (!uid.startsWith("demo-")) {
+                        const u = await prisma.user
+                            .findUnique({ where: { id: uid }, select: { isActive: true } })
+                            .catch(() => undefined)
+                        // undefined = DB hiccup (fail open); null = user deleted
+                        if (u === null || u?.isActive === false) return null
+                    }
                     // Shaped to match the NextAuth session.user so existing helpers
                     // (checkAccess, audienceWhere, prisma lookups by session.user.id)
                     // work unchanged whether auth came from a cookie or a bearer token.

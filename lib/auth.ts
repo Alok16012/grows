@@ -201,20 +201,25 @@ export const authOptions: NextAuthOptions = {
 
                     if (!passwordOk) throw new Error("Invalid credentials")
 
-                    // Activate inactive accounts (password already verified)
+                    // Deactivated accounts stay locked out. Users are deactivated
+                    // when their employee is terminated or deleted — a correct
+                    // password must NOT silently revive the account.
                     if (!user.isActive) {
-                        user = await prisma.user.update({
-                            where: { id: user.id },
-                            data: { isActive: true },
-                            include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                        })
+                        throw new Error("Your account is inactive. Please contact HR.")
                     }
 
-                    // Look up employee record for profile photo (linked via userId)
+                    // Look up employee record (photo + employment status)
                     const employee = await prisma.employee.findFirst({
                         where: { userId: user.id },
-                        select: { photo: true }
+                        select: { photo: true, status: true }
                     }).catch(() => null)
+
+                    // Only current staff may sign in: terminated / inactive
+                    // employees are blocked even if their User row is active
+                    // (e.g. status was changed before user-sync existed).
+                    if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE")) {
+                        throw new Error("Your account is inactive. Please contact HR.")
+                    }
 
                     return {
                         id: user.id,
@@ -259,9 +264,19 @@ export const authOptions: NextAuthOptions = {
                     })
                     const employee = await prisma.employee.findFirst({
                         where: { userId: token.id as string },
-                        select: { photo: true }
+                        select: { photo: true, status: true }
                     }).catch(() => null)
-                    if (dbUser) {
+                    // Kill live sessions of users who were deleted, deactivated,
+                    // or whose employee was terminated after they logged in.
+                    // (Demo users have no DB row — skip them in dev.)
+                    const isDemo = String(token.id).startsWith("demo-")
+                    const lockedOut = !isDemo && (
+                        !dbUser || !dbUser.isActive ||
+                        (employee ? (employee.status === "TERMINATED" || employee.status === "INACTIVE") : false)
+                    )
+                    if (lockedOut) {
+                        ;(token as any).invalidated = true
+                    } else if (dbUser) {
                         token.role = dbUser.role
                         token.permissions = resolvePermissions(dbUser)
                         ;(token as any).customRoleName = dbUser.customRole?.isActive ? dbUser.customRole.name : null
@@ -279,6 +294,11 @@ export const authOptions: NextAuthOptions = {
             return token
         },
         async session({ session, token }) {
+            // Token was invalidated (user deleted/deactivated/terminated) —
+            // report no session so the client is treated as signed out.
+            if ((token as any)?.invalidated) {
+                return null as any
+            }
             if (token) {
                 session.user.id = token.id
                 session.user.role = token.role as Role

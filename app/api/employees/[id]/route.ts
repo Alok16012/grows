@@ -182,9 +182,9 @@ export async function PUT(
             data: updateData,
         })
 
-        // Update linked User account (role + email sync)
+        // Update linked User account (role + email + login-access sync)
         const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY", "CLIENT"]
-        if (systemRole || customRoleId !== undefined || email !== undefined) {
+        if (systemRole || customRoleId !== undefined || email !== undefined || status !== undefined) {
             const empWithUser = await prisma.employee.findUnique({
                 where: { id: params.id },
                 select: { userId: true },
@@ -196,6 +196,11 @@ export async function PUT(
                 // Sync login email when employee email is updated
                 if (email && email.trim() && !email.includes("@cims.local")) {
                     userUpdate.email = email.trim()
+                }
+                // Terminated / inactive employees lose login access; restoring
+                // the employee to ACTIVE / ON_LEAVE restores it.
+                if (status !== undefined) {
+                    userUpdate.isActive = !(status === "TERMINATED" || status === "INACTIVE")
                 }
                 if (Object.keys(userUpdate).length > 0) {
                     await prisma.user.update({ where: { id: empWithUser.userId }, data: userUpdate })
