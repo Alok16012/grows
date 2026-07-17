@@ -23,6 +23,11 @@ export async function GET(req: Request) {
                 },
                 customRole: {
                     select: { id: true, name: true, color: true }
+                },
+                // Lets the System Users page distinguish employee-linked logins
+                // from clients/admins/legacy accounts.
+                employeeProfile: {
+                    select: { id: true, employeeId: true }
                 }
             },
             orderBy: {

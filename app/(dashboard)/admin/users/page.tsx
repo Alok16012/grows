@@ -359,6 +359,25 @@ export default function UserManagementPage() {
                 <div>
                     <h1 className="text-[22px] font-semibold tracking-tight text-[#1a1a18]">System Users</h1>
                     <p className="text-[13px] text-[#6b6860] mt-[3px]">Manage access, roles, and account security</p>
+                    {users.length > 0 && (() => {
+                        // Why total users > employee logins: admins, client-portal
+                        // accounts and legacy logins (kept for work history) also
+                        // live in this table. Categories are mutually exclusive.
+                        const emp = users.filter(u => u.employeeProfile).length
+                        const rest = users.filter(u => !u.employeeProfile)
+                        const admins = rest.filter(u => u.role === "ADMIN").length
+                        const clients = rest.filter(u => u.role === "CLIENT").length
+                        const legacy = rest.length - admins - clients
+                        return (
+                            <p className="text-[12px] text-[#9e9b95] mt-[6px]">
+                                <span className="font-semibold text-[#1a1a18]">{users.length}</span> total
+                                {" · "}<span className="text-[#0d6b4a] font-medium">{emp} employee logins</span>
+                                {clients > 0 && <>{" · "}{clients} client portal</>}
+                                {admins > 0 && <>{" · "}{admins} admin</>}
+                                {legacy > 0 && <>{" · "}{legacy} legacy (kept — have work history)</>}
+                            </p>
+                        )
+                    })()}
                 </div>
                 <div className="flex items-center gap-[10px]">
                     <button
