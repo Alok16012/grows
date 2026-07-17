@@ -24,6 +24,9 @@ const getStats = unstable_cache(
             totalProjects,
             pendingApprovals,
             totalUsers,
+            newCompaniesThisMonth,
+            newProjectsThisMonth,
+            newUsersThisMonth,
             recentInspections,
             approvedThisMonth,
             rejectedThisMonth,
@@ -33,6 +36,9 @@ const getStats = unstable_cache(
             prisma.project.count(),
             prisma.inspection.count({ where: { status: "pending" } }),
             prisma.user.count(),
+            prisma.company.count({ where: { createdAt: monthRange } }),
+            prisma.project.count({ where: { createdAt: monthRange } }),
+            prisma.user.count({ where: { createdAt: monthRange } }),
             prisma.inspection.findMany({
                 take: 5,
                 orderBy: { submittedAt: "desc" },
@@ -55,6 +61,11 @@ const getStats = unstable_cache(
             totalProjects,
             pendingApprovals,
             totalUsers,
+            newThisMonth: {
+                companies: newCompaniesThisMonth,
+                projects: newProjectsThisMonth,
+                users: newUsersThisMonth,
+            },
             recentInspections: recentInspections.map(i => ({
                 id: i.id,
                 projectName: i.assignment.project.name,

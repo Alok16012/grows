@@ -13,7 +13,6 @@ import {
     XCircle,
     MoreHorizontal,
     ChevronDown,
-    Filter,
     ArrowUpRight,
     Search,
     Plus,
@@ -170,7 +169,7 @@ function AdminRecruitmentTable() {
             <div className="p-4 border-b border-[var(--border)] flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2 flex-1">
                     <Users className="h-4 w-4 text-[var(--accent)]" />
-                    <span className="text-[13.5px] font-semibold text-[var(--text)]">Recruitment by HR</span>
+                    <span className="text-[13.5px] font-semibold text-[var(--text)]">Recruitment Overview by HR</span>
                     <span className="text-[11px] text-[var(--text3)]">Who recruited & onboarded how many</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -292,11 +291,16 @@ export default function AdminDashboard() {
         )
     }
 
+    const hour = new Date().getHours()
+    const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening"
+    const firstName = (session?.user?.name || "Admin").split(" ")[0]
+
+    const nm = stats.newThisMonth || {}
     const statRow = [
-        { label: "Companies", value: stats.totalCompanies ?? 0, sub: "Across all regions", icon: Building2 },
-        { label: "Projects", value: stats.totalProjects ?? 0, sub: "Active management", icon: Folder },
-        { label: "Pending", value: stats.pendingApprovals ?? 0, sub: "Action required", icon: ClipboardCheck },
-        { label: "Users", value: stats.totalUsers ?? 0, sub: "System access", icon: Users },
+        { label: "Companies", value: stats.totalCompanies ?? 0, sub: "Across all regions", icon: Building2, color: "#1a9e6e", bg: "#e8f7f1", delta: nm.companies ?? 0 },
+        { label: "Projects", value: stats.totalProjects ?? 0, sub: "Active management", icon: Folder, color: "#3b82f6", bg: "#eff6ff", delta: nm.projects ?? 0 },
+        { label: "Pending Actions", value: stats.pendingApprovals ?? 0, sub: "Action required", icon: ClipboardCheck, color: "#d97706", bg: "#fef3c7", delta: null as number | null },
+        { label: "Total Users", value: stats.totalUsers ?? 0, sub: "System access", icon: Users, color: "#7c3aed", bg: "#f5f3ff", delta: nm.users ?? 0 },
     ]
 
     return (
@@ -326,30 +330,42 @@ export default function AdminDashboard() {
             </div>
 
             {/* Page Header — Desktop only */}
-            <div className="hidden md:flex items-center justify-between">
-                <h1 className="text-[20px] font-semibold text-[var(--text)] tracking-tight">Admin Dashboard</h1>
-                <div className="flex items-center gap-2">
-                    <button className="h-9 px-4 flex items-center gap-2 bg-white border border-[var(--border)] rounded-[8px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-all">
-                        <Filter size={16} />
-                        Filter
-                    </button>
-                    <button className="h-9 px-4 flex items-center gap-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-semibold hover:opacity-90 transition-all shadow-sm">
-                        Export Data
-                    </button>
-                </div>
+            <div className="hidden md:block">
+                <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-tight">
+                    {greeting}, {firstName}! <span className="align-middle">👋</span>
+                </h1>
+                <p className="text-[13px] text-[var(--text2)] mt-1">
+                    Here&apos;s what&apos;s happening with your inspection operations today.
+                </p>
             </div>
 
             {/* STAT ROW — Desktop only (mobile uses welcome banner above) */}
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-[14px]">
                 {statRow.map((stat) => (
-                    <div key={stat.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 flex flex-col justify-between hover:shadow-sm transition-all group">
-                        <div className="flex items-center justify-between mb-3 text-[11.5px] font-medium text-[var(--text2)]">
-                            {stat.label}
-                            <stat.icon size={16} className="text-[var(--text3)] group-hover:text-[var(--accent)] transition-colors" />
+                    <div key={stat.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col justify-between hover:shadow-sm transition-all">
+                        <div className="flex items-start justify-between mb-4">
+                            <span className="text-[12px] font-medium text-[var(--text2)]">{stat.label}</span>
+                            <div className="h-9 w-9 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: stat.bg }}>
+                                <stat.icon size={17} style={{ color: stat.color }} />
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-[24px] font-semibold text-[var(--text)] leading-tight mb-0.5">{stat.value}</div>
-                            <div className="text-[11px] text-[var(--text3)]">{stat.sub}</div>
+                        <div className="flex items-end justify-between gap-2">
+                            <div className="min-w-0">
+                                <div className="text-[26px] font-semibold text-[var(--text)] leading-tight tabular-nums">
+                                    {(stat.value as number).toLocaleString("en-IN")}
+                                </div>
+                                <div className="text-[11.5px] text-[var(--text3)] mt-0.5">{stat.sub}</div>
+                            </div>
+                            {stat.delta != null && stat.delta > 0 ? (
+                                <span
+                                    title="New this month"
+                                    className="flex items-center gap-0.5 h-6 px-2 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold shrink-0"
+                                >
+                                    <ArrowUpRight size={12} className="stroke-[3px]" /> +{stat.delta}
+                                </span>
+                            ) : (
+                                <span className="text-[13px] text-[var(--text3)] font-medium shrink-0">—</span>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -426,7 +442,7 @@ export default function AdminDashboard() {
                 <div className="md:col-span-2 bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col hover:shadow-sm transition-all">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                            <h3 className="text-[13px] font-medium text-[var(--text)] leading-none">Completion rate</h3>
+                            <h3 className="text-[13px] font-medium text-[var(--text)] leading-none">Inspection Completion</h3>
                             <div className="h-6 flex items-center gap-1 px-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface2)] text-[11px] text-[var(--text2)] font-medium cursor-pointer hover:bg-white transition-all">
                                 Last 30 days
                                 <ChevronDown size={12} />
@@ -438,6 +454,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex-1 flex flex-col justify-center">
+                        <p className="text-[11.5px] text-[var(--text3)] mb-1">Total Completed</p>
                         <div className="flex items-baseline gap-4 mb-4">
                             <div className="text-[32px] font-semibold text-[var(--text)] tabular-nums">12,482</div>
                             <div className="h-6 flex items-center gap-1 px-2.5 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold">
