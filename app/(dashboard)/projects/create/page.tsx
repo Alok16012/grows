@@ -1,321 +1,375 @@
-
 "use client"
 
-import { Suspense, useState, useEffect } from "react"
+import { Suspense, useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import {
+    ChevronLeft, Loader2, FileText, Users, Search, ShieldCheck,
+    CheckCircle2, Globe, Sparkles, Lock, Phone,
+} from "lucide-react"
 
-type Site = {
-    id: string
-    name: string
-    code?: string | null
-    city?: string | null
+type Site = { id: string; name: string; code?: string | null; city?: string | null }
+type Person = { id: string; name: string | null; email: string | null; phone?: string | null }
+
+const PROJECT_TYPES = ["Mechanical", "Electrical", "Civil", "Safety", "Facility", "Quality", "Other"]
+const PRIORITIES = [
+    { value: "Low", dot: "#6b7280" },
+    { value: "Medium", dot: "#f59e0b" },
+    { value: "High", dot: "#ef4444" },
+]
+const STATUS_OPTIONS = [
+    { value: "PLANNING", label: "Planning", dot: "#3b82f6" },
+    { value: "ACTIVE", label: "Active", dot: "#1a9e6e" },
+    { value: "ON_HOLD", label: "On Hold", dot: "#ef4444" },
+]
+
+const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+const selectCls = inputCls + " cursor-pointer"
+
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+    return (
+        <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">
+            {children}{required && <span className="text-[var(--red)] ml-0.5">*</span>}
+        </label>
+    )
 }
 
-type Person = {
-    id: string
-    name: string | null
-    email: string | null
+function PersonCard({ person, checked, onToggle, showContact }: {
+    person: Person; checked: boolean; onToggle: () => void; showContact?: boolean
+}) {
+    const initials = (person.name || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()
+    return (
+        <button type="button" onClick={onToggle}
+            className={`flex items-center gap-2.5 p-2.5 rounded-[10px] border-[1.5px] text-left transition-all w-full ${
+                checked ? "border-[var(--accent)] bg-[#f0fdf4]" : "border-[var(--border)] bg-white hover:border-[var(--accent)]/40"
+            }`}>
+            <span className={`flex items-center justify-center w-[17px] h-[17px] rounded-[4px] border-[1.5px] shrink-0 transition-colors ${
+                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[#d4d1ca] bg-white"
+            }`}>
+                {checked && <CheckCircle2 size={11} className="text-white" strokeWidth={3} />}
+            </span>
+            <span className="w-8 h-8 rounded-full bg-[var(--surface2)] text-[var(--text2)] text-[10.5px] font-bold flex items-center justify-center shrink-0">
+                {initials}
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block text-[12.5px] font-semibold text-[var(--text)] truncate">{person.name || "Unnamed"}</span>
+                <span className="block text-[11px] text-[var(--text3)] truncate">
+                    {showContact && person.phone ? (
+                        <span className="inline-flex items-center gap-1"><Phone size={9} /> {person.phone}</span>
+                    ) : (person.email || "—")}
+                </span>
+            </span>
+        </button>
+    )
 }
 
 function CreateProjectForm() {
     const router = useRouter()
     const searchParams = useSearchParams()
-
-    // Fix hydration mismatch: wait for mount to safely read searchParams
-    const [isMounted, setIsMounted] = useState(false)
-    useEffect(() => {
-        setIsMounted(true)
-    }, [])
-
     const initialSiteId = searchParams.get("siteId") || ""
 
-    const [loading, setLoading] = useState(false)
+    const [saving, setSaving] = useState<false | "create" | "draft">(false)
     const [sites, setSites] = useState<Site[]>([])
     const [loadingSites, setLoadingSites] = useState(true)
-    const [error, setError] = useState("")
-
-    // We only want to set the initial site ID if it's available and we just mounted
-    const [selectedSiteId, setSelectedSiteId] = useState("")
-
-    // Managers & Inspectors are added directly at the Project level.
     const [managers, setManagers] = useState<Person[]>([])
     const [inspectors, setInspectors] = useState<Person[]>([])
-    const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
-    const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
+    const [inspectorSearch, setInspectorSearch] = useState("")
+
+    const [form, setForm] = useState({
+        name: "", description: "", siteId: "", projectType: "",
+        startDate: "", endDate: "", priority: "Medium", status: "PLANNING",
+    })
+    const [managerIds, setManagerIds] = useState<string[]>([])
+    const [inspectorIds, setInspectorIds] = useState<string[]>([])
 
     useEffect(() => {
-        if (isMounted && initialSiteId && !selectedSiteId) {
-            setSelectedSiteId(initialSiteId)
-        }
+        if (initialSiteId) setForm(f => ({ ...f, siteId: initialSiteId }))
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isMounted, initialSiteId])
+    }, [initialSiteId])
 
     useEffect(() => {
-        const fetchSites = async () => {
-            try {
-                const res = await fetch("/api/sites?isActive=true")
-                const data = await res.json()
-                setSites(Array.isArray(data) ? data : [])
-            } catch {
-                setError("Failed to load sites")
-            } finally {
-                setLoadingSites(false)
-            }
-        }
-        fetchSites()
+        fetch("/api/sites?isActive=true")
+            .then(r => r.ok ? r.json() : [])
+            .then(d => setSites(Array.isArray(d) ? d : []))
+            .catch(() => toast.error("Failed to load sites"))
+            .finally(() => setLoadingSites(false))
+        Promise.all([
+            fetch("/api/users?role=MANAGER").then(r => r.ok ? r.json() : []),
+            fetch("/api/users?role=INSPECTION_BOY").then(r => r.ok ? r.json() : []),
+        ]).then(([m, i]) => {
+            setManagers(Array.isArray(m) ? m : [])
+            setInspectors(Array.isArray(i) ? i : [])
+        }).catch(() => { /* non-fatal */ })
     }, [])
 
-    useEffect(() => {
-        const fetchPeople = async () => {
-            try {
-                const [mRes, iRes] = await Promise.all([
-                    fetch("/api/users?role=MANAGER"),
-                    fetch("/api/users?role=INSPECTION_BOY"),
-                ])
-                const mData = await mRes.json()
-                const iData = await iRes.json()
-                setManagers(Array.isArray(mData) ? mData : [])
-                setInspectors(Array.isArray(iData) ? iData : [])
-            } catch {
-                // Non-fatal: project can still be created without members
-            }
+    const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+    const toggle = (id: string, setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+        setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+    const filteredInspectors = useMemo(() => {
+        const q = inspectorSearch.trim().toLowerCase()
+        if (!q) return inspectors
+        return inspectors.filter(i =>
+            (i.name || "").toLowerCase().includes(q) ||
+            (i.phone || "").toLowerCase().includes(q) ||
+            (i.email || "").toLowerCase().includes(q))
+    }, [inspectors, inspectorSearch])
+
+    const requirements = [
+        { label: "Project Name is required", ok: form.name.trim().length > 0 },
+        { label: "Site selection is required", ok: !!form.siteId },
+        { label: "At least one Manager is required", ok: managerIds.length > 0 },
+        { label: "At least one Inspector is required", ok: inspectorIds.length > 0 },
+    ]
+    const canSubmit = form.name.trim().length > 0 && !!form.siteId
+
+    const submit = async (mode: "create" | "draft") => {
+        if (!canSubmit) {
+            toast.error("Project Name and Site are required")
+            return
         }
-        fetchPeople()
-    }, [])
-
-    const toggleId = (
-        id: string,
-        setter: React.Dispatch<React.SetStateAction<string[]>>
-    ) => setter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setLoading(true)
-        setError("")
-
-        const formData = new FormData(e.currentTarget)
-        const data = {
-            name: formData.get("name"),
-            description: formData.get("description"),
-            siteId: selectedSiteId,
-            managerIds: selectedManagerIds,
-            inspectorIds: selectedInspectorIds,
-        }
-
+        setSaving(mode)
         try {
             const res = await fetch("/api/projects", {
                 method: "POST",
-                body: JSON.stringify(data),
                 headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...form,
+                    status: mode === "draft" ? "PLANNING" : form.status,
+                    startDate: form.startDate || undefined,
+                    endDate: form.endDate || undefined,
+                    managerIds,
+                    inspectorIds,
+                }),
             })
-
-            if (!res.ok) throw new Error("Failed to create project")
-
+            if (!res.ok) throw new Error(await res.text() || "Failed to create project")
+            toast.success(mode === "draft" ? "Project saved as draft" : "Project created!")
             router.push("/projects")
             router.refresh()
-        } catch {
-            setError("Something went wrong. Please try again.")
+        } catch (e) {
+            toast.error((e as Error).message || "Something went wrong")
         } finally {
-            setLoading(false)
+            setSaving(false)
         }
     }
 
-    const inputClasses = "w-full p-[10px_14px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] outline-none transition-all placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)]"
-
-    const backLink = "/projects"
+    const sectionCls = "bg-white border border-[var(--border)] rounded-[14px] p-5"
 
     return (
-        <div className="min-h-[calc(100vh-54px)] bg-[var(--bg)] py-[28px] px-[24px]">
-            <div className="max-w-[520px] mx-auto w-full">
-                {/* Header Row */}
-                <div className="flex items-center gap-[14px] mb-[28px]">
-                    <Link
-                        href={backLink}
-                        className="w-[32px] h-[32px] bg-white border border-[var(--border)] rounded-[8px] flex items-center justify-center shrink-0 hover:bg-[var(--surface2)] transition-colors"
-                    >
-                        <ChevronLeft className="h-4 w-4 text-[var(--text2)]" />
-                    </Link>
-                    <h1 className="text-[22px] font-semibold tracking-[-0.4px] text-[var(--text)]">
-                        Create Project
-                    </h1>
+        <div className="pb-8">
+            <Link href="/projects" className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--text2)] hover:text-[var(--text)] transition-colors mb-3">
+                <ChevronLeft size={14} /> Back to Projects
+            </Link>
+            <div className="mb-5">
+                <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Create Project</h1>
+                <p className="text-[13px] text-[var(--text3)] mt-0.5">Create a new inspection project and assign your team.</p>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">
+                {/* ── LEFT: form ── */}
+                <div className="space-y-4">
+                    {/* Project details */}
+                    <div className={sectionCls}>
+                        <div className="flex items-center gap-2.5 mb-1">
+                            <div className="w-8 h-8 rounded-[9px] bg-[var(--accent-light)] flex items-center justify-center">
+                                <FileText size={15} className="text-[var(--accent)]" />
+                            </div>
+                            <div>
+                                <h2 className="text-[14px] font-semibold text-[var(--text)]">Project Details</h2>
+                                <p className="text-[11.5px] text-[var(--text3)]">Provide the basic information about your new project.</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mt-4">
+                            <div>
+                                <FieldLabel required>Project Name</FieldLabel>
+                                <input value={form.name} onChange={e => set("name", e.target.value)}
+                                    className={inputCls} placeholder="e.g. Annual Electrical Safety Audit" />
+                            </div>
+                            <div className="sm:row-span-2">
+                                <FieldLabel>Description</FieldLabel>
+                                <textarea value={form.description} onChange={e => set("description", e.target.value.slice(0, 500))}
+                                    rows={4}
+                                    className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)] resize-y min-h-[90px]"
+                                    placeholder="Describe the scope and objectives of this project..." />
+                                <p className="text-[10.5px] text-[var(--text3)] text-right mt-0.5">{form.description.length} / 500</p>
+                            </div>
+                            <div>
+                                <FieldLabel required>Site</FieldLabel>
+                                <select value={form.siteId} onChange={e => set("siteId", e.target.value)} className={selectCls} disabled={loadingSites}>
+                                    <option value="">{loadingSites ? "Loading sites..." : "Select a site"}</option>
+                                    {sites.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <FieldLabel required>Project Type</FieldLabel>
+                                <select value={form.projectType} onChange={e => set("projectType", e.target.value)} className={selectCls}>
+                                    <option value="">Select project type</option>
+                                    {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <FieldLabel required>Estimated Start Date</FieldLabel>
+                                <input type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)} className={inputCls} />
+                            </div>
+                            <div>
+                                <FieldLabel required>Target End Date</FieldLabel>
+                                <input type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} className={inputCls} />
+                            </div>
+                            <div>
+                                <FieldLabel required>Priority</FieldLabel>
+                                <select value={form.priority} onChange={e => set("priority", e.target.value)} className={selectCls}>
+                                    {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.value}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <FieldLabel required>Status</FieldLabel>
+                                <select value={form.status} onChange={e => set("status", e.target.value)} className={selectCls}>
+                                    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Managers */}
+                    <div className={sectionCls}>
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-[9px] bg-[#eff6ff] flex items-center justify-center">
+                                    <Users size={15} className="text-[#3b82f6]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-[14px] font-semibold text-[var(--text)]">Managers</h2>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Select one or more managers who will oversee this project.</p>
+                                </div>
+                            </div>
+                            <button type="button"
+                                onClick={() => setManagerIds(managerIds.length === managers.length ? [] : managers.map(m => m.id))}
+                                className="text-[12px] font-medium text-[var(--accent)] hover:underline">
+                                {managerIds.length === managers.length && managers.length > 0 ? "Clear All" : "Select All"}
+                            </button>
+                        </div>
+                        {managers.length === 0 ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">No managers available.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+                                {managers.map(m => (
+                                    <PersonCard key={m.id} person={m} checked={managerIds.includes(m.id)} onToggle={() => toggle(m.id, setManagerIds)} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Inspectors */}
+                    <div className={sectionCls}>
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-[9px] bg-[#fef3c7] flex items-center justify-center">
+                                    <Users size={15} className="text-[#d97706]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspectors</h2>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Select inspectors who will perform inspections in this project.</p>
+                                </div>
+                            </div>
+                            <button type="button"
+                                onClick={() => setInspectorIds(inspectorIds.length === inspectors.length ? [] : inspectors.map(i => i.id))}
+                                className="text-[12px] font-medium text-[var(--accent)] hover:underline">
+                                {inspectorIds.length === inspectors.length && inspectors.length > 0 ? "Clear All" : "Select All"}
+                            </button>
+                        </div>
+                        <div className="relative mt-3 mb-2">
+                            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                            <input value={inspectorSearch} onChange={e => setInspectorSearch(e.target.value)}
+                                placeholder="Search inspectors by name or phone..."
+                                className={inputCls + " pl-8"} />
+                        </div>
+                        {filteredInspectors.length === 0 ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">No inspectors found.</p>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                                    {filteredInspectors.map(i => (
+                                        <PersonCard key={i.id} person={i} checked={inspectorIds.includes(i.id)} onToggle={() => toggle(i.id, setInspectorIds)} showContact />
+                                    ))}
+                                </div>
+                                <p className="text-[11px] text-[var(--text3)] mt-2">
+                                    Showing {filteredInspectors.length} of {inspectors.length} inspectors{inspectorIds.length > 0 ? ` · ${inspectorIds.length} selected` : ""}
+                                </p>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Footer actions */}
+                    <div className="flex items-center justify-end gap-2">
+                        <Link href="/projects"
+                            className="px-4 h-9 inline-flex items-center rounded-[9px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                            Cancel
+                        </Link>
+                        <button onClick={() => submit("draft")} disabled={!!saving}
+                            className="px-4 h-9 inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors disabled:opacity-50">
+                            {saving === "draft" && <Loader2 size={13} className="animate-spin" />}
+                            Save as Draft
+                        </button>
+                        <button onClick={() => submit("create")} disabled={!!saving}
+                            className="px-5 h-9 inline-flex items-center gap-1.5 rounded-[9px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+                            {saving === "create" && <Loader2 size={13} className="animate-spin" />}
+                            Create Project
+                        </button>
+                    </div>
                 </div>
 
-                {/* Form Card */}
-                <div className="bg-white border border-[var(--border)] rounded-[14px] p-[28px] shadow-none">
-                    <form onSubmit={handleSubmit}>
-                        {/* Card Header */}
-                        <div className="mb-[24px]">
-                            <h2 className="text-[16px] font-semibold text-[var(--text)] mb-1">
-                                Project Details
-                            </h2>
-                            <p className="text-[13px] text-[var(--text2)] leading-[1.5]">
-                                Enter the information for the new project.
-                            </p>
+                {/* ── RIGHT: sidebar ── */}
+                <div className="space-y-4">
+                    <div className={sectionCls}>
+                        <h3 className="text-[13.5px] font-semibold text-[var(--text)] flex items-center gap-2 mb-3">
+                            <Sparkles size={14} className="text-[var(--accent)]" /> Getting Started
+                        </h3>
+                        <ol className="space-y-3">
+                            {[
+                                ["Project Basics", "Name your project clearly and add a description of its scope."],
+                                ["Link a Site", "Select the site where inspections will be conducted."],
+                                ["Assign Your Team", "Add managers and inspectors who will be responsible for this project."],
+                                ["Review & Create", "Review details and create your project to get started."],
+                            ].map(([title, sub], i) => (
+                                <li key={title} className="flex gap-2.5">
+                                    <span className="w-[22px] h-[22px] rounded-full bg-[var(--accent)] text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                                    <span>
+                                        <span className="block text-[12.5px] font-semibold text-[var(--text)]">{title}</span>
+                                        <span className="block text-[11.5px] text-[var(--text3)] leading-snug mt-0.5">{sub}</span>
+                                    </span>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+
+                    <div className={sectionCls}>
+                        <h3 className="text-[13.5px] font-semibold text-[var(--text)] flex items-center gap-2 mb-3">
+                            <ShieldCheck size={14} className="text-[var(--accent)]" /> Requirements
+                        </h3>
+                        <ul className="space-y-2">
+                            {requirements.map(r => (
+                                <li key={r.label} className="flex items-center gap-2 text-[12px]">
+                                    <CheckCircle2 size={14} className={r.ok ? "text-[var(--accent)]" : "text-[var(--text3)] opacity-40"} />
+                                    <span className={r.ok ? "text-[var(--text)]" : "text-[var(--text3)]"}>{r.label}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className={sectionCls}>
+                        <h3 className="text-[13.5px] font-semibold text-[var(--text)] flex items-center gap-2 mb-1">
+                            <Lock size={14} className="text-[var(--accent)]" /> Permissions
+                        </h3>
+                        <p className="text-[11.5px] text-[var(--text3)] mb-3">Project visibility and access control</p>
+                        <FieldLabel>Who can access this project?</FieldLabel>
+                        <div className="flex items-center gap-2 h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/40 px-3 text-[13px] text-[var(--text2)]">
+                            <Globe size={13} className="text-[var(--text3)]" /> All authorized users
                         </div>
-
-                        <div className="flex flex-col gap-[18px]">
-                            {error && (
-                                <div className="p-3 text-[13px] text-[var(--red)] bg-[var(--red-light)] border border-[#fca5a5] rounded-[9px]">
-                                    {error}
-                                </div>
-                            )}
-
-                            {/* Field: Name */}
-                            <div className="flex flex-col gap-[6px]">
-                                <label htmlFor="name" className="text-[13px] font-medium text-[var(--text)] block">
-                                    Project Name <span className="text-[var(--red)] ml-[2px]">*</span>
-                                </label>
-                                <input
-                                    id="name"
-                                    name="name"
-                                    required
-                                    placeholder="Project Alpha"
-                                    className={inputClasses}
-                                />
-                            </div>
-
-                            {/* Field: Description */}
-                            <div className="flex flex-col gap-[6px]">
-                                <label htmlFor="description" className="text-[13px] font-medium text-[var(--text)] block">
-                                    Description
-                                </label>
-                                <textarea
-                                    id="description"
-                                    name="description"
-                                    placeholder="Brief description of the project..."
-                                    className={`${inputClasses} min-h-[90px] resize-y`}
-                                />
-                            </div>
-
-                            {/* Field: Site Select */}
-                            <div className="flex flex-col gap-[6px]">
-                                <label htmlFor="siteId" className="text-[13px] font-medium text-[var(--text)] block">
-                                    Site <span className="text-[var(--red)] ml-[2px]">*</span>
-                                </label>
-                                {loadingSites ? (
-                                    <div className="flex items-center gap-2 text-[13px] text-[var(--text3)] h-[44px] px-[14px] rounded-[9px] border border-[var(--border)] bg-[var(--surface2)]">
-                                        <Loader2 className="h-4 w-4 animate-spin" /> Loading sites...
-                                    </div>
-                                ) : sites.length === 0 ? (
-                                    <div className="text-[13px] text-[var(--text2)] p-[10px_14px] rounded-[9px] border border-dashed border-[var(--border)] bg-[var(--surface2)]">
-                                        No sites found. Create a Site first, then add a project under it.
-                                    </div>
-                                ) : (
-                                    <select
-                                        id="siteId"
-                                        value={selectedSiteId}
-                                        onChange={(e) => setSelectedSiteId(e.target.value)}
-                                        required
-                                        className={`${inputClasses} appearance-none bg-no-repeat bg-[position:right_14px_center] pr-[36px] cursor-pointer`}
-                                        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239e9b95' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")" }}
-                                    >
-                                        <option value="">Select a site...</option>
-                                        {sites.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                                {s.name}{s.code ? ` (${s.code})` : ""}{s.city ? ` — ${s.city}` : ""}
-                                            </option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-
-                            {/* Field: Managers */}
-                            <div className="flex flex-col gap-[6px]">
-                                <label className="text-[13px] font-medium text-[var(--text)] block">
-                                    Managers
-                                    {selectedManagerIds.length > 0 && (
-                                        <span className="ml-[6px] text-[12px] text-[var(--text2)]">
-                                            ({selectedManagerIds.length} selected)
-                                        </span>
-                                    )}
-                                </label>
-                                {managers.length === 0 ? (
-                                    <div className="text-[13px] text-[var(--text2)] p-[10px_14px] rounded-[9px] border border-dashed border-[var(--border)] bg-[var(--surface2)]">
-                                        No managers available.
-                                    </div>
-                                ) : (
-                                    <div className="max-h-[160px] overflow-y-auto rounded-[9px] border border-[var(--border)] bg-[var(--surface2)]">
-                                        {managers.map((m) => {
-                                            const checked = selectedManagerIds.includes(m.id)
-                                            return (
-                                                <label
-                                                    key={m.id}
-                                                    className={`flex items-center gap-[10px] p-[9px_14px] border-b border-[var(--border)] last:border-0 cursor-pointer transition-colors ${checked ? "bg-[#f0fdf4]" : "hover:bg-white"}`}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={checked}
-                                                        onChange={() => toggleId(m.id, setSelectedManagerIds)}
-                                                        className="accent-[var(--accent)] w-[15px] h-[15px]"
-                                                    />
-                                                    <span className="text-[13px] text-[var(--text)]">{m.name || "Unnamed"}</span>
-                                                    {m.email && <span className="text-[12px] text-[var(--text3)]">({m.email})</span>}
-                                                </label>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Field: Inspectors */}
-                            <div className="flex flex-col gap-[6px]">
-                                <label className="text-[13px] font-medium text-[var(--text)] block">
-                                    Inspectors
-                                    {selectedInspectorIds.length > 0 && (
-                                        <span className="ml-[6px] text-[12px] text-[var(--text2)]">
-                                            ({selectedInspectorIds.length} selected)
-                                        </span>
-                                    )}
-                                </label>
-                                {inspectors.length === 0 ? (
-                                    <div className="text-[13px] text-[var(--text2)] p-[10px_14px] rounded-[9px] border border-dashed border-[var(--border)] bg-[var(--surface2)]">
-                                        No inspectors available.
-                                    </div>
-                                ) : (
-                                    <div className="max-h-[160px] overflow-y-auto rounded-[9px] border border-[var(--border)] bg-[var(--surface2)]">
-                                        {inspectors.map((i) => {
-                                            const checked = selectedInspectorIds.includes(i.id)
-                                            return (
-                                                <label
-                                                    key={i.id}
-                                                    className={`flex items-center gap-[10px] p-[9px_14px] border-b border-[var(--border)] last:border-0 cursor-pointer transition-colors ${checked ? "bg-[#f0fdf4]" : "hover:bg-white"}`}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={checked}
-                                                        onChange={() => toggleId(i.id, setSelectedInspectorIds)}
-                                                        className="accent-[var(--accent)] w-[15px] h-[15px]"
-                                                    />
-                                                    <span className="text-[13px] text-[var(--text)]">{i.name || "Unnamed"}</span>
-                                                    {i.email && <span className="text-[12px] text-[var(--text3)]">({i.email})</span>}
-                                                </label>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Divider & Actions */}
-                            <div className="border-t border-[var(--border)] mt-[8px] pt-[20px] flex justify-end gap-[10px]">
-                                <Link
-                                    href={backLink}
-                                    className="inline-flex items-center justify-center bg-white border border-[var(--border)] text-[var(--text2)] px-[20px] py-[9px] rounded-[9px] text-[13px] font-medium cursor-pointer hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors"
-                                >
-                                    Cancel
-                                </Link>
-                                <button
-                                    type="submit"
-                                    disabled={loading || !selectedSiteId}
-                                    className="inline-flex items-center justify-center bg-[var(--accent)] text-white border-0 px-[20px] py-[9px] rounded-[9px] text-[13px] font-medium cursor-pointer hover:bg-[#158a5e] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Create Project
-                                </button>
-                            </div>
-                        </div>
-                    </form>
+                        <p className="text-[11px] text-[var(--text3)] mt-2">Managers and inspectors you assign will be able to access this project.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -326,7 +380,7 @@ export default function CreateProjectPage() {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
             </div>
         }>
             <CreateProjectForm />

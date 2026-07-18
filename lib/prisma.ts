@@ -49,3 +49,30 @@ const prisma: PrismaClientExtended =
 export default prisma
 
 if (process.env.NODE_ENV !== "production") globalThis.prismaGlobal = prisma
+
+// ── Project workflow columns (code/status/type/priority/dates) ──────────────
+// Added to the Prisma model after prod was provisioned; migrations don't run
+// on deploy there, so the client would SELECT missing columns and 500 every
+// Project read. Create them idempotently: project routes await this, and the
+// fire-and-forget below heals cold starts before any other route touches
+// Project.
+let projectSchemaEnsured = false
+
+export async function ensureProjectSchema() {
+    if (projectSchemaEnsured) return
+    try {
+        await (prisma as any).$executeRawUnsafe(`
+            ALTER TABLE "Project"
+                ADD COLUMN IF NOT EXISTS "code"        TEXT,
+                ADD COLUMN IF NOT EXISTS "status"      TEXT NOT NULL DEFAULT 'ACTIVE',
+                ADD COLUMN IF NOT EXISTS "projectType" TEXT,
+                ADD COLUMN IF NOT EXISTS "priority"    TEXT,
+                ADD COLUMN IF NOT EXISTS "startDate"   TIMESTAMP(3),
+                ADD COLUMN IF NOT EXISTS "endDate"     TIMESTAMP(3)
+        `)
+        projectSchemaEnsured = true
+    } catch { /* best effort — retried on next call */ }
+}
+
+// Heal on cold start without blocking module load.
+void ensureProjectSchema()

@@ -95,6 +95,14 @@ model Project {
   siteId          String?
   name            String
   description     String?
+  // Project workflow fields (added later — created in prod at runtime via
+  // ensureProjectSchema in lib/prisma.ts, since prod migrations are manual).
+  code            String?          // e.g. PRJ-2026-00027
+  status          String           @default("ACTIVE") // PLANNING | ACTIVE | ON_HOLD | COMPLETED | ARCHIVED
+  projectType     String?
+  priority        String?          // Low | Medium | High
+  startDate       DateTime?
+  endDate         DateTime?
   createdBy       String
   createdAt       DateTime         @default(now())
   assignments     Assignment[]

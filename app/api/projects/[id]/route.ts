@@ -1,7 +1,7 @@
 
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
+import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
@@ -13,6 +13,8 @@ export async function GET(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+        await ensureProjectSchema()
 
         const project = await prisma.project.findUnique({
             where: {
@@ -32,7 +34,22 @@ export async function GET(
         const managerIds = project.projectManagers.map((m) => m.managerId)
         const inspectorIds = Array.from(new Set(project.assignments.map((a) => a.inspectionBoyId)))
 
-        return NextResponse.json({ ...project, managerIds, inspectorIds })
+        // Summary sidebar data: inspection counts + creator display name.
+        const [total, approved, pending, sentBack, creator] = await Promise.all([
+            prisma.inspection.count({ where: { assignment: { projectId: project.id } } }).catch(() => 0),
+            prisma.inspection.count({ where: { assignment: { projectId: project.id }, status: "approved" } }).catch(() => 0),
+            prisma.inspection.count({ where: { assignment: { projectId: project.id }, status: "pending" } }).catch(() => 0),
+            prisma.inspection.count({ where: { assignment: { projectId: project.id }, status: "sent_back" } }).catch(() => 0),
+            prisma.user.findUnique({ where: { id: project.createdBy }, select: { name: true } }).catch(() => null),
+        ])
+
+        return NextResponse.json({
+            ...project,
+            managerIds,
+            inspectorIds,
+            createdByName: creator?.name ?? null,
+            inspectionStats: { total, approved, pending, sentBack },
+        })
     } catch (error) {
         console.error("[PROJECT_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })
@@ -49,8 +66,10 @@ export async function PUT(
             return new NextResponse("Forbidden", { status: 403 })
         }
 
+        await ensureProjectSchema()
+
         const body = await req.json()
-        const { name, description, reportConfig, siteId, managerIds, inspectorIds } = body
+        const { name, description, reportConfig, siteId, managerIds, inspectorIds, projectType, priority, status, startDate, endDate } = body
         const projectId = params.id
 
         const updateData: any = {}
@@ -60,6 +79,14 @@ export async function PUT(
         }
         if (description !== undefined) updateData.description = description
         if (reportConfig !== undefined) updateData.reportConfig = reportConfig
+        if (projectType !== undefined) updateData.projectType = projectType || null
+        if (priority !== undefined) updateData.priority = priority || null
+        if (status !== undefined) {
+            const VALID_STATUSES = ["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]
+            if (VALID_STATUSES.includes(status)) updateData.status = status
+        }
+        if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null
+        if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null
 
         // Moving the project to a different Site also re-derives the (non-null)
         // companyId from that Site's branch, matching project creation.

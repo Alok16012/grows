@@ -1,72 +1,129 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
-    Plus, Loader2, FolderOpen, Search, LayoutTemplate,
-    Pencil, Calendar, Building2, FolderKanban
+    Plus, Loader2, FolderOpen, Search, LayoutTemplate, Settings2,
+    Pencil, Calendar, Building2, FolderKanban, MoreVertical,
+    Users, ChevronLeft, ChevronRight, LayoutGrid, List, X,
 } from "lucide-react"
 import { can } from "@/lib/can"
+
+type TeamMember = { id: string; name: string }
 
 type Project = {
     id: string
     name: string
     description: string | null
+    code?: string | null
+    status?: string | null
+    projectType?: string | null
+    priority?: string | null
     createdAt: string
-    company: {
-        id: string
-        name: string
-    }
-    site: {
-        id: string
-        name: string
-        code?: string | null
-        city?: string | null
-    } | null
+    company: { id: string; name: string }
+    site: { id: string; name: string; code?: string | null; city?: string | null } | null
+    team?: TeamMember[]
 }
 
-// Group key/label for a project. Projects are organised by their real HR Site.
-// Legacy projects with no Site link are bucketed under a single neutral
-// "No Site" group instead of their Company — the Site filter must only ever
-// list actual sites, never company names.
-function groupOf(p: Project): { id: string; name: string; isSite: boolean } {
-    if (p.site) return { id: `site:${p.site.id}`, name: p.site.name, isSite: true }
-    return { id: "no-site", name: "No Site", isSite: false }
+const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
+    ACTIVE: { label: "Active", bg: "#e8f7f1", fg: "#0d6b4a", dot: "#1a9e6e" },
+    PLANNING: { label: "Planning", bg: "#eff6ff", fg: "#1d4ed8", dot: "#3b82f6" },
+    ON_HOLD: { label: "On Hold", bg: "#fef2f2", fg: "#b91c1c", dot: "#ef4444" },
+    COMPLETED: { label: "Completed", bg: "#f3f4f6", fg: "#374151", dot: "#6b7280" },
+    ARCHIVED: { label: "Archived", bg: "#f3f4f6", fg: "#9ca3af", dot: "#9ca3af" },
+}
+const STATUS_FILTERS = ["ALL", "ACTIVE", "PLANNING", "ON_HOLD", "COMPLETED", "ARCHIVED"] as const
+
+function StatusBadge({ status }: { status?: string | null }) {
+    const meta = STATUS_META[status ?? "ACTIVE"] ?? STATUS_META.ACTIVE
+    return (
+        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold" style={{ background: meta.bg, color: meta.fg }}>
+            {meta.label}
+        </span>
+    )
+}
+
+const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
+
+function TeamAvatars({ team }: { team?: TeamMember[] }) {
+    const members = (team ?? []).filter(m => m.name)
+    if (members.length === 0) return <span className="text-[11.5px] text-[var(--text3)]">—</span>
+    const shown = members.slice(0, 3)
+    return (
+        <span className="flex items-center">
+            {shown.map((m, i) => (
+                <span
+                    key={m.id}
+                    title={m.name}
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9.5px] font-bold border-2 border-white select-none"
+                    style={{ background: AVATAR_COLORS[(m.name.charCodeAt(0) || 0) % AVATAR_COLORS.length], marginLeft: i > 0 ? -6 : 0 }}
+                >
+                    {m.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
+                </span>
+            ))}
+            {members.length > 3 && (
+                <span className="text-[10.5px] font-semibold text-[var(--text2)] ml-1">+{members.length - 3}</span>
+            )}
+        </span>
+    )
+}
+
+function ProjectMenu({ project }: { project: Project }) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener("mousedown", handler)
+        return () => document.removeEventListener("mousedown", handler)
+    }, [])
+    return (
+        <div className="relative" ref={ref}>
+            <button onClick={() => setOpen(o => !o)}
+                className="p-1 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] hover:text-[var(--text)] transition-colors">
+                <MoreVertical size={15} />
+            </button>
+            {open && (
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-20 py-1 overflow-hidden">
+                    <Link href={`/projects/${project.id}/edit`} className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors">
+                        <Pencil size={13} /> Edit Project
+                    </Link>
+                    <Link href={`/projects/${project.id}/form-builder`} className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors">
+                        <LayoutTemplate size={13} /> Form Builder
+                    </Link>
+                    <Link href={`/projects/${project.id}/report-config`} className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors">
+                        <Settings2 size={13} /> Report Config
+                    </Link>
+                </div>
+            )}
+        </div>
+    )
 }
 
 export default function ProjectsPage() {
     const { data: session } = useSession()
-    const role = session?.user?.role
+    const isAdminOrManager = can(session, "projects.view")
 
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
-    const [selectedSiteId, setSelectedSiteId] = useState("all")
-    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
+    const [siteFilter, setSiteFilter] = useState("all")
+    const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("ALL")
+    const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name">("recent")
+    const [view, setView] = useState<"grid" | "list">("grid")
+    const [page, setPage] = useState(1)
+    const [perPage, setPerPage] = useState(12)
 
-    const isAdminOrManager = can(session, "projects.view")
+    useEffect(() => { setPage(1) }, [search, siteFilter, statusFilter, perPage, sortBy])
 
     const fetchProjects = useCallback(async () => {
         setLoading(true)
         try {
             const res = await fetch("/api/projects")
             const data = await res.json()
-            const list: Project[] = Array.isArray(data) ? data : []
-            setProjects(list)
-
-            // Extract unique real sites for the filter dropdown — company /
-            // "No Site" buckets are deliberately excluded so only sites show.
-            const siteMap = new Map<string, string>()
-            list.forEach(p => {
-                const g = groupOf(p)
-                if (g.isSite) siteMap.set(g.id, g.name)
-            })
-            setSites(Array.from(siteMap.entries()).map(([id, name]) => ({ id, name })))
+            setProjects(Array.isArray(data) ? data : [])
         } catch {
             setProjects([])
         } finally {
@@ -74,164 +131,281 @@ export default function ProjectsPage() {
         }
     }, [])
 
-    useEffect(() => {
-        fetchProjects()
-    }, [fetchProjects])
+    useEffect(() => { fetchProjects() }, [fetchProjects])
 
-    const filtered = projects.filter(p => {
-        const g = groupOf(p)
-        const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-            (p.description?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-            g.name.toLowerCase().includes(search.toLowerCase())
-        const matchSite = selectedSiteId === "all" || g.id === selectedSiteId
-        return matchSearch && matchSite
-    })
+    // Real sites only in the dropdown — never company names.
+    const sites = useMemo(() => {
+        const map = new Map<string, string>()
+        projects.forEach(p => { if (p.site) map.set(p.site.id, p.site.name) })
+        return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+    }, [projects])
+    const hasNoSiteProjects = useMemo(() => projects.some(p => !p.site), [projects])
 
-    // Group by site (falling back to company for legacy projects)
-    const grouped = filtered.reduce<Record<string, { site: { id: string; name: string }; projects: Project[] }>>((acc, p) => {
-        const g = groupOf(p)
-        if (!acc[g.id]) acc[g.id] = { site: g, projects: [] }
-        acc[g.id].projects.push(p)
-        return acc
-    }, {})
+    // Status counts for the stats strip (over the full list, not filtered).
+    const counts = useMemo(() => {
+        const c: Record<string, number> = { total: projects.length, ACTIVE: 0, PLANNING: 0, ON_HOLD: 0, COMPLETED: 0, ARCHIVED: 0 }
+        projects.forEach(p => { const s = p.status ?? "ACTIVE"; if (c[s] !== undefined) c[s]++ })
+        return c
+    }, [projects])
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase()
+        const list = projects.filter(p => {
+            if (q && !(
+                p.name.toLowerCase().includes(q) ||
+                (p.description ?? "").toLowerCase().includes(q) ||
+                (p.code ?? "").toLowerCase().includes(q) ||
+                (p.site?.name ?? "").toLowerCase().includes(q)
+            )) return false
+            if (siteFilter === "no-site" && p.site) return false
+            if (siteFilter !== "all" && siteFilter !== "no-site" && p.site?.id !== siteFilter) return false
+            if (statusFilter !== "ALL" && (p.status ?? "ACTIVE") !== statusFilter) return false
+            return true
+        })
+        list.sort((a, b) => {
+            if (sortBy === "name") return a.name.localeCompare(b.name)
+            const d = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            return sortBy === "oldest" ? d : -d
+        })
+        return list
+    }, [projects, search, siteFilter, statusFilter, sortBy])
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+    const safePage = Math.min(page, totalPages)
+    const pageProjects = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+    const showFrom = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
+    const showTo = Math.min(safePage * perPage, filtered.length)
+
+    const hasFilters = search !== "" || siteFilter !== "all" || statusFilter !== "ALL"
+    const clearAll = () => { setSearch(""); setSiteFilter("all"); setStatusFilter("ALL") }
+
+    const fmtDate = (s: string) =>
+        new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
             </div>
         )
     }
 
+    const actionBtn = "inline-flex items-center gap-1.5 px-2.5 h-8 rounded-[8px] border border-[var(--border)] bg-white text-[11.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors"
+
+    const renderCard = (project: Project) => (
+        <div key={project.id} className="bg-white border border-[var(--border)] rounded-[14px] p-4 hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] transition-all flex flex-col">
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+                <h3 className="text-[14.5px] font-bold text-[var(--text)] uppercase tracking-[0.2px] leading-tight truncate">{project.name}</h3>
+                <div className="flex items-center gap-1 shrink-0">
+                    <StatusBadge status={project.status} />
+                    {isAdminOrManager && <ProjectMenu project={project} />}
+                </div>
+            </div>
+            <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--text2)] mb-2 truncate">
+                <Building2 size={12} className="text-[var(--text3)] shrink-0" />
+                {project.site ? `${project.site.name}${project.site.code ? ` (${project.site.code})` : ""}` : "No site linked"}
+            </p>
+            <p className="text-[12px] text-[var(--text3)] leading-snug line-clamp-2 mb-3 min-h-[32px]">
+                {project.description || "No description provided."}
+            </p>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                    <p className="text-[10px] text-[var(--text3)] font-medium mb-0.5">Created</p>
+                    <p className="text-[11.5px] text-[var(--text2)] font-medium flex items-center gap-1">
+                        <Calendar size={11} className="text-[var(--text3)]" /> {fmtDate(project.createdAt)}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-[10px] text-[var(--text3)] font-medium mb-0.5">Type</p>
+                    <p className="text-[11.5px] text-[var(--text2)] font-medium truncate">{project.projectType || "—"}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] text-[var(--text3)] font-medium mb-0.5">Team</p>
+                    <TeamAvatars team={project.team} />
+                </div>
+            </div>
+            {isAdminOrManager && (
+                <div className="flex items-center gap-1.5 mt-auto pt-1">
+                    <Link href={`/projects/${project.id}/form-builder`} className={actionBtn}>
+                        <LayoutTemplate size={12} /> Form Builder
+                    </Link>
+                    <Link href={`/projects/${project.id}/report-config`} className={actionBtn}>
+                        <Settings2 size={12} /> Report Config
+                    </Link>
+                    <Link href={`/projects/${project.id}/edit`} className={actionBtn}>
+                        <Users size={12} /> Assign Team
+                    </Link>
+                    <Link href={`/projects/${project.id}/edit`} className={actionBtn + " ml-auto px-2"} title="Edit project">
+                        <Pencil size={12} />
+                    </Link>
+                </div>
+            )}
+        </div>
+    )
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 pb-8">
             {/* Header */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                        <FolderKanban className="h-8 w-8 text-primary" />
+                    <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)] flex items-center gap-2">
+                        <FolderKanban className="h-6 w-6 text-[var(--accent)]" />
                         Projects
                     </h1>
-                    <p className="text-muted-foreground text-sm mt-1">
-                        {projects.length} project{projects.length !== 1 ? "s" : ""} across {sites.length} site{sites.length !== 1 ? "s" : ""}
-                    </p>
+                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage inspection projects across client sites.</p>
                 </div>
                 {isAdminOrManager && (
-                    <Button asChild>
-                        <Link href="/projects/create">
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Project
-                        </Link>
-                    </Button>
+                    <Link href="/projects/create"
+                        className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
+                        <Plus size={16} /> New Project
+                    </Link>
                 )}
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3">
-                <div className="relative flex-1 min-w-[200px] max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search projects..."
-                        className="pl-9"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                    />
+            {/* Filters + stats strip */}
+            <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-3 items-stretch">
+                <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 space-y-2.5">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="relative flex-1 min-w-[180px]">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..."
+                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]" />
+                        </div>
+                        <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
+                            className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] cursor-pointer min-w-[140px]">
+                            <option value="all">All Sites</option>
+                            {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {hasNoSiteProjects && <option value="no-site">No Site</option>}
+                        </select>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[12px] font-medium text-[var(--text2)]">Status:</span>
+                        <div className="flex items-center gap-1 bg-[var(--surface2)] rounded-[8px] p-1 flex-wrap">
+                            {STATUS_FILTERS.map(s => (
+                                <button key={s} onClick={() => setStatusFilter(s)}
+                                    className={`px-2.5 py-1 rounded-[6px] text-[12px] font-medium transition-colors ${
+                                        statusFilter === s
+                                            ? "bg-white text-[var(--text)] shadow-sm border border-[var(--border)]"
+                                            : "text-[var(--text2)] hover:text-[var(--text)]"
+                                    }`}>
+                                    {s === "ALL" ? "All" : STATUS_META[s].label}
+                                </button>
+                            ))}
+                        </div>
+                        {hasFilters && (
+                            <button onClick={clearAll} className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline ml-1">
+                                <X size={12} /> Clear all
+                            </button>
+                        )}
+                    </div>
                 </div>
-                {sites.length > 1 && (
-                    <select
-                        className="h-10 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        value={selectedSiteId}
-                        onChange={e => setSelectedSiteId(e.target.value)}
-                    >
-                        <option value="all">All Sites</option>
-                        {sites.map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
+
+                {/* Stats strip */}
+                <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 flex items-center justify-around gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-[9px] bg-[var(--surface2)] flex items-center justify-center">
+                            <FolderKanban size={16} className="text-[var(--text2)]" />
+                        </div>
+                        <div>
+                            <p className="text-[20px] font-bold text-[var(--text)] leading-none tabular-nums">{counts.total}</p>
+                            <p className="text-[10.5px] text-[var(--text3)] mt-0.5">Total Projects</p>
+                        </div>
+                    </div>
+                    {(["ACTIVE", "PLANNING", "ON_HOLD", "COMPLETED"] as const).map(s => (
+                        <div key={s}>
+                            <p className="text-[18px] font-bold text-[var(--text)] leading-none tabular-nums flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: STATUS_META[s].dot }} />
+                                {counts[s]}
+                            </p>
+                            <p className="text-[10.5px] text-[var(--text3)] mt-0.5">{STATUS_META[s].label}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* List header: count + sort + view toggle */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h2 className="text-[15px] font-semibold text-[var(--text)]">All Projects ({filtered.length})</h2>
+                <div className="flex items-center gap-2">
+                    <label className="text-[12px] text-[var(--text3)]">Sort by:</label>
+                    <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
+                        className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                        <option value="recent">Recently Created</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="name">Name A–Z</option>
                     </select>
-                )}
+                    <div className="flex items-center gap-0.5 bg-[var(--surface2)] rounded-[8px] p-0.5">
+                        <button onClick={() => setView("grid")} title="Grid view"
+                            className={`p-1.5 rounded-[6px] transition-colors ${view === "grid" ? "bg-[var(--accent)] text-white" : "text-[var(--text3)] hover:text-[var(--text)]"}`}>
+                            <LayoutGrid size={14} />
+                        </button>
+                        <button onClick={() => setView("list")} title="List view"
+                            className={`p-1.5 rounded-[6px] transition-colors ${view === "list" ? "bg-[var(--accent)] text-white" : "text-[var(--text3)] hover:text-[var(--text)]"}`}>
+                            <List size={14} />
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Content */}
             {filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4 rounded-xl border-2 border-dashed p-8 text-center">
-                    <FolderOpen className="h-12 w-12 text-muted-foreground opacity-40" />
+                <div className="flex flex-col items-center justify-center min-h-[36vh] gap-4 rounded-[14px] border-2 border-dashed border-[var(--border)] bg-white p-8 text-center">
+                    <FolderOpen className="h-12 w-12 text-[var(--text3)] opacity-40" />
                     <div>
-                        <p className="text-lg font-semibold">No projects found</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            {search || selectedSiteId !== "all" ? "Try adjusting your filters." : "Create your first project to get started."}
+                        <p className="text-[15px] font-semibold text-[var(--text)]">No projects found</p>
+                        <p className="text-[13px] text-[var(--text3)] mt-1">
+                            {hasFilters ? "Try adjusting your filters." : "Create your first project to get started."}
                         </p>
                     </div>
-                    {isAdminOrManager && !search && selectedSiteId === "all" && (
-                        <Button asChild>
-                            <Link href="/projects/create">
-                                <Plus className="mr-2 h-4 w-4" /> Create Project
-                            </Link>
-                        </Button>
+                    {isAdminOrManager && !hasFilters && (
+                        <Link href="/projects/create"
+                            className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
+                            <Plus size={15} /> Create Project
+                        </Link>
                     )}
                 </div>
             ) : (
-                <div className="space-y-8">
-                    {Object.values(grouped)
-                        .sort((a, b) => {
-                            // Keep the "No Site" bucket at the very bottom.
-                            if (a.site.id === "no-site") return 1
-                            if (b.site.id === "no-site") return -1
-                            return a.site.name.localeCompare(b.site.name)
-                        })
-                        .map(group => (
-                        <div key={group.site.id} className="space-y-3">
-                            {/* Site Group Header */}
-                            <div className="flex items-center gap-2">
-                                <Building2 className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm font-semibold text-foreground">
-                                    {group.site.name}
-                                </span>
-                                <Badge variant="secondary" className="text-xs">
-                                    {group.projects.length}
-                                </Badge>
-                            </div>
+                <>
+                    <div className={view === "grid" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" : "grid grid-cols-1 gap-3"}>
+                        {pageProjects.map(renderCard)}
+                    </div>
 
-                            {/* Project Cards */}
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {group.projects.map(project => (
-                                    <Card key={project.id} className="hover:shadow-md transition-shadow">
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-base leading-tight">{project.name}</CardTitle>
-                                            <CardDescription className="line-clamp-2 text-xs">
-                                                {project.description || "No description provided"}
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <Calendar className="h-3 w-3" />
-                                                Created {new Date(project.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                                            </div>
-                                        </CardContent>
-                                        {isAdminOrManager && (
-                                            <CardFooter className="flex flex-wrap gap-2 pt-0">
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/projects/${project.id}/form-builder`}>
-                                                        <LayoutTemplate className="h-3 w-3 mr-1" /> Form Builder
-                                                    </Link>
-                                                </Button>
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/projects/${project.id}/report-config`}>
-                                                        ⚙️ Report Config
-                                                    </Link>
-                                                </Button>
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/projects/${project.id}/edit`}>
-                                                        <Pencil className="h-3 w-3 mr-1" /> Edit
-                                                    </Link>
-                                                </Button>
-                                            </CardFooter>
-                                        )}
-                                    </Card>
+                    {/* Pagination */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <p className="text-[12.5px] text-[var(--text3)]">
+                            Showing {showFrom} to {showTo} of {filtered.length} project{filtered.length !== 1 ? "s" : ""}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+                                className="w-8 h-8 flex items-center justify-center rounded-[8px] border border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                <ChevronLeft size={14} />
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => totalPages <= 7 || Math.abs(p - safePage) <= 2 || p === 1 || p === totalPages)
+                                .map((p, idx, arr) => (
+                                    <span key={p} className="flex items-center gap-2">
+                                        {idx > 0 && arr[idx - 1] !== p - 1 && <span className="text-[12px] text-[var(--text3)]">…</span>}
+                                        <button onClick={() => setPage(p)}
+                                            className={`min-w-8 h-8 px-2 rounded-[8px] text-[12.5px] font-medium border transition-colors ${
+                                                p === safePage
+                                                    ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+                                                    : "bg-white border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)]"
+                                            }`}>
+                                            {p}
+                                        </button>
+                                    </span>
                                 ))}
-                            </div>
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                                className="w-8 h-8 flex items-center justify-center rounded-[8px] border border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                <ChevronRight size={14} />
+                            </button>
+                            <select value={perPage} onChange={e => setPerPage(Number(e.target.value))}
+                                className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                                {[12, 24, 48].map(n => <option key={n} value={n}>{n} / page</option>)}
+                            </select>
                         </div>
-                    ))}
-                </div>
+                    </div>
+                </>
             )}
         </div>
     )

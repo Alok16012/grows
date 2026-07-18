@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { ensureSiteAssignmentSchema } from "@/lib/site-assignment-schema"
+import { ensureProjectSchema } from "@/lib/prisma"
 
 export async function GET(req: Request) {
     try {
@@ -19,27 +20,41 @@ export async function GET(req: Request) {
         if (siteId) where.siteId = siteId
         else if (companyId) where.companyId = companyId
 
+        await ensureProjectSchema()
+
         const projects = await prisma.project.findMany({
             where,
             include: {
                 company: true,
                 site: { select: { id: true, name: true, code: true, city: true } },
-                // Current project members, so callers (e.g. the assignment wizard)
-                // can pre-fill a project's existing inspectors & managers.
-                projectManagers: { select: { managerId: true } },
-                assignments: { where: { status: "active" }, select: { inspectionBoyId: true } },
+                // Current project members, so callers (e.g. the assignment wizard,
+                // the projects grid team avatars) can show/pre-fill them.
+                projectManagers: { select: { managerId: true, manager: { select: { id: true, name: true } } } },
+                assignments: {
+                    where: { status: "active" },
+                    select: { inspectionBoyId: true, inspectionBoy: { select: { id: true, name: true } } },
+                },
             },
             orderBy: {
                 createdAt: "desc",
             },
         })
 
-        // Flatten member ids alongside the raw relations for convenience.
-        const withMembers = projects.map((p) => ({
-            ...p,
-            managerIds: p.projectManagers.map((m) => m.managerId),
-            inspectorIds: Array.from(new Set(p.assignments.map((a) => a.inspectionBoyId))),
-        }))
+        // Flatten member ids + display names alongside the raw relations.
+        const withMembers = projects.map((p) => {
+            const inspectorNames = Array.from(
+                new Map(p.assignments.map((a) => [a.inspectionBoyId, a.inspectionBoy?.name ?? ""])).entries()
+            )
+            return {
+                ...p,
+                managerIds: p.projectManagers.map((m) => m.managerId),
+                inspectorIds: inspectorNames.map(([id]) => id),
+                team: [
+                    ...p.projectManagers.map((m) => ({ id: m.managerId, name: m.manager?.name ?? "" })),
+                    ...inspectorNames.map(([id, name]) => ({ id, name })),
+                ],
+            }
+        })
 
         return NextResponse.json(withMembers)
     } catch (error) {
@@ -66,12 +81,14 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { name, description, siteId, managerIds, inspectorIds } = body
+        const { name, description, siteId, managerIds, inspectorIds, projectType, priority, status, startDate, endDate } = body
         let { companyId } = body
 
         if (!name || !siteId) {
             return new NextResponse("Name and Site ID are required", { status: 400 })
         }
+
+        await ensureProjectSchema()
 
         // Inspection projects now hang off a real HR Site. We still keep the
         // (non-null) companyId column populated for backwards compatibility, so
@@ -85,12 +102,31 @@ export async function POST(req: Request) {
         }
         companyId = site.branch.companyId
 
+        // Auto-generate a sequential project code, e.g. PRJ-2026-00027.
+        const year = new Date().getFullYear()
+        const lastWithCode = await prisma.project.findFirst({
+            where: { code: { startsWith: "PRJ-" } },
+            orderBy: { createdAt: "desc" },
+            select: { code: true },
+        }).catch(() => null)
+        let nextNum = (await prisma.project.count().catch(() => 0)) + 1
+        const match = lastWithCode?.code?.match(/(\d+)$/)
+        if (match) nextNum = parseInt(match[1]) + 1
+        const code = `PRJ-${year}-${String(nextNum).padStart(5, "0")}`
+
+        const VALID_STATUSES = ["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]
         const project = await prisma.project.create({
             data: {
                 name,
                 description,
                 companyId,
                 siteId,
+                code,
+                status: VALID_STATUSES.includes(status) ? status : "PLANNING",
+                projectType: projectType || null,
+                priority: priority || "Medium",
+                startDate: startDate ? new Date(startDate) : null,
+                endDate: endDate ? new Date(endDate) : null,
                 createdBy: actorId!,
             },
         })

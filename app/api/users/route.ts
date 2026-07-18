@@ -39,6 +39,7 @@ export async function GET(req: Request) {
                     id: true,
                     name: true,
                     email: true,
+                    phone: true,
                 },
             })
             return NextResponse.json(users)
@@ -55,6 +56,7 @@ export async function GET(req: Request) {
                     id: true,
                     name: true,
                     email: true,
+                    phone: true,
                 },
             })
             return NextResponse.json(users)
