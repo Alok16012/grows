@@ -7,6 +7,7 @@ import { can } from "@/lib/can"
 import {
     Plus, Search, MapPin, Loader2, X, Users, Edit2,
     MoreVertical, Trash2, Phone, Building2, ChevronDown,
+    ChevronLeft, ChevronRight,
     CheckCircle, XCircle, UserCheck, AlertTriangle, Navigation,
     Shield, Home, Wrench, Layers, Clock, User, CalendarDays,
 } from "lucide-react"
@@ -409,19 +410,20 @@ function AddSiteModal({
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, color, bg, icon }: {
-    label: string; value: number; sub?: string; color: string; bg: string; icon: React.ReactNode
+function StatCard({ label, value, sub, color, bg, icon, danger }: {
+    label: string; value: number; sub?: string; color: string; bg: string; icon: React.ReactNode; danger?: boolean
 }) {
     return (
-        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: bg, color }}>
-                {icon}
+        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4 hover:shadow-sm transition-all">
+            <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: bg, color }}>
+                    {icon}
+                </div>
+                <ChevronRight size={15} className="text-[var(--text3)]" />
             </div>
-            <div>
-                <p className="text-[22px] font-bold leading-none" style={{ color }}>{value}</p>
-                <p className="text-[12px] text-[var(--text3)] mt-0.5">{label}</p>
-                {sub && <p className="text-[11px] text-[var(--text3)] mt-0.5">{sub}</p>}
-            </div>
+            <p className={`text-[26px] font-bold leading-none tabular-nums ${danger ? "text-[var(--red)]" : "text-[var(--text)]"}`}>{value}</p>
+            <p className="text-[12.5px] font-medium text-[var(--text)] mt-1.5">{label}</p>
+            {sub && <p className="text-[11px] text-[var(--text3)] mt-0.5">{sub}</p>}
         </div>
     )
 }
@@ -994,6 +996,11 @@ export default function SitesPage() {
     const [showModal, setShowModal] = useState(false)
     const [editSite, setEditSite] = useState<Site | null>(null)
     const [detailSite, setDetailSite] = useState<Site | null>(null)
+    const [page, setPage] = useState(1)
+    const [perPage, setPerPage] = useState(12)
+
+    // Any filter change goes back to the first page.
+    useEffect(() => { setPage(1) }, [search, statusFilter, typeFilter, perPage])
 
     useEffect(() => {
         if (status !== "unauthenticated") return
@@ -1039,6 +1046,13 @@ export default function SitesPage() {
     const totalDeployed = sites.reduce((acc, s) => acc + s._count.deployments, 0)
     const understaffedSites = sites.filter(s => s._count.deployments < s.manpowerRequired).length
 
+    // Client-side pagination over the filtered list.
+    const totalPages = Math.max(1, Math.ceil(sites.length / perPage))
+    const safePage = Math.min(page, totalPages)
+    const pageSites = sites.slice((safePage - 1) * perPage, safePage * perPage)
+    const showFrom = sites.length === 0 ? 0 : (safePage - 1) * perPage + 1
+    const showTo = Math.min(safePage * perPage, sites.length)
+
     const handleToggle = async (site: Site) => {
         try {
             const res = await fetch(`/api/sites/${site.id}`, {
@@ -1072,7 +1086,7 @@ export default function SitesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Sites</h1>
-                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage client sites and employee deployments</p>
+                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage client sites and employee deployments across locations.</p>
                 </div>
                 <button
                     onClick={() => { setEditSite(null); setShowModal(true) }}
@@ -1084,13 +1098,13 @@ export default function SitesPage() {
             {/* Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <StatCard label="Total Sites" value={totalSites} color="#3b82f6" bg="#eff6ff"
-                    icon={<Building2 size={18} />} />
+                    icon={<Building2 size={18} />} sub="Across all clients" />
                 <StatCard label="Active Sites" value={activeSites} color="#1a9e6e" bg="#e8f7f1"
-                    icon={<CheckCircle size={18} />} />
+                    icon={<CheckCircle size={18} />} sub="Currently operational" />
                 <StatCard label="Total Deployed" value={totalDeployed} color="#1a9e6e" bg="#e8f7f1"
-                    icon={<Users size={18} />} sub="active deployments" />
+                    icon={<Users size={18} />} sub="Active deployments" />
                 <StatCard label="Understaffed" value={understaffedSites} color="#dc2626" bg="#fef2f2"
-                    icon={<AlertTriangle size={18} />} sub="below required strength" />
+                    icon={<AlertTriangle size={18} />} sub="Below required strength" danger />
             </div>
 
             {/* Filters */}
@@ -1158,20 +1172,65 @@ export default function SitesPage() {
                     )}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                    {sites.map(site => (
-                        <SiteCard
-                            key={site.id}
-                            site={site}
-                            role={role}
-                            onView={() => setDetailSite(site)}
-                            onEdit={() => { setEditSite(site); setShowModal(true) }}
-                            onDeploy={() => setDetailSite(site)}
-                            onToggle={() => handleToggle(site)}
-                            onDelete={() => handleDelete(site)}
-                        />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {pageSites.map(site => (
+                            <SiteCard
+                                key={site.id}
+                                site={site}
+                                role={role}
+                                onView={() => setDetailSite(site)}
+                                onEdit={() => { setEditSite(site); setShowModal(true) }}
+                                onDeploy={() => setDetailSite(site)}
+                                onToggle={() => handleToggle(site)}
+                                onDelete={() => handleDelete(site)}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <p className="text-[12.5px] text-[var(--text3)]">
+                            Showing {showFrom} to {showTo} of {sites.length} site{sites.length !== 1 ? "s" : ""}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={safePage === 1}
+                                className="w-8 h-8 flex items-center justify-center rounded-[8px] border border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                <ChevronLeft size={14} />
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => totalPages <= 7 || Math.abs(p - safePage) <= 2 || p === 1 || p === totalPages)
+                                .map((p, idx, arr) => (
+                                    <span key={p} className="flex items-center gap-2">
+                                        {idx > 0 && arr[idx - 1] !== p - 1 && <span className="text-[12px] text-[var(--text3)]">…</span>}
+                                        <button
+                                            onClick={() => setPage(p)}
+                                            className={`min-w-8 h-8 px-2 rounded-[8px] text-[12.5px] font-medium border transition-colors ${
+                                                p === safePage
+                                                    ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+                                                    : "bg-white border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)]"
+                                            }`}>
+                                            {p}
+                                        </button>
+                                    </span>
+                                ))}
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={safePage === totalPages}
+                                className="w-8 h-8 flex items-center justify-center rounded-[8px] border border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                <ChevronRight size={14} />
+                            </button>
+                            <select
+                                value={perPage}
+                                onChange={e => setPerPage(Number(e.target.value))}
+                                className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                                {[12, 24, 48].map(n => <option key={n} value={n}>{n} / page</option>)}
+                            </select>
+                        </div>
+                    </div>
+                </>
             )}
 
             {/* Add/Edit Site Modal */}
