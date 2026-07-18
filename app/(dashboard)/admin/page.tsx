@@ -192,27 +192,29 @@ function AdminRecruitmentTable() {
                     <p className="text-[13px] text-[var(--text3)]">No recruitment activity for this period.</p>
                 </div>
             ) : (
-                <div className="overflow-x-auto overflow-y-auto max-h-[430px] flex-1">
-                    <table className="w-full" style={{ fontSize: 12 }}>
+                <div className="overflow-y-auto max-h-[430px] flex-1">
+                    {/* table-fixed + percentage widths: every column fits the card,
+                        so nothing gets clipped and there is no sideways scroll. */}
+                    <table className="w-full table-fixed" style={{ fontSize: 11.5 }}>
                         <thead className="sticky top-0 z-10">
                             <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
-                                <th style={{ textAlign: "left", padding: "8px 16px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>HR / Recruiter</th>
+                                <th style={{ width: "26%", textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--text2)", fontSize: 11 }}>HR / Recruiter</th>
                                 {REC_COLS.map(c => (
-                                    <th key={c.key} style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
+                                    <th key={c.key} style={{ width: "15%", textAlign: "right", padding: "8px 8px", fontWeight: 600, color: c.color, fontSize: 11 }}>{c.label}</th>
                                 ))}
-                                <th style={{ textAlign: "right", padding: "8px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Conv.</th>
+                                <th style={{ width: "14%", textAlign: "right", padding: "8px 12px", fontWeight: 700, color: "var(--text)", fontSize: 11 }}>Conv.</th>
                             </tr>
                         </thead>
                         <tbody>
                             {data.rows.map((row: any) => (
                                 <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }} className="hover:bg-[var(--surface2)] transition-colors">
-                                    <td style={{ padding: "9px 16px", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>{row.name}</td>
+                                    <td title={row.name} style={{ padding: "9px 12px", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.name}</td>
                                     {REC_COLS.map(c => (
-                                        <td key={c.key} style={{ textAlign: "right", padding: "9px 12px", color: row[c.key] > 0 ? c.color : "var(--text3)", fontWeight: row[c.key] > 0 ? 600 : 400 }}>
+                                        <td key={c.key} style={{ textAlign: "right", padding: "9px 8px", color: row[c.key] > 0 ? c.color : "var(--text3)", fontWeight: row[c.key] > 0 ? 600 : 400 }}>
                                             {row[c.key] || "—"}
                                         </td>
                                     ))}
-                                    <td style={{ textAlign: "right", padding: "9px 16px" }}>
+                                    <td style={{ textAlign: "right", padding: "9px 12px" }}>
                                         <span className={cn(
                                             "px-2 py-0.5 rounded-full text-[11px] font-semibold",
                                             row.conversion >= 50 ? "bg-green-100 text-green-700" : row.conversion >= 20 ? "bg-amber-100 text-amber-700" : "bg-[var(--surface2)] text-[var(--text3)]"
@@ -223,13 +225,13 @@ function AdminRecruitmentTable() {
                         </tbody>
                         <tfoot>
                             <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
-                                <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }}>Total</td>
+                                <td style={{ padding: "9px 12px", fontWeight: 700, color: "var(--text)" }}>Total</td>
                                 {REC_COLS.map(c => (
-                                    <td key={c.key} style={{ textAlign: "right", padding: "9px 12px", fontWeight: 700, color: data.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
+                                    <td key={c.key} style={{ textAlign: "right", padding: "9px 8px", fontWeight: 700, color: data.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
                                         {data.totals[c.key] || "—"}
                                     </td>
                                 ))}
-                                <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 800, color: "var(--text)" }}>
+                                <td style={{ textAlign: "right", padding: "9px 12px", fontWeight: 800, color: "var(--text)" }}>
                                     {data.totals.recruited > 0 ? Math.round((data.totals.onboarded / data.totals.recruited) * 100) : 0}%
                                 </td>
                             </tr>
@@ -362,7 +364,9 @@ export default function AdminDashboard() {
     ]
 
     return (
-        <div className="p-4 lg:p-6 space-y-4 bg-[var(--bg)] min-h-screen">
+        // The dashboard layout already provides lg:p-8 around pages — adding our
+        // own desktop padding doubled the top gap into a blank band.
+        <div className="p-4 lg:p-0 space-y-4">
             {/* Mobile Welcome Banner */}
             <div className="md:hidden bg-gradient-to-br from-[#1a9e6e] to-[#0d6b4a] rounded-[16px] p-4 text-white shadow-sm">
                 <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>
