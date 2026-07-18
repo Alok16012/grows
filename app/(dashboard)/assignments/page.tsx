@@ -19,6 +19,7 @@ type Assignment = {
     projectId: string
     inspectionBoyId: string | null
     status: string
+    code?: string | null
     recurrenceType?: string
     recurrenceActive?: boolean
     startDate?: string | null
@@ -31,7 +32,14 @@ type Assignment = {
         name: string
         company?: { name: string } | null
         site?: { id: string; name: string } | null
+        managers?: { id: string; name: string | null; email?: string | null }[]
     } | null
+}
+
+// Older assignments predate the ASG-… codes — derive a stable readable
+// number from the row id so every assignment has one.
+function assignmentNo(a: Assignment) {
+    return a.code ?? `ASG-${a.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`
 }
 
 const WIZARD_STEPS = [
@@ -701,9 +709,9 @@ export default function AssignmentsPage() {
                                 <table className="w-full" style={{ fontSize: 12.5 }}>
                                     <thead>
                                         <tr className="bg-[var(--surface2)]/60 text-[11px] text-[var(--text3)] uppercase tracking-wide">
-                                            <th className="text-left font-semibold px-4 py-2.5">Inspector</th>
+                                            <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Assignment #</th>
+                                            <th className="text-left font-semibold px-3 py-2.5">Inspector</th>
                                             <th className="text-left font-semibold px-3 py-2.5">Project</th>
-                                            <th className="text-left font-semibold px-3 py-2.5">Site</th>
                                             <th className="text-left font-semibold px-3 py-2.5">Status</th>
                                             <th className="text-left font-semibold px-3 py-2.5">Type</th>
                                             <th className="text-left font-semibold px-3 py-2.5 whitespace-nowrap">Start Date</th>
@@ -714,13 +722,17 @@ export default function AssignmentsPage() {
                                         {pageRows.map(a => {
                                             const st = displayStatus(a)
                                             return (
-                                                <tr key={a.id} className="hover:bg-[var(--surface2)]/40 transition-colors">
+                                                <tr key={a.id} onClick={() => setDetail(a)}
+                                                    className="hover:bg-[var(--surface2)]/40 transition-colors cursor-pointer">
                                                     <td className="px-4 py-2.5">
+                                                        <p className="font-mono text-[11.5px] font-semibold text-[var(--accent)] whitespace-nowrap">{assignmentNo(a)}</p>
+                                                        <p className="text-[10.5px] text-[var(--text3)] whitespace-nowrap">{a.project?.site?.name || a.project?.company?.name || "—"}</p>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
                                                         <p className="font-semibold text-[var(--text)] leading-tight">{a.inspectionBoy?.name || "—"}</p>
                                                         <p className="text-[10.5px] text-[var(--text3)]">Inspector</p>
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-[var(--text2)] max-w-[140px] truncate">{a.project?.name || "—"}</td>
-                                                    <td className="px-3 py-2.5 text-[var(--text2)] max-w-[140px] truncate">{a.project?.site?.name || a.project?.company?.name || "—"}</td>
+                                                    <td className="px-3 py-2.5 text-[var(--text2)] max-w-[150px] truncate">{a.project?.name || "—"}</td>
                                                     <td className="px-3 py-2.5">
                                                         <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold whitespace-nowrap" style={{ background: st.bg, color: st.fg }}>
                                                             {st.label}
@@ -730,7 +742,7 @@ export default function AssignmentsPage() {
                                                         {(a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring"}
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{fmtDate(a.startDate ?? a.createdAt)}</td>
-                                                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                                                    <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                         <div className="inline-flex items-center gap-1.5">
                                                             <button onClick={() => setDetail(a)} title="View details"
                                                                 className="p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
@@ -793,18 +805,20 @@ export default function AssignmentsPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setDetail(null)}>
                     <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-md shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-                            <h2 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2">
-                                <FileText size={15} className="text-[var(--accent)]" /> Assignment Details
-                            </h2>
+                            <div>
+                                <h2 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2">
+                                    <FileText size={15} className="text-[var(--accent)]" /> Assignment Details
+                                </h2>
+                                <p className="font-mono text-[11.5px] font-semibold text-[var(--accent)] mt-0.5">{assignmentNo(detail)}</p>
+                            </div>
                             <button onClick={() => setDetail(null)} className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
                                 <X size={17} />
                             </button>
                         </div>
                         <div className="p-5 space-y-2.5">
                             {[
-                                { label: "Inspector", value: detail.inspectionBoy?.name || "—" },
                                 { label: "Project", value: detail.project?.name || "—" },
-                                { label: "Site", value: detail.project?.site?.name || "—" },
+                                { label: "Site", value: detail.project?.site?.name || detail.project?.company?.name || "—" },
                                 { label: "Status", value: displayStatus(detail).label },
                                 { label: "Type", value: (detail.recurrenceType ?? "none") === "none" ? "One-time" : `Recurring (${detail.recurrenceType})${detail.recurrenceActive ? "" : " — stopped"}` },
                                 { label: "Start Date", value: fmtDate(detail.startDate ?? detail.createdAt) },
@@ -816,6 +830,25 @@ export default function AssignmentsPage() {
                                     <span className="text-[12.5px] font-semibold text-[var(--text)] text-right max-w-[60%] truncate">{r.value}</span>
                                 </div>
                             ))}
+                            {/* People on this assignment */}
+                            <div className="pt-2.5 border-t border-[var(--border)]">
+                                <p className="text-[12px] text-[var(--text2)] mb-1.5">People</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {detail.inspectionBoy?.name && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--accent-light)] text-[var(--accent)] text-[11px] font-semibold">
+                                            <Users size={10} /> {detail.inspectionBoy.name} · Inspector
+                                        </span>
+                                    )}
+                                    {(detail.project?.managers ?? []).map(m => (
+                                        <span key={m.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#eff6ff] text-[#1d4ed8] text-[11px] font-semibold">
+                                            <Users size={10} /> {m.name || "Unnamed"} · Manager
+                                        </span>
+                                    ))}
+                                    {!detail.inspectionBoy?.name && (detail.project?.managers ?? []).length === 0 && (
+                                        <span className="text-[12px] text-[var(--text3)]">No people linked.</span>
+                                    )}
+                                </div>
+                            </div>
                             {detail.notes && (
                                 <div className="pt-2 border-t border-[var(--border)]">
                                     <p className="text-[12px] text-[var(--text2)] mb-1">Notes</p>

@@ -126,6 +126,7 @@ model Assignment {
   recurrenceActive Boolean      @default(false)
   // Scheduling fields (created in prod at runtime via ensureProjectSchema —
   // prod migrations are manual).
+  code             String?      // e.g. ASG-2026-00012
   startDate        DateTime?
   notes            String?
   createdAt        DateTime     @default(now())

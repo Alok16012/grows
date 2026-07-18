@@ -111,6 +111,7 @@ export async function GET(req: Request) {
                         inspectionBoyId: true,
                         assignedBy: true,
                         status: true,
+                        code: true,
                         recurrenceType: true,
                         recurrenceActive: true,
                         startDate: true,
@@ -231,6 +232,18 @@ export async function POST(req: Request) {
         const created: any[] = []
         const failed: any[] = []
 
+        // Sequential human-readable assignment numbers: ASG-YYYY-NNNNN.
+        const year = new Date().getFullYear()
+        const lastWithCode = await prisma.assignment.findFirst({
+            where: { code: { startsWith: "ASG-" } },
+            orderBy: { createdAt: "desc" },
+            select: { code: true },
+        }).catch(() => null)
+        let seq = (await prisma.assignment.count().catch(() => 0)) + 1
+        const seqMatch = lastWithCode?.code?.match(/(\d+)$/)
+        if (seqMatch) seq = parseInt(seqMatch[1]) + 1
+        const nextCode = () => `ASG-${year}-${String(seq++).padStart(5, "0")}`
+
         // Create assignments for every (project × inspector) pair
         if (hasInspectors) {
             const existingAssignments = await prisma.assignment.findMany({
@@ -260,6 +273,7 @@ export async function POST(req: Request) {
                                 status: "active",
                                 recurrenceType: recurType,
                                 recurrenceActive: recurType !== "none",
+                                code: nextCode(),
                                 startDate: start,
                                 notes: noteText,
                             },

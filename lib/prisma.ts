@@ -72,6 +72,7 @@ export async function ensureProjectSchema() {
         `)
         await (prisma as any).$executeRawUnsafe(`
             ALTER TABLE "Assignment"
+                ADD COLUMN IF NOT EXISTS "code"      TEXT,
                 ADD COLUMN IF NOT EXISTS "startDate" TIMESTAMP(3),
                 ADD COLUMN IF NOT EXISTS "notes"     TEXT
         `)

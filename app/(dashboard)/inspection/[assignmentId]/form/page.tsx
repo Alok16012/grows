@@ -13,7 +13,10 @@ import {
     ExternalLink,
     Camera,
     MapPin,
-    Timer
+    Timer,
+    ClipboardList,
+    ArrowRight,
+    X
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import CameraCapture from "@/components/CameraCapture"
@@ -45,6 +48,43 @@ export default function InspectionFormPage() {
 
     const isAdmin = session?.user?.role === "ADMIN"
     const canEdit = inspection?.status === "draft" || isAdmin
+
+    // Other assignments of this inspector that still need filling — powers the
+    // "which project do you want to fill?" chooser and the pending banner.
+    const [otherPending, setOtherPending] = useState<any[]>([])
+    const [showChooser, setShowChooser] = useState(false)
+
+    useEffect(() => {
+        if (authStatus !== "authenticated" || session?.user?.role !== "INSPECTION_BOY") return
+        fetch("/api/assignments?status=all")
+            .then(r => (r.ok ? r.json() : []))
+            .then((list: any[]) => {
+                if (!Array.isArray(list)) return
+                const pending = list.filter(a =>
+                    a.id !== assignmentId &&
+                    a.status === "active" &&
+                    (!a.inspection || a.inspection.status === "draft")
+                )
+                setOtherPending(pending)
+                // Ask which form to fill — once per browser session, and only
+                // when there genuinely is a choice to make.
+                if (pending.length > 0 && !sessionStorage.getItem("insp-chooser-seen")) {
+                    setShowChooser(true)
+                }
+            })
+            .catch(() => { /* non-fatal */ })
+    }, [authStatus, session?.user?.role, assignmentId])
+
+    const dismissChooser = () => {
+        sessionStorage.setItem("insp-chooser-seen", "1")
+        setShowChooser(false)
+    }
+
+    const switchToAssignment = (id: string) => {
+        sessionStorage.setItem("insp-chooser-seen", "1")
+        setShowChooser(false)
+        router.push(`/inspection/${id}/form`)
+    }
 
     // Work timer
     useEffect(() => {
@@ -691,6 +731,27 @@ export default function InspectionFormPage() {
             {/* FORM CONTENT */}
             <div className="w-full max-w-[660px] mx-auto p-[20px_20px_100px]">
 
+                {/* Other pending inspections banner */}
+                {!isAdmin && otherPending.length > 0 && (
+                    <div className="bg-[#fef3c7] border border-[#fde68a] rounded-[12px] p-[12px_16px] mb-[20px]">
+                        <p className="text-[12.5px] font-semibold text-[#92400e] flex items-center gap-1.5 mb-2">
+                            <ClipboardList size={14} />
+                            {otherPending.length} more inspection{otherPending.length > 1 ? "s" : ""} pending after this one
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {otherPending.slice(0, 4).map((a: any) => (
+                                <button key={a.id} onClick={() => switchToAssignment(a.id)}
+                                    className="inline-flex items-center gap-1 bg-white border border-[#fde68a] text-[#92400e] rounded-full px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#fffbeb] transition-colors">
+                                    {a.project?.name} <ArrowRight size={10} />
+                                </button>
+                            ))}
+                            {otherPending.length > 4 && (
+                                <span className="text-[11.5px] text-[#92400e] self-center">+{otherPending.length - 4} more</span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Reviewer sent-back notice */}
                 {inspection?.sentBackCount > 0 && inspection?.reviewerNotes && (
                     <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-[14px_18px] mb-[20px]">
@@ -961,11 +1022,67 @@ export default function InspectionFormPage() {
                     onClose={() => setCameraFieldId(null)}
                 />
             )}
-            <DocumentViewer 
-                url={previewUrl} 
-                fileName={previewName} 
-                onClose={() => setPreviewUrl(null)} 
+            <DocumentViewer
+                url={previewUrl}
+                fileName={previewName}
+                onClose={() => setPreviewUrl(null)}
             />
+
+            {/* Project chooser — inspector has multiple pending inspections */}
+            {showChooser && !isAdmin && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-[16px] border border-[#e8e6e1] w-full max-w-md shadow-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e8e6e1]">
+                            <div>
+                                <h2 className="text-[15px] font-semibold text-[#1a1a18] flex items-center gap-2">
+                                    <ClipboardList size={15} className="text-[#1a9e6e]" /> Which inspection do you want to fill?
+                                </h2>
+                                <p className="text-[12px] text-[#9e9b95] mt-0.5">You have {otherPending.length + 1} pending inspections.</p>
+                            </div>
+                            <button onClick={dismissChooser} className="p-1 text-[#9e9b95] hover:text-[#1a1a18] rounded-md hover:bg-[#f9f8f5] transition-colors">
+                                <X size={17} />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-2 max-h-[55vh] overflow-y-auto">
+                            {/* Current form — continue */}
+                            <button onClick={dismissChooser}
+                                className="w-full flex items-center gap-3 p-3 rounded-[12px] border-[1.5px] border-[#1a9e6e] bg-[#f0fdf4] text-left hover:bg-[#e8f7f1] transition-colors">
+                                <span className="w-9 h-9 rounded-[9px] bg-[#1a9e6e] flex items-center justify-center shrink-0">
+                                    <CheckCircle2 size={16} className="text-white" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[13px] font-semibold text-[#1a1a18] truncate">{assignment?.project?.name}</span>
+                                    <span className="block text-[11.5px] text-[#6b6860] truncate">
+                                        {assignment?.project?.site?.name || assignment?.project?.company?.name} · This form
+                                    </span>
+                                </span>
+                                <span className="text-[11.5px] font-semibold text-[#1a9e6e] shrink-0">Continue →</span>
+                            </button>
+
+                            {/* Other pending forms */}
+                            {otherPending.map((a: any) => (
+                                <button key={a.id} onClick={() => switchToAssignment(a.id)}
+                                    className="w-full flex items-center gap-3 p-3 rounded-[12px] border border-[#e8e6e1] bg-white text-left hover:border-[#1a9e6e]/50 hover:bg-[#f9f8f5] transition-colors">
+                                    <span className="w-9 h-9 rounded-[9px] bg-[#fef3c7] flex items-center justify-center shrink-0">
+                                        <ClipboardList size={15} className="text-[#d97706]" />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-[13px] font-semibold text-[#1a1a18] truncate">{a.project?.name}</span>
+                                        <span className="block text-[11.5px] text-[#6b6860] truncate">
+                                            {a.project?.site?.name || a.project?.company?.name}
+                                            {a.inspection?.status === "draft" ? " · Draft saved" : " · Not started"}
+                                        </span>
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] text-[10.5px] font-semibold shrink-0">Pending</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="px-5 py-3.5 border-t border-[#e8e6e1] bg-[#f9f8f5]/60">
+                            <p className="text-[11.5px] text-[#9e9b95]">Baaki pending forms upar banner me bhi dikhte rahenge.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

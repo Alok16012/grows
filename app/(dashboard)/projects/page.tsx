@@ -6,8 +6,9 @@ import Link from "next/link"
 import {
     Plus, Loader2, FolderOpen, Search, LayoutTemplate, Settings2,
     Pencil, Calendar, Building2, FolderKanban, MoreVertical,
-    Users, ChevronLeft, ChevronRight, LayoutGrid, List, X,
+    Users, ChevronLeft, ChevronRight, LayoutGrid, List, X, Trash2,
 } from "lucide-react"
+import { toast } from "sonner"
 import { can } from "@/lib/can"
 
 type TeamMember = { id: string; name: string }
@@ -69,7 +70,7 @@ function TeamAvatars({ team }: { team?: TeamMember[] }) {
     )
 }
 
-function ProjectMenu({ project }: { project: Project }) {
+function ProjectMenu({ project, onDelete }: { project: Project; onDelete: () => void }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     useEffect(() => {
@@ -96,6 +97,11 @@ function ProjectMenu({ project }: { project: Project }) {
                     <Link href={`/projects/${project.id}/report-config`} className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors">
                         <Settings2 size={13} /> Report Config
                     </Link>
+                    <div className="my-1 border-t border-[var(--border)]" />
+                    <button onClick={() => { setOpen(false); onDelete() }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-red-50 transition-colors">
+                        <Trash2 size={13} /> Delete Project
+                    </button>
                 </div>
             )}
         </div>
@@ -179,6 +185,20 @@ export default function ProjectsPage() {
     const hasFilters = search !== "" || siteFilter !== "all" || statusFilter !== "ALL"
     const clearAll = () => { setSearch(""); setSiteFilter("all"); setStatusFilter("ALL") }
 
+    const handleDelete = async (project: Project) => {
+        if (!confirm(
+            `Delete project "${project.name}"?\n\nThis permanently removes the project along with its assignments, inspections, form templates and reports. This cannot be undone.`
+        )) return
+        try {
+            const res = await fetch(`/api/projects/${project.id}`, { method: "DELETE" })
+            if (!res.ok) throw new Error(await res.text() || "Failed to delete")
+            toast.success(`Project "${project.name}" deleted`)
+            fetchProjects()
+        } catch (e) {
+            toast.error((e as Error).message || "Failed to delete project")
+        }
+    }
+
     const fmtDate = (s: string) =>
         new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
 
@@ -198,7 +218,7 @@ export default function ProjectsPage() {
                 <h3 className="text-[14.5px] font-bold text-[var(--text)] uppercase tracking-[0.2px] leading-tight truncate">{project.name}</h3>
                 <div className="flex items-center gap-1 shrink-0">
                     <StatusBadge status={project.status} />
-                    {isAdminOrManager && <ProjectMenu project={project} />}
+                    {isAdminOrManager && <ProjectMenu project={project} onDelete={() => handleDelete(project)} />}
                 </div>
             </div>
             <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--text2)] mb-2 truncate">
