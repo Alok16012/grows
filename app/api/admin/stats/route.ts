@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
+import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
@@ -28,9 +28,12 @@ function istDayRange(offsetDays = 0) {
 // endpoint fans out ~20 queries.
 const getStats = unstable_cache(
     async () => {
+        await ensureProjectSchema()
+
         const now = new Date()
         const today = istDayRange(0)
         const yesterday = istDayRange(-1)
+        const week = istDayRange(-6) // start of the 7-day attendance window
         const in30d = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
         const ago30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
         const ago60d = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
@@ -61,6 +64,8 @@ const getStats = unstable_cache(
             contractsExpiring,
             docExpiries,
             recentInspections,
+            projectStatusRows,
+            weekAttendanceRows,
         ] = await Promise.all([
             safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0),
             safe(prisma.employee.count({ where: { status: "ACTIVE", createdAt: { gte: ago30d } } }), 0),
@@ -116,6 +121,16 @@ const getStats = unstable_cache(
                     submitter: { select: { name: true } },
                 },
             }), [] as any[]),
+            // Projects grouped by workflow status — feeds the status donut
+            safe(
+                prisma.project.groupBy({ by: ["status"], _count: { _all: true } }) as Promise<{ status: string; _count: { _all: number } }[]>,
+                []
+            ),
+            // Present check-ins over the last 7 IST days — feeds the trend bars
+            safe(prisma.attendance.findMany({
+                where: { date: { gte: week.start, lt: today.end }, checkIn: { not: null } },
+                select: { date: true },
+            }), [] as { date: Date }[]),
         ])
 
         // ── Attendance aggregation ──
@@ -159,6 +174,28 @@ const getStats = unstable_cache(
 
         const approvalsTotal = pendingLeaves + pendingExpenses + pendingDocs + pendingInspections
 
+        // ── Projects by status (missing status column on old rows = ACTIVE) ──
+        const projectsByStatus: Record<string, number> = {}
+        for (const r of projectStatusRows) {
+            const key = r.status || "ACTIVE"
+            projectsByStatus[key] = (projectsByStatus[key] ?? 0) + (r._count?._all ?? 0)
+        }
+
+        // ── 7-day attendance trend, bucketed on IST day boundaries ──
+        const IST_MS = 330 * 60 * 1000
+        const dayKey = (d: Date) => new Date(d.getTime() + IST_MS).toISOString().slice(0, 10)
+        const weekCounts = new Map<string, number>()
+        for (const r of weekAttendanceRows) {
+            const k = dayKey(new Date(r.date))
+            weekCounts.set(k, (weekCounts.get(k) ?? 0) + 1)
+        }
+        const attendanceTrend7d: { day: string; count: number }[] = []
+        for (let i = -6; i <= 0; i++) {
+            const { start } = istDayRange(i)
+            const k = dayKey(new Date(start.getTime() + 1000))
+            attendanceTrend7d.push({ day: k, count: weekCounts.get(k) ?? 0 })
+        }
+
         return {
             activeEmployees,
             newEmployees30d,
@@ -187,6 +224,8 @@ const getStats = unstable_cache(
                 pct: payrollTotal > 0 ? Math.round((payrollProcessed / payrollTotal) * 100) : 0,
             },
             alerts: { contractsExpiring, docExpiries, lowAttendanceSites },
+            projectsByStatus,
+            attendanceTrend7d,
             recentInspections: recentInspections.map((i: any) => ({
                 id: i.id,
                 projectName: i.assignment?.project?.name ?? "—",
@@ -196,7 +235,7 @@ const getStats = unstable_cache(
             })),
         }
     },
-    ["admin-stats-v2"],
+    ["admin-stats-v3"],
     { revalidate: 30, tags: ["admin-stats"] },
 )
 

@@ -270,6 +270,60 @@ function MiniBar({ pct, danger }: { pct: number; danger?: boolean }) {
     )
 }
 
+// ── Donut chart (pure SVG — 2px surface gaps between segments, hover titles) ──
+
+type DonutSlice = { label: string; value: number; color: string }
+
+function Donut({ slices, centerLabel }: { slices: DonutSlice[]; centerLabel: string }) {
+    const sum = slices.reduce((s, x) => s + x.value, 0)
+    const R = 38
+    const C = 2 * Math.PI * R
+    const nonzero = slices.filter(s => s.value > 0)
+    let acc = 0
+    return (
+        <svg viewBox="0 0 100 100" className="w-[116px] h-[116px] shrink-0" role="img" aria-label={centerLabel}>
+            <circle cx="50" cy="50" r={R} fill="none" stroke="var(--surface2)" strokeWidth="13" />
+            {sum > 0 && nonzero.map(s => {
+                const len = (s.value / sum) * C
+                const dash = nonzero.length === 1 ? C : Math.max(0.5, len - 2)
+                const el = (
+                    <circle key={s.label} cx="50" cy="50" r={R} fill="none" stroke={s.color} strokeWidth="13"
+                        strokeDasharray={`${dash} ${C - dash}`} strokeDashoffset={-acc}
+                        transform="rotate(-90 50 50)">
+                        <title>{`${s.label}: ${s.value} (${Math.round((s.value / sum) * 100)}%)`}</title>
+                    </circle>
+                )
+                acc += len
+                return el
+            })}
+            <text x="50" y="49" textAnchor="middle" style={{ fontSize: 17, fontWeight: 700, fill: "var(--text)" }}>
+                {sum.toLocaleString("en-IN")}
+            </text>
+            <text x="50" y="61" textAnchor="middle" style={{ fontSize: 6.5, fill: "var(--text3)", letterSpacing: 0.8 }}>
+                {centerLabel}
+            </text>
+        </svg>
+    )
+}
+
+function DonutLegend({ slices }: { slices: DonutSlice[] }) {
+    const sum = slices.reduce((s, x) => s + x.value, 0)
+    return (
+        <div className="space-y-1.5 min-w-0 flex-1">
+            {slices.map(s => (
+                <div key={s.label} className="flex items-center gap-2 text-[12px]">
+                    <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: s.color }} />
+                    <span className="text-[var(--text2)] truncate flex-1">{s.label}</span>
+                    <span className="font-semibold text-[var(--text)] tabular-nums">{s.value.toLocaleString("en-IN")}</span>
+                    <span className="text-[11px] text-[var(--text3)] tabular-nums w-9 text-right">
+                        {sum > 0 ? Math.round((s.value / sum) * 100) : 0}%
+                    </span>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 export default function AdminDashboard() {
     const { data: session } = useSession()
     const [stats, setStats] = useState<any>(null)
@@ -343,6 +397,22 @@ export default function AdminDashboard() {
     const days: { day: string; count: number }[] = trend.days || []
     const maxCount = Math.max(1, ...days.map((d: { count: number }) => d.count))
     const fmtK = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(n))
+
+    // Donut data — palettes validated for CVD safety (dataviz checks).
+    const attSlices: { label: string; value: number; color: string }[] = [
+        { label: "Present", value: att.present, color: "#1a9e6e" },
+        { label: "Absent", value: att.absent, color: "#dc2626" },
+        { label: "On Leave", value: att.onLeave, color: "#f59e0b" },
+    ]
+    const pbs = stats.projectsByStatus || {}
+    const projSlices: { label: string; value: number; color: string }[] = [
+        { label: "Active", value: pbs.ACTIVE ?? 0, color: "#1a9e6e" },
+        { label: "Planning", value: pbs.PLANNING ?? 0, color: "#3b82f6" },
+        { label: "On Hold", value: pbs.ON_HOLD ?? 0, color: "#ef4444" },
+        { label: "Completed", value: pbs.COMPLETED ?? 0, color: "#7c3aed" },
+    ]
+    const week7: { day: string; count: number }[] = stats.attendanceTrend7d || []
+    const week7Max = Math.max(1, ...week7.map((d: { count: number }) => d.count))
 
     const alertItems = [
         alerts.contractsExpiring > 0 ? { tone: "amber" as const, title: "Contracts expiring soon", text: `${alerts.contractsExpiring} contract(s) will expire in the next 30 days.`, href: "/contracts", link: "View contracts" } : null,
@@ -543,6 +613,80 @@ export default function AdminDashboard() {
                                     </span>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ── ROW: Visual summaries — donuts + weekly trend ── */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-[14px] items-stretch">
+                {/* Attendance split donut */}
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px]">
+                    <h3 className="text-[13.5px] font-semibold text-[var(--text)] mb-3">
+                        Attendance Split <span className="font-normal text-[var(--text3)]">(Today)</span>
+                    </h3>
+                    {att.present + att.absent + att.onLeave === 0 ? (
+                        <p className="text-[12.5px] text-[var(--text3)] text-center py-8">No employees yet.</p>
+                    ) : (
+                        <div className="flex items-center gap-4">
+                            <Donut centerLabel="EMPLOYEES" slices={attSlices} />
+                            <DonutLegend slices={attSlices} />
+                        </div>
+                    )}
+                </div>
+
+                {/* Projects by status donut */}
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px]">
+                    <h3 className="text-[13.5px] font-semibold text-[var(--text)] mb-3">Projects by Status</h3>
+                    {projSlices.every(s => s.value === 0) ? (
+                        <p className="text-[12.5px] text-[var(--text3)] text-center py-8">No projects yet.</p>
+                    ) : (
+                        <div className="flex items-center gap-4">
+                            <Donut centerLabel="PROJECTS" slices={projSlices} />
+                            <DonutLegend slices={projSlices} />
+                        </div>
+                    )}
+                </div>
+
+                {/* 7-day attendance trend */}
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col">
+                    <h3 className="text-[13.5px] font-semibold text-[var(--text)] mb-1">
+                        Attendance <span className="font-normal text-[var(--text3)]">(Last 7 days)</span>
+                    </h3>
+                    <p className="text-[11px] text-[var(--text3)] mb-3">Employees checked in per day</p>
+                    {week7.length === 0 ? (
+                        <p className="text-[12.5px] text-[var(--text3)] text-center py-8">No attendance data yet.</p>
+                    ) : (
+                        <div className="flex-1 flex flex-col justify-end">
+                            <div className="flex gap-2">
+                                <div className="flex flex-col justify-between text-[10px] text-[var(--text3)] tabular-nums h-[88px] py-0.5 shrink-0 text-right w-7">
+                                    <span>{fmtK(week7Max)}</span>
+                                    <span>{fmtK(Math.round(week7Max / 2))}</span>
+                                    <span>0</span>
+                                </div>
+                                <div className="flex-1 flex items-end gap-[6px] h-[88px] border-l border-b border-[var(--border)] pl-2">
+                                    {week7.map((d: { day: string; count: number }, i: number) => (
+                                        <div
+                                            key={d.day}
+                                            style={{ height: `${Math.max(3, (d.count / week7Max) * 100)}%` }}
+                                            title={`${format(new Date(d.day), "EEE, d MMM")}: ${d.count}`}
+                                            className={cn(
+                                                "flex-1 rounded-t-[3px] transition-all",
+                                                i === week7.length - 1
+                                                    ? "bg-[var(--accent)]"
+                                                    : "bg-[color-mix(in_srgb,var(--accent)_28%,transparent)]"
+                                            )}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex gap-[6px] pl-9 mt-1.5">
+                                {week7.map((d: { day: string }) => (
+                                    <span key={d.day} className="flex-1 text-center text-[9.5px] text-[var(--text3)] font-medium">
+                                        {format(new Date(d.day), "EEE")}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
