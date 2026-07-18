@@ -71,6 +71,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
             uploadedDocs, // array of { type, fileName, fileUrl }
             siteId,       // NEW — selected site from dropdown
             hrId,         // NEW — selected HR user (stored as managerId)
+            designation,  // job role — feeds document templates ({{designation}})
+            uan,          // previous PF / UAN number
+            pfNumber,
+            esiNumber,    // previous ESIC number
         } = body
 
         // 1. Update Employee Record
@@ -101,6 +105,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
                 bankIFSC: bankIFSC ?? existing.bankIFSC,
                 bankName: bankName ?? existing.bankName,
                 bankBranch: bankBranch || existing.bankBranch,
+                designation: designation || existing.designation,
+                uan: uan || existing.uan,
+                pfNumber: pfNumber || existing.pfNumber,
+                esiNumber: esiNumber || existing.esiNumber,
                 // NEW: HR assignment goes on managerId
                 managerId: hrId || existing.managerId,
                 kycRejectionNote: null,

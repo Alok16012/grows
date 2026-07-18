@@ -23,6 +23,7 @@ type FormData = {
     // Assignment (NEW)
     siteId: string
     hrId: string
+    designation: string
     // Current Address
     address: string
     city: string
@@ -42,6 +43,9 @@ type FormData = {
     // KYC
     aadharNumber: string
     panNumber: string
+    // Statutory numbers (previous employment)
+    uan: string
+    esiNumber: string
     // Bank
     bankName: string
     bankAccountNumber: string
@@ -54,11 +58,12 @@ type HrOption = { id: string; name: string; email?: string | null; role?: string
 
 const EMPTY: FormData = {
     dateOfBirth: "", gender: "", bloodGroup: "", fathersName: "", maritalStatus: "", photo: "",
-    siteId: "", hrId: "",
+    siteId: "", hrId: "", designation: "",
     address: "", city: "", state: "", pincode: "",
     permanentAddress: "", permanentCity: "", permanentState: "", permanentPincode: "", sameAsCurrent: false,
     emergencyContact1Name: "", emergencyContact1Phone: "", emergencyContact2Name: "", emergencyContact2Phone: "",
     aadharNumber: "", panNumber: "",
+    uan: "", esiNumber: "",
     bankName: "", bankAccountNumber: "", bankIFSC: "", bankBranch: "",
 }
 
@@ -123,6 +128,7 @@ export default function OnboardingPortal() {
                         photo: data.photo || "",
                         siteId: data.currentSiteId || "",
                         hrId: data.managerId || "",
+                        designation: data.designation || "",
                         address: data.address || "",
                         city: data.city || "",
                         state: data.state || "",
@@ -138,6 +144,8 @@ export default function OnboardingPortal() {
                         emergencyContact2Phone: data.emergencyContact2Phone || "",
                         aadharNumber: data.aadharNumber || "",
                         panNumber: data.panNumber || "",
+                        uan: data.uan || "",
+                        esiNumber: data.esiNumber || "",
                         bankName: data.bankName || "",
                         bankAccountNumber: data.bankAccountNumber || "",
                         bankIFSC: data.bankIFSC || "",
@@ -352,9 +360,15 @@ export default function OnboardingPortal() {
                                             ))}
                                         </select>
                                     </Field>
+                                    <div style={{ gridColumn: "1 / -1" }}>
+                                        <Field label="Designation / Job Role *">
+                                            <input type="text" value={form.designation} onChange={set("designation")}
+                                                placeholder="e.g. Quality Inspector, Security Guard" className={inp} required />
+                                        </Field>
+                                    </div>
                                 </div>
                                 <p style={{ fontSize: 11, color: "#6b7280", marginTop: 10, margin: "10px 0 0" }}>
-                                    Select the site where you'll work and the HR person handling your onboarding.
+                                    Select the site where you&apos;ll work, the HR person handling your onboarding, and your job role — the designation is printed on your official letters.
                                 </p>
                             </div>
 
@@ -508,6 +522,28 @@ export default function OnboardingPortal() {
                                     </Field>
                                 </div>
                             </div>
+                            {/* Previous employment statutory numbers */}
+                            <div style={{ marginTop: 24 }}>
+                                <p style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                    Previous Employment — PF &amp; ESIC
+                                </p>
+                                <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 12 }}>
+                                    If you worked before and have a PF (UAN) or ESIC number, enter it so your account continues. Leave blank if this is your first job.
+                                </p>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                                    <Field label="Previous PF / UAN Number">
+                                        <input type="text" maxLength={12} value={form.uan}
+                                            onChange={e => setForm(f => ({ ...f, uan: e.target.value.replace(/\D/g, "") }))}
+                                            placeholder="12-digit UAN" className={inp} />
+                                    </Field>
+                                    <Field label="Previous ESIC Number">
+                                        <input type="text" maxLength={17} value={form.esiNumber}
+                                            onChange={e => setForm(f => ({ ...f, esiNumber: e.target.value.replace(/\D/g, "") }))}
+                                            placeholder="ESIC IP number" className={inp} />
+                                    </Field>
+                                </div>
+                            </div>
+
                             <div style={{ marginTop: 16, padding: "12px 14px", borderRadius: 10, background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.2)" }}>
                                 <p style={{ fontSize: 12, color: "#fbbf24", margin: 0 }}>Your KYC details will be verified by HR. Make sure the information matches your official documents.</p>
                             </div>
