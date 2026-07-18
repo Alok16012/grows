@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
 import { ensureSiteAssignmentSchema } from "@/lib/site-assignment-schema"
+import { ensureProjectSchema } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
 
@@ -36,6 +37,8 @@ export async function GET(req: Request) {
     }
 
     try {
+        await ensureProjectSchema()
+
         if (user.role === Role.INSPECTION_BOY) {
             const assignments = await prisma.assignment.findMany({
                 where,
@@ -108,6 +111,10 @@ export async function GET(req: Request) {
                         inspectionBoyId: true,
                         assignedBy: true,
                         status: true,
+                        recurrenceType: true,
+                        recurrenceActive: true,
+                        startDate: true,
+                        notes: true,
                         createdAt: true,
                         inspectionBoy: { select: { id: true, name: true, email: true } },
                         assigner: { select: { name: true } }
@@ -178,6 +185,8 @@ export async function POST(req: Request) {
     }
 
     try {
+        await ensureProjectSchema()
+
         const body = await req.json()
         const {
             projectId,
@@ -188,8 +197,12 @@ export async function POST(req: Request) {
             managerId,
             managerIds,
             recurrenceType,
+            startDate,
+            notes,
         } = body
         const recurType: string = ["daily", "weekly"].includes(recurrenceType) ? recurrenceType : "none"
+        const start = startDate ? new Date(startDate) : null
+        const noteText = typeof notes === "string" && notes.trim() ? notes.trim().slice(0, 250) : null
 
         // Resolve the list of target projects.
         // - wholeSite + siteId  → every current project under that real HR Site
@@ -247,6 +260,8 @@ export async function POST(req: Request) {
                                 status: "active",
                                 recurrenceType: recurType,
                                 recurrenceActive: recurType !== "none",
+                                startDate: start,
+                                notes: noteText,
                             },
                         })
                         created.push(assignment)

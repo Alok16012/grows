@@ -124,6 +124,10 @@ model Assignment {
   status           String       @default("active")
   recurrenceType   String       @default("none")
   recurrenceActive Boolean      @default(false)
+  // Scheduling fields (created in prod at runtime via ensureProjectSchema —
+  // prod migrations are manual).
+  startDate        DateTime?
+  notes            String?
   createdAt        DateTime     @default(now())
   assigner         User         @relation("AssignmentAssigner", fields: [assignedBy], references: [id])
   inspectionBoy    User         @relation("AssignmentInspector", fields: [inspectionBoyId], references: [id])

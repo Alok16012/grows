@@ -1,10 +1,131 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { Loader2, Check, ChevronDown, ChevronLeft, Search, Trash2 } from "lucide-react"
+import {
+    Loader2, Check, ChevronLeft, ChevronRight, Search, Trash2, X,
+    Users, Sparkles, Eye, MoreVertical, Calendar, RefreshCw,
+    ClipboardList, StopCircle, FileText,
+} from "lucide-react"
 import { can } from "@/lib/can"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Person = { id: string; name: string | null; email: string | null; phone?: string | null }
+
+type Assignment = {
+    id: string
+    projectId: string
+    inspectionBoyId: string | null
+    status: string
+    recurrenceType?: string
+    recurrenceActive?: boolean
+    startDate?: string | null
+    notes?: string | null
+    createdAt: string
+    inspectionBoy?: { id?: string; name: string | null; email?: string | null } | null
+    assigner?: { name: string | null } | null
+    project?: {
+        id: string
+        name: string
+        company?: { name: string } | null
+        site?: { id: string; name: string } | null
+    } | null
+}
+
+const WIZARD_STEPS = [
+    { key: "site", label: "Site & Access" },
+    { key: "inspectors", label: "Inspectors" },
+    { key: "managers", label: "Managers" },
+    { key: "review", label: "Type & Review" },
+]
+
+const RECURRENCE_OPTIONS = [
+    { value: "none", label: "One-time" },
+    { value: "daily", label: "Recurring — Daily" },
+    { value: "weekly", label: "Recurring — Weekly" },
+]
+
+const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+const selectCls = inputCls + " cursor-pointer"
+
+// Derived display status: active assignments whose start date is in the
+// future read as "Scheduled" — matches how admins think about them.
+function displayStatus(a: Assignment): { label: string; bg: string; fg: string } {
+    if (a.status === "manager_only") return { label: "Manager Only", bg: "#f5f3ff", fg: "#7c3aed" }
+    if (a.status === "inactive") return { label: "Inactive", bg: "#f3f4f6", fg: "#6b7280" }
+    if (a.startDate && new Date(a.startDate) > new Date()) return { label: "Scheduled", bg: "#eff6ff", fg: "#1d4ed8" }
+    return { label: "Active", bg: "#e8f7f1", fg: "#0d6b4a" }
+}
+
+function fmtDate(s?: string | null) {
+    if (!s) return "—"
+    return new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function PersonRow({ person, checked, onToggle }: { person: Person; checked: boolean; onToggle: () => void }) {
+    const initials = (person.name || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()
+    return (
+        <button type="button" onClick={onToggle}
+            className={`flex items-center gap-2.5 p-[9px_12px] w-full text-left border-b border-[var(--border)] last:border-0 transition-colors ${
+                checked ? "bg-[#f0fdf4]" : "hover:bg-[var(--surface2)]"
+            }`}>
+            <span className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] shrink-0 transition-colors ${
+                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[#d4d1ca] bg-white"
+            }`}>
+                {checked && <Check size={10} className="text-white" strokeWidth={3.5} />}
+            </span>
+            <span className="w-7 h-7 rounded-full bg-[var(--surface2)] text-[var(--text2)] text-[10px] font-bold flex items-center justify-center shrink-0">
+                {initials}
+            </span>
+            <span className="min-w-0">
+                <span className="block text-[12.5px] font-semibold text-[var(--text)] truncate">{person.name || "Unnamed"}</span>
+                <span className="block text-[11px] text-[var(--text3)] truncate">{person.phone || person.email || "—"}</span>
+            </span>
+        </button>
+    )
+}
+
+function RowMenu({ assignment, onDelete, onStopRecurrence }: {
+    assignment: Assignment
+    onDelete: () => void
+    onStopRecurrence: () => void
+}) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener("mousedown", handler)
+        return () => document.removeEventListener("mousedown", handler)
+    }, [])
+    const isVirtual = assignment.id.startsWith("virtual-")
+    if (isVirtual) return <span className="w-7 inline-block" />
+    return (
+        <div className="relative inline-block" ref={ref}>
+            <button onClick={() => setOpen(o => !o)}
+                className="p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
+                <MoreVertical size={13} />
+            </button>
+            {open && (
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-20 py-1 overflow-hidden">
+                    {assignment.recurrenceActive && (
+                        <button onClick={() => { onStopRecurrence(); setOpen(false) }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                            <StopCircle size={13} /> Stop Recurrence
+                        </button>
+                    )}
+                    <button onClick={() => { onDelete(); setOpen(false) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-red-50 transition-colors">
+                        <Trash2 size={13} /> Delete Assignment
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
 
 export default function AssignmentsPage() {
     const { data: session, status } = useSession()
@@ -13,9 +134,7 @@ export default function AssignmentsPage() {
     const [mounted, setMounted] = useState(false)
     const isManagerOrAdmin = can(session, "assignments.view")
 
-    useEffect(() => {
-        setMounted(true)
-    }, [])
+    useEffect(() => { setMounted(true) }, [])
 
     useEffect(() => {
         if (!mounted) return
@@ -26,58 +145,53 @@ export default function AssignmentsPage() {
         }
     }, [status, session, router, isManagerOrAdmin, mounted])
 
+    // ── Data ──
     const [sites, setSites] = useState<any[]>([])
     const [projects, setProjects] = useState<any[]>([])
-    const [inspectors, setInspectors] = useState<any[]>([])
-    const [managers, setManagers] = useState<any[]>([])
-    const [assignments, setAssignments] = useState<any[]>([])
+    const [inspectors, setInspectors] = useState<Person[]>([])
+    const [managers, setManagers] = useState<Person[]>([])
+    const [assignments, setAssignments] = useState<Assignment[]>([])
+    const [fetching, setFetching] = useState(true)
 
-    // Site is the real HR Site (workforce site). Access is granted either to the
-    // whole Site (all its projects, future ones auto-included) or to specific
-    // projects under it.
+    // ── Wizard state ──
+    const [wizardStep, setWizardStep] = useState(0)
     const [selectedSiteId, setSelectedSiteId] = useState("")
-    const [wholeSite, setWholeSite] = useState(false)
+    const [wholeSite, setWholeSite] = useState(true)
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
     const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
     const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
     const [recurrenceType, setRecurrenceType] = useState("none")
-    // Step-wise wizard for the New Assignment form
-    const [wizardStep, setWizardStep] = useState(0)
-
+    const [startDate, setStartDate] = useState("")
+    const [notes, setNotes] = useState("")
     const [loading, setLoading] = useState(false)
-    const [fetching, setFetching] = useState(true)
-    const [filterStatus, setFilterStatus] = useState("all")
-    // Search boxes for the selection lists + the assignments table
     const [inspectorSearch, setInspectorSearch] = useState("")
     const [managerSearch, setManagerSearch] = useState("")
+
+    // ── Table state ──
     const [assignmentSearch, setAssignmentSearch] = useState("")
+    const [filterStatus, setFilterStatus] = useState("all")
+    const [page, setPage] = useState(1)
+    const [perPage, setPerPage] = useState(10)
+    const [detail, setDetail] = useState<Assignment | null>(null)
+
+    useEffect(() => { setPage(1) }, [assignmentSearch, filterStatus, perPage])
 
     useEffect(() => {
-        if (mounted && isManagerOrAdmin) {
-            fetchInitialData()
-        }
+        if (mounted && isManagerOrAdmin) fetchInitialData()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isManagerOrAdmin, mounted])
 
     useEffect(() => {
-        if (selectedSiteId) {
-            fetchProjects(selectedSiteId)
-        } else {
-            setProjects([])
-        }
-        // Changing Site resets the project selection & access mode.
+        if (selectedSiteId) fetchProjects(selectedSiteId)
+        else setProjects([])
+        // Changing Site resets the project selection.
         setSelectedProjectIds([])
-        setWholeSite(false)
     }, [selectedSiteId])
 
     // Auto-fill inspectors & managers from the chosen projects' existing members.
-    // Runs only when the project selection (or access mode / project list) changes,
-    // so it seeds the defaults without fighting the user's manual edits on later steps.
     useEffect(() => {
-        const sourceProjects = wholeSite
-            ? projects
-            : projects.filter(p => selectedProjectIds.includes(p.id))
+        const sourceProjects = wholeSite ? projects : projects.filter(p => selectedProjectIds.includes(p.id))
         if (sourceProjects.length === 0) return
-
         const mgr = new Set<string>()
         const ins = new Set<string>()
         sourceProjects.forEach(p => {
@@ -96,9 +210,8 @@ export default function AssignmentsPage() {
                 fetch("/api/sites?isActive=true"),
                 fetch("/api/users?role=INSPECTION_BOY"),
                 fetch("/api/users?role=MANAGER"),
-                fetch(`/api/assignments?t=${Date.now()}`)
+                fetch(`/api/assignments?t=${Date.now()}`),
             ])
-
             if (siteRes.ok) setSites(await siteRes.json())
             if (insRes.ok) setInspectors(await insRes.json())
             if (mgrRes.ok) setManagers(await mgrRes.json())
@@ -106,8 +219,7 @@ export default function AssignmentsPage() {
                 const data = await assRes.json()
                 setAssignments(Array.isArray(data) ? data : [])
             }
-        } catch (error) {
-            console.error("Failed to fetch data", error)
+        } catch {
             setAssignments([])
         } finally {
             setFetching(false)
@@ -117,22 +229,36 @@ export default function AssignmentsPage() {
     const fetchProjects = async (siteId: string) => {
         try {
             const res = await fetch(`/api/projects?siteId=${siteId}`)
-            if (res.ok) {
-                const data = await res.json()
-                setProjects(Array.isArray(data) ? data : [])
-            } else {
-                setProjects([])
-            }
-        } catch (error) {
-            console.error("Failed to fetch projects", error)
+            const data = res.ok ? await res.json() : []
+            setProjects(Array.isArray(data) ? data : [])
+        } catch {
             setProjects([])
         }
+    }
+
+    const refreshAssignments = async () => {
+        try {
+            const res = await fetch(`/api/assignments?t=${Date.now()}`)
+            const data = await res.json()
+            setAssignments(Array.isArray(data) ? data : [])
+        } catch { /* keep old */ }
+    }
+
+    const resetForm = () => {
+        setSelectedInspectorIds([])
+        setSelectedManagerIds([])
+        setSelectedProjectIds([])
+        setWholeSite(true)
+        setSelectedSiteId("")
+        setRecurrenceType("none")
+        setStartDate("")
+        setNotes("")
+        setWizardStep(0)
     }
 
     const handleAssign = async () => {
         const hasProjects = wholeSite ? !!selectedSiteId : selectedProjectIds.length > 0
         if (!hasProjects || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)) return
-
         setLoading(true)
         try {
             const res = await fetch("/api/assignments", {
@@ -144,28 +270,19 @@ export default function AssignmentsPage() {
                     projectIds: wholeSite ? undefined : selectedProjectIds,
                     inspectorIds: selectedInspectorIds.length > 0 ? selectedInspectorIds : undefined,
                     managerIds: selectedManagerIds.length > 0 ? selectedManagerIds : undefined,
-                    recurrenceType
-                })
+                    recurrenceType,
+                    startDate: startDate || undefined,
+                    notes: notes || undefined,
+                }),
             })
-
             if (res.ok) {
-                const result = await res.json()
-                const assRes = await fetch(`/api/assignments?t=${Date.now()}`)
-                const assData = await assRes.json()
-                setAssignments(Array.isArray(assData) ? assData : [])
-
-                setSelectedInspectorIds([])
-                setSelectedManagerIds([])
-                setSelectedProjectIds([])
-                setWholeSite(false)
-                setSelectedSiteId("")
-                setRecurrenceType("none")
-                setWizardStep(0)
+                await refreshAssignments()
+                resetForm()
             } else {
                 const error = await res.json()
                 alert(error.error || "Failed to assign")
             }
-        } catch (error) {
+        } catch {
             alert("An error occurred")
         } finally {
             setLoading(false)
@@ -176,44 +293,12 @@ export default function AssignmentsPage() {
         if (!confirm("Are you sure you want to delete this assignment permanently?")) return
         try {
             const res = await fetch(`/api/assignments/${id}`, { method: "DELETE" })
-            if (res.ok) {
-                setAssignments(assignments.filter(a => a.id !== id))
-            } else {
-                alert("Failed to delete assignment")
-            }
-        } catch (error) {
+            if (res.ok) setAssignments(prev => prev.filter(a => a.id !== id))
+            else alert("Failed to delete assignment")
+        } catch {
             alert("An error occurred while deleting")
         }
     }
-
-    // Filtered selection lists (search by name or email)
-    const insMatch = inspectorSearch.trim().toLowerCase()
-    const filteredInspectors = insMatch
-        ? inspectors.filter(i =>
-            (i.name || "").toLowerCase().includes(insMatch) ||
-            (i.email || "").toLowerCase().includes(insMatch))
-        : inspectors
-    const mgrMatch = managerSearch.trim().toLowerCase()
-    const filteredManagers = mgrMatch
-        ? managers.filter(m =>
-            (m.name || "").toLowerCase().includes(mgrMatch) ||
-            (m.email || "").toLowerCase().includes(mgrMatch))
-        : managers
-
-    const asgMatch = assignmentSearch.trim().toLowerCase()
-    const filteredAssignments = Array.isArray(assignments) ? assignments.filter(a => {
-        if (filterStatus !== "all" && a.status !== filterStatus) return false
-        if (asgMatch) {
-            const hay = [
-                a.inspectionBoy?.name,
-                a.project?.name,
-                a.project?.site?.name,
-                a.project?.company?.name,
-            ].filter(Boolean).join(" ").toLowerCase()
-            if (!hay.includes(asgMatch)) return false
-        }
-        return true
-    }) : []
 
     const handleStopRecurrence = async (id: string) => {
         if (!confirm("Stop auto-recurring for this assignment? No more assignments will be created automatically.")) return
@@ -221,587 +306,437 @@ export default function AssignmentsPage() {
             const res = await fetch(`/api/assignments/${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ recurrenceActive: false })
+                body: JSON.stringify({ recurrenceActive: false }),
             })
-            if (res.ok) {
-                setAssignments(prev => prev.map(a => a.id === id ? { ...a, recurrenceActive: false } : a))
-            }
-        } catch { }
+            if (res.ok) setAssignments(prev => prev.map(a => a.id === id ? { ...a, recurrenceActive: false } : a))
+        } catch { /* ignore */ }
     }
 
-    const resetForm = () => {
-        setSelectedInspectorIds([])
-        setSelectedManagerIds([])
-        setSelectedProjectIds([])
-        setWholeSite(false)
-        setSelectedSiteId("")
-        setRecurrenceType("none")
-        setWizardStep(0)
-    }
-
-    // ── Step-wise wizard for the New Assignment form ──
-    const wizardSteps = [
-        { key: "site", label: "Site & Access" },
-        { key: "inspectors", label: "Inspectors" },
-        { key: "managers", label: "Managers" },
-        { key: "review", label: "Type & Review" },
-    ]
-    // Step 0 needs a Site and either "whole site" or at least one project ticked.
+    // ── Wizard helpers ──
     const hasProjectAccess = wholeSite ? !!selectedSiteId : selectedProjectIds.length > 0
-    const canLeaveStep0 = !!selectedSiteId && hasProjectAccess
-    const handleWizardNext = () => {
+    const canLeaveStep0 = !!selectedSiteId && hasProjectAccess && !!startDate
+    const goNext = () => {
         if (wizardStep === 0 && !canLeaveStep0) return
-        setWizardStep(s => Math.min(s + 1, wizardSteps.length - 1))
+        setWizardStep(s => Math.min(s + 1, WIZARD_STEPS.length - 1))
     }
-    const handleWizardBack = () => setWizardStep(s => Math.max(s - 1, 0))
-    const goToWizardStep = (target: number) => {
+    const goBack = () => setWizardStep(s => Math.max(s - 1, 0))
+    const goToStep = (target: number) => {
         if (target === wizardStep) return
         if (target < wizardStep) { setWizardStep(target); return }
-        // moving forward always requires a Site + project access first
         if (canLeaveStep0) setWizardStep(target)
     }
+    const toggleId = (id: string, setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+        setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
     const selectedSite = sites.find(s => s.id === selectedSiteId)
-    const selectedProjectsList = projects.filter(p => selectedProjectIds.includes(p.id))
-    const selectedInspectors = inspectors.filter(i => selectedInspectorIds.includes(i.id))
-    const selectedManagers = managers.filter(m => selectedManagerIds.includes(m.id))
-    const toggleProject = (id: string) => {
-        setSelectedProjectIds(prev =>
-            prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-        )
-    }
+
+    const insMatch = inspectorSearch.trim().toLowerCase()
+    const filteredInspectors = insMatch
+        ? inspectors.filter(i => (i.name || "").toLowerCase().includes(insMatch) || (i.email || "").toLowerCase().includes(insMatch) || (i.phone || "").toLowerCase().includes(insMatch))
+        : inspectors
+    const mgrMatch = managerSearch.trim().toLowerCase()
+    const filteredManagers = mgrMatch
+        ? managers.filter(m => (m.name || "").toLowerCase().includes(mgrMatch) || (m.email || "").toLowerCase().includes(mgrMatch))
+        : managers
+
+    // ── Table data ──
+    const realAssignments = useMemo(() => assignments.filter(a => !a.id.startsWith("virtual-")), [assignments])
+    const stats = useMemo(() => ({
+        total: realAssignments.length,
+        active: realAssignments.filter(a => displayStatus(a).label === "Active").length,
+        oneTime: realAssignments.filter(a => (a.recurrenceType ?? "none") === "none").length,
+        recurring: realAssignments.filter(a => (a.recurrenceType ?? "none") !== "none").length,
+    }), [realAssignments])
+
+    const filteredAssignments = useMemo(() => {
+        const q = assignmentSearch.trim().toLowerCase()
+        return assignments.filter(a => {
+            if (filterStatus !== "all" && displayStatus(a).label !== filterStatus) return false
+            if (q) {
+                const hay = [
+                    a.inspectionBoy?.name,
+                    a.project?.name,
+                    a.project?.site?.name,
+                    a.project?.company?.name,
+                ].filter(Boolean).join(" ").toLowerCase()
+                if (!hay.includes(q)) return false
+            }
+            return true
+        })
+    }, [assignments, assignmentSearch, filterStatus])
+
+    const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / perPage))
+    const safePage = Math.min(page, totalPages)
+    const pageRows = filteredAssignments.slice((safePage - 1) * perPage, safePage * perPage)
+    const showFrom = filteredAssignments.length === 0 ? 0 : (safePage - 1) * perPage + 1
+    const showTo = Math.min(safePage * perPage, filteredAssignments.length)
 
     if (status === "loading" || fetching) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-[#1a9e6e]" />
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
             </div>
         )
     }
-
     if (!isManagerOrAdmin) return null
 
+    const listBox = "bg-[var(--surface2)]/40 border border-[var(--border)] rounded-[10px] max-h-[260px] overflow-y-auto"
+
     return (
-        <div className="min-h-screen bg-[#f5f4f0] p-4 lg:p-[24px_28px]">
-            <div className="flex justify-between items-center mb-4 lg:mb-[20px]">
-                <h1 className="text-[22px] font-[600] tracking-[-0.4px] text-[#1a1a18]">Assignments</h1>
+        <div className="pb-8">
+            {/* Header */}
+            <div className="mb-4">
+                <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)] flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-[9px] bg-[var(--accent-light)] flex items-center justify-center">
+                        <Users size={16} className="text-[var(--accent)]" />
+                    </span>
+                    Assignments
+                </h1>
+                <p className="text-[13px] text-[var(--text3)] mt-0.5">Assign inspectors and managers to projects and define access, scope, and schedules.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-[20px] items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-[440px_1fr] gap-4 items-start">
 
-                {/* LEFT COLUMN: FORM */}
-                <div>
-                    {/* NEW ASSIGNMENT */}
-                    <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[22px]">
-                        <h2 className="text-[15px] font-[600] text-[#1a1a18] mb-[4px]">New Assignment</h2>
-                        <p className="text-[13px] text-[#6b6860] mb-[16px]">Pick a Site, then grant access to all its projects or specific ones.</p>
+                {/* ── LEFT: New Assignment wizard ── */}
+                <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <Sparkles size={15} className="text-[var(--accent)]" />
+                        <h2 className="text-[15px] font-semibold text-[var(--text)]">New Assignment</h2>
+                    </div>
+                    <p className="text-[12px] text-[var(--text3)] mb-4">Create a new assignment in a few simple steps.</p>
 
-                        {/* STEPPER RAIL */}
-                        <div className="mb-[20px]">
-                            <div className="flex items-center justify-between mb-[10px]">
-                                <span className="text-[12px] font-[600] text-[#1a1a18]">
-                                    Step {wizardStep + 1} of {wizardSteps.length} — {wizardSteps[wizardStep].label}
-                                </span>
-                                <span className="text-[11px] font-[500] text-[#9e9b95]">
-                                    {Math.round((wizardStep / (wizardSteps.length - 1)) * 100)}%
-                                </span>
-                            </div>
-                            <div className="flex items-center">
-                                {wizardSteps.map((s, i) => {
-                                    const isDone = i < wizardStep
-                                    const isActive = i === wizardStep
-                                    return (
-                                        <div key={s.key} className="flex items-center flex-1 last:flex-none">
-                                            <button
-                                                type="button"
-                                                onClick={() => goToWizardStep(i)}
-                                                className="flex flex-col items-center gap-[5px] shrink-0 focus:outline-none"
-                                            >
-                                                <span className={`flex items-center justify-center w-[26px] h-[26px] rounded-full text-[12px] font-[700] border-[1.5px] transition-colors ${isActive ? "bg-[#1a9e6e] border-[#1a9e6e] text-white" : isDone ? "bg-[#e8f7f1] border-[#1a9e6e] text-[#0d6b4a]" : "bg-white border-[#e8e6e1] text-[#9e9b95]"}`}>
-                                                    {isDone ? <Check className="h-[14px] w-[14px]" strokeWidth={3} /> : i + 1}
-                                                </span>
-                                                <span className={`text-[10.5px] font-[500] whitespace-nowrap ${isActive ? "text-[#1a1a18]" : "text-[#9e9b95]"}`}>{s.label}</span>
-                                            </button>
-                                            {i < wizardSteps.length - 1 && (
-                                                <span className={`h-[2px] flex-1 mx-[6px] mb-[18px] rounded-full transition-colors ${i < wizardStep ? "bg-[#1a9e6e]" : "bg-[#e8e6e1]"}`} />
-                                            )}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
+                    {/* Stepper */}
+                    <p className="text-[12px] font-semibold text-[var(--text)] mb-2.5">
+                        Step {wizardStep + 1} of {WIZARD_STEPS.length} — {WIZARD_STEPS[wizardStep].label}
+                    </p>
+                    <div className="flex items-center mb-5">
+                        {WIZARD_STEPS.map((s, i) => {
+                            const isDone = i < wizardStep
+                            const isActive = i === wizardStep
+                            return (
+                                <div key={s.key} className="flex items-center flex-1 last:flex-none">
+                                    <button type="button" onClick={() => goToStep(i)} className="flex flex-col items-center gap-[5px] shrink-0 focus:outline-none">
+                                        <span className={`flex items-center justify-center w-[26px] h-[26px] rounded-full text-[12px] font-bold border-[1.5px] transition-colors ${
+                                            isActive ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+                                                : isDone ? "bg-[var(--accent-light)] border-[var(--accent)] text-[var(--accent)]"
+                                                    : "bg-white border-[var(--border)] text-[var(--text3)]"
+                                        }`}>
+                                            {isDone ? <Check size={13} strokeWidth={3} /> : i + 1}
+                                        </span>
+                                        <span className={`text-[10px] font-medium whitespace-nowrap ${isActive ? "text-[var(--text)]" : "text-[var(--text3)]"}`}>{s.label}</span>
+                                    </button>
+                                    {i < WIZARD_STEPS.length - 1 && (
+                                        <span className={`h-[2px] flex-1 mx-1.5 mb-[18px] rounded-full transition-colors ${i < wizardStep ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`} />
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
 
-                        {/* STEP 1: SITE & ACCESS */}
-                        {wizardStep === 0 && (
-                        <div className="mb-[18px]">
-                            <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[6px]">
-                                Select Site <span className="text-[#dc2626]">*</span>
-                            </label>
-                            <div className="relative mb-[16px]">
-                                <select
-                                    className="w-full appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[10px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] focus:bg-white cursor-pointer"
-                                    value={selectedSiteId}
-                                    onChange={(e) => setSelectedSiteId(e.target.value)}
-                                >
+                    {/* STEP 1: Site & Access */}
+                    {wizardStep === 0 && (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Select Site <span className="text-[var(--red)]">*</span></label>
+                                <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)} className={selectCls}>
                                     <option value="">Select Site</option>
-                                    {sites.map(s => <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
+                                    {sites.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}{s.city ? `, ${s.city}` : ""}{s.code ? ` (${s.code})` : ""}</option>
+                                    ))}
                                 </select>
-                                <ChevronDown className="absolute right-[14px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none" />
                             </div>
 
                             {selectedSiteId && (
-                                <>
-                                    <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[8px]">
-                                        Access <span className="text-[#dc2626]">*</span>
-                                    </label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-[10px] mb-[14px]">
-                                        <button
-                                            type="button"
-                                            onClick={() => { setWholeSite(true); setSelectedProjectIds([]) }}
-                                            className={`text-left p-[12px_14px] rounded-[10px] border-[1.5px] transition-all ${wholeSite ? "border-[#1a9e6e] bg-[#f0fdf4]" : "border-[#e8e6e1] bg-[#f9f8f5] hover:bg-white"}`}
-                                        >
-                                            <div className="flex items-center gap-[6px] mb-[3px]">
-                                                <div className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] ${wholeSite ? "border-[#1a9e6e]" : "border-[#d4d1ca]"}`}>
-                                                    {wholeSite && <span className="w-[8px] h-[8px] rounded-full bg-[#1a9e6e]" />}
-                                                </div>
-                                                <span className="text-[12.5px] font-[600] text-[#1a1a18]">Whole Site</span>
-                                            </div>
-                                            <span className="text-[11px] text-[#6b6860] leading-tight block">All projects — new ones added later are auto-included.</span>
+                                <div>
+                                    <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Access Scope</label>
+                                    <div className="space-y-2">
+                                        <button type="button" onClick={() => { setWholeSite(true); setSelectedProjectIds([]) }}
+                                            className={`w-full flex items-center gap-2.5 p-[11px_14px] rounded-[10px] border-[1.5px] text-left transition-all ${
+                                                wholeSite ? "border-[var(--accent)] bg-[#f0fdf4]" : "border-[var(--border)] bg-white hover:border-[var(--accent)]/40"
+                                            }`}>
+                                            <span className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] shrink-0 ${wholeSite ? "border-[var(--accent)]" : "border-[#d4d1ca]"}`}>
+                                                {wholeSite && <span className="w-[7px] h-[7px] rounded-full bg-[var(--accent)]" />}
+                                            </span>
+                                            <span>
+                                                <span className="block text-[12.5px] font-semibold text-[var(--text)] underline decoration-transparent">All Projects</span>
+                                                <span className="block text-[11px] text-[var(--text3)]">Every project under this site — future ones auto-included.</span>
+                                            </span>
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setWholeSite(false)}
-                                            className={`text-left p-[12px_14px] rounded-[10px] border-[1.5px] transition-all ${!wholeSite ? "border-[#1a9e6e] bg-[#f0fdf4]" : "border-[#e8e6e1] bg-[#f9f8f5] hover:bg-white"}`}
-                                        >
-                                            <div className="flex items-center gap-[6px] mb-[3px]">
-                                                <div className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] ${!wholeSite ? "border-[#1a9e6e]" : "border-[#d4d1ca]"}`}>
-                                                    {!wholeSite && <span className="w-[8px] h-[8px] rounded-full bg-[#1a9e6e]" />}
-                                                </div>
-                                                <span className="text-[12.5px] font-[600] text-[#1a1a18]">Specific Projects</span>
-                                            </div>
-                                            <span className="text-[11px] text-[#6b6860] leading-tight block">Pick only the projects to grant access to.</span>
+                                        <button type="button" onClick={() => setWholeSite(false)}
+                                            className={`w-full flex items-center gap-2.5 p-[11px_14px] rounded-[10px] border-[1.5px] text-left transition-all ${
+                                                !wholeSite ? "border-[var(--accent)] bg-[#f0fdf4]" : "border-[var(--border)] bg-white hover:border-[var(--accent)]/40"
+                                            }`}>
+                                            <span className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] shrink-0 ${!wholeSite ? "border-[var(--accent)]" : "border-[#d4d1ca]"}`}>
+                                                {!wholeSite && <span className="w-[7px] h-[7px] rounded-full bg-[var(--accent)]" />}
+                                            </span>
+                                            <span>
+                                                <span className="block text-[12.5px] font-semibold text-[var(--text)]">Specific Projects</span>
+                                                <span className="block text-[11px] text-[var(--text3)]">Pick only the projects to grant access to.</span>
+                                            </span>
                                         </button>
                                     </div>
 
                                     {!wholeSite && (
-                                        <>
-                                            <div className="flex justify-between items-center mb-[8px]">
-                                                <label className="text-[12.5px] font-[500] text-[#1a1a18]">Select Projects</label>
+                                        <div className="mt-2.5">
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <span className="text-[12px] font-medium text-[var(--text)]">Select Projects</span>
                                                 {selectedProjectIds.length > 0 && (
-                                                    <span className="bg-[#e8f7f1] text-[#0d6b4a] px-[8px] py-[2px] rounded-[20px] text-[11px] font-[500]">
+                                                    <span className="bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-full text-[11px] font-medium">
                                                         {selectedProjectIds.length} selected
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="bg-[#f9f8f5] border border-[#e8e6e1] rounded-[10px] max-h-[220px] overflow-y-auto">
+                                            <div className={listBox}>
                                                 {projects.length === 0 ? (
-                                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No projects under this Site.</div>
-                                                ) : (
-                                                    projects.map(project => {
-                                                        const isChecked = selectedProjectIds.includes(project.id)
-                                                        return (
-                                                            <label key={project.id} className={`flex items-center gap-[10px] p-[10px_14px] border-b border-[#e8e6e1] last:border-0 cursor-pointer transition-colors ${isChecked ? 'bg-[#f0fdf4] border-l-[3px] border-l-[#1a9e6e]' : 'hover:bg-[#e8f7f1] border-l-[3px] border-l-transparent'}`}>
-                                                                <div className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] transition-colors ${isChecked ? 'bg-[#1a9e6e] border-[#1a9e6e]' : 'border-[#d4d1ca] bg-white'}`}>
-                                                                    {isChecked && <Check className="h-[10px] w-[10px] text-white" strokeWidth={3} />}
-                                                                </div>
-                                                                <input type="checkbox" className="hidden" checked={isChecked} onChange={() => toggleProject(project.id)} />
-                                                                <span className="text-[13px] font-[500] text-[#1a1a18]">{project.name}</span>
-                                                            </label>
-                                                        )
-                                                    })
-                                                )}
+                                                    <p className="p-4 text-center text-[12px] text-[var(--text3)]">No projects under this Site.</p>
+                                                ) : projects.map(p => {
+                                                    const checked = selectedProjectIds.includes(p.id)
+                                                    return (
+                                                        <button key={p.id} type="button" onClick={() => toggleId(p.id, setSelectedProjectIds)}
+                                                            className={`flex items-center gap-2.5 p-[9px_12px] w-full text-left border-b border-[var(--border)] last:border-0 transition-colors ${
+                                                                checked ? "bg-[#f0fdf4]" : "hover:bg-[var(--surface2)]"
+                                                            }`}>
+                                                            <span className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] shrink-0 ${
+                                                                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[#d4d1ca] bg-white"
+                                                            }`}>
+                                                                {checked && <Check size={10} className="text-white" strokeWidth={3.5} />}
+                                                            </span>
+                                                            <span className="text-[12.5px] font-medium text-[var(--text)] truncate">{p.name}</span>
+                                                        </button>
+                                                    )
+                                                })}
                                             </div>
-                                        </>
+                                        </div>
                                     )}
-
-                                    {wholeSite && (
-                                        <p className="text-[11.5px] text-[#0d6b4a] bg-[#e8f7f1] px-[10px] py-[8px] rounded-[8px]">
-                                            Covers all {projects.length} current project{projects.length === 1 ? "" : "s"} under this Site. Any project added later is automatically included.
-                                        </p>
-                                    )}
-                                </>
+                                </div>
                             )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Start Date <span className="text-[var(--red)]">*</span></label>
+                                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
+                                </div>
+                                <div>
+                                    <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Recurrence</label>
+                                    <select value={recurrenceType} onChange={e => setRecurrenceType(e.target.value)} className={selectCls}>
+                                        {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Notes / Summary <span className="text-[var(--text3)] font-normal">(Optional)</span></label>
+                                <textarea value={notes} onChange={e => setNotes(e.target.value.slice(0, 250))} rows={3}
+                                    placeholder="e.g. Routine inspection for mechanical & safety compliance."
+                                    className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)] resize-y min-h-[70px]" />
+                                <p className="text-[10.5px] text-[var(--text3)] text-right">{notes.length}/250</p>
+                            </div>
                         </div>
+                    )}
 
-                        )}
-
-                        {/* STEP 2: INSPECTORS */}
-                        {wizardStep === 1 && (
-                        <div className="mb-[18px]">
-                            <div className="flex justify-between items-center mb-[8px]">
-                                <label className="text-[12.5px] font-[500] text-[#1a1a18]">Select Inspectors</label>
+                    {/* STEP 2: Inspectors */}
+                    {wizardStep === 1 && (
+                        <div>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <span className="text-[12px] font-medium text-[var(--text)]">Select Inspectors</span>
                                 {selectedInspectorIds.length > 0 && (
-                                    <span className="bg-[#e8f7f1] text-[#0d6b4a] px-[8px] py-[2px] rounded-[20px] text-[11px] font-[500]">
+                                    <span className="bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-full text-[11px] font-medium">
                                         {selectedInspectorIds.length} selected
                                     </span>
                                 )}
                             </div>
-                            <div className="relative mb-[8px]">
-                                <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[#9e9b95] pointer-events-none" />
-                                <input
-                                    type="text"
-                                    value={inspectorSearch}
-                                    onChange={(e) => setInspectorSearch(e.target.value)}
-                                    placeholder="Search inspectors by name or email…"
-                                    className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] pl-[30px] pr-[12px] py-[7px] text-[12.5px] text-[#1a1a18] outline-none focus:border-[#1a9e6e] transition-colors"
-                                />
+                            <div className="relative mb-2">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                                <input value={inspectorSearch} onChange={e => setInspectorSearch(e.target.value)}
+                                    placeholder="Search inspectors by name or email..." className={inputCls + " pl-8"} />
                             </div>
-                            <div className="bg-[#f9f8f5] border border-[#e8e6e1] rounded-[10px] max-h-[220px] overflow-y-auto">
-                                {inspectors.length === 0 ? (
-                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No inspectors found.</div>
-                                ) : filteredInspectors.length === 0 ? (
-                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No inspectors match “{inspectorSearch}”.</div>
-                                ) : (
-                                    filteredInspectors.map(inspector => {
-                                        const isChecked = selectedInspectorIds.includes(inspector.id)
-                                        return (
-                                            <label key={inspector.id} className={`flex items-center gap-[10px] p-[10px_14px] border-b border-[#e8e6e1] last:border-0 cursor-pointer transition-colors ${isChecked ? 'bg-[#f0fdf4] border-l-[3px] border-l-[#1a9e6e]' : 'hover:bg-[#e8f7f1] border-l-[3px] border-l-transparent'}`}>
-                                                <div className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] transition-colors ${isChecked ? 'bg-[#1a9e6e] border-[#1a9e6e]' : 'border-[#d4d1ca] bg-white'}`}>
-                                                    {isChecked && <Check className="h-[10px] w-[10px] text-white" strokeWidth={3} />}
-                                                </div>
-                                                <input
-                                                    type="checkbox"
-                                                    className="hidden"
-                                                    checked={isChecked}
-                                                    onChange={() => {
-                                                        setSelectedInspectorIds(prev =>
-                                                            prev.includes(inspector.id) ? prev.filter(id => id !== inspector.id) : [...prev, inspector.id]
-                                                        )
-                                                    }}
-                                                />
-                                                <div className="flex items-center justify-center w-[28px] h-[28px] rounded-full bg-[#fef3c7] text-[#92400e] text-[11px] font-[600]">
-                                                    {inspector.name?.substring(0, 2).toUpperCase() || "IN"}
-                                                </div>
-                                                <div className="flex items-center gap-[4px]">
-                                                    <span className="text-[13px] font-[500] text-[#1a1a18]">{inspector.name}</span>
-                                                    <span className="text-[12px] text-[#9e9b95]">({inspector.email})</span>
-                                                </div>
-                                            </label>
-                                        )
-                                    })
-                                )}
+                            <div className={listBox}>
+                                {filteredInspectors.length === 0 ? (
+                                    <p className="p-4 text-center text-[12px] text-[var(--text3)]">No inspectors found.</p>
+                                ) : filteredInspectors.map(i => (
+                                    <PersonRow key={i.id} person={i} checked={selectedInspectorIds.includes(i.id)} onToggle={() => toggleId(i.id, setSelectedInspectorIds)} />
+                                ))}
                             </div>
                         </div>
+                    )}
 
-                        )}
-
-                        {/* STEP 3: MANAGERS */}
-                        {wizardStep === 2 && (
+                    {/* STEP 3: Managers */}
+                    {wizardStep === 2 && (
                         <div>
-                            <div className="flex justify-between items-center mb-[8px]">
-                                <label className="text-[12.5px] font-[500] text-[#1a1a18]">Assign Managers <span className="text-[12.5px] font-[400] text-[#9e9b95]">(Optional)</span></label>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <span className="text-[12px] font-medium text-[var(--text)]">Select Managers</span>
                                 {selectedManagerIds.length > 0 && (
-                                    <span className="bg-[#eff6ff] text-[#1d4ed8] px-[8px] py-[2px] rounded-[20px] text-[11px] font-[500]">
+                                    <span className="bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-full text-[11px] font-medium">
                                         {selectedManagerIds.length} selected
                                     </span>
                                 )}
                             </div>
-                            <div className="relative mb-[8px]">
-                                <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[#9e9b95] pointer-events-none" />
-                                <input
-                                    type="text"
-                                    value={managerSearch}
-                                    onChange={(e) => setManagerSearch(e.target.value)}
-                                    placeholder="Search managers by name or email…"
-                                    className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] pl-[30px] pr-[12px] py-[7px] text-[12.5px] text-[#1a1a18] outline-none focus:border-[#3b82f6] transition-colors"
-                                />
+                            <div className="relative mb-2">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                                <input value={managerSearch} onChange={e => setManagerSearch(e.target.value)}
+                                    placeholder="Search managers by name or email..." className={inputCls + " pl-8"} />
                             </div>
-                            <div className="bg-[#f9f8f5] border border-[#e8e6e1] rounded-[10px] max-h-[160px] overflow-y-auto">
-                                {managers.length === 0 ? (
-                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No managers found.</div>
-                                ) : filteredManagers.length === 0 ? (
-                                    <div className="p-4 text-center text-[12px] text-[#9e9b95]">No managers match “{managerSearch}”.</div>
-                                ) : (
-                                    filteredManagers.map(manager => {
-                                        const isChecked = selectedManagerIds.includes(manager.id)
-                                        return (
-                                            <label key={manager.id} className={`flex items-center gap-[10px] p-[10px_14px] border-b border-[#e8e6e1] last:border-0 cursor-pointer transition-colors ${isChecked ? 'bg-[#eff6ff] border-l-[3px] border-l-[#3b82f6]' : 'hover:bg-[#eff6ff] border-l-[3px] border-l-transparent'}`}>
-                                                <div className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] transition-colors ${isChecked ? 'bg-[#3b82f6] border-[#3b82f6]' : 'border-[#d4d1ca] bg-white'}`}>
-                                                    {isChecked && <Check className="h-[10px] w-[10px] text-white" strokeWidth={3} />}
-                                                </div>
-                                                <input
-                                                    type="checkbox"
-                                                    className="hidden"
-                                                    checked={isChecked}
-                                                    onChange={() => {
-                                                        setSelectedManagerIds(prev =>
-                                                            prev.includes(manager.id) ? prev.filter(id => id !== manager.id) : [...prev, manager.id]
-                                                        )
-                                                    }}
-                                                />
-                                                <div className="flex items-center justify-center w-[28px] h-[28px] rounded-full bg-[#eff6ff] text-[#1d4ed8] text-[11px] font-[600]">
-                                                    {manager.name?.substring(0, 2).toUpperCase() || "MA"}
-                                                </div>
-                                                <div className="flex items-center gap-[4px]">
-                                                    <span className="text-[13px] font-[500] text-[#1a1a18]">{manager.name}</span>
-                                                    <span className="text-[12px] text-[#9e9b95]">({manager.email})</span>
-                                                </div>
-                                            </label>
-                                        )
-                                    })
-                                )}
-                            </div>
-                        </div>
-
-                        )}
-
-                        {/* STEP 4: TYPE & REVIEW */}
-                        {wizardStep === 3 && (
-                        <>
-                        <div>
-                            <label className="block text-[12.5px] font-[500] text-[#1a1a18] mb-[8px]">
-                                Assignment Type
-                            </label>
-                            <div className="flex gap-[8px]">
-                                {[
-                                    { value: "none", label: "One-time", icon: "📋" },
-                                    { value: "daily", label: "Daily", icon: "📅" },
-                                    { value: "weekly", label: "Weekly", icon: "🗓️" }
-                                ].map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => setRecurrenceType(opt.value)}
-                                        className={`flex-1 flex flex-col items-center gap-[4px] p-[10px_8px] rounded-[10px] border-[1.5px] transition-all text-[12px] font-[500] ${recurrenceType === opt.value
-                                            ? opt.value === "none"
-                                                ? "border-[#1a9e6e] bg-[#f0fdf4] text-[#0d6b4a]"
-                                                : "border-[#3b82f6] bg-[#eff6ff] text-[#1d4ed8]"
-                                            : "border-[#e8e6e1] bg-[#f9f8f5] text-[#6b6860] hover:bg-white"
-                                            }`}
-                                    >
-                                        <span className="text-[16px]">{opt.icon}</span>
-                                        {opt.label}
-                                    </button>
+                            <div className={listBox}>
+                                {filteredManagers.length === 0 ? (
+                                    <p className="p-4 text-center text-[12px] text-[var(--text3)]">No managers found.</p>
+                                ) : filteredManagers.map(m => (
+                                    <PersonRow key={m.id} person={m} checked={selectedManagerIds.includes(m.id)} onToggle={() => toggleId(m.id, setSelectedManagerIds)} />
                                 ))}
                             </div>
-                            {recurrenceType !== "none" && (
-                                <p className="text-[11.5px] text-[#3b82f6] mt-[6px] bg-[#eff6ff] px-[10px] py-[6px] rounded-[7px]">
-                                    After each inspection is approved, a new assignment will be auto-created {recurrenceType === "daily" ? "daily" : "weekly"}.
-                                    Manager can stop this anytime.
-                                </p>
-                            )}
                         </div>
+                    )}
 
-                        {/* REVIEW SUMMARY */}
-                        <div className="mt-[18px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[12px] p-[16px]">
-                            <div className="text-[11px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px] mb-[12px]">Review</div>
-                            <div className="space-y-[10px]">
-                                <div className="flex justify-between items-start gap-[12px]">
-                                    <span className="text-[12.5px] text-[#6b6860]">Site</span>
-                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">{selectedSite?.name || <span className="text-[#dc2626]">Not selected</span>}</span>
+                    {/* STEP 4: Review */}
+                    {wizardStep === 3 && (
+                        <div className="space-y-2.5">
+                            {[
+                                { label: "Site", value: selectedSite ? selectedSite.name : "—" },
+                                { label: "Scope", value: wholeSite ? `All Projects (${projects.length})` : `${selectedProjectIds.length} specific project(s)` },
+                                { label: "Start Date", value: startDate ? fmtDate(startDate) : "—" },
+                                { label: "Recurrence", value: RECURRENCE_OPTIONS.find(o => o.value === recurrenceType)?.label ?? "One-time" },
+                                { label: "Inspectors", value: selectedInspectorIds.length > 0 ? `${selectedInspectorIds.length} selected` : "None" },
+                                { label: "Managers", value: selectedManagerIds.length > 0 ? `${selectedManagerIds.length} selected` : "None" },
+                            ].map(r => (
+                                <div key={r.label} className="flex items-center justify-between bg-[var(--surface2)]/50 border border-[var(--border)] rounded-[9px] px-3 py-2">
+                                    <span className="text-[12px] text-[var(--text2)]">{r.label}</span>
+                                    <span className="text-[12.5px] font-semibold text-[var(--text)]">{r.value}</span>
                                 </div>
-                                <div className="flex justify-between items-start gap-[12px]">
-                                    <span className="text-[12.5px] text-[#6b6860]">Access</span>
-                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">
-                                        {wholeSite
-                                            ? <span className="text-[#0d6b4a]">Whole Site — all projects (future auto-included)</span>
-                                            : selectedProjectsList.length > 0
-                                                ? selectedProjectsList.map(p => p.name).join(", ")
-                                                : <span className="text-[#dc2626]">No projects selected</span>}
-                                    </span>
+                            ))}
+                            {notes && (
+                                <div className="bg-[var(--surface2)]/50 border border-[var(--border)] rounded-[9px] px-3 py-2">
+                                    <p className="text-[12px] text-[var(--text2)] mb-0.5">Notes</p>
+                                    <p className="text-[12.5px] text-[var(--text)]">{notes}</p>
                                 </div>
-                                <div className="flex justify-between items-start gap-[12px]">
-                                    <span className="text-[12.5px] text-[#6b6860]">Inspectors</span>
-                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">
-                                        {selectedInspectors.length > 0 ? selectedInspectors.map(i => i.name).join(", ") : <span className="text-[#9e9b95]">None</span>}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-start gap-[12px]">
-                                    <span className="text-[12.5px] text-[#6b6860]">Managers</span>
-                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right">
-                                        {selectedManagers.length > 0 ? selectedManagers.map(m => m.name).join(", ") : <span className="text-[#9e9b95]">None</span>}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-start gap-[12px]">
-                                    <span className="text-[12.5px] text-[#6b6860]">Type</span>
-                                    <span className="text-[12.5px] font-[500] text-[#1a1a18] text-right capitalize">{recurrenceType === "none" ? "One-time" : recurrenceType}</span>
-                                </div>
-                            </div>
+                            )}
                             {selectedInspectorIds.length === 0 && selectedManagerIds.length === 0 && (
-                                <p className="text-[11.5px] text-[#d97706] mt-[12px] bg-[#fef3c7] px-[10px] py-[6px] rounded-[7px]">
-                                    Select at least one inspector or manager to create this assignment.
+                                <p className="text-[12px] text-[var(--red)] bg-[var(--red-light)] rounded-[9px] px-3 py-2">
+                                    Select at least one inspector or manager before creating the assignment.
                                 </p>
                             )}
                         </div>
-                        </>
-                        )}
+                    )}
 
-                        {/* WIZARD NAV */}
-                        <div className="flex justify-between items-center gap-[10px] mt-[18px] pt-[14px] border-t border-[#e8e6e1]">
-                            <button
-                                onClick={handleWizardBack}
-                                disabled={wizardStep === 0}
-                                className="inline-flex items-center gap-[4px] bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[14px] py-[8px] hover:bg-[#f9f8f5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                <ChevronLeft className="h-[15px] w-[15px]" />
-                                Back
+                    {/* Footer */}
+                    <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-[var(--border)]">
+                        <button onClick={goBack} disabled={wizardStep === 0}
+                            className="inline-flex items-center gap-1 px-3.5 h-9 rounded-[9px] border border-[var(--border)] bg-white text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <ChevronLeft size={13} /> Back
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <button onClick={resetForm}
+                                className="px-3.5 h-9 rounded-[9px] text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                                Cancel
                             </button>
-                            <div className="flex gap-[10px]">
-                                <button
-                                    onClick={resetForm}
-                                    className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#f9f8f5] transition-colors"
-                                >
-                                    Cancel
+                            {wizardStep < WIZARD_STEPS.length - 1 ? (
+                                <button onClick={goNext} disabled={wizardStep === 0 && !canLeaveStep0}
+                                    className="inline-flex items-center gap-1 px-4 h-9 rounded-[9px] bg-[var(--accent)] text-white text-[12.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
+                                    Next <ChevronRight size={13} />
                                 </button>
-                                {wizardStep < wizardSteps.length - 1 ? (
-                                    <button
-                                        onClick={handleWizardNext}
-                                        disabled={wizardStep === 0 && !canLeaveStep0}
-                                        className="inline-flex items-center gap-[4px] bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                    >
-                                        Next
-                                        <ChevronLeft className="h-[15px] w-[15px] rotate-180" />
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={handleAssign}
-                                        disabled={loading || !canLeaveStep0 || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}
-                                        className="bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-[500] px-[16px] py-[8px] hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-                                    >
-                                        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                                        Create Assignment
-                                    </button>
-                                )}
-                            </div>
+                            ) : (
+                                <button onClick={handleAssign}
+                                    disabled={loading || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}
+                                    className="inline-flex items-center gap-1.5 px-4 h-9 rounded-[9px] bg-[var(--accent)] text-white text-[12.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
+                                    {loading && <Loader2 size={13} className="animate-spin" />}
+                                    Create Assignment
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* RIGHT COLUMN: TABLE */}
-                <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden lg:sticky lg:top-[24px]">
-                    <div className="p-[14px_18px] border-b border-[#e8e6e1] flex justify-between items-center bg-white z-20">
-                        <h2 className="text-[13.5px] font-[600] text-[#1a1a18]">Assignments</h2>
-                        <div className="flex items-center gap-[8px]">
-                        <div className="relative">
-                            <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[12px] w-[12px] text-[#9e9b95] pointer-events-none" />
-                            <input
-                                type="text"
-                                value={assignmentSearch}
-                                onChange={(e) => setAssignmentSearch(e.target.value)}
-                                placeholder="Search inspector, project, site…"
-                                className="w-[200px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] pl-[28px] pr-[10px] py-[6px] text-[12px] text-[#1a1a18] outline-none focus:border-[#1a9e6e] transition-colors"
-                            />
+                {/* ── RIGHT: stats + table ── */}
+                <div className="space-y-4 min-w-0">
+                    {/* Stats strip */}
+                    <div className="bg-white border border-[var(--border)] rounded-[14px] p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 divide-x-0 sm:divide-x divide-[var(--border)]">
+                        <div className="flex items-center gap-2.5 sm:pl-2">
+                            <span className="w-9 h-9 rounded-[9px] bg-[var(--accent-light)] flex items-center justify-center"><ClipboardList size={16} className="text-[var(--accent)]" /></span>
+                            <span>
+                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.total}</span>
+                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Total Assignments</span>
+                            </span>
                         </div>
-                        <div className="relative">
-                            <select
-                                className="w-[120px] appearance-none bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] p-[6px_12px] text-[12px] text-[#1a1a18] font-[500] outline-none transition-all hover:bg-white focus:border-[#1a9e6e] cursor-pointer"
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                            >
-                                <option value="all">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="pending">Pending</option>
-                                <option value="manager_only">Manager Only</option>
-                            </select>
-                            <ChevronDown className="absolute right-[10px] top-1/2 -translate-y-1/2 h-[12px] w-[12px] text-[#9e9b95] pointer-events-none" />
+                        <div className="flex items-center gap-2.5 sm:pl-4">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] shrink-0" />
+                            <span>
+                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.active}</span>
+                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Active</span>
+                            </span>
                         </div>
+                        <div className="flex items-center gap-2.5 sm:pl-4">
+                            <span className="w-9 h-9 rounded-[9px] bg-[#eff6ff] flex items-center justify-center"><Calendar size={15} className="text-[#3b82f6]" /></span>
+                            <span>
+                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.oneTime}</span>
+                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">One-time</span>
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2.5 sm:pl-4">
+                            <span className="w-9 h-9 rounded-[9px] bg-[#f5f3ff] flex items-center justify-center"><RefreshCw size={15} className="text-[#7c3aed]" /></span>
+                            <span>
+                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.recurring}</span>
+                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Recurring</span>
+                            </span>
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto lg:max-h-[calc(100vh-140px)] overflow-y-auto">
-                        {filteredAssignments.length === 0 ? (
-                            <div className="p-[30px] text-center text-[13px] text-[#9e9b95]">
-                                No assignments found.
+                    {/* Table card */}
+                    <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
+                        <div className="p-3.5 flex flex-wrap items-center gap-2.5 border-b border-[var(--border)]">
+                            <h2 className="text-[15px] font-semibold text-[var(--text)] flex-1">Assignments</h2>
+                            <div className="relative min-w-[200px]">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                                <input value={assignmentSearch} onChange={e => setAssignmentSearch(e.target.value)}
+                                    placeholder="Search by inspector, project, site..." className={inputCls + " pl-8 h-8"} />
                             </div>
+                            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                                className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2.5 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                                <option value="all">All Status</option>
+                                {["Active", "Scheduled", "Inactive", "Manager Only"].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+
+                        {filteredAssignments.length === 0 ? (
+                            <p className="text-center text-[13px] text-[var(--text3)] py-12">No assignments found.</p>
                         ) : (
-                            <>
-                                {/* Mobile Card View */}
-                                <div className="lg:hidden divide-y divide-[#e8e6e1]">
-                                    {filteredAssignments.map((a: any) => {
-                                        let statusBadge = { label: "Inactive", classes: "bg-[#f9f8f5] border border-[#e8e6e1] text-[#9e9b95]" }
-                                        const displayStatus = a.status || ""
-                                        if (displayStatus === "active") statusBadge = { label: "Active", classes: "bg-[#e8f7f1] text-[#0d6b4a]" }
-                                        else if (displayStatus === "pending") statusBadge = { label: "Pending", classes: "bg-[#fef3c7] text-[#d97706]" }
-                                        else if (displayStatus === "manager_only") statusBadge = { label: "Manager Only", classes: "bg-[#eff6ff] text-[#1d4ed8]" }
-                                        return (
-                                            <div key={a.id} className="p-[14px_16px] hover:bg-[#f9f8f5] transition-colors">
-                                                <div className="flex items-start justify-between gap-2 mb-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="text-[13.5px] font-[600] text-[#1a1a18] truncate">{a.inspectionBoy?.name || "System"}</p>
-                                                        <p className="text-[12px] text-[#6b6860] font-[500] truncate">{a.project?.name || "Unknown"}</p>
-                                                        <p className="text-[11px] text-[#9e9b95] truncate">{a.project?.site?.name || a.project?.company?.name || "Unknown"}</p>
-                                                    </div>
-                                                    <span className={`shrink-0 inline-flex items-center px-[10px] py-[3px] rounded-[20px] text-[11px] font-[500] ${statusBadge.classes}`}>
-                                                        {statusBadge.label}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between mt-[8px]">
-                                                    <div>
-                                                        {a.recurrenceType && a.recurrenceType !== "none" ? (
-                                                            <span className={`inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[20px] text-[11px] font-[500] ${a.recurrenceActive ? "bg-[#eff6ff] text-[#1d4ed8]" : "bg-[#f9f8f5] text-[#9e9b95] line-through"}`}>
-                                                                {a.recurrenceType === "daily" ? "📅 Daily" : "🗓️ Weekly"}
-                                                                {!a.recurrenceActive && " (stopped)"}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[11px] text-[#9e9b95]">One-time</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-[6px]">
-                                                        {a.recurrenceType && a.recurrenceType !== "none" && a.recurrenceActive && (
-                                                            <button onClick={() => handleStopRecurrence(a.id)} className="h-[28px] px-[10px] inline-flex items-center justify-center rounded-[7px] text-[11px] font-[500] text-[#d97706] bg-[#fef3c7] hover:bg-[#fde68a] transition-colors">Stop</button>
-                                                        )}
-                                                        <button onClick={() => handleDelete(a.id)} title="Delete" className="w-[28px] h-[28px] inline-flex items-center justify-center rounded-[7px] text-[#9e9b95] hover:bg-[#fef2f2] hover:text-[#dc2626] transition-colors">
-                                                            <Trash2 className="h-[14px] w-[14px]" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                                {/* Desktop Table View */}
-                                <table className="w-full text-left border-collapse hidden lg:table">
-                                    <thead className="sticky top-0 z-10 bg-[#f9f8f5]">
-                                        <tr className="border-b border-[#e8e6e1]">
-                                            <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Inspector</th>
-                                            <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Project</th>
-                                            <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Site</th>
-                                            <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Status</th>
-                                            <th className="p-[10px_16px] text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Recurrence</th>
-                                            <th className="p-[10px_16px] text-right text-[11px] font-[500] text-[#9e9b95] uppercase tracking-[0.5px]">Actions</th>
+                            <div className="overflow-x-auto">
+                                <table className="w-full" style={{ fontSize: 12.5 }}>
+                                    <thead>
+                                        <tr className="bg-[var(--surface2)]/60 text-[11px] text-[var(--text3)] uppercase tracking-wide">
+                                            <th className="text-left font-semibold px-4 py-2.5">Inspector</th>
+                                            <th className="text-left font-semibold px-3 py-2.5">Project</th>
+                                            <th className="text-left font-semibold px-3 py-2.5">Site</th>
+                                            <th className="text-left font-semibold px-3 py-2.5">Status</th>
+                                            <th className="text-left font-semibold px-3 py-2.5">Type</th>
+                                            <th className="text-left font-semibold px-3 py-2.5 whitespace-nowrap">Start Date</th>
+                                            <th className="text-right font-semibold px-4 py-2.5">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {filteredAssignments.map((a: any) => {
-                                            let statusBadge = { label: "Inactive", classes: "bg-[#f9f8f5] border border-[#e8e6e1] text-[#9e9b95]" }
-                                            let displayStatus = a.status || ""
-
-                                            if (displayStatus === "active") {
-                                                statusBadge = { label: "Active", classes: "bg-[#e8f7f1] text-[#0d6b4a]" }
-                                            } else if (displayStatus === "pending") {
-                                                statusBadge = { label: "Pending", classes: "bg-[#fef3c7] text-[#d97706]" }
-                                            } else if (displayStatus === "manager_only") {
-                                                statusBadge = { label: "Manager Only", classes: "bg-[#eff6ff] text-[#1d4ed8]" }
-                                            }
-
+                                    <tbody className="divide-y divide-[var(--border)]">
+                                        {pageRows.map(a => {
+                                            const st = displayStatus(a)
                                             return (
-                                                <tr key={a.id} className="border-b border-[#e8e6e1] last:border-b-0 hover:bg-[#f9f8f5] transition-colors">
-                                                    <td className="p-[12px_16px]">
-                                                        <div className="text-[13px] font-[500] text-[#1a1a18] mb-[1px]">{a.inspectionBoy?.name || "System"}</div>
-                                                        <div className="text-[11.5px] text-[#9e9b95]">{a.manager ? "Manager" : "Inspector Role"}</div>
+                                                <tr key={a.id} className="hover:bg-[var(--surface2)]/40 transition-colors">
+                                                    <td className="px-4 py-2.5">
+                                                        <p className="font-semibold text-[var(--text)] leading-tight">{a.inspectionBoy?.name || "—"}</p>
+                                                        <p className="text-[10.5px] text-[var(--text3)]">Inspector</p>
                                                     </td>
-                                                    <td className="p-[12px_16px] text-[13px] text-[#6b6860] font-[500]">{a.project?.name || "Unknown"}</td>
-                                                    <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{a.project?.site?.name || a.project?.company?.name || "Unknown"}</td>
-                                                    <td className="p-[12px_16px]">
-                                                        <span className={`inline-flex items-center px-[12px] py-[3px] rounded-[20px] text-[11.5px] font-[500] ${statusBadge.classes}`}>{statusBadge.label}</span>
+                                                    <td className="px-3 py-2.5 text-[var(--text2)] max-w-[140px] truncate">{a.project?.name || "—"}</td>
+                                                    <td className="px-3 py-2.5 text-[var(--text2)] max-w-[140px] truncate">{a.project?.site?.name || a.project?.company?.name || "—"}</td>
+                                                    <td className="px-3 py-2.5">
+                                                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold whitespace-nowrap" style={{ background: st.bg, color: st.fg }}>
+                                                            {st.label}
+                                                        </span>
                                                     </td>
-                                                    <td className="p-[12px_16px]">
-                                                        {a.recurrenceType && a.recurrenceType !== "none" ? (
-                                                            <span className={`inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[20px] text-[11px] font-[500] ${a.recurrenceActive ? "bg-[#eff6ff] text-[#1d4ed8]" : "bg-[#f9f8f5] text-[#9e9b95] line-through"}`}>
-                                                                {a.recurrenceType === "daily" ? "📅 Daily" : "🗓️ Weekly"}
-                                                                {!a.recurrenceActive && " (stopped)"}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[11px] text-[#9e9b95]">One-time</span>
-                                                        )}
+                                                    <td className="px-3 py-2.5 text-[var(--text2)] whitespace-nowrap">
+                                                        {(a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring"}
                                                     </td>
-                                                    <td className="p-[12px_16px] text-right">
-                                                        <div className="flex items-center justify-end gap-[4px]">
-                                                            {a.recurrenceType && a.recurrenceType !== "none" && a.recurrenceActive && (
-                                                                <button onClick={() => handleStopRecurrence(a.id)} title="Stop Recurrence" className="h-[26px] px-[8px] inline-flex items-center justify-center rounded-[7px] text-[11px] font-[500] text-[#d97706] bg-[#fef3c7] hover:bg-[#fde68a] transition-colors">Stop</button>
-                                                            )}
-                                                            <button onClick={() => handleDelete(a.id)} title="Delete Assignment" className="w-[28px] h-[28px] inline-flex items-center justify-center rounded-[7px] text-[#9e9b95] hover:bg-[#fef2f2] hover:text-[#dc2626] transition-colors">
-                                                                <Trash2 className="h-[14px] w-[14px]" />
+                                                    <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{fmtDate(a.startDate ?? a.createdAt)}</td>
+                                                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                                                        <div className="inline-flex items-center gap-1.5">
+                                                            <button onClick={() => setDetail(a)} title="View details"
+                                                                className="p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
+                                                                <Eye size={13} />
                                                             </button>
+                                                            <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} />
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -809,12 +744,88 @@ export default function AssignmentsPage() {
                                         })}
                                     </tbody>
                                 </table>
-                            </>
+                            </div>
+                        )}
+
+                        {/* Pagination */}
+                        {filteredAssignments.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-[var(--border)]">
+                                <p className="text-[12px] text-[var(--text3)]">
+                                    Showing {showFrom} to {showTo} of {filteredAssignments.length} assignment{filteredAssignments.length !== 1 ? "s" : ""}
+                                </p>
+                                <div className="flex items-center gap-1.5">
+                                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+                                        className="w-7 h-7 flex items-center justify-center rounded-[7px] border border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                        <ChevronLeft size={13} />
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(p => totalPages <= 7 || Math.abs(p - safePage) <= 2 || p === 1 || p === totalPages)
+                                        .map((p, idx, arr) => (
+                                            <span key={p} className="flex items-center gap-1.5">
+                                                {idx > 0 && arr[idx - 1] !== p - 1 && <span className="text-[11px] text-[var(--text3)]">…</span>}
+                                                <button onClick={() => setPage(p)}
+                                                    className={`min-w-7 h-7 px-1.5 rounded-[7px] text-[12px] font-medium border transition-colors ${
+                                                        p === safePage
+                                                            ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+                                                            : "bg-white border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)]"
+                                                    }`}>
+                                                    {p}
+                                                </button>
+                                            </span>
+                                        ))}
+                                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                                        className="w-7 h-7 flex items-center justify-center rounded-[7px] border border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                        <ChevronRight size={13} />
+                                    </button>
+                                    <select value={perPage} onChange={e => setPerPage(Number(e.target.value))}
+                                        className="h-7 rounded-[7px] border border-[var(--border)] bg-white px-1.5 text-[12px] text-[var(--text2)] outline-none cursor-pointer">
+                                        {[10, 25, 50].map(n => <option key={n} value={n}>{n} / page</option>)}
+                                    </select>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
-
             </div>
+
+            {/* Detail modal */}
+            {detail && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setDetail(null)}>
+                    <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-md shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+                            <h2 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2">
+                                <FileText size={15} className="text-[var(--accent)]" /> Assignment Details
+                            </h2>
+                            <button onClick={() => setDetail(null)} className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
+                                <X size={17} />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-2.5">
+                            {[
+                                { label: "Inspector", value: detail.inspectionBoy?.name || "—" },
+                                { label: "Project", value: detail.project?.name || "—" },
+                                { label: "Site", value: detail.project?.site?.name || "—" },
+                                { label: "Status", value: displayStatus(detail).label },
+                                { label: "Type", value: (detail.recurrenceType ?? "none") === "none" ? "One-time" : `Recurring (${detail.recurrenceType})${detail.recurrenceActive ? "" : " — stopped"}` },
+                                { label: "Start Date", value: fmtDate(detail.startDate ?? detail.createdAt) },
+                                { label: "Assigned By", value: detail.assigner?.name || "—" },
+                                { label: "Created", value: fmtDate(detail.createdAt) },
+                            ].map(r => (
+                                <div key={r.label} className="flex items-center justify-between">
+                                    <span className="text-[12.5px] text-[var(--text2)]">{r.label}</span>
+                                    <span className="text-[12.5px] font-semibold text-[var(--text)] text-right max-w-[60%] truncate">{r.value}</span>
+                                </div>
+                            ))}
+                            {detail.notes && (
+                                <div className="pt-2 border-t border-[var(--border)]">
+                                    <p className="text-[12px] text-[var(--text2)] mb-1">Notes</p>
+                                    <p className="text-[12.5px] text-[var(--text)] bg-[var(--surface2)]/50 rounded-[8px] p-2.5">{detail.notes}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
