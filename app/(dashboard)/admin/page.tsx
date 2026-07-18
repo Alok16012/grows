@@ -168,7 +168,7 @@ function AdminRecruitmentTable() {
     ]
 
     return (
-        <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
+        <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden h-full flex flex-col">
             <div className="p-4 border-b border-[var(--border)] flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2 flex-1">
                     <Users className="h-4 w-4 text-[var(--accent)]" />
@@ -192,9 +192,9 @@ function AdminRecruitmentTable() {
                     <p className="text-[13px] text-[var(--text3)]">No recruitment activity for this period.</p>
                 </div>
             ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-auto max-h-[430px] flex-1">
                     <table className="w-full" style={{ fontSize: 12 }}>
-                        <thead>
+                        <thead className="sticky top-0 z-10">
                             <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
                                 <th style={{ textAlign: "left", padding: "8px 16px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>HR / Recruiter</th>
                                 {REC_COLS.map(c => (
@@ -506,7 +506,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Today's Attendance Breakdown */}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px]">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] h-full flex flex-col">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-[13.5px] font-semibold text-[var(--text)] leading-none">Today&apos;s Attendance Breakdown</h3>
                         <Link href="/attendance" className="text-[11.5px] font-medium text-[var(--accent-text)] hover:underline">View all sites</Link>
@@ -516,7 +516,10 @@ export default function AdminDashboard() {
                         <span className="text-[16px] font-semibold text-[var(--text)] tabular-nums">{att.pct}%</span>
                     </div>
                     {topSites.length === 0 ? (
-                        <p className="text-[12.5px] text-[var(--text3)] text-center py-8">No attendance marked yet today.</p>
+                        <div className="flex-1 flex flex-col items-center justify-center py-8">
+                            <CalendarCheck size={24} className="text-[var(--text3)] mb-2" />
+                            <p className="text-[12.5px] text-[var(--text3)]">No attendance marked yet today.</p>
+                        </div>
                     ) : (
                         <div>
                             <div className="grid grid-cols-[1.6fr_0.7fr_0.7fr_1.2fr] gap-2 text-[11px] font-medium text-[var(--text3)] pb-2 border-b border-[var(--border)]">
@@ -542,13 +545,15 @@ export default function AdminDashboard() {
             </div>
 
             {/* ── ROW: Recruitment · Pipelines · Alerts ── */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-[14px] items-start">
-                <div className="xl:col-span-5">
+            {/* Columns stretch to the tallest card (the recruitment table) so the
+                row never leaves a hole of blank space on the right. */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-[14px] items-stretch">
+                <div className="xl:col-span-6">
                     <AdminRecruitmentTable />
                 </div>
 
-                {/* Pipelines */}
-                <div className="xl:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-[14px]">
+                {/* Pipelines — vertical stack on xl so they fill the row height */}
+                <div className="xl:col-span-3 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 xl:auto-rows-fr gap-[14px]">
                     {/* Onboarding */}
                     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[16px] flex flex-col">
                         <div className="h-8 w-8 rounded-[9px] bg-[#e8f7f1] flex items-center justify-center mb-3"><UserPlus size={15} className="text-[#0d6b4a]" /></div>
@@ -589,13 +594,13 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Alerts */}
-                <div className="xl:col-span-3 bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
+                <div className="xl:col-span-3 bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden h-full flex flex-col">
                     <div className="px-4 py-3.5 border-b border-[var(--border)] flex items-center justify-between">
                         <h3 className="text-[13.5px] font-semibold text-[var(--text)] leading-none">Alerts &amp; Important</h3>
                     </div>
-                    <div className="p-4 space-y-3">
+                    <div className="p-4 space-y-3 flex-1 flex flex-col">
                         {alertItems.length === 0 ? (
-                            <div className="flex flex-col items-center py-6 text-center">
+                            <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
                                 <CheckCircle2 size={26} className="text-[var(--accent)] mb-2" />
                                 <p className="text-[12.5px] font-medium text-[var(--text)]">All clear</p>
                                 <p className="text-[11.5px] text-[var(--text3)] mt-0.5">No expiries or low-attendance alerts.</p>
@@ -625,15 +630,21 @@ export default function AdminDashboard() {
             </div>
 
             {/* ── ROW: Recent Submissions · Quick Actions ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px] items-start">
+            {/* Stretched to equal height — an empty submissions list centres its
+                message instead of collapsing and leaving blank page space. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px] items-stretch">
                 {/* Recent Submissions */}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden h-full flex flex-col">
                     <div className="px-4 py-3.5 border-b border-[var(--border)] flex items-center justify-between">
                         <h3 className="text-[14px] font-semibold text-[var(--text)] leading-none">Recent Submissions</h3>
                         <Link href="/approvals" className="text-[12px] font-medium text-[var(--accent-text)] hover:underline">View all</Link>
                     </div>
                     {(stats.recentInspections || []).length === 0 ? (
-                        <p className="text-center text-[13px] text-[var(--text3)] py-10">No submissions yet</p>
+                        <div className="flex-1 flex flex-col items-center justify-center py-10">
+                            <FileCheck size={24} className="text-[var(--text3)] mb-2" />
+                            <p className="text-[13px] text-[var(--text3)]">No submissions yet</p>
+                            <p className="text-[11.5px] text-[var(--text3)] mt-0.5">Inspector submissions will appear here.</p>
+                        </div>
                     ) : (
                         <div>
                             <div className="grid grid-cols-[1.4fr_1fr_0.8fr_0.8fr] gap-2 px-4 py-2 text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide bg-[var(--surface2)]">
@@ -661,11 +672,11 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden h-full flex flex-col">
                     <div className="px-4 py-3.5 border-b border-[var(--border)]">
                         <h3 className="text-[14px] font-semibold text-[var(--text)] leading-none">Quick Actions</h3>
                     </div>
-                    <div className="p-4 grid grid-cols-2 gap-3">
+                    <div className="p-4 grid grid-cols-2 auto-rows-fr gap-3 flex-1">
                         {QUICK_ACTIONS.map(({ href, icon: Icon, label, sub, color, bg }) => (
                             <Link key={label} href={href} className="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[12px] hover:shadow-sm hover:border-[var(--accent)] transition-all">
                                 <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
