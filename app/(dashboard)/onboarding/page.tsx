@@ -150,19 +150,37 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
-function DetailModal({ record, onClose, onAction }: {
+function DetailModal({ record: listRecord, onClose, onAction }: {
     record: OnboardingRecord
     onClose: () => void
     onAction: (id: string, action: "approve" | "reject", reason?: string) => Promise<void>
 }) {
+    // The list API now returns a slim summary (fast to load); the full record —
+    // all KYC fields + documents — is fetched here when the modal opens.
+    const [record, setRecord] = useState<OnboardingRecord>(listRecord)
+    const [detailLoading, setDetailLoading] = useState(true)
+    useEffect(() => {
+        let stop = false
+        fetch(`/api/onboarding/${listRecord.id}`)
+            .then(r => (r.ok ? r.json() : null))
+            .then(full => {
+                if (stop || !full) return
+                setRecord(full)
+                setDocs(((full.employee?.documents as any[]) || []))
+            })
+            .catch(() => { /* keep summary */ })
+            .finally(() => { if (!stop) setDetailLoading(false) })
+        return () => { stop = true }
+    }, [listRecord.id])
+
     const e = record.employee
     const [tab, setTab] = useState<"personal" | "employment" | "bank" | "safety" | "docs">("personal")
     const [acting, setActing] = useState(false)
     const [showReject, setShowReject] = useState(false)
-    const [rejectReason, setRejectReason] = useState(record.notes || "")
+    const [rejectReason, setRejectReason] = useState(listRecord.notes || "")
     const [approveNotes, setApproveNotes] = useState("")
     const [viewDoc, setViewDoc] = useState<{ url: string; name: string } | null>(null)
-    const [docs, setDocs] = useState<{ id: string; type: string; fileName: string; fileUrl: string; status: string; rejectionReason?: string | null }[]>(((e.documents as any[]) || []))
+    const [docs, setDocs] = useState<{ id: string; type: string; fileName: string; fileUrl: string; status: string; rejectionReason?: string | null }[]>(((listRecord.employee.documents as any[]) || []))
     const [docActing, setDocActing] = useState<string | null>(null)
     const [docRejectId, setDocRejectId] = useState<string | null>(null)
     const [docRejectReason, setDocRejectReason] = useState("")
@@ -360,7 +378,12 @@ function DetailModal({ record, onClose, onAction }: {
                             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid var(--border)" }}>
                                 Uploaded Documents
                             </div>
-                            {docs.length === 0 ? (
+                            {docs.length === 0 && detailLoading ? (
+                                <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text3)" }}>
+                                    <Loader2 size={22} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+                                    <p style={{ fontSize: 13, margin: 0 }}>Loading documents…</p>
+                                </div>
+                            ) : docs.length === 0 ? (
                                 <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text3)" }}>
                                     <FileText size={28} style={{ margin: "0 auto 8px" }} />
                                     <p style={{ fontSize: 13, margin: 0 }}>No documents uploaded yet</p>

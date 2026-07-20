@@ -48,6 +48,10 @@ export async function GET(req: Request) {
             }
         }
 
+        // Slim summary for the LIST — only what the cards/table render. The
+        // detail modal fetches the full record (all KYC fields + documents)
+        // from /api/onboarding/[id] when opened. This cut the list payload by
+        // ~90% and removed the biggest joins (documents, salary).
         const records = await prisma.onboardingRecord.findMany({
             where,
             include: {
@@ -60,62 +64,17 @@ export async function GET(req: Request) {
                         employeeId: true,
                         designation: true,
                         dateOfJoining: true,
-                        dateOfBirth: true,
                         photo: true,
-                        gender: true,
                         phone: true,
-                        alternatePhone: true,
-                        email: true,
-                        address: true,
-                        city: true,
-                        state: true,
-                        pincode: true,
-                        permanentAddress: true,
-                        permanentCity: true,
-                        permanentState: true,
-                        permanentPincode: true,
-                        nameAsPerAadhar: true,
-                        fathersName: true,
-                        bloodGroup: true,
-                        maritalStatus: true,
-                        nationality: true,
-                        religion: true,
-                        caste: true,
-                        emergencyContact1Name: true,
-                        emergencyContact1Phone: true,
-                        emergencyContact2Name: true,
-                        emergencyContact2Phone: true,
-                        employmentType: true,
                         status: true,
-                        basicSalary: true,
-                        departmentId: true,
+                        isKycVerified: true,
+                        kycRejectionNote: true,
                         department: { select: { name: true } },
                         deployments: {
                             where: { isActive: true },
-                            include: { site: { select: { name: true } } },
+                            select: { site: { select: { name: true } } },
                             take: 1,
                         },
-                        isKycVerified: true,
-                        aadharNumber: true,
-                        panNumber: true,
-                        uan: true,
-                        pfNumber: true,
-                        esiNumber: true,
-                        labourCardNo: true,
-                        bankAccountNumber: true,
-                        bankIFSC: true,
-                        bankName: true,
-                        bankBranch: true,
-                        kycRejectionNote: true,
-                        safetyGoggles: true,
-                        safetyGloves: true,
-                        safetyHelmet: true,
-                        safetyMask: true,
-                        safetyJacket: true,
-                        safetyEarMuffs: true,
-                        safetyShoes: true,
-                        documents: true,
-                        employeeSalary: true,
                     },
                 },
                 tasks: {
@@ -124,18 +83,6 @@ export async function GET(req: Request) {
             },
             orderBy: { createdAt: "desc" },
         })
-
-        // Backfill profile photo from the latest PHOTO document if the
-        // employee's `photo` column is still empty (older records only).
-        for (const r of records) {
-            const emp: any = r.employee
-            if (emp && !emp.photo && Array.isArray(emp.documents)) {
-                const photoDoc = emp.documents
-                    .filter((d: any) => d.type === "PHOTO")
-                    .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0]
-                if (photoDoc?.fileUrl) emp.photo = photoDoc.fileUrl
-            }
-        }
 
         return NextResponse.json(records)
     } catch (error) {
