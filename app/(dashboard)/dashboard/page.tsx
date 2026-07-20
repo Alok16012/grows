@@ -4,8 +4,8 @@
 // Every custom-role user lands here after login and sees ONLY the widgets
 // their permissions allow — styled to match the admin dashboard.
 
-import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
+import { useCachedFetch } from "@/lib/useCachedFetch"
 import {
     Users, CalendarCheck, ClipboardCheck, ClipboardList, ChevronRight,
     ArrowUpRight, UserPlus, LogOut, Wallet, Target, KeyRound, Headphones,
@@ -156,19 +156,13 @@ const ALL_ACTIONS: { perm: string[]; href: string; icon: React.ElementType; labe
 
 export default function UniversalDashboard() {
     const { data: session } = useSession()
-    const [stats, setStats] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
+    // Cached fetch: revisits paint the last snapshot instantly and refresh in
+    // the background — critical because the server is far from most users.
+    const { data: stats, loading } = useCachedFetch<any>("/api/dashboard/stats")
 
     const perms: string[] = (session?.user as any)?.permissions || []
     const isAdmin = session?.user?.role === "ADMIN"
     const has = (...keys: string[]) => isAdmin || keys.some(k => perms.includes(k))
-
-    useEffect(() => {
-        fetch("/api/dashboard/stats")
-            .then(r => r.ok ? r.json() : null)
-            .then(d => { setStats(d); setLoading(false) })
-            .catch(() => setLoading(false))
-    }, [])
 
     if (loading || !session) {
         return (

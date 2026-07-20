@@ -29,6 +29,7 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { useCachedFetch } from "@/lib/useCachedFetch"
 
 // ─── Expense Team Summary (reused on admin dashboard) ────────────────────────
 
@@ -326,23 +327,9 @@ function DonutLegend({ slices }: { slices: DonutSlice[] }) {
 
 export default function AdminDashboard() {
     const { data: session } = useSession()
-    const [stats, setStats] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await fetch("/api/admin/stats")
-                const data = await res.json()
-                setStats(data)
-            } catch (error) {
-                console.error("Failed to fetch admin stats", error)
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchStats()
-    }, [])
+    // Cached fetch: revisits paint the last snapshot instantly and refresh in
+    // the background — critical because the server is far from most users.
+    const { data: stats, loading } = useCachedFetch<any>("/api/admin/stats")
 
     if (loading) {
         return (
