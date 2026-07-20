@@ -69,7 +69,6 @@ export const authOptions: NextAuthOptions = {
                         "manager@cims.com":   { name: "Manager User",    role: "MANAGER" },
                         "hr@cims.com":        { name: "HR Manager",      role: "HR_MANAGER" },
                         "inspector@cims.com": { name: "Inspection Boy",  role: "INSPECTION_BOY" },
-                        "client@cims.com":    { name: "Client User",     role: "CLIENT" },
                     }
                     if (demoUsers[credentials.email] && passwordRaw === "demo123") {
                         try {

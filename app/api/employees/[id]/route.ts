@@ -183,7 +183,7 @@ export async function PUT(
         })
 
         // Update linked User account (role + email + login-access sync)
-        const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY", "CLIENT"]
+        const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"]
         if (systemRole || customRoleId !== undefined || email !== undefined || status !== undefined) {
             const empWithUser = await prisma.employee.findUnique({
                 where: { id: params.id },

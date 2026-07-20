@@ -50,7 +50,6 @@ import BulkImportInspectors from "@/components/BulkImportInspectors"
 
 export default function UserManagementPage() {
     const [users, setUsers] = useState<any[]>([])
-    const [companies, setCompanies] = useState<any[]>([])
     const [customRoles, setCustomRoles] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
@@ -66,15 +65,7 @@ export default function UserManagementPage() {
     const [cleaning, setCleaning] = useState(false)
 
     const [managers, setManagers] = useState<any[]>([])
-    const [groupProjects, setGroupProjects] = useState<any[]>([])
-    const [groupCompanies, setGroupCompanies] = useState<any[]>([])
 
-    // Group assignment for inspector creation
-    const [groupMode, setGroupMode] = useState<"none" | "existing" | "new">("none")
-    const [groupCompanyId, setGroupCompanyId] = useState("")
-    const [groupProjectId, setGroupProjectId] = useState("")
-    const [newGroupProjectName, setNewGroupProjectName] = useState("")
-    const [groupManagerIds, setGroupManagerIds] = useState<string[]>([])
 
     // Form state
     const [formData, setFormData] = useState({
@@ -82,28 +73,23 @@ export default function UserManagementPage() {
         email: "",
         password: "",
         role: "ADMIN",
-        customRoleId: "",
-        companyId: ""
+        customRoleId: ""
     })
 
     const fetchData = async () => {
         setLoading(true)
         try {
-            const [usersRes, companiesRes, managersRes, rolesRes] = await Promise.all([
+            const [usersRes, managersRes, rolesRes] = await Promise.all([
                 fetch("/api/admin/users"),
-                fetch("/api/companies"),
                 fetch("/api/users?role=MANAGER"),
                 fetch("/api/admin/roles")
             ])
-            const [usersData, companiesData, managersData, rolesData] = await Promise.all([
+            const [usersData, managersData, rolesData] = await Promise.all([
                 usersRes.json(),
-                companiesRes.json(),
                 managersRes.json(),
                 rolesRes.ok ? rolesRes.json() : []
             ])
             setUsers(Array.isArray(usersData) ? usersData : [])
-            setCompanies(Array.isArray(companiesData) ? companiesData : [])
-            setGroupCompanies(Array.isArray(companiesData) ? companiesData : [])
             setManagers(Array.isArray(managersData) ? managersData : [])
             setCustomRoles(Array.isArray(rolesData) ? rolesData : [])
         } catch (error) {
@@ -176,50 +162,11 @@ export default function UserManagementPage() {
                 throw new Error(data.message || data.error || "Failed to create user")
             }
 
-            const newUser = await res.json()
-
-            // Handle group assignment for inspectors
-            if (formData.role === "INSPECTION_BOY") {
-                let assignProjectId = groupProjectId
-
-                if (groupMode === "new" && groupCompanyId && newGroupProjectName.trim()) {
-                    // Create new project first
-                    const projRes = await fetch("/api/projects", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ companyId: groupCompanyId, name: newGroupProjectName.trim() })
-                    })
-                    if (projRes.ok) {
-                        const proj = await projRes.json()
-                        assignProjectId = proj.id
-                    }
-                }
-
-                if (assignProjectId && newUser.id) {
-                    await fetch("/api/assignments", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            projectId: assignProjectId,
-                            inspectorIds: [newUser.id],
-                            managerIds: groupManagerIds.length > 0 ? groupManagerIds : undefined,
-                        })
-                    })
-                    toast.success("User created and assigned to group")
-                } else {
-                    toast.success("User created successfully")
-                }
-            } else {
-                toast.success("User created successfully")
-            }
+            await res.json()
+            toast.success("User created successfully")
 
             setIsCreateModalOpen(false)
-            setFormData({ name: "", email: "", password: "", role: "ADMIN", customRoleId: "", companyId: "" })
-            setGroupMode("none")
-            setGroupCompanyId("")
-            setGroupProjectId("")
-            setNewGroupProjectName("")
-            setGroupManagerIds([])
+            setFormData({ name: "", email: "", password: "", role: "ADMIN", customRoleId: "" })
             fetchData()
         } catch (error: any) {
             toast.error(error.message)
@@ -304,14 +251,6 @@ export default function UserManagementPage() {
         } finally {
             setSubmitting(false)
         }
-    }
-
-    const fetchGroupProjects = async (companyId: string) => {
-        if (!companyId) { setGroupProjects([]); setGroupProjectId(""); return }
-        try {
-            const res = await fetch(`/api/projects?companyId=${companyId}`)
-            if (res.ok) setGroupProjects(await res.json())
-        } catch { }
     }
 
     const filteredUsers = users.filter(u => {

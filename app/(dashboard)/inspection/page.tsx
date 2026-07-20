@@ -224,7 +224,7 @@ export default function InspectionDashboard() {
                         <line x1="12" y1="20" x2="12" y2="4" />
                         <line x1="6" y1="20" x2="6" y2="14" />
                     </svg>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a18]">Company Wise Reports (Current Month)</h2>
+                    <h2 className="text-[15px] font-semibold text-[#1a1a18]">Site Wise Reports (Current Month)</h2>
                 </div>
 
                 {reportLoading ? (
@@ -352,7 +352,7 @@ export default function InspectionDashboard() {
                                         <line x1="1" y1="9" x2="4" y2="9" />
                                         <line x1="1" y1="14" x2="4" y2="14" />
                                     </svg>
-                                    {a.project.company.name}
+                                    {a.project.site?.name || ""}
                                 </p>
                                 <p className="text-[15px] font-semibold text-[#1a1a18] mb-3">{a.project.name}</p>
                                 <div className="flex flex-col gap-1.5 mb-3">
@@ -414,7 +414,7 @@ export default function InspectionDashboard() {
                                     return (
                                         <div key={a.id} className="bg-white border border-[#e8e6e1] rounded-[10px] p-[12px_14px] flex items-center justify-between">
                                             <div>
-                                                <p className="text-[10.5px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-[2px]">{a.project?.company?.name}</p>
+                                                <p className="text-[10.5px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-[2px]">{a.project?.site?.name}</p>
                                                 <p className="text-[13.5px] font-semibold text-[#1a1a18]">{a.project?.name}</p>
                                                 <p className="text-[11.5px] text-[#9e9b95] mt-[2px]">{safeFormat(a.createdAt, "MMM d, yyyy")}</p>
                                             </div>

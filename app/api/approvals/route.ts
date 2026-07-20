@@ -41,7 +41,7 @@ export async function GET(req: Request) {
                     include: {
                         project: {
                             include: {
-                                company: true
+                                site: { select: { id: true, name: true } }
                             }
                         }
                     }

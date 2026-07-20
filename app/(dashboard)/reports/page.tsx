@@ -158,10 +158,10 @@ export default function ReportsPage() {
     const [dateFrom, setDateFrom] = useState(todayStr)
     const [dateTo, setDateTo] = useState(todayStr)
     const [mounted, setMounted] = useState(false)
-    const [selectedCompanyId, setSelectedCompanyId] = useState("all")
+    const [selectedSiteId, setSelectedSiteId] = useState("all")
     const [selectedProjectId, setSelectedProjectId] = useState("all")
     const [selectedInspectorId, setSelectedInspectorId] = useState("all")
-    const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+    const [sites, setSites] = useState<{ id: string; name: string }[]>([])
 
     useEffect(() => {
         setMounted(true)
@@ -188,7 +188,7 @@ export default function ReportsPage() {
     const [sortKey, setSortKey] = useState<string>("date")
     const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
     // Column visibility
-    const ALL_COLS = ["date", "inspector", "company", "project", "part", "location", "inspected", "accepted", "rework", "rejected"] as const
+    const ALL_COLS = ["date", "inspector", "site", "project", "part", "location", "inspected", "accepted", "rework", "rejected"] as const
     type ColKey = typeof ALL_COLS[number]
     const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(new Set(ALL_COLS))
     const [showColMenu, setShowColMenu] = useState(false)
@@ -199,33 +199,33 @@ export default function ReportsPage() {
     useEffect(() => {
         if (!mounted) return
         if (can(session, "reports.view")) {
-            fetch("/api/companies").then(r => r.json()).then(d => setCompanies(Array.isArray(d) ? d : [])).catch(() => { })
+            fetch("/api/sites?isActive=true").then(r => r.json()).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => { })
             fetch("/api/users?role=INSPECTION_BOY").then(r => r.json()).then(d => setInspectors(Array.isArray(d) ? d : [])).catch(() => { })
         } else if (role === "INSPECTION_BOY") {
-            // Fetch projects the inspector is assigned to, derive unique companies
+            // Fetch projects the inspector is assigned to, derive unique sites
             fetch("/api/projects").then(r => r.json()).then((allProjects: any[]) => {
                 if (!Array.isArray(allProjects)) return
-                const companyMap = new Map<string, { id: string; name: string }>()
+                const siteMap = new Map<string, { id: string; name: string }>()
                 allProjects.forEach(p => {
-                    if (p.company) companyMap.set(p.company.id, { id: p.company.id, name: p.company.name })
+                    if (p.site) siteMap.set(p.site.id, { id: p.site.id, name: p.site.name })
                 })
-                setCompanies(Array.from(companyMap.values()))
+                setSites(Array.from(siteMap.values()))
             }).catch(() => { })
         }
     }, [role, mounted])
 
     useEffect(() => {
-        if (selectedCompanyId === "all") {
+        if (selectedSiteId === "all") {
             setProjects([])
             setSelectedProjectId("all")
             return
         }
-        fetch(`/api/projects?companyId=${selectedCompanyId}`)
+        fetch(`/api/projects?siteId=${selectedSiteId}`)
             .then(r => r.json())
             .then(d => setProjects(Array.isArray(d) ? d : []))
             .catch(() => { })
         setSelectedProjectId("all")
-    }, [selectedCompanyId])
+    }, [selectedSiteId])
 
     const fetchReport = useCallback(async () => {
         setLoading(true)
@@ -241,7 +241,7 @@ export default function ReportsPage() {
                 params.set("dateFrom", dateFrom)
                 params.set("dateTo", dateTo)
             }
-            if (selectedCompanyId !== "all") params.set("companyId", selectedCompanyId)
+            if (selectedSiteId !== "all") params.set("siteId", selectedSiteId)
             if (selectedProjectId !== "all") params.set("projectId", selectedProjectId)
             if (selectedInspectorId !== "all") params.set("inspectorId", selectedInspectorId)
 
@@ -252,7 +252,7 @@ export default function ReportsPage() {
         } finally {
             setLoading(false)
         }
-    }, [selectedMonth, selectedYear, dateFilterMode, dateFrom, dateTo, selectedCompanyId, selectedProjectId, selectedInspectorId])
+    }, [selectedMonth, selectedYear, dateFilterMode, dateFrom, dateTo, selectedSiteId, selectedProjectId, selectedInspectorId])
 
     useEffect(() => {
         fetchReport()
@@ -333,7 +333,7 @@ export default function ReportsPage() {
                 const row: any = {
                     "Date": r.date ? format(new Date(r.date), "dd/MM/yyyy HH:mm") : "—",
                     "Shift": r.shift || "—",
-                    "Company": r.company || "—",
+                    "Site": r.site || "—",
                     "Project": r.project || "—",
                     "Location": r.location || "—",
                     "Part Name": r.partName || "—",
@@ -349,7 +349,7 @@ export default function ReportsPage() {
                     "Inspector Name": r.inspector || "—"
                 }
 
-                const baseKeys = ["id", "date", "shift", "company", "project", "location", "partName", "partNumber", "inspected", "accepted", "rework", "rejected", "inspector"]
+                const baseKeys = ["id", "date", "shift", "site", "project", "location", "partName", "partNumber", "inspected", "accepted", "rework", "rejected", "inspector"]
                 Object.keys(r).forEach(k => {
                     if (!baseKeys.includes(k) && typeof r[k] === 'number') {
                         row[k] = r[k]
@@ -365,8 +365,8 @@ export default function ReportsPage() {
         const workbook = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
 
-        const companyName = companies.find(c => c.id === selectedCompanyId)?.name || "Global"
-        const fileName = `${fileNamePrefix}_${companyName.replace(/\s+/g, '')}_${MONTHS[selectedMonth - 1]}_${selectedYear}.xlsx`
+        const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global"
+        const fileName = `${fileNamePrefix}_${siteName.replace(/\s+/g, '')}_${MONTHS[selectedMonth - 1]}_${selectedYear}.xlsx`
         XLSX.writeFile(workbook, fileName)
     }
 
@@ -390,7 +390,7 @@ export default function ReportsPage() {
                 import("@react-pdf/renderer"),
                 import("./ReportPDF")
             ])
-            const companyName = companies.find(c => c.id === selectedCompanyId)?.name || "Global View"
+            const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global View"
             const period = `${MONTHS[selectedMonth - 1]} ${selectedYear}`
             const project = projects.find(p => p.id === selectedProjectId)?.name || "All Projects"
             const inspector = inspectors.find(i => i.id === selectedInspectorId)?.name || "All Inspectors"
@@ -399,7 +399,7 @@ export default function ReportsPage() {
             const blob = await pdf(
                 <ReportDocument
                     data={data}
-                    companyName={companyName}
+                    companyName={siteName}
                     period={period}
                     project={project}
                     inspector={inspector}
@@ -411,7 +411,7 @@ export default function ReportsPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement("a")
             a.href = url
-            a.download = `QualityReport_${companyName.replace(/\s+/g, "")}_${MONTHS[selectedMonth - 1]}_${selectedYear}.pdf`
+            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${MONTHS[selectedMonth - 1]}_${selectedYear}.pdf`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
@@ -490,10 +490,10 @@ export default function ReportsPage() {
             {/* FILTER ROW */}
             <div className="no-print bg-white border-b border-[#e8e6e1] p-3 md:p-[12px_24px] sticky top-0 z-20">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-[10px] md:gap-[12px]">
-                    {/* Company */}
+                    {/* Site */}
                     {[
-                        { label: "Company", value: selectedCompanyId, options: companies, setter: setSelectedCompanyId, allLabel: "Global View" },
-                        { label: "Project", value: selectedProjectId, options: projects, setter: setSelectedProjectId, allLabel: "All Projects", disabled: selectedCompanyId === "all" },
+                        { label: "Site", value: selectedSiteId, options: sites, setter: setSelectedSiteId, allLabel: "Global View" },
+                        { label: "Project", value: selectedProjectId, options: projects, setter: setSelectedProjectId, allLabel: "All Projects", disabled: selectedSiteId === "all" },
                         { label: "Inspector", value: selectedInspectorId, options: inspectors, setter: setSelectedInspectorId, allLabel: "All Inspectors" },
                     ].map((filter, idx) => (
                         <div key={idx} className="flex flex-col">
@@ -657,7 +657,7 @@ export default function ReportsPage() {
 
                 {/* Print Header Visible Only in PDF */}
                 <div className="hidden print:block mb-[24px] border-b border-[#1a1a18] pb-[16px]">
-                    <h1 className="text-[24px] font-[700] text-[#1a1a18]">{companies.find(c => c.id === selectedCompanyId)?.name || "Global View"} - {activeTab}</h1>
+                    <h1 className="text-[24px] font-[700] text-[#1a1a18]">{sites.find(c => c.id === selectedSiteId)?.name || "Global View"} - {activeTab}</h1>
                     <p className="text-[12px] font-[500] text-[#6b6860] mt-[4px]">
                         Period: {MONTHS[selectedMonth - 1]} {selectedYear} •
                         Project: {projects.find(p => p.id === selectedProjectId)?.name || "All"} •
@@ -929,7 +929,7 @@ export default function ReportsPage() {
                             const COL_META: { key: ColKey; label: string; numeric: boolean }[] = [
                                 { key: "date", label: "Date", numeric: false },
                                 { key: "inspector", label: "Inspector", numeric: false },
-                                { key: "company", label: "Company", numeric: false },
+                                { key: "site", label: "Site", numeric: false },
                                 { key: "project", label: "Project", numeric: false },
                                 { key: "part", label: "Part", numeric: false },
                                 { key: "location", label: "Location", numeric: false },
@@ -1099,7 +1099,7 @@ export default function ReportsPage() {
                                                         <tr key={r.id} className="hover:bg-[#f9f8f5] transition-colors">
                                                             {visibleCols.has("date") && <td className="p-[12px_16px] text-[12.5px] font-mono text-[#6b6860] whitespace-nowrap">{r.date ? format(new Date(r.date), "dd/MM/yyyy") : "—"}</td>}
                                                             {visibleCols.has("inspector") && <td className="p-[12px_16px] text-[13px] font-[500] text-[#1a1a18] whitespace-nowrap">{r.inspector}</td>}
-                                                            {visibleCols.has("company") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.company}</td>}
+                                                            {visibleCols.has("site") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.site}</td>}
                                                             {visibleCols.has("project") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.project}</td>}
                                                             {visibleCols.has("part") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.partName}</td>}
                                                             {visibleCols.has("location") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.location}</td>}

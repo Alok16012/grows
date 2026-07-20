@@ -50,7 +50,7 @@ const getStats = unstable_cache(
                             project: {
                                 select: {
                                     name: true,
-                                    company: { select: { name: true } },
+                                    site: { select: { name: true } },
                                 },
                             },
                         },
@@ -76,15 +76,15 @@ const getStats = unstable_cache(
                 SELECT
                     p.id            as project_id,
                     p.name          as project_name,
-                    c.name          as company_name,
+                    COALESCE(s.name, 'No Site') as company_name,
                     COUNT(i.id)     as total,
                     COUNT(CASE WHEN i.status = 'rejected' THEN 1 END) as rejected,
                     AVG(COALESCE(i."sentBackCount", 0)) as avg_sent_back
                 FROM "Project" p
-                JOIN "Company" c ON c.id = p."companyId"
+                LEFT JOIN "Site" s ON s.id = p."siteId"
                 LEFT JOIN "Assignment" a ON a."projectId" = p.id
                 LEFT JOIN "Inspection" i ON i."assignmentId" = a.id
-                GROUP BY p.id, p.name, c.name
+                GROUP BY p.id, p.name, s.name
                 HAVING COUNT(i.id) > 0
                 ORDER BY (CASE WHEN COUNT(i.id) > 0 THEN
                     COUNT(CASE WHEN i.status = 'rejected' THEN 1 END)::float / COUNT(i.id)
@@ -102,7 +102,7 @@ const getStats = unstable_cache(
                 return {
                     projectId: r.project_id,
                     projectName: r.project_name,
-                    companyName: r.company_name,
+                    siteName: r.company_name,
                     total,
                     rejected,
                     rejectionRate: parseFloat(rejectionRate.toFixed(1)),
@@ -122,7 +122,7 @@ const getStats = unstable_cache(
             recentPending: recentPending.map(i => ({
                 id: i.id,
                 projectName: i.assignment.project.name,
-                companyName: i.assignment.project.company.name,
+                siteName: i.assignment.project.site?.name ?? "No Site",
                 inspectorName: i.submitter.name,
                 submittedAt: i.submittedAt,
             })),

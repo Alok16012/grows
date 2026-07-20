@@ -36,13 +36,11 @@ export async function GET(req: Request) {
         const city = searchParams.get("city")
         const siteType = searchParams.get("siteType")
         const search = searchParams.get("search")
-        const branchId = searchParams.get("branchId")
 
         const where: Record<string, unknown> = {}
         if (isActive !== null && isActive !== "") where.isActive = isActive === "true"
         if (city) where.city = { contains: city, mode: "insensitive" }
         if (siteType) where.siteType = siteType
-        if (branchId) where.branchId = branchId
         if (search) {
             where.OR = [
                 { name: { contains: search, mode: "insensitive" } },
@@ -54,7 +52,6 @@ export async function GET(req: Request) {
         const sites = await prisma.site.findMany({
             where,
             include: {
-                branch: { select: { id: true, name: true } },
                 _count: {
                     select: {
                         deployments: { where: { isActive: true } },
@@ -86,19 +83,13 @@ export async function POST(req: Request) {
 
         const body = await req.json()
         const {
-            name, address, city, state, pincode, branchId,
+            name, address, city, state, pincode,
             clientName, clientId, latitude, longitude, radius,
             manpowerRequired, contactPerson, contactPhone, siteType, shift,
         } = body
 
-        let finalBranchId = branchId
-        if (!finalBranchId) {
-            const firstBranch = await prisma.branch.findFirst({ select: { id: true } })
-            finalBranchId = firstBranch?.id
-        }
-
-        if (!name || !address || !finalBranchId) {
-            return new NextResponse("Name, address and branchId are required", { status: 400 })
+        if (!name || !address) {
+            return new NextResponse("Name and address are required", { status: 400 })
         }
 
         // Auto-generate site code as SITE-NNNN
@@ -126,7 +117,6 @@ export async function POST(req: Request) {
                 pincode: pincode || null,
                 clientName: clientName || null,
                 clientId: clientId || null,
-                branchId: finalBranchId,
                 latitude: latitude ? parseFloat(latitude) : null,
                 longitude: longitude ? parseFloat(longitude) : null,
                 radius: radius ? parseFloat(radius) : 100,

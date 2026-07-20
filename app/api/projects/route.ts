@@ -13,19 +13,16 @@ export async function GET(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const { searchParams } = new URL(req.url)
-        const companyId = searchParams.get("companyId")
         const siteId = searchParams.get("siteId")
 
         const where: Record<string, unknown> = {}
         if (siteId) where.siteId = siteId
-        else if (companyId) where.companyId = companyId
 
         await ensureProjectSchema()
 
         const projects = await prisma.project.findMany({
             where,
             include: {
-                company: true,
                 site: { select: { id: true, name: true, code: true, city: true } },
                 // Current project members, so callers (e.g. the assignment wizard,
                 // the projects grid team avatars) can show/pre-fill them.
@@ -82,25 +79,20 @@ export async function POST(req: Request) {
 
         const body = await req.json()
         const { name, description, siteId, managerIds, inspectorIds, projectType, priority, status, startDate, endDate } = body
-        let { companyId } = body
-
         if (!name || !siteId) {
             return new NextResponse("Name and Site ID are required", { status: 400 })
         }
 
         await ensureProjectSchema()
 
-        // Inspection projects now hang off a real HR Site. We still keep the
-        // (non-null) companyId column populated for backwards compatibility, so
-        // derive it from the chosen Site's branch → company.
+        // Projects hang off a real HR Site — the Company concept is retired.
         const site = await prisma.site.findUnique({
             where: { id: siteId },
-            select: { branch: { select: { companyId: true } } },
+            select: { id: true },
         })
         if (!site) {
             return new NextResponse("Site not found", { status: 400 })
         }
-        companyId = site.branch.companyId
 
         // Auto-generate a sequential project code, e.g. PRJ-2026-00027.
         const year = new Date().getFullYear()
@@ -119,7 +111,6 @@ export async function POST(req: Request) {
             data: {
                 name,
                 description,
-                companyId,
                 siteId,
                 code,
                 status: VALID_STATUSES.includes(status) ? status : "PLANNING",

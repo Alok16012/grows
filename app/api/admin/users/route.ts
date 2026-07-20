@@ -18,9 +18,6 @@ export async function GET(req: Request) {
     try {
         const users = await prisma.user.findMany({
             include: {
-                company: {
-                    select: { name: true }
-                },
                 customRole: {
                     select: { id: true, name: true, color: true }
                 },
@@ -56,7 +53,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const { name, email, password, role, companyId, customRoleId } = body
+        const { name, email, password, role, customRoleId } = body
 
         if (!name || !email || !password || !role) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -72,9 +69,6 @@ export async function POST(req: Request) {
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
-        // Ensure companyId is null if not provided or empty string
-        const finalCompanyId = (role === Role.CLIENT && companyId && companyId.trim() !== "") ? companyId : null
-
         const user = await prisma.user.create({
             data: {
                 name,
@@ -82,7 +76,6 @@ export async function POST(req: Request) {
                 password: hashedPassword,
                 role: role as any,
                 customRoleId: customRoleId || null,
-                company: finalCompanyId ? { connect: { id: finalCompanyId } } : undefined
             }
         })
 

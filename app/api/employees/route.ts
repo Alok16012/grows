@@ -25,7 +25,6 @@ export async function GET(req: Request) {
         const status = searchParams.get("status")
         const search = searchParams.get("search")
         const employmentType = searchParams.get("employmentType")
-        const companyId = searchParams.get("companyId")
         const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
         const pageSize = Math.min(1000, parseInt(searchParams.get("pageSize") ?? "50"))
         // `lite=1` strips the base64 `photo` blob from each row. Profile photos
@@ -50,10 +49,6 @@ export async function GET(req: Request) {
         // live in the Onboarding module until approved.
         where.NOT = { onboardingRecord: { is: { status: { not: "COMPLETED" } } } }
         if (employmentType) where.employmentType = employmentType
-        if (companyId) {
-            // filter via branch -> company
-            where.branch = { companyId }
-        }
         if (siteId) {
             where.deployments = {
                 some: {

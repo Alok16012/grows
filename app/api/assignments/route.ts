@@ -45,7 +45,6 @@ export async function GET(req: Request) {
                 include: {
                     project: {
                         include: {
-                            company: true,
                             site: { select: { id: true, name: true } },
                             projectManagers: {
                                 include: { manager: { select: { id: true, name: true, email: true } } }
@@ -74,7 +73,6 @@ export async function GET(req: Request) {
                 project: {
                     id: project.id,
                     name: project.name,
-                    company: project.company,
                     site: project.site,
                     managers: project.projectManagers.map(pm => pm.manager)
                 }
@@ -99,7 +97,6 @@ export async function GET(req: Request) {
                 id: true,
                 name: true,
                 createdAt: true,
-                company: { select: { id: true, name: true } },
                 site: { select: { id: true, name: true } },
                 assignments: {
                     where: status && status !== "all" && status !== "manager_only"
@@ -143,7 +140,6 @@ export async function GET(req: Request) {
                         project: {
                             id: project.id,
                             name: project.name,
-                            company: project.company,
                             site: project.site,
                             managers
                         }
@@ -161,7 +157,6 @@ export async function GET(req: Request) {
                     project: {
                         id: project.id,
                         name: project.name,
-                        company: project.company,
                         site: project.site,
                         managers
                     },

@@ -30,7 +30,6 @@ type Assignment = {
     project?: {
         id: string
         name: string
-        company?: { name: string } | null
         site?: { id: string; name: string } | null
         managers?: { id: string; name: string | null; email?: string | null }[]
     } | null
@@ -149,7 +148,7 @@ export default function AssignmentsPage() {
         if (status === "unauthenticated") {
             router.push("/login")
         } else if (status === "authenticated" && !isManagerOrAdmin) {
-            router.push(session?.user?.role === "INSPECTION_BOY" ? "/inspection" : "/client")
+            router.push(session?.user?.role === "INSPECTION_BOY" ? "/inspection" : "/")
         }
     }, [status, session, router, isManagerOrAdmin, mounted])
 
@@ -365,7 +364,6 @@ export default function AssignmentsPage() {
                     a.inspectionBoy?.name,
                     a.project?.name,
                     a.project?.site?.name,
-                    a.project?.company?.name,
                 ].filter(Boolean).join(" ").toLowerCase()
                 if (!hay.includes(q)) return false
             }
@@ -726,7 +724,7 @@ export default function AssignmentsPage() {
                                                     className="hover:bg-[var(--surface2)]/40 transition-colors cursor-pointer">
                                                     <td className="px-4 py-2.5">
                                                         <p className="font-mono text-[11.5px] font-semibold text-[var(--accent)] whitespace-nowrap">{assignmentNo(a)}</p>
-                                                        <p className="text-[10.5px] text-[var(--text3)] whitespace-nowrap">{a.project?.site?.name || a.project?.company?.name || "—"}</p>
+                                                        <p className="text-[10.5px] text-[var(--text3)] whitespace-nowrap">{a.project?.site?.name || "—"}</p>
                                                     </td>
                                                     <td className="px-3 py-2.5">
                                                         <p className="font-semibold text-[var(--text)] leading-tight">{a.inspectionBoy?.name || "—"}</p>
@@ -818,7 +816,7 @@ export default function AssignmentsPage() {
                         <div className="p-5 space-y-2.5">
                             {[
                                 { label: "Project", value: detail.project?.name || "—" },
-                                { label: "Site", value: detail.project?.site?.name || detail.project?.company?.name || "—" },
+                                { label: "Site", value: detail.project?.site?.name || "—" },
                                 { label: "Status", value: displayStatus(detail).label },
                                 { label: "Type", value: (detail.recurrenceType ?? "none") === "none" ? "One-time" : `Recurring (${detail.recurrenceType})${detail.recurrenceActive ? "" : " — stopped"}` },
                                 { label: "Start Date", value: fmtDate(detail.startDate ?? detail.createdAt) },

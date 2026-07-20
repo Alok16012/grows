@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     const role = session.user.role
 
     // Determine filters
-    let companyId: string | null = null
+    let siteId: string | null = null
     let inspectorId: string | null = null
 
     // Full-report access is driven by the reports.view permission (custom roles)
@@ -42,18 +42,14 @@ export async function GET(req: Request) {
     const canViewAllReports = role === "ADMIN" || (session.user.permissions ?? []).includes("reports.view")
 
     if (canViewAllReports) {
-        companyId = searchParams.get("companyId") || null
+        siteId = searchParams.get("siteId") || null
         inspectorId = searchParams.get("inspectorId") || null
-    } else if (role === "CLIENT") {
-        const user = await prisma.user.findUnique({ where: { id: session.user.id } })
-        companyId = user?.companyId ?? null
     } else if (role === "INSPECTION_BOY") {
         // Always restrict to their own inspections only
         inspectorId = session.user.id
-        // Honor company/project filters if provided
-        const requestedCompanyId = searchParams.get("companyId")
-        if (requestedCompanyId) companyId = requestedCompanyId
-        // If no company selected, companyId stays null → shows all their data across companies
+        // Honor site/project filters if provided
+        const requestedSiteId = searchParams.get("siteId")
+        if (requestedSiteId) siteId = requestedSiteId
     } else {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -86,9 +82,9 @@ export async function GET(req: Request) {
                     lte: endDate,
                 },
                 assignment: {
-                    project: (companyId || projectId) ? {
+                    project: (siteId || projectId) ? {
                         id: projectId || undefined,
-                        companyId: companyId || undefined
+                        siteId: siteId || undefined
                     } : undefined,
                     inspectionBoyId: inspectorId || undefined,
                 },
@@ -100,7 +96,7 @@ export async function GET(req: Request) {
                 assignment: {
                     include: {
                         project: {
-                            include: { company: true },
+                            include: { site: { select: { id: true, name: true } } },
                         },
                         inspectionBoy: true,
                     },
@@ -123,7 +119,7 @@ export async function GET(req: Request) {
             rejectionPPM: 0,
             overallPPM: 0,
             period: periodLabel,
-            companyName: "All Companies",
+            siteName: "All Sites",
             partModel: "",
         }
 
@@ -132,17 +128,17 @@ export async function GET(req: Request) {
         const dayMap: Record<string, any> = {}
         const inspectorMap: Record<string, any> = {}
         const locationMap: Record<string, any> = {}
-        const companyMap: Record<string, any> = {}
+        const siteMap: Record<string, any> = {}
         const defectMap: Record<string, number> = {}
         const partModels = new Set<string>()
-        let resolvedCompanyName: string | null = null
+        let resolvedSiteName: string | null = null
 
         for (const inspection of inspections) {
             const responses = inspection.responses
             const inspectorName = inspection.assignment.inspectionBoy.name
-            const companyName = inspection.assignment.project.company.name
-            const companyId = inspection.assignment.project.companyId
-            if (!resolvedCompanyName) resolvedCompanyName = companyName
+            const siteName = inspection.assignment.project.site?.name ?? "No Site"
+            const rowSiteId = inspection.assignment.project.siteId ?? "no-site"
+            if (!resolvedSiteName) resolvedSiteName = siteName
             const date = inspection.submittedAt
                 ? new Date(inspection.submittedAt).toISOString().slice(0, 10)
                 : new Date(inspection.createdAt).toISOString().slice(0, 10)
@@ -217,7 +213,7 @@ export async function GET(req: Request) {
             accumulate(dayMap, date, "date", date)
             accumulate(inspectorMap, inspectorName, "inspectorName", inspectorName)
             accumulate(locationMap, location, "location", location)
-            accumulate(companyMap, companyId, "companyName", companyName)
+            accumulate(siteMap, rowSiteId, "siteName", siteName)
         }
 
         // Compute summary rates
@@ -231,7 +227,7 @@ export async function GET(req: Request) {
             summary.overallPPM = Math.round(((summary.totalRework + summary.totalRejected) / total) * 1_000_000)
         }
         summary.partModel = Array.from(partModels).join(", ") || "N/A"
-        if (resolvedCompanyName) summary.companyName = resolvedCompanyName
+        if (resolvedSiteName) summary.siteName = resolvedSiteName
 
         // Helper for map to array
         const mapToArray = (map: any, sortFn: (a: any, b: any) => number) =>
@@ -249,7 +245,7 @@ export async function GET(req: Request) {
         const dayWise = mapToArray(dayMap, (a, b) => a.date.localeCompare(b.date))
         const inspectorWise = mapToArray(inspectorMap, (a, b) => b.totalInspected - a.totalInspected)
         const locationWise = Object.values(locationMap).sort((a: any, b: any) => b.totalInspected - a.totalInspected)
-        const companyWise = mapToArray(companyMap, (a, b) => b.totalInspected - a.totalInspected)
+        const siteWise = mapToArray(siteMap, (a, b) => b.totalInspected - a.totalInspected)
 
         const totalDefects = Object.values(defectMap).reduce((a, b) => a + b, 0)
         const topDefects = Object.entries(defectMap)
@@ -267,14 +263,14 @@ export async function GET(req: Request) {
             dayWise,
             inspectorWise,
             locationWise,
-            companyWise,
+            siteWise,
             topDefects,
             records: inspections.map(i => {
                 const r: any = {
                     id: i.id,
                     inspector: i.assignment.inspectionBoy.name,
                     date: i.submittedAt || i.createdAt,
-                    company: i.assignment.project.company.name,
+                    site: i.assignment.project.site?.name ?? "No Site",
                     project: i.assignment.project.name,
                     inspected: 0,
                     accepted: 0,

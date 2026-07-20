@@ -97,7 +97,7 @@ export default function ApprovalsPage() {
 
     const filteredInspections = inspections.filter(i =>
         i.assignment?.project?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        i.assignment?.project?.company?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.assignment?.project?.site?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         i.submitter?.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
@@ -198,7 +198,7 @@ export default function ApprovalsPage() {
                                             <p className="text-[13.5px] font-semibold text-[#1a1a18] truncate">{inspection.submitter?.name}</p>
                                             <p className="text-[11.5px] text-[#9e9b95] truncate">{inspection.submitter?.email}</p>
                                             <p className="text-[12px] text-[#6b6860] font-[500] truncate mt-1">{inspection.assignment?.project?.name}</p>
-                                            <p className="text-[11px] text-[#9e9b95] truncate">{inspection.assignment?.project?.company?.name}</p>
+                                            <p className="text-[11px] text-[#9e9b95] truncate">{inspection.assignment?.project?.site?.name}</p>
                                         </div>
                                         <span className={`shrink-0 inline-block px-[10px] py-[4px] rounded-[20px] text-[11px] font-medium ${
                                             inspection.status === "pending" ? "bg-[#fef3c7] text-[#d97706]" :
@@ -268,7 +268,7 @@ export default function ApprovalsPage() {
                                                 {inspection.assignment?.project?.name}
                                             </td>
                                             <td className="px-[18px] py-3.5 text-[13px] text-[#1a1a18]">
-                                                {inspection.assignment?.project?.company?.name}
+                                                {inspection.assignment?.project?.site?.name}
                                             </td>
                                             <td className="px-[18px] py-3.5 text-[13px] text-[#6b6860]">
                                                 {inspection.submittedAt ? new Date(inspection.submittedAt).toLocaleDateString('en-GB') : "—"}

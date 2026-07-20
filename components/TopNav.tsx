@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 
 interface SearchResults {
-    companies: any[]
+    sites: any[]
     projects: any[]
     inspections: any[]
 }
@@ -135,15 +135,15 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                     {loading && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--text3)]" /></div>}
                 </div>
 
-                {isOpen && (results?.companies.length || results?.projects.length || results?.inspections.length) ? (
+                {isOpen && (results?.sites.length || results?.projects.length || results?.inspections.length) ? (
                     <div className="absolute top-full left-0 mt-2 w-full max-h-[400px] overflow-y-auto rounded-[12px] border border-[var(--border)] bg-[var(--surface)] shadow-xl z-50 p-2 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        {results.companies.length > 0 && (
+                        {results.sites.length > 0 && (
                             <section>
-                                <h3 className="px-2 py-1 text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-1">Companies</h3>
-                                {results.companies.map(c => (
-                                    <Link key={c.id} href={`/companies/${c.id}`} className="flex items-center gap-3 px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
+                                <h3 className="px-2 py-1 text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-1">Sites</h3>
+                                {results.sites.map(c => (
+                                    <Link key={c.id} href="/sites" className="flex items-center gap-3 px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
                                         <Building2 size={16} className="text-[var(--accent)]" />
-                                        <span className="text-[13px] font-medium text-[var(--text)]">{c.name}</span>
+                                        <span className="text-[13px] font-medium text-[var(--text)]">{c.name}{c.code ? ` (${c.code})` : ""}</span>
                                     </Link>
                                 ))}
                             </section>
@@ -152,12 +152,12 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                             <section>
                                 <h3 className="px-2 py-1 text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-1">Projects</h3>
                                 {results.projects.map(p => (
-                                    <Link key={p.id} href={`/companies/${p.companyId}`} className="flex flex-col px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
+                                    <Link key={p.id} href="/projects" className="flex flex-col px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
                                         <div className="flex items-center gap-3">
                                             <Folder size={16} className="text-blue-500" />
                                             <span className="text-[13px] font-medium text-[var(--text)]">{p.name}</span>
                                         </div>
-                                        <span className="text-[10px] text-[var(--text3)] ml-7">{p.companyName}</span>
+                                        <span className="text-[10px] text-[var(--text3)] ml-7">{p.siteName}</span>
                                     </Link>
                                 ))}
                             </section>

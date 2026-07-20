@@ -32,7 +32,7 @@ interface FailedInspector {
     error: string
 }
 
-interface CompanyOption {
+interface SiteOption {
     id: string
     name: string
 }
@@ -62,44 +62,44 @@ export default function BulkImportInspectors({ onImportComplete }: BulkImportIns
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Group assignment state
-    const [companies, setCompanies] = useState<CompanyOption[]>([])
+    const [sites, setSites] = useState<SiteOption[]>([])
     const [projects, setProjects] = useState<ProjectOption[]>([])
     const [managers, setManagers] = useState<ManagerOption[]>([])
-    const [selectedCompanyId, setSelectedCompanyId] = useState("")
+    const [selectedSiteId, setSelectedSiteId] = useState("")
     const [selectedProjectId, setSelectedProjectId] = useState("")
     const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
 
     useEffect(() => {
         if (open) {
-            fetchCompaniesAndManagers()
+            fetchSitesAndManagers()
         }
     }, [open])
 
     useEffect(() => {
-        if (selectedCompanyId) {
-            fetchProjects(selectedCompanyId)
+        if (selectedSiteId) {
+            fetchProjects(selectedSiteId)
         } else {
             setProjects([])
             setSelectedProjectId("")
         }
-    }, [selectedCompanyId])
+    }, [selectedSiteId])
 
-    const fetchCompaniesAndManagers = async () => {
+    const fetchSitesAndManagers = async () => {
         try {
-            const [compRes, mgrRes] = await Promise.all([
-                fetch("/api/companies"),
+            const [siteRes, mgrRes] = await Promise.all([
+                fetch("/api/sites?isActive=true"),
                 fetch("/api/users?role=MANAGER")
             ])
-            if (compRes.ok) setCompanies(await compRes.json())
+            if (siteRes.ok) setSites(await siteRes.json())
             if (mgrRes.ok) setManagers(await mgrRes.json())
         } catch (error) {
-            console.error("Failed to fetch companies/managers", error)
+            console.error("Failed to fetch sites/managers", error)
         }
     }
 
-    const fetchProjects = async (companyId: string) => {
+    const fetchProjects = async (siteId: string) => {
         try {
-            const res = await fetch(`/api/projects?companyId=${companyId}`)
+            const res = await fetch(`/api/projects?siteId=${siteId}`)
             if (res.ok) {
                 const data = await res.json()
                 setProjects(Array.isArray(data) ? data : [])
@@ -232,7 +232,7 @@ export default function BulkImportInspectors({ onImportComplete }: BulkImportIns
         setFile(null)
         setParsedData([])
         setResults(null)
-        setSelectedCompanyId("")
+        setSelectedSiteId("")
         setSelectedProjectId("")
         setSelectedManagerIds([])
     }
@@ -286,20 +286,20 @@ export default function BulkImportInspectors({ onImportComplete }: BulkImportIns
                             </div>
                             <p className="text-[12.5px] text-[#6b6860] mb-3">Select a project to auto-assign imported inspectors</p>
                             <div className="space-y-2">
-                                <label className="text-[11.5px] font-medium text-[#9e9b95] uppercase tracking-[0.5px]">Company</label>
+                                <label className="text-[11.5px] font-medium text-[#9e9b95] uppercase tracking-[0.5px]">Site</label>
                                 <select
                                     className="w-full bg-white border border-[#e8e6e1] rounded-[9px] px-[14px] py-[10px] text-[13px] text-[#1a1a18] focus:border-[#1a9e6e] focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all cursor-pointer"
-                                    value={selectedCompanyId}
-                                    onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                    value={selectedSiteId}
+                                    onChange={(e) => setSelectedSiteId(e.target.value)}
                                 >
-                                    <option value="">Select Company (Optional)</option>
-                                    {companies.map((c) => (
+                                    <option value="">Select Site (Optional)</option>
+                                    {sites.map((c) => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {selectedCompanyId && (
+                            {selectedSiteId && (
                                 <div className="space-y-2 mt-3">
                                     <label className="text-[11.5px] font-medium text-[#9e9b95] uppercase tracking-[0.5px]">Project</label>
                                     <select

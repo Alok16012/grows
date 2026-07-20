@@ -76,6 +76,18 @@ export async function ensureProjectSchema() {
                 ADD COLUMN IF NOT EXISTS "startDate" TIMESTAMP(3),
                 ADD COLUMN IF NOT EXISTS "notes"     TEXT
         `)
+        // Company/Branch concepts are retired — projects hang off Sites and
+        // sites/departments stand alone. Legacy columns stay but become
+        // nullable so new rows never need them. DROP NOT NULL is idempotent.
+        for (const sql of [
+            `ALTER TABLE "Project" ALTER COLUMN "companyId" DROP NOT NULL`,
+            `ALTER TABLE "Site" ALTER COLUMN "branchId" DROP NOT NULL`,
+            `ALTER TABLE "Department" ALTER COLUMN "branchId" DROP NOT NULL`,
+        ]) {
+            try {
+                await (prisma as any).$executeRawUnsafe(sql)
+            } catch { /* table may not exist yet in some envs */ }
+        }
         projectSchemaEnsured = true
     } catch { /* best effort — retried on next call */ }
 }

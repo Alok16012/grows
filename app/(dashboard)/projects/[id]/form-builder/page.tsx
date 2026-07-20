@@ -20,7 +20,7 @@ export default async function FormBuilderPage({ params }: { params: { id: string
 
     const project = await prisma.project.findUnique({
         where: { id: params.id },
-        include: { company: true },
+        include: { site: { select: { id: true, name: true } } },
     })
 
     if (!project) {
@@ -36,8 +36,7 @@ export default async function FormBuilderPage({ params }: { params: { id: string
         <FormBuilderClient
             projectId={params.id}
             projectName={project.name}
-            companyName={project.company.name}
-            companyId={project.companyId}
+            siteName={project.site?.name ?? "No Site"}
         />
     )
 }

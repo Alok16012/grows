@@ -225,7 +225,7 @@ export async function GET() {
                         assignment: {
                             select: {
                                 project: {
-                                    select: { name: true, company: { select: { name: true } } }
+                                    select: { name: true, site: { select: { name: true } } }
                                 }
                             }
                         }
@@ -324,7 +324,7 @@ export async function GET() {
                 .map(i => ({
                     status: i.status,
                     project: i.assignment?.project?.name || "—",
-                    company: i.assignment?.project?.company?.name || "—",
+                    company: i.assignment?.project?.site?.name || "—",
                     date: i.submittedAt || i.createdAt
                 }))
         }

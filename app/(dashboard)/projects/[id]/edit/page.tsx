@@ -16,7 +16,6 @@ type Project = {
     id: string
     name: string
     description: string | null
-    companyId: string
     siteId: string | null
     code?: string | null
     status?: string | null

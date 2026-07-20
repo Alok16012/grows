@@ -256,13 +256,11 @@ function FieldPreview({ field }: { field: FormField }) {
 export default function FormBuilderClient({
     projectId,
     projectName,
-    companyName,
-    companyId,
+    siteName,
 }: {
     projectId: string
     projectName: string
-    companyName: string
-    companyId: string
+    siteName: string
 }) {
     const [fields, setFields] = useState<FormField[]>([])
     const [loading, setLoading] = useState(true)
@@ -443,7 +441,7 @@ export default function FormBuilderClient({
         <div className="min-h-[calc(100vh-54px)] bg-[#f5f4f0] p-[24px]">
             <div className="flex items-start gap-[14px] mb-[20px]">
                 <Link
-                    href={`/companies/${companyId}`}
+                    href="/projects"
                     className="w-[30px] h-[30px] bg-white border border-[#e8e6e1] rounded-[8px] flex items-center justify-center text-[#6b6860] hover:bg-[#f9f8f5] transition-colors shrink-0 mt-1"
                 >
                     <ChevronLeft size={16} />
@@ -451,7 +449,7 @@ export default function FormBuilderClient({
                 <div>
                     <h1 className="text-[20px] font-[600] text-[#1a1a18] leading-tight">Form Builder</h1>
                     <p className="text-[12px] text-[#6b6860] mt-[2px]">
-                        {projectName} <span className="mx-1 text-[#9e9b95]">•</span> {companyName}
+                        {projectName} <span className="mx-1 text-[#9e9b95]">•</span> {siteName}
                     </p>
                 </div>
             </div>

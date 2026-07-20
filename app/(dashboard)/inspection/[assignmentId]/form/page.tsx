@@ -682,7 +682,7 @@ export default function InspectionFormPage() {
                     </button>
                     <span className="text-[14px] font-[600] text-[#1a1a18] ml-[10px]">{assignment?.project?.name}</span>
                     <span className="text-[#9e9b95] mx-[8px]">•</span>
-                    <span className="text-[13px] text-[#6b6860]">{assignment?.project?.company?.name}</span>
+                    <span className="text-[13px] text-[#6b6860]">{assignment?.project?.site?.name}</span>
                 </div>
 
                 {!isSubmitted && (
@@ -1053,7 +1053,7 @@ export default function InspectionFormPage() {
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-[13px] font-semibold text-[#1a1a18] truncate">{assignment?.project?.name}</span>
                                     <span className="block text-[11.5px] text-[#6b6860] truncate">
-                                        {assignment?.project?.site?.name || assignment?.project?.company?.name} · This form
+                                        {assignment?.project?.site?.name} · This form
                                     </span>
                                 </span>
                                 <span className="text-[11.5px] font-semibold text-[#1a9e6e] shrink-0">Continue →</span>
@@ -1069,7 +1069,7 @@ export default function InspectionFormPage() {
                                     <span className="min-w-0 flex-1">
                                         <span className="block text-[13px] font-semibold text-[#1a1a18] truncate">{a.project?.name}</span>
                                         <span className="block text-[11.5px] text-[#6b6860] truncate">
-                                            {a.project?.site?.name || a.project?.company?.name}
+                                            {a.project?.site?.name}
                                             {a.inspection?.status === "draft" ? " · Draft saved" : " · Not started"}
                                         </span>
                                     </span>

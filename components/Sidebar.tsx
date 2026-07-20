@@ -104,7 +104,6 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     // Three views:
     //   • Admin / Manager  — full operational access
     //   • INSPECTION_BOY   — inspector self-service
-    //   • CLIENT           — read-only portal
     // ─────────────────────────────────────────────────────────────────────────
     const navigation: NavSection[] = [
 
@@ -118,8 +117,6 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     icon: LayoutDashboard,
                     roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"],
                 },
-                // CLIENT gets their own portal as the first item
-                { name: "Client Portal", href: "/client", icon: FileText, roles: ["CLIENT"] },
             ],
         },
 
@@ -232,13 +229,6 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             ],
         },
 
-        // ── CLIENT — REPORTS ─────────────────────────────────────────────────
-        {
-            title: "REPORTS",
-            links: [
-                { name: "Reports",  href: "/reports", icon: BarChart2, roles: ["CLIENT"] },
-            ],
-        },
     ]
 
     return (

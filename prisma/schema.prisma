@@ -91,7 +91,9 @@ model SiteAssignment {
 
 model Project {
   id              String           @id @default(uuid())
-  companyId       String
+  // Legacy column — projects now hang off a Site directly. Kept nullable so
+  // old rows keep their value; nothing reads or writes it anymore.
+  companyId       String?
   siteId          String?
   name            String
   description     String?
@@ -108,7 +110,7 @@ model Project {
   assignments     Assignment[]
   formTemplates   FormTemplate[]
   expenses        Expense[]
-  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company         Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site            Site?            @relation(fields: [siteId], references: [id])
   projectManagers ProjectManager[]
   defectColumns   Json?
@@ -502,11 +504,12 @@ model Department {
   id          String     @id @default(uuid())
   name        String
   description String?
-  branchId    String
+  // Legacy — the Branch concept is retired.
+  branchId    String?
   headId      String?
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
-  branch      Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch      Branch?    @relation(fields: [branchId], references: [id], onDelete: Cascade)
   employees   Employee[]
 }
 
@@ -520,7 +523,8 @@ model Site {
   pincode          String?
   clientName       String?
   clientId         String?
-  branchId         String
+  // Legacy — the Branch concept is retired; sites stand alone now.
+  branchId         String?
   latitude         Float?
   longitude        Float?
   radius           Float        @default(100)
@@ -533,7 +537,7 @@ model Site {
   createdBy        String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
-  branch           Branch       @relation(fields: [branchId], references: [id])
+  branch           Branch?      @relation(fields: [branchId], references: [id])
   deployments      Deployment[]
   attendances      Attendance[]
   leads            Lead[]       @relation("LeadSite")

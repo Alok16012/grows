@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
-import { sendApprovalEmail } from "@/lib/email"
 
 export async function GET(
     req: Request,
@@ -27,7 +26,7 @@ export async function GET(
                     include: {
                         project: {
                             include: {
-                                company: true
+                                site: { select: { id: true, name: true } }
                             }
                         }
                     }
@@ -69,7 +68,7 @@ export async function PATCH(
             where: { id: inspectionId },
             include: {
                 submitter: true,
-                assignment: { include: { project: { include: { company: true } } } }
+                assignment: { include: { project: { include: { site: { select: { id: true, name: true } } } } } }
             }
         })
 
@@ -86,7 +85,7 @@ export async function PATCH(
         }
 
         const projectName = inspection.assignment?.project?.name || "Project"
-        const companyName = inspection.assignment?.project?.company?.name || "Company"
+        const companyName = inspection.assignment?.project?.site?.name || "Site"
 
         if (action === "send_back") {
             await prisma.$transaction(async (tx) => {
@@ -180,55 +179,18 @@ export async function PATCH(
             }
         })
 
-        // After transaction: auto-create share link + email clients on approval
+        // After transaction: auto-create the public share link on approval.
+        // (The client-portal concept was removed — no client emails anymore.)
         if (action === "approve") {
             try {
-                const companyId = inspection.assignment?.project?.companyId
-
-                // Auto-create shareable link
-                const shareLink = await prisma.shareableLink.upsert({
+                await prisma.shareableLink.upsert({
                     where: { inspectionId: inspectionId },
                     create: { inspectionId, createdBy: session!.user.id },
                     update: {}
                 })
-
-                // NEXT_PUBLIC_APP_URL must be set on Vercel — fail loudly if missing
-                // instead of silently sending links to the wrong domain.
-                const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? ""
-                const shareUrl = `${appUrl}/share/${shareLink.token}`
-
-                // Find all active CLIENT users for this company
-                const clients = companyId
-                    ? await prisma.user.findMany({
-                        where: {
-                            role: Role.CLIENT,
-                            companyId,
-                            isActive: true,
-                            email: { not: undefined }
-                        },
-                        select: { email: true, name: true }
-                    })
-                    : []
-
-                if (clients.length > 0) {
-                    const toEmails = clients.map(c => c.email).filter(Boolean) as string[]
-                    const clientNames = clients.map(c => c.name || "Client")
-
-                    await sendApprovalEmail({
-                        toEmails,
-                        clientNames,
-                        projectName,
-                        companyName,
-                        inspectorName: inspection.submitter?.name || "Inspector",
-                        approvedAt: new Date(),
-                        reviewerNotes: reviewerNotes || null,
-                        shareUrl,
-                        approvedByName: session!.user.name || session!.user.email || "Manager"
-                    })
-                }
-            } catch (emailErr) {
-                // Email failure should NOT fail the approval
-                console.error("EMAIL_SEND_ERROR", emailErr)
+            } catch (linkErr) {
+                // Link failure should NOT fail the approval
+                console.error("SHARE_LINK_ERROR", linkErr)
             }
         }
 

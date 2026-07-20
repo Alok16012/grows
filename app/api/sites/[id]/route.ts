@@ -18,7 +18,6 @@ export async function GET(
         const site = await prisma.site.findUnique({
             where: { id: params.id },
             include: {
-                branch: { select: { id: true, name: true } },
                 deployments: {
                     where: { isActive: true },
                     include: {

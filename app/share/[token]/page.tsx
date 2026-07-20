@@ -55,7 +55,7 @@ export default function SharePage() {
     )
 
     const inspection = data.inspection
-    const company = inspection?.assignment?.project?.company
+    const site = inspection?.assignment?.project?.site
     const project = inspection?.assignment?.project
     const responses = (inspection?.responses || []).sort((a: any, b: any) => a.field.displayOrder - b.field.displayOrder)
 
@@ -67,7 +67,7 @@ export default function SharePage() {
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-[11px] font-semibold uppercase tracking-widest opacity-70 mb-1">Quality Inspection Report</p>
-                            <h1 className="text-[22px] font-bold">{company?.name || "Company"}</h1>
+                            <h1 className="text-[22px] font-bold">{site?.name || "Growus Auto India"}</h1>
                             <p className="text-[14px] opacity-80 mt-1">{project?.name || "Project"}</p>
                         </div>
                         <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-1.5 text-[11px]">

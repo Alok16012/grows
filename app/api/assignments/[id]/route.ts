@@ -22,7 +22,7 @@ export async function GET(
             include: {
                 project: {
                     include: {
-                        company: true,
+                        site: { select: { id: true, name: true } },
                         projectManagers: {
                             include: { manager: { select: { id: true, name: true, email: true } } }
                         }
@@ -47,7 +47,7 @@ export async function GET(
             project: {
                 id: assignment.project.id,
                 name: assignment.project.name,
-                company: assignment.project.company,
+                site: (assignment.project as any).site ?? null,
                 projectId: assignment.project.id, // For compatibility
                 managers: assignment.project.projectManagers.map(pm => pm.manager)
             }

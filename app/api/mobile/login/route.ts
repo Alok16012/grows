@@ -23,7 +23,6 @@ const DEMO_USERS: Record<string, { name: string; role: string }> = {
     "manager@cims.com": { name: "Manager User", role: "MANAGER" },
     "hr@cims.com": { name: "HR Manager", role: "HR_MANAGER" },
     "inspector@cims.com": { name: "Inspection Boy", role: "INSPECTION_BOY" },
-    "client@cims.com": { name: "Client User", role: "CLIENT" },
 }
 
 const phoneDigits = (s: string | null | undefined): string => {

@@ -27,8 +27,6 @@ export default async function Home() {
         redirect("/employees")
       case "INSPECTION_BOY":
         redirect("/inspection")
-      case "CLIENT":
-        redirect("/client")
       default:
         // Unknown role — fall back to a safe page instead of bouncing to /login
         redirect("/profile")

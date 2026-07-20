@@ -21,7 +21,6 @@ export async function GET(
                 id: params.id,
             },
             include: {
-                company: true,
                 site: { select: { id: true, name: true, code: true, city: true } },
                 projectManagers: { select: { managerId: true } },
                 assignments: { where: { status: "active" }, select: { inspectionBoyId: true } },
@@ -88,16 +87,10 @@ export async function PUT(
         if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null
         if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null
 
-        // Moving the project to a different Site also re-derives the (non-null)
-        // companyId from that Site's branch, matching project creation.
         if (siteId !== undefined && siteId) {
-            const site = await prisma.site.findUnique({
-                where: { id: siteId },
-                select: { branch: { select: { companyId: true } } },
-            })
+            const site = await prisma.site.findUnique({ where: { id: siteId }, select: { id: true } })
             if (!site) return new NextResponse("Site not found", { status: 400 })
             updateData.siteId = siteId
-            updateData.companyId = site.branch.companyId
         }
 
         const project = await prisma.project.update({

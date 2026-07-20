@@ -126,7 +126,7 @@ interface InspectionPDFProps {
 }
 
 export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
-    const companyName = inspection.assignment?.project?.company?.name || 'Company'
+    const companyName = inspection.assignment?.project?.site?.name || 'Growus Auto India'
     const projectName = inspection.assignment?.project?.name || 'Project'
     const reportDate = inspection.submittedAt
         ? new Date(inspection.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })

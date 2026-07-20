@@ -13,7 +13,7 @@ export async function GET(
                     submitter: { select: { name: true, email: true } },
                     assignment: {
                         include: {
-                            project: { include: { company: true } }
+                            project: { include: { site: { select: { id: true, name: true } } } }
                         }
                     },
                     responses: { include: { field: true } }
