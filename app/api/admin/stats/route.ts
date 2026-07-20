@@ -103,9 +103,8 @@ const getStats = unstable_cache(
             safe(prisma.exitRequest.count({ where: { status: "CLEARANCE_PENDING" } }), 0),
             safe(prisma.payroll.count({ where: { month, year } }), 0),
             safe(prisma.payroll.count({ where: { month, year, status: { in: ["PROCESSED", "PAID"] } } }), 0),
-            safe(prisma.clientContract.count({
-                where: { status: "ACTIVE", endDate: { gte: now, lte: in30d } },
-            }), 0),
+            // Clients & Finance module removed — no contract expiry alerts.
+            Promise.resolve(0),
             safe(prisma.employee.count({
                 where: { status: "ACTIVE", labourCardExpDate: { gte: now, lte: in30d } },
             }), 0),

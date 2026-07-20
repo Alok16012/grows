@@ -27,7 +27,7 @@ export default async function FormBuilderPage({ params }: { params: { id: string
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
                 <h1 className="text-2xl font-bold">Project not found</h1>
-                <Button asChild><Link href="/companies">Go Back</Link></Button>
+                <Button asChild><Link href="/projects">Go Back</Link></Button>
             </div>
         )
     }

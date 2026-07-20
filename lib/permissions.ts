@@ -187,32 +187,6 @@ export const PERMISSION_GROUPS = [
         ]
     },
 
-    // ── CLIENTS & FINANCE ────────────────────────────────────────────────────
-    {
-        group: "Companies",
-        key: "companies",
-        permissions: [
-            { key: "companies.view",   label: "View Companies" },
-            { key: "companies.manage", label: "Add / Edit Companies" },
-        ]
-    },
-    {
-        group: "Billing",
-        key: "billing",
-        permissions: [
-            { key: "billing.view",   label: "View Invoices" },
-            { key: "billing.manage", label: "Create / Edit Invoices & Payments" },
-        ]
-    },
-    {
-        group: "Contracts",
-        key: "contracts",
-        permissions: [
-            { key: "contracts.view",   label: "View Contracts" },
-            { key: "contracts.manage", label: "Create / Edit Contracts" },
-        ]
-    },
-
     // ── OPERATIONS ───────────────────────────────────────────────────────────
     {
         group: "Announcements",
@@ -285,9 +259,6 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "performance.view", "performance.manage",
     "exit.view", "exit.manage",
     "lms.view", "lms.manage",
-    "companies.view", "companies.manage",
-    "billing.view", "billing.manage",
-    "contracts.view", "contracts.manage",
     "approvals.view", "approvals.manage",
     "helpdesk.view", "helpdesk.manage",
     "reports.view", "reports.export",

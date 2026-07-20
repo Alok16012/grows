@@ -540,19 +540,6 @@ export default function AnalyticsPage() {
                             ]}
                         />
                         <FinanceCard
-                            title="Billing"
-                            badge={billing?.overdueCount ? { label: "overdue", count: billing.overdueCount } : undefined}
-                            rows={[
-                                { label: "Invoiced This Month", value: inr(billing?.invoicedThisMonth ?? 0) },
-                                { label: "Collected", value: inr(billing?.collectedThisMonth ?? 0), accent: true },
-                                {
-                                    label: "Outstanding",
-                                    value: inr(billing?.outstanding ?? 0),
-                                    red: (billing?.outstanding ?? 0) > 0
-                                },
-                            ]}
-                        />
-                        <FinanceCard
                             title="Expenses"
                             rows={[
                                 { label: "Pending Approvals", value: String(expenses?.pendingApprovals ?? 0) },

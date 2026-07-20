@@ -402,7 +402,6 @@ export default function AdminDashboard() {
     const week7Max = Math.max(1, ...week7.map((d: { count: number }) => d.count))
 
     const alertItems = [
-        alerts.contractsExpiring > 0 ? { tone: "amber" as const, title: "Contracts expiring soon", text: `${alerts.contractsExpiring} contract(s) will expire in the next 30 days.`, href: "/contracts", link: "View contracts" } : null,
         alerts.docExpiries > 0 ? { tone: "amber" as const, title: "Document expiries", text: `${alerts.docExpiries} labour card(s) will expire in the next 30 days.`, href: "/employees/master", link: "Review now" } : null,
         alerts.lowAttendanceSites > 0 ? { tone: "red" as const, title: "Low attendance sites", text: `${alerts.lowAttendanceSites} site(s) are below 80% attendance today.`, href: "/attendance", link: "View sites" } : null,
     ].filter((a): a is NonNullable<typeof a> => a !== null)

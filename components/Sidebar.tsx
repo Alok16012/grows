@@ -29,9 +29,7 @@ import {
     LogOut,
     Package,
     Headphones,
-    Receipt,
     CreditCard,
-    FileSignature,
     GraduationCap,
     Navigation,
     Shield,
@@ -171,16 +169,6 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Performance",      href: "/performance", icon: Star,          roles: ["ADMIN", "MANAGER"], permission: "performance.view" },
                 { name: "Exit Management",  href: "/exit",        icon: LogOut,        roles: ["ADMIN", "MANAGER"], permission: "exit.view" },
                 { name: "Training (LMS)",   href: "/lms",         icon: GraduationCap, roles: ["ADMIN", "MANAGER"], permission: "lms.manage" },
-            ],
-        },
-
-        // ── CLIENTS & FINANCE ─────────────────────────────────────────────────
-        {
-            title: "CLIENTS & FINANCE",
-            links: [
-                { name: "Companies",    href: "/companies", icon: Building2,     roles: ["ADMIN", "MANAGER"], permission: "companies.view" },
-                { name: "Billing",      href: "/billing",   icon: Receipt,       roles: ["ADMIN", "MANAGER"], permission: "billing.view" },
-                { name: "Contracts",    href: "/contracts", icon: FileSignature, roles: ["ADMIN", "MANAGER"], permission: "contracts.view" },
             ],
         },
 
