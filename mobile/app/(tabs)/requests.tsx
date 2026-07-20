@@ -74,16 +74,17 @@ export default function RequestsScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <LinearGradient colors={gradients.navy as [string, string]} style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.headerTitle}>Requests</Text>
-        <Text style={styles.headerSub}>Raise and track your requests</Text>
-      </LinearGradient>
-
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.navy} />}
       >
+        <LinearGradient colors={gradients.navy as [string, string]} style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+          <Text style={styles.headerTitle}>Requests</Text>
+          <Text style={styles.headerSub}>Raise and track your requests</Text>
+        </LinearGradient>
+
+        <View style={styles.body}>
         <View style={styles.actions}>
           <ActionTile label="Apply Leave" icon="calendar" tint={tiles.amber} onPress={() => router.push("/leave/apply")} />
           <ActionTile label="New Expense" icon="receipt" tint={tiles.purple} onPress={() => router.push("/expenses/new")} />
@@ -135,6 +136,7 @@ export default function RequestsScreen() {
           </Card>
         )}
         <View style={{ height: spacing.xxl }} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -174,7 +176,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: colors.white, fontSize: font.size.xxl, fontWeight: font.weight.bold },
   headerSub: { color: colors.onNavyMuted, fontSize: font.size.sm, marginTop: 4 },
-  scroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  scroll: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.lg },
   actions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginTop: -spacing.xxl - spacing.xs },
   actionTile: {
     width: "48%",

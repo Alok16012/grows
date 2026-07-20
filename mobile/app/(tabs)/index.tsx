@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "@/auth";
 import { api } from "@/api";
+import { canAccessAdmin } from "@/access";
 import { Avatar, Card } from "@/components/ui";
 import { colors, font, radius, spacing, shadow, gradients, tiles } from "@/theme";
 import { greeting, inr, hoursLabel } from "@/format";
@@ -87,35 +88,36 @@ export default function HomeScreen() {
     <View style={styles.root}>
       <StatusBar style="light" />
 
-      {/* ---- Navy header ---- */}
-      <LinearGradient
-        colors={gradients.navy as [string, string]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + spacing.md }]}
-      >
-        <View style={styles.headerRow}>
-          <Pressable style={styles.headerUser} onPress={() => router.push("/(tabs)/profile")}>
-            <Avatar name={user?.name} uri={user?.photo ?? undefined} size={46} />
-            <View style={{ marginLeft: spacing.md }}>
-              <Text style={styles.greeting}>{greeting()},</Text>
-              <Text style={styles.userName} numberOfLines={1}>
-                {firstName}
-              </Text>
-            </View>
-          </Pressable>
-          <Pressable style={styles.bell} onPress={() => router.push("/notifications")} hitSlop={8}>
-            <Ionicons name="notifications-outline" size={22} color={colors.white} />
-            {unread > 0 ? <View style={styles.bellDot} /> : null}
-          </Pressable>
-        </View>
-      </LinearGradient>
-
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.navy} />}
       >
+        {/* ---- Navy header ---- */}
+        <LinearGradient
+          colors={gradients.navy as [string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingTop: insets.top + spacing.md }]}
+        >
+          <View style={styles.headerRow}>
+            <Pressable style={styles.headerUser} onPress={() => router.push("/(tabs)/profile")}>
+              <Avatar name={user?.name} uri={user?.photo ?? undefined} size={46} />
+              <View style={{ marginLeft: spacing.md }}>
+                <Text style={styles.greeting}>{greeting()},</Text>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {firstName}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable style={styles.bell} onPress={() => router.push("/notifications")} hitSlop={8}>
+              <Ionicons name="notifications-outline" size={22} color={colors.white} />
+              {unread > 0 ? <View style={styles.bellDot} /> : null}
+            </Pressable>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.body}>
         {/* ---- Quick actions grid (overlaps header) ---- */}
         <View style={styles.grid}>
           {TILES.map((t) => (
@@ -131,6 +133,30 @@ export default function HomeScreen() {
             </Pressable>
           ))}
         </View>
+
+        {/* ---- Admin workspace (privileged users only) ---- */}
+        {canAccessAdmin(user) ? (
+          <Pressable
+            onPress={() => router.push("/admin" as any)}
+            style={({ pressed }) => [styles.adminBanner, pressed && { opacity: 0.9 }]}
+          >
+            <LinearGradient
+              colors={gradients.navy as [string, string]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.adminGrad}
+            >
+              <View style={styles.adminIcon}>
+                <Ionicons name="grid" size={22} color={colors.white} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.adminTitle}>Admin Workspace</Text>
+                <Text style={styles.adminSub}>Manage employees, payroll, inspections & more</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.onNavyMuted} />
+            </LinearGradient>
+          </Pressable>
+        ) : null}
 
         {/* ---- Today snapshot ---- */}
         <Card style={styles.section}>
@@ -181,6 +207,7 @@ export default function HomeScreen() {
         </Card>
 
         <View style={{ height: spacing.xxl }} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -251,7 +278,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.navy,
   },
-  scroll: { paddingHorizontal: spacing.lg },
+  scroll: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.lg },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -278,6 +306,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   tileLabel: { fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.text },
+  adminBanner: { marginTop: spacing.sm, marginBottom: spacing.sm, borderRadius: radius.lg, overflow: "hidden", ...shadow.card },
+  adminGrad: { flexDirection: "row", alignItems: "center", padding: spacing.lg, gap: spacing.md },
+  adminIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  adminTitle: { color: colors.white, fontSize: font.size.md, fontWeight: font.weight.bold },
+  adminSub: { color: colors.onNavyMuted, fontSize: font.size.xs, marginTop: 2 },
   section: { marginTop: spacing.sm },
   snapRow: { flexDirection: "row", alignItems: "center" },
   snapDot: { width: 10, height: 10, borderRadius: 5, marginRight: spacing.md },

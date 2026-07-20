@@ -53,6 +53,7 @@ function RootNavigator() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="holidays" />
       <Stack.Screen name="announcements" />
+      <Stack.Screen name="admin" options={{ animation: "slide_from_bottom" }} />
     </Stack>
   );
 }

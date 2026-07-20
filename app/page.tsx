@@ -11,6 +11,13 @@ export default async function Home() {
   } else {
     // Redirect to respective dashboard
     const role = session.user.role
+
+    // Custom-role users get the universal permission-driven dashboard —
+    // it renders exactly the widgets their permissions allow.
+    if (role !== "ADMIN" && (session.user as any).customRoleName) {
+      redirect("/dashboard")
+    }
+
     switch (role) {
       case "ADMIN":
         redirect("/admin")

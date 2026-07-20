@@ -48,14 +48,6 @@ export default function LoginScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <LinearGradient colors={gradients.navy as [string, string]} style={styles.hero}>
-        <View style={styles.logoMark}>
-          <Text style={styles.logoG}>G</Text>
-        </View>
-        <Text style={styles.brand}>Growus</Text>
-        <Text style={styles.tagline}>Employee Self-Service</Text>
-      </LinearGradient>
-
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
@@ -65,56 +57,66 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.card}>
-            <Text style={styles.welcome}>Welcome back 👋</Text>
-            <Text style={styles.sub}>Sign in to continue to your dashboard</Text>
+          <LinearGradient colors={gradients.navy as [string, string]} style={styles.hero}>
+            <View style={styles.logoMark}>
+              <Text style={styles.logoG}>G</Text>
+            </View>
+            <Text style={styles.brand}>Growus</Text>
+            <Text style={styles.tagline}>Employee Self-Service</Text>
+          </LinearGradient>
 
-            <View style={{ height: spacing.xl }} />
+          <View style={styles.body}>
+            <View style={styles.card}>
+              <Text style={styles.welcome}>Welcome back 👋</Text>
+              <Text style={styles.sub}>Sign in to continue to your dashboard</Text>
 
-            <Field
-              label="Employee ID / Email / Phone"
-              placeholder="e.g. EMP1024 or you@company.com"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              value={identifier}
-              onChangeText={setIdentifier}
-              returnKeyType="next"
-            />
+              <View style={{ height: spacing.xl }} />
 
-            <View style={styles.pwWrap}>
               <Field
-                label="Password"
-                placeholder="Enter your password"
-                secureTextEntry={!showPw}
-                value={password}
-                onChangeText={setPassword}
-                returnKeyType="go"
-                onSubmitEditing={onSubmit}
-                style={{ marginBottom: 0 }}
+                label="Employee ID / Email / Phone"
+                placeholder="e.g. EMP1024 or you@company.com"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                value={identifier}
+                onChangeText={setIdentifier}
+                returnKeyType="next"
               />
-              <Pressable onPress={() => setShowPw((s) => !s)} hitSlop={10} style={styles.eye}>
-                <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textMuted} />
+
+              <View style={styles.pwWrap}>
+                <Field
+                  label="Password"
+                  placeholder="Enter your password"
+                  secureTextEntry={!showPw}
+                  value={password}
+                  onChangeText={setPassword}
+                  returnKeyType="go"
+                  onSubmitEditing={onSubmit}
+                  style={{ marginBottom: 0 }}
+                />
+                <Pressable onPress={() => setShowPw((s) => !s)} hitSlop={10} style={styles.eye}>
+                  <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textMuted} />
+                </Pressable>
+              </View>
+
+              {error ? (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={16} color={colors.danger} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : (
+                <View style={{ height: spacing.lg }} />
+              )}
+
+              <Button label="Log In" onPress={onSubmit} loading={loading} icon="log-in-outline" />
+
+              <Pressable style={styles.forgot} hitSlop={8}>
+                <Text style={styles.forgotText}>Forgot Password?</Text>
               </Pressable>
             </View>
 
-            {error ? (
-              <View style={styles.errorBox}>
-                <Ionicons name="alert-circle" size={16} color={colors.danger} />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : (
-              <View style={{ height: spacing.lg }} />
-            )}
-
-            <Button label="Log In" onPress={onSubmit} loading={loading} icon="log-in-outline" />
-
-            <Pressable style={styles.forgot} hitSlop={8}>
-              <Text style={styles.forgotText}>Forgot Password?</Text>
-            </Pressable>
+            <Text style={styles.footer}>Powered by Growus · Secure Login</Text>
           </View>
-
-          <Text style={styles.footer}>Powered by Growus · Secure Login</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -126,7 +128,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   hero: {
     paddingTop: 84,
-    paddingBottom: 64,
+    paddingBottom: 72,
     alignItems: "center",
     borderBottomLeftRadius: 36,
     borderBottomRightRadius: 36,
@@ -144,12 +146,13 @@ const styles = StyleSheet.create({
   logoG: { color: colors.white, fontSize: 40, fontWeight: font.weight.heavy },
   brand: { color: colors.white, fontSize: font.size.xxl, fontWeight: font.weight.bold, letterSpacing: 0.5 },
   tagline: { color: colors.onNavyMuted, fontSize: font.size.sm, marginTop: 4 },
-  scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  scroll: { flexGrow: 1, paddingBottom: spacing.xxl },
+  body: { paddingHorizontal: spacing.lg },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     padding: spacing.xl,
-    marginTop: -36,
+    marginTop: -40,
     borderWidth: 1,
     borderColor: colors.border,
     ...shadow.raised,

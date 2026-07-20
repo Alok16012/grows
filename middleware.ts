@@ -10,24 +10,11 @@ const rolePaths: Record<string, string> = {
     "CLIENT": "/client",
 }
 
-// Pick a sensible landing page for a user with a custom role based on
-// what permissions they actually hold. Falls back to the system-role
-// default when they don't match any permission-based home.
-function landingForCustomRole(permissions: string[]): string | null {
-    if (permissions.includes("recruitment.view")) return "/recruitment"
-    if (permissions.includes("assignments.view")) return "/assignments"
-    if (permissions.includes("projects.view")) return "/projects"
-    if (permissions.includes("sites.view")) return "/sites"
-    if (permissions.includes("employees.view")) return "/employees"
-    if (permissions.includes("attendance.view")) return "/attendance"
-    if (permissions.includes("payroll.view")) return "/payroll"
-    if (permissions.includes("helpdesk.view")) return "/helpdesk"
-    if (permissions.includes("lms.view")) return "/lms/learn"
-    if (permissions.includes("users.manage")) return "/admin/employee-logins"
-    // Last resort: every user can always see their own profile. This guarantees a
-    // custom-role user is never left on a page they can't load (e.g. /manager,
-    // which needs reports.view).
-    return "/profile"
+// Custom-role users all land on the universal permission-driven dashboard —
+// it renders exactly the widgets their permissions allow, so no one ever
+// lands on a page they can't load.
+function landingForCustomRole(_permissions: string[]): string {
+    return "/dashboard"
 }
 
 export default withAuth(
@@ -76,8 +63,7 @@ export default withAuth(
                 return NextResponse.redirect(new URL(ownDashboard, req.url))
             }
             if (role === "MANAGER" && customRoleName && !permissions.includes("reports.view")) {
-                const safe = customLanding && customLanding !== "/manager" ? customLanding : "/profile"
-                return NextResponse.redirect(new URL(safe, req.url))
+                return NextResponse.redirect(new URL("/dashboard", req.url))
             }
         }
         // /inspection → INSPECTION_BOY or ADMIN

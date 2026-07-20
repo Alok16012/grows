@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "@/auth";
 import { api } from "@/api";
+import { canAccessAdmin } from "@/access";
 import { Avatar, Card, Button } from "@/components/ui";
 import { colors, font, radius, spacing, gradients, shadow } from "@/theme";
 import { shortDate } from "@/format";
@@ -49,15 +50,16 @@ export default function ProfileScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <LinearGradient colors={gradients.navy as [string, string]} style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.headerTitle}>Profile</Text>
-      </LinearGradient>
-
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.navy} />}
       >
+        <LinearGradient colors={gradients.navy as [string, string]} style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </LinearGradient>
+
+        <View style={styles.body}>
         <Card style={styles.idCard}>
           <Avatar name={name} uri={photo} size={84} />
           <Text style={styles.name}>{name}</Text>
@@ -92,6 +94,29 @@ export default function ProfileScreen() {
           <InfoRow icon="git-branch-outline" label="IFSC" value={emp?.bankIFSC} last />
         </Section>
 
+        {canAccessAdmin(user) ? (
+          <Pressable
+            onPress={() => router.push("/admin" as any)}
+            style={({ pressed }) => [styles.adminCard, pressed && { opacity: 0.9 }]}
+          >
+            <LinearGradient
+              colors={gradients.navy as [string, string]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.adminGrad}
+            >
+              <View style={styles.adminIcon}>
+                <Ionicons name="grid" size={22} color={colors.white} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.adminTitle}>Admin Workspace</Text>
+                <Text style={styles.adminSub}>Open the full management panel</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.onNavyMuted} />
+            </LinearGradient>
+          </Pressable>
+        ) : null}
+
         <Card padded={false} style={{ marginTop: spacing.md }}>
           <NavRow icon="document-text-outline" label="My Documents" onPress={() => router.push("/documents")} />
           <View style={styles.navDivider} />
@@ -103,6 +128,7 @@ export default function ProfileScreen() {
         <Button label="Log Out" variant="danger" icon="log-out-outline" onPress={confirmLogout} style={{ marginTop: spacing.xl }} />
         <Text style={styles.version}>Growus · v1.0.0</Text>
         <View style={{ height: spacing.xxl }} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -164,7 +190,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 28,
   },
   headerTitle: { color: colors.white, fontSize: font.size.xxl, fontWeight: font.weight.bold },
-  scroll: { paddingHorizontal: spacing.lg },
+  scroll: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.lg },
   idCard: { alignItems: "center", marginTop: -spacing.xxl, paddingVertical: spacing.xl },
   name: { fontSize: font.size.xl, fontWeight: font.weight.bold, color: colors.text, marginTop: spacing.md },
   designation: { fontSize: font.size.sm, color: colors.textSecondary, marginTop: 2 },
@@ -192,6 +219,18 @@ const styles = StyleSheet.create({
   infoBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { fontSize: font.size.md, color: colors.textSecondary, flex: 1 },
   infoValue: { fontSize: font.size.md, color: colors.text, fontWeight: font.weight.medium, maxWidth: "55%" },
+  adminCard: { marginTop: spacing.lg, borderRadius: radius.lg, overflow: "hidden", ...shadow.card },
+  adminGrad: { flexDirection: "row", alignItems: "center", padding: spacing.lg, gap: spacing.md },
+  adminIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  adminTitle: { color: colors.white, fontSize: font.size.md, fontWeight: font.weight.bold },
+  adminSub: { color: colors.onNavyMuted, fontSize: font.size.xs, marginTop: 2 },
   navDivider: { height: 1, backgroundColor: colors.border, marginLeft: spacing.lg + 30 },
   navRow: { flexDirection: "row", alignItems: "center", padding: spacing.lg },
   navLabel: { flex: 1, fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.text },

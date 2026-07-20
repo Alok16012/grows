@@ -101,20 +101,21 @@ export default function AttendanceScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={gradients.navy as [string, string]}
-        style={[styles.header, { paddingTop: insets.top + spacing.md }]}
-      >
-        <Text style={styles.headerTitle}>Attendance</Text>
-        <Text style={styles.clock}>{clock}</Text>
-        <Text style={styles.date}>{dateLabel}</Text>
-      </LinearGradient>
-
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.navy} />}
       >
+        <LinearGradient
+          colors={gradients.navy as [string, string]}
+          style={[styles.header, { paddingTop: insets.top + spacing.md }]}
+        >
+          <Text style={styles.headerTitle}>Attendance</Text>
+          <Text style={styles.clock}>{clock}</Text>
+          <Text style={styles.date}>{dateLabel}</Text>
+        </LinearGradient>
+
+        <View style={styles.body}>
         {/* Punch card */}
         <Card style={styles.punchCard}>
           <View style={styles.punchTimes}>
@@ -204,6 +205,7 @@ export default function AttendanceScreen() {
           </Card>
         )}
         <View style={{ height: spacing.xxl }} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -299,7 +301,8 @@ const styles = StyleSheet.create({
   headerTitle: { color: colors.onNavyMuted, fontSize: font.size.md, fontWeight: font.weight.semibold },
   clock: { color: colors.white, fontSize: 44, fontWeight: font.weight.heavy, marginTop: spacing.xs, letterSpacing: 0.5 },
   date: { color: colors.onNavyMuted, fontSize: font.size.sm, marginTop: 2 },
-  scroll: { paddingHorizontal: spacing.lg },
+  scroll: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.lg },
   punchCard: { marginTop: -spacing.xxl },
   punchTimes: { flexDirection: "row", alignItems: "center" },
   punchTime: { flex: 1, alignItems: "center" },

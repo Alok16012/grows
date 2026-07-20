@@ -98,28 +98,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
 
-    // Land users purely by what their custom role grants — system roles
-    // (INSPECTION_BOY/CLIENT/MANAGER/HR_MANAGER) no longer drive routing.
-    // ADMIN → admin home; everyone else → first page their permissions allow;
-    // fallback → their own profile (the one page every user always has).
-    function landingForUser(): string {
-        if (role === "ADMIN") return "/admin"
-
-        if (userPermissions.includes("recruitment.view")) return "/recruitment"
-        if (userPermissions.includes("assignments.view")) return "/assignments"
-        if (userPermissions.includes("projects.view")) return "/projects"
-        if (userPermissions.includes("sites.view")) return "/sites"
-        if (userPermissions.includes("employees.view")) return "/employees"
-        if (userPermissions.includes("attendance.view")) return "/attendance"
-        if (userPermissions.includes("payroll.view")) return "/payroll"
-        if (userPermissions.includes("expenses.view") || userPermissions.includes("expenses.manage")) return "/expenses"
-        if (userPermissions.includes("helpdesk.view")) return "/helpdesk"
-        if (userPermissions.includes("lms.view")) return "/lms/learn"
-        if (userPermissions.includes("reports.view")) return "/reports"
-
-        return "/profile"
-    }
-    const dashboardHref = landingForUser()
+    // ADMIN → admin home; everyone else → the universal permission-driven
+    // dashboard, which renders exactly the widgets their permissions allow.
+    const dashboardHref = role === "ADMIN" ? "/admin" : "/dashboard"
 
     // ─────────────────────────────────────────────────────────────────────────
     // NAVIGATION CONFIG
@@ -302,6 +283,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
                     const filteredLinks = section.links.filter(link => {
                         if (currentRole === "ADMIN") return true
+
+                        // The universal dashboard is available to every user who
+                        // holds at least one permission — it self-adapts to them.
+                        if (link.name === "Dashboard") return userPermissions.length > 0
 
                         // Everything is gated PURELY by custom-role permissions now.
                         // No hardcoded role (MANAGER/HR_MANAGER/INSPECTION_BOY/CLIENT)
