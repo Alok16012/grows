@@ -249,23 +249,29 @@ export const authOptions: NextAuthOptions = {
                 ;(token as any).customRoleColor = (user as any).customRoleColor || null
                 ;(token as any).photo = (user as any).photo || null
             }
-            // Refresh user role/permissions from DB at most once every 30 seconds.
-            // Permission changes propagate quickly; cost is ~1 DB query per 30s
-            // per active user, which is acceptable for this app's scale.
-            const REFRESH_INTERVAL_MS = 30 * 1000
+            // Refresh user role/permissions from DB at most once every 3 minutes.
+            // These two queries used to run every 30s on virtually EVERY API
+            // request (getServerSession runs this callback), which added two DB
+            // round-trips of latency across the whole app. 3 min still propagates
+            // permission changes quickly enough, at ~1/6th the DB load.
+            const REFRESH_INTERVAL_MS = 3 * 60 * 1000
             const lastRefresh = (token as { roleRefreshedAt?: number }).roleRefreshedAt ?? 0
             const needsRefresh = token.id && !user && (Date.now() - lastRefresh > REFRESH_INTERVAL_MS)
 
             if (needsRefresh) {
                 try {
-                    const dbUser = await prisma.user.findUnique({
-                        where: { id: token.id as string },
-                        select: { role: true, isActive: true, customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                    })
-                    const employee = await prisma.employee.findFirst({
-                        where: { userId: token.id as string },
-                        select: { photo: true, status: true }
-                    }).catch(() => null)
+                    // Run both lookups in parallel — this path is on the critical
+                    // request latency path.
+                    const [dbUser, employee] = await Promise.all([
+                        prisma.user.findUnique({
+                            where: { id: token.id as string },
+                            select: { role: true, isActive: true, customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
+                        }),
+                        prisma.employee.findFirst({
+                            where: { userId: token.id as string },
+                            select: { photo: true, status: true }
+                        }).catch(() => null),
+                    ])
                     // Kill live sessions of users who were deleted, deactivated,
                     // or whose employee was terminated after they logged in.
                     // (Demo users have no DB row — skip them in dev.)

@@ -4,6 +4,13 @@ const nextConfig = {
     poweredByHeader: false,
     experimental: {
         optimizePackageImports: ["@radix-ui/react-icons", "recharts", "lucide-react", "date-fns"],
+        // Client router cache: revisiting a page within 30s reuses the cached
+        // RSC payload instead of re-rendering on the server — makes back/forward
+        // and sidebar navigation feel instant.
+        staleTimes: {
+            dynamic: 30,
+            static: 180,
+        },
     },
     images: {
         formats: ["image/avif", "image/webp"],

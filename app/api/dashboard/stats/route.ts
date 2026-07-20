@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { unstable_cache } from "next/cache"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
@@ -21,6 +22,20 @@ export async function GET() {
 
     const isAdmin = session.user.role === "ADMIN"
     const perms: string[] = (session.user as any).permissions || []
+
+    // 30-second server cache, keyed by the permission set (NOT the user) — all
+    // users sharing a role hit the same cached snapshot instead of re-running
+    // 15+ DB queries per dashboard load. Data contains no user-specific values.
+    const cacheKey = isAdmin ? "ADMIN" : [...perms].sort().join(",")
+    const getStats = unstable_cache(
+        () => computeStats(isAdmin, perms),
+        ["dashboard-stats", cacheKey],
+        { revalidate: 30 }
+    )
+    return NextResponse.json(await getStats())
+}
+
+async function computeStats(isAdmin: boolean, perms: string[]) {
     const has = (p: string) => isAdmin || perms.includes(p)
 
     const now = new Date()
@@ -201,5 +216,5 @@ export async function GET() {
     }
 
     await Promise.all(jobs)
-    return NextResponse.json(out)
+    return out
 }
