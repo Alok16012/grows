@@ -33,6 +33,8 @@ export default function EmployeeLoginsPage() {
     const [roleFilter, setRoleFilter] = useState("ALL")
     const [siteFilter, setSiteFilter] = useState("ALL")
     const [deptFilter, setDeptFilter] = useState("ALL")
+    const [page, setPage] = useState(1)
+    useEffect(() => { setPage(1) }, [search, roleFilter, siteFilter, deptFilter])
     const [reveal, setReveal] = useState<Record<string, boolean>>({})
     const [generating, setGenerating] = useState(false)
     const [resettingMobile, setResettingMobile] = useState(false)
@@ -188,6 +190,12 @@ export default function EmployeeLoginsPage() {
 
     const missingCount = rows.filter(r => !r.hasLogin || !r.password).length
 
+    // Render pagination — thousands of rows in one grid froze the page.
+    const PAGE = 100
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE))
+    const safePage = Math.min(page, totalPages)
+    const paged = filtered.slice((safePage - 1) * PAGE, safePage * PAGE)
+
     if (loading && rows.length === 0) {
         return (
             <div className="p-6 lg:p-7 flex h-[70vh] items-center justify-center">
@@ -278,10 +286,10 @@ export default function EmployeeLoginsPage() {
                     <span className="text-[11px] font-semibold text-[#6b6860] uppercase tracking-wide text-right">Actions</span>
                 </div>
 
-                {filtered.map((row, idx) => (
+                {paged.map((row, idx) => (
                     <div
                         key={row.employeeId}
-                        className={`grid grid-cols-[2fr_1.2fr_1.6fr_1.4fr_auto] gap-3 px-5 py-3.5 items-center hover:bg-[#f9f8f5] transition-colors ${idx !== filtered.length - 1 ? "border-b border-[#e8e6e1]" : ""}`}
+                        className={`grid grid-cols-[2fr_1.2fr_1.6fr_1.4fr_auto] gap-3 px-5 py-3.5 items-center hover:bg-[#f9f8f5] transition-colors ${idx !== paged.length - 1 ? "border-b border-[#e8e6e1]" : ""}`}
                     >
                         {/* Employee */}
                         <div className="flex items-center gap-3 min-w-0">
@@ -357,6 +365,21 @@ export default function EmployeeLoginsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 mt-4">
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+                        className="px-4 py-1.5 rounded-[8px] border border-[#e8e6e1] bg-white text-[12px] font-semibold text-[#1a1a18] disabled:opacity-40">
+                        ← Prev
+                    </button>
+                    <span className="text-[12px] font-semibold text-[#6b6860]">Page {safePage} / {totalPages}</span>
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                        className="px-4 py-1.5 rounded-[8px] border border-[#e8e6e1] bg-white text-[12px] font-semibold text-[#1a1a18] disabled:opacity-40">
+                        Next →
+                    </button>
+                </div>
+            )}
 
             {/* Edit Modal */}
             {editing && (

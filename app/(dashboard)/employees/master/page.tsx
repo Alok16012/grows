@@ -681,6 +681,16 @@ export default function EmployeeMasterPage() {
 
     const activeFilterCount = Object.values(colFilters).filter(v => v.trim()).length
 
+    // ── Render pagination ─────────────────────────────────────────────────────
+    // The grid renders 100 rows at a time: 500 rows × 40+ columns froze the DOM
+    // and made this page one of the slowest to load. Export/selection still
+    // operate on the full filtered set.
+    const RENDER_PAGE = 100
+    const [renderPage, setRenderPage] = useState(1)
+    useEffect(() => { setRenderPage(1) }, [statusFilter, siteFilter, search, colFilters])
+    const renderTotalPages = Math.max(1, Math.ceil(filteredEmployees.length / RENDER_PAGE))
+    const pagedEmployees = filteredEmployees.slice((renderPage - 1) * RENDER_PAGE, renderPage * RENDER_PAGE)
+
     // ── Selection helpers ─────────────────────────────────────────────────────
     const allSelected = filteredEmployees.length > 0 && filteredEmployees.every(e => selectedIds.has(e.id))
     const someSelected = !allSelected && filteredEmployees.some(e => selectedIds.has(e.id))
@@ -994,7 +1004,7 @@ export default function EmployeeMasterPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredEmployees.map((emp, idx) => {
+                            {pagedEmployees.map((emp, idx) => {
                                 const sc = STATUS_COLOR[emp.status] || { bg: "#f3f4f6", color: "#6b7280" }
                                 const isChecked = selectedIds.has(emp.id)
                                 return (
@@ -1008,7 +1018,7 @@ export default function EmployeeMasterPage() {
                                         </td>
                                         {/* SL */}
                                         <td style={{ position: "sticky", left: 36, zIndex: 2, background: "inherit", padding: "6px 8px", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, color: "var(--text3)", fontWeight: 600, whiteSpace: "nowrap", minWidth: 32 }}>
-                                            {idx + 1}
+                                            {(renderPage - 1) * RENDER_PAGE + idx + 1}
                                         </td>
                                         {/* Edit button */}
                                         <td style={{ position: "sticky", left: 68, zIndex: 2, background: "inherit", padding: "4px 6px", borderRight: "2px solid var(--border)", textAlign: "center" }}>
@@ -1047,11 +1057,26 @@ export default function EmployeeMasterPage() {
             </div>
 
             {/* Footer */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "var(--text3)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "var(--text3)", flexWrap: "wrap", gap: 8 }}>
                 <span>
-                    Showing {filteredEmployees.length} of {employees.length} employee{employees.length !== 1 ? "s" : ""}
+                    Showing {pagedEmployees.length === filteredEmployees.length
+                        ? filteredEmployees.length
+                        : `${(renderPage - 1) * RENDER_PAGE + 1}–${(renderPage - 1) * RENDER_PAGE + pagedEmployees.length} of ${filteredEmployees.length}`} employee{filteredEmployees.length !== 1 ? "s" : ""}
                     {activeFilterCount > 0 && <span style={{ color: "#f59e0b", fontWeight: 600 }}> ({activeFilterCount} column filter{activeFilterCount > 1 ? "s" : ""} active)</span>}
                 </span>
+                {renderTotalPages > 1 && (
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button onClick={() => setRenderPage(p => Math.max(1, p - 1))} disabled={renderPage === 1}
+                            style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", cursor: renderPage === 1 ? "default" : "pointer", opacity: renderPage === 1 ? 0.5 : 1, fontSize: 11, fontWeight: 600, color: "var(--text)" }}>
+                            ← Prev
+                        </button>
+                        <span style={{ fontWeight: 600, color: "var(--text2)" }}>Page {renderPage} / {renderTotalPages}</span>
+                        <button onClick={() => setRenderPage(p => Math.min(renderTotalPages, p + 1))} disabled={renderPage === renderTotalPages}
+                            style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", cursor: renderPage === renderTotalPages ? "default" : "pointer", opacity: renderPage === renderTotalPages ? 0.5 : 1, fontSize: 11, fontWeight: 600, color: "var(--text)" }}>
+                            Next →
+                        </button>
+                    </span>
+                )}
                 <span>{visibleCols.length} columns visible</span>
             </div>
         </div>
