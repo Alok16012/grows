@@ -63,6 +63,32 @@ export default function ApprovalsPage() {
         }
     }
 
+    // Quick approve/reject from the list. Goes through /api/approvals/[id]
+    // (permission: approvals.manage) — NOT /api/inspections/[id], which only
+    // the admin or the submitting inspector may PATCH.
+    const quickAction = async (id: string, action: "approve" | "reject") => {
+        let reviewerNotes = ""
+        if (action === "reject") {
+            const reason = prompt("Reason for rejection:")
+            if (!reason || !reason.trim()) return
+            reviewerNotes = reason.trim()
+        } else if (!confirm("Approve this inspection?")) {
+            return
+        }
+        try {
+            const res = await fetch(`/api/approvals/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action, reviewerNotes }),
+            })
+            if (res.ok) fetchData(activeTab)
+            else {
+                const err = await res.json().catch(() => null)
+                alert(err?.error || "Action failed")
+            }
+        } catch { /* network error — leave list as is */ }
+    }
+
     useEffect(() => {
         if (authStatus === "authenticated") {
             fetchData(activeTab)
@@ -190,12 +216,7 @@ export default function ApprovalsPage() {
                                         <div className="flex items-center gap-2">
                                             {inspection.status === "pending" && (
                                                 <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            const res = await fetch(`/api/inspections/${inspection.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "approved" }) })
-                                                            if (res.ok) fetchData(activeTab)
-                                                        } catch {}
-                                                    }}
+                                                    onClick={() => quickAction(inspection.id, "approve")}
                                                     className="h-8 w-8 rounded-[7px] bg-[#e8f7f1] text-[#0d6b4a] flex items-center justify-center hover:bg-[#1a9e6e] hover:text-white transition-colors"
                                                     title="Approve"
                                                 >
@@ -204,12 +225,7 @@ export default function ApprovalsPage() {
                                             )}
                                             {inspection.status === "pending" && (
                                                 <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            const res = await fetch(`/api/inspections/${inspection.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "rejected" }) })
-                                                            if (res.ok) fetchData(activeTab)
-                                                        } catch {}
-                                                    }}
+                                                    onClick={() => quickAction(inspection.id, "reject")}
                                                     className="h-8 w-8 rounded-[7px] bg-[#fef2f2] text-[#dc2626] flex items-center justify-center hover:bg-[#dc2626] hover:text-white transition-colors"
                                                     title="Reject"
                                                 >
@@ -271,16 +287,7 @@ export default function ApprovalsPage() {
                                                 <div className="flex items-center gap-1.5">
                                                     {inspection.status === "pending" && (
                                                         <button
-                                                            onClick={async () => {
-                                                                try {
-                                                                    const res = await fetch(`/api/inspections/${inspection.id}`, {
-                                                                        method: "PATCH",
-                                                                        headers: { "Content-Type": "application/json" },
-                                                                        body: JSON.stringify({ status: "approved" })
-                                                                    })
-                                                                    if (res.ok) fetchData(activeTab)
-                                                                } catch {}
-                                                            }}
+                                                            onClick={() => quickAction(inspection.id, "approve")}
                                                             className="h-7 w-7 rounded-[7px] bg-[#e8f7f1] text-[#0d6b4a] flex items-center justify-center hover:bg-[#1a9e6e] hover:text-white transition-colors"
                                                             title="Approve"
                                                         >
@@ -289,16 +296,7 @@ export default function ApprovalsPage() {
                                                     )}
                                                     {inspection.status === "pending" && (
                                                         <button
-                                                            onClick={async () => {
-                                                                try {
-                                                                    const res = await fetch(`/api/inspections/${inspection.id}`, {
-                                                                        method: "PATCH",
-                                                                        headers: { "Content-Type": "application/json" },
-                                                                        body: JSON.stringify({ status: "rejected" })
-                                                                    })
-                                                                    if (res.ok) fetchData(activeTab)
-                                                                } catch {}
-                                                            }}
+                                                            onClick={() => quickAction(inspection.id, "reject")}
                                                             className="h-7 w-7 rounded-[7px] bg-[#fef2f2] text-[#dc2626] flex items-center justify-center hover:bg-[#dc2626] hover:text-white transition-colors"
                                                             title="Reject"
                                                         >
