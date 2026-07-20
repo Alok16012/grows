@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, ActivityIndicator, StyleSheet, Text as RNText, TextInput as RNTextInput } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -9,6 +9,14 @@ import { AuthProvider, useAuth } from "@/auth";
 import { colors, font } from "@/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Cap system font scaling so XL device font/display settings can't blow up
+// fixed layouts (overlapping text, uneven card sizes). 1.15 keeps things
+// accessible without breaking the design.
+// @ts-expect-error defaultProps is legacy but still honoured by RN
+RNText.defaultProps = { ...(RNText.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
+// @ts-expect-error same for inputs
+RNTextInput.defaultProps = { ...(RNTextInput.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
 
 function BrandSplash() {
   return (
