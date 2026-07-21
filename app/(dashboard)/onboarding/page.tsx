@@ -771,15 +771,6 @@ export default function OnboardingPage() {
 
     useEffect(() => { fetchRecords() }, [fetchRecords])
 
-    // Auto-expand the first pending row once per load so the quick-actions panel
-    // is visible up front (matches the design).
-    const autoExpandedRef = useRef(false)
-    useEffect(() => {
-        if (autoExpandedRef.current || records.length === 0) return
-        const firstPending = records.find(r => r.status === "IN_PROGRESS" || r.status === "NOT_STARTED")
-        if (firstPending) { setExpandedId(firstPending.id); autoExpandedRef.current = true }
-    }, [records])
-
     const handleAction = async (id: string, action: "approve" | "reject", reason?: string) => {
         try {
             const res = await fetch(`/api/onboarding/${id}`, {
