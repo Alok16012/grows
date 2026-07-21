@@ -3,7 +3,11 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Search, Loader2, RefreshCw, FileSpreadsheet, Filter, Pencil, X, Save, Trash2, CheckSquare } from "lucide-react"
+import {
+    Search, Loader2, RefreshCw, FileSpreadsheet, Pencil, X, Save, Trash2, CheckSquare,
+    Users, UserCheck, UserX, CalendarOff, UserMinus,
+    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+} from "lucide-react"
 import * as XLSX from "xlsx"
 import { can } from "@/lib/can"
 
@@ -575,6 +579,20 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
     )
 }
 
+// Small square pagination arrow button used in the table footer.
+function PageBtn({ onClick, disabled, children }: { onClick: () => void; disabled: boolean; children: React.ReactNode }) {
+    return (
+        <button onClick={onClick} disabled={disabled}
+            style={{
+                width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)",
+                background: "var(--surface)", color: "var(--text2)", cursor: disabled ? "default" : "pointer",
+                opacity: disabled ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center",
+            }}>
+            {children}
+        </button>
+    )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function EmployeeMasterPage() {
     const { data: session, status } = useSession()
@@ -587,9 +605,9 @@ export default function EmployeeMasterPage() {
     const [siteFilter, setSiteFilter] = useState("")
     const [sites, setSites] = useState<{id: string, name: string}[]>([])
     const [exporting, setExporting] = useState(false)
-    const [visibleGroups, setVisibleGroups] = useState<Set<string>>(
-        new Set(COLUMN_GROUPS.map(g => g.group))
-    )
+    // Which column-group tab is active — the table shows the pinned identity
+    // columns plus this group's columns (mockup-style tab strip).
+    const [activeGroup, setActiveGroup] = useState<string>(COLUMN_GROUPS[0].group)
     const [colFilters, setColFilters] = useState<Record<string, string>>({})
     const [editEmp, setEditEmp] = useState<Employee | null>(null)
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -646,14 +664,6 @@ export default function EmployeeMasterPage() {
 
     // Removed branches derivation
 
-    const toggleGroup = (group: string) => {
-        setVisibleGroups(prev => {
-            const next = new Set(prev)
-            next.has(group) ? next.delete(group) : next.add(group)
-            return next
-        })
-    }
-
     const toggleCol = (key: string) => {
         setHiddenColKeys(prev => {
             const next = new Set(prev)
@@ -682,14 +692,13 @@ export default function EmployeeMasterPage() {
     const activeFilterCount = Object.values(colFilters).filter(v => v.trim()).length
 
     // ── Render pagination ─────────────────────────────────────────────────────
-    // The grid renders 100 rows at a time: 500 rows × 40+ columns froze the DOM
-    // and made this page one of the slowest to load. Export/selection still
+    // Only one page of rows is in the DOM at a time; export/selection still
     // operate on the full filtered set.
-    const RENDER_PAGE = 100
+    const [rowsPerPage, setRowsPerPage] = useState(25)
     const [renderPage, setRenderPage] = useState(1)
-    useEffect(() => { setRenderPage(1) }, [statusFilter, siteFilter, search, colFilters])
-    const renderTotalPages = Math.max(1, Math.ceil(filteredEmployees.length / RENDER_PAGE))
-    const pagedEmployees = filteredEmployees.slice((renderPage - 1) * RENDER_PAGE, renderPage * RENDER_PAGE)
+    useEffect(() => { setRenderPage(1) }, [statusFilter, siteFilter, search, colFilters, rowsPerPage])
+    const renderTotalPages = Math.max(1, Math.ceil(filteredEmployees.length / rowsPerPage))
+    const pagedEmployees = filteredEmployees.slice((renderPage - 1) * rowsPerPage, renderPage * rowsPerPage)
 
     // ── Selection helpers ─────────────────────────────────────────────────────
     const allSelected = filteredEmployees.length > 0 && filteredEmployees.every(e => selectedIds.has(e.id))
@@ -799,11 +808,21 @@ export default function EmployeeMasterPage() {
     // The /api/employees response also nulls these fields server-side.
     const columnGroups = canViewSalary ? COLUMN_GROUPS : COLUMN_GROUPS.filter(g => g.group !== "Salary")
 
+    // Export columns: every permitted group's columns minus any the user
+    // unticked in the Columns picker (independent of which tab is active).
     const visibleCols = columnGroups
-        .filter(g => visibleGroups.has(g.group))
         .flatMap(g => g.cols
             .filter(c => !hiddenColKeys.has(c.key))
             .map(c => ({ ...c, groupColor: g.color, groupName: g.group })))
+
+    // Table columns: pinned identity columns + the active tab's columns.
+    const PINNED_KEYS = ["employeeId", "fullName", "status"]
+    const basicGroup = columnGroups[0]
+    const activeGroupDef = columnGroups.find(g => g.group === activeGroup) ?? basicGroup
+    const tableCols = [
+        ...basicGroup.cols.filter(c => PINNED_KEYS.includes(c.key)).map(c => ({ ...c, groupColor: basicGroup.color })),
+        ...activeGroupDef.cols.filter(c => !PINNED_KEYS.includes(c.key)).map(c => ({ ...c, groupColor: activeGroupDef.color })),
+    ]
 
     const isAdmin = can(session, "employees.view")
 
@@ -816,83 +835,95 @@ export default function EmployeeMasterPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", minHeight: 0 }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div>
-                    <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", margin: 0 }}>Employee Master</h1>
-                    <p style={{ fontSize: 12, color: "var(--text3)", margin: "2px 0 0 0" }}>
-                        Complete employee data — all fields, all employees
-                    </p>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--accent-light, #e8f7f1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                        <Users size={19} style={{ color: "var(--accent)" }} />
+                    </div>
+                    <div>
+                        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.3px" }}>Employee Master</h1>
+                        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "2px 0 0 0" }}>
+                            Complete employee data for all employees
+                        </p>
+                    </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     {activeFilterCount > 0 && (
                         <button onClick={() => setColFilters({})}
-                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 8, border: "1px solid #f59e0b40", background: "#fef9c3", fontSize: 11, color: "#92400e", cursor: "pointer", fontWeight: 600 }}>
-                            <X size={11} /> Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 12px", borderRadius: 9, border: "1px solid #f59e0b40", background: "#fef9c3", fontSize: 12, color: "#92400e", cursor: "pointer", fontWeight: 600 }}>
+                            <X size={12} /> Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
                         </button>
                     )}
                     <button onClick={fetchEmployees} disabled={loading}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 9, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12.5, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
                     <button onClick={selectedIds.size > 0 ? handleDownloadSelected : handleExport} disabled={exporting || filteredEmployees.length === 0}
                         title={selectedIds.size > 0 ? "Downloads only the selected rows, with the columns you've picked" : "Downloads all rows, with the columns you've picked"}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1 }}>
-                        {exporting ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
-                        {exporting ? "Exporting…" : selectedIds.size > 0 ? `Download Excel (${selectedIds.size} selected)` : `Download Excel (${filteredEmployees.length})`}
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 17px", borderRadius: 9, border: "none", background: "var(--accent, #1a9e6e)", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                        {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+                        {exporting ? "Exporting…" : selectedIds.size > 0 ? `Download Excel (${selectedIds.size})` : "Download Excel"}
                     </button>
                 </div>
             </div>
 
-            {/* Stats */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {/* KPI cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 12 }}>
                 {[
-                    { label: "Total",      value: filteredEmployees.length,                                          color: "#3b82f6" },
-                    { label: "Active",     value: filteredEmployees.filter(e => e.status === "ACTIVE").length,      color: "#16a34a" },
-                    { label: "Inactive",   value: filteredEmployees.filter(e => e.status === "INACTIVE").length,    color: "#6b7280" },
-                    { label: "On Leave",   value: filteredEmployees.filter(e => e.status === "ON_LEAVE").length,    color: "#f59e0b" },
-                    { label: "Terminated", value: filteredEmployees.filter(e => e.status === "TERMINATED").length,  color: "#dc2626" },
+                    { label: "Total Employees", value: filteredEmployees.length,                                         color: "#3b82f6", bg: "#eff6ff", icon: Users },
+                    { label: "Active",          value: filteredEmployees.filter(e => e.status === "ACTIVE").length,     color: "#16a34a", bg: "#e8f7f1", icon: UserCheck },
+                    { label: "Inactive",        value: filteredEmployees.filter(e => e.status === "INACTIVE").length,   color: "#6b7280", bg: "#f3f4f6", icon: UserX },
+                    { label: "On Leave",        value: filteredEmployees.filter(e => e.status === "ON_LEAVE").length,   color: "#d97706", bg: "#fef3c7", icon: CalendarOff },
+                    { label: "Terminated",      value: filteredEmployees.filter(e => e.status === "TERMINATED").length, color: "#dc2626", bg: "#fef2f2", icon: UserMinus },
                 ].map(s => (
-                    <div key={s.label} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", minWidth: 90 }}>
-                        <p style={{ fontSize: 10, color: "var(--text3)", margin: 0, fontWeight: 600, textTransform: "uppercase" }}>{s.label}</p>
-                        <p style={{ fontSize: 20, fontWeight: 700, color: s.color, margin: 0, lineHeight: 1.2 }}>{s.value}</p>
+                    <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 18px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface)" }}>
+                        <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <s.icon size={20} style={{ color: s.color }} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                            <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, fontWeight: 500, whiteSpace: "nowrap" }}>{s.label}</p>
+                            <p style={{ fontSize: 24, fontWeight: 700, color: s.color, margin: 0, lineHeight: 1.25, fontVariantNumeric: "tabular-nums" }}>{s.value.toLocaleString("en-IN")}</p>
+                        </div>
                     </div>
                 ))}
             </div>
 
-            {/* Filters + Column toggles */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 320 }}>
-                    <Search size={13} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, ID, phone…"
-                        style={{ width: "100%", padding: "6px 10px 6px 28px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, outline: "none", background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
+            {/* Search + filters */}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ position: "relative", flex: 1, minWidth: 240, maxWidth: 440 }}>
+                    <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, employee ID, phone, email…"
+                        style={{ width: "100%", height: 38, padding: "0 12px 0 36px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, outline: "none", background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
                 </div>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
+                    style={{ height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer" }}>
                     <option value="">All Status</option>
                     {["ACTIVE","INACTIVE","ON_LEAVE","TERMINATED","RESIGNED"].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
-                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
+                    style={{ height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer", maxWidth: 200 }}>
                     <option value="">All Sites</option>
                     {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
 
                 {(statusFilter || siteFilter || search) && (
                     <button onClick={() => { setStatusFilter(""); setSiteFilter(""); setSearch(""); }}
-                        style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                        <X size={12} /> Clear
+                        style={{ display: "flex", alignItems: "center", gap: 4, height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        <X size={13} /> Clear
                     </button>
                 )}
 
-                {/* Per-column picker */}
+                <div style={{ flex: 1 }} />
+
+                {/* Columns picker (controls the Excel export) */}
                 <div style={{ position: "relative" }}>
                     <button onClick={() => setShowColPicker(v => !v)}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: showColPicker ? "var(--surface2)" : "transparent", color: "var(--text2)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                        <CheckSquare size={13} /> Columns ({visibleCols.length})
+                        style={{ display: "flex", alignItems: "center", gap: 6, height: 38, padding: "0 14px", borderRadius: 10, border: "1px solid var(--border)", background: showColPicker ? "var(--surface2)" : "var(--surface)", color: "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                        <CheckSquare size={14} /> Columns ({visibleCols.length})
                     </button>
                     {showColPicker && (
                         <>
                             <div onClick={() => setShowColPicker(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, width: 280, maxHeight: 420, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 12px 40px rgba(11,27,51,0.18)", padding: 12 }}>
+                            <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, width: 280, maxHeight: 420, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 12px 40px rgba(11,27,51,0.18)", padding: 12 }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                                     <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>Choose columns to export</span>
                                 </div>
@@ -902,7 +933,7 @@ export default function EmployeeMasterPage() {
                                     <button onClick={() => setHiddenColKeys(new Set(columnGroups.flatMap(g => g.cols.map(c => c.key))))}
                                         style={{ flex: 1, padding: "5px 0", borderRadius: 7, border: "1px solid var(--border)", background: "transparent", color: "var(--text3)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Clear all</button>
                                 </div>
-                                {columnGroups.filter(g => visibleGroups.has(g.group)).map(g => (
+                                {columnGroups.map(g => (
                                     <div key={g.group} style={{ marginBottom: 10 }}>
                                         <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: g.color, marginBottom: 4 }}>{g.group}</div>
                                         {g.cols.map(c => (
@@ -914,26 +945,33 @@ export default function EmployeeMasterPage() {
                                     </div>
                                 ))}
                                 <p style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 4, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-                                    Tip: hide a whole group from the chips, or untick single columns here. Excel downloads exactly these {visibleCols.length} columns.
+                                    Excel downloads exactly these {visibleCols.length} columns.
                                 </p>
                             </div>
                         </>
                     )}
                 </div>
+            </div>
 
-                {/* Column group toggles */}
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-                    <Filter size={12} style={{ color: "var(--text3)" }} />
-                    {columnGroups.map(g => (
-                        <button key={g.group} onClick={() => toggleGroup(g.group)}
-                            style={{ padding: "3px 8px", borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: "pointer", border: `1px solid ${g.color}40`,
-                                background: visibleGroups.has(g.group) ? g.color + "22" : "transparent",
-                                color: visibleGroups.has(g.group) ? g.color : "var(--text3)",
-                                transition: "all 0.15s" }}>
+            {/* Column-group tabs */}
+            <div style={{ display: "flex", gap: 4, overflowX: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "6px 8px" }}>
+                {columnGroups.map(g => {
+                    const active = activeGroupDef.group === g.group
+                    return (
+                        <button key={g.group} onClick={() => setActiveGroup(g.group)}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9,
+                                border: "none", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                                fontSize: 12.5, fontWeight: 600, transition: "all 0.15s",
+                                background: active ? g.color + "14" : "transparent",
+                                color: active ? g.color : "var(--text3)",
+                                boxShadow: active ? `inset 0 -2px 0 ${g.color}` : "none",
+                            }}>
+                            <span style={{ width: 7, height: 7, borderRadius: 4, background: active ? g.color : "var(--border)", flexShrink: 0 }} />
                             {g.group}
                         </button>
-                    ))}
-                </div>
+                    )
+                })}
             </div>
 
             {/* Table */}
@@ -953,51 +991,36 @@ export default function EmployeeMasterPage() {
                         )}
                     </div>
                 ) : (
-                    <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12 }}>
+                    <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12.5 }}>
                         <thead>
-                            {/* Group header row — colSpan 3 covers checkbox + SL + edit */}
-                            <tr style={{ background: "#f8fafc" }}>
-                                <th colSpan={3} style={{ position: "sticky", left: 0, zIndex: 3, background: "#f8fafc", padding: "6px 10px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>
-                                    Actions
-                                </th>
-                                {columnGroups.filter(g => visibleGroups.has(g.group)).map(g => (
-                                    <th key={g.group} colSpan={g.cols.length}
-                                        style={{ padding: "6px 12px", borderBottom: "1px solid var(--border)", borderRight: "1px solid " + g.color + "40",
-                                            background: g.color + "12", color: g.color, fontSize: 10, fontWeight: 700,
-                                            textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center", whiteSpace: "nowrap" }}>
-                                        {g.group}
-                                    </th>
-                                ))}
-                            </tr>
                             {/* Column labels row */}
-                            <tr style={{ background: "#f1f5f9" }}>
-                                {/* Checkbox — select all */}
-                                <th style={{ position: "sticky", left: 0, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap", minWidth: 36 }}>
+                            <tr style={{ background: "#f8fafc" }}>
+                                <th style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#f8fafc", padding: "10px 10px", borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap", minWidth: 40 }}>
                                     <input type="checkbox" checked={allSelected} ref={el => { if (el) el.indeterminate = someSelected }} onChange={toggleAll}
                                         style={{ width: 14, height: 14, cursor: "pointer", accentColor: "var(--accent)" }} />
                                 </th>
-                                <th style={{ position: "sticky", left: 36, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 32 }}>
-                                    SL
+                                <th style={{ position: "sticky", left: 40, top: 0, zIndex: 3, background: "#f8fafc", padding: "10px 8px", borderBottom: "1px solid var(--border)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 34 }}>
+                                    #
                                 </th>
-                                <th style={{ position: "sticky", left: 68, zIndex: 3, background: "#f1f5f9", padding: "5px 8px", borderBottom: "1px solid var(--border)", borderRight: "2px solid var(--border)", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 42 }}>
+                                <th style={{ position: "sticky", left: 74, top: 0, zIndex: 3, background: "#f8fafc", padding: "10px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 46 }}>
                                     Edit
                                 </th>
-                                {visibleCols.map(col => (
-                                    <th key={col.key} style={{ padding: "5px 10px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "left", fontSize: 10, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 90 }}>
+                                {tableCols.map(col => (
+                                    <th key={col.key} style={{ position: "sticky", top: 0, zIndex: 2, background: "#f8fafc", padding: "10px 12px", borderBottom: "1px solid var(--border)", textAlign: "left", fontSize: 11.5, fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap", minWidth: 110 }}>
                                         {col.label}
                                     </th>
                                 ))}
                             </tr>
-                            {/* Column filter row */}
-                            <tr style={{ background: "#fff", borderBottom: "2px solid var(--border)" }}>
-                                <td colSpan={3} style={{ position: "sticky", left: 0, zIndex: 3, background: "#fff", borderRight: "2px solid var(--border)", padding: "4px 6px" }} />
-                                {visibleCols.map(col => (
-                                    <td key={col.key} style={{ padding: "3px 6px", borderRight: "1px solid #e2e8f0" }}>
+                            {/* Column search row */}
+                            <tr style={{ background: "#fff" }}>
+                                <td colSpan={3} style={{ position: "sticky", left: 0, zIndex: 3, background: "#fff", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", padding: "5px 8px" }} />
+                                {tableCols.map(col => (
+                                    <td key={col.key} style={{ padding: "5px 8px", borderBottom: "1px solid var(--border)" }}>
                                         <input
                                             value={colFilters[col.key] || ""}
                                             onChange={e => setColFilter(col.key, e.target.value)}
-                                            placeholder="Filter…"
-                                            style={{ width: "100%", padding: "3px 6px", borderRadius: 5, border: `1px solid ${colFilters[col.key] ? col.groupColor + "80" : "var(--border)"}`, fontSize: 10, outline: "none", background: colFilters[col.key] ? col.groupColor + "10" : "#fafafa", color: "var(--text)", minWidth: 70, boxSizing: "border-box" }}
+                                            placeholder={`Search ${col.label.toLowerCase()}…`}
+                                            style={{ width: "100%", padding: "5px 8px", borderRadius: 7, border: `1px solid ${colFilters[col.key] ? col.groupColor + "80" : "var(--border)"}`, fontSize: 11, outline: "none", background: colFilters[col.key] ? col.groupColor + "10" : "#fafafa", color: "var(--text)", minWidth: 90, boxSizing: "border-box" }}
                                         />
                                     </td>
                                 ))}
@@ -1008,40 +1031,37 @@ export default function EmployeeMasterPage() {
                                 const sc = STATUS_COLOR[emp.status] || { bg: "#f3f4f6", color: "#6b7280" }
                                 const isChecked = selectedIds.has(emp.id)
                                 return (
-                                    <tr key={emp.id} style={{ background: isChecked ? "#eff6ff" : idx % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid var(--border)" }}
-                                        onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = "#f0f9ff" }}
-                                        onMouseLeave={e => { if (!isChecked) e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
-                                        {/* Checkbox */}
-                                        <td style={{ position: "sticky", left: 0, zIndex: 2, background: "inherit", padding: "6px 8px", borderRight: "1px solid var(--border)", textAlign: "center", minWidth: 36 }}>
+                                    <tr key={emp.id} style={{ background: isChecked ? "#eff6ff" : "#fff", borderBottom: "1px solid #eef0f3" }}
+                                        onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = "#f9fafb" }}
+                                        onMouseLeave={e => { if (!isChecked) e.currentTarget.style.background = "#fff" }}>
+                                        <td style={{ position: "sticky", left: 0, zIndex: 2, background: "inherit", padding: "9px 10px", textAlign: "center", minWidth: 40 }}>
                                             <input type="checkbox" checked={isChecked} onChange={() => toggleOne(emp.id)}
                                                 style={{ width: 14, height: 14, cursor: "pointer", accentColor: "var(--accent)" }} />
                                         </td>
-                                        {/* SL */}
-                                        <td style={{ position: "sticky", left: 36, zIndex: 2, background: "inherit", padding: "6px 8px", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, color: "var(--text3)", fontWeight: 600, whiteSpace: "nowrap", minWidth: 32 }}>
-                                            {(renderPage - 1) * RENDER_PAGE + idx + 1}
+                                        <td style={{ position: "sticky", left: 40, zIndex: 2, background: "inherit", padding: "9px 8px", textAlign: "center", fontSize: 11.5, color: "var(--text3)", fontWeight: 500, whiteSpace: "nowrap", minWidth: 34 }}>
+                                            {(renderPage - 1) * rowsPerPage + idx + 1}
                                         </td>
-                                        {/* Edit button */}
-                                        <td style={{ position: "sticky", left: 68, zIndex: 2, background: "inherit", padding: "4px 6px", borderRight: "2px solid var(--border)", textAlign: "center" }}>
+                                        <td style={{ position: "sticky", left: 74, zIndex: 2, background: "inherit", padding: "7px 8px", borderRight: "1px solid var(--border)", textAlign: "center", minWidth: 46 }}>
                                             <button onClick={() => setEditEmp(emp)}
                                                 title="Edit employee"
-                                                style={{ padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", color: "var(--accent)", display: "inline-flex", alignItems: "center" }}>
+                                                style={{ padding: "5px 7px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", color: "var(--text3)", display: "inline-flex", alignItems: "center" }}>
                                                 <Pencil size={12} />
                                             </button>
                                         </td>
-                                        {visibleCols.map(col => {
+                                        {tableCols.map(col => {
                                             const val = col.get(emp)
                                             const isStatus = col.key === "status"
-                                            const filterVal = colFilters[col.key]
-                                            const highlighted = filterVal && val.toLowerCase().includes(filterVal.toLowerCase())
+                                            const isId = col.key === "employeeId"
+                                            const isName = col.key === "fullName"
                                             return (
-                                                <td key={col.key} style={{ padding: "6px 10px", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", color: "var(--text)", background: highlighted ? col.groupColor + "15" : undefined }}
+                                                <td key={col.key} style={{ padding: "9px 12px", whiteSpace: "nowrap", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}
                                                     title={val}>
                                                     {isStatus ? (
-                                                        <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color }}>
+                                                        <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: sc.bg, color: sc.color, letterSpacing: "0.3px" }}>
                                                             {val}
                                                         </span>
                                                     ) : (
-                                                        <span style={{ fontSize: 12, color: val ? "var(--text)" : "var(--text3)" }}>
+                                                        <span style={{ fontSize: 12.5, fontWeight: isId || isName ? 600 : 400, color: val ? "var(--text)" : "var(--text3)" }}>
                                                             {val || "—"}
                                                         </span>
                                                     )}
@@ -1056,28 +1076,45 @@ export default function EmployeeMasterPage() {
                 )}
             </div>
 
-            {/* Footer */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "var(--text3)", flexWrap: "wrap", gap: 8 }}>
+            {/* Footer — showing count · rows per page · numbered pagination */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: "var(--text3)", flexWrap: "wrap", gap: 10 }}>
                 <span>
-                    Showing {pagedEmployees.length === filteredEmployees.length
-                        ? filteredEmployees.length
-                        : `${(renderPage - 1) * RENDER_PAGE + 1}–${(renderPage - 1) * RENDER_PAGE + pagedEmployees.length} of ${filteredEmployees.length}`} employee{filteredEmployees.length !== 1 ? "s" : ""}
-                    {activeFilterCount > 0 && <span style={{ color: "#f59e0b", fontWeight: 600 }}> ({activeFilterCount} column filter{activeFilterCount > 1 ? "s" : ""} active)</span>}
+                    Showing {filteredEmployees.length === 0 ? 0 : (renderPage - 1) * rowsPerPage + 1} to {(renderPage - 1) * rowsPerPage + pagedEmployees.length} of {filteredEmployees.length} employees
+                    {activeFilterCount > 0 && <span style={{ color: "#f59e0b", fontWeight: 600 }}> ({activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""})</span>}
                 </span>
-                {renderTotalPages > 1 && (
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button onClick={() => setRenderPage(p => Math.max(1, p - 1))} disabled={renderPage === 1}
-                            style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", cursor: renderPage === 1 ? "default" : "pointer", opacity: renderPage === 1 ? 0.5 : 1, fontSize: 11, fontWeight: 600, color: "var(--text)" }}>
-                            ← Prev
-                        </button>
-                        <span style={{ fontWeight: 600, color: "var(--text2)" }}>Page {renderPage} / {renderTotalPages}</span>
-                        <button onClick={() => setRenderPage(p => Math.min(renderTotalPages, p + 1))} disabled={renderPage === renderTotalPages}
-                            style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", cursor: renderPage === renderTotalPages ? "default" : "pointer", opacity: renderPage === renderTotalPages ? 0.5 : 1, fontSize: 11, fontWeight: 600, color: "var(--text)" }}>
-                            Next →
-                        </button>
+                <span style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        Rows per page
+                        <select value={rowsPerPage} onChange={e => setRowsPerPage(Number(e.target.value))}
+                            style={{ padding: "5px 8px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer" }}>
+                            {[25, 50, 100, 200].map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
                     </span>
-                )}
-                <span>{visibleCols.length} columns visible</span>
+                    {renderTotalPages > 1 && (
+                        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <PageBtn onClick={() => setRenderPage(1)} disabled={renderPage === 1}><ChevronsLeft size={14} /></PageBtn>
+                            <PageBtn onClick={() => setRenderPage(p => Math.max(1, p - 1))} disabled={renderPage === 1}><ChevronLeft size={14} /></PageBtn>
+                            {Array.from({ length: Math.min(5, renderTotalPages) }, (_, i) => {
+                                const start = Math.max(1, Math.min(renderTotalPages - 4, renderPage - 2))
+                                const p = start + i
+                                if (p > renderTotalPages) return null
+                                return (
+                                    <button key={p} onClick={() => setRenderPage(p)}
+                                        style={{
+                                            minWidth: 30, height: 30, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                                            border: p === renderPage ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                            background: p === renderPage ? "var(--accent)" : "var(--surface)",
+                                            color: p === renderPage ? "#fff" : "var(--text2)",
+                                        }}>
+                                        {p}
+                                    </button>
+                                )
+                            })}
+                            <PageBtn onClick={() => setRenderPage(p => Math.min(renderTotalPages, p + 1))} disabled={renderPage === renderTotalPages}><ChevronRight size={14} /></PageBtn>
+                            <PageBtn onClick={() => setRenderPage(renderTotalPages)} disabled={renderPage === renderTotalPages}><ChevronsRight size={14} /></PageBtn>
+                        </span>
+                    )}
+                </span>
             </div>
         </div>
 
