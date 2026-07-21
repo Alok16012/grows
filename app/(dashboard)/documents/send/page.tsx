@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X, Undo2, RotateCcw, History, PenLine, Trash2, Lock } from "lucide-react"
+import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X, Undo2, RotateCcw, History, PenLine, Trash2, Lock, Play, ArrowRight, FileStack, ChevronDown } from "lucide-react"
 import { can, canAny } from "@/lib/can"
 
 type DocType = { id: string; name: string; requiresApproval: boolean; templateContent?: string }
@@ -299,6 +299,7 @@ export default function SendDocumentsPage() {
     // old "everyone saw everything" mess); everyone else clears only their own sends.
     const isAdmin = session?.user?.role === "ADMIN"
     const [clearing, setClearing] = useState(false)
+    const [showAllIssued, setShowAllIssued] = useState(false)
     const clearDocs = async (scope: "mine" | "all") => {
         const msg = scope === "all"
             ? "Delete ALL issued documents for EVERYONE? This permanently removes every letter that was ever sent and cannot be undone."
@@ -323,293 +324,346 @@ export default function SendDocumentsPage() {
         <button
             type="button"
             onClick={() => setScope(s)}
-            className={`flex items-center gap-2 px-3.5 h-9 rounded-[9px] text-[13px] font-medium border transition-colors ${scope === s
+            className={`flex-1 flex items-center justify-center gap-2 h-[46px] rounded-[10px] text-[13.5px] font-semibold border transition-colors ${scope === s
                 ? "bg-[var(--accent)] text-white border-[var(--accent)]"
                 : "bg-[var(--surface)] text-[var(--text2)] border-[var(--border)] hover:bg-[var(--surface2)]"}`}
         >
-            <Icon size={14} /> {label}
+            <Icon size={16} /> {label}
         </button>
     )
 
-    const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]"
-    const labelCls = "block text-[12px] text-[var(--text2)] mb-1.5"
+    const inputCls = "w-full h-[44px] rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-[13.5px] text-[var(--text)] outline-none focus:border-[var(--accent)]"
+    const labelCls = "block text-[12.5px] font-medium text-[var(--text2)] mb-2"
+    const displayedIssued = showAllIssued ? issued : issued.slice(0, 6)
 
     if (loading) {
         return <div className="p-6 flex h-[70vh] items-center justify-center"><Loader2 className="h-9 w-9 animate-spin text-[var(--accent)]" /></div>
     }
 
     return (
-        <div className="p-6 lg:p-7 max-w-5xl">
-            <div className="mb-5">
-                <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">Send Documents</h1>
-                <p className="text-[13px] text-[var(--text3)] mt-[3px]">Issue a letter/document to employees by role or selection — generated on the company letterhead as PDF.</p>
+        <div className="p-5 lg:p-7 max-w-6xl mx-auto flex flex-col gap-6">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                    <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Send Documents</h1>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1.5">Issue letters or documents to employees by role or selection — generated on the company letterhead as PDF.</p>
+                </div>
+                <button
+                    onClick={openPreview}
+                    className="flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                    <Play size={15} /> How it works
+                </button>
             </div>
 
-            {/* Composer */}
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-5 space-y-4">
-                <div>
-                    <label className={labelCls}>Document type</label>
-                    <select value={typeId} onChange={e => setTypeId(e.target.value)} className={inputCls}>
-                        <option value="">— Select a document type —</option>
-                        {docTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                    {docTypes.length === 0 && (
-                        <p className="text-[12px] text-[var(--text3)] mt-1.5">No document types yet. Create one in <button onClick={() => router.push("/documents/types")} className="text-[var(--accent)] underline">Doc Types</button>.</p>
-                    )}
-                </div>
-
-                <div>
-                    <label className={labelCls}>Send to</label>
-                    <div className="flex flex-wrap gap-2">
-                        {scopeBtn("role", "By role", UserCheck)}
-                        {scopeBtn("employees", "Pick employees", Users)}
-                        {scopeBtn("all", "All employees", Globe)}
+            {/* Compose Document card */}
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-6">
+                <div className="flex items-center justify-between gap-3 mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-[11px] bg-[#e8f7f1] flex items-center justify-center">
+                            <FileText size={20} className="text-[var(--accent)]" />
+                        </div>
+                        <h2 className="text-[17px] font-bold text-[var(--text)]">Compose Document</h2>
                     </div>
-                </div>
-
-                {scope === "role" && (
-                    <div>
-                        <label className={labelCls}>Role</label>
-                        <select value={roleId} onChange={e => setRoleId(e.target.value)} className={inputCls}>
-                            <option value="">— Select a role —</option>
-                            {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    <div className="relative">
+                        <select value={typeId} onChange={e => setTypeId(e.target.value)}
+                            className="appearance-none h-[40px] pl-9 pr-9 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-medium text-[var(--text2)] outline-none cursor-pointer hover:bg-[var(--surface2)]">
+                            <option value="">Use a template</option>
+                            {docTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
-                    </div>
-                )}
-
-                {scope === "employees" && (
-                    <div>
-                        <label className={labelCls}>Employees ({selectedEmp.size} selected)</label>
-                        <div className="relative mb-2">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
-                            <input value={empSearch} onChange={e => setEmpSearch(e.target.value)} placeholder="Search name / ID / designation" className={inputCls + " pl-9"} />
-                        </div>
-                        <div className="max-h-64 overflow-y-auto border border-[var(--border)] rounded-[8px] divide-y divide-[var(--border)]">
-                            {filteredEmps.map(e => (
-                                <label key={e.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-[var(--surface2)]">
-                                    <input type="checkbox" checked={selectedEmp.has(e.id)} onChange={() => toggleEmp(e.id)} />
-                                    <span className="text-[13px] text-[var(--text)]">{e.firstName} {e.lastName}</span>
-                                    <span className="text-[12px] text-[var(--text3)]">{e.employeeId}{e.designation ? ` · ${e.designation}` : ""}{e.user?.customRole ? ` · ${e.user.customRole.name}` : ""}</span>
-                                </label>
-                            ))}
-                            {filteredEmps.length === 0 && <p className="px-3 py-3 text-[13px] text-[var(--text3)]">No employees found.</p>}
-                        </div>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label className={labelCls}>Effective date (optional)</label>
-                        <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} className={inputCls} />
-                    </div>
-                    <div>
-                        <label className={labelCls}>Remarks (optional)</label>
-                        <input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Internal note" className={inputCls} />
+                        <FileStack size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                        <ChevronDown size={15} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
                     </div>
                 </div>
 
-                {/* Sender's signature — personal to each sender, stamped on every doc they issue */}
-                <div>
-                    <label className={labelCls + " flex items-center gap-1.5"}>
-                        <PenLine size={12} /> Your signature — appears on documents you send
-                    </label>
-                    {signature ? (
-                        <div className="flex items-center gap-4 border border-[var(--border)] rounded-[10px] bg-[var(--surface2)] p-3">
-                            <div className="bg-white border border-[var(--border)] rounded-[8px] px-3 py-2">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={signature} alt="Your signature" className="h-10 max-w-[160px] object-contain" />
+                <div className="flex flex-col gap-5">
+                    {/* Document type */}
+                    <div>
+                        <label className={labelCls}>Document type</label>
+                        <select value={typeId} onChange={e => setTypeId(e.target.value)} className={inputCls}>
+                            <option value="">— Select a document type —</option>
+                            {docTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        {docTypes.length === 0 && (
+                            <p className="text-[12px] text-[var(--text3)] mt-1.5">No document types yet. Create one in <button onClick={() => router.push("/documents/types")} className="text-[var(--accent)] underline">Doc Types</button>.</p>
+                        )}
+                    </div>
+
+                    {/* Send to */}
+                    <div>
+                        <label className={labelCls}>Send to</label>
+                        <div className="flex gap-3">
+                            {scopeBtn("role", "By Role", Users)}
+                            {scopeBtn("employees", "Pick Employees", UserCheck)}
+                            {scopeBtn("all", "All Employees", Globe)}
+                        </div>
+                    </div>
+
+                    {/* Role / Effective date / Remarks */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className={labelCls}>{scope === "role" ? "Role" : scope === "all" ? "Audience" : "Selection"}</label>
+                            {scope === "role" ? (
+                                <select value={roleId} onChange={e => setRoleId(e.target.value)} className={inputCls}>
+                                    <option value="">— Select a role —</option>
+                                    {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                </select>
+                            ) : scope === "all" ? (
+                                <div className={inputCls + " flex items-center text-[var(--text3)]"}>All active employees</div>
+                            ) : (
+                                <div className={inputCls + " flex items-center text-[var(--text2)]"}>{selectedEmp.size} employee(s) selected</div>
+                            )}
+                        </div>
+                        <div>
+                            <label className={labelCls}>Effective date (optional)</label>
+                            <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} className={inputCls} />
+                        </div>
+                        <div>
+                            <label className={labelCls}>Remarks (optional)</label>
+                            <input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Internal note" className={inputCls} />
+                        </div>
+                    </div>
+
+                    {/* Employee picker (only when picking) */}
+                    {scope === "employees" && (
+                        <div>
+                            <div className="relative mb-2">
+                                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                                <input value={empSearch} onChange={e => setEmpSearch(e.target.value)} placeholder="Search name / ID / designation" className={inputCls + " pl-9"} />
                             </div>
-                            <span className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] font-medium">
-                                <Lock size={12} /> Locked to your account
-                            </span>
-                            <div className="ml-auto flex items-center gap-2">
-                                <label className={`inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text2)] border border-[var(--border)] rounded-[8px] px-3 h-8 cursor-pointer hover:bg-white transition ${sigBusy ? "opacity-50 pointer-events-none" : ""}`}>
-                                    {sigBusy ? <Loader2 size={13} className="animate-spin" /> : <PenLine size={13} />} Change
-                                    <input type="file" accept="image/png,image/jpeg" className="hidden"
-                                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadSignature(f); e.target.value = "" }} />
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={removeSignature}
-                                    disabled={sigBusy}
-                                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-600 border border-[var(--border)] rounded-[8px] px-3 h-8 hover:bg-red-50 transition disabled:opacity-50"
-                                >
-                                    <Trash2 size={13} /> Remove
-                                </button>
+                            <div className="max-h-64 overflow-y-auto border border-[var(--border)] rounded-[10px] divide-y divide-[var(--border)]">
+                                {filteredEmps.map(e => (
+                                    <label key={e.id} className="flex items-center gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-[var(--surface2)]">
+                                        <input type="checkbox" checked={selectedEmp.has(e.id)} onChange={() => toggleEmp(e.id)} style={{ accentColor: "var(--accent)" }} />
+                                        <span className="text-[13px] text-[var(--text)]">{e.firstName} {e.lastName}</span>
+                                        <span className="text-[12px] text-[var(--text3)]">{e.employeeId}{e.designation ? ` · ${e.designation}` : ""}{e.user?.customRole ? ` · ${e.user.customRole.name}` : ""}</span>
+                                    </label>
+                                ))}
+                                {filteredEmps.length === 0 && <p className="px-3 py-3 text-[13px] text-[var(--text3)]">No employees found.</p>}
                             </div>
                         </div>
-                    ) : (
-                        <label className={`flex items-center gap-3 border border-dashed border-[var(--border)] rounded-[10px] bg-[var(--surface2)] p-4 cursor-pointer hover:border-[var(--accent)] transition ${sigBusy ? "opacity-50 pointer-events-none" : ""}`}>
-                            {sigBusy ? <Loader2 size={16} className="animate-spin text-[var(--accent)]" /> : <PenLine size={16} className="text-[var(--text3)]" />}
-                            <span className="text-[13px] text-[var(--text2)]">
-                                Upload your signature — <span className="font-medium">small PNG or JPEG</span>, max 200 KB. Saved once, then applied to every document you send.
-                            </span>
-                            <input type="file" accept="image/png,image/jpeg" className="hidden"
-                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadSignature(f); e.target.value = "" }} />
-                        </label>
                     )}
-                </div>
 
-                {typeId && (
+                    {/* Your signature / Letterhead */}
                     <div>
-                        <label className={labelCls}>Document content — edit before sending</label>
-                        <textarea
-                            value={template}
-                            onChange={e => setTemplate(e.target.value)}
-                            rows={8}
-                            placeholder="This document type has no template yet. Type the content here…"
-                            className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] font-mono leading-relaxed"
-                        />
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                            <span className="text-[11px] text-[var(--text3)] mr-1">Insert:</span>
-                            {TEMPLATE_VARS.map(v => (
-                                <button
-                                    key={v}
-                                    type="button"
-                                    onClick={() => setTemplate(t => `${t}${t && !t.endsWith(" ") && !t.endsWith("\n") ? " " : ""}${v}`)}
-                                    className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)] font-mono"
-                                >
-                                    {v}
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-[11px] text-[var(--text3)] mt-1.5">{"{{...}}"} placeholders are filled automatically for each employee. Edits here apply to this send only — the saved template is unchanged.</p>
+                        <label className={labelCls + " flex items-center gap-1.5"}>
+                            <PenLine size={13} /> Your signature / Letterhead
+                        </label>
+                        {signature ? (
+                            <div className="flex items-center gap-4 border border-[var(--border)] rounded-[12px] bg-[var(--surface2)] p-4 flex-wrap">
+                                <div className="bg-white border border-[var(--border)] rounded-[10px] px-4 py-2.5 flex items-center justify-center shrink-0">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={signature} alt="Your signature" className="h-11 max-w-[150px] object-contain" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[14px] font-bold text-[var(--text)]">Growus Auto</span>
+                                        <span className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] font-semibold">
+                                            <Lock size={12} /> Locked to your account
+                                        </span>
+                                    </div>
+                                    <p className="text-[12.5px] text-[var(--text3)] mt-0.5">This will appear on all documents you send.</p>
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <label className={`inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--text2)] border border-[var(--border)] rounded-[9px] px-3.5 h-9 cursor-pointer bg-[var(--surface)] hover:bg-[var(--surface2)] transition ${sigBusy ? "opacity-50 pointer-events-none" : ""}`}>
+                                        {sigBusy ? <Loader2 size={14} className="animate-spin" /> : <PenLine size={14} />} Change
+                                        <input type="file" accept="image/png,image/jpeg" className="hidden"
+                                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadSignature(f); e.target.value = "" }} />
+                                    </label>
+                                    <button type="button" onClick={removeSignature} disabled={sigBusy}
+                                        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-red-600 border border-[var(--border)] rounded-[9px] px-3.5 h-9 bg-[var(--surface)] hover:bg-red-50 transition disabled:opacity-50">
+                                        <Trash2 size={14} /> Remove
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <label className={`flex items-center gap-3 border border-dashed border-[var(--border)] rounded-[12px] bg-[var(--surface2)] p-4 cursor-pointer hover:border-[var(--accent)] transition ${sigBusy ? "opacity-50 pointer-events-none" : ""}`}>
+                                {sigBusy ? <Loader2 size={16} className="animate-spin text-[var(--accent)]" /> : <PenLine size={16} className="text-[var(--text3)]" />}
+                                <span className="text-[13px] text-[var(--text2)]">
+                                    Upload your signature / letterhead — <span className="font-medium">small PNG or JPEG</span>, max 200 KB. Saved once, then applied to every document you send.
+                                </span>
+                                <input type="file" accept="image/png,image/jpeg" className="hidden"
+                                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadSignature(f); e.target.value = "" }} />
+                            </label>
+                        )}
                     </div>
-                )}
 
-                <div className="flex items-center justify-between pt-1">
-                    <p className="text-[13px] text-[var(--text2)]">Target: <span className="font-semibold text-[var(--text)]">{targetCount}</span> employee(s)</p>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={openPreview}
-                            disabled={!typeId}
-                            className="inline-flex items-center gap-2 px-4 h-9 bg-[var(--surface)] text-[var(--text2)] border border-[var(--border)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Eye size={14} /> Preview
-                        </button>
-                        <button
-                            onClick={send}
-                            disabled={sending || !typeId || targetCount === 0}
-                            className="inline-flex items-center gap-2 px-4 h-9 bg-[var(--accent)] text-white rounded-[9px] text-[13px] font-medium hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                            Send document
-                        </button>
+                    {/* Document content editor (only after a type is chosen) */}
+                    {typeId && (
+                        <div>
+                            <label className={labelCls}>Document content — edit before sending</label>
+                            <textarea value={template} onChange={e => setTemplate(e.target.value)} rows={7}
+                                placeholder="This document type has no template yet. Type the content here…"
+                                className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] font-mono leading-relaxed" />
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                <span className="text-[11px] text-[var(--text3)] mr-1">Insert:</span>
+                                {TEMPLATE_VARS.map(v => (
+                                    <button key={v} type="button"
+                                        onClick={() => setTemplate(t => `${t}${t && !t.endsWith(" ") && !t.endsWith("\n") ? " " : ""}${v}`)}
+                                        className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)] font-mono">
+                                        {v}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Target recipients bar */}
+                    <div className="rounded-[14px] bg-[var(--surface2)] border border-[var(--border)] p-4 flex items-center gap-4 flex-wrap">
+                        <div className="w-11 h-11 rounded-[12px] bg-[#e8f7f1] flex items-center justify-center shrink-0">
+                            <Users size={20} className="text-[var(--accent)]" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[12.5px] text-[var(--text3)]">Target recipients</p>
+                            <p className="text-[18px] font-bold text-[var(--text)] leading-tight">
+                                {targetCount} <span className="text-[13px] font-medium text-[var(--text3)]">employee(s)</span>
+                            </p>
+                            <p className="text-[11.5px] text-[var(--text3)]">{targetCount === 0 ? "No recipients selected yet" : "Ready to send"}</p>
+                        </div>
+                        <p className="hidden lg:block text-[12.5px] text-[var(--text3)] flex-1 min-w-[180px] pl-4">
+                            Recipients will be shown here based on the filters above.
+                        </p>
+                        <div className="flex items-center gap-2.5 ml-auto">
+                            <button onClick={openPreview} disabled={!typeId}
+                                className="inline-flex items-center gap-2 px-4 h-[42px] bg-[var(--surface)] text-[var(--text2)] border border-[var(--border)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                <Eye size={16} /> Preview
+                            </button>
+                            <button onClick={send} disabled={sending || !typeId || targetCount === 0}
+                                className="inline-flex items-center gap-2 px-5 h-[42px] bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                Send Document
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Recently issued */}
-            <div className="mt-7">
-                <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-                    <h2 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2"><FileText size={16} /> Issued documents</h2>
+            {/* Issued Documents card */}
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-6">
+                <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-[11px] bg-[#eef2ff] flex items-center justify-center">
+                            <FileText size={20} className="text-[#6366f1]" />
+                        </div>
+                        <h2 className="text-[17px] font-bold text-[var(--text)]">Issued Documents</h2>
+                    </div>
                     {canManage && issued.length > 0 && (
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => clearDocs("mine")}
-                                disabled={clearing}
-                                className="inline-flex items-center gap-1.5 px-3 h-8 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors disabled:opacity-50"
-                            >
-                                {clearing ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} Clear my sends
+                            <button onClick={() => clearDocs("mine")} disabled={clearing}
+                                className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors disabled:opacity-50">
+                                {clearing ? <Loader2 size={13} className="animate-spin" /> : <X size={14} />} Clear my sends
                             </button>
                             {isAdmin && (
-                                <button
-                                    onClick={() => clearDocs("all")}
-                                    disabled={clearing}
-                                    className="inline-flex items-center gap-1.5 px-3 h-8 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--red)] hover:bg-red-50 transition-colors disabled:opacity-50"
-                                >
-                                    <Trash2 size={13} /> Clear all (everyone)
+                                <button onClick={() => clearDocs("all")} disabled={clearing}
+                                    className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                                    <Trash2 size={14} /> Clear all (everyone)
                                 </button>
                             )}
                         </div>
                     )}
                 </div>
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
-                    {issued.length === 0 ? (
-                        <p className="px-4 py-6 text-[13px] text-[var(--text3)] text-center">No documents issued yet.</p>
-                    ) : (
-                        <table className="w-full text-[13px]">
-                            <thead>
-                                <tr className="bg-[var(--surface2)] text-[var(--text3)] text-[12px]">
-                                    <th className="text-left font-medium px-4 py-2.5">Employee</th>
-                                    <th className="text-left font-medium px-4 py-2.5">Document</th>
-                                    <th className="text-left font-medium px-4 py-2.5">Ref</th>
-                                    <th className="text-left font-medium px-4 py-2.5">Sent by</th>
-                                    <th className="text-left font-medium px-4 py-2.5">Date</th>
-                                    <th className="text-left font-medium px-4 py-2.5">Status</th>
-                                    <th className="text-right font-medium px-4 py-2.5">PDF</th>
-                                    {canManage && <th className="text-right font-medium px-4 py-2.5">Actions</th>}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--border)]">
-                                {issued.map(d => (
-                                    <tr key={d.id} className="hover:bg-[var(--surface2)]/50">
-                                        <td className="px-4 py-2.5 text-[var(--text)]">{d.employee.firstName} {d.employee.lastName} <span className="text-[var(--text3)]">· {d.employee.employeeId}</span></td>
-                                        <td className="px-4 py-2.5 text-[var(--text2)]">{d.type.name}</td>
-                                        <td className="px-4 py-2.5 text-[var(--text3)]">{d.docNumber}</td>
-                                        <td className="px-4 py-2.5 text-[var(--text2)]">{d.sentByName || "—"}</td>
-                                        <td className="px-4 py-2.5 text-[var(--text3)]">{fmtDate(d.issuedAt || d.createdAt)}</td>
-                                        <td className="px-4 py-2.5">
-                                            <span
-                                                className={`text-[12px] px-2 py-0.5 rounded-full ${d.status === "RECALLED"
-                                                    ? "bg-red-100 text-red-700"
-                                                    : "bg-[var(--accent)]/10 text-[var(--accent)]"}`}
-                                                title={d.status === "RECALLED" && d.recalledByName
-                                                    ? `Recalled by ${d.recalledByName} on ${fmtDate(d.recalledAt)}${d.recallReason ? ` — ${d.recallReason}` : ""}`
-                                                    : undefined}
-                                            >
-                                                {d.status}
-                                            </span>
-                                            {(d.recallCount ?? 0) > 0 && (
-                                                <span className="ml-1.5 text-[11px] text-[var(--text3)]" title="Times recalled">↺{d.recallCount}</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right">
-                                            <a href={`/api/hr-documents/${d.id}/pdf`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[var(--accent)] hover:underline">
-                                                <Download size={13} /> PDF
-                                            </a>
-                                        </td>
-                                        {canManage && (
-                                            <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                                                <div className="inline-flex items-center gap-2 justify-end">
-                                                    {d.status === "ISSUED" && (
-                                                        <button
-                                                            onClick={() => recallDoc(d)}
-                                                            disabled={busyId === d.id}
-                                                            className="inline-flex items-center gap-1 text-[12px] text-red-600 hover:underline disabled:opacity-50"
-                                                            title="Recall this document"
-                                                        >
-                                                            {busyId === d.id ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} Recall
-                                                        </button>
-                                                    )}
-                                                    {d.status === "RECALLED" && (
-                                                        <button
-                                                            onClick={() => reissueDoc(d)}
-                                                            disabled={busyId === d.id}
-                                                            className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline disabled:opacity-50"
-                                                            title="Re-send this document"
-                                                        >
-                                                            {busyId === d.id ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Re-send
-                                                        </button>
-                                                    )}
-                                                    {(d.history?.length ?? 0) > 0 && (
-                                                        <button
-                                                            onClick={() => setHistoryDoc(d)}
-                                                            className="inline-flex items-center gap-1 text-[12px] text-[var(--text3)] hover:text-[var(--text)]"
-                                                            title="View recall / re-send history"
-                                                        >
-                                                            <History size={13} /> History
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        )}
+
+                {issued.length === 0 ? (
+                    <p className="px-4 py-8 text-[13px] text-[var(--text3)] text-center">No documents issued yet.</p>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-[13px]" style={{ minWidth: 820 }}>
+                                <thead>
+                                    <tr className="border-b border-[var(--border)] text-[var(--text3)] text-[11.5px]">
+                                        <th className="text-left font-semibold px-3 py-2.5">Employee</th>
+                                        <th className="text-left font-semibold px-3 py-2.5">Document</th>
+                                        <th className="text-left font-semibold px-3 py-2.5">Reference No.</th>
+                                        <th className="text-left font-semibold px-3 py-2.5">Sent by</th>
+                                        <th className="text-left font-semibold px-3 py-2.5">Issue Date</th>
+                                        <th className="text-left font-semibold px-3 py-2.5">Status</th>
+                                        <th className="text-left font-semibold px-3 py-2.5">PDF</th>
+                                        {canManage && <th className="text-left font-semibold px-3 py-2.5">Actions</th>}
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                                </thead>
+                                <tbody>
+                                    {displayedIssued.map(d => {
+                                        const st = d.status === "RECALLED"
+                                            ? { label: "RECALLED", color: "#dc2626", bg: "#fef2f2" }
+                                            : d.status === "SCHEDULED"
+                                                ? { label: "SCHEDULED", color: "#2563eb", bg: "#eff6ff" }
+                                                : { label: d.status, color: "#15803d", bg: "#dcfce7" }
+                                        return (
+                                            <tr key={d.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface2)]">
+                                                <td className="px-3 py-3">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light,#e8f7f1)] text-[var(--accent)] flex items-center justify-center text-[11px] font-bold shrink-0">
+                                                            {d.employee.firstName[0]}{(d.employee.lastName || "")[0]}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-semibold text-[var(--text)] whitespace-nowrap text-[12.5px]">{d.employee.firstName} {d.employee.lastName}</p>
+                                                            <p className="text-[10.5px] font-mono text-[var(--text3)]">{d.employee.employeeId}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3 text-[var(--text2)] whitespace-nowrap">{d.type.name}</td>
+                                                <td className="px-3 py-3 font-mono text-[12px] text-[var(--text3)] whitespace-nowrap">{d.docNumber}</td>
+                                                <td className="px-3 py-3">
+                                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                                        <div className="w-6 h-6 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                                                            {(d.sentByName || "?")[0]}
+                                                        </div>
+                                                        <span className="text-[12.5px] text-[var(--text2)]">{d.sentByName || "—"}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3 text-[var(--text3)] whitespace-nowrap">{fmtDate(d.issuedAt || d.createdAt)}</td>
+                                                <td className="px-3 py-3">
+                                                    <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-full tracking-wide" style={{ color: st.color, background: st.bg }}>
+                                                        {st.label}
+                                                    </span>
+                                                    {(d.recallCount ?? 0) > 0 && <span className="ml-1.5 text-[11px] text-[var(--text3)]" title="Times recalled">↺{d.recallCount}</span>}
+                                                </td>
+                                                <td className="px-3 py-3">
+                                                    <a href={`/api/hr-documents/${d.id}/pdf`} target="_blank" rel="noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--accent)] hover:underline">
+                                                        <Download size={14} /> PDF
+                                                    </a>
+                                                </td>
+                                                {canManage && (
+                                                    <td className="px-3 py-3 whitespace-nowrap">
+                                                        <div className="flex items-center gap-3">
+                                                            {d.status === "ISSUED" && (
+                                                                <button onClick={() => recallDoc(d)} disabled={busyId === d.id}
+                                                                    className="inline-flex items-center gap-1 text-[12.5px] font-medium text-red-600 hover:underline disabled:opacity-50">
+                                                                    {busyId === d.id ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={14} />} Recall
+                                                                </button>
+                                                            )}
+                                                            {d.status === "RECALLED" && (
+                                                                <button onClick={() => reissueDoc(d)} disabled={busyId === d.id}
+                                                                    className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--accent)] hover:underline disabled:opacity-50">
+                                                                    {busyId === d.id ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={14} />} Re-send
+                                                                </button>
+                                                            )}
+                                                            {(d.history?.length ?? 0) > 0 && (
+                                                                <button onClick={() => setHistoryDoc(d)}
+                                                                    className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]">
+                                                                    <History size={14} /> History
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        {issued.length > 6 && (
+                            <div className="flex justify-center pt-4">
+                                <button onClick={() => setShowAllIssued(v => !v)}
+                                    className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--accent)] hover:underline">
+                                    {showAllIssued ? "Show less" : "View all issued documents"} <ArrowRight size={15} />
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* History modal */}
