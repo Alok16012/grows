@@ -1704,29 +1704,25 @@ export default function LMSPage() {
     return (
         <div className="flex flex-col h-full bg-[var(--surface2)] min-h-0">
             {/* Page Header */}
-            <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-5 shrink-0">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-[var(--accent)] rounded-[10px] flex items-center justify-center">
-                            <GraduationCap size={18} className="text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-[18px] font-bold text-[var(--text)]">Learning Management</h1>
-                            <p className="text-[12px] text-[var(--text3)]">Training courses &amp; employee development</p>
-                        </div>
+            <div className="px-6 pt-6 pb-3 shrink-0">
+                <div className="flex items-start justify-between flex-wrap gap-3">
+                    <div>
+                        <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Training (LMS)</h1>
+                        <p className="text-[13.5px] text-[var(--text3)] mt-1">Training courses &amp; employee development.</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                         <button
                             onClick={() => { setEnrollCourseId(undefined); setShowEnrollModal(true) }}
-                            className="h-9 px-4 text-[13px] border border-[var(--border)] rounded-[8px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center gap-2"
+                            className="h-[42px] px-4 text-[13px] font-semibold border border-[var(--border)] bg-[var(--surface)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center gap-2"
                         >
-                            <Users size={15} /> Enroll Employees
+                            <Users size={16} /> Enroll Employees
                         </button>
                         <button
                             onClick={() => { setEditCourse(null); setShowCourseModal(true) }}
-                            className="h-9 px-4 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2"
+                            className="h-[42px] px-5 text-[13px] bg-[var(--accent)] text-white rounded-[10px] font-semibold flex items-center gap-2 hover:opacity-90"
+                            style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
                         >
-                            <Plus size={15} /> Create Course
+                            <Plus size={16} /> Create Course
                         </button>
                     </div>
                 </div>

@@ -690,32 +690,33 @@ export default function HelpdeskPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Helpdesk</h1>
-                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage and track support tickets</p>
+                    <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Helpdesk</h1>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage and track support tickets.</p>
                 </div>
                 <button
                     onClick={() => setShowNew(true)}
-                    className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
+                    className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold h-[42px] px-5 hover:opacity-90 transition-opacity"
+                    style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
                 >
                     <Plus size={16} /> New Ticket
                 </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {[
-                    { label: "Open Tickets", value: openCount, color: "#3b82f6", bg: "#eff6ff", icon: <AlertCircle size={18} /> },
-                    { label: "In Progress", value: inProgressCount, color: "#f59e0b", bg: "#fffbeb", icon: <Timer size={18} /> },
-                    { label: "Resolved Today", value: resolvedToday, color: "#1a9e6e", bg: "#e8f7f1", icon: <CheckCircle2 size={18} /> },
-                    { label: "Avg Resolution (hrs)", value: avgResolution, color: "#8b5cf6", bg: "#fdf4ff", icon: <Clock size={18} /> },
+                    { label: "Open Tickets", value: openCount, color: "#3b82f6", bg: "#eff6ff", icon: <AlertCircle size={20} /> },
+                    { label: "In Progress", value: inProgressCount, color: "#d97706", bg: "#fef3c7", icon: <Timer size={20} /> },
+                    { label: "Resolved Today", value: resolvedToday, color: "#1a9e6e", bg: "#e8f7f1", icon: <CheckCircle2 size={20} /> },
+                    { label: "Avg Resolution (hrs)", value: avgResolution, color: "#8b5cf6", bg: "#f5f3ff", icon: <Clock size={20} /> },
                 ].map(s => (
-                    <div key={s.label} className="bg-white border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
-                        <div style={{ background: s.bg, color: s.color }} className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0">
+                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
+                        <div style={{ background: s.bg, color: s.color }} className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0">
                             {s.icon}
                         </div>
-                        <div>
-                            <p className="text-[22px] font-bold text-[var(--text)] leading-tight">{s.value}</p>
-                            <p className="text-[11.5px] text-[var(--text3)]">{s.label}</p>
+                        <div className="min-w-0">
+                            <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{s.label}</p>
+                            <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: s.color }}>{s.value}</p>
                         </div>
                     </div>
                 ))}

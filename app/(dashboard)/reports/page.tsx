@@ -464,12 +464,12 @@ export default function ReportsPage() {
     const StatCard = ({ label, value, bg, iconBg, iconColor, icon: Icon }: any) => {
         const animatedValue = useCountUp(value)
         return (
-            <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-[12px_14px] md:p-[16px_18px] print-card">
-                <div className={`w-[32px] h-[32px] rounded-full flex items-center justify-center mb-[10px] ${iconBg}`}>
-                    <Icon className="h-[16px] w-[16px]" style={{ color: iconColor }} />
+            <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[12px_14px] md:p-[16px_18px] print-card">
+                <div className={`w-[38px] h-[38px] rounded-[11px] flex items-center justify-center mb-[10px] ${iconBg}`}>
+                    <Icon className="h-[18px] w-[18px]" style={{ color: iconColor }} />
                 </div>
-                <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px] mb-[6px]">{label}</div>
-                <div className="text-[28px] font-[700] font-mono tracking-[-1px] text-[#1a1a18] leading-none">
+                <div className="text-[11px] font-[500] text-[#9e9b95] mb-[5px]">{label}</div>
+                <div className="text-[27px] font-[700] tracking-[-0.5px] leading-none" style={{ color: iconColor }}>
                     {animatedValue.toLocaleString()}
                 </div>
             </div>

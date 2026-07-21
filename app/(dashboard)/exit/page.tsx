@@ -8,7 +8,7 @@ import {
   Plus, Loader2, X, Search, MoreVertical,
   LogOut, CheckCircle2, Clock, AlertCircle,
   ChevronRight, ChevronDown, Check, Eye,
-  Trash2, Calendar
+  Trash2, Calendar, IndianRupee, type LucideIcon,
 } from "lucide-react"
 import { format, isWithinInterval, addDays } from "date-fns"
 
@@ -142,14 +142,22 @@ function Avatar({ first, last, photo, size = 38 }: { first: string; last: string
 
 // ─── Stats Card ───────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ label, value, color, bg, icon: Icon }: { label: string; value: number; color: string; bg?: string; icon?: LucideIcon }) {
   return (
     <div style={{
       background: "var(--surface)", border: "1px solid var(--border)",
-      borderRadius: 12, padding: "18px 20px",
+      borderRadius: 14, padding: "18px 20px",
+      display: "flex", alignItems: "center", gap: 14,
     }}>
-      <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 2 }}>{label}</div>
+      {Icon && (
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: bg || (color + "1f"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={20} style={{ color }} />
+        </div>
+      )}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 12.5, color: "var(--text3)", whiteSpace: "nowrap" }}>{label}</div>
+        <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1.15, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      </div>
     </div>
   )
 }
@@ -274,16 +282,17 @@ export default function ExitPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", margin: 0 }}>Exit Management</h1>
-          <p style={{ fontSize: 13, color: "var(--text2)", marginTop: 2 }}>Manage employee exits, clearance &amp; F&amp;F settlements</p>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Exit Management</h1>
+          <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 4 }}>Manage employee exits, clearance &amp; F&amp;F settlements.</p>
         </div>
         <button
           onClick={() => setShowInitModal(true)}
           style={{
-            display: "flex", alignItems: "center", gap: 6,
+            display: "flex", alignItems: "center", gap: 7,
             background: "var(--accent)", color: "#fff",
-            border: "none", borderRadius: 8, padding: "9px 16px",
+            border: "none", borderRadius: 10, height: 42, padding: "0 18px",
             fontSize: 13, fontWeight: 600, cursor: "pointer",
+            boxShadow: "0 1px 3px rgba(26,158,110,0.35)",
           }}
         >
           <Plus size={16} /> Initiate Exit
@@ -291,11 +300,11 @@ export default function ExitPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
-        <StatCard label="Active Exits" value={activeCount} color="#f59e0b" />
-        <StatCard label="Pending F&F" value={fnfPendingCount} color="#ef4444" />
-        <StatCard label="Completed This Month" value={completedThisMonth} color="var(--accent)" />
-        <StatCard label="Notice Ending This Week" value={noticePeriodEndingThisWeek} color="#3b82f6" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 24 }}>
+        <StatCard label="Active Exits" value={activeCount} color="#d97706" bg="#fef3c7" icon={LogOut} />
+        <StatCard label="Pending F&F" value={fnfPendingCount} color="#dc2626" bg="#fef2f2" icon={IndianRupee} />
+        <StatCard label="Completed This Month" value={completedThisMonth} color="#1a9e6e" bg="#e8f7f1" icon={CheckCircle2} />
+        <StatCard label="Notice Ending This Week" value={noticePeriodEndingThisWeek} color="#3b82f6" bg="#eff6ff" icon={Clock} />
       </div>
 
       {/* Filters */}

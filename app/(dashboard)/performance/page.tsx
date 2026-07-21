@@ -438,32 +438,25 @@ export default function PerformancePage() {
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
-                    <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "var(--text)" }}>
-                        Performance Management
+                    <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: "var(--text)", letterSpacing: "-0.5px" }}>
+                        Performance
                     </h1>
-                    <p style={{ fontSize: 13, color: "#6b7280", margin: "2px 0 0" }}>
-                        Track, review, and improve employee performance
+                    <p style={{ fontSize: 13.5, color: "var(--text3)", margin: "4px 0 0" }}>
+                        Track, review and improve employee performance.
                     </p>
                 </div>
                 {isAdminOrManager && activeTab === "reviews" && (
                     <button
                         onClick={() => setShowCreateModal(true)}
                         style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            padding: "9px 18px",
-                            background: "var(--accent)",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 8,
-                            fontWeight: 600,
-                            fontSize: 14,
-                            cursor: "pointer",
+                            display: "flex", alignItems: "center", gap: 7,
+                            height: 42, padding: "0 18px",
+                            background: "var(--accent)", color: "#fff", border: "none",
+                            borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                            boxShadow: "0 1px 3px rgba(26,158,110,0.35)",
                         }}
                     >
-                        <Plus size={16} />
-                        New Review
+                        <Plus size={16} /> New Review
                     </button>
                 )}
             </div>

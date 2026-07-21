@@ -331,9 +331,9 @@ export default function AnalyticsPage() {
             {/* ── Header ─────────────────────────────────────── */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-[-0.4px]">HRMS Analytics</h1>
-                    <p className="text-[13px] text-[var(--text2)] mt-0.5">
-                        Comprehensive workforce, finance and operations overview
+                    <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Analytics</h1>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">
+                        Comprehensive workforce, finance and operations overview.
                     </p>
                 </div>
                 {loading && (

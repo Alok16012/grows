@@ -112,8 +112,8 @@ export default function ApprovalsPage() {
     return (
         <div className="p-4 lg:p-7">
             <div className="mb-5">
-                <h1 className="text-[22px] font-semibold tracking-tight text-[#1a1a18]">Inspection Approvals</h1>
-                <p className="text-[13px] text-[#6b6860] mt-[3px]">Review and approve submitted inspections to finalize reports.</p>
+                <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Approvals</h1>
+                <p className="text-[13.5px] text-[var(--text3)] mt-1">Review and approve submitted inspections to finalize reports.</p>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">

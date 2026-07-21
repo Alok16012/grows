@@ -186,20 +186,19 @@ export default function AnnouncementsPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-[22px] font-bold text-[var(--text)] flex items-center gap-2">
-                        <Megaphone size={22} className="text-[var(--accent)]" /> Announcements
-                    </h1>
-                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Company notices &amp; holiday calendar</p>
+                    <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Announcements</h1>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Company notices &amp; holiday calendar.</p>
                 </div>
                 {canManage && (
-                    <div className="flex gap-2">
-                        <button onClick={() => setShowAnnForm(true)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 transition-opacity">
-                            <Plus size={15} /> New Notice
-                        </button>
+                    <div className="flex gap-2.5">
                         <button onClick={() => setShowHolForm(true)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors">
-                            <Plus size={15} /> Add Holiday
+                            className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
+                            <Plus size={16} /> Add Holiday
+                        </button>
+                        <button onClick={() => setShowAnnForm(true)}
+                            className="inline-flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                            style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                            <Plus size={16} /> New Notice
                         </button>
                     </div>
                 )}
@@ -470,14 +469,14 @@ export default function AnnouncementsPage() {
 
 function StatCard({ icon, tint, value, label, sub }: { icon: React.ReactNode; tint: string; value: number; label: string; sub: string }) {
     return (
-        <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-[10px] flex items-center justify-center shrink-0"
+        <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-[18px] flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0"
                 style={{ color: tint, backgroundColor: tint + "1a" }}>
                 {icon}
             </div>
             <div className="min-w-0">
-                <p className="text-[22px] font-bold text-[var(--text)] leading-none">{value}</p>
-                <p className="text-[12px] font-medium text-[var(--text2)] mt-1 truncate">{label}</p>
+                <p className="text-[12px] text-[var(--text3)] truncate">{label}</p>
+                <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: tint }}>{value}</p>
                 <p className="text-[11px] text-[var(--text3)] truncate">{sub}</p>
             </div>
         </div>
