@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
+import { pickPhotoUrl } from "@/lib/employee-photo"
 
 export async function GET(
     req: Request,
@@ -36,13 +37,13 @@ export async function GET(
 
         if (!employee) return new NextResponse("Not Found", { status: 404 })
 
-        // Backfill profile photo from the latest PHOTO document if the
-        // `photo` column is empty (older records stored it as a document).
+        // Backfill profile photo from an uploaded Photo document if the
+        // `photo` column is empty (onboarding photos come in as "Photo", HR
+        // uploads as "PHOTO" — pickPhotoUrl matches both, plus passport-style
+        // filenames).
         if (!employee.photo && Array.isArray(employee.documents)) {
-            const photoDoc = employee.documents
-                .filter((d: any) => d.type === "PHOTO")
-                .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0]
-            if (photoDoc?.fileUrl) (employee as any).photo = photoDoc.fileUrl
+            const url = pickPhotoUrl(employee.documents as any)
+            if (url) (employee as any).photo = url
         }
 
         return NextResponse.json(employee)

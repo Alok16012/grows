@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { roleLabel } from "@/lib/role-label"
 import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
@@ -785,6 +786,7 @@ export default function ProfilePage() {
     // Self-service tabs (Documents / Letters / Onboarding / Payslip) are shown to
     // anyone who has a linked employee record — role-independent. Their own data.
     const [isEmployee, setIsEmployee] = useState(false)
+    const [designation, setDesignation] = useState("")
 
     useEffect(() => {
         fetch("/api/profile").then(r => r.json()).then(d => {
@@ -792,6 +794,7 @@ export default function ProfilePage() {
         }).finally(() => setLoading(false))
         fetch("/api/me/employee").then(r => r.json()).then(d => {
             setIsEmployee(!!d && !!d.id)
+            setDesignation(d?.designation || "")
         }).catch(() => setIsEmployee(false))
     }, [])
 
@@ -896,7 +899,7 @@ export default function ProfilePage() {
                     ) : (
                         <span className="inline-block mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide"
                             style={{ backgroundColor: badge.bg, color: badge.color }}>
-                            {formData.role.replace("_", " ")}
+                            {roleLabel(formData.role, { designation })}
                         </span>
                     )}
                 </div>

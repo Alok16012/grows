@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
+import { pickPhotoUrl } from "@/lib/employee-photo"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import crypto from "crypto"
 
@@ -98,23 +99,35 @@ export async function GET(req: Request) {
             prisma.employee.count({ where }),
         ])
 
-        // Backfill profile photo from the latest PHOTO document for any
-        // employee whose `photo` column is still empty (older records were
-        // saved as documents only). Keeps avatars consistent everywhere.
+        // Backfill profile photo from an uploaded Photo document for any
+        // employee whose `photo` column is still empty. Photos land with
+        // inconsistent types ("PHOTO" vs "Photo") and passport-style names, so
+        // fetch anything photo-ish and let pickPhotoUrl choose the best one.
         try {
             const missing = lite ? [] : employees.filter(e => !e.photo).map(e => e.id)
             if (missing.length > 0) {
-                const photos = await prisma.employeeDocument.findMany({
-                    where: { employeeId: { in: missing }, type: "PHOTO" },
-                    select: { employeeId: true, fileUrl: true },
+                const candidates = await prisma.employeeDocument.findMany({
+                    where: {
+                        employeeId: { in: missing },
+                        OR: [
+                            { type: { contains: "photo", mode: "insensitive" } },
+                            { fileName: { contains: "photo", mode: "insensitive" } },
+                            { fileName: { contains: "passport", mode: "insensitive" } },
+                        ],
+                    },
+                    select: { employeeId: true, type: true, fileName: true, fileUrl: true, uploadedAt: true },
                     orderBy: { uploadedAt: "desc" },
                 })
-                const photoMap = new Map<string, string>()
-                for (const p of photos) {
-                    if (!photoMap.has(p.employeeId)) photoMap.set(p.employeeId, p.fileUrl)
+                const byEmp = new Map<string, typeof candidates>()
+                for (const c of candidates) {
+                    const arr = byEmp.get(c.employeeId) ?? []
+                    arr.push(c)
+                    byEmp.set(c.employeeId, arr)
                 }
                 for (const e of employees) {
-                    if (!e.photo && photoMap.has(e.id)) e.photo = photoMap.get(e.id)!
+                    if (e.photo) continue
+                    const url = pickPhotoUrl(byEmp.get(e.id) ?? [])
+                    if (url) e.photo = url
                 }
             }
         } catch (e) {

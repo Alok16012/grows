@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { isPhotoDoc } from "@/lib/employee-photo"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 
@@ -61,7 +62,7 @@ export async function POST(
 
         // Keep the employee's profile photo in sync so the avatar shows up
         // everywhere (list view, board view, detail page, HR logins, etc.)
-        if (type === "PHOTO") {
+        if (isPhotoDoc(type, fileName)) {
             try {
                 await prisma.employee.update({
                     where: { id: record.employeeId },

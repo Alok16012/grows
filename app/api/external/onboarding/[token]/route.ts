@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getHrContacts } from "@/lib/hr-contacts"
+import { isPhotoDoc } from "@/lib/employee-photo"
 
 // GET external candidate data using secure token.
 // Also returns the active site + HR user lists so the public onboarding form
@@ -139,8 +140,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
         }
 
         // 3. Process Initial Documents
+        let photoUrlFromDocs: string | null = null
         if (uploadedDocs && Array.isArray(uploadedDocs)) {
             for (const doc of uploadedDocs) {
+                if (!photoUrlFromDocs && isPhotoDoc(doc.type, doc.fileName)) photoUrlFromDocs = doc.fileUrl
                 const existDoc = await prisma.employeeDocument.findFirst({
                     where: { employeeId: existing.id, type: doc.type }
                 })
@@ -166,6 +169,15 @@ export async function POST(req: Request, { params }: { params: { token: string }
                     })
                 }
             }
+        }
+
+        // Set the profile photo from the uploaded Photo document when the
+        // candidate hasn't uploaded an explicit profile picture.
+        if (photoUrlFromDocs && !existing.photo && !photo) {
+            await prisma.employee.update({
+                where: { id: existing.id },
+                data: { photo: photoUrlFromDocs },
+            }).catch(() => {})
         }
 
         return NextResponse.json({ success: true, employee: updatedEmployee })

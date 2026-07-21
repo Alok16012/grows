@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { roleLabel } from "@/lib/role-label"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -395,7 +396,7 @@ export default function UserManagementPage() {
                                         user.role === "ADMIN" ? "bg-[#e8f7f1] text-[#0d6b4a]" :
                                         "bg-[#f9f8f5] text-[#6b6860]"
                                     }`}>
-                                        {user.role === "ADMIN" ? "Admin" : user.role === "MANAGER" ? "Manager" : user.role === "INSPECTION_BOY" ? "Inspector" : user.role === "CLIENT" ? "Client" : user.role}
+                                        {roleLabel(user.role, { designation: user.employeeProfile?.designation })}
                                     </span>
                                 )}
                             </div>

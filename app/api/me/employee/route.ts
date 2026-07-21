@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
+import { pickPhotoUrl } from "@/lib/employee-photo"
 
 // Fields employee can self-edit (safe list — no salary, no role, no IDs)
 const EDITABLE_FIELDS = [
@@ -31,6 +32,17 @@ export async function GET(req: Request) {
         where: { userId: session.user.id },
     })
     if (!emp) return NextResponse.json(null)
+
+    // If no explicit profile photo, fall back to an uploaded Photo document.
+    if (!emp.photo) {
+        const docs = await prisma.employeeDocument.findMany({
+            where: { employeeId: emp.id },
+            select: { type: true, fileName: true, fileUrl: true, uploadedAt: true },
+        }).catch(() => [])
+        const url = pickPhotoUrl(docs)
+        if (url) (emp as any).photo = url
+    }
+
     return NextResponse.json(emp)
 }
 

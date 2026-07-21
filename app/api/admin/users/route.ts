@@ -24,7 +24,7 @@ export async function GET(req: Request) {
                 // Lets the System Users page distinguish employee-linked logins
                 // from clients/admins/legacy accounts.
                 employeeProfile: {
-                    select: { id: true, employeeId: true }
+                    select: { id: true, employeeId: true, designation: true }
                 }
             },
             orderBy: {

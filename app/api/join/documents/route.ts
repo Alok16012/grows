@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { isPhotoDoc } from "@/lib/employee-photo"
 
 // Public route — authenticated via onboardingToken only
 // POST /api/join/documents — saves uploaded document record for an onboarding employee
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
 
         // Keep the employee's profile photo in sync so the avatar shows up
         // everywhere (list view, board view, detail page, HR logins, etc.)
-        if (type === "PHOTO") {
+        if (isPhotoDoc(type, fileName)) {
             try {
                 await prisma.employee.update({
                     where: { id: employee.id },
