@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import {
     Plus, Search, Loader2, CheckCircle, XCircle,
     Clock, X, Calendar, FileText, CalendarOff,
-    ChevronRight, User
+    ChevronRight, ChevronLeft, User, Download,
 } from "lucide-react"
 import { format } from "date-fns"
 import { can } from "@/lib/can"
@@ -429,6 +429,9 @@ export default function LeavesPage() {
     const [search, setSearch] = useState("")
     const [showApply, setShowApply] = useState(false)
     const [selectedLeave, setSelectedLeave] = useState<Leave | null>(null)
+    const [page, setPage] = useState(1)
+    const [perPage, setPerPage] = useState(25)
+    useEffect(() => { setPage(1) }, [statusFilter, typeFilter, monthFilter, search, perPage])
 
     const isAdminOrManager = can(session, "leaves.view")
 
@@ -479,75 +482,98 @@ export default function LeavesPage() {
     })()
     const rejected = leaves.filter(l => l.status === "REJECTED").length
 
+    const totalReq = leaves.length
+    const pctOf = (n: number) => totalReq > 0 ? `${((n / totalReq) * 100).toFixed(1)}% of total` : "—"
     const statsCards = [
-        { label: "Pending Requests",       value: pending,           color: "#f59e0b", bg: "#fffbeb", icon: <Clock size={18} /> },
-        { label: "Approved This Month",     value: approvedThisMonth, color: "#1a9e6e", bg: "#e8f7f1", icon: <CheckCircle size={18} /> },
-        { label: "Total Leave Days (Month)",value: totalLeaveDays,    color: "#3b82f6", bg: "#eff6ff", icon: <Calendar size={18} /> },
-        { label: "Rejected",                value: rejected,          color: "#dc2626", bg: "#fef2f2", icon: <XCircle size={18} /> },
+        { label: "Pending Requests",        value: pending,           sub: pctOf(pending),        color: "#d97706", bg: "#fef3c7", icon: Clock },
+        { label: "Approved This Month",     value: approvedThisMonth, sub: "current month",       color: "#1a9e6e", bg: "#e8f7f1", icon: CheckCircle },
+        { label: "Leave Days (Month)",      value: totalLeaveDays,    sub: "approved days",       color: "#3b82f6", bg: "#eff6ff", icon: Calendar },
+        { label: "Rejected",                value: rejected,          sub: pctOf(rejected),       color: "#dc2626", bg: "#fef2f2", icon: XCircle },
     ]
+
+    const exportCsv = () => {
+        const rows = [["Employee", "Emp ID", "Type", "Start", "End", "Days", "Status", "Reason", "Applied"]]
+        for (const l of leaves) rows.push([
+            `${l.employee.firstName} ${l.employee.lastName}`, l.employee.employeeId, l.type,
+            format(new Date(l.startDate), "dd/MM/yyyy"), format(new Date(l.endDate), "dd/MM/yyyy"),
+            String(l.days), l.status, l.reason || "", format(new Date(l.createdAt), "dd/MM/yyyy"),
+        ])
+        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")
+        const a = document.createElement("a")
+        a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
+        a.download = `leaves_${new Date().toISOString().slice(0, 10)}.csv`
+        a.click()
+        toast.success(`Exported ${leaves.length} leaves`)
+    }
+
+    const totalPages = Math.max(1, Math.ceil(leaves.length / perPage))
+    const safePage = Math.min(page, totalPages)
+    const pageRows = leaves.slice((safePage - 1) * perPage, safePage * perPage)
 
     return (
         <div className="space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
-                    <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Leave Management</h1>
-                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage employee leave requests</p>
+                    <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Leaves</h1>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage employee leave requests and approvals.</p>
                 </div>
-                <button onClick={() => setShowApply(true)}
-                    className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
-                    <Plus size={16} /> Apply Leave
-                </button>
+                <div className="flex items-center gap-2.5">
+                    <button onClick={exportCsv}
+                        className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
+                        <Download size={16} /> Export
+                    </button>
+                    <button onClick={() => setShowApply(true)}
+                        className="inline-flex items-center gap-2 h-[42px] px-5 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                        style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                        <Plus size={16} /> Apply Leave
+                    </button>
+                </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {statsCards.map(s => (
-                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
-                        <div style={{ background: s.bg, color: s.color }} className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0">{s.icon}</div>
-                        <div>
-                            <p className="text-[22px] font-bold text-[var(--text)] leading-tight">{s.value}</p>
-                            <p className="text-[11.5px] text-[var(--text3)]">{s.label}</p>
+                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
+                        <div style={{ background: s.bg }} className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0">
+                            <s.icon size={20} style={{ color: s.color }} />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{s.label}</p>
+                            <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: s.color }}>{s.value}</p>
+                            <p className="text-[11px] text-[var(--text3)]">{s.sub}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Filters */}
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 space-y-3">
-                {/* Status pills */}
-                <div className="flex flex-wrap items-center gap-2">
+            {/* Filter tabs + search */}
+            <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-1">
                     {(["", "PENDING", "APPROVED", "REJECTED", "CANCELLED"] as const).map(s => (
                         <button key={s} onClick={() => setStatusFilter(s)}
-                            className={`px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors ${statusFilter === s ? "bg-[var(--accent)] text-white" : "border border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
+                            className={`px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${statusFilter === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
                             {s === "" ? "All" : STATUS_CONFIG[s]?.label}
                         </button>
                     ))}
-                    <div className="w-px h-5 bg-[var(--border)] mx-1" />
-                    {(["", ...LEAVE_TYPES] as const).map(t => {
-                        const cfg = t ? LEAVE_TYPE_CONFIG[t] : null
-                        const active = typeFilter === t
-                        return (
-                            <button key={t} onClick={() => setTypeFilter(t)}
-                                style={active && cfg ? { color: cfg.color, background: cfg.bg, borderColor: cfg.border } : {}}
-                                className={`px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors border ${active && cfg ? "border" : "border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
-                                {t === "" ? "All Types" : t}
-                            </button>
-                        )
-                    })}
                 </div>
-                {/* Search + Month */}
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative flex-1 min-w-[200px]">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search employee..."
-                            className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
-                    </div>
-                    <input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
-                    {monthFilter && (
-                        <button onClick={() => setMonthFilter("")} className="text-[12px] text-[var(--text3)] hover:text-[var(--text)] transition-colors">Clear</button>
-                    )}
+                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+                    className="h-9 px-3 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                    <option value="">All Types</option>
+                    {LEAVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
+                    className="h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer" />
+                {(monthFilter || typeFilter || statusFilter) && (
+                    <button onClick={() => { setMonthFilter(""); setTypeFilter(""); setStatusFilter("") }}
+                        className="inline-flex items-center gap-1 h-9 px-3 rounded-[9px] text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]">
+                        <X size={13} /> Clear
+                    </button>
+                )}
+                <div className="relative flex-1 min-w-[200px] max-w-[320px] ml-auto">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by employee name or ID..."
+                        className="w-full h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
                 </div>
             </div>
 
@@ -561,31 +587,31 @@ export default function LeavesPage() {
                     <p className="text-[13px] text-[var(--text3)] mt-1">No matching leaves found</p>
                 </div>
             ) : (
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-full" style={{ minWidth: 900 }}>
                             <thead>
-                                <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Employee</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Type</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Duration</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3 max-w-[160px]">Reason</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Status</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Applied</th>
-                                    <th className="text-right text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Actions</th>
+                                <tr className="border-b border-[var(--border)]">
+                                    <th className="text-left text-[11.5px] font-semibold text-[var(--text3)] px-5 py-3.5 whitespace-nowrap">Employee</th>
+                                    <th className="text-left text-[11.5px] font-semibold text-[var(--text3)] px-4 py-3.5 whitespace-nowrap">Type</th>
+                                    <th className="text-left text-[11.5px] font-semibold text-[var(--text3)] px-4 py-3.5 whitespace-nowrap">Duration</th>
+                                    <th className="text-left text-[11.5px] font-semibold text-[var(--text3)] px-4 py-3.5 max-w-[160px] whitespace-nowrap">Reason</th>
+                                    <th className="text-left text-[11.5px] font-semibold text-[var(--text3)] px-4 py-3.5 whitespace-nowrap">Status</th>
+                                    <th className="text-left text-[11.5px] font-semibold text-[var(--text3)] px-4 py-3.5 whitespace-nowrap">Applied</th>
+                                    <th className="text-right text-[11.5px] font-semibold text-[var(--text3)] px-5 py-3.5 whitespace-nowrap">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {leaves.map((leave, i) => (
+                                {pageRows.map((leave, i) => (
                                     <tr key={leave.id}
                                         onClick={() => setSelectedLeave(leave)}
-                                        className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/30 transition-colors cursor-pointer ${i === leaves.length - 1 ? "border-b-0" : ""}`}>
+                                        className={`border-b border-[var(--border)] hover:bg-[var(--surface2)] transition-colors cursor-pointer ${i === pageRows.length - 1 ? "border-b-0" : ""}`}>
                                         <td className="px-5 py-3">
                                             <div className="flex items-center gap-3">
                                                 <Avatar firstName={leave.employee.firstName} lastName={leave.employee.lastName} photo={leave.employee.photo} />
                                                 <div>
                                                     <p className="text-[13px] font-semibold text-[var(--text)]">{leave.employee.firstName} {leave.employee.lastName}</p>
-                                                    <p className="text-[11px] text-[var(--text3)]">{leave.employee.employeeId}</p>
+                                                    <p className="text-[11px] font-mono text-[var(--text3)]">{leave.employee.employeeId}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -645,6 +671,45 @@ export default function LeavesPage() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] flex-wrap gap-3">
+                        <span className="text-[12.5px] text-[var(--text3)]">
+                            Showing {(safePage - 1) * perPage + 1} to {(safePage - 1) * perPage + pageRows.length} of {leaves.length} requests
+                        </span>
+                        <div className="flex items-center gap-3">
+                            {totalPages > 1 && (
+                                <div className="flex items-center gap-1.5">
+                                    <button disabled={safePage === 1} onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        className="w-9 h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--text2)] disabled:opacity-40">
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        const start = Math.max(1, Math.min(totalPages - 4, safePage - 2))
+                                        const p = start + i
+                                        if (p > totalPages) return null
+                                        return (
+                                            <button key={p} onClick={() => setPage(p)}
+                                                className="min-w-[36px] h-9 rounded-[9px] text-[13px] font-semibold"
+                                                style={{
+                                                    border: p === safePage ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                                    background: p === safePage ? "var(--accent)" : "var(--surface)",
+                                                    color: p === safePage ? "#fff" : "var(--text2)",
+                                                }}>{p}</button>
+                                        )
+                                    })}
+                                    <button disabled={safePage === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                        className="w-9 h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--text2)] disabled:opacity-40">
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            )}
+                            <select value={perPage} onChange={e => setPerPage(Number(e.target.value))}
+                                className="h-9 px-3 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                                {[25, 50, 100].map(n => <option key={n} value={n}>{n} per page</option>)}
+                            </select>
+                        </div>
                     </div>
                 </div>
             )}

@@ -1689,17 +1689,17 @@ function StatCard({
     icon: LucideIcon
 }) {
     return (
-        <div className="bg-white border border-[var(--border)] rounded-[12px] p-4 flex items-start gap-3">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
             <div
-                className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0"
-                style={{ background: color + "22" }}
+                className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0"
+                style={{ background: color + "1f" }}
             >
                 <Icon size={20} color={color} />
             </div>
-            <div>
-                <p className="text-[12px] text-[var(--text3)] mb-0.5">{label}</p>
-                <p className="text-[20px] font-bold text-[var(--text)] leading-tight">{value}</p>
-                {sub && <p className="text-[11px] text-[var(--text3)] mt-0.5">{sub}</p>}
+            <div className="min-w-0">
+                <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{label}</p>
+                <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color }}>{value}</p>
+                {sub && <p className="text-[11px] text-[var(--text3)]">{sub}</p>}
             </div>
         </div>
     )
@@ -2401,26 +2401,17 @@ export default function ExpensesPage() {
     return (
         <div className="min-h-screen bg-[var(--surface)] p-4 md:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
                 <div>
-                    <h1 className="text-[20px] font-bold text-[var(--text)] flex items-center gap-2">
-                        <CreditCard size={22} className="text-[var(--accent)]" />
-                        Expense Management
-                    </h1>
-                    <p className="text-[13px] text-[var(--text2)] mt-0.5">Track and manage employee expense claims</p>
+                    <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Expenses</h1>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Track and manage employee expense claims.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5 flex-wrap">
                     <button
                         onClick={() => exportExpenses("xlsx")}
-                        className="h-9 px-3 border border-[var(--border)] text-[var(--text2)] text-[12px] font-medium rounded-[8px] hover:bg-[var(--surface2)] flex items-center gap-1.5 transition-colors"
+                        className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] flex items-center gap-2 transition-colors"
                     >
-                        <Download size={13} /> Excel
-                    </button>
-                    <button
-                        onClick={() => exportExpenses("csv")}
-                        className="h-9 px-3 border border-[var(--border)] text-[var(--text2)] text-[12px] font-medium rounded-[8px] hover:bg-[var(--surface2)] flex items-center gap-1.5 transition-colors"
-                    >
-                        <Download size={13} /> CSV
+                        <Download size={16} /> Export
                     </button>
                     {isPrivileged && (
                         <>
@@ -2428,16 +2419,16 @@ export default function ExpensesPage() {
                                 onClick={startReview}
                                 disabled={reviewLoading || pendingCount === 0}
                                 title={pendingCount === 0 ? "No pending expenses" : "Review pending expenses one by one"}
-                                className="h-9 px-4 bg-[#8b5cf6] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-[42px] px-4 bg-[#8b5cf6] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {reviewLoading ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
-                                Review pending{pendingCount > 0 ? ` (${pendingCount})` : ""}
+                                Review{pendingCount > 0 ? ` (${pendingCount})` : ""}
                             </button>
                             <button
                                 onClick={approveAll}
                                 disabled={approveAllLoading || pendingCount === 0}
                                 title={pendingCount === 0 ? "No pending expenses" : "Approve all pending expenses at once"}
-                                className="h-9 px-4 bg-[#1a9e6e] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-[42px] px-4 bg-[#1a9e6e] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {approveAllLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                                 Approve all{pendingCount > 0 ? ` (${pendingCount})` : ""}
@@ -2446,7 +2437,8 @@ export default function ExpensesPage() {
                     )}
                     <button
                         onClick={() => setAddOpen(true)}
-                        className="h-9 px-4 bg-[var(--accent)] text-white text-[13px] font-medium rounded-[8px] hover:opacity-90 flex items-center gap-2 transition-opacity"
+                        className="h-[42px] px-5 bg-[var(--accent)] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity"
+                        style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
                     >
                         <Plus size={16} /> Add Expense
                     </button>

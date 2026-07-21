@@ -8,7 +8,8 @@ import {
     Loader2, RefreshCw, Play, FileSpreadsheet,
     ShieldCheck, Upload, IndianRupee,
     Clock, Trash2, TrendingUp, Settings2, Lock,
-    CheckCircle2, ArrowRight, ChevronRight
+    CheckCircle2, ArrowRight, ChevronRight,
+    CalendarRange, Users, Wallet,
 } from "lucide-react"
 import { can } from "@/lib/can"
 
@@ -197,25 +198,25 @@ export default function PayrollPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48, maxWidth: 1200 }}>
 
             {/* ── Page Header ── */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.4px" }}>Payroll</h1>
-                    <p style={{ fontSize: 12, color: "var(--text3)", margin: "3px 0 0 0" }}>
+                    <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Payroll</h1>
+                    <p style={{ fontSize: 13.5, color: "var(--text3)", margin: "4px 0 0 0" }}>
                         {MONTHS[currentMonth - 1]} {currentYear} · Monthly payroll workflow
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                     <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}
-                        style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
+                        style={{ height: 42, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer" }}>
                         {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                     <button onClick={fetchRuns} disabled={loading}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
-                        <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
+                        style={{ display: "flex", alignItems: "center", gap: 7, height: 42, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
+                        <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
                     <button onClick={() => router.push("/payroll/salary-master")}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, color: "var(--text2)", cursor: "pointer", fontWeight: 600 }}>
-                        <Settings2 size={13} /> Salary Structure
+                        style={{ display: "flex", alignItems: "center", gap: 7, height: 42, padding: "0 18px", borderRadius: 10, border: "none", background: "var(--accent)", fontSize: 13, color: "#fff", cursor: "pointer", fontWeight: 600, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                        <Settings2 size={15} /> Salary Structure
                     </button>
                 </div>
             </div>
@@ -569,24 +570,24 @@ export default function PayrollPage() {
             )}
 
             {/* ── Stats Row ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                 {[
-                    { label: "Runs This Year",       value: String(runs.length),                                color: "#3b82f6", sub: "payroll runs" },
-                    { label: "Employees",             value: String(thisMonthRun?._count.payrolls ?? "—"),       color: "#8b5cf6", sub: "this month" },
-                    { label: "Gross Pay",             value: thisMonthRun ? fmt(thisMonthRun.totalGross) : "—", color: "#0369a1", sub: "this month" },
-                    { label: "Net Pay",               value: thisMonthRun ? fmt(thisMonthRun.totalNet) : "—",   color: "#16a34a", sub: "this month" },
-                    { label: "Gross YTD",             value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",      color: "#0369a1", sub: "year to date" },
-                    { label: "Net YTD",               value: totalNetYTD > 0 ? fmt(totalNetYTD) : "—",          color: "#15803d", sub: "year to date" },
+                    { label: "Runs This Year", value: String(runs.length),                              color: "#3b82f6", bg: "#eff6ff", sub: "payroll runs", icon: CalendarRange },
+                    { label: "Employees",      value: String(thisMonthRun?._count.payrolls ?? "—"),     color: "#8b5cf6", bg: "#f5f3ff", sub: "this month",   icon: Users },
+                    { label: "Gross Pay",      value: thisMonthRun ? fmt(thisMonthRun.totalGross) : "—", color: "#0369a1", bg: "#e0f2fe", sub: "this month",  icon: IndianRupee },
+                    { label: "Net Pay",        value: thisMonthRun ? fmt(thisMonthRun.totalNet) : "—",   color: "#16a34a", bg: "#dcfce7", sub: "this month",  icon: Wallet },
+                    { label: "Gross YTD",      value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",      color: "#0369a1", bg: "#e0f2fe", sub: "year to date", icon: TrendingUp },
+                    { label: "Net YTD",        value: totalNetYTD > 0 ? fmt(totalNetYTD) : "—",          color: "#15803d", bg: "#dcfce7", sub: "year to date", icon: TrendingUp },
                 ].map(s => (
-                    <div key={s.label} style={{
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        border: "1px solid var(--border)",
-                        background: "var(--surface)",
-                    }}>
-                        <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", margin: 0 }}>{s.label}</p>
-                        <p style={{ fontSize: 17, fontWeight: 800, color: s.color, margin: "5px 0 2px" }}>{s.value}</p>
-                        <p style={{ fontSize: 10, color: "var(--text3)", margin: 0 }}>{s.sub}</p>
+                    <div key={s.label} style={{ padding: "16px 18px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <s.icon size={19} style={{ color: s.color }} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                            <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, whiteSpace: "nowrap" }}>{s.label}</p>
+                            <p style={{ fontSize: 19, fontWeight: 700, color: s.color, margin: "2px 0 1px", lineHeight: 1.1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.value}</p>
+                            <p style={{ fontSize: 10.5, color: "var(--text3)", margin: 0 }}>{s.sub}</p>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -620,16 +621,14 @@ export default function PayrollPage() {
                     <div style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                             <thead>
-                                <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                                <tr style={{ borderBottom: "1px solid var(--border)" }}>
                                     {["Month", "Employees", "Gross Pay", "Net Pay", "PF (Co.)", "ESI (Co.)", "Status", "Actions"].map(h => (
                                         <th key={h} style={{
-                                            padding: "10px 16px",
+                                            padding: "13px 16px",
                                             textAlign: ["Month","Status","Actions"].includes(h) ? "left" : "right",
-                                            fontSize: 10,
-                                            fontWeight: 700,
+                                            fontSize: 11.5,
+                                            fontWeight: 600,
                                             color: "var(--text3)",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
                                             whiteSpace: "nowrap"
                                         }}>{h}</th>
                                     ))}

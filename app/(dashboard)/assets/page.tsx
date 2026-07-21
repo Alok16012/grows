@@ -745,35 +745,35 @@ export default function AssetsPage() {
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--surface)] shrink-0">
+            <div className="flex items-start justify-between px-6 pt-6 pb-2 shrink-0 flex-wrap gap-3">
                 <div>
-                    <h1 className="text-[20px] font-bold text-[var(--text)]">Asset Management</h1>
-                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage and track physical assets issued to employees</p>
+                    <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Assets</h1>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage and track physical assets issued to employees.</p>
                 </div>
                 <button
                     onClick={() => setAddModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white rounded-xl text-[13px] font-medium hover:opacity-90 transition-opacity">
-                    <Plus size={16} />
-                    Add Asset
+                    className="flex items-center gap-2 h-[42px] px-5 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                    style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                    <Plus size={16} /> Add Asset
                 </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 px-6 py-4 shrink-0">
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 px-6 py-4 shrink-0">
                 {[
-                    { label: "Total Assets", value: totalAssets, icon: Package, color: "#3b82f6", bg: "#eff6ff" },
-                    { label: "Total Items", value: totalItems, icon: BarChart3, color: "#1a9e6e", bg: "#e8f7f1" },
-                    { label: "Currently Issued", value: currentlyIssued, icon: Users, color: "#d97706", bg: "#fffbeb" },
-                    { label: "Damaged / Lost", value: damagedLost, icon: AlertTriangle, color: "#dc2626", bg: "#fef2f2" },
+                    { label: "Total Assets", value: totalAssets, sub: `${totalItems} items`, icon: Package, color: "#3b82f6", bg: "#eff6ff" },
+                    { label: "Total Items", value: totalItems, sub: "across all assets", icon: BarChart3, color: "#1a9e6e", bg: "#e8f7f1" },
+                    { label: "Currently Issued", value: currentlyIssued, sub: "in use", icon: Users, color: "#d97706", bg: "#fef3c7" },
+                    { label: "Damaged / Lost", value: damagedLost, sub: "need attention", icon: AlertTriangle, color: "#dc2626", bg: "#fef2f2" },
                 ].map(stat => (
-                    <div key={stat.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ background: stat.bg }}>
+                    <div key={stat.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: stat.bg }}>
                             <stat.icon size={20} style={{ color: stat.color }} />
                         </div>
-                        <div>
-                            <p className="text-[22px] font-bold text-[var(--text)] leading-none">{stat.value}</p>
-                            <p className="text-[12px] text-[var(--text3)] mt-1">{stat.label}</p>
+                        <div className="min-w-0">
+                            <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{stat.label}</p>
+                            <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: stat.color }}>{stat.value}</p>
+                            <p className="text-[11px] text-[var(--text3)]">{stat.sub}</p>
                         </div>
                     </div>
                 ))}
