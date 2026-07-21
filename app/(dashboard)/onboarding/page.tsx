@@ -4,10 +4,11 @@ import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
     Search, Loader2, CheckCircle2, XCircle, Clock,
-    User, Phone, MapPin, X, ChevronRight,
-    Building2, Calendar, RefreshCw, FileText, Eye, Link2, Copy, Check
+    User, Phone, MapPin, X, ChevronRight, ChevronLeft, MoreVertical,
+    Building2, Calendar, RefreshCw, FileText, Eye, Link2, Copy, Check,
+    Users, ClipboardList,
 } from "lucide-react"
-import { format } from "date-fns"
+import { format, formatDistanceToNow } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -550,6 +551,155 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
     )
 }
 
+// ─── Pagination arrow ──────────────────────────────────────────────────────────
+function PageArrow({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button onClick={onClick} disabled={disabled}
+            style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            {children}
+        </button>
+    )
+}
+
+// ─── Table row ──────────────────────────────────────────────────────────────────
+function OnboardingRow({ record, expanded, onToggle, onOpen, onApprove }: {
+    record: OnboardingRecord
+    expanded: boolean
+    onToggle: () => void
+    onOpen: () => void
+    onApprove: () => void
+}) {
+    const e = record.employee
+    const fullName = [e.firstName, e.middleName, e.lastName].filter(Boolean).join(" ")
+    const site = e.deployments?.[0]?.site?.name
+    const st = STATUS_CONFIG[record.status]
+    const StIcon = st.icon
+    const isPending = record.status === "IN_PROGRESS" || record.status === "NOT_STARTED"
+
+    const tasks = record.tasks ?? []
+    const totalTasks = tasks.length || 7
+    const doneTasks = tasks.filter(t => t.status === "COMPLETED").length
+    const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+
+    const cell: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle", borderTop: "1px solid var(--border)" }
+
+    return (
+        <>
+            <tr style={{ background: expanded ? "var(--accent-light, #f0fdf9)" : undefined, transition: "background 0.15s" }}
+                onMouseEnter={el => { if (!expanded) el.currentTarget.style.background = "var(--surface2)" }}
+                onMouseLeave={el => { if (!expanded) el.currentTarget.style.background = "" }}>
+                {/* Employee */}
+                <td style={{ ...cell, borderTop: expanded ? "1px solid var(--accent)" : "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                        <Avatar name={fullName} photo={e.photo} size={38} />
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>{fullName}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2 }}>
+                                <span style={{ fontFamily: "monospace", fontSize: 11.5, fontWeight: 700, color: "var(--accent)" }}>{displayEmpId(e.employeeId)}</span>
+                                {isPending && (
+                                    <span style={{ fontSize: 9.5, fontWeight: 700, color: "#15803d", background: "#dcfce7", padding: "1px 7px", borderRadius: 20, letterSpacing: "0.3px" }}>New</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                {/* Role / Designation */}
+                <td style={cell}>
+                    <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, whiteSpace: "nowrap" }}>{e.designation || "—"}</div>
+                    {e.department?.name && <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 1 }}>{e.department.name}</div>}
+                </td>
+                {/* Site */}
+                <td style={cell}>
+                    {site ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--text)", whiteSpace: "nowrap" }}>
+                            <MapPin size={12} style={{ color: "var(--text3)" }} /> {site}
+                        </div>
+                    ) : <span style={{ color: "var(--text3)" }}>—</span>}
+                </td>
+                {/* Contact */}
+                <td style={cell}>
+                    {e.phone ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--text2)", whiteSpace: "nowrap" }}>
+                            <Phone size={12} style={{ color: "var(--text3)" }} /> {e.phone}
+                        </div>
+                    ) : <span style={{ color: "var(--text3)" }}>—</span>}
+                </td>
+                {/* Joined On */}
+                <td style={cell}>
+                    {e.dateOfJoining ? (
+                        <div style={{ whiteSpace: "nowrap" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--text)" }}>
+                                <Calendar size={12} style={{ color: "var(--text3)" }} /> {format(new Date(e.dateOfJoining), "dd MMM yyyy")}
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1, paddingLeft: 17 }}>
+                                {formatDistanceToNow(new Date(e.dateOfJoining), { addSuffix: true })}
+                            </div>
+                        </div>
+                    ) : <span style={{ color: "var(--text3)" }}>—</span>}
+                </td>
+                {/* Progress */}
+                <td style={cell}>
+                    <div style={{ minWidth: 130 }}>
+                        <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 4, whiteSpace: "nowrap" }}>{doneTasks} of {totalTasks} Completed</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ flex: 1, height: 6, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}>
+                                <div style={{ width: `${progress}%`, height: "100%", borderRadius: 4, background: progress === 100 ? "#15803d" : "var(--accent, #1a9e6e)" }} />
+                            </div>
+                            <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>{progress}%</span>
+                        </div>
+                    </div>
+                </td>
+                {/* Status */}
+                <td style={cell}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}`, fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+                        <StIcon size={11} /> {st.label}
+                    </span>
+                </td>
+                {/* Actions */}
+                <td style={cell}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button onClick={onOpen}
+                            style={{ padding: "7px 16px", borderRadius: 8, border: isPending ? "none" : "1px solid var(--border)", background: isPending ? "var(--accent, #1a9e6e)" : "var(--surface)", color: isPending ? "#fff" : "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                            {isPending ? "Review" : "View"}
+                        </button>
+                        <button onClick={onToggle} title="Quick actions"
+                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text3)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                            <MoreVertical size={15} />
+                        </button>
+                    </div>
+                </td>
+            </tr>
+
+            {/* Expanded quick-actions row */}
+            {expanded && (
+                <tr>
+                    <td colSpan={8} style={{ padding: 0, background: "var(--accent-light, #f0fdf9)", borderBottom: "1px solid var(--accent)" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, padding: "6px 16px 16px" }}>
+                            {[
+                                { icon: Eye,           title: "Review",         sub: "Review employee details", color: "#3b82f6", onClick: onOpen },
+                                { icon: CheckCircle2,  title: "Approve",        sub: "Approve onboarding",      color: "#15803d", onClick: onApprove },
+                                { icon: XCircle,       title: "Reject",         sub: "Reject onboarding",       color: "#dc2626", onClick: onOpen },
+                                { icon: ClipboardList, title: "View Checklist", sub: "See onboarding tasks",    color: "#6b7280", onClick: onOpen },
+                            ].map(a => (
+                                <button key={a.title} onClick={a.onClick}
+                                    style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", textAlign: "left" }}>
+                                    <div style={{ width: 36, height: 36, borderRadius: 10, background: a.color + "18", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <a.icon size={17} style={{ color: a.color }} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{a.title}</div>
+                                        <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 1 }}>{a.sub}</div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </td>
+                </tr>
+            )}
+        </>
+    )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
@@ -564,6 +714,10 @@ export default function OnboardingPage() {
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [selected, setSelected] = useState<OnboardingRecord | null>(null)
     const [linkCopied, setLinkCopied] = useState(false)
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [page, setPage] = useState(1)
+    const [perPage, setPerPage] = useState(10)
+    useEffect(() => { setPage(1) }, [filter, debouncedSearch, perPage])
 
     const copyJoinLink = () => {
         const url = `${window.location.origin}/join`
@@ -634,127 +788,148 @@ export default function OnboardingPage() {
         return acc
     }, {} as Record<string, number>)
 
-    const role = session?.user?.role
+    const total = records.length
+    const pct = (n: number) => total > 0 ? `${((n / total) * 100).toFixed(1)}% of total` : "0% of total"
+
+    const kpis = [
+        { label: "Pending Review", count: (counts["IN_PROGRESS"] || 0) + (counts["NOT_STARTED"] || 0), color: "#d97706", bg: "#fef3c7", icon: Clock },
+        { label: "Approved",       count: counts["COMPLETED"] || 0, color: "#15803d", bg: "#dcfce7", icon: CheckCircle2 },
+        { label: "Rejected",       count: counts["ON_HOLD"]   || 0, color: "#dc2626", bg: "#fee2e2", icon: XCircle },
+        { label: "Total",          count: total,                    color: "#3b82f6", bg: "#eff6ff", icon: Users, isTotal: true },
+    ]
+
+    // Client-side pagination over the fetched (already status/search filtered) list.
+    const totalPages = Math.max(1, Math.ceil(records.length / perPage))
+    const safePage = Math.min(page, totalPages)
+    const pageRows = records.slice((safePage - 1) * perPage, safePage * perPage)
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1100, paddingBottom: 32 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 32 }}>
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div>
-                    <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Onboarding</h1>
-                    <p style={{ fontSize: 12, color: "var(--text3)", margin: "3px 0 0 0" }}>
+                    <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.4px" }}>Onboarding</h1>
+                    <p style={{ fontSize: 13, color: "var(--text3)", margin: "4px 0 0 0" }}>
                         Review, approve or reject newly joined employees
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                        onClick={copyJoinLink}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--accent)", background: "var(--accent-light)", color: "var(--accent-text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-                    >
-                        {linkCopied ? <><Check size={13} /> Copied!</> : <><Link2 size={13} /> Share Join Link</>}
+                <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={copyJoinLink}
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        {linkCopied ? <><Check size={15} /> Copied!</> : <><Link2 size={15} /> Share Join Link</>}
                     </button>
-                    <button onClick={fetchRecords} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-                        <RefreshCw size={13} /> Refresh
+                    <button onClick={fetchRecords}
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
                 </div>
             </div>
 
-            {/* Stats */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {[
-                    { label: "Pending Review", count: (counts["IN_PROGRESS"] || 0) + (counts["NOT_STARTED"] || 0), color: "#d97706", bg: "#fef3c7", border: "#fcd34d" },
-                    { label: "Approved",       count: counts["COMPLETED"] || 0, color: "#15803d", bg: "#dcfce7", border: "#86efac" },
-                    { label: "Rejected",       count: counts["ON_HOLD"]   || 0, color: "#dc2626", bg: "#fee2e2", border: "#fca5a5" },
-                    { label: "Total",          count: records.length,            color: "#6b7280", bg: "var(--surface2)", border: "var(--border)" },
-                ].map(s => (
-                    <div key={s.label} style={{ padding: "10px 16px", borderRadius: 10, background: s.bg, border: `1px solid ${s.border}`, display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.count}</span>
-                        <span style={{ fontSize: 12, color: s.color, fontWeight: 600 }}>{s.label}</span>
+            {/* KPI cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+                {kpis.map(s => (
+                    <div key={s.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "18px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <s.icon size={21} style={{ color: s.color }} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                            <p style={{ fontSize: 12.5, color: "var(--text3)", margin: 0, fontWeight: 500 }}>{s.label}</p>
+                            <p style={{ fontSize: 27, fontWeight: 800, color: s.color, margin: "1px 0 2px", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{s.count}</p>
+                            <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>{s.isTotal ? "100% of total" : pct(s.count)}</p>
+                        </div>
                     </div>
                 ))}
             </div>
 
-            {/* Filters */}
-            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                {/* Status filter */}
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {/* Filter tabs + search */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 4 }}>
                     {FILTER_TABS.map(t => (
                         <button key={t.key} onClick={() => setFilter(t.key)}
-                            style={{ padding: "6px 14px", borderRadius: 20, border: filter === t.key ? "1px solid var(--accent)" : "1px solid var(--border)", background: filter === t.key ? "var(--accent)" : "var(--surface2)", color: filter === t.key ? "#fff" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            style={{ padding: "8px 16px", borderRadius: 9, border: "none", background: filter === t.key ? "var(--accent)" : "transparent", color: filter === t.key ? "#fff" : "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                             {t.label}
                         </button>
                     ))}
                 </div>
-                {/* Search */}
-                <div style={{ flex: 1, minWidth: 180, position: "relative" }}>
-                    <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
-                    <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Search by name or employee ID…"
-                        style={{ width: "100%", paddingLeft: 30, paddingRight: 10, paddingTop: 7, paddingBottom: 7, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface2)", color: "var(--text)", outline: "none" }}
-                    />
+                <div style={{ flex: 1 }} />
+                <div style={{ position: "relative", minWidth: 240, flex: "0 1 360px" }}>
+                    <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)}
+                        placeholder="Search by name or employee ID..."
+                        style={{ width: "100%", height: 40, paddingLeft: 36, paddingRight: 12, borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", boxSizing: "border-box" }} />
                 </div>
             </div>
 
-            {/* List */}
+            {/* Table */}
             {loading ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60, gap: 8, color: "var(--text3)" }}>
                     <Loader2 size={20} className="animate-spin" />
                     <span>Loading onboarding records…</span>
                 </div>
             ) : records.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 60, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: 60, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14 }}>
                     <User size={32} style={{ color: "var(--text3)", margin: "0 auto 12px" }} />
                     <p style={{ color: "var(--text2)", fontWeight: 600, margin: 0 }}>No onboarding records found</p>
                     <p style={{ color: "var(--text3)", fontSize: 12, margin: "4px 0 0" }}>Converted employees from Recruitment will appear here</p>
                 </div>
             ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {records.map(record => {
-                        const e = record.employee
-                        const fullName = [e.firstName, e.middleName, e.lastName].filter(Boolean).join(" ")
-                        const site = e.deployments?.[0]?.site?.name
-                        const st = STATUS_CONFIG[record.status]
-                        const Icon = st.icon
+                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+                    <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 980 }}>
+                            <thead>
+                                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                                    {["Employee", "Role / Designation", "Site", "Contact", "Joined On", "Progress", "Status", "Actions"].map(h => (
+                                        <th key={h} style={{ textAlign: "left", padding: "13px 16px", fontSize: 11.5, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pageRows.map(record => (
+                                    <OnboardingRow
+                                        key={record.id}
+                                        record={record}
+                                        expanded={expandedId === record.id}
+                                        onToggle={() => setExpandedId(id => id === record.id ? null : record.id)}
+                                        onOpen={() => setSelected(record)}
+                                        onApprove={() => { if (confirm("Approve this employee's onboarding?")) handleAction(record.id, "approve") }}
+                                    />
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
 
-                        return (
-                            <div key={record.id}
-                                onClick={() => setSelected(record)}
-                                style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "all 0.15s", }}
-                                onMouseEnter={el => (el.currentTarget.style.borderColor = "var(--accent)")}
-                                onMouseLeave={el => (el.currentTarget.style.borderColor = "var(--border)")}
-                            >
-                                <Avatar name={fullName} photo={e.photo} size={42} />
-
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 2 }}>{fullName}</div>
-                                    <div style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                                        <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--accent)" }}>{displayEmpId(e.employeeId)}</span>
-                                        {e.designation && <span>{e.designation}</span>}
-                                        {e.department?.name && <><Building2 size={11} /><span>{e.department.name}</span></>}
-                                        {site && <><MapPin size={11} /><span>{site}</span></>}
-                                        {e.phone && <><Phone size={11} /><span>{e.phone}</span></>}
-                                        {e.dateOfJoining && <><Calendar size={11} /><span>Joined {format(new Date(e.dateOfJoining), "dd MMM yyyy")}</span></>}
-                                    </div>
-                                </div>
-
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                                    <span style={{ padding: "4px 10px", borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}`, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-                                        <Icon size={11} />
-                                        {st.label}
-                                    </span>
-                                    {record.status === "ON_HOLD" && record.notes && (
-                                        <span style={{ fontSize: 11, color: "#dc2626", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={record.notes}>
-                                            {record.notes}
-                                        </span>
-                                    )}
-                                    <ChevronRight size={14} style={{ color: "var(--text3)" }} />
-                                </div>
+                    {/* Pagination */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: 10 }}>
+                        <span style={{ fontSize: 12.5, color: "var(--text3)" }}>
+                            Showing {(safePage - 1) * perPage + 1} to {(safePage - 1) * perPage + pageRows.length} of {records.length} results
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <PageArrow disabled={safePage === 1} onClick={() => setPage(p => Math.max(1, p - 1))}><ChevronLeft size={15} /></PageArrow>
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    const start = Math.max(1, Math.min(totalPages - 4, safePage - 2))
+                                    const p = start + i
+                                    if (p > totalPages) return null
+                                    return (
+                                        <button key={p} onClick={() => setPage(p)}
+                                            style={{ minWidth: 32, height: 32, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                                border: p === safePage ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                                background: p === safePage ? "var(--accent)" : "var(--surface)",
+                                                color: p === safePage ? "#fff" : "var(--text2)" }}>
+                                            {p}
+                                        </button>
+                                    )
+                                })}
+                                {totalPages > 5 && safePage < totalPages - 2 && <span style={{ color: "var(--text3)", padding: "0 4px" }}>…</span>}
+                                <PageArrow disabled={safePage === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}><ChevronRight size={15} /></PageArrow>
                             </div>
-                        )
-                    })}
+                            <select value={perPage} onChange={e => setPerPage(Number(e.target.value))}
+                                style={{ height: 32, padding: "0 8px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12.5, background: "var(--surface)", color: "var(--text2)", outline: "none", cursor: "pointer" }}>
+                                {[10, 20, 50].map(n => <option key={n} value={n}>{n} / page</option>)}
+                            </select>
+                        </div>
+                    </div>
                 </div>
             )}
 
