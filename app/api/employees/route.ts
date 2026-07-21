@@ -99,6 +99,35 @@ export async function GET(req: Request) {
             prisma.employee.count({ where }),
         ])
 
+        // Status counts for the stat cards — computed across ALL statuses
+        // (ignoring the active status-tab filter) but honouring the dept / site
+        // / type / search filters, so the cards reflect the current view. Plus
+        // "joined this month" per status for the trend indicators.
+        const countsWhere = { ...where }
+        delete (countsWhere as any).status
+        const monthStart = new Date()
+        monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+        const inMonth = { dateOfJoining: { gte: monthStart } }
+        const [
+            cTotal, cActive, cOnLeave, cInactive, cTerminated, cResigned,
+            mTotal, mActive, mTerminated,
+        ] = await Promise.all([
+            prisma.employee.count({ where: { ...countsWhere, status: { notIn: ["ONBOARDING"] } } }),
+            prisma.employee.count({ where: { ...countsWhere, status: "ACTIVE" } }),
+            prisma.employee.count({ where: { ...countsWhere, status: "ON_LEAVE" } }),
+            prisma.employee.count({ where: { ...countsWhere, status: "INACTIVE" } }),
+            prisma.employee.count({ where: { ...countsWhere, status: "TERMINATED" } }),
+            prisma.employee.count({ where: { ...countsWhere, status: "RESIGNED" } }),
+            prisma.employee.count({ where: { ...countsWhere, status: { notIn: ["ONBOARDING"] }, ...inMonth } }),
+            prisma.employee.count({ where: { ...countsWhere, status: "ACTIVE", ...inMonth } }),
+            prisma.employee.count({ where: { ...countsWhere, status: { in: ["TERMINATED", "RESIGNED"] }, ...inMonth } }),
+        ])
+        const counts = {
+            total: cTotal, active: cActive, onLeave: cOnLeave,
+            inactive: cInactive, terminated: cTerminated, resigned: cResigned,
+            newThisMonth: { total: mTotal, active: mActive, terminated: mTerminated },
+        }
+
         // Backfill profile photo from an uploaded Photo document for any
         // employee whose `photo` column is still empty. Photos land with
         // inconsistent types ("PHOTO" vs "Photo") and passport-style names, so
@@ -156,7 +185,7 @@ export async function GET(req: Request) {
             }
         }
 
-        return NextResponse.json({ employees, total, page, pageSize, totalPages: Math.ceil(total / pageSize), canViewSalary }, {
+        return NextResponse.json({ employees, total, counts, page, pageSize, totalPages: Math.ceil(total / pageSize), canViewSalary }, {
             headers: {
                 // Browser-cache for 10s — back-button / list re-renders within
                 // 10s reuse the cached response instead of re-querying.

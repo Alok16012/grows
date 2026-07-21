@@ -6,11 +6,11 @@ import { toast } from "sonner"
 import { can } from "@/lib/can"
 import {
     Plus, Search, UserCheck, X, Loader2, Users,
-    Calendar, TrendingDown, Edit2, Eye, ChevronDown,
+    Calendar, TrendingDown, TrendingUp, Minus, Edit2, Eye, ChevronDown,
     CheckCircle, Clock, Building2, Briefcase, Phone, Mail,
     FileText, IndianRupee, MoreVertical, ShieldOff, Trash2,
     User, CreditCard, MapPin, LogOut, Download, Upload,
-    Copy, Link2, RefreshCw
+    Copy, Link2, RefreshCw, SlidersHorizontal
 } from "lucide-react"
 import { format } from "date-fns"
 // xlsx is lazy-loaded — it's a ~430KB dep used only on template download
@@ -112,6 +112,46 @@ function fmtRupee(n?: number) {
 }
 function getMonthName(m: number) {
     return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1] || ""
+}
+
+// Decorative sparkline for the stat cards (fixed gentle wave — the app has no
+// per-day employee history, so this is a visual cue, not real data).
+function Sparkline({ color, seed = 0 }: { color: string; seed?: number }) {
+    const base = [6, 10, 7, 13, 9, 15, 11, 17]
+    const pts = base.map((v, i) => `${(i / (base.length - 1)) * 72},${22 - ((v + (seed % 3)) % 18)}`).join(" ")
+    return (
+        <svg viewBox="0 0 72 24" preserveAspectRatio="none" className="w-[64px] h-[26px] shrink-0">
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    )
+}
+
+function StatCard({ label, value, icon, color, bg, trend, sparkColor, seed }: {
+    label: string; value: number; icon: React.ReactNode; color: string; bg: string
+    trend?: { dir: "up" | "down" | "flat"; text: string }; sparkColor: string; seed: number
+}) {
+    return (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] hover:shadow-sm transition-all">
+            <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                    <div style={{ background: bg, color }} className="w-10 h-10 rounded-[11px] flex items-center justify-center shrink-0">
+                        {icon}
+                    </div>
+                    <span className="text-[12.5px] font-medium text-[var(--text2)]">{label}</span>
+                </div>
+                <Sparkline color={sparkColor} seed={seed} />
+            </div>
+            <p className="text-[28px] font-bold text-[var(--text)] leading-none tabular-nums">{value.toLocaleString("en-IN")}</p>
+            {trend && (
+                <p className={`text-[11.5px] font-medium mt-2 flex items-center gap-1 ${
+                    trend.dir === "up" ? "text-[var(--accent-text)]" : trend.dir === "down" ? "text-[var(--red)]" : "text-[var(--text3)]"
+                }`}>
+                    {trend.dir === "up" ? <TrendingUp size={12} /> : trend.dir === "down" ? <TrendingDown size={12} /> : <Minus size={12} />}
+                    {trend.text}
+                </p>
+            )}
+        </div>
+    )
 }
 
 // ─── Info Item ────────────────────────────────────────────────────────────────
@@ -1048,6 +1088,10 @@ function EmployeesPage() {
     const [page, setPage] = useState(1)
     const [totalPages, setTotalPages] = useState(1)
     const [totalCount, setTotalCount] = useState(0)
+    const [counts, setCounts] = useState<{
+        total: number; active: number; onLeave: number; inactive: number; terminated: number; resigned: number
+        newThisMonth: { total: number; active: number; terminated: number }
+    } | null>(null)
     const PAGE_SIZE = 50
     const [showModal, setShowModal] = useState(false)
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
@@ -1094,6 +1138,7 @@ function EmployeesPage() {
                 setEmployees(Array.isArray(data.employees) ? data.employees : [])
                 setTotalPages(data.totalPages ?? 1)
                 setTotalCount(data.total ?? 0)
+                if (data.counts) setCounts(data.counts)
             } else {
                 // fallback for old API shape
                 setEmployees(Array.isArray(data) ? data : [])
@@ -1470,10 +1515,15 @@ function EmployeesPage() {
     return (
         <div className="space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Employees</h1>
-                    <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage your workforce</p>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-[12px] bg-[var(--accent-light)] flex items-center justify-center shrink-0">
+                        <Users size={20} className="text-[var(--accent-text)]" />
+                    </div>
+                    <div>
+                        <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Employees</h1>
+                        <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage your workforce and track employee information</p>
+                    </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <div style={{ position: "relative" }}>
@@ -1542,80 +1592,104 @@ function EmployeesPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                    { label: "Total Employees", value: total, icon: <Users size={18} />, color: "#1a9e6e", bg: "#e8f7f1" },
-                    { label: "Active", value: active, icon: <CheckCircle size={18} />, color: "#16a34a", bg: "#dcfce7" },
-                    { label: "On Leave", value: onLeave, icon: <Clock size={18} />, color: "#f59e0b", bg: "#fffbeb" },
-                    { label: "Terminated/Resigned", value: terminatedResignedThisMonth, icon: <TrendingDown size={18} />, color: "#dc2626", bg: "#fef2f2" },
-                ].map(stat => (
-                    <div key={stat.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
-                        <div style={{ background: stat.bg, color: stat.color }} className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0">
-                            {stat.icon}
-                        </div>
-                        <div>
-                            <p className="text-[22px] font-bold text-[var(--text)] leading-tight">{stat.value}</p>
-                            <p className="text-[11.5px] text-[var(--text3)]">{stat.label}</p>
-                        </div>
-                    </div>
-                ))}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard
+                    label="Total Employees" value={counts?.total ?? total}
+                    icon={<Users size={18} />} color="#0d6b4a" bg="#e8f7f1" sparkColor="#1a9e6e" seed={0}
+                    trend={counts && counts.newThisMonth.total > 0 ? { dir: "up", text: `${counts.newThisMonth.total} this month` } : { dir: "flat", text: "No change" }}
+                />
+                <StatCard
+                    label="Active Employees" value={counts?.active ?? active}
+                    icon={<CheckCircle size={18} />} color="#16a34a" bg="#dcfce7" sparkColor="#16a34a" seed={1}
+                    trend={counts && counts.newThisMonth.active > 0 ? { dir: "up", text: `${counts.newThisMonth.active} this month` } : { dir: "flat", text: "No change" }}
+                />
+                <StatCard
+                    label="On Leave" value={counts?.onLeave ?? onLeave}
+                    icon={<Clock size={18} />} color="#d97706" bg="#fffbeb" sparkColor="#f59e0b" seed={2}
+                    trend={{ dir: "flat", text: "No change" }}
+                />
+                <StatCard
+                    label="Terminated / Resigned" value={counts ? counts.terminated + counts.resigned : terminatedResignedThisMonth}
+                    icon={<TrendingDown size={18} />} color="#dc2626" bg="#fef2f2" sparkColor="#ef4444" seed={1}
+                    trend={counts && counts.newThisMonth.terminated > 0 ? { dir: "down", text: `${counts.newThisMonth.terminated} this month` } : { dir: "flat", text: "No change" }}
+                />
             </div>
 
-            {/* Filters */}
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 space-y-3">
-                {/* Status pills */}
-                <div className="flex flex-wrap gap-2">
+            {/* Status tabs — underline style */}
+            <div className="border-b border-[var(--border)] overflow-x-auto">
+                <div className="flex items-center gap-1 min-w-max">
                     {[{ k: "", label: "All" }, ...Object.entries(STATUS_CONFIG).map(([k, v]) => ({ k, label: v.label }))].map(({ k, label }) => (
                         <button
                             key={k}
                             onClick={() => setStatusFilter(k)}
-                            className={`px-3 py-1 rounded-full text-[12px] font-medium border transition-all ${statusFilter === k
-                                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
-                                : "bg-[var(--surface2)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent-text)]"
-                                }`}
+                            className={`px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                                statusFilter === k
+                                    ? "border-[var(--accent)] text-[var(--accent-text)]"
+                                    : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
+                            }`}
                         >
                             {label}
                         </button>
                     ))}
                 </div>
+            </div>
 
-                {/* Search + dropdowns */}
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative flex-1 min-w-[200px]">
-                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
-                        <input
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && fetchEmployees()}
-                            placeholder="Search by name, ID, phone..."
-                            className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-                        />
-                    </div>
+            {/* Search + dropdowns */}
+            <div className="flex flex-wrap items-center gap-2.5">
+                <div className="relative flex-1 min-w-[220px]">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && fetchEmployees()}
+                        placeholder="Search by name, ID, phone, email..."
+                        className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                    />
+                </div>
+                <div className="relative">
+                    <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
                     <select
                         value={deptFilter}
                         onChange={e => setDeptFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+                        className="h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text2)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Departments</option>
                         {allDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                </div>
+                <div className="relative">
+                    <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
                     <select
                         value={siteFilter}
                         onChange={e => setSiteFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+                        className="h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text2)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Sites</option>
                         {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                </div>
+                <div className="relative">
+                    <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
                     <select
                         value={empTypeFilter}
                         onChange={e => setEmpTypeFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+                        className="h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text2)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Employment Types</option>
                         {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
                 </div>
+                {(deptFilter || siteFilter || empTypeFilter || search) && (
+                    <button
+                        onClick={() => { setDeptFilter(""); setSiteFilter(""); setEmpTypeFilter(""); setSearch("") }}
+                        className="h-10 px-3.5 inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors"
+                    >
+                        <X size={14} /> Clear
+                    </button>
+                )}
             </div>
 
             {/* Employee Table */}
