@@ -6,7 +6,7 @@ import {
     Search, Loader2, CheckCircle2, XCircle, Clock,
     User, Phone, MapPin, X, ChevronRight, ChevronLeft, MoreVertical,
     Building2, Calendar, RefreshCw, FileText, Eye, Link2, Copy, Check,
-    Users, ClipboardList,
+    Users, ClipboardList, SlidersHorizontal, ChevronsUpDown,
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
@@ -562,9 +562,11 @@ function PageArrow({ disabled, onClick, children }: { disabled: boolean; onClick
 }
 
 // ─── Table row ──────────────────────────────────────────────────────────────────
-function OnboardingRow({ record, expanded, onToggle, onOpen, onApprove }: {
+function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, onApprove }: {
     record: OnboardingRecord
     expanded: boolean
+    checked: boolean
+    onCheck: () => void
     onToggle: () => void
     onOpen: () => void
     onApprove: () => void
@@ -581,15 +583,25 @@ function OnboardingRow({ record, expanded, onToggle, onOpen, onApprove }: {
     const doneTasks = tasks.filter(t => t.status === "COMPLETED").length
     const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
 
-    const cell: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle", borderTop: "1px solid var(--border)" }
+    // With borderCollapse: separate, draw row separators via borderBottom.
+    // When expanded, the row group is outlined with an accent box (top/side
+    // borders here; the expansion cell closes the box below).
+    const topB = expanded ? "2px solid var(--accent)" : "none"
+    const botB = expanded ? "none" : "1px solid var(--border)"
+    const cell: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle", borderTop: topB, borderBottom: botB, background: expanded ? "var(--accent-light, #f0fdf9)" : undefined }
 
     return (
         <>
-            <tr style={{ background: expanded ? "var(--accent-light, #f0fdf9)" : undefined, transition: "background 0.15s" }}
-                onMouseEnter={el => { if (!expanded) el.currentTarget.style.background = "var(--surface2)" }}
-                onMouseLeave={el => { if (!expanded) el.currentTarget.style.background = "" }}>
+            <tr style={{ transition: "background 0.15s" }}
+                onMouseEnter={el => { if (!expanded) el.currentTarget.querySelectorAll("td").forEach(td => (td as HTMLElement).style.background = "var(--surface2)") }}
+                onMouseLeave={el => { if (!expanded) el.currentTarget.querySelectorAll("td").forEach(td => (td as HTMLElement).style.background = "") }}>
+                {/* Checkbox */}
+                <td style={{ ...cell, width: 40, padding: "14px 6px 14px 16px", borderLeft: expanded ? "2px solid var(--accent)" : "none", borderTopLeftRadius: expanded ? 12 : 0 }}>
+                    <input type="checkbox" checked={checked} onChange={onCheck}
+                        style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
+                </td>
                 {/* Employee */}
-                <td style={{ ...cell, borderTop: expanded ? "1px solid var(--accent)" : "1px solid var(--border)" }}>
+                <td style={cell}>
                     <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                         <Avatar name={fullName} photo={e.photo} size={38} />
                         <div style={{ minWidth: 0 }}>
@@ -656,14 +668,14 @@ function OnboardingRow({ record, expanded, onToggle, onOpen, onApprove }: {
                     </span>
                 </td>
                 {/* Actions */}
-                <td style={cell}>
+                <td style={{ ...cell, borderRight: expanded ? "2px solid var(--accent)" : "none", borderTopRightRadius: expanded ? 12 : 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <button onClick={onOpen}
                             style={{ padding: "7px 16px", borderRadius: 8, border: isPending ? "none" : "1px solid var(--border)", background: isPending ? "var(--accent, #1a9e6e)" : "var(--surface)", color: isPending ? "#fff" : "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                             {isPending ? "Review" : "View"}
                         </button>
                         <button onClick={onToggle} title="Quick actions"
-                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text3)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                            style={{ width: 30, height: 30, borderRadius: 8, border: expanded ? "1px solid var(--accent)" : "1px solid var(--border)", background: expanded ? "var(--accent-light, #f0fdf9)" : "var(--surface)", color: expanded ? "var(--accent)" : "var(--text3)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                             <MoreVertical size={15} />
                         </button>
                     </div>
@@ -673,7 +685,7 @@ function OnboardingRow({ record, expanded, onToggle, onOpen, onApprove }: {
             {/* Expanded quick-actions row */}
             {expanded && (
                 <tr>
-                    <td colSpan={8} style={{ padding: 0, background: "var(--accent-light, #f0fdf9)", borderBottom: "1px solid var(--accent)" }}>
+                    <td colSpan={9} style={{ padding: 0, background: "var(--accent-light, #f0fdf9)", borderLeft: "2px solid var(--accent)", borderRight: "2px solid var(--accent)", borderBottom: "2px solid var(--accent)", borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, padding: "6px 16px 16px" }}>
                             {[
                                 { icon: Eye,           title: "Review",         sub: "Review employee details", color: "#3b82f6", onClick: onOpen },
@@ -715,6 +727,7 @@ export default function OnboardingPage() {
     const [selected, setSelected] = useState<OnboardingRecord | null>(null)
     const [linkCopied, setLinkCopied] = useState(false)
     const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
     useEffect(() => { setPage(1) }, [filter, debouncedSearch, perPage])
@@ -757,6 +770,15 @@ export default function OnboardingPage() {
     }, [filter, debouncedSearch])
 
     useEffect(() => { fetchRecords() }, [fetchRecords])
+
+    // Auto-expand the first pending row once per load so the quick-actions panel
+    // is visible up front (matches the design).
+    const autoExpandedRef = useRef(false)
+    useEffect(() => {
+        if (autoExpandedRef.current || records.length === 0) return
+        const firstPending = records.find(r => r.status === "IN_PROGRESS" || r.status === "NOT_STARTED")
+        if (firstPending) { setExpandedId(firstPending.id); autoExpandedRef.current = true }
+    }, [records])
 
     const handleAction = async (id: string, action: "approve" | "reject", reason?: string) => {
         try {
@@ -859,6 +881,10 @@ export default function OnboardingPage() {
                         placeholder="Search by name or employee ID..."
                         style={{ width: "100%", height: 40, paddingLeft: 36, paddingRight: 12, borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", boxSizing: "border-box" }} />
                 </div>
+                <button
+                    style={{ display: "flex", alignItems: "center", gap: 7, height: 40, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    <SlidersHorizontal size={15} /> Filters
+                </button>
             </div>
 
             {/* Table */}
@@ -876,11 +902,38 @@ export default function OnboardingPage() {
             ) : (
                 <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
                     <div style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 980 }}>
+                        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13, minWidth: 1020 }}>
                             <thead>
-                                <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                                    {["Employee", "Role / Designation", "Site", "Contact", "Joined On", "Progress", "Status", "Actions"].map(h => (
-                                        <th key={h} style={{ textAlign: "left", padding: "13px 16px", fontSize: 11.5, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>{h}</th>
+                                <tr>
+                                    <th style={{ padding: "13px 6px 13px 16px", borderBottom: "1px solid var(--border)", width: 40 }}>
+                                        <input type="checkbox"
+                                            checked={pageRows.length > 0 && pageRows.every(r => selectedIds.has(r.id))}
+                                            ref={el => { if (el) el.indeterminate = pageRows.some(r => selectedIds.has(r.id)) && !pageRows.every(r => selectedIds.has(r.id)) }}
+                                            onChange={e => {
+                                                setSelectedIds(prev => {
+                                                    const next = new Set(prev)
+                                                    if (e.target.checked) pageRows.forEach(r => next.add(r.id))
+                                                    else pageRows.forEach(r => next.delete(r.id))
+                                                    return next
+                                                })
+                                            }}
+                                            style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
+                                    </th>
+                                    {[
+                                        { label: "Employee", sort: true },
+                                        { label: "Role / Designation", sort: true },
+                                        { label: "Site", sort: true },
+                                        { label: "Contact", sort: true },
+                                        { label: "Joined On", sort: false },
+                                        { label: "Progress", sort: false },
+                                        { label: "Status", sort: false },
+                                        { label: "Actions", sort: false },
+                                    ].map(h => (
+                                        <th key={h.label} style={{ textAlign: "left", padding: "13px 16px", fontSize: 11.5, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", borderBottom: "1px solid var(--border)" }}>
+                                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                                {h.label}{h.sort && <ChevronsUpDown size={12} style={{ opacity: 0.5 }} />}
+                                            </span>
+                                        </th>
                                     ))}
                                 </tr>
                             </thead>
@@ -890,6 +943,8 @@ export default function OnboardingPage() {
                                         key={record.id}
                                         record={record}
                                         expanded={expandedId === record.id}
+                                        checked={selectedIds.has(record.id)}
+                                        onCheck={() => setSelectedIds(prev => { const n = new Set(prev); n.has(record.id) ? n.delete(record.id) : n.add(record.id); return n })}
                                         onToggle={() => setExpandedId(id => id === record.id ? null : record.id)}
                                         onOpen={() => setSelected(record)}
                                         onApprove={() => { if (confirm("Approve this employee's onboarding?")) handleAction(record.id, "approve") }}
