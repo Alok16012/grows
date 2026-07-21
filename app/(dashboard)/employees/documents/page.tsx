@@ -3,7 +3,11 @@ import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Search, Download, Trash2, Loader2, Eye, Upload, Users, FileText, CheckCircle2, AlertCircle, Filter } from "lucide-react"
+import {
+    Search, Download, Trash2, Loader2, Eye, Upload, Users, FileText,
+    CheckCircle2, AlertCircle, Filter, Clock, ShieldCheck, MoreVertical,
+    ChevronLeft, ChevronRight, Info, X,
+} from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { can } from "@/lib/can"
 
@@ -31,14 +35,14 @@ type Employee = {
 
 // ─── Document columns shown in the table ─────────────────────────────────────
 const DOC_COLS = [
-    { key: "AADHAAR",      label: "Aadhaar",      color: "#1d4ed8", bg: "#dbeafe" },
-    { key: "PAN",          label: "PAN",          color: "#b45309", bg: "#fef3c7" },
-    { key: "PHOTO",        label: "Photo",        color: "#15803d", bg: "#dcfce7" },
-    { key: "BANK_DETAILS", label: "Bank Details", color: "#0369a1", bg: "#e0f2fe" },
-    { key: "CERTIFICATE",  label: "Certificate",  color: "#0f766e", bg: "#ccfbf1" },
-    { key: "RESUME",       label: "Resume",       color: "#7c3aed", bg: "#ede9fe" },
-    { key: "OFFER_LETTER", label: "Offer Letter", color: "#9333ea", bg: "#f3e8ff" },
-    { key: "OTHER",        label: "Other",        color: "#6b7280", bg: "#f3f4f6" },
+    { key: "AADHAAR",      label: "Aadhaar",      hint: "Aadhaar card (front & back)",   color: "#1d4ed8", bg: "#dbeafe" },
+    { key: "PAN",          label: "PAN",          hint: "PAN card",                       color: "#b45309", bg: "#fef3c7" },
+    { key: "PHOTO",        label: "Photo",        hint: "Passport-size photo",            color: "#15803d", bg: "#dcfce7" },
+    { key: "OFFER_LETTER", label: "Agreement",    hint: "Offer letter / agreement",       color: "#9333ea", bg: "#f3e8ff" },
+    { key: "BANK_DETAILS", label: "Bank Proof",   hint: "Passbook / cancelled cheque",    color: "#0369a1", bg: "#e0f2fe" },
+    { key: "CERTIFICATE",  label: "Certificate",  hint: "Educational certificate",        color: "#0f766e", bg: "#ccfbf1" },
+    { key: "RESUME",       label: "Resume",       hint: "Resume / CV",                    color: "#7c3aed", bg: "#ede9fe" },
+    { key: "OTHER",        label: "Other",        hint: "Any other document",             color: "#6b7280", bg: "#f3f4f6" },
 ]
 
 // Sentinel id for a PHOTO cell synthesised from the employee's profile photo
@@ -63,8 +67,24 @@ function DocCell({
 }) {
     const [uploading, setUploading] = useState(false)
     const [deleting, setDeleting]   = useState(false)
+    const [verifying, setVerifying] = useState(false)
     const [fetchingFile, setFetchingFile] = useState(false)
     const fileRef = useRef<HTMLInputElement>(null)
+
+    const handleVerify = async () => {
+        if (!doc || doc.id === PROFILE_PHOTO_ID) return
+        setVerifying(true)
+        try {
+            const r = await fetch(`/api/employees/${empId}/documents/${doc.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "VERIFIED" }),
+            })
+            if (r.ok) { toast.success("Document verified"); onUploaded() }
+            else toast.error("Verify failed")
+        } catch { toast.error("Verify error") }
+        finally { setVerifying(false) }
+    }
 
     // The bulk list omits the base64 `fileUrl` for speed. Resolve it lazily the
     // first time the user views/downloads a document. Profile-photo cells carry
@@ -140,19 +160,13 @@ function DocCell({
     // ── Not uploaded ──────────────────────────────────────────────────────────
     if (!doc) {
         return (
-            <div className="flex flex-col items-center justify-center gap-1.5 h-full min-h-[64px] px-2">
-                <div className="flex items-center gap-1 text-[10px] font-semibold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-                    <AlertCircle size={9} /> Not Uploaded
-                </div>
+            <div className="flex flex-col items-start gap-2 px-3 py-3 min-h-[60px]">
+                <span className="text-[11px] font-semibold text-[#dc2626] bg-[#fef2f2] px-2.5 py-1 rounded-full">Not Uploaded</span>
                 {isAdmin && (
                     <>
-                        <button
-                            onClick={() => fileRef.current?.click()}
-                            disabled={uploading}
-                            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-[4px] bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50"
-                        >
-                            {uploading ? <Loader2 size={9} className="animate-spin" /> : <Upload size={9} />}
-                            Upload
+                        <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#15803d] hover:underline disabled:opacity-50">
+                            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Upload
                         </button>
                         <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleUpload} />
                     </>
@@ -162,36 +176,54 @@ function DocCell({
     }
 
     // ── Uploaded ──────────────────────────────────────────────────────────────
-    const statusColor = doc.status === "VERIFIED" ? "#14532d" : doc.status === "REJECTED" ? "#991b1b" : "#92400e"
-    const statusBg    = doc.status === "VERIFIED" ? "#dcfce7" : doc.status === "REJECTED" ? "#fef2f2" : "#fffbeb"
+    const isVerified = doc.status === "VERIFIED"
+    const isRejected = doc.status === "REJECTED"
+    const badge = isVerified
+        ? { label: "Verified", color: "#15803d", bg: "#dcfce7" }
+        : isRejected
+            ? { label: "Rejected", color: "#dc2626", bg: "#fef2f2" }
+            : { label: "Pending", color: "#b45309", bg: "#fef3c7" }
 
     return (
-        <div className="flex flex-col gap-1 px-2 py-1.5 min-h-[64px]">
-            {/* filename + status */}
-            <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ color: statusColor, background: statusBg }}>
-                    {doc.status === "VERIFIED" ? "✓" : doc.status === "REJECTED" ? "✗" : "●"} {doc.status}
-                </span>
-            </div>
-            <p className="text-[11px] text-[#1a1a18] truncate max-w-[120px]" title={doc.fileName}>{doc.fileName}</p>
-            {/* actions */}
-            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+        <div className="flex flex-col items-start gap-2 px-3 py-3 min-h-[60px]">
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ color: badge.color, background: badge.bg }}>
+                {badge.label}
+            </span>
+            <div className="flex items-center gap-3 flex-wrap">
+                {/* Verify link for pending docs */}
+                {isAdmin && !isVerified && doc.id !== PROFILE_PHOTO_ID && (
+                    <button onClick={handleVerify} disabled={verifying}
+                        className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#2563eb] hover:underline disabled:opacity-50">
+                        {verifying ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Verify
+                    </button>
+                )}
                 <button onClick={handleView} disabled={fetchingFile}
-                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50">
-                    {fetchingFile ? <Loader2 size={9} className="animate-spin" /> : <Eye size={9} />} View
+                    className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#2563eb] hover:underline disabled:opacity-50">
+                    {fetchingFile ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} View
                 </button>
                 <button onClick={handleDownload} disabled={fetchingFile}
-                    className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">
-                    <Download size={9} /> Download
+                    className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#15803d] hover:underline disabled:opacity-50">
+                    <Download size={12} /> Download
                 </button>
                 {isAdmin && doc.id !== PROFILE_PHOTO_ID && (
                     <button onClick={handleDelete} disabled={deleting}
-                        className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-[4px] bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">
-                        {deleting ? <Loader2 size={9} className="animate-spin" /> : <Trash2 size={9} />} Delete
+                        className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#dc2626] hover:underline disabled:opacity-50">
+                        {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                     </button>
                 )}
             </div>
         </div>
+    )
+}
+
+// ─── Pagination arrow button ─────────────────────────────────────────────────
+function PageBtn({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button onClick={onClick} disabled={disabled}
+            className="w-[34px] h-[34px] rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] flex items-center justify-center"
+            style={{ opacity: disabled ? 0.4 : 1, cursor: disabled ? "default" : "pointer" }}>
+            {children}
+        </button>
     )
 }
 
@@ -205,8 +237,13 @@ export default function MasterDocumentsPage() {
     const [loading, setLoading]     = useState(true)
     const [search, setSearch]       = useState("")
     const [siteFilter, setSiteFilter] = useState("ALL")
-    const [statusFilter, setStatusFilter] = useState("ALL") // ALL | COMPLETE | MISSING
+    const [statusFilter, setStatusFilter] = useState("ALL") // ALL | COMPLETE | MISSING | PENDING
+    const [docTypeFilter, setDocTypeFilter] = useState("ALL")
+    const [page, setPage] = useState(1)
+    const [perPage, setPerPage] = useState(25)
     const [viewer, setViewer]       = useState<{ url: string; name: string } | null>(null)
+
+    useEffect(() => { setPage(1) }, [search, siteFilter, statusFilter, docTypeFilter, perPage])
 
     useEffect(() => { if (status === "unauthenticated") router.push("/login") }, [status, router])
 
@@ -254,8 +291,14 @@ export default function MasterDocumentsPage() {
     // employee simply has a profile photo set (onboarding/modal upload path).
     const hasDoc = (emp: Employee, key: string) =>
         !!docMap.get(emp.id)?.has(key) || (key === "PHOTO" && !!emp.photo)
-    const fullyVerified = employees.filter(e => DOC_COLS.every(c => hasDoc(e, c.key))).length
-    const missingAny = totalEmployees - fullyVerified
+    const allPresent = employees.filter(e => DOC_COLS.every(c => hasDoc(e, c.key))).length
+    const missingAny = totalEmployees - allPresent
+    // Employees with at least one uploaded document still awaiting verification.
+    const verificationPending = employees.filter(e => {
+        const m = docMap.get(e.id)
+        return m && Array.from(m.values()).some(d => d.status === "PENDING")
+    }).length
+    const pctOf = (n: number) => totalEmployees > 0 ? `${((n / totalEmployees) * 100).toFixed(1)}%` : "0%"
 
     // Filtered rows
     const filtered = employees.filter(emp => {
@@ -273,168 +316,232 @@ export default function MasterDocumentsPage() {
         if (statusFilter === "MISSING") {
             if (DOC_COLS.every(c => hasDoc(emp, c.key))) return false
         }
+        if (statusFilter === "PENDING") {
+            const m = docMap.get(emp.id)
+            if (!m || !Array.from(m.values()).some(d => d.status === "PENDING")) return false
+        }
         return true
     })
+
+    // Which doc columns to show — "All" shows every type, else just the one.
+    const visibleCols = docTypeFilter === "ALL" ? DOC_COLS : DOC_COLS.filter(c => c.key === docTypeFilter)
+
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+    const safePage = Math.min(page, totalPages)
+    const pageRows = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+    const anyFilter = search || siteFilter !== "ALL" || statusFilter !== "ALL" || docTypeFilter !== "ALL"
 
     // Upload/manage rights are permission-driven: ADMIN, or any custom role that
     // has been granted "Upload Documents". Base roles get nothing implicitly.
     const isAdmin = can(session, "documents.upload")
 
     return (
-        <div className="p-4 lg:p-6 max-w-full mx-auto">
+        <div className="p-4 lg:p-6 max-w-full mx-auto flex flex-col gap-5">
             {/* Header */}
-            <div className="mb-5 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-[10px] bg-[#e8f7f1] flex items-center justify-center shrink-0">
-                    <FileText size={20} className="text-[#1a9e6e]" />
-                </div>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                    <h1 className="text-[20px] font-semibold text-[#1a1a18]">Document Management</h1>
-                    <p className="text-[12px] text-[#6b6860]">All employee documents — manage, upload and verify</p>
+                    <h1 className="text-[24px] font-bold text-[var(--text)] tracking-[-0.4px]">Document Management</h1>
+                    <p className="text-[13px] text-[var(--text3)] mt-1">Manage, upload and verify all employee documents in one place.</p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                    <button className="flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                        <Download size={16} /> Export
+                    </button>
+                    {isAdmin && (
+                        <button onClick={() => toast.info("Use the per-document Upload buttons in each employee's row.")}
+                            className="flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent,#1a9e6e)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                            style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                            <Upload size={16} /> Upload Documents
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {[
-                    { label: "Total Employees", value: totalEmployees, color: "#3b82f6", bg: "#eff6ff",  icon: <Users size={15} /> },
-                    { label: "Total Documents", value: totalDocs,      color: "#1a9e6e", bg: "#e8f7f1",  icon: <FileText size={15} /> },
-                    { label: "All Docs Present", value: fullyVerified,  color: "#14532d", bg: "#dcfce7",  icon: <CheckCircle2 size={15} /> },
-                    { label: "Missing Docs",     value: missingAny,     color: "#dc2626", bg: "#fef2f2",  icon: <AlertCircle size={15} /> },
+                    { label: "Total Employees",      value: totalEmployees,       sub: "100%",              color: "#3b82f6", bg: "#eff6ff", icon: Users },
+                    { label: "Total Documents",      value: totalDocs,            sub: "100%",              color: "#1a9e6e", bg: "#e8f7f1", icon: FileText },
+                    { label: "All Docs Present",     value: allPresent,           sub: pctOf(allPresent),   color: "#15803d", bg: "#dcfce7", icon: CheckCircle2 },
+                    { label: "Missing Docs",         value: missingAny,           sub: pctOf(missingAny),   color: "#dc2626", bg: "#fef2f2", icon: AlertCircle },
+                    { label: "Verification Pending", value: verificationPending,  sub: pctOf(verificationPending), color: "#d97706", bg: "#fef3c7", icon: Clock },
                 ].map(s => (
-                    <div key={s.label} className="bg-white border border-[#e8e6e1] rounded-[12px] p-3 flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-[7px] flex items-center justify-center shrink-0" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                        <div>
-                            <p className="text-[10px] text-[#6b6860]">{s.label}</p>
-                            <p className="text-[18px] font-bold leading-tight" style={{ color: s.color }}>{s.value}</p>
+                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: s.bg }}>
+                            <s.icon size={20} style={{ color: s.color }} />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{s.label}</p>
+                            <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: s.color }}>{s.value}</p>
+                            <p className="text-[11px] text-[var(--text3)]">{s.sub}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-2 mb-4 items-center">
-                <div className="relative flex-1 min-w-[180px] max-w-[300px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[#9e9b95]" />
-                    <input placeholder="Search employee, ID…"
-                        className="w-full pl-8 pr-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] placeholder:text-[#9e9b95] outline-none focus:border-[#1a9e6e]"
+            <div className="flex flex-wrap gap-2.5 items-center">
+                <div className="relative flex-1 min-w-[200px] max-w-[320px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)]" />
+                    <input placeholder="Search by employee name or ID..."
+                        className="w-full h-10 pl-9 pr-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] placeholder:text-[var(--text3)] outline-none focus:border-[var(--accent)]"
                         value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
-                    className="px-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] text-[#6b6860] outline-none cursor-pointer">
+                    className="h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
                     {sites.map(s => <option key={s} value={s}>{s === "ALL" ? "All Sites" : s}</option>)}
                 </select>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 bg-white border border-[#e8e6e1] rounded-[8px] text-[12px] text-[#6b6860] outline-none cursor-pointer">
+                    className="h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
                     <option value="ALL">All Status</option>
                     <option value="COMPLETE">All Docs Present</option>
                     <option value="MISSING">Missing Docs</option>
+                    <option value="PENDING">Verification Pending</option>
                 </select>
-                <span className="text-[11px] text-[#9e9b95] ml-auto flex items-center gap-1">
-                    <Filter size={11} /> {filtered.length} employees
+                <select value={docTypeFilter} onChange={e => setDocTypeFilter(e.target.value)}
+                    className="h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
+                    <option value="ALL">All Document Types</option>
+                    {DOC_COLS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+                {anyFilter && (
+                    <button onClick={() => { setSearch(""); setSiteFilter("ALL"); setStatusFilter("ALL"); setDocTypeFilter("ALL") }}
+                        className="h-10 px-3 rounded-[10px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center gap-1.5">
+                        <X size={14} /> Clear
+                    </button>
+                )}
+                <span className="text-[12.5px] text-[var(--text3)] ml-auto flex items-center gap-1.5 whitespace-nowrap">
+                    <Users size={14} /> {filtered.length} employees
                 </span>
             </div>
 
             {/* Table */}
             {loading ? (
                 <div className="flex items-center justify-center py-16">
-                    <Loader2 className="animate-spin text-[#1a9e6e]" size={26} />
+                    <Loader2 className="animate-spin text-[var(--accent)]" size={26} />
                 </div>
             ) : filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-14 gap-3 bg-white border border-[#e8e6e1] rounded-[14px]">
-                    <FileText size={32} className="text-[#c8c5bf]" />
-                    <p className="text-[13px] text-[#9e9b95]">No employees found</p>
+                <div className="flex flex-col items-center justify-center py-14 gap-3 bg-[var(--surface)] border border-[var(--border)] rounded-[14px]">
+                    <FileText size={32} className="text-[var(--text3)]" />
+                    <p className="text-[13px] text-[var(--text3)]">No employees found</p>
                 </div>
             ) : (
-                <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-x-auto">
-                    <table className="w-full min-w-[900px] border-collapse text-[12px]">
-                        <thead>
-                            <tr className="bg-[#f9f8f5] border-b border-[#e8e6e1]">
-                                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#9e9b95] uppercase tracking-wider w-[100px]">Emp ID</th>
-                                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#9e9b95] uppercase tracking-wider w-[160px]">Employee Name</th>
-                                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#9e9b95] uppercase tracking-wider w-[100px]">Site</th>
-                                {DOC_COLS.map(col => (
-                                    <th key={col.key} className="text-center px-2 py-3 text-[10px] font-semibold uppercase tracking-wider min-w-[130px]"
-                                        style={{ color: col.color }}>
-                                        {col.label}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map((emp, i) => {
-                                const empDocs = docMap.get(emp.id)
-                                const hasAll  = empDocs && DOC_COLS.every(c => empDocs.has(c.key))
-                                const ac      = avatarColor(emp.firstName)
-                                return (
-                                    <tr key={emp.id}
-                                        className={`border-b border-[#f0efec] last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-[#fafaf8]"} hover:bg-[#f7fdf9] transition-colors`}>
-                                        {/* Emp ID */}
-                                        <td className="px-4 py-2 align-top pt-3">
-                                            <span className="font-mono text-[11px] text-[#6b6860] bg-[#f3f4f6] px-2 py-0.5 rounded whitespace-nowrap">
-                                                {emp.employeeId}
-                                            </span>
-                                        </td>
-                                        {/* Name */}
-                                        <td className="px-4 py-2 align-top pt-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                                                    style={{ background: ac, position: "relative", overflow: "hidden" }}>
-                                                    {emp.firstName[0]}{emp.lastName[0]}
-                                                    {emp.photo && (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={emp.photo} alt=""
-                                                            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                                                            onError={e => (e.currentTarget.style.display = "none")} />
-                                                    )}
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-[12.5px]" style={{ minWidth: 300 + visibleCols.length * 140 }}>
+                            <thead>
+                                <tr className="border-b border-[var(--border)]">
+                                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] whitespace-nowrap">Employee</th>
+                                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] whitespace-nowrap">Site</th>
+                                    {visibleCols.map(col => (
+                                        <th key={col.key} className="text-left px-3 py-3 text-[11px] font-semibold whitespace-nowrap" style={{ color: col.color }}>
+                                            <span className="inline-flex items-center gap-1" title={col.hint}>{col.label}<Info size={11} className="opacity-50" /></span>
+                                        </th>
+                                    ))}
+                                    <th className="w-10" />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pageRows.map(emp => {
+                                    const empDocs = docMap.get(emp.id)
+                                    const ac      = avatarColor(emp.firstName)
+                                    return (
+                                        <tr key={emp.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface2)] transition-colors">
+                                            {/* Employee */}
+                                            <td className="px-4 py-3 align-middle">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-mono text-[10.5px] text-[var(--text3)] bg-[var(--surface2)] px-2 py-1 rounded-md whitespace-nowrap">{emp.employeeId}</span>
+                                                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                                                        style={{ background: ac, position: "relative", overflow: "hidden" }}>
+                                                        {emp.firstName[0]}{emp.lastName[0]}
+                                                        {emp.photo && (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img src={emp.photo} alt=""
+                                                                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                                                                onError={e => (e.currentTarget.style.display = "none")} />
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-[var(--text)] whitespace-nowrap text-[13px]">{emp.firstName} {emp.lastName}</p>
+                                                        {emp.designation && <p className="text-[11px] text-[var(--text3)]">{emp.designation}</p>}
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-semibold text-[#1a1a18] whitespace-nowrap">{emp.firstName} {emp.lastName}</p>
-                                                    {emp.designation && <p className="text-[10px] text-[#9e9b95]">{emp.designation}</p>}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        {/* Site */}
-                                        <td className="px-4 py-2 align-top pt-3 text-[11px] text-[#6b6860] whitespace-nowrap">{emp.deployments?.[0]?.site?.name || "Unassigned"}</td>
-                                        {/* Doc columns */}
-                                        {DOC_COLS.map(col => {
-                                            let doc = empDocs?.get(col.key)
-                                            // Many employees have a profile photo (set via the onboarding
-                                            // form / employee modal) without a matching PHOTO document row.
-                                            // Surface that photo here so the column isn't wrongly "Not Uploaded".
-                                            if (!doc && col.key === "PHOTO" && emp.photo) {
-                                                doc = {
-                                                    id: PROFILE_PHOTO_ID,
-                                                    type: "PHOTO",
-                                                    fileName: "Profile photo",
-                                                    fileUrl: emp.photo,
-                                                    status: "VERIFIED",
-                                                    uploadedAt: new Date().toISOString(),
-                                                    employee: {
-                                                        id: emp.id, employeeId: emp.employeeId,
-                                                        firstName: emp.firstName, lastName: emp.lastName,
-                                                    },
+                                            </td>
+                                            {/* Site */}
+                                            <td className="px-4 py-3 align-middle text-[12.5px] text-[var(--text2)] whitespace-nowrap">{emp.deployments?.[0]?.site?.name || "Unassigned"}</td>
+                                            {/* Doc columns */}
+                                            {visibleCols.map(col => {
+                                                let doc = empDocs?.get(col.key)
+                                                if (!doc && col.key === "PHOTO" && emp.photo) {
+                                                    doc = {
+                                                        id: PROFILE_PHOTO_ID, type: "PHOTO", fileName: "Profile photo",
+                                                        fileUrl: emp.photo, status: "VERIFIED", uploadedAt: new Date().toISOString(),
+                                                        employee: { id: emp.id, employeeId: emp.employeeId, firstName: emp.firstName, lastName: emp.lastName },
+                                                    }
                                                 }
-                                            }
-                                            return (
-                                                <td key={col.key}
-                                                    className={`px-1 py-1 align-top border-l border-[#f0efec] ${doc ? "bg-[#f0fdf4]/40" : "bg-[#fff5f5]/60"}`}>
-                                                    <DocCell
-                                                        doc={doc}
-                                                        empId={emp.id}
-                                                        docType={col.key}
-                                                        onView={(url, name) => setViewer({ url, name })}
-                                                        onDelete={handleDeleteLocal}
-                                                        onUploaded={fetchAll}
-                                                        isAdmin={isAdmin}
-                                                    />
-                                                </td>
-                                            )
-                                        })}
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+                                                return (
+                                                    <td key={col.key} className="align-middle border-l border-[var(--border)]">
+                                                        <DocCell
+                                                            doc={doc}
+                                                            empId={emp.id}
+                                                            docType={col.key}
+                                                            onView={(url, name) => setViewer({ url, name })}
+                                                            onDelete={handleDeleteLocal}
+                                                            onUploaded={fetchAll}
+                                                            isAdmin={isAdmin}
+                                                        />
+                                                    </td>
+                                                )
+                                            })}
+                                            {/* Kebab */}
+                                            <td className="px-2 align-middle border-l border-[var(--border)]">
+                                                <button className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text3)] hover:bg-[var(--surface2)]" title="More">
+                                                    <MoreVertical size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[12.5px] text-[var(--text3)]">
+                                Showing {(safePage - 1) * perPage + 1} to {(safePage - 1) * perPage + pageRows.length} of {filtered.length} employees
+                            </span>
+                            <select value={perPage} onChange={e => setPerPage(Number(e.target.value))}
+                                className="h-9 px-3 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                                {[25, 50, 100].map(n => <option key={n} value={n}>{n} per page</option>)}
+                            </select>
+                        </div>
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1.5">
+                                <PageBtn disabled={safePage === 1} onClick={() => setPage(p => Math.max(1, p - 1))}><ChevronLeft size={15} /></PageBtn>
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    const start = Math.max(1, Math.min(totalPages - 4, safePage - 2))
+                                    const p = start + i
+                                    if (p > totalPages) return null
+                                    return (
+                                        <button key={p} onClick={() => setPage(p)}
+                                            className="min-w-[34px] h-[34px] rounded-[9px] text-[13px] font-semibold"
+                                            style={{
+                                                border: p === safePage ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                                background: p === safePage ? "var(--accent)" : "var(--surface)",
+                                                color: p === safePage ? "#fff" : "var(--text2)",
+                                            }}>{p}</button>
+                                    )
+                                })}
+                                {totalPages > 5 && safePage < totalPages - 2 && <span className="text-[var(--text3)] px-1">…</span>}
+                                {totalPages > 5 && safePage < totalPages - 2 && (
+                                    <button onClick={() => setPage(totalPages)} className="min-w-[34px] h-[34px] rounded-[9px] text-[13px] font-semibold border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)]">{totalPages}</button>
+                                )}
+                                <PageBtn disabled={safePage === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}><ChevronRight size={15} /></PageBtn>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
