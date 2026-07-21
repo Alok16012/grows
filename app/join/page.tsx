@@ -62,12 +62,15 @@ const TABS = [
     { key: "documents",  label: "Documents" },
 ]
 
+// `type` MUST be the system-wide enum key (Document Master / employee doc
+// views): AADHAAR, PHOTO, BANK_DETAILS — not display-y variants like AADHAR /
+// PASSPORT_PHOTO / BANK_PASSBOOK, which never matched their slots.
 const DOC_TYPES: { type: string; label: string; required: boolean }[] = [
-    { type: "AADHAR",          label: "Aadhar Card",           required: true },
-    { type: "PAN",             label: "PAN Card",              required: true },
-    { type: "PASSPORT_PHOTO",  label: "Passport Size Photo",   required: true },
-    { type: "BANK_PASSBOOK",   label: "Bank Passbook / Cancelled Cheque", required: false },
-    { type: "OTHER",           label: "Any Other Document",    required: false },
+    { type: "AADHAAR",      label: "Aadhar Card",           required: true },
+    { type: "PAN",          label: "PAN Card",              required: true },
+    { type: "PHOTO",        label: "Passport Size Photo",   required: true },
+    { type: "BANK_DETAILS", label: "Bank Passbook / Cancelled Cheque", required: false },
+    { type: "OTHER",        label: "Any Other Document",    required: false },
 ]
 
 const SAFETY_ITEMS: { key: keyof FormData; label: string; icon: string }[] = [

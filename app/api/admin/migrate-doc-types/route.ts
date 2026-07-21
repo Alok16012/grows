@@ -23,6 +23,7 @@ const LABEL_TO_ENUM: Record<string, string> = {
     "photo": "PHOTO",
     "passport photo": "PHOTO",
     "passport size photo": "PHOTO",
+    "passport_photo": "PHOTO",
     "resume": "RESUME",
     "resume / cv": "RESUME",
     "cv": "RESUME",
@@ -35,6 +36,8 @@ const LABEL_TO_ENUM: Record<string, string> = {
     "bank passbook": "BANK_DETAILS",
     "bank proof / passbook": "BANK_DETAILS",
     "bank_proof": "BANK_DETAILS",
+    "bank_passbook": "BANK_DETAILS",
+    "bank passbook / cancelled cheque": "BANK_DETAILS",
     "offer letter": "OFFER_LETTER",
 }
 
