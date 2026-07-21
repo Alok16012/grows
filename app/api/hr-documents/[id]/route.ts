@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, canSendDocuments, canViewDocuments } from "@/lib/permissions"
 import { ensureHrDocRecallSchema, type HrDocHistoryEvent } from "@/lib/hr-doc-schema"
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
@@ -30,7 +30,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     // Any HrDocument read/write below selects the recall audit columns, so make
     // sure they exist first (prod migrations don't auto-run).
     await ensureHrDocRecallSchema()
-    if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+    if (!session || !canSendDocuments(session)) {
         // Allow employees to acknowledge their own documents
         if (session) {
             const body = await req.json()
@@ -129,7 +129,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, [], "documents.view")) return new NextResponse("Forbidden", { status: 403 })
+    if (!session || !canViewDocuments(session)) return new NextResponse("Forbidden", { status: 403 })
     try {
         await prisma.hrDocument.delete({ where: { id: params.id } })
         return new NextResponse(null, { status: 204 })

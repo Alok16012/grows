@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X, Undo2, RotateCcw, History, PenLine, Trash2, Lock } from "lucide-react"
-import { can } from "@/lib/can"
+import { can, canAny } from "@/lib/can"
 
 type DocType = { id: string; name: string; requiresApproval: boolean; templateContent?: string }
 
@@ -68,7 +68,7 @@ export default function SendDocumentsPage() {
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && !can(session, "documents.view")) router.push("/")
+        if (status === "authenticated" && !canAny(session, ["documents.send", "documents.view"])) router.push("/")
     }, [status, session, router])
 
     const fetchIssued = useCallback(async () => {
@@ -251,7 +251,7 @@ export default function SendDocumentsPage() {
     // the same PUT endpoint and refresh the list; history is kept server-side.
     const [busyId, setBusyId] = useState<string | null>(null)
     const [historyDoc, setHistoryDoc] = useState<IssuedDoc | null>(null)
-    const canManage = can(session, "documents.upload")
+    const canManage = canAny(session, ["documents.send", "documents.view", "documents.upload"])
 
     const recallDoc = async (d: IssuedDoc) => {
         const reason = window.prompt(

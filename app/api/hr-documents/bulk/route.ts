@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, canSendDocuments } from "@/lib/permissions"
 import { generateDocNumber, fillTemplate, buildDocVars } from "@/lib/hr-document"
 import { ensureHrDocRecallSchema, getUserSignature } from "@/lib/hr-doc-schema"
 
@@ -14,7 +14,7 @@ export const maxDuration = 60
 // (status ISSUED) so employees can see/download them immediately.
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+    if (!session || !canSendDocuments(session)) {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

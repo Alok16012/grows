@@ -55,6 +55,9 @@ type NavLink = {
     icon: any
     roles: string[]
     permission?: string
+    // Visible if the user holds ANY of these permissions (OR). Use when a
+    // page is reachable through more than one permission.
+    permissionAny?: string[]
     badge?: boolean
     subLinks?: { name: string; href: string }[]
     // Extra path prefixes that should mark this link active (e.g. the
@@ -142,7 +145,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Jobs",             href: "/jobs",                icon: Briefcase,    roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "jobs.view" },
                 { name: "Onboarding",       href: "/onboarding",          icon: ClipboardList, roles: ["ADMIN", "MANAGER"], permission: "onboarding.view" },
                 { name: "Documents",        href: "/employees/documents", icon: Files,        roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
-                { name: "Send Documents",   href: "/documents/send",      icon: SendHorizontal, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
+                { name: "Send Documents",   href: "/documents/send",      icon: SendHorizontal, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permissionAny: ["documents.send", "documents.view"] },
             ],
         },
 
@@ -267,6 +270,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                         // Everything is gated PURELY by custom-role permissions now.
                         // No hardcoded role (MANAGER/HR_MANAGER/INSPECTION_BOY/CLIENT)
                         // grants anything — Admin → Roles is the single source of truth.
+                        if (link.permissionAny) return link.permissionAny.some(p => userPermissions.includes(p))
                         if (link.permission) return userPermissions.includes(link.permission)
 
                         // No universal exceptions: a link without a permission is

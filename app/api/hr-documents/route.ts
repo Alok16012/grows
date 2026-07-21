@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, canSendDocuments, canViewDocuments } from "@/lib/permissions"
 import { ensureHrDocRecallSchema, getUserSignature } from "@/lib/hr-doc-schema"
 
 function generateDocNumber() {
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
         //    one manager/HR must not see another's sends.
         //  • Everyone else (employees)     → only their own received ISSUED docs.
         const isAdmin = session.user.role === "ADMIN"
-        const canManage = checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+        const canManage = canViewDocuments(session)
         if (isAdmin) {
             // no extra scoping
         } else if (canManage) {
@@ -81,7 +81,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+    if (!session || !canSendDocuments(session)) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     try {
@@ -155,7 +155,7 @@ export async function DELETE(req: Request) {
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
     const isAdmin = session.user.role === "ADMIN"
-    const canManage = checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+    const canManage = canSendDocuments(session)
     if (!isAdmin && !canManage) return new NextResponse("Forbidden", { status: 403 })
 
     const scope = new URL(req.url).searchParams.get("scope") || "mine"

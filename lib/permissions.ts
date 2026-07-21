@@ -113,6 +113,7 @@ export const PERMISSION_GROUPS = [
         key: "documents",
         permissions: [
             { key: "documents.view",   label: "View Documents" },
+            { key: "documents.send",   label: "Send / Issue Documents" },
             { key: "documents.upload", label: "Upload Documents" },
             { key: "documents.verify", label: "Verify Documents" },
         ]
@@ -303,4 +304,20 @@ export function checkAccess(
     void allowedRoles
     if (session.user.role === "ADMIN") return true
     return !!(permission && session.user.permissions?.includes(permission))
+}
+
+type PermSession = { user: { role: string; permissions?: string[] } } | null | undefined
+
+// Sending / issuing documents (Send Documents module, recall, clear, doc types)
+// is granted by the dedicated `documents.send` permission OR the broader
+// `documents.view` — the latter kept for backward compatibility with roles
+// created before `documents.send` existed.
+export function canSendDocuments(session: PermSession): boolean {
+    return checkAccess(session, [], "documents.send") || checkAccess(session, [], "documents.view")
+}
+
+// Viewing documents is granted by `documents.view` OR, for senders who need to
+// see what they issued, `documents.send`.
+export function canViewDocuments(session: PermSession): boolean {
+    return checkAccess(session, [], "documents.view") || checkAccess(session, [], "documents.send")
 }

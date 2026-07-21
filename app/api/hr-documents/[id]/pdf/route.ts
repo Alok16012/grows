@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import { authOptions } from "@/lib/auth"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, canViewDocuments } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
 import { ensureHrDocRecallSchema, getUserSignature } from "@/lib/hr-doc-schema"
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer"
@@ -42,7 +42,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
         // Managers/HR can view any document; an employee can only view their own
         // issued document.
-        const isManager = checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+        const isManager = canViewDocuments(session)
         if (!isManager) {
             if (doc.employee.userId !== session.user.id || doc.status !== "ISSUED") {
                 return new NextResponse("Forbidden", { status: 403 })

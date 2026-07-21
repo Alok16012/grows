@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, canSendDocuments } from "@/lib/permissions"
 import { fillTemplate, buildDocVars } from "@/lib/hr-document"
 
 // POST /api/hr-documents/preview
@@ -10,7 +10,7 @@ import { fillTemplate, buildDocVars } from "@/lib/hr-document"
 // employee so the sender can see exactly what will be issued before sending.
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+    if (!session || !canSendDocuments(session)) {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

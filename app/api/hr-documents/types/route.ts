@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, canSendDocuments } from "@/lib/permissions"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
@@ -22,7 +22,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, ["HR_MANAGER"], "documents.view")) {
+    if (!session || !canSendDocuments(session)) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     try {
