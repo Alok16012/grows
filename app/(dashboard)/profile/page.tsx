@@ -193,11 +193,13 @@ function MyDetailsTab() {
 }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-const DOC_TYPES = ["AADHAAR","PAN","RESUME","PHOTO","CERTIFICATE","BANK_PROOF","OFFER_LETTER","OTHER"]
+// Types MUST match the system-wide enum keys (Document Master, employee doc
+// views) — BANK_DETAILS, not BANK_PROOF — so uploads map to the right slots.
+const DOC_TYPES = ["AADHAAR","PAN","RESUME","PHOTO","CERTIFICATE","BANK_DETAILS","OFFER_LETTER","OTHER"]
 const DOC_LABELS: Record<string, string> = {
     AADHAAR:"Aadhaar Card", PAN:"PAN Card", RESUME:"Resume / CV",
     PHOTO:"Passport Photo", CERTIFICATE:"Educational Certificate",
-    BANK_PROOF:"Bank Proof / Passbook", OFFER_LETTER:"Offer Letter", OTHER:"Other Document"
+    BANK_DETAILS:"Bank Proof / Passbook", OFFER_LETTER:"Offer Letter", OTHER:"Other Document"
 }
 
 function statusBadge(s: string) {

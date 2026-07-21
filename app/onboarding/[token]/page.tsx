@@ -68,7 +68,17 @@ const EMPTY: FormData = {
 }
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
-const DOC_TYPES = ["Aadhaar Card", "PAN Card", "Photo", "Resume", "Educational Certificates", "Bank Proof"]
+// `type` MUST be the enum key the rest of the system uses (Document Master,
+// employee document views). Storing the human label here previously meant
+// onboarding docs never matched those slots and looked "missing".
+const DOC_TYPES: { type: string; label: string }[] = [
+    { type: "AADHAAR",      label: "Aadhaar Card" },
+    { type: "PAN",          label: "PAN Card" },
+    { type: "PHOTO",        label: "Photo" },
+    { type: "RESUME",       label: "Resume" },
+    { type: "CERTIFICATE",  label: "Educational Certificates" },
+    { type: "BANK_DETAILS", label: "Bank Proof" },
+]
 
 const STEPS = [
     { id: 1, label: "Personal", icon: User },
@@ -195,7 +205,7 @@ export default function OnboardingPortal() {
         }
     }
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: string, label: string) => {
         const file = e.target.files?.[0]
         if (!file) return
         setUploadingDocs(p => ({ ...p, [type]: true }))
@@ -206,9 +216,9 @@ export default function OnboardingPortal() {
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
             setDocs(p => [...p.filter(d => d.type !== type), { type, fileName: file.name, fileUrl: data.url }])
-            toast.success(`${type} uploaded`)
+            toast.success(`${label} uploaded`)
         } catch {
-            toast.error(`Failed to upload ${type}`)
+            toast.error(`Failed to upload ${label}`)
         } finally {
             setUploadingDocs(p => ({ ...p, [type]: false }))
         }
@@ -587,7 +597,7 @@ export default function OnboardingPortal() {
                             <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 20 }}>Upload clear, legible copies of each document.</p>
 
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                {DOC_TYPES.map(type => {
+                                {DOC_TYPES.map(({ type, label }) => {
                                     const exist = docs.find(d => d.type === type)
                                     const uploading = uploadingDocs[type]
                                     return (
@@ -597,7 +607,7 @@ export default function OnboardingPortal() {
                                                     <FileText size={16} style={{ color: exist ? "#4ade80" : "#6b7280" }} />
                                                 </div>
                                                 <div style={{ minWidth: 0 }}>
-                                                    <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 1px", color: "#fff" }}>{type}</p>
+                                                    <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 1px", color: "#fff" }}>{label}</p>
                                                     {exist
                                                         ? <p style={{ fontSize: 11, color: exist.status === "REJECTED" ? "#f87171" : "#4ade80", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                             {exist.status === "REJECTED" ? `Rejected: ${exist.rejectionReason}` : `Uploaded: ${exist.fileName}`}
@@ -609,7 +619,7 @@ export default function OnboardingPortal() {
                                                 <div style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.4)", background: "rgba(99,102,241,0.08)", cursor: uploading ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 500, color: "#a5b4fc", opacity: uploading ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}>
                                                     {uploading ? <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Uploading</> : exist ? "Re-upload" : "Upload"}
                                                 </div>
-                                                <input type="file" style={{ display: "none" }} disabled={uploading} onChange={e => handleFileChange(e, type)} />
+                                                <input type="file" style={{ display: "none" }} disabled={uploading} onChange={e => handleFileChange(e, type, label)} />
                                             </label>
                                         </div>
                                     )
