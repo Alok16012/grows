@@ -295,6 +295,30 @@ export default function SendDocumentsPage() {
         }
     }
 
+    // Wipe issued documents. Admins can clear everything (fresh start after the
+    // old "everyone saw everything" mess); everyone else clears only their own sends.
+    const isAdmin = session?.user?.role === "ADMIN"
+    const [clearing, setClearing] = useState(false)
+    const clearDocs = async (scope: "mine" | "all") => {
+        const msg = scope === "all"
+            ? "Delete ALL issued documents for EVERYONE? This permanently removes every letter that was ever sent and cannot be undone."
+            : "Delete all documents YOU have sent? This permanently removes them and cannot be undone."
+        if (!confirm(msg)) return
+        if (scope === "all" && !confirm("Are you absolutely sure? This wipes the entire issued-documents history.")) return
+        setClearing(true)
+        try {
+            const res = await fetch(`/api/hr-documents?scope=${scope}`, { method: "DELETE" })
+            if (!res.ok) throw new Error(await res.text() || "Failed")
+            const data = await res.json()
+            toast.success(`Cleared ${data.deleted} document(s)`)
+            await fetchIssued()
+        } catch (e) {
+            toast.error((e as Error).message)
+        } finally {
+            setClearing(false)
+        }
+    }
+
     const scopeBtn = (s: Scope, label: string, Icon: typeof Users) => (
         <button
             type="button"
@@ -477,7 +501,29 @@ export default function SendDocumentsPage() {
 
             {/* Recently issued */}
             <div className="mt-7">
-                <h2 className="text-[15px] font-semibold text-[var(--text)] mb-3 flex items-center gap-2"><FileText size={16} /> Issued documents</h2>
+                <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                    <h2 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2"><FileText size={16} /> Issued documents</h2>
+                    {canManage && issued.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => clearDocs("mine")}
+                                disabled={clearing}
+                                className="inline-flex items-center gap-1.5 px-3 h-8 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors disabled:opacity-50"
+                            >
+                                {clearing ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} Clear my sends
+                            </button>
+                            {isAdmin && (
+                                <button
+                                    onClick={() => clearDocs("all")}
+                                    disabled={clearing}
+                                    className="inline-flex items-center gap-1.5 px-3 h-8 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--red)] hover:bg-red-50 transition-colors disabled:opacity-50"
+                                >
+                                    <Trash2 size={13} /> Clear all (everyone)
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
                     {issued.length === 0 ? (
                         <p className="px-4 py-6 text-[13px] text-[var(--text3)] text-center">No documents issued yet.</p>

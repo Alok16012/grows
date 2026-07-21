@@ -28,9 +28,21 @@ export async function GET(req: Request) {
         if (status) where.status = status
         if (employeeId) where.employeeId = employeeId
         if (typeId) where.typeId = typeId
-        // Self-service: anyone WITHOUT the management permission sees only their
-        // own ISSUED documents (scoped to their linked employee). Role-independent.
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+        // Visibility rules:
+        //  • ADMIN                         → every document (oversight).
+        //  • Sender (has documents.view)   → only the documents THEY issued —
+        //    one manager/HR must not see another's sends.
+        //  • Everyone else (employees)     → only their own received ISSUED docs.
+        const isAdmin = session.user.role === "ADMIN"
+        const canManage = checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+        if (isAdmin) {
+            // no extra scoping
+        } else if (canManage) {
+            where.OR = [
+                { createdBy: session.user.id },
+                { issuedBy: session.user.id },
+            ]
+        } else {
             const emp = await prisma.employee.findFirst({ where: { userId: session.user.id } })
             if (!emp) return NextResponse.json([])
             where.employeeId = emp.id
@@ -130,6 +142,37 @@ export async function POST(req: Request) {
         return NextResponse.json(doc)
     } catch (e) {
         console.error("[HR_DOCS_POST]", e)
+        return new NextResponse("Internal Error", { status: 500 })
+    }
+}
+
+// DELETE /api/hr-documents — clear issued documents.
+//   • ?scope=mine  → the caller's own sends (any manager/HR with documents.view)
+//   • ?scope=all   → every document (ADMIN only)
+// Used to wipe the mess left by the old "everyone sees everything" behaviour.
+export async function DELETE(req: Request) {
+    const session = await getServerSession(authOptions)
+    if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+    const isAdmin = session.user.role === "ADMIN"
+    const canManage = checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+    if (!isAdmin && !canManage) return new NextResponse("Forbidden", { status: 403 })
+
+    const scope = new URL(req.url).searchParams.get("scope") || "mine"
+    try {
+        await ensureHrDocRecallSchema()
+        let where: Record<string, unknown>
+        if (scope === "all") {
+            if (!isAdmin) return new NextResponse("Only an admin can clear all documents", { status: 403 })
+            where = {}
+        } else {
+            // Own sends only.
+            where = { OR: [{ createdBy: session.user.id }, { issuedBy: session.user.id }] }
+        }
+        const { count } = await prisma.hrDocument.deleteMany({ where })
+        return NextResponse.json({ deleted: count })
+    } catch (e) {
+        console.error("[HR_DOCS_DELETE]", e)
         return new NextResponse("Internal Error", { status: 500 })
     }
 }
