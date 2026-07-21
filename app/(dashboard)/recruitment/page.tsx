@@ -9,10 +9,10 @@ import {
     Target, X, ChevronRight, Briefcase,
     MessageSquare, PhoneCall, Send, Clock, Filter,
     Edit2, Trash2, CheckCircle, Loader2,
-    StickyNote, ArrowRight,
+    StickyNote, ArrowRight, ArrowUpRight,
     UserCheck, Banknote, Building2, Wrench,
     FileText, GraduationCap, Award, BarChart2,
-    Flame, Droplet, Thermometer, CheckSquare, AlertCircle,
+    Flame, Droplet, Thermometer, Snowflake, CheckSquare, AlertCircle,
     TrendingUp, Download, Upload, Eye,
     Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera
 } from "lucide-react"
@@ -258,12 +258,12 @@ function StatusBadge({ status }: { status: string }) {
 function ScoreBadge({ score }: { score: string }) {
     const s = SCORE_CONFIG[score] ?? SCORE_CONFIG.WARM
     const icons: Record<string, React.ReactNode> = {
-        HOT:  <Flame size={10} />,
-        WARM: <Thermometer size={10} />,
-        COLD: <Droplet size={10} />,
+        HOT:  <Flame size={11} />,
+        WARM: <Flame size={11} />,
+        COLD: <Snowflake size={11} />,
     }
     return (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border"
+        <span className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full text-[11px] font-semibold border"
             style={{ color: s.color, background: s.bg, borderColor: s.border }}>
             {icons[score] ?? null}
             {s.label}
@@ -607,8 +607,19 @@ export default function RecruitmentPage() {
         const total = leads.length
         const selected = leads.filter(l => ["SELECTED", "OFFERED", "JOINED"].includes(l.status)).length
         const joined = leads.filter(l => l.status === "JOINED").length
-        const interviews = leads.filter(l => l.status === "INTERVIEW_SCHEDULED").length
-        return { total, selected, joined, interviews }
+        const interviews = leads.filter(l => ["INTERVIEW_SCHEDULED", "INTERVIEW_DONE"].includes(l.status)).length
+
+        // Real "this month" additions per metric, from createdAt.
+        const now = new Date()
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        const inMonth = (l: Lead) => l.createdAt && new Date(l.createdAt) >= monthStart
+        return {
+            total, selected, joined, interviews,
+            totalMonth:      leads.filter(inMonth).length,
+            interviewsMonth: leads.filter(l => inMonth(l) && ["INTERVIEW_SCHEDULED", "INTERVIEW_DONE"].includes(l.status)).length,
+            selectedMonth:   leads.filter(l => inMonth(l) && ["SELECTED", "OFFERED", "JOINED"].includes(l.status)).length,
+            joinedMonth:     leads.filter(l => inMonth(l) && l.status === "JOINED").length,
+        }
     }, [leads])
 
     // ── Form Handlers ──────────────────────────────────────────────────────────
@@ -874,16 +885,31 @@ export default function RecruitmentPage() {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
                     {[
-                        { label: "TOTAL CANDIDATES", value: stats.total, icon: Users, color: "#3b82f6" },
-                        { label: "INTERVIEWS", value: stats.interviews, icon: Calendar, color: "#f59e0b" },
-                        { label: "SELECTED / OFFERED", value: stats.selected, icon: UserCheck, color: "#1a9e6e" },
-                        { label: "JOINED", value: stats.joined, icon: Award, color: "#047857" },
+                        { label: "TOTAL CANDIDATES",   value: stats.total,     month: stats.totalMonth,      icon: Users,     color: "#3b82f6", bg: "#eff6ff" },
+                        { label: "INTERVIEWS",         value: stats.interviews,month: stats.interviewsMonth, icon: Calendar,  color: "#f59e0b", bg: "#fef3c7" },
+                        { label: "SELECTED / OFFERED", value: stats.selected,  month: stats.selectedMonth,   icon: UserCheck, color: "#1a9e6e", bg: "#e8f7f1" },
+                        { label: "JOINED",             value: stats.joined,    month: stats.joinedMonth,     icon: Award,     color: "#047857", bg: "#ecfdf5" },
                     ].map(s => (
-                        <div key={s.label} className="bg-white border border-[var(--border)] rounded-[12px] p-4">
-                            <p className="text-[10px] font-semibold text-[var(--text3)] tracking-wider uppercase">{s.label}</p>
-                            <p className="text-[28px] font-bold mt-1" style={{ color: s.color }}>{s.value}</p>
+                        <div key={s.label} className="bg-white border border-[var(--border)] rounded-[14px] p-[18px]">
+                            <div className="flex items-start gap-3">
+                                <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: s.bg }}>
+                                    <s.icon size={20} style={{ color: s.color }} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[10.5px] font-semibold text-[var(--text3)] tracking-wider uppercase whitespace-nowrap">{s.label}</p>
+                                    <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
+                                        <span className="text-[28px] font-bold leading-none tabular-nums" style={{ color: s.color }}>{s.value}</span>
+                                        {s.month > 0 && (
+                                            <span className="inline-flex items-center gap-0.5 text-[11.5px] font-semibold text-[#1a9e6e] whitespace-nowrap">
+                                                <ArrowUpRight size={13} className="stroke-[2.5]" />
+                                                {s.month} this month
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -1680,19 +1706,18 @@ function KanbanView({
                     ? colLeads.filter(l => l.source === "On-site Join").length
                     : 0
                 return (
-                <div key={status.key} className="flex flex-col shrink-0 w-[240px]">
-                    <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-[8px]"
-                        style={{ background: status.bg, border: `1px solid ${status.border}` }}>
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: status.color }} />
-                        <span className="text-[12px] font-semibold flex-1 truncate" style={{ color: status.color }}>{status.label}</span>
+                <div key={status.key} className="flex flex-col shrink-0 w-[248px] bg-[var(--surface2)]/60 rounded-[14px] p-2.5">
+                    <div className="flex items-center gap-2 px-1.5 py-1.5 mb-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: status.color }} />
+                        <span className="text-[13px] font-semibold flex-1 truncate" style={{ color: status.color }}>{status.label}</span>
                         {onSiteCount > 0 && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1"
                                 style={{ background: "#dcfce7", color: "#047857", border: "1px solid #86efac" }}>
                                 <CheckCircle size={9} />
-                                {onSiteCount} on-site
+                                {onSiteCount}
                             </span>
                         )}
-                        <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-white/70" style={{ color: status.color }}>
+                        <span className="text-[12px] font-bold text-[var(--text3)] tabular-nums">
                             {colLeads.length}
                         </span>
                     </div>
@@ -1733,9 +1758,10 @@ function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lea
                 </div>
             )}
             <div className="p-3">
-                <div className="flex items-start justify-between gap-1 mb-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[12px] overflow-hidden" style={{ position: "relative" }}>
+                {/* Header: avatar + name + role */}
+                <div className="flex items-start justify-between gap-1.5 mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[13px] overflow-hidden" style={{ position: "relative" }}>
                             {lead.candidateName.charAt(0).toUpperCase()}
                             {lead.profileUrl && (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -1744,61 +1770,51 @@ function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lea
                                     onError={e => (e.currentTarget.style.display = "none")} />
                             )}
                         </div>
-                        <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
+                        <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
+                            <p className="text-[11.5px] text-[var(--text3)] leading-tight line-clamp-1 mt-0.5">{lead.position}</p>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                        <PriorityDot priority={lead.priority} />
-                    </div>
+                    <PriorityDot priority={lead.priority} />
                 </div>
-                <div className="flex items-center gap-1 text-[11px] text-[var(--text2)] mb-1.5">
-                    <Briefcase size={10} className="shrink-0" />
-                    <span className="truncate">{lead.position}</span>
-                </div>
+
                 {/* Score badge */}
-                <div className="mb-2">
+                <div className="mb-2.5">
                     <ScoreBadge score={lead.score} />
                 </div>
-                <div className="flex flex-col gap-1">
+
+                {/* Detail rows */}
+                <div className="flex flex-col gap-1.5">
                     {lead.experience != null && (
-                        <span className="text-[11px] text-[var(--text3)]">{lead.experience}y exp</span>
+                        <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--text2)]">
+                            <Briefcase size={11} className="text-[var(--text3)] shrink-0" />
+                            <span>{lead.experience} yr exp</span>
+                        </div>
                     )}
                     {lead.phone && (
-                        <div className="flex items-center gap-1 text-[11px] text-[var(--text3)]">
-                            <Phone size={10} />
+                        <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--text2)]">
+                            <Phone size={11} className="text-[var(--text3)] shrink-0" />
                             <span>{lead.phone}</span>
                         </div>
                     )}
                     {lead.city && (
-                        <div className="flex items-center gap-1 text-[11px] text-[var(--text3)]">
-                            <MapPin size={10} />
-                            <span>{lead.city}</span>
+                        <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--text2)]">
+                            <MapPin size={11} className="text-[var(--text3)] shrink-0" />
+                            <span className="truncate">{lead.city}</span>
                         </div>
                     )}
                     {lead.interviewDate && (
-                        <div className="flex items-center gap-1 text-[11px] text-[#f59e0b]">
-                            <Calendar size={10} />
+                        <div className="flex items-center gap-1.5 text-[11.5px] text-[#f59e0b]">
+                            <Calendar size={11} className="shrink-0" />
                             <span>{fmt(lead.interviewDate)}</span>
                         </div>
                     )}
                 </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border)]">
-                    <span className="text-[10px] text-[var(--text3)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-full">{lead.source}</span>
-                    <div className="flex items-center gap-1.5">
-                        {lead._count?.documents ? (
-                            <span className="text-[10px] text-[var(--text3)] flex items-center gap-0.5">
-                                <FileText size={9} />{lead._count.documents}
-                            </span>
-                        ) : null}
-                        {lead._count?.activities ? (
-                            <span className="text-[10px] text-[var(--text3)] flex items-center gap-0.5">
-                                <MessageSquare size={9} />{lead._count.activities}
-                            </span>
-                        ) : null}
-                    </div>
-                </div>
+
+                {/* Recruiter footer */}
                 {lead.creator?.name && (
-                    <div className="flex items-center gap-1 mt-1.5 text-[10px] text-[var(--text3)]" title="Recruited by">
-                        <UserCheck size={10} className="shrink-0" />
+                    <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-[var(--border)] text-[11px] text-[var(--text3)]" title="Recruited by">
+                        <UserCheck size={11} className="shrink-0" />
                         <span className="truncate">{lead.creator.name}</span>
                     </div>
                 )}
