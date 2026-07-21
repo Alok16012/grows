@@ -726,18 +726,27 @@ export default function OnboardingPage() {
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [selected, setSelected] = useState<OnboardingRecord | null>(null)
     const [linkCopied, setLinkCopied] = useState(false)
+    const [shareOpen, setShareOpen] = useState(false)
+    const [shareRole, setShareRole] = useState("")
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
     useEffect(() => { setPage(1) }, [filter, debouncedSearch, perPage])
 
+    // Personalized join link — embeds the logged-in user as the HR contact (ref)
+    // and an optional role, so candidates who open it get their HR auto-assigned
+    // and the role pre-filled (no manual picking = fewer mistakes).
+    const uid = (session?.user as { id?: string })?.id || ""
+    const joinLink = `${typeof window !== "undefined" ? window.location.origin : ""}/join`
+        + `?ref=${encodeURIComponent(uid)}`
+        + (shareRole.trim() ? `&role=${encodeURIComponent(shareRole.trim())}` : "")
+
     const copyJoinLink = () => {
-        const url = `${window.location.origin}/join`
-        navigator.clipboard.writeText(url)
+        navigator.clipboard.writeText(joinLink)
         setLinkCopied(true)
         setTimeout(() => setLinkCopied(false), 2500)
-        toast.success("Join link copied to clipboard!")
+        toast.success("Personalized join link copied!")
     }
 
     // Debounce the search box so we query 300ms after typing stops.
@@ -828,9 +837,9 @@ export default function OnboardingPage() {
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
-                    <button onClick={copyJoinLink}
+                    <button onClick={() => setShareOpen(true)}
                         style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                        {linkCopied ? <><Check size={15} /> Copied!</> : <><Link2 size={15} /> Share Join Link</>}
+                        <Link2 size={15} /> Share Join Link
                     </button>
                     <button onClick={fetchRecords}
                         style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -986,6 +995,54 @@ export default function OnboardingPage() {
                     onClose={() => setSelected(null)}
                     onAction={handleAction}
                 />
+            )}
+
+            {/* Share Join Link modal */}
+            {shareOpen && (
+                <div onClick={() => setShareOpen(false)}
+                    style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                    <div onClick={e => e.stopPropagation()}
+                        style={{ background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+                        <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8f7f1", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Link2 size={18} style={{ color: "var(--accent)" }} />
+                                </div>
+                                <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", margin: 0 }}>Share Join Link</h2>
+                            </div>
+                            <button onClick={() => setShareOpen(false)} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)" }}><X size={18} /></button>
+                        </div>
+                        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+                            <p style={{ fontSize: 13, color: "var(--text2)", margin: 0, lineHeight: 1.5 }}>
+                                Yeh link candidate ko bhejo. Woh khud ko <b>aapke naam se HR contact</b> ke saath register karega — HR ko manually select nahi karna padega, mistakes kam.
+                            </p>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 6 }}>Role / Designation (optional)</label>
+                                <input value={shareRole} onChange={e => setShareRole(e.target.value)}
+                                    placeholder="e.g. Quality Inspector"
+                                    style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", fontSize: 13.5, background: "var(--surface)", color: "var(--text)", outline: "none", boxSizing: "border-box" }} />
+                                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "6px 0 0" }}>Bharoge toh candidate ke form mein designation bhi auto-fill ho jaayegi.</p>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 6 }}>Your personalized link</label>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                    <input readOnly value={joinLink}
+                                        onFocus={e => e.currentTarget.select()}
+                                        style={{ flex: 1, height: 42, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", fontSize: 12.5, background: "var(--surface2)", color: "var(--text2)", outline: "none", boxSizing: "border-box" }} />
+                                    <button onClick={copyJoinLink}
+                                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 16px", borderRadius: 10, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                        {linkCopied ? <><Check size={15} /> Copied</> : <><Copy size={15} /> Copy</>}
+                                    </button>
+                                </div>
+                            </div>
+                            <a href={`https://wa.me/?text=${encodeURIComponent(`Namaste! Growus Auto mein onboarding ke liye yeh link fill karo:\n${joinLink}`)}`}
+                                target="_blank" rel="noreferrer"
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, borderRadius: 10, border: "1px solid #25d366", background: "#25d36612", color: "#128c3e", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                                Share on WhatsApp
+                            </a>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     )

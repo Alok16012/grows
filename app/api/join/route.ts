@@ -5,20 +5,31 @@ import crypto from "crypto"
 
 // Public route — returns site + HR lists so the /join form can render
 // the Work Site and Assigned HR dropdowns without needing a session.
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const [sites, hrUsers] = await Promise.all([
+        // `ref` = the user id embedded in a personalized "Share Join Link". When
+        // present we resolve that person's name so the form can pre-fill and lock
+        // the HR contact — the candidate (and HR) don't pick it manually.
+        const ref = new URL(req.url).searchParams.get("ref")
+
+        const [sites, hrUsers, referrer] = await Promise.all([
             prisma.site.findMany({
                 where: { isActive: true },
                 select: { id: true, name: true, code: true },
                 orderBy: { name: "asc" },
             }),
             getHrContacts(),
+            ref
+                ? prisma.user.findUnique({
+                    where: { id: ref },
+                    select: { id: true, name: true, role: true, customRole: { select: { name: true } } },
+                }).catch(() => null)
+                : Promise.resolve(null),
         ])
-        return NextResponse.json({ sites, hrUsers })
+        return NextResponse.json({ sites, hrUsers, referrer })
     } catch (error) {
         console.error("[JOIN_GET]", error)
-        return NextResponse.json({ sites: [], hrUsers: [] }, { status: 200 })
+        return NextResponse.json({ sites: [], hrUsers: [], referrer: null }, { status: 200 })
     }
 }
 

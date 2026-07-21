@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import {
     Loader2, CheckCircle2, Copy, Check, AlertCircle,
-    ChevronRight, ChevronLeft, Upload, X, FileText, ImageIcon
+    ChevronRight, ChevronLeft, Upload, X, FileText, ImageIcon, Lock
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -121,15 +121,34 @@ export default function JoinPage() {
     // Site + HR dropdown options, loaded from /api/join (public GET)
     const [sites, setSites] = useState<{ id: string; name: string; code?: string | null }[]>([])
     const [hrUsers, setHrUsers] = useState<{ id: string; name: string; role?: string | null; customRole?: { name: string } | null }[]>([])
+    // When the candidate opens a personalized "Share Join Link", the sharing HR
+    // (and optionally the role) are embedded in the URL. We pre-fill and lock the
+    // HR contact + designation so the candidate/HR don't pick them manually.
+    const [referrer, setReferrer] = useState<{ id: string; name: string } | null>(null)
 
     useEffect(() => {
-        fetch("/api/join")
+        const params = new URLSearchParams(window.location.search)
+        const ref = params.get("ref") || ""
+        const role = params.get("role") || ""
+
+        fetch(`/api/join${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`)
             .then(r => r.json())
             .then(d => {
                 if (Array.isArray(d?.sites)) setSites(d.sites)
                 if (Array.isArray(d?.hrUsers)) setHrUsers(d.hrUsers)
+                if (d?.referrer?.id) {
+                    setReferrer({ id: d.referrer.id, name: d.referrer.name || "Assigned HR" })
+                    set("hrId", d.referrer.id)
+                } else if (ref) {
+                    // Ref given but user not found — still assign it so the sharer
+                    // becomes the HR contact; show a generic label.
+                    setReferrer({ id: ref, name: "Assigned HR" })
+                    set("hrId", ref)
+                }
+                if (role) set("designation", role)
             })
             .catch(() => { /* dropdowns just stay empty */ })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Docs state
@@ -424,14 +443,21 @@ export default function JoinPage() {
                                         </div>
                                         <div>
                                             <Lbl text="Assigned HR / Manager" required />
-                                            <select style={{ ...sel, borderColor: errors.hrId ? "var(--red)" : undefined }} value={form.hrId} onChange={e => { set("hrId", e.target.value); clrErr("hrId") }}>
-                                                <option value="">Select your HR contact</option>
-                                                {hrUsers.map(u => (
-                                                    <option key={u.id} value={u.id}>
-                                                        {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            {referrer ? (
+                                                <div style={{ ...sel, display: "flex", alignItems: "center", gap: 8, background: "#e8f7f1", borderColor: "#1a9e6e", color: "#0d6b4a", fontWeight: 600 }}>
+                                                    <Lock size={13} /> {referrer.name}
+                                                    <span style={{ fontSize: 11, fontWeight: 500, color: "#15803d", marginLeft: "auto" }}>Auto-assigned</span>
+                                                </div>
+                                            ) : (
+                                                <select style={{ ...sel, borderColor: errors.hrId ? "var(--red)" : undefined }} value={form.hrId} onChange={e => { set("hrId", e.target.value); clrErr("hrId") }}>
+                                                    <option value="">Select your HR contact</option>
+                                                    {hrUsers.map(u => (
+                                                        <option key={u.id} value={u.id}>
+                                                            {u.name}{u.customRole?.name ? ` — ${u.customRole.name}` : u.role ? ` — ${u.role.replace("_", " ")}` : ""}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
                                             <Err msg={errors.hrId} />
                                         </div>
                                     </div>
