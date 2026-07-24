@@ -389,7 +389,7 @@ export default function AssignmentsPage() {
     const listBox = "bg-[var(--surface2)]/40 border border-[var(--border)] rounded-[10px] max-h-[260px] overflow-y-auto"
 
     return (
-        <div className="pb-8">
+        <div className="p-4 lg:p-0 pb-8">
             {/* Header */}
             <div className="mb-4">
                 <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)] flex items-center gap-2">

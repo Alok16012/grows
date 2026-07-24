@@ -212,7 +212,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     const sectionCls = "bg-white border border-[var(--border)] rounded-[14px] p-5"
 
     return (
-        <div className="pb-8">
+        <div className="p-4 lg:p-0 pb-8">
             <Link href="/projects" className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--text2)] hover:text-[var(--text)] transition-colors mb-3">
                 <ChevronLeft size={14} /> Back to Projects
             </Link>

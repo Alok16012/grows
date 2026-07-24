@@ -131,17 +131,17 @@ function StatCard({ label, value, icon, color, bg, trend, sparkColor, seed }: {
     trend?: { dir: "up" | "down" | "flat"; text: string }; sparkColor: string; seed: number
 }) {
     return (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] hover:shadow-sm transition-all">
-            <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2.5">
-                    <div style={{ background: bg, color }} className="w-10 h-10 rounded-[11px] flex items-center justify-center shrink-0">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-3.5 sm:p-[18px] hover:shadow-sm transition-all">
+            <div className="flex items-start justify-between mb-2.5 sm:mb-3 gap-2">
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                    <div style={{ background: bg, color }} className="w-9 h-9 sm:w-10 sm:h-10 rounded-[10px] sm:rounded-[11px] flex items-center justify-center shrink-0">
                         {icon}
                     </div>
-                    <span className="text-[12.5px] font-medium text-[var(--text2)]">{label}</span>
+                    <span className="text-[12px] sm:text-[12.5px] font-medium text-[var(--text2)] leading-tight">{label}</span>
                 </div>
-                <Sparkline color={sparkColor} seed={seed} />
+                <div className="hidden sm:block"><Sparkline color={sparkColor} seed={seed} /></div>
             </div>
-            <p className="text-[28px] font-bold text-[var(--text)] leading-none tabular-nums">{value.toLocaleString("en-IN")}</p>
+            <p className="text-[24px] sm:text-[28px] font-bold text-[var(--text)] leading-none tabular-nums">{value.toLocaleString("en-IN")}</p>
             {trend && (
                 <p className={`text-[11.5px] font-medium mt-2 flex items-center gap-1 ${
                     trend.dir === "up" ? "text-[var(--accent-text)]" : trend.dir === "down" ? "text-[var(--red)]" : "text-[var(--text3)]"
@@ -1513,7 +1513,7 @@ function EmployeesPage() {
 
 
     return (
-        <div className="space-y-5">
+        <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">

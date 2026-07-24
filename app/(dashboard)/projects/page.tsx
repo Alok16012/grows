@@ -264,7 +264,7 @@ export default function ProjectsPage() {
     )
 
     return (
-        <div className="space-y-4 pb-8">
+        <div className="p-4 lg:p-0 space-y-4 pb-8">
             {/* Header */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>

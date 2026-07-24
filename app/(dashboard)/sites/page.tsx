@@ -1081,7 +1081,7 @@ export default function SitesPage() {
     }
 
     return (
-        <div className="space-y-5 pb-8">
+        <div className="p-4 lg:p-0 space-y-5 pb-8">
             {/* Page Header */}
             <div className="flex items-center justify-between">
                 <div>
