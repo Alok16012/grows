@@ -5,6 +5,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
+import { Ionicons } from "@expo/vector-icons";
 import { AuthProvider, useAuth } from "@/auth";
 import { colors, font } from "@/theme";
 
@@ -34,9 +36,13 @@ function RootNavigator() {
   const { user, bootstrapping } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  // Preload the Ionicons glyph font — without this the icons render as blank
+  // boxes in the production APK (the font isn't ready at first paint).
+  const [fontsLoaded] = useFonts({ ...Ionicons.font });
+  const ready = !bootstrapping && fontsLoaded;
 
   useEffect(() => {
-    if (bootstrapping) return;
+    if (!ready) return;
     SplashScreen.hideAsync().catch(() => {});
     const inAuthGroup = segments[0] === "(auth)";
     if (!user && !inAuthGroup) {
@@ -44,9 +50,9 @@ function RootNavigator() {
     } else if (user && inAuthGroup) {
       router.replace("/(tabs)");
     }
-  }, [user, bootstrapping, segments, router]);
+  }, [user, ready, segments, router]);
 
-  if (bootstrapping) return <BrandSplash />;
+  if (!ready) return <BrandSplash />;
 
   return (
     <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", contentStyle: { backgroundColor: colors.bg } }}>
