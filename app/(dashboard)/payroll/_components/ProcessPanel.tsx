@@ -401,7 +401,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
 
                             {/* Mini stats */}
                             {fetched && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                                     {[
                                         { label: "Total Staff",     value: String(employees.length),                 color: "#3b82f6" },
                                         { label: "Salary Approved", value: `${approvedCount}/${employees.length}`,   color: approvedCount < employees.length ? "#f59e0b" : "#16a34a" },

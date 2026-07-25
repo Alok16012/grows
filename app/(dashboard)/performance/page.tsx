@@ -574,7 +574,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {/* Summary Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
                 {summaryCards.map(c => (
                     <div key={c.label} style={{
                         background: "#fff",
@@ -619,7 +619,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
             </div>
 
             {/* Ranking Strip */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
                 {rankCards.map(r => (
                     <div key={r.key} style={{
                         background: r.bg,
@@ -816,7 +816,7 @@ function ReviewsTab({
                     No reviews found
                 </div>
             ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
                     {reviews.map(r => (
                         <ReviewCard key={r.id} review={r} onClick={() => onCardClick(r)} />
                     ))}

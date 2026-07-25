@@ -428,7 +428,7 @@ ${records.map(p => buildSlipHTML(p)).join("")}
                                         <span>Total Deductions</span><span style={{ color: "#dc2626" }}>-₹{Math.round(selected.totalDeductions).toLocaleString("en-IN")}</span>
                                     </div>
                                 </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, background: "var(--surface2)", borderRadius: 8, padding: "10px", textAlign: "center" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, background: "var(--surface2)", borderRadius: 8, padding: "10px", textAlign: "center" }}>
                                     {[["Days",selected.workingDays ?? 0],["Present",selected.presentDays ?? 0],["LOP",(selected.workingDays??0)-(selected.presentDays??0)],["OT Hrs",selected.overtimeHrs ?? 0]]
                                         .map(([l,v]) => (
                                         <div key={l as string}>

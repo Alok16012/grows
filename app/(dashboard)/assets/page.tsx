@@ -771,7 +771,7 @@ export default function AssetsPage() {
                             <stat.icon size={20} style={{ color: stat.color }} />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{stat.label}</p>
+                            <p className="text-[12px] text-[var(--text3)]">{stat.label}</p>
                             <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: stat.color }}>{stat.value}</p>
                             <p className="text-[11px] text-[var(--text3)]">{stat.sub}</p>
                         </div>

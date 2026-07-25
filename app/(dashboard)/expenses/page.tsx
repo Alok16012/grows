@@ -1697,7 +1697,7 @@ function StatCard({
                 <Icon size={20} color={color} />
             </div>
             <div className="min-w-0">
-                <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{label}</p>
+                <p className="text-[12px] text-[var(--text3)]">{label}</p>
                 <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color }}>{value}</p>
                 {sub && <p className="text-[11px] text-[var(--text3)]">{sub}</p>}
             </div>

@@ -10,7 +10,7 @@ export default function DashboardLoading() {
             </div>
 
             {/* Stats row skeleton */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
                 {[1, 2, 3, 4].map(i => (
                     <div key={i} style={{
                         height: 90,

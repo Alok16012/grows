@@ -715,7 +715,7 @@ export default function HelpdeskPage() {
                             {s.icon}
                         </div>
                         <div className="min-w-0">
-                            <p className="text-[12px] text-[var(--text3)] whitespace-nowrap">{s.label}</p>
+                            <p className="text-[12px] text-[var(--text3)]">{s.label}</p>
                             <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: s.color }}>{s.value}</p>
                         </div>
                     </div>

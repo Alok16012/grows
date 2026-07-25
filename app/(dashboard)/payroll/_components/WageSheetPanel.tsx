@@ -420,7 +420,7 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
 
                             {/* Stat cards */}
                             {data.length>0 && (
-                                <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:8 }}>
+                                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))", gap:8 }}>
                                     {[{label:"Employees",value:String(data.length),color:"#3b82f6"},{label:"Total Gross",value:fmt(totals.gross),color:"#0369a1"},{label:"Deductions",value:fmt(totals.ded),color:"#dc2626"},{label:"Net Payable",value:fmt(totals.net),color:"#16a34a"}].map(s=>(
                                         <div key={s.label} style={{ padding:"9px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)" }}>
                                             <p style={{ fontSize:9, color:"var(--text3)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.4px", margin:0 }}>{s.label}</p>

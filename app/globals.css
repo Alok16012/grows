@@ -84,3 +84,15 @@
     font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   }
 }
+
+/* ── Mobile safety net (phone widths / the Growus ERP app WebView) ──────────
+   The dashboard is desktop-first; on a phone a stray wide element used to push
+   the whole page sideways so cards got clipped at the screen edge. Never let a
+   page scroll horizontally, and keep KPI grids from forcing a row wider than
+   the screen. Wide tables still scroll inside their own overflow-x container. */
+@media (max-width: 640px) {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+}

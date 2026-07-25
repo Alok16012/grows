@@ -389,7 +389,7 @@ export default function SalaryMasterPage() {
             )}
 
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                 {[
                     { label: "Total Employees", value: data.length, color: "#3b82f6" },
                     { label: "Structure Set",   value: withSal,     color: "#16a34a" },

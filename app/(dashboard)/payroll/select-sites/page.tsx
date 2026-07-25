@@ -90,7 +90,7 @@ export default function SelectSitesPage() {
             </div>
 
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
                 {[
                     { label: "Sites with Wage Sheet", value: sites.length, icon: Building2,     color: "#3b82f6" },
                     { label: "Selected Sites",         value: selected.size, icon: CheckCircle2, color: "#7c3aed" },

@@ -283,7 +283,7 @@ function FinalPayrollInner() {
 
                             {/* Stats */}
                             {data.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                                     {[
                                         { label: "Employees",    value: String(data.length),  color: "#3b82f6" },
                                         { label: "Total Gross",  value: fmt(totGross),         color: "#0369a1" },
