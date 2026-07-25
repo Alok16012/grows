@@ -27,6 +27,28 @@ const isHttps = API_BASE_URL.startsWith("https");
 const HOST = API_BASE_URL.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 const SESSION_COOKIE = isHttps ? "__Secure-next-auth.session-token" : "next-auth.session-token";
 
+// Android WebView treats an off-screen `position: fixed` element (e.g. a closed
+// slide-in drawer parked to the right) as scrollable page width. The document
+// then scrolls sideways and the whole panel looks shifted / cut off. The web app
+// never needs document-level horizontal scroll — wide tables scroll inside their
+// own container — so clamp it here as a permanent safety net for every page.
+const CLAMP_HORIZONTAL_SCROLL = `
+(function () {
+  var ID = '__growus_no_hscroll__';
+  function apply() {
+    if (document.getElementById(ID) || !document.head) return;
+    var s = document.createElement('style');
+    s.id = ID;
+    s.textContent = 'html,body{overflow-x:hidden !important;max-width:100% !important;}';
+    document.head.appendChild(s);
+  }
+  apply();
+  // Re-apply after client-side navigation swaps the document head.
+  new MutationObserver(apply).observe(document.documentElement, { childList: true, subtree: true });
+})();
+true;
+`;
+
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -134,6 +156,7 @@ export default function AdminScreen() {
             thirdPartyCookiesEnabled
             domStorageEnabled
             originWhitelist={["https://*", "http://*"]}
+            injectedJavaScript={CLAMP_HORIZONTAL_SCROLL}
             onNavigationStateChange={onNav}
             onLoadStart={() => setPageLoading(true)}
             onLoadEnd={() => setPageLoading(false)}

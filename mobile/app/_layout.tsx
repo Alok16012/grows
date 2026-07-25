@@ -15,10 +15,16 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // Cap system font scaling so XL device font/display settings can't blow up
 // fixed layouts (overlapping text, uneven card sizes). 1.15 keeps things
 // accessible without breaking the design.
-// @ts-expect-error defaultProps is legacy but still honoured by RN
-RNText.defaultProps = { ...(RNText.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
-// @ts-expect-error same for inputs
-RNTextInput.defaultProps = { ...(RNTextInput.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
+//
+// `defaultProps` on function components is legacy and unsupported in newer
+// React — wrapped so a throw here can NEVER take the whole app down at
+// startup (a blank-screen launch is far worse than uncapped font scaling).
+try {
+  // @ts-expect-error defaultProps is legacy
+  RNText.defaultProps = { ...(RNText.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
+  // @ts-expect-error same for inputs
+  RNTextInput.defaultProps = { ...(RNTextInput.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
+} catch { /* non-fatal */ }
 
 function BrandSplash() {
   return (
@@ -26,7 +32,8 @@ function BrandSplash() {
       <View style={styles.logoMark}>
         <Text style={styles.logoG}>G</Text>
       </View>
-      <Text style={styles.logoWord}>Growus</Text>
+      <Text style={styles.logoWord}>GROWUS <Text style={{ color: colors.brand }}>ERP</Text></Text>
+      <Text style={styles.logoTag}>Enterprise Resource Planning</Text>
       <ActivityIndicator color={colors.onNavyMuted} style={{ marginTop: 28 }} />
     </View>
   );
@@ -36,10 +43,12 @@ function RootNavigator() {
   const { user, bootstrapping } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  // Preload the Ionicons glyph font — without this the icons render as blank
-  // boxes in the production APK (the font isn't ready at first paint).
-  const [fontsLoaded] = useFonts({ ...Ionicons.font });
-  const ready = !bootstrapping && fontsLoaded;
+  // Best-effort font preload — DON'T gate the app on it. In release builds the
+  // async font load can fail/stall, and gating render on `fontsLoaded` left the
+  // app stuck on a blank splash forever. Icons are also bundled natively
+  // (android assets/fonts/Ionicons.ttf), so they render regardless of this.
+  useFonts({ ...Ionicons.font });
+  const ready = !bootstrapping;
 
   useEffect(() => {
     if (!ready) return;
@@ -51,6 +60,13 @@ function RootNavigator() {
       router.replace("/(tabs)");
     }
   }, [user, ready, segments, router]);
+
+  // Hard failsafe: never let the native splash linger. Hide it shortly after
+  // mount even if something above is delayed.
+  useEffect(() => {
+    const t = setTimeout(() => { SplashScreen.hideAsync().catch(() => {}); }, 1200);
+    return () => clearTimeout(t);
+  }, []);
 
   if (!ready) return <BrandSplash />;
 
@@ -102,5 +118,6 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   logoG: { color: colors.white, fontSize: 44, fontWeight: font.weight.heavy },
-  logoWord: { color: colors.white, fontSize: font.size.xxl, fontWeight: font.weight.bold, letterSpacing: 0.5 },
+  logoWord: { color: colors.white, fontSize: font.size.xxl, fontWeight: font.weight.heavy, letterSpacing: 1 },
+  logoTag: { color: colors.onNavyMuted, fontSize: font.size.xs, marginTop: 6, letterSpacing: 1.5, textTransform: "uppercase" },
 });

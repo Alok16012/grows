@@ -291,8 +291,15 @@ function LeaveDrawer({ leave, onClose, onUpdated, isAdminOrManager }: {
         <>
             {/* Backdrop */}
             {leave && <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />}
-            {/* Drawer */}
-            <div className={`fixed top-0 right-0 h-full w-[400px] max-w-full z-50 bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl transition-transform duration-300 flex flex-col ${leave ? "translate-x-0" : "translate-x-full"}`}>
+            {/* Drawer — parked off-screen right when closed, so it lives inside a
+                viewport-sized overflow-hidden layer. Android WebView counts an
+                off-screen `fixed` element as scrollable page width, which made the
+                whole admin panel scroll/shift sideways in the mobile app; clipping
+                it here keeps the slide animation without widening the page. The
+                layer is click-through (pointer-events-none) so the backdrop below
+                still closes the drawer. */}
+            <div className="fixed inset-0 z-50 overflow-hidden pointer-events-none" aria-hidden={!leave}>
+            <div className={`absolute top-0 right-0 h-full w-[400px] max-w-full pointer-events-auto bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl transition-transform duration-300 flex flex-col ${leave ? "translate-x-0" : "translate-x-full"}`}>
                 {leave && (
                     <>
                         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
@@ -410,6 +417,7 @@ function LeaveDrawer({ leave, onClose, onUpdated, isAdminOrManager }: {
                         )}
                     </>
                 )}
+            </div>
             </div>
         </>
     )
