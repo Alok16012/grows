@@ -25,7 +25,10 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["ADMIN", "MANAGER", "HR_MANAGER"], "onboarding.view")) {
+        // Onboarding list is visible to anyone with onboarding.view OR
+        // recruitment.view — recruiters need the onboarding link for the
+        // candidates they source, without a separate onboarding grant.
+        if (!checkAccess(session, [], "onboarding.view") && !checkAccess(session, [], "recruitment.view")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

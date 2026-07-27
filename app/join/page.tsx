@@ -29,6 +29,8 @@ type FormData = {
     // Bank & Compliance
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
     aadharNumber: string; panNumber: string
+    // PF / ESIC — carried into the Employee record after onboarding
+    uan: string; pfNumber: string; esiNumber: string
     // Safety
     safetyGoggles: boolean; safetyGloves: boolean; safetyHelmet: boolean
     safetyMask: boolean; safetyJacket: boolean; safetyEarMuffs: boolean; safetyShoes: boolean
@@ -50,6 +52,7 @@ const INITIAL: FormData = {
     siteId: "", hrId: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
     aadharNumber: "", panNumber: "",
+    uan: "", pfNumber: "", esiNumber: "",
     safetyGoggles: false, safetyGloves: false, safetyHelmet: false,
     safetyMask: false, safetyJacket: false, safetyEarMuffs: false, safetyShoes: false,
 }
@@ -727,6 +730,26 @@ export default function JoinPage() {
                                             <Lbl text="PAN Number" required />
                                             <input style={{ ...inp, textTransform: "uppercase", borderColor: errors.panNumber ? "var(--red)" : undefined }} placeholder="ABCDE1234F" maxLength={10} value={form.panNumber} onChange={e => { set("panNumber", e.target.value.toUpperCase()); clrErr("panNumber") }} />
                                             <Err msg={errors.panNumber} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <SecTitle>PF &amp; ESIC</SecTitle>
+                                    <p style={{ fontSize: 12, color: "var(--text3)", margin: "6px 0 0", lineHeight: 1.6 }}>
+                                        If you worked before and have a UAN / PF or ESIC number, enter it so your account continues. Leave blank if this is your first job.
+                                    </p>
+                                    <div style={{ ...g2, marginTop: 14 }}>
+                                        <div>
+                                            <Lbl text="UAN (PF) Number" />
+                                            <input style={inp} placeholder="12-digit UAN" maxLength={12} value={form.uan} onChange={e => set("uan", e.target.value.replace(/\D/g,""))} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="PF Number" />
+                                            <input style={inp} placeholder="PF account number" value={form.pfNumber} onChange={e => set("pfNumber", e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="ESIC Number" />
+                                            <input style={inp} placeholder="ESIC IP number" value={form.esiNumber} onChange={e => set("esiNumber", e.target.value)} />
                                         </div>
                                     </div>
                                 </div>

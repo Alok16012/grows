@@ -143,7 +143,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Employee Master",  href: "/employees/master",    icon: TableProperties, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
                 { name: "Recruitment",      href: "/recruitment",         icon: Target,       roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "recruitment.view" },
                 { name: "Jobs",             href: "/jobs",                icon: Briefcase,    roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "jobs.view" },
-                { name: "Onboarding",       href: "/onboarding",          icon: ClipboardList, roles: ["ADMIN", "MANAGER"], permission: "onboarding.view" },
+                { name: "Onboarding",       href: "/onboarding",          icon: ClipboardList, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permissionAny: ["onboarding.view", "recruitment.view"] },
                 { name: "Documents",        href: "/employees/documents", icon: Files,        roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
                 { name: "Send Documents",   href: "/documents/send",      icon: SendHorizontal, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permissionAny: ["documents.send", "documents.view"] },
             ],

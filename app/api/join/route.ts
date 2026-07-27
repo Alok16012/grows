@@ -72,6 +72,8 @@ export async function POST(req: Request) {
             emergencyContact2Name, emergencyContact2Phone,
             // KYC
             aadharNumber, panNumber,
+            // PF / ESIC (flows into the Employee record after onboarding)
+            uan, pfNumber, esiNumber,
             // Bank
             bankAccountNumber, bankIFSC, bankName, bankBranch,
             // Employment
@@ -141,6 +143,9 @@ export async function POST(req: Request) {
                 emergencyContact2Phone: emergencyContact2Phone || null,
                 aadharNumber:     aadharNumber     || null,
                 panNumber:        panNumber        || null,
+                uan:              uan              || null,
+                pfNumber:         pfNumber         || null,
+                esiNumber:        esiNumber        || null,
                 bankAccountNumber: bankAccountNumber || null,
                 bankIFSC:          bankIFSC          || null,
                 bankName:          bankName          || null,
