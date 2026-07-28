@@ -14,7 +14,7 @@ import {
     FileText, GraduationCap, Award, BarChart2,
     Flame, Droplet, Thermometer, Snowflake, CheckSquare, AlertCircle,
     TrendingUp, Download, Upload, Eye,
-    Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera, RefreshCw
+    Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
@@ -338,6 +338,26 @@ export default function RecruitmentPage() {
 
     // Convert to employee state
     const [convertLead, setConvertLead] = useState<Lead | null>(null)
+
+    // Onboarding (join) link — the same personalized link the Onboarding module
+    // shares, surfaced here so a recruiter can send it without needing access to
+    // the Onboarding module itself.
+    const [shareOpen, setShareOpen] = useState(false)
+    const [shareRole, setShareRole] = useState("")
+    const [linkCopied, setLinkCopied] = useState(false)
+
+    // `ref` embeds the logged-in recruiter so the candidate's HR contact is
+    // pre-filled and locked; `role` pre-fills their designation.
+    const joinLink = `${typeof window !== "undefined" ? window.location.origin : ""}/join`
+        + `?ref=${encodeURIComponent((session?.user as { id?: string })?.id || "")}`
+        + (shareRole.trim() ? `&role=${encodeURIComponent(shareRole.trim())}` : "")
+
+    const copyJoinLink = () => {
+        navigator.clipboard.writeText(joinLink)
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 2500)
+        toast.success("Onboarding link copied!")
+    }
 
     // View/edit employee modal
     const [viewEmpOpen, setViewEmpOpen] = useState(false)
@@ -858,6 +878,14 @@ export default function RecruitmentPage() {
                         <p className="text-[13px] text-[var(--text2)] mt-0.5">Track candidates from lead to joining</p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                            onClick={() => setShareOpen(true)}
+                            title="Share the onboarding form link with a candidate"
+                            style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                        >
+                            <Link2 size={15} />
+                            Onboarding Link
+                        </button>
                         <button
                             onClick={handleExport}
                             title="Export to Excel"
@@ -1556,6 +1584,54 @@ export default function RecruitmentPage() {
                 />
             )}
 
+            {/* ── Share Onboarding (join) Link ── */}
+            {shareOpen && (
+                <div onClick={() => setShareOpen(false)}
+                    style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                    <div onClick={e => e.stopPropagation()}
+                        style={{ background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+                        <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8f7f1", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Link2 size={18} style={{ color: "var(--accent)" }} />
+                                </div>
+                                <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", margin: 0 }}>Onboarding Link</h2>
+                            </div>
+                            <button onClick={() => setShareOpen(false)} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)" }}><X size={18} /></button>
+                        </div>
+                        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+                            <p style={{ fontSize: 13, color: "var(--text2)", margin: 0, lineHeight: 1.5 }}>
+                                Yeh link candidate ko bhejo. Woh khud apni details &amp; documents bharega, <b>aapke naam se HR contact</b> ke saath — phir wo Onboarding mein approval ke liye aa jaayega.
+                            </p>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 6 }}>Role / Designation (optional)</label>
+                                <input value={shareRole} onChange={e => setShareRole(e.target.value)}
+                                    placeholder="e.g. Quality Inspector"
+                                    style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", fontSize: 13.5, background: "var(--surface)", color: "var(--text)", outline: "none", boxSizing: "border-box" }} />
+                                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "6px 0 0" }}>Bharoge toh candidate ke form mein designation bhi auto-fill ho jaayegi.</p>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 6 }}>Your personalized link</label>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                    <input readOnly value={joinLink}
+                                        onFocus={e => e.currentTarget.select()}
+                                        style={{ flex: 1, height: 42, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", fontSize: 12.5, background: "var(--surface2)", color: "var(--text2)", outline: "none", boxSizing: "border-box" }} />
+                                    <button onClick={copyJoinLink}
+                                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 16px", borderRadius: 10, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                        {linkCopied ? <><CheckCircle size={15} /> Copied</> : <><Copy size={15} /> Copy</>}
+                                    </button>
+                                </div>
+                            </div>
+                            <a href={`https://wa.me/?text=${encodeURIComponent(`Namaste! Growus Auto mein onboarding ke liye yeh link fill karo:\n${joinLink}`)}`}
+                                target="_blank" rel="noreferrer"
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, borderRadius: 10, border: "1px solid #25d366", background: "#25d36612", color: "#128c3e", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                                Share on WhatsApp
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Convert to Employee Modal ── */}
             {convertLead && (
                 <ConvertModal
@@ -1968,161 +2044,6 @@ function DocumentsTabView({ leads, onLeadClick, onView }: { leads: Lead[]; onLea
     )
 }
 
-// ─── Onboarding form link (converted candidates) ──────────────────────────────
-// Converting a lead already mints an onboarding token, but it was never shown
-// anywhere — so recruiters couldn't actually send the candidate their form.
-// This surfaces the link with copy / WhatsApp / open, plus a regenerate that
-// invalidates the old link.
-function OnboardingLinkBox({ leadId, candidateName, phone }: {
-    leadId: string
-    candidateName: string
-    phone?: string | null
-}) {
-    const [url, setUrl] = useState<string | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [regenerating, setRegenerating] = useState(false)
-    const [copied, setCopied] = useState(false)
-
-    const absolute = useCallback((path: string) => {
-        if (typeof window === "undefined") return path
-        return `${window.location.origin}${path}`
-    }, [])
-
-    const load = useCallback(async () => {
-        try {
-            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`)
-            const data = res.ok ? await res.json() : null
-            setUrl(data?.exists && data.path ? absolute(data.path) : null)
-        } catch {
-            setUrl(null)
-        } finally {
-            setLoading(false)
-        }
-    }, [leadId, absolute])
-
-    useEffect(() => { load() }, [load])
-
-    // Creates the placeholder record on first use, so the recruiter never has
-    // to fill the long Convert form just to send the candidate their form.
-    const generate = async () => {
-        setRegenerating(true)
-        try {
-            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            })
-            if (!res.ok) throw new Error(await res.text() || "Failed")
-            const data = await res.json()
-            setUrl(absolute(data.path))
-            toast.success("Onboarding link ready — send it to the candidate")
-        } catch {
-            toast.error("Could not generate onboarding link")
-        } finally {
-            setRegenerating(false)
-        }
-    }
-
-    const copy = () => {
-        if (!url) return
-        navigator.clipboard?.writeText(url).then(() => {
-            setCopied(true)
-            toast.success("Onboarding link copied")
-            setTimeout(() => setCopied(false), 1600)
-        }).catch(() => toast.error("Could not copy"))
-    }
-
-    const shareWhatsApp = () => {
-        if (!url) return
-        const digits = (phone || "").replace(/\D/g, "")
-        const to = digits.length === 10 ? `91${digits}` : digits
-        const msg = encodeURIComponent(
-            `Hi ${candidateName}, welcome aboard! Please complete your onboarding form here:\n${url}`
-        )
-        window.open(to ? `https://wa.me/${to}?text=${msg}` : `https://wa.me/?text=${msg}`, "_blank")
-    }
-
-    const regenerate = async () => {
-        if (!confirm("Generate a new onboarding link?\n\nThe link shared earlier will stop working.")) return
-        setRegenerating(true)
-        try {
-            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ regenerate: true }),
-            })
-            if (!res.ok) throw new Error(await res.text() || "Failed")
-            const data = await res.json()
-            setUrl(absolute(data.path))
-            toast.success("New onboarding link generated")
-        } catch {
-            toast.error("Could not regenerate link")
-        } finally {
-            setRegenerating(false)
-        }
-    }
-
-    const btn = "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] text-[11.5px] font-semibold transition-colors shrink-0"
-
-    const card = "mb-4 p-3 rounded-[10px] border bg-[#f0fdf4] border-green-200"
-
-    if (loading) {
-        return (
-            <div className={`${card} flex items-center gap-2 text-[12px] text-green-700`}>
-                <Loader2 size={13} className="animate-spin" /> Checking onboarding link…
-            </div>
-        )
-    }
-
-    // No link yet — one click creates it and the candidate fills the rest.
-    if (!url) {
-        return (
-            <div className={card}>
-                <p className="text-[12px] font-semibold text-green-800 flex items-center gap-1.5 mb-1">
-                    <Link2 size={13} /> Onboarding form
-                </p>
-                <p className="text-[11px] text-green-700/80 mb-2.5">
-                    Send the candidate a link so they fill their own details &amp; documents. It then lands in Onboarding for approval.
-                </p>
-                <button onClick={generate} disabled={regenerating}
-                    className={`${btn} bg-green-600 text-white hover:bg-green-700 disabled:opacity-50`}>
-                    {regenerating ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                    {regenerating ? "Generating…" : "Generate Onboarding Link"}
-                </button>
-            </div>
-        )
-    }
-
-    return (
-        <div className={card}>
-            <p className="text-[12px] font-semibold text-green-800 flex items-center gap-1.5 mb-1.5">
-                <Link2 size={13} /> Onboarding form link
-            </p>
-            <p className="text-[11px] font-mono text-green-700 break-all bg-white/70 border border-green-200 rounded-[6px] px-2 py-1.5 mb-2">
-                {url}
-            </p>
-            <div className="flex flex-wrap items-center gap-1.5">
-                <button onClick={copy} className={`${btn} bg-green-600 text-white hover:bg-green-700`}>
-                    {copied ? <CheckCircle size={12} /> : <Copy size={12} />} {copied ? "Copied" : "Copy Link"}
-                </button>
-                <button onClick={shareWhatsApp} className={`${btn} bg-white text-green-700 border border-green-300 hover:bg-green-50`}>
-                    <MessageSquare size={12} /> WhatsApp
-                </button>
-                <a href={url} target="_blank" rel="noreferrer" className={`${btn} bg-white text-green-700 border border-green-300 hover:bg-green-50`}>
-                    <ExternalLink size={12} /> Open
-                </a>
-                <button onClick={regenerate} disabled={regenerating}
-                    className={`${btn} bg-white text-[var(--text2)] border border-[var(--border)] hover:bg-[var(--surface2)] disabled:opacity-50`}>
-                    {regenerating ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Regenerate
-                </button>
-            </div>
-            <p className="text-[10.5px] text-green-700/80 mt-1.5">
-                Send this to the candidate — they fill their details &amp; documents, then it lands in Onboarding for approval.
-            </p>
-        </div>
-    )
-}
-
 // ─── Detail Drawer ────────────────────────────────────────────────────────────
 function DetailDrawer({
     lead, session, users, activityContent, activityType, savingActivity,
@@ -2384,12 +2305,6 @@ function DetailDrawer({
                                         </>
                                     )}
                                 </div>
-                            )}
-
-                            {/* Onboarding form link — usable with recruitment access alone,
-                                no access to the Onboarding module required. */}
-                            {["SELECTED", "OFFERED", "JOINED"].includes(lead.status) && (
-                                <OnboardingLinkBox leadId={lead.id} candidateName={lead.candidateName} phone={lead.phone} />
                             )}
 
                             {/* Resume / Profile links */}
