@@ -14,16 +14,24 @@ type Doc = { type: string; fileName: string; fileUrl: string; status?: string | 
 
 type FormData = {
     // Personal
+    middleName: string
+    nameAsPerAadhar: string
     dateOfBirth: string
     gender: string
     bloodGroup: string
     fathersName: string
     maritalStatus: string
+    nationality: string
+    religion: string
+    caste: string
+    alternatePhone: string
     photo: string
-    // Assignment (NEW)
+    // Assignment
     siteId: string
     hrId: string
     designation: string
+    dateOfJoining: string
+    employmentType: string
     // Current Address
     address: string
     city: string
@@ -35,17 +43,16 @@ type FormData = {
     permanentState: string
     permanentPincode: string
     sameAsCurrent: boolean
-    // Emergency Contacts
+    // Emergency Contact
     emergencyContact1Name: string
     emergencyContact1Phone: string
-    emergencyContact2Name: string
-    emergencyContact2Phone: string
     // KYC
     aadharNumber: string
     panNumber: string
     // Statutory numbers (previous employment)
     uan: string
     esiNumber: string
+    labourCardNo: string
     // Bank
     bankName: string
     bankAccountNumber: string
@@ -57,17 +64,20 @@ type SiteOption = { id: string; name: string; code?: string | null }
 type HrOption = { id: string; name: string; email?: string | null; role?: string | null; customRole?: { name: string } | null }
 
 const EMPTY: FormData = {
-    dateOfBirth: "", gender: "", bloodGroup: "", fathersName: "", maritalStatus: "", photo: "",
-    siteId: "", hrId: "", designation: "",
+    middleName: "", nameAsPerAadhar: "",
+    dateOfBirth: "", gender: "", bloodGroup: "", fathersName: "", maritalStatus: "",
+    nationality: "Indian", religion: "", caste: "", alternatePhone: "", photo: "",
+    siteId: "", hrId: "", designation: "", dateOfJoining: "", employmentType: "",
     address: "", city: "", state: "", pincode: "",
     permanentAddress: "", permanentCity: "", permanentState: "", permanentPincode: "", sameAsCurrent: false,
-    emergencyContact1Name: "", emergencyContact1Phone: "", emergencyContact2Name: "", emergencyContact2Phone: "",
+    emergencyContact1Name: "", emergencyContact1Phone: "",
     aadharNumber: "", panNumber: "",
-    uan: "", esiNumber: "",
+    uan: "", esiNumber: "", labourCardNo: "",
     bankName: "", bankAccountNumber: "", bankIFSC: "", bankBranch: "",
 }
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Daily Wage"]
 // `type` MUST be the enum key the rest of the system uses (Document Master,
 // employee document views). Storing the human label here previously meant
 // onboarding docs never matched those slots and looked "missing".
@@ -130,15 +140,23 @@ export default function OnboardingPortal() {
                     if (Array.isArray(data.sites)) setSites(data.sites)
                     if (Array.isArray(data.hrUsers)) setHrUsers(data.hrUsers)
                     setForm({
+                        middleName: data.middleName || "",
+                        nameAsPerAadhar: data.nameAsPerAadhar || "",
                         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split("T")[0] : "",
                         gender: data.gender || "",
                         bloodGroup: data.bloodGroup || "",
                         fathersName: data.fathersName || "",
                         maritalStatus: data.maritalStatus || "",
+                        nationality: data.nationality || "Indian",
+                        religion: data.religion || "",
+                        caste: data.caste || "",
+                        alternatePhone: data.alternatePhone || "",
                         photo: data.photo || "",
                         siteId: data.currentSiteId || "",
                         hrId: data.managerId || "",
                         designation: data.designation || "",
+                        dateOfJoining: data.dateOfJoining ? new Date(data.dateOfJoining).toISOString().split("T")[0] : "",
+                        employmentType: data.employmentType || "",
                         address: data.address || "",
                         city: data.city || "",
                         state: data.state || "",
@@ -150,12 +168,11 @@ export default function OnboardingPortal() {
                         sameAsCurrent: false,
                         emergencyContact1Name: data.emergencyContact1Name || "",
                         emergencyContact1Phone: data.emergencyContact1Phone || "",
-                        emergencyContact2Name: data.emergencyContact2Name || "",
-                        emergencyContact2Phone: data.emergencyContact2Phone || "",
                         aadharNumber: data.aadharNumber || "",
                         panNumber: data.panNumber || "",
                         uan: data.uan || "",
                         esiNumber: data.esiNumber || "",
+                        labourCardNo: data.labourCardNo || "",
                         bankName: data.bankName || "",
                         bankAccountNumber: data.bankAccountNumber || "",
                         bankIFSC: data.bankIFSC || "",
@@ -224,7 +241,20 @@ export default function OnboardingPortal() {
         }
     }
 
+    // Same rule as the Employee form: Aadhaar, PAN and bank proof are compulsory.
+    const REQUIRED_DOCS = [
+        { type: "AADHAAR", label: "Aadhaar Card" },
+        { type: "PAN", label: "PAN Card" },
+        { type: "BANK_DETAILS", label: "Bank Proof" },
+    ]
+    const missingRequiredDocs = REQUIRED_DOCS.filter(r => !docs.some(d => d.type === r.type))
+
     const handleSubmit = async () => {
+        if (missingRequiredDocs.length > 0) {
+            toast.error(`Upload required documents: ${missingRequiredDocs.map(d => d.label).join(", ")}`)
+            setStep(6)
+            return
+        }
         setSubmitting(true)
         try {
             const res = await fetch(`/api/external/onboarding/${token}`, {
@@ -376,6 +406,15 @@ export default function OnboardingPortal() {
                                                 placeholder="e.g. Quality Inspector, Security Guard" className={inp} required />
                                         </Field>
                                     </div>
+                                    <Field label="Date of Joining">
+                                        <input type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")} className={inp} />
+                                    </Field>
+                                    <Field label="Employment Type">
+                                        <select value={form.employmentType} onChange={set("employmentType")} className={inp}>
+                                            <option value="">Select...</option>
+                                            {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </Field>
                                 </div>
                                 <p style={{ fontSize: 11, color: "#6b7280", marginTop: 10, margin: "10px 0 0" }}>
                                     Select the site where you&apos;ll work, the HR person handling your onboarding, and your job role — the designation is printed on your official letters.
@@ -428,6 +467,24 @@ export default function OnboardingPortal() {
                                         <input type="text" value={form.fathersName} onChange={set("fathersName")} placeholder="Father's full name" className={inp} />
                                     </Field>
                                 </div>
+                                <Field label="Middle Name">
+                                    <input type="text" value={form.middleName} onChange={set("middleName")} placeholder="Middle name" className={inp} />
+                                </Field>
+                                <Field label="Name as per Aadhaar">
+                                    <input type="text" value={form.nameAsPerAadhar} onChange={set("nameAsPerAadhar")} placeholder="Exactly as printed on Aadhaar" className={inp} />
+                                </Field>
+                                <Field label="Nationality">
+                                    <input type="text" value={form.nationality} onChange={set("nationality")} placeholder="Indian" className={inp} />
+                                </Field>
+                                <Field label="Religion">
+                                    <input type="text" value={form.religion} onChange={set("religion")} placeholder="Religion" className={inp} />
+                                </Field>
+                                <Field label="Caste">
+                                    <input type="text" value={form.caste} onChange={set("caste")} placeholder="General / OBC / SC / ST" className={inp} />
+                                </Field>
+                                <Field label="Alternate Phone">
+                                    <input type="tel" maxLength={10} value={form.alternatePhone} onChange={set("alternatePhone")} placeholder="10-digit number" className={inp} />
+                                </Field>
                             </div>
                         </div>
                     )}
@@ -487,25 +544,13 @@ export default function OnboardingPortal() {
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Emergency Contacts</h2>
 
                             <div style={{ marginBottom: 24, padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.06)" }}>
-                                <p style={{ fontSize: 13, fontWeight: 600, color: "#a5b4fc", marginBottom: 12 }}>Primary Contact *</p>
+                                <p style={{ fontSize: 13, fontWeight: 600, color: "#a5b4fc", marginBottom: 12 }}>Emergency Contact *</p>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                                     <Field label="Full Name">
                                         <input type="text" value={form.emergencyContact1Name} onChange={set("emergencyContact1Name")} placeholder="Contact name" className={inp} />
                                     </Field>
                                     <Field label="Phone Number">
                                         <input type="tel" maxLength={10} value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} placeholder="10-digit mobile" className={inp} />
-                                    </Field>
-                                </div>
-                            </div>
-
-                            <div style={{ padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.06)" }}>
-                                <p style={{ fontSize: 13, fontWeight: 600, color: "#a5b4fc", marginBottom: 12 }}>Secondary Contact (optional)</p>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                                    <Field label="Full Name">
-                                        <input type="text" value={form.emergencyContact2Name} onChange={set("emergencyContact2Name")} placeholder="Contact name" className={inp} />
-                                    </Field>
-                                    <Field label="Phone Number">
-                                        <input type="tel" maxLength={10} value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} placeholder="10-digit mobile" className={inp} />
                                     </Field>
                                 </div>
                             </div>
@@ -545,6 +590,10 @@ export default function OnboardingPortal() {
                                         <input type="text" maxLength={12} value={form.uan}
                                             onChange={e => setForm(f => ({ ...f, uan: e.target.value.replace(/\D/g, "") }))}
                                             placeholder="12-digit UAN" className={inp} />
+                                    </Field>
+                                    <Field label="Labour Card No.">
+                                        <input type="text" value={form.labourCardNo} onChange={set("labourCardNo")}
+                                            placeholder="Labour card number" className={inp} />
                                     </Field>
                                     <Field label="Previous ESIC Number">
                                         <input type="text" maxLength={17} value={form.esiNumber}
@@ -594,7 +643,16 @@ export default function OnboardingPortal() {
                     {step === 6 && (
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Document Uploads</h2>
-                            <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 20 }}>Upload clear, legible copies of each document.</p>
+                            <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>Upload clear, legible copies of each document.</p>
+
+                            {missingRequiredDocs.length > 0 && (
+                                <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 12, background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)", marginBottom: 16 }}>
+                                    <AlertCircle size={16} style={{ color: "#fbbf24", flexShrink: 0, marginTop: 1 }} />
+                                    <p style={{ fontSize: 12, color: "#fbbf24", margin: 0, lineHeight: 1.5 }}>
+                                        <b>Required:</b> {missingRequiredDocs.map(d => d.label).join(", ")}. These must be uploaded before you can submit.
+                                    </p>
+                                </div>
+                            )}
 
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                 {DOC_TYPES.map(({ type, label }) => {
@@ -607,7 +665,10 @@ export default function OnboardingPortal() {
                                                     <FileText size={16} style={{ color: exist ? "#4ade80" : "#6b7280" }} />
                                                 </div>
                                                 <div style={{ minWidth: 0 }}>
-                                                    <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 1px", color: "#fff" }}>{label}</p>
+                                                    <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 1px", color: "#fff" }}>
+                                                        {label}
+                                                        {REQUIRED_DOCS.some(r => r.type === type) && <span style={{ color: "#f87171", marginLeft: 4 }}>*</span>}
+                                                    </p>
                                                     {exist
                                                         ? <p style={{ fontSize: 11, color: exist.status === "REJECTED" ? "#f87171" : "#4ade80", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                             {exist.status === "REJECTED" ? `Rejected: ${exist.rejectionReason}` : `Uploaded: ${exist.fileName}`}

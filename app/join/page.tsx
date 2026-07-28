@@ -13,7 +13,8 @@ type FormData = {
     firstName: string; middleName: string; lastName: string
     gender: string; dateOfBirth: string; bloodGroup: string
     maritalStatus: string; fathersName: string; nationality: string; religion: string
-    phone: string; email: string
+    caste: string; nameAsPerAadhar: string
+    phone: string; email: string; alternatePhone: string
     // Current Address
     address: string; city: string; state: string; pincode: string
     // Permanent Address
@@ -21,7 +22,6 @@ type FormData = {
     permanentAddress: string; permanentCity: string; permanentState: string; permanentPincode: string
     // Emergency
     emergencyContact1Name: string; emergencyContact1Phone: string
-    emergencyContact2Name: string; emergencyContact2Phone: string
     // Employment
     designation: string; dateOfJoining: string; employmentType: string
     // Site + HR assignment
@@ -30,10 +30,7 @@ type FormData = {
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
     aadharNumber: string; panNumber: string
     // PF / ESIC — carried into the Employee record after onboarding
-    uan: string; pfNumber: string; esiNumber: string
-    // Safety
-    safetyGoggles: boolean; safetyGloves: boolean; safetyHelmet: boolean
-    safetyMask: boolean; safetyJacket: boolean; safetyEarMuffs: boolean; safetyShoes: boolean
+    uan: string; esiNumber: string; labourCardNo: string
 }
 
 type DocFile = { type: string; label: string; file: File | null; uploading: boolean; url: string | null; error: string | null }
@@ -42,26 +39,23 @@ const INITIAL: FormData = {
     firstName: "", middleName: "", lastName: "",
     gender: "", dateOfBirth: "", bloodGroup: "", maritalStatus: "",
     fathersName: "", nationality: "Indian", religion: "",
-    phone: "", email: "",
+    caste: "", nameAsPerAadhar: "",
+    phone: "", email: "", alternatePhone: "",
     address: "", city: "", state: "", pincode: "",
     sameAsCurrent: false,
     permanentAddress: "", permanentCity: "", permanentState: "", permanentPincode: "",
     emergencyContact1Name: "", emergencyContact1Phone: "",
-    emergencyContact2Name: "", emergencyContact2Phone: "",
     designation: "", dateOfJoining: "", employmentType: "",
     siteId: "", hrId: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
     aadharNumber: "", panNumber: "",
-    uan: "", pfNumber: "", esiNumber: "",
-    safetyGoggles: false, safetyGloves: false, safetyHelmet: false,
-    safetyMask: false, safetyJacket: false, safetyEarMuffs: false, safetyShoes: false,
+    uan: "", esiNumber: "", labourCardNo: "",
 }
 
 const TABS = [
     { key: "personal",   label: "Personal" },
     { key: "employment", label: "Employment" },
     { key: "bank",       label: "Bank & Compliance" },
-    { key: "safety",     label: "Safety" },
     { key: "documents",  label: "Documents" },
 ]
 
@@ -72,19 +66,10 @@ const DOC_TYPES: { type: string; label: string; required: boolean }[] = [
     { type: "AADHAAR",      label: "Aadhar Card",           required: true },
     { type: "PAN",          label: "PAN Card",              required: true },
     { type: "PHOTO",        label: "Passport Size Photo",   required: true },
-    { type: "BANK_DETAILS", label: "Bank Passbook / Cancelled Cheque", required: false },
+    { type: "BANK_DETAILS", label: "Bank Passbook / Cancelled Cheque", required: true },
     { type: "OTHER",        label: "Any Other Document",    required: false },
 ]
 
-const SAFETY_ITEMS: { key: keyof FormData; label: string; icon: string }[] = [
-    { key: "safetyHelmet",  label: "Safety Helmet",    icon: "🪖" },
-    { key: "safetyGoggles", label: "Safety Goggles",   icon: "🥽" },
-    { key: "safetyGloves",  label: "Safety Gloves",    icon: "🧤" },
-    { key: "safetyMask",    label: "Safety Mask",      icon: "😷" },
-    { key: "safetyJacket",  label: "Safety Jacket",    icon: "🦺" },
-    { key: "safetyEarMuffs",label: "Ear Muffs",        icon: "🎧" },
-    { key: "safetyShoes",   label: "Safety Shoes",     icon: "👟" },
-]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,6 +102,7 @@ export default function JoinPage() {
     const [tab, setTab] = useState("personal")
     const [form, setForm] = useState<FormData>(INITIAL)
     const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
+    const [docError, setDocError] = useState("")
     const [loading, setLoading] = useState(false)
     const [submitted, setSubmitted] = useState(false)
     const [result, setResult] = useState<{ employeeId: string; uploadWarning?: number } | null>(null)
@@ -289,6 +275,18 @@ export default function JoinPage() {
 
     async function handleSubmit() {
         if (!validate(tab)) return
+
+        // Required documents must actually be uploaded, not just marked with an
+        // asterisk — same rule as the Employee form.
+        const missingDocs = DOC_TYPES
+            .filter(d => d.required)
+            .filter(d => !docs.some(x => x.type === d.type && x.url))
+        if (missingDocs.length > 0) {
+            setTab("documents")
+            setDocError(`Upload required documents: ${missingDocs.map(d => d.label).join(", ")}`)
+            return
+        }
+
         setLoading(true)
         try {
             // 1. Create employee record
@@ -560,6 +558,14 @@ export default function JoinPage() {
                                             <Lbl text="Religion" />
                                             <input style={inp} placeholder="Hindu" value={form.religion} onChange={e => set("religion", e.target.value)} />
                                         </div>
+                                        <div>
+                                            <Lbl text="Caste" />
+                                            <input style={inp} placeholder="General / OBC / SC / ST" value={form.caste} onChange={e => set("caste", e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="Name as per Aadhaar" />
+                                            <input style={inp} placeholder="Exactly as printed on Aadhaar" value={form.nameAsPerAadhar} onChange={e => set("nameAsPerAadhar", e.target.value)} />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -578,6 +584,10 @@ export default function JoinPage() {
                                             <Lbl text="Email Address" />
                                             <input style={{ ...inp, borderColor: errors.email ? "var(--red)" : undefined }} type="email" placeholder="you@example.com" value={form.email} onChange={e => { set("email", e.target.value); clrErr("email") }} />
                                             <Err msg={errors.email} />
+                                        </div>
+                                        <div>
+                                            <Lbl text="Alternate Phone" />
+                                            <input style={inp} placeholder="9876543210" maxLength={10} value={form.alternatePhone} onChange={e => set("alternatePhone", e.target.value.replace(/\D/g,""))} />
                                         </div>
                                     </div>
                                 </div>
@@ -638,14 +648,6 @@ export default function JoinPage() {
                                             <Lbl text="Primary Contact Phone" required />
                                             <input style={{ ...inp, borderColor: errors.emergencyContact1Phone ? "var(--red)" : undefined }} placeholder="9876543210" maxLength={10} value={form.emergencyContact1Phone} onChange={e => { set("emergencyContact1Phone", e.target.value.replace(/\D/g,"")); clrErr("emergencyContact1Phone") }} />
                                             <Err msg={errors.emergencyContact1Phone} />
-                                        </div>
-                                        <div>
-                                            <Lbl text="Secondary Contact Name" />
-                                            <input style={inp} placeholder="Optional" value={form.emergencyContact2Name} onChange={e => set("emergencyContact2Name", e.target.value)} />
-                                        </div>
-                                        <div>
-                                            <Lbl text="Secondary Contact Phone" />
-                                            <input style={inp} placeholder="9876543210" maxLength={10} value={form.emergencyContact2Phone} onChange={e => set("emergencyContact2Phone", e.target.value.replace(/\D/g,""))} />
                                         </div>
                                     </div>
                                 </div>
@@ -744,8 +746,8 @@ export default function JoinPage() {
                                             <input style={inp} placeholder="12-digit UAN" maxLength={12} value={form.uan} onChange={e => set("uan", e.target.value.replace(/\D/g,""))} />
                                         </div>
                                         <div>
-                                            <Lbl text="PF Number" />
-                                            <input style={inp} placeholder="PF account number" value={form.pfNumber} onChange={e => set("pfNumber", e.target.value)} />
+                                            <Lbl text="Labour Card No." />
+                                            <input style={inp} placeholder="Labour card number" value={form.labourCardNo} onChange={e => set("labourCardNo", e.target.value)} />
                                         </div>
                                         <div>
                                             <Lbl text="ESIC Number" />
@@ -757,38 +759,15 @@ export default function JoinPage() {
                         )}
 
                         {/* ── SAFETY ──────────────────────────────────────────── */}
-                        {tab === "safety" && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                                <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px" }}>
-                                    <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, lineHeight: 1.6 }}>
-                                        ✅ Tick the safety equipment you already own or have been provided. HR will verify and issue missing items.
-                                    </p>
-                                </div>
-                                <div>
-                                    <SecTitle>Safety Equipment</SecTitle>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-                                        {SAFETY_ITEMS.map(item => (
-                                            <label key={item.key}
-                                                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: `1px solid ${form[item.key] ? "var(--accent)" : "var(--border)"}`, borderRadius: 10, cursor: "pointer", background: form[item.key] ? "var(--accent-light)" : "var(--surface2)", transition: "all 0.15s" }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={form[item.key] as boolean}
-                                                    onChange={e => set(item.key, e.target.checked)}
-                                                    style={{ width: 16, height: 16, accentColor: "var(--accent)", flexShrink: 0 }}
-                                                />
-                                                <span style={{ fontSize: 18 }}>{item.icon}</span>
-                                                <span style={{ fontSize: 13, fontWeight: 500, color: form[item.key] ? "var(--accent-text)" : "var(--text2)" }}>{item.label}</span>
-                                                {form[item.key] && <Check size={14} color="var(--accent)" style={{ marginLeft: "auto", flexShrink: 0 }} />}
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         {/* ── DOCUMENTS ───────────────────────────────────────── */}
                         {tab === "documents" && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                                {docError && (
+                                    <div style={{ background: "var(--red-light)", border: "1px solid #fca5a5", borderRadius: 10, padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                                        <AlertCircle size={14} color="var(--red)" style={{ marginTop: 1, flexShrink: 0 }} />
+                                        <p style={{ fontSize: 12, color: "var(--red)", margin: 0, lineHeight: 1.6, fontWeight: 500 }}>{docError}</p>
+                                    </div>
+                                )}
                                 <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start" }}>
                                     <AlertCircle size={14} color="#d97706" style={{ marginTop: 1, flexShrink: 0 }} />
                                     <p style={{ fontSize: 12, color: "#92400e", margin: 0, lineHeight: 1.6 }}>

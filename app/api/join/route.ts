@@ -73,16 +73,14 @@ export async function POST(req: Request) {
             // KYC
             aadharNumber, panNumber,
             // PF / ESIC (flows into the Employee record after onboarding)
-            uan, pfNumber, esiNumber,
+            uan, esiNumber, labourCardNo,
             // Bank
             bankAccountNumber, bankIFSC, bankName, bankBranch,
             // Employment
-            employmentType, nationality, religion,
+            employmentType, nationality, religion, caste, nameAsPerAadhar, alternatePhone,
             // Site + HR assignment (NEW)
             siteId, hrId,
             // Safety (declared by employee)
-            safetyGoggles, safetyGloves, safetyHelmet,
-            safetyMask, safetyJacket, safetyEarMuffs, safetyShoes,
         } = body
 
         if (!firstName?.trim() || !lastName?.trim() || !phone?.trim()) {
@@ -144,7 +142,7 @@ export async function POST(req: Request) {
                 aadharNumber:     aadharNumber     || null,
                 panNumber:        panNumber        || null,
                 uan:              uan              || null,
-                pfNumber:         pfNumber         || null,
+                labourCardNo:     labourCardNo     || null,
                 esiNumber:        esiNumber        || null,
                 bankAccountNumber: bankAccountNumber || null,
                 bankIFSC:          bankIFSC          || null,
@@ -155,16 +153,12 @@ export async function POST(req: Request) {
                 ...(employmentType ? { employmentType } : {}),
                 nationality:       nationality       || null,
                 religion:          religion          || null,
+                caste:             caste             || null,
+                nameAsPerAadhar:   nameAsPerAadhar   || null,
+                alternatePhone:    alternatePhone    || null,
                 // HR assignment from self-registration form
                 managerId:         hrId              || null,
                 // Safety equipment declared by employee
-                safetyGoggles:  !!safetyGoggles,
-                safetyGloves:   !!safetyGloves,
-                safetyHelmet:   !!safetyHelmet,
-                safetyMask:     !!safetyMask,
-                safetyJacket:   !!safetyJacket,
-                safetyEarMuffs: !!safetyEarMuffs,
-                safetyShoes:    !!safetyShoes,
                 status:            "ONBOARDING",
                 onboardingToken,
                 photo:             photo || null,
