@@ -1044,7 +1044,7 @@ export default function RecruitmentPage() {
                             <button onClick={openAddForm} className="text-[13px] text-[var(--accent)] hover:underline">Add first candidate</button>
                         </div>
                     ) : viewMode === "kanban" ? (
-                        <KanbanView leads={leadsByStatus} onCard={openDetail} onStatusChange={handleStatusChange} />
+                        <KanbanView leads={leadsByStatus} onCard={openDetail} onStatusChange={handleStatusChange} onAdd={openAddForm} />
                     ) : (
                         <ListView leads={filteredLeads} onCard={openDetail} onEdit={openEditForm} onDelete={handleDelete} session={session} />
                     )}
@@ -1768,44 +1768,46 @@ function Modal({ children, onClose, title, wide }: { children: React.ReactNode; 
 
 // ─── Kanban View ──────────────────────────────────────────────────────────────
 function KanbanView({
-    leads, onCard, onStatusChange
+    leads, onCard, onStatusChange, onAdd
 }: {
     leads: Record<string, Lead[]>
     onCard: (l: Lead) => void
     onStatusChange: (id: string, s: string) => void
+    onAdd: () => void
 }) {
     return (
-        <div className="flex gap-3 overflow-x-auto pb-4 px-4 lg:px-0 flex-1">
+        <div className="flex gap-3.5 overflow-x-auto pb-4 px-4 lg:px-0 flex-1">
             {STATUSES.map(status => {
                 const colLeads = leads[status.key] ?? []
-                const onSiteCount = status.key === "JOINED"
-                    ? colLeads.filter(l => l.source === "On-site Join").length
-                    : 0
                 return (
-                <div key={status.key} className="flex flex-col shrink-0 w-[248px] bg-[var(--surface2)]/60 rounded-[14px] p-2.5">
-                    <div className="flex items-center gap-2 px-1.5 py-1.5 mb-2">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: status.color }} />
-                        <span className="text-[13px] font-semibold flex-1 truncate" style={{ color: status.color }}>{status.label}</span>
-                        {onSiteCount > 0 && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1"
-                                style={{ background: "#dcfce7", color: "#047857", border: "1px solid #86efac" }}>
-                                <CheckCircle size={9} />
-                                {onSiteCount}
-                            </span>
-                        )}
-                        <span className="text-[12px] font-bold text-[var(--text3)] tabular-nums">
+                <div key={status.key} className="flex flex-col shrink-0 w-[268px]">
+                    {/* Filled colored column header */}
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-t-[12px]" style={{ background: status.color }}>
+                        <span className="w-2 h-2 rounded-full bg-white/80 shrink-0" />
+                        <span className="text-[13px] font-semibold text-white flex-1 truncate">{status.label}</span>
+                        <span className="text-[12px] font-bold text-white tabular-nums bg-white/25 px-2 py-0.5 rounded-full min-w-[26px] text-center">
                             {colLeads.length}
                         </span>
                     </div>
-                    <div className="flex flex-col gap-2">
+                    {/* Column body */}
+                    <div className="flex flex-col gap-2.5 p-2.5 bg-[var(--surface2)]/50 border-x border-b border-[var(--border)] rounded-b-[12px] flex-1 min-h-[140px]">
                         {colLeads.map(lead => (
-                            <KanbanCard key={lead.id} lead={lead} onCard={onCard} statusColor={status.color} />
+                            <KanbanCard key={lead.id} lead={lead} onCard={onCard} statusColor={status.color} statusBg={status.bg} />
                         ))}
                         {colLeads.length === 0 && (
-                            <div className="border-2 border-dashed border-[var(--border)] rounded-[10px] py-6 flex items-center justify-center">
-                                <p className="text-[11px] text-[var(--text3)]">No candidates</p>
+                            <div className="flex flex-col items-center justify-center gap-1 py-8 text-center flex-1">
+                                <p className="text-[12px] font-medium text-[var(--text3)]">No candidates</p>
+                                <p className="text-[11px] text-[var(--text3)]/70">Add a new lead here</p>
                             </div>
                         )}
+                        {/* Add candidate footer */}
+                        <button
+                            onClick={onAdd}
+                            className="mt-0.5 w-full flex items-center justify-center gap-1.5 py-2 rounded-[9px] border border-dashed text-[12px] font-medium bg-white/40 hover:bg-white transition-colors"
+                            style={{ borderColor: status.border, color: status.color }}
+                        >
+                            <Plus size={13} /> Add Candidate
+                        </button>
                     </div>
                 </div>
                 )
@@ -1814,11 +1816,13 @@ function KanbanView({
     )
 }
 
-function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lead) => void; statusColor: string }) {
+function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCard: (l: Lead) => void; statusColor: string; statusBg: string }) {
     const isOnSiteJoin = lead.source === "On-site Join"
+    const salary = fmtSalary(lead.expectedSalary)
+    const recruiter = lead.assignee?.name || lead.creator?.name
     return (
         <div onClick={() => onCard(lead)}
-            className="bg-white border rounded-[10px] cursor-pointer hover:shadow-md transition-all group overflow-hidden"
+            className="bg-white border rounded-[11px] cursor-pointer hover:shadow-md transition-all overflow-hidden"
             style={{
                 borderColor: isOnSiteJoin ? "#6ee7b7" : "var(--border)",
                 boxShadow: isOnSiteJoin ? "0 0 0 1px #6ee7b7" : undefined,
@@ -1834,8 +1838,8 @@ function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lea
                 </div>
             )}
             <div className="p-3">
-                {/* Header: avatar + name + role */}
-                <div className="flex items-start justify-between gap-1.5 mb-2.5">
+                {/* Header: avatar + name / role / city + score pill */}
+                <div className="flex items-start justify-between gap-2 mb-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-9 h-9 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[13px] overflow-hidden" style={{ position: "relative" }}>
                             {lead.candidateName.charAt(0).toUpperCase()}
@@ -1849,49 +1853,61 @@ function KanbanCard({ lead, onCard, statusColor }: { lead: Lead; onCard: (l: Lea
                         <div className="min-w-0">
                             <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
                             <p className="text-[11.5px] text-[var(--text3)] leading-tight line-clamp-1 mt-0.5">{lead.position}</p>
+                            {lead.city && (
+                                <p className="flex items-center gap-1 text-[11px] text-[var(--text3)] leading-tight mt-0.5">
+                                    <MapPin size={10} className="shrink-0" />
+                                    <span className="truncate">{lead.city}</span>
+                                </p>
+                            )}
                         </div>
                     </div>
-                    <PriorityDot priority={lead.priority} />
-                </div>
-
-                {/* Score badge */}
-                <div className="mb-2.5">
                     <ScoreBadge score={lead.score} />
                 </div>
 
-                {/* Detail rows */}
-                <div className="flex flex-col gap-1.5">
-                    {lead.experience != null && (
-                        <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--text2)]">
-                            <Briefcase size={11} className="text-[var(--text3)] shrink-0" />
-                            <span>{lead.experience} yr exp</span>
-                        </div>
-                    )}
-                    {lead.phone && (
-                        <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--text2)]">
-                            <Phone size={11} className="text-[var(--text3)] shrink-0" />
-                            <span>{lead.phone}</span>
-                        </div>
-                    )}
-                    {lead.city && (
-                        <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--text2)]">
-                            <MapPin size={11} className="text-[var(--text3)] shrink-0" />
-                            <span className="truncate">{lead.city}</span>
-                        </div>
-                    )}
-                    {lead.interviewDate && (
-                        <div className="flex items-center gap-1.5 text-[11.5px] text-[#f59e0b]">
-                            <Calendar size={11} className="shrink-0" />
-                            <span>{fmt(lead.interviewDate)}</span>
-                        </div>
-                    )}
+                {/* Exp + Salary */}
+                {(lead.experience != null || salary) && (
+                    <div className="flex items-center gap-3 flex-wrap text-[11.5px] mb-1.5">
+                        {lead.experience != null && (
+                            <span className="flex items-center gap-1 text-[var(--text2)]">
+                                <Briefcase size={11} className="text-[var(--text3)] shrink-0" />{lead.experience} Yrs Exp
+                            </span>
+                        )}
+                        {salary && <span className="font-semibold text-[var(--text)]">{salary}</span>}
+                    </div>
+                )}
+
+                {/* Phone */}
+                {lead.phone && (
+                    <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--text2)] mb-1.5">
+                        <Phone size={11} className="text-[var(--text3)] shrink-0" />
+                        <span>{lead.phone}</span>
+                    </div>
+                )}
+
+                {/* Added date */}
+                <div className="flex items-center gap-1.5 text-[11px] text-[var(--text3)]">
+                    <Calendar size={10} className="shrink-0" />
+                    <span>Added: {fmt(lead.createdAt)}</span>
                 </div>
 
-                {/* Recruiter footer */}
-                {lead.creator?.name && (
-                    <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-[var(--border)] text-[11px] text-[var(--text3)]" title="Recruited by">
-                        <UserCheck size={11} className="shrink-0" />
-                        <span className="truncate">{lead.creator.name}</span>
+                {/* Recruiter box + next follow-up */}
+                {(recruiter || lead.nextFollowUp) && (
+                    <div className="mt-2.5 rounded-[9px] p-2" style={{ background: statusBg }}>
+                        {recruiter && (
+                            <>
+                                <div className="flex items-center gap-1.5 text-[10.5px] font-medium text-[var(--text3)] uppercase tracking-wide">
+                                    <UserCheck size={11} className="shrink-0" style={{ color: statusColor }} />
+                                    Recruiter
+                                </div>
+                                <p className="text-[12px] font-semibold leading-tight mt-0.5 truncate" style={{ color: statusColor }}>{recruiter}</p>
+                            </>
+                        )}
+                        {lead.nextFollowUp && (
+                            <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--text3)] mt-1.5">
+                                <Calendar size={10} className="shrink-0" />
+                                <span>Next Follow-up: {fmt(lead.nextFollowUp)}</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
