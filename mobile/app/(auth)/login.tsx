@@ -61,7 +61,7 @@ export default function LoginScreen() {
             <View style={styles.logoMark}>
               <Text style={styles.logoG}>G</Text>
             </View>
-            <Text style={styles.brand}>Growus</Text>
+            <Text style={styles.brand}>GROWUS <Text style={{ color: colors.brand }}>ERP</Text></Text>
             <Text style={styles.tagline}>Employee Self-Service</Text>
           </LinearGradient>
 
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     ...shadow.raised,
   },
   logoG: { color: colors.white, fontSize: 40, fontWeight: font.weight.heavy },
-  brand: { color: colors.white, fontSize: font.size.xxl, fontWeight: font.weight.bold, letterSpacing: 0.5 },
+  brand: { color: colors.white, fontSize: font.size.xxl, fontWeight: font.weight.heavy, letterSpacing: 1 },
   tagline: { color: colors.onNavyMuted, fontSize: font.size.sm, marginTop: 4 },
   scroll: { flexGrow: 1, paddingBottom: spacing.xxl },
   body: { paddingHorizontal: spacing.lg },

@@ -63,7 +63,7 @@ export default function ProfileScreen() {
         <Card style={styles.idCard}>
           <Avatar name={name} uri={photo} size={84} />
           <Text style={styles.name}>{name}</Text>
-          <Text style={styles.designation}>{emp?.designation || user?.role || "Employee"}</Text>
+          <Text style={styles.designation}>{emp?.designation || user?.customRoleName || "Employee"}</Text>
           {emp?.employeeId ? (
             <View style={styles.idTag}>
               <Ionicons name="id-card-outline" size={13} color={colors.brandDark} />
@@ -126,7 +126,7 @@ export default function ProfileScreen() {
         </Card>
 
         <Button label="Log Out" variant="danger" icon="log-out-outline" onPress={confirmLogout} style={{ marginTop: spacing.xl }} />
-        <Text style={styles.version}>Growus · v1.0.0</Text>
+        <Text style={styles.version}>GROWUS ERP · v1.0.0</Text>
         <View style={{ height: spacing.xxl }} />
         </View>
       </ScrollView>
