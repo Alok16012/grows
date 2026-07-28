@@ -76,7 +76,7 @@ export default function ApplyPage() {
     const photoRef = useRef<HTMLInputElement>(null)
 
     async function uploadPhoto(file: File) {
-        if (file.size > 2 * 1024 * 1024) { setError("Photo 2MB se badi nahi honi chahiye"); return }
+        if (file.size > 2 * 1024 * 1024) { setError("Photo must be 2MB or smaller"); return }
         setPhotoUploading(true)
         try {
             const fd = new FormData()

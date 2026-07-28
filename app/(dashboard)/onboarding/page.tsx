@@ -1014,14 +1014,14 @@ export default function OnboardingPage() {
                         </div>
                         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
                             <p style={{ fontSize: 13, color: "var(--text2)", margin: 0, lineHeight: 1.5 }}>
-                                Yeh link candidate ko bhejo. Woh khud ko <b>aapke naam se HR contact</b> ke saath register karega — HR ko manually select nahi karna padega, mistakes kam.
+                                Send this link to the candidate. They register themselves with <b>you as their HR contact</b>, so nobody has to pick an HR manually and there is less room for mistakes.
                             </p>
                             <div>
                                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 6 }}>Role / Designation (optional)</label>
                                 <input value={shareRole} onChange={e => setShareRole(e.target.value)}
                                     placeholder="e.g. Quality Inspector"
                                     style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", fontSize: 13.5, background: "var(--surface)", color: "var(--text)", outline: "none", boxSizing: "border-box" }} />
-                                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "6px 0 0" }}>Bharoge toh candidate ke form mein designation bhi auto-fill ho jaayegi.</p>
+                                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "6px 0 0" }}>Fill this in and the designation is pre-filled on the candidate's form.</p>
                             </div>
                             <div>
                                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 6 }}>Your personalized link</label>
@@ -1035,7 +1035,7 @@ export default function OnboardingPage() {
                                     </button>
                                 </div>
                             </div>
-                            <a href={`https://wa.me/?text=${encodeURIComponent(`Namaste! Growus Auto mein onboarding ke liye yeh link fill karo:\n${joinLink}`)}`}
+                            <a href={`https://wa.me/?text=${encodeURIComponent(`Hello! Please complete your onboarding for Growus Auto using this link:\n${joinLink}`)}`}
                                 target="_blank" rel="noreferrer"
                                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, borderRadius: 10, border: "1px solid #25d366", background: "#25d36612", color: "#128c3e", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                                 Share on WhatsApp

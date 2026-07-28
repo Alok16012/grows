@@ -369,7 +369,7 @@ export default function PayrollPage() {
             const wb = XLSX.read(ab)
             const ws = wb.Sheets[wb.SheetNames[0]]
             const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws)
-            if (!rows.length) { toast.error("File mein koi data nahi mila."); return }
+            if (!rows.length) { toast.error("No data found in the file."); return }
 
             // Process all rows in parallel (faster than sequential)
             const results = await Promise.allSettled(

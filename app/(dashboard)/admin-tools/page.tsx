@@ -58,7 +58,7 @@ export default function AdminToolsPage() {
     }
 
     const handleBulkFix = async () => {
-        if (!confirm("Yeh sabhi employees ke login fix karega (password = phone number). Continue?")) return
+        if (!confirm("This will fix the login for all employees (password = phone number). Continue?")) return
         setBulkFixing(true)
         setBulkResult(null)
         try {
@@ -81,13 +81,13 @@ export default function AdminToolsPage() {
             {/* Debug Single Employee */}
             <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-6 mb-6">
                 <h2 className="text-[15px] font-semibold text-[#1a1a18] mb-1">🔍 Check Employee Login</h2>
-                <p className="text-[12px] text-[#9e9b95] mb-4">Phone number, Employee ID, ya email enter karo</p>
+                <p className="text-[12px] text-[#9e9b95] mb-4">Enter a phone number, Employee ID or email</p>
                 <div className="flex gap-2 mb-4">
                     <input
                         type="text"
                         value={debugInput}
                         onChange={e => setDebugInput(e.target.value)}
-                        placeholder="9322059808 ya EMP001"
+                        placeholder="9322059808 or EMP001"
                         className="flex-1 border border-[#e8e6e1] rounded-[8px] px-3 py-2 text-[13px] focus:outline-none focus:border-[#1a9e6e]"
                     />
                     <button
@@ -142,15 +142,15 @@ export default function AdminToolsPage() {
             <div className="bg-white border border-purple-200 rounded-[12px] p-6 mb-6">
                 <h2 className="text-[15px] font-semibold text-[#1a1a18] mb-1">🛡️ Fix Custom Role Dashboard Access</h2>
                 <p className="text-[12px] text-[#9e9b95] mb-1">
-                    MIS Executive, HR Recruiter jaise custom role waale users jo abhi <strong>INSPECTION_BOY</strong> pe hain,
-                    unhe <strong>MANAGER</strong> level pe upgrade karega.
+                    Upgrades users who hold a custom role — MIS Executive, HR Recruiter and the like — but are still on
+                    <strong> INSPECTION_BOY</strong>, moving them to <strong>MANAGER</strong> level.
                 </p>
                 <p className="text-[12px] text-amber-600 mb-4">
-                    ⚠️ Yeh sirf unhe hi affect karega jinke paas custom role assigned hai — pure field workers safe hain.
+                    ⚠️ Only users who already have a custom role assigned are affected — plain field workers are left untouched.
                 </p>
                 <button
                     onClick={async () => {
-                        if (!confirm("Custom role waale INSPECTION_BOY users ko MANAGER level pe upgrade kare?")) return
+                        if (!confirm("Upgrade INSPECTION_BOY users who have a custom role to MANAGER level?")) return
                         setRoleFixing(true)
                         setRoleFixResult(null)
                         try {
@@ -173,7 +173,7 @@ export default function AdminToolsPage() {
                     <div className={`mt-4 p-3 rounded-[8px] text-[12px] ${roleFixResult.error ? "bg-red-50 border border-red-200 text-red-800" : "bg-purple-50 border border-purple-200 text-purple-800"}`}>
                         {roleFixResult.error
                             ? <p>❌ {roleFixResult.error}</p>
-                            : <><p className="font-bold">✅ Done!</p><p>{roleFixResult.message}</p><p className="mt-1 text-[11px] text-purple-600">Users ko re-login karna hoga nayi session ke liye.</p></>
+                            : <><p className="font-bold">✅ Done!</p><p>{roleFixResult.message}</p><p className="mt-1 text-[11px] text-purple-600">Users must sign in again for the new session to take effect.</p></>
                         }
                     </div>
                 )}

@@ -166,7 +166,7 @@ export default function JoinPage() {
     const photoInputRef = useRef<HTMLInputElement>(null)
 
     async function handlePhotoSelect(file: File) {
-        if (file.size > 2 * 1024 * 1024) { alert("Photo 2MB se badi nahi honi chahiye"); return }
+        if (file.size > 2 * 1024 * 1024) { alert("Photo must be 2MB or smaller"); return }
         setPhotoUploading(true)
         try {
             const fd = new FormData()

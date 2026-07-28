@@ -590,7 +590,7 @@ export function EmployeeModal({
                                     onChange={async (e) => {
                                         const file = e.target.files?.[0]
                                         if (!file) return
-                                        if (file.size > 2 * 1024 * 1024) { toast.error("Photo 2MB se badi nahi honi chahiye"); return }
+                                        if (file.size > 2 * 1024 * 1024) { toast.error("Photo must be 2MB or smaller"); return }
                                         setPhotoUploading(true)
                                         try {
                                             const fd = new FormData()
@@ -727,7 +727,7 @@ export function EmployeeModal({
                                             {employee && (employee as any).user?.email ? (
                                                 <p className="text-[11px] text-amber-600">Login: {(employee as any).user.email}</p>
                                             ) : (
-                                                <p className="text-[11px] text-amber-600">Role select karke click karo if employee can&apos;t login</p>
+                                                <p className="text-[11px] text-amber-600">Select a role and click here if the employee can&apos;t log in</p>
                                             )}
                                         </div>
                                     </div>
@@ -735,7 +735,7 @@ export function EmployeeModal({
                                         type="button"
                                         onClick={async () => {
                                             if (!employee) return
-                                            if (!form.customRoleId) { alert("Pehle System Role select karo"); return }
+                                            if (!form.customRoleId) { alert("Select a System Role first"); return }
                                             try {
                                                 const res = await fetch(`/api/employees/${employee.id}/fix-login`, {
                                                     method: "POST",
@@ -1187,7 +1187,7 @@ export function EmployeeModal({
                                                                     {employee && (
                                                                         <button type="button" disabled={docDeleting === uploaded.id}
                                                                             onClick={async () => {
-                                                                                if (!confirm(`"${uploaded.fileName}" delete karna chahte hain?`)) return
+                                                                                if (!confirm(`Delete "${uploaded.fileName}"?`)) return
                                                                                 setDocDeleting(uploaded.id)
                                                                                 try {
                                                                                     const r = await fetch(`/api/employees/${employee.id}/documents/${uploaded.id}`, { method: "DELETE" })
