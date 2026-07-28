@@ -1991,9 +1991,8 @@ function OnboardingLinkBox({ leadId, candidateName, phone }: {
     const load = useCallback(async () => {
         try {
             const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`)
-            if (!res.ok) throw new Error(await res.text() || "Failed")
-            const data = await res.json()
-            setUrl(absolute(data.path))
+            const data = res.ok ? await res.json() : null
+            setUrl(data?.exists && data.path ? absolute(data.path) : null)
         } catch {
             setUrl(null)
         } finally {
@@ -2002,6 +2001,27 @@ function OnboardingLinkBox({ leadId, candidateName, phone }: {
     }, [leadId, absolute])
 
     useEffect(() => { load() }, [load])
+
+    // Creates the placeholder record on first use, so the recruiter never has
+    // to fill the long Convert form just to send the candidate their form.
+    const generate = async () => {
+        setRegenerating(true)
+        try {
+            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            })
+            if (!res.ok) throw new Error(await res.text() || "Failed")
+            const data = await res.json()
+            setUrl(absolute(data.path))
+            toast.success("Onboarding link ready — send it to the candidate")
+        } catch {
+            toast.error("Could not generate onboarding link")
+        } finally {
+            setRegenerating(false)
+        }
+    }
 
     const copy = () => {
         if (!url) return
@@ -2026,7 +2046,11 @@ function OnboardingLinkBox({ leadId, candidateName, phone }: {
         if (!confirm("Generate a new onboarding link?\n\nThe link shared earlier will stop working.")) return
         setRegenerating(true)
         try {
-            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`, { method: "POST" })
+            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ regenerate: true }),
+            })
             if (!res.ok) throw new Error(await res.text() || "Failed")
             const data = await res.json()
             setUrl(absolute(data.path))
@@ -2038,21 +2062,41 @@ function OnboardingLinkBox({ leadId, candidateName, phone }: {
         }
     }
 
+    const btn = "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] text-[11.5px] font-semibold transition-colors shrink-0"
+
+    const card = "mb-4 p-3 rounded-[10px] border bg-[#f0fdf4] border-green-200"
+
     if (loading) {
         return (
-            <div className="mt-3 pt-3 border-t border-green-200 flex items-center gap-2 text-[12px] text-green-700">
-                <Loader2 size={13} className="animate-spin" /> Loading onboarding link…
+            <div className={`${card} flex items-center gap-2 text-[12px] text-green-700`}>
+                <Loader2 size={13} className="animate-spin" /> Checking onboarding link…
             </div>
         )
     }
-    if (!url) return null
 
-    const btn = "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] text-[11.5px] font-semibold transition-colors shrink-0"
+    // No link yet — one click creates it and the candidate fills the rest.
+    if (!url) {
+        return (
+            <div className={card}>
+                <p className="text-[12px] font-semibold text-green-800 flex items-center gap-1.5 mb-1">
+                    <Link2 size={13} /> Onboarding form
+                </p>
+                <p className="text-[11px] text-green-700/80 mb-2.5">
+                    Send the candidate a link so they fill their own details &amp; documents. It then lands in Onboarding for approval.
+                </p>
+                <button onClick={generate} disabled={regenerating}
+                    className={`${btn} bg-green-600 text-white hover:bg-green-700 disabled:opacity-50`}>
+                    {regenerating ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                    {regenerating ? "Generating…" : "Generate Onboarding Link"}
+                </button>
+            </div>
+        )
+    }
 
     return (
-        <div className="mt-3 pt-3 border-t border-green-200">
-            <p className="text-[11.5px] font-semibold text-green-800 flex items-center gap-1.5 mb-1.5">
-                <Link2 size={12} /> Onboarding form link
+        <div className={card}>
+            <p className="text-[12px] font-semibold text-green-800 flex items-center gap-1.5 mb-1.5">
+                <Link2 size={13} /> Onboarding form link
             </p>
             <p className="text-[11px] font-mono text-green-700 break-all bg-white/70 border border-green-200 rounded-[6px] px-2 py-1.5 mb-2">
                 {url}
@@ -2311,22 +2355,19 @@ function DetailDrawer({
                         <div className="px-5 py-4">
                             {/* Convert to Employee banner */}
                             {["SELECTED", "OFFERED", "JOINED"].includes(lead.status) && (
-                                <div className={`mb-4 p-3 rounded-[10px] border ${lead.convertedEmployeeId ? "bg-green-50 border-green-200" : "bg-[#fffbeb] border-amber-200 flex items-center justify-between gap-3"}`}>
+                                <div className={`mb-4 p-3 rounded-[10px] border flex items-center justify-between gap-3 ${lead.convertedEmployeeId ? "bg-green-50 border-green-200" : "bg-[#fffbeb] border-amber-200"}`}>
                                     {lead.convertedEmployeeId ? (
                                         <>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2">
-                                                    <CheckCircle size={16} className="text-green-600 shrink-0" />
-                                                    <span className="text-[13px] font-semibold text-green-700">Converted to Employee</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => lead.convertedEmployeeId && onViewEmployee(lead.convertedEmployeeId)}
-                                                    className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-green-600 text-white rounded-[6px] hover:bg-green-700 transition-colors shrink-0"
-                                                >
-                                                    <ExternalLink size={12} /> View Employee
-                                                </button>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle size={16} className="text-green-600 shrink-0" />
+                                                <span className="text-[13px] font-semibold text-green-700">Converted to Employee</span>
                                             </div>
-                                            <OnboardingLinkBox leadId={lead.id} candidateName={lead.candidateName} phone={lead.phone} />
+                                            <button
+                                                onClick={() => lead.convertedEmployeeId && onViewEmployee(lead.convertedEmployeeId)}
+                                                className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-green-600 text-white rounded-[6px] hover:bg-green-700 transition-colors shrink-0"
+                                            >
+                                                <ExternalLink size={12} /> View Employee
+                                            </button>
                                         </>
                                     ) : (
                                         <>
@@ -2343,6 +2384,12 @@ function DetailDrawer({
                                         </>
                                     )}
                                 </div>
+                            )}
+
+                            {/* Onboarding form link — usable with recruitment access alone,
+                                no access to the Onboarding module required. */}
+                            {["SELECTED", "OFFERED", "JOINED"].includes(lead.status) && (
+                                <OnboardingLinkBox leadId={lead.id} candidateName={lead.candidateName} phone={lead.phone} />
                             )}
 
                             {/* Resume / Profile links */}
