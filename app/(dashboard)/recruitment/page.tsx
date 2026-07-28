@@ -14,7 +14,7 @@ import {
     FileText, GraduationCap, Award, BarChart2,
     Flame, Droplet, Thermometer, Snowflake, CheckSquare, AlertCircle,
     TrendingUp, Download, Upload, Eye,
-    Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera
+    Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera, RefreshCw
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
@@ -1968,6 +1968,117 @@ function DocumentsTabView({ leads, onLeadClick, onView }: { leads: Lead[]; onLea
     )
 }
 
+// ─── Onboarding form link (converted candidates) ──────────────────────────────
+// Converting a lead already mints an onboarding token, but it was never shown
+// anywhere — so recruiters couldn't actually send the candidate their form.
+// This surfaces the link with copy / WhatsApp / open, plus a regenerate that
+// invalidates the old link.
+function OnboardingLinkBox({ leadId, candidateName, phone }: {
+    leadId: string
+    candidateName: string
+    phone?: string | null
+}) {
+    const [url, setUrl] = useState<string | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [regenerating, setRegenerating] = useState(false)
+    const [copied, setCopied] = useState(false)
+
+    const absolute = useCallback((path: string) => {
+        if (typeof window === "undefined") return path
+        return `${window.location.origin}${path}`
+    }, [])
+
+    const load = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`)
+            if (!res.ok) throw new Error(await res.text() || "Failed")
+            const data = await res.json()
+            setUrl(absolute(data.path))
+        } catch {
+            setUrl(null)
+        } finally {
+            setLoading(false)
+        }
+    }, [leadId, absolute])
+
+    useEffect(() => { load() }, [load])
+
+    const copy = () => {
+        if (!url) return
+        navigator.clipboard?.writeText(url).then(() => {
+            setCopied(true)
+            toast.success("Onboarding link copied")
+            setTimeout(() => setCopied(false), 1600)
+        }).catch(() => toast.error("Could not copy"))
+    }
+
+    const shareWhatsApp = () => {
+        if (!url) return
+        const digits = (phone || "").replace(/\D/g, "")
+        const to = digits.length === 10 ? `91${digits}` : digits
+        const msg = encodeURIComponent(
+            `Hi ${candidateName}, welcome aboard! Please complete your onboarding form here:\n${url}`
+        )
+        window.open(to ? `https://wa.me/${to}?text=${msg}` : `https://wa.me/?text=${msg}`, "_blank")
+    }
+
+    const regenerate = async () => {
+        if (!confirm("Generate a new onboarding link?\n\nThe link shared earlier will stop working.")) return
+        setRegenerating(true)
+        try {
+            const res = await fetch(`/api/recruitment/${leadId}/onboarding-link`, { method: "POST" })
+            if (!res.ok) throw new Error(await res.text() || "Failed")
+            const data = await res.json()
+            setUrl(absolute(data.path))
+            toast.success("New onboarding link generated")
+        } catch {
+            toast.error("Could not regenerate link")
+        } finally {
+            setRegenerating(false)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="mt-3 pt-3 border-t border-green-200 flex items-center gap-2 text-[12px] text-green-700">
+                <Loader2 size={13} className="animate-spin" /> Loading onboarding link…
+            </div>
+        )
+    }
+    if (!url) return null
+
+    const btn = "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] text-[11.5px] font-semibold transition-colors shrink-0"
+
+    return (
+        <div className="mt-3 pt-3 border-t border-green-200">
+            <p className="text-[11.5px] font-semibold text-green-800 flex items-center gap-1.5 mb-1.5">
+                <Link2 size={12} /> Onboarding form link
+            </p>
+            <p className="text-[11px] font-mono text-green-700 break-all bg-white/70 border border-green-200 rounded-[6px] px-2 py-1.5 mb-2">
+                {url}
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+                <button onClick={copy} className={`${btn} bg-green-600 text-white hover:bg-green-700`}>
+                    {copied ? <CheckCircle size={12} /> : <Copy size={12} />} {copied ? "Copied" : "Copy Link"}
+                </button>
+                <button onClick={shareWhatsApp} className={`${btn} bg-white text-green-700 border border-green-300 hover:bg-green-50`}>
+                    <MessageSquare size={12} /> WhatsApp
+                </button>
+                <a href={url} target="_blank" rel="noreferrer" className={`${btn} bg-white text-green-700 border border-green-300 hover:bg-green-50`}>
+                    <ExternalLink size={12} /> Open
+                </a>
+                <button onClick={regenerate} disabled={regenerating}
+                    className={`${btn} bg-white text-[var(--text2)] border border-[var(--border)] hover:bg-[var(--surface2)] disabled:opacity-50`}>
+                    {regenerating ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Regenerate
+                </button>
+            </div>
+            <p className="text-[10.5px] text-green-700/80 mt-1.5">
+                Send this to the candidate — they fill their details &amp; documents, then it lands in Onboarding for approval.
+            </p>
+        </div>
+    )
+}
+
 // ─── Detail Drawer ────────────────────────────────────────────────────────────
 function DetailDrawer({
     lead, session, users, activityContent, activityType, savingActivity,
@@ -2200,19 +2311,22 @@ function DetailDrawer({
                         <div className="px-5 py-4">
                             {/* Convert to Employee banner */}
                             {["SELECTED", "OFFERED", "JOINED"].includes(lead.status) && (
-                                <div className={`mb-4 p-3 rounded-[10px] border flex items-center justify-between gap-3 ${lead.convertedEmployeeId ? "bg-green-50 border-green-200" : "bg-[#fffbeb] border-amber-200"}`}>
+                                <div className={`mb-4 p-3 rounded-[10px] border ${lead.convertedEmployeeId ? "bg-green-50 border-green-200" : "bg-[#fffbeb] border-amber-200 flex items-center justify-between gap-3"}`}>
                                     {lead.convertedEmployeeId ? (
                                         <>
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle size={16} className="text-green-600 shrink-0" />
-                                                <span className="text-[13px] font-semibold text-green-700">Converted to Employee</span>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle size={16} className="text-green-600 shrink-0" />
+                                                    <span className="text-[13px] font-semibold text-green-700">Converted to Employee</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => lead.convertedEmployeeId && onViewEmployee(lead.convertedEmployeeId)}
+                                                    className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-green-600 text-white rounded-[6px] hover:bg-green-700 transition-colors shrink-0"
+                                                >
+                                                    <ExternalLink size={12} /> View Employee
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => lead.convertedEmployeeId && onViewEmployee(lead.convertedEmployeeId)}
-                                                className="flex items-center gap-1.5 h-7 px-3 text-[12px] font-semibold bg-green-600 text-white rounded-[6px] hover:bg-green-700 transition-colors shrink-0"
-                                            >
-                                                <ExternalLink size={12} /> View Employee
-                                            </button>
+                                            <OnboardingLinkBox leadId={lead.id} candidateName={lead.candidateName} phone={lead.phone} />
                                         </>
                                     ) : (
                                         <>
