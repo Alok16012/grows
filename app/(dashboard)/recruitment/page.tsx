@@ -1789,25 +1789,30 @@ function KanbanView({
                             {colLeads.length}
                         </span>
                     </div>
-                    {/* Column body */}
-                    <div className="flex flex-col gap-2.5 p-2.5 bg-[var(--surface2)]/50 border-x border-b border-[var(--border)] rounded-b-[12px] flex-1 min-h-[140px]">
-                        {colLeads.map(lead => (
-                            <KanbanCard key={lead.id} lead={lead} onCard={onCard} statusColor={status.color} statusBg={status.bg} />
-                        ))}
-                        {colLeads.length === 0 && (
-                            <div className="flex flex-col items-center justify-center gap-1 py-8 text-center flex-1">
-                                <p className="text-[12px] font-medium text-[var(--text3)]">No candidates</p>
-                                <p className="text-[11px] text-[var(--text3)]/70">Add a new lead here</p>
-                            </div>
-                        )}
-                        {/* Add candidate footer */}
-                        <button
-                            onClick={onAdd}
-                            className="mt-0.5 w-full flex items-center justify-center gap-1.5 py-2 rounded-[9px] border border-dashed text-[12px] font-medium bg-white/40 hover:bg-white transition-colors"
-                            style={{ borderColor: status.border, color: status.color }}
-                        >
-                            <Plus size={13} /> Add Candidate
-                        </button>
+                    {/* Column body — cards scroll INTERNALLY so the page height
+                        stays fixed no matter how many candidates a column holds. */}
+                    <div className="flex flex-col bg-[var(--surface2)]/50 border-x border-b border-[var(--border)] rounded-b-[12px]">
+                        <div className="flex flex-col gap-2.5 p-2.5 overflow-y-auto scrollbar-thin" style={{ maxHeight: "calc(100vh - 300px)", minHeight: 120 }}>
+                            {colLeads.map(lead => (
+                                <KanbanCard key={lead.id} lead={lead} onCard={onCard} statusColor={status.color} statusBg={status.bg} />
+                            ))}
+                            {colLeads.length === 0 && (
+                                <div className="flex flex-col items-center justify-center gap-1 py-8 text-center">
+                                    <p className="text-[12px] font-medium text-[var(--text3)]">No candidates</p>
+                                    <p className="text-[11px] text-[var(--text3)]/70">Add a new lead here</p>
+                                </div>
+                            )}
+                        </div>
+                        {/* Add candidate footer — pinned below the scroll area */}
+                        <div className="p-2.5 pt-1.5 border-t border-[var(--border)]/60">
+                            <button
+                                onClick={onAdd}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-[9px] border border-dashed text-[12px] font-medium bg-white/40 hover:bg-white transition-colors"
+                                style={{ borderColor: status.border, color: status.color }}
+                            >
+                                <Plus size={13} /> Add Candidate
+                            </button>
+                        </div>
                     </div>
                 </div>
                 )

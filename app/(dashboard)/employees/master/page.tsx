@@ -975,7 +975,7 @@ export default function EmployeeMasterPage() {
             </div>
 
             {/* Table */}
-            <div style={{ flex: 1, minHeight: 0, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
+            <div style={{ flex: 1, minHeight: 300, maxHeight: "calc(100vh - 240px)", overflow: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
                 {loading ? (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60, gap: 10 }}>
                         <Loader2 size={22} className="animate-spin" style={{ color: "var(--accent)" }} />
