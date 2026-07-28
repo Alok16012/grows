@@ -228,9 +228,26 @@ export async function POST(req: Request) {
             await ensureCategoryItemsColumn()
         }
 
-        // Generate expense number
-        const count = await prisma.expense.count()
-        const expenseNo = `EXP-${String(count + 1).padStart(4, "0")}`
+        // Generate expense number from the MAX existing number (+ bump), NOT a
+        // row count — a count collides with existing numbers whenever any prior
+        // expense was deleted (that was the "expenseNo already exists" 23505 bug).
+        const nextExpenseNo = async (bump = 0): Promise<string> => {
+            try {
+                const rows: any[] = await (prisma as any).$queryRaw`
+                    SELECT COALESCE(MAX(CAST(SUBSTRING("expenseNo" FROM 5) AS INTEGER)), 0) AS max
+                    FROM "Expense" WHERE "expenseNo" ~ '^EXP-[0-9]+$'`
+                const max = Number(rows?.[0]?.max ?? 0)
+                return `EXP-${String(max + 1 + bump).padStart(4, "0")}`
+            } catch {
+                const count = await prisma.expense.count()
+                return `EXP-${String(count + 1 + bump).padStart(4, "0")}`
+            }
+        }
+        const isDupExpenseNo = (err: any) =>
+            err?.code === "P2002" ||
+            /23505|already exists|duplicate key|unique constraint/i.test(String(err?.message ?? ""))
+
+        let expenseNo = await nextExpenseNo()
 
         // Ensure the newer columns (categoryItems, siteId, siteName) exist before
         // the insert tries to write them — migrations don't run on deploy.
@@ -357,6 +374,21 @@ export async function POST(req: Request) {
                         expense = await findInserted()
                     }
                 }
+            }
+        }
+
+        // If every attempt failed purely because the expense number collided
+        // (a concurrent insert, or a stale MAX), bump the number and retry the
+        // guaranteed raw insert a few times until it lands.
+        let dupTries = 0
+        while (!expense && isDupExpenseNo(lastError) && dupTries < 10) {
+            dupTries++
+            expenseNo = await nextExpenseNo(dupTries)
+            try {
+                expense = await rawInsert()
+            } catch (eDup: any) {
+                lastError = eDup
+                expense = await findInserted()
             }
         }
 
