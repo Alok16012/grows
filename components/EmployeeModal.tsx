@@ -377,13 +377,28 @@ export function EmployeeModal({
         aadharNumber:    !isAadharValid(form.aadharNumber)   ? "Aadhar must be 12 digits" : "",
         panNumber:       !isPANValid(form.panNumber)         ? "PAN format: AAAAA9999A (10 chars)" : "",
         emergencyContact1Phone: !isPhoneValid((form as any).emergencyContact1Phone) ? "Phone must be 10 digits" : "",
-        emergencyContact2Phone: !isPhoneValid((form as any).emergencyContact2Phone) ? "Phone must be 10 digits" : "",
     }
     const hasFieldErrors = Object.values(fieldErrors).some(Boolean)
+
+    // Aadhaar, PAN and bank proof are compulsory — an employee can't be saved
+    // without them, whether already uploaded or queued in this session.
+    const REQUIRED_DOCS: { key: string; label: string }[] = [
+        { key: "AADHAAR", label: "Aadhaar Card" },
+        { key: "PAN", label: "PAN Card" },
+        { key: "BANK_DETAILS", label: "Bank Details" },
+    ]
+    const missingRequiredDocs = REQUIRED_DOCS.filter(
+        d => !existingDocs.some(x => x.type === d.key) && !pendingDocs.some(x => x.type === d.key)
+    )
 
     const doSave = async (keepOpen: boolean) => {
         if (!form.firstName.trim()) { toast.error("First name is required"); return }
         if (hasFieldErrors) { toast.error("Please fix validation errors before saving"); return }
+        if (missingRequiredDocs.length > 0) {
+            toast.error(`Upload required documents: ${missingRequiredDocs.map(d => d.label).join(", ")}`)
+            setActiveTab("documents")
+            return
+        }
         setLoading(true)
         try {
             const existingId = employee?.id || draftEmpId
@@ -792,10 +807,6 @@ export function EmployeeModal({
                                     </select>
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Basic Salary (₹)</label>
-                                    <input type="number" value={form.basicSalary} onChange={set("basicSalary")} className={inputCls} placeholder="0" min="0" />
-                                </div>
-                                <div>
                                     <label className={labelCls}>Status</label>
                                     <select value={form.status} onChange={set("status")} className={inputCls}>
                                         {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -1044,10 +1055,6 @@ export function EmployeeModal({
                                     <input value={form.uan} onChange={set("uan")} className={inputCls} placeholder="Universal Account Number" />
                                 </div>
                                 <div>
-                                    <label className={labelCls}>PF Number</label>
-                                    <input value={form.pfNumber} onChange={set("pfNumber")} className={inputCls} placeholder="PF number" />
-                                </div>
-                                <div>
                                     <label className={labelCls}>ESIC Number</label>
                                     <input value={form.esiNumber} onChange={set("esiNumber")} className={inputCls} placeholder="ESIC number" />
                                 </div>
@@ -1059,24 +1066,14 @@ export function EmployeeModal({
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Emergency Contacts</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={labelCls}>EC1 Name</label>
+                                    <label className={labelCls}>Contact Name</label>
                                     <input value={form.emergencyContact1Name} onChange={set("emergencyContact1Name")} className={inputCls} placeholder="Contact person name" />
                                 </div>
                                 <div>
-                                    <label className={labelCls}>EC1 Phone</label>
+                                    <label className={labelCls}>Contact Phone</label>
                                     <input value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} maxLength={10}
                                         className={inputCls + (fieldErrors.emergencyContact1Phone ? " !border-red-400" : "")} placeholder="10-digit number" />
                                     {fieldErrors.emergencyContact1Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.emergencyContact1Phone}</p>}
-                                </div>
-                                <div>
-                                    <label className={labelCls}>EC2 Name</label>
-                                    <input value={form.emergencyContact2Name} onChange={set("emergencyContact2Name")} className={inputCls} placeholder="Contact person name" />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>EC2 Phone</label>
-                                    <input value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} maxLength={10}
-                                        className={inputCls + (fieldErrors.emergencyContact2Phone ? " !border-red-400" : "")} placeholder="10-digit number" />
-                                    {fieldErrors.emergencyContact2Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.emergencyContact2Phone}</p>}
                                 </div>
                             </div>
                         </div>
@@ -1132,6 +1129,16 @@ export function EmployeeModal({
                         pendingDocs.forEach(d => { if (!pendingByType[d.type]) pendingByType[d.type] = d })
 
                         return (
+                            <div>
+                            {missingRequiredDocs.length > 0 && (
+                                <div className="mb-3 flex items-start gap-2 rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2.5">
+                                    <span className="text-amber-600 mt-[1px]">⚠</span>
+                                    <p className="text-[12px] text-amber-800">
+                                        <b>Required documents missing:</b> {missingRequiredDocs.map(d => d.label).join(", ")}.
+                                        These must be uploaded before the employee can be saved.
+                                    </p>
+                                </div>
+                            )}
                             <div className="border border-[var(--border)] rounded-[10px] overflow-hidden">
                                 <table className="w-full text-[12px]">
                                     <thead>
@@ -1150,7 +1157,12 @@ export function EmployeeModal({
                                             const statusColor: Record<string, string> = { PENDING: "bg-amber-100 text-amber-700", VERIFIED: "bg-green-100 text-green-700", REJECTED: "bg-red-100 text-red-700" }
                                             return (
                                                 <tr key={key} className="border-b border-[var(--border)] last:border-0">
-                                                    <td className="px-3 py-2.5 font-medium text-[var(--text)]">{label}</td>
+                                                    <td className="px-3 py-2.5 font-medium text-[var(--text)]">
+                                                        {label}
+                                                        {REQUIRED_DOCS.some(d => d.key === key) && (
+                                                            <span className="ml-1 text-[var(--red)]" title="Required">*</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-3 py-2.5">
                                                         {uploaded ? (
                                                             <div className="flex items-center gap-2">
@@ -1257,6 +1269,7 @@ export function EmployeeModal({
                                         })}
                                     </tbody>
                                 </table>
+                            </div>
                             </div>
                         )
                     })()}
