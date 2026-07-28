@@ -419,6 +419,9 @@ export function EmployeeModal({
                 try {
                     const j = JSON.parse(raw)
                     if (j?.error) msg = j.error
+                    // Server-side failures ship a `details` field — show it, a
+                    // bare "Failed to save employee" isn't actionable.
+                    if (j?.details) msg = `${msg}: ${j.details}`
                 } catch { /* plain-text error */ }
                 if (res.status === 409) {
                     // `finally` below resets the loading state on return.

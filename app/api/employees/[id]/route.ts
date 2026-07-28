@@ -212,7 +212,12 @@ export async function PUT(
         return NextResponse.json(employee)
     } catch (error) {
         console.error("[EMPLOYEE_PUT]", error)
-        return new NextResponse("Internal Error", { status: 500 })
+        // Surface the real reason — a bare "Internal Error" gives the user
+        // nothing to act on when a save fails.
+        return NextResponse.json(
+            { error: "Failed to save employee", details: error instanceof Error ? error.message : String(error) },
+            { status: 500 },
+        )
     }
 }
 

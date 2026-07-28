@@ -194,6 +194,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
         return NextResponse.json({ success: true, employee: updatedEmployee })
     } catch (error) {
         console.error("[ONBOARDING_EXTERNAL_POST]", error)
-        return new NextResponse("Internal Error", { status: 500 })
+        return NextResponse.json(
+            { error: "Submission failed", details: error instanceof Error ? error.message : String(error) },
+            { status: 500 },
+        )
     }
 }

@@ -278,9 +278,12 @@ export default function JoinPage() {
 
         // Required documents must actually be uploaded, not just marked with an
         // asterisk — same rule as the Employee form.
+        // Files are uploaded AFTER the employee is created (the upload needs the
+        // onboarding token), so at this point a chosen file only has `file` set —
+        // checking `url` here would always report every document as missing.
         const missingDocs = DOC_TYPES
             .filter(d => d.required)
-            .filter(d => !docs.some(x => x.type === d.type && x.url))
+            .filter(d => !docs.some(x => x.type === d.type && (x.file || x.url)))
         if (missingDocs.length > 0) {
             setTab("documents")
             setDocError(`Upload required documents: ${missingDocs.map(d => d.label).join(", ")}`)
