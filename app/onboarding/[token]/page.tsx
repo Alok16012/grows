@@ -242,12 +242,18 @@ export default function OnboardingPortal() {
     }
 
     // Same rule as the Employee form: Aadhaar, PAN and bank proof are compulsory.
+    // Older uploads were stored under the human label ("Aadhaar Card") instead of
+    // the enum key, so match loosely — otherwise an already-uploaded document
+    // reads as missing and the candidate can never submit.
+    const normType = (t?: string | null) => (t || "").toUpperCase().replace(/[^A-Z]/g, "")
     const REQUIRED_DOCS = [
-        { type: "AADHAAR", label: "Aadhaar Card" },
-        { type: "PAN", label: "PAN Card" },
-        { type: "BANK_DETAILS", label: "Bank Proof" },
+        { type: "AADHAAR", label: "Aadhaar Card", match: (n: string) => n.includes("AADHA") },
+        { type: "PAN", label: "PAN Card", match: (n: string) => n.startsWith("PAN") },
+        { type: "BANK_DETAILS", label: "Bank Proof", match: (n: string) => n.includes("BANK") },
     ]
-    const missingRequiredDocs = REQUIRED_DOCS.filter(r => !docs.some(d => d.type === r.type))
+    const missingRequiredDocs = REQUIRED_DOCS.filter(
+        r => !docs.some(d => d.fileUrl && (d.type === r.type || r.match(normType(d.type))))
+    )
 
     const handleSubmit = async () => {
         if (missingRequiredDocs.length > 0) {
