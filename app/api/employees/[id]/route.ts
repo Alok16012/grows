@@ -123,7 +123,11 @@ export async function PUT(
         if (dateOfLeaving !== undefined) updateData.dateOfLeaving = dateOfLeaving ? new Date(dateOfLeaving) : null
         if (status !== undefined) updateData.status = status
         if (employmentType !== undefined) updateData.employmentType = employmentType
-        if (basicSalary !== undefined) updateData.basicSalary = basicSalary ? parseFloat(basicSalary) : 0
+        if (basicSalary !== undefined) {
+            // Guard against NaN/Infinity — Prisma rejects them on a numeric column.
+            const n = typeof basicSalary === "number" ? basicSalary : parseFloat(basicSalary)
+            updateData.basicSalary = Number.isFinite(n) ? n : 0
+        }
         if (notes !== undefined) updateData.notes = notes
         // New fields
         if (middleName !== undefined) updateData.middleName = middleName || null
@@ -141,7 +145,10 @@ export async function PUT(
         if (labourCardNo !== undefined) updateData.labourCardNo = labourCardNo || null
         if (labourCardExpDate !== undefined) updateData.labourCardExpDate = labourCardExpDate ? new Date(labourCardExpDate) : null
         if (contractFrom !== undefined) updateData.contractFrom = contractFrom ? new Date(contractFrom) : null
-        if (contractPeriodDays !== undefined) updateData.contractPeriodDays = contractPeriodDays ? parseInt(String(contractPeriodDays)) : null
+        if (contractPeriodDays !== undefined) {
+            const d = parseInt(String(contractPeriodDays), 10)
+            updateData.contractPeriodDays = Number.isFinite(d) ? d : null
+        }
         if (contractorCode !== undefined) updateData.contractorCode = contractorCode || null
         if (workOrderNumber !== undefined) updateData.workOrderNumber = workOrderNumber || null
         if (workOrderFrom !== undefined) updateData.workOrderFrom = workOrderFrom ? new Date(workOrderFrom) : null
