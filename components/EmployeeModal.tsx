@@ -101,6 +101,27 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
     RESIGNED: { label: "Resigned", color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
 }
 
+// Force a real download even for cross-origin (Supabase) files: the <a download>
+// attribute is ignored across origins, so fetch the file as a blob and save it.
+// Falls back to opening the URL if CORS/network blocks the fetch.
+async function downloadFile(url: string, fileName: string) {
+    try {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error("fetch failed")
+        const blob = await res.blob()
+        const objectUrl = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = objectUrl
+        a.download = fileName || "document"
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+    } catch {
+        window.open(url, "_blank", "noopener")
+    }
+}
+
 const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Daily Wage"]
 const SALARY_TYPES = ["Monthly", "Daily", "Hourly"]
 
@@ -1195,10 +1216,11 @@ export function EmployeeModal({
                                                                         className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
                                                                         <Eye size={11} /> View
                                                                     </button>
-                                                                    <a href={uploaded.fileUrl} download={uploaded.fileName}
+                                                                    <button type="button"
+                                                                        onClick={() => downloadFile(uploaded.fileUrl, uploaded.fileName)}
                                                                         className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
                                                                         <Download size={11} /> Download
-                                                                    </a>
+                                                                    </button>
                                                                     {employee && (
                                                                         <button type="button" disabled={docDeleting === uploaded.id}
                                                                             onClick={async () => {

@@ -29,13 +29,24 @@ export function DocumentViewer({ url, fileName, onClose }: DocumentViewerProps) 
     const isImage = url.startsWith('data:image/') || /\.(jpg|jpeg|png|webp|gif|svg)(\?|$)/i.test(url)
     const isPdf = url.startsWith('data:application/pdf') || /\.pdf(\?|$)/i.test(url)
 
-    const handleDownload = () => {
-        const link = document.createElement('a')
-        link.href = url
-        link.download = fileName || 'document'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+    const handleDownload = async () => {
+        // Cross-origin (Supabase) files ignore the <a download> attribute, so
+        // fetch the file as a blob and save it; fall back to opening on failure.
+        try {
+            const res = await fetch(url)
+            if (!res.ok) throw new Error("fetch failed")
+            const blob = await res.blob()
+            const objectUrl = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = objectUrl
+            link.download = fileName || 'document'
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+        } catch {
+            window.open(url, "_blank", "noopener")
+        }
     }
 
     return (
