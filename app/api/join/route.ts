@@ -170,7 +170,15 @@ export async function POST(req: Request) {
         // the apply form and went straight through external onboarding.
         try {
             const adminUser = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } })
-            if (adminUser) {
+            // Owner = the recruiter whose link was used (hrId), so the lead shows
+            // up in THAT recruiter's Recruitment pipeline. Falls back to an admin
+            // if there's no valid recruiter, so the lead is always created.
+            let ownerId: string | null = adminUser?.id ?? null
+            if (hrId) {
+                const rec = await prisma.user.findUnique({ where: { id: hrId }, select: { id: true } })
+                if (rec) ownerId = rec.id
+            }
+            if (ownerId) {
                 const candidateName = [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean).join(" ")
                 await prisma.lead.create({
                     data: {
@@ -186,7 +194,8 @@ export async function POST(req: Request) {
                         priority: "MEDIUM",
                         score:    "WARM",
                         siteId:   siteId || null,
-                        createdBy: adminUser.id,
+                        createdBy: ownerId,
+                        assignedTo: ownerId,
                         convertedEmployeeId: employee.id,
                     } as any,
                 })
