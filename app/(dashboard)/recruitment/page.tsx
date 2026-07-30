@@ -70,6 +70,25 @@ const ACTIVITY_TYPES = [
     { key: "interview", label: "Interview", icon: UserCheck,    color: "#f59e0b" },
 ]
 
+// Normalise an Indian phone number for wa.me (digits only, with country code).
+function waNumber(phone?: string | null) {
+    const d = (phone || "").replace(/\D/g, "")
+    if (!d) return ""
+    return d.length === 10 ? `91${d}` : d
+}
+
+// Open the real Call / WhatsApp / Email channel for a candidate.
+function openContactChannel(type: string, phone?: string | null, email?: string | null) {
+    if (type === "call" && phone) {
+        window.open(`tel:${phone.replace(/\s/g, "")}`)
+    } else if (type === "whatsapp") {
+        const num = waNumber(phone)
+        if (num) window.open(`https://wa.me/${num}`, "_blank", "noopener")
+    } else if (type === "email" && email) {
+        window.open(`mailto:${email}`)
+    }
+}
+
 const POSITIONS = [
     "Quality Inspector",
     "Quality Supervisor",
@@ -2523,7 +2542,7 @@ function DetailDrawer({
                                     {ACTIVITY_TYPES.map(t => {
                                         const Icon = t.icon
                                         return (
-                                            <button key={t.key} onClick={() => onActivityTypeChange(t.key)}
+                                            <button key={t.key} onClick={() => { onActivityTypeChange(t.key); openContactChannel(t.key, lead.phone, lead.email) }}
                                                 className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border transition-all"
                                                 style={activityType === t.key
                                                     ? { background: t.color, color: "#fff", borderColor: t.color }
