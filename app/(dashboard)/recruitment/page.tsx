@@ -1767,15 +1767,36 @@ function Modal({ children, onClose, title, wide }: { children: React.ReactNode; 
 }
 
 // ─── Kanban View ──────────────────────────────────────────────────────────────
+// Per-candidate colour: each lead gets a stable colour derived from its id,
+// so the SAME person is recognisable by colour across every pipeline stage.
+const PERSON_COLORS = [
+    { bg: "#e0f2fe", fg: "#0369a1" }, // sky
+    { bg: "#dcfce7", fg: "#15803d" }, // green
+    { bg: "#fef3c7", fg: "#b45309" }, // amber
+    { bg: "#ffe4e6", fg: "#be123c" }, // rose
+    { bg: "#e0e7ff", fg: "#4338ca" }, // indigo
+    { bg: "#ccfbf1", fg: "#0f766e" }, // teal
+    { bg: "#f3e8ff", fg: "#7e22ce" }, // purple
+    { bg: "#ffedd5", fg: "#c2410c" }, // orange
+    { bg: "#fce7f3", fg: "#be185d" }, // pink
+    { bg: "#cffafe", fg: "#0e7490" }, // cyan
+    { bg: "#ecfccb", fg: "#4d7c0f" }, // lime
+    { bg: "#fae8ff", fg: "#a21caf" }, // fuchsia
+]
+function personColor(key: string) {
+    let h = 0
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+    return PERSON_COLORS[h % PERSON_COLORS.length]
+}
+
 // How many cards a column renders before "Show more" — keeps the DOM light
 // so a stage with hundreds of candidates paints instantly instead of hanging.
 const KANBAN_PAGE = 25
 
-function KanbanColumn({ status, colLeads, onCard, onAdd }: {
+function KanbanColumn({ status, colLeads, onCard }: {
     status: any
     colLeads: Lead[]
     onCard: (l: Lead) => void
-    onAdd: () => void
 }) {
     const [visible, setVisible] = useState(KANBAN_PAGE)
     // Reset paging when the column's contents change (filter/search/refresh).
@@ -1815,16 +1836,6 @@ function KanbanColumn({ status, colLeads, onCard, onAdd }: {
                         </button>
                     )}
                 </div>
-                {/* Add candidate footer — pinned below the scroll area */}
-                <div className="p-2.5 pt-1.5 border-t border-[var(--border)]/60">
-                    <button
-                        onClick={onAdd}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-[9px] border border-dashed text-[12px] font-medium bg-white/40 hover:bg-white transition-colors"
-                        style={{ borderColor: status.border, color: status.color }}
-                    >
-                        <Plus size={13} /> Add Candidate
-                    </button>
-                </div>
             </div>
         </div>
     )
@@ -1839,10 +1850,11 @@ function KanbanView({
     onAdd: () => void
 }) {
     void onStatusChange
+    void onAdd
     return (
         <div className="flex gap-3.5 overflow-x-auto pb-4 px-4 lg:px-0 flex-1">
             {STATUSES.map(status => (
-                <KanbanColumn key={status.key} status={status} colLeads={leads[status.key] ?? []} onCard={onCard} onAdd={onAdd} />
+                <KanbanColumn key={status.key} status={status} colLeads={leads[status.key] ?? []} onCard={onCard} />
             ))}
         </div>
     )
@@ -1852,11 +1864,14 @@ function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCar
     const isOnSiteJoin = lead.source === "On-site Join"
     const salary = fmtSalary(lead.expectedSalary)
     const recruiter = lead.assignee?.name || lead.creator?.name
+    // Stable per-candidate colour — same person, same colour in every stage.
+    const color = personColor(lead.id || lead.candidateName || "")
     return (
         <div onClick={() => onCard(lead)}
             className="bg-white border rounded-[11px] cursor-pointer hover:shadow-md transition-all overflow-hidden shrink-0"
             style={{
                 borderColor: isOnSiteJoin ? "#6ee7b7" : "var(--border)",
+                borderLeft: `4px solid ${color.fg}`,
                 boxShadow: isOnSiteJoin ? "0 0 0 1px #6ee7b7" : undefined,
             }}>
             {/* On-site join top banner */}
@@ -1873,7 +1888,7 @@ function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCar
                 {/* Header: avatar + name / role / city + score pill */}
                 <div className="flex items-start justify-between gap-2 mb-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[13px] overflow-hidden" style={{ position: "relative" }}>
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-[13px] overflow-hidden" style={{ position: "relative", background: color.bg, color: color.fg }}>
                             {(lead.candidateName || "?").charAt(0).toUpperCase()}
                             {lead.profileUrl && (
                                 // eslint-disable-next-line @next/next/no-img-element
