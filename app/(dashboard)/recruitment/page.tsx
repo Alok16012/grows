@@ -1854,7 +1854,7 @@ function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCar
     const recruiter = lead.assignee?.name || lead.creator?.name
     return (
         <div onClick={() => onCard(lead)}
-            className="bg-white border rounded-[11px] cursor-pointer hover:shadow-md transition-all overflow-hidden"
+            className="bg-white border rounded-[11px] cursor-pointer hover:shadow-md transition-all overflow-hidden shrink-0"
             style={{
                 borderColor: isOnSiteJoin ? "#6ee7b7" : "var(--border)",
                 boxShadow: isOnSiteJoin ? "0 0 0 1px #6ee7b7" : undefined,
