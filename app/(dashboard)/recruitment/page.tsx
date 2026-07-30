@@ -1874,7 +1874,7 @@ function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCar
                 <div className="flex items-start justify-between gap-2 mb-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-9 h-9 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[13px] overflow-hidden" style={{ position: "relative" }}>
-                            {lead.candidateName.charAt(0).toUpperCase()}
+                            {(lead.candidateName || "?").charAt(0).toUpperCase()}
                             {lead.profileUrl && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover"
@@ -1883,7 +1883,7 @@ function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCar
                             )}
                         </div>
                         <div className="min-w-0">
-                            <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-1">{lead.candidateName}</p>
+                            <p className="text-[13px] font-semibold text-[var(--text)] leading-tight line-clamp-2 break-words">{lead.candidateName || "Unnamed candidate"}</p>
                             <p className="text-[11.5px] text-[var(--text3)] leading-tight line-clamp-1 mt-0.5">{lead.position}</p>
                             {lead.city && (
                                 <p className="flex items-center gap-1 text-[11px] text-[var(--text3)] leading-tight mt-0.5">
