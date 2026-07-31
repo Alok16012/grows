@@ -132,7 +132,10 @@ function MarkAttendanceModal({
 
     useEffect(() => {
         if (!open) return
-        if (preselected) setSelectedEmpId(preselected.id)
+        // Reset when opened without a preselection — the modal stays mounted, so
+        // a previously edited employee would otherwise still be selected and the
+        // next generic "Mark Attendance" would target the wrong person.
+        setSelectedEmpId(preselected ? preselected.id : "")
         if (existing) {
             setForm({
                 status: existing.status,
@@ -781,6 +784,10 @@ function AdminView() {
     const [sites, setSites] = useState<Site[]>([])
     const [siteFilter, setSiteFilter] = useState("")
     const [search, setSearch] = useState("")
+    // `search` also drives an instant client-side filter, so only the server
+    // fetch is debounced — typing stays responsive without one request per key.
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const latestAttendanceRequestRef = useRef(0)
     const [loading, setLoading] = useState(true)
     const [markModal, setMarkModal] = useState(false)
     const [bulkModal, setBulkModal] = useState(false)
@@ -793,29 +800,33 @@ function AdminView() {
 
     const fetchEmployees = useCallback(async () => {
         try {
-            const params = new URLSearchParams({ status: "ACTIVE" })
+            const params = new URLSearchParams({ status: "ACTIVE", pageSize: "1000" })
             if (siteFilter) params.set("siteId", siteFilter)
             const res = await fetch(`/api/employees?${params}`)
             const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : [])
+            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
         } catch { setEmployees([]) }
     }, [siteFilter])
 
     const fetchAttendances = useCallback(async () => {
+        const requestId = ++latestAttendanceRequestRef.current
         setLoading(true)
         try {
             const params = new URLSearchParams({ date: format(selectedDate, "yyyy-MM-dd") })
             if (siteFilter) params.set("siteId", siteFilter)
-            if (search) params.set("search", search)
+            if (debouncedSearch) params.set("search", debouncedSearch)
             const res = await fetch(`/api/attendance?${params}`)
             const data = await res.json()
+            // Drop the response if a newer request has already been issued.
+            if (requestId !== latestAttendanceRequestRef.current) return
             setAttendances(Array.isArray(data) ? data : [])
         } catch {
+            if (requestId !== latestAttendanceRequestRef.current) return
             toast.error("Failed to load attendance")
         } finally {
-            setLoading(false)
+            if (requestId === latestAttendanceRequestRef.current) setLoading(false)
         }
-    }, [selectedDate, siteFilter, search])
+    }, [selectedDate, siteFilter, debouncedSearch])
 
     const fetchMonthlyAttendances = useCallback(async () => {
         setLoading(true)
@@ -835,6 +846,11 @@ function AdminView() {
     useEffect(() => { fetchEmployees() }, [fetchEmployees])
 
     useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 300)
+        return () => clearTimeout(timer)
+    }, [search])
+
+    useEffect(() => {
         if (tab === "daily") fetchAttendances()
         else fetchMonthlyAttendances()
     }, [tab, fetchAttendances, fetchMonthlyAttendances])
@@ -845,7 +861,12 @@ function AdminView() {
         !search || `${e.firstName} ${e.lastName} ${e.employeeId}`.toLowerCase().includes(search.toLowerCase())
     )
     const presentCount = attendances.filter(a => a.status === "PRESENT").length
-    const absentCount = filteredEmployees.filter(e => !attendanceMap.has(e.id)).length
+    // Absent = explicitly marked ABSENT, plus anyone with no record for the day.
+    // Counting only the unmarked silently dropped every real ABSENT entry.
+    const absentCount = filteredEmployees.filter(e => {
+        const record = attendanceMap.get(e.id)
+        return !record || record.status === "ABSENT"
+    }).length
     const lateHalfCount = attendances.filter(a => a.status === "LATE" || a.status === "HALF_DAY").length
     const onLeaveCount = attendances.filter(a => a.status === "LEAVE").length
 

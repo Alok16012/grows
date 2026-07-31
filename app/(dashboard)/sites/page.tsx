@@ -613,13 +613,14 @@ function AssignForm({ siteId, onAssigned, onCancel }: {
 
     useEffect(() => {
         setFetching(true)
-        fetch("/api/employees?status=ACTIVE")
-            .then(r => r.json())
-            .then(async (all: Employee[]) => {
+        fetch("/api/employees?status=ACTIVE&pageSize=1000")
+            .then(r => r.ok ? r.json() : { employees: [] })
+            .then(async (data: any) => {
+                const all: Employee[] = Array.isArray(data) ? data : (data.employees ?? [])
                 // filter out already deployed employees
                 const depsRes = await fetch("/api/deployments?isActive=true")
-                const deps: Deployment[] = await depsRes.json()
-                const deployedIds = new Set(deps.map(d => d.employeeId))
+                const deps: Deployment[] = depsRes.ok ? await depsRes.json() : []
+                const deployedIds = new Set((Array.isArray(deps) ? deps : []).map(d => d.employeeId))
                 setEmployees(all.filter(e => !deployedIds.has(e.id)))
             })
             .catch(() => setEmployees([]))

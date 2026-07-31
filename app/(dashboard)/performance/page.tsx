@@ -350,10 +350,10 @@ export default function PerformancePage() {
     }, [])
 
     const fetchEmployees = useCallback(async () => {
-        const res = await fetch("/api/employees?limit=500")
+        const res = await fetch("/api/employees?pageSize=1000")
         if (res.ok) {
             const data = await res.json()
-            setEmployees(data.employees || data)
+            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
         }
     }, [])
 

@@ -1,7 +1,9 @@
 "use client"
 import { Suspense, useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
 import { Loader2, Download, Printer, RefreshCw, ChevronRight, ShieldCheck, FileSpreadsheet } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
@@ -327,8 +329,9 @@ function ComplianceMasterInner() {
         net:   filtered.reduce((s, r) => s + r.netSalary, 0),
     }
 
-    const handleExcel = () => {
+    const handleExcel = async () => {
         if (!filtered.length) { toast.error("No data"); return }
+        const XLSX = await loadXLSX()
         const xlRows = filtered.map((r, i) => ({
             "Sr": i + 1,
             "Emp ID": r.employeeId,

@@ -101,8 +101,8 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Apply Leave Modal ────────────────────────────────────────────────────────
 
-function ApplyLeaveModal({ open, onClose, onSaved }: {
-    open: boolean; onClose: () => void; onSaved: () => void
+function ApplyLeaveModal({ open, onClose, onSaved, canManage }: {
+    open: boolean; onClose: () => void; onSaved: () => void; canManage: boolean
 }) {
     const [loading, setLoading] = useState(false)
     const [employees, setEmployees] = useState<Employee[]>([])
@@ -112,13 +112,18 @@ function ApplyLeaveModal({ open, onClose, onSaved }: {
 
     useEffect(() => {
         if (open) {
-            fetch("/api/employees?status=ACTIVE")
-                .then(r => r.json())
-                .then(data => setEmployees(Array.isArray(data) ? data : []))
-                .catch(() => {})
+            // Only managers pick an employee. Everyone else applies for themselves,
+            // and /api/employees would 403 for them anyway — which used to leave a
+            // required dropdown permanently empty and the form unsubmittable.
+            if (canManage) {
+                fetch("/api/employees?status=ACTIVE&pageSize=1000")
+                    .then(r => r.ok ? r.json() : { employees: [] })
+                    .then(data => setEmployees(Array.isArray(data) ? data : (data.employees ?? [])))
+                    .catch(() => {})
+            }
             setForm({ employeeId: "", type: "CL", startDate: "", endDate: "", days: "", reason: "" })
         }
-    }, [open])
+    }, [open, canManage])
 
     useEffect(() => {
         if (form.startDate && form.endDate) {
@@ -133,10 +138,13 @@ function ApplyLeaveModal({ open, onClose, onSaved }: {
         e.preventDefault()
         setLoading(true)
         try {
+            // Without leaves.manage the server files the leave against the caller
+            // and rejects a mismatched employeeId, so don't send one at all.
+            const { employeeId, ...selfPayload } = form
             const res = await fetch("/api/leaves", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify(canManage ? form : selfPayload),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success("Leave applied successfully!")
@@ -159,14 +167,16 @@ function ApplyLeaveModal({ open, onClose, onSaved }: {
                     <button onClick={onClose} className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors"><X size={18} /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                    <div>
-                        <label className="block text-[12px] text-[var(--text2)] mb-1">Employee *</label>
-                        <select value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} required
-                            className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
-                            <option value="">Select employee</option>
-                            {employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.employeeId})</option>)}
-                        </select>
-                    </div>
+                    {canManage && (
+                        <div>
+                            <label className="block text-[12px] text-[var(--text2)] mb-1">Employee *</label>
+                            <select value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} required
+                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
+                                <option value="">Select employee</option>
+                                {employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.employeeId})</option>)}
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="block text-[12px] text-[var(--text2)] mb-1">Leave Type *</label>
                         <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} required
@@ -441,7 +451,10 @@ export default function LeavesPage() {
     const [perPage, setPerPage] = useState(25)
     useEffect(() => { setPage(1) }, [statusFilter, typeFilter, monthFilter, search, perPage])
 
-    const isAdminOrManager = can(session, "leaves.view")
+    // Mirrors the API gate on PUT /api/leaves/[id]. Keyed on view, this rendered
+    // Approve/Reject for read-only roles (which then 403'd) while hiding the
+    // self-Cancel button those same users actually need.
+    const isAdminOrManager = can(session, "leaves.approve") || can(session, "leaves.manage")
 
     useEffect(() => {
         if (status !== "unauthenticated") return
@@ -731,7 +744,7 @@ export default function LeavesPage() {
             />
 
             {/* Apply Modal */}
-            <ApplyLeaveModal open={showApply} onClose={() => setShowApply(false)} onSaved={fetchLeaves} />
+            <ApplyLeaveModal open={showApply} onClose={() => setShowApply(false)} onSaved={fetchLeaves} canManage={can(session, "leaves.manage")} />
         </div>
     )
 }

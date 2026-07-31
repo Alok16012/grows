@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import {
     Download, Loader2, FileText, RefreshCw, ArrowLeft,
     LayoutDashboard, AlertCircle, Search, Info, Building2
@@ -130,6 +132,7 @@ export default function ReportsDownloadsPage() {
     const handleDownloadWage = async () => {
         setDownloadingWage(true)
         try {
+            const XLSX = await loadXLSX()
             const siteParam = downloadOption === "site-wise" && selectedSite !== "all"
                 ? `&siteId=${encodeURIComponent(selectedSite)}`
                 : ""
@@ -204,6 +207,7 @@ export default function ReportsDownloadsPage() {
     const handleDownloadBank = async () => {
         setDownloadingBank(true)
         try {
+            const XLSX = await loadXLSX()
             const siteParam = downloadOption === "site-wise" && selectedSite !== "all"
                 ? `&siteId=${encodeURIComponent(selectedSite)}`
                 : ""

@@ -2,10 +2,14 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")) {
+        return new NextResponse("Forbidden", { status: 403 })
+    }
     try {
         const [total, draft, pendingApproval, issued] = await Promise.all([
             prisma.hrDocument.count(),

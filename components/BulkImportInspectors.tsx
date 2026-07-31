@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import {
     Dialog,
     DialogContent,
@@ -109,7 +111,8 @@ export default function BulkImportInspectors({ onImportComplete }: BulkImportIns
         }
     }
 
-    const downloadTemplate = () => {
+    const downloadTemplate = async () => {
+        const XLSX = await loadXLSX()
         const ws = XLSX.utils.json_to_sheet([
             { Name: "John Doe", Email: "john@example.com", Phone: "1234567890" },
             { Name: "Jane Smith", Email: "jane@example.com", Phone: "9876543210" }
@@ -126,8 +129,9 @@ export default function BulkImportInspectors({ onImportComplete }: BulkImportIns
         setFile(selectedFile)
 
         const reader = new FileReader()
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             try {
+                const XLSX = await loadXLSX()
                 const data = new Uint8Array(event.target?.result as ArrayBuffer)
                 const workbook = XLSX.read(data, { type: "array" })
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
@@ -199,8 +203,9 @@ export default function BulkImportInspectors({ onImportComplete }: BulkImportIns
         }
     }
 
-    const exportResults = () => {
+    const exportResults = async () => {
         if (!results) return
+        const XLSX = await loadXLSX()
 
         const exportData = [
             ...results.created.map(c => ({

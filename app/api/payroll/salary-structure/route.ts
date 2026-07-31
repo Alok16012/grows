@@ -2,12 +2,16 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 // GET /api/payroll/salary-structure
 // Returns all employees (active) with their salary structure (null if not set)
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
+        return new NextResponse("Forbidden", { status: 403 })
+    }
 
     const employees = await prisma.employee.findMany({
         where: { status: "ACTIVE" },
@@ -40,6 +44,9 @@ export async function GET() {
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
+        return new NextResponse("Forbidden", { status: 403 })
+    }
 
     const body = await req.json()
     const rows: {

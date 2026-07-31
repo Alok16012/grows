@@ -688,7 +688,7 @@ export default function AssetsPage() {
     // Fetch employees (for modals)
     const fetchEmployees = useCallback(async () => {
         try {
-            const res = await fetch("/api/employees?status=ACTIVE&limit=500")
+            const res = await fetch("/api/employees?status=ACTIVE&pageSize=1000")
             if (res.ok) {
                 const data = await res.json()
                 setEmployees(Array.isArray(data) ? data : (data.employees ?? []))

@@ -1,7 +1,10 @@
 "use client"
 import { Suspense, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import * as XLSX from "xlsx"
+import type { Range as XLSXRange } from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
 import {
     Loader2, Download, ChevronRight, ShieldCheck,
@@ -50,12 +53,13 @@ const REPORT_SECTIONS: Record<string, SectionMap> = {
     "pt-challan":    [["Employee Info", 3], ["Period", 1], ["Wages", 1], ["Contribution", 1], ["Attendance", 2]],
 }
 
-function buildHierarchicalSheet(
+async function buildHierarchicalSheet(
     data: Record<string, string | number>[],
     reportType: string,
     title: string,
     m: number, y: number
 ) {
+    const XLSX = await loadXLSX()
     const cols = Object.keys(data[0] || {})
     const nCols = cols.length
     const sections: SectionMap = REPORT_SECTIONS[reportType] ? [...REPORT_SECTIONS[reportType]] : [["Data", nCols]]
@@ -76,7 +80,7 @@ function buildHierarchicalSheet(
     const aoa: (string | number)[][] = [titleRow, subTitleRow, sectionRow, headerRow, ...dataRows]
     const ws = XLSX.utils.aoa_to_sheet(aoa)
 
-    const merges: XLSX.Range[] = [
+    const merges: XLSXRange[] = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } },
     ]
@@ -128,6 +132,7 @@ function ComplianceInner() {
         const key = `${item.id}-${month}-${year}`
         setDlLoading(key)
         try {
+            const XLSX = await loadXLSX()
             const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}`)
             if (!r.ok) { toast.error("No data found for this period"); return }
             const data = await r.json()
@@ -145,7 +150,7 @@ function ComplianceInner() {
                 ], { origin: "A1" })
                 XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
             } else {
-                const ws = buildHierarchicalSheet(data, item.type, item.label, month, year)
+                const ws = await buildHierarchicalSheet(data, item.type, item.label, month, year)
                 XLSX.utils.book_append_sheet(wb, ws, item.label.substring(0, 31))
             }
             XLSX.writeFile(wb, `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)

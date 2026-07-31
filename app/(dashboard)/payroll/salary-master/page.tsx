@@ -2,7 +2,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import {
     Loader2, Search, ChevronRight, Download, Upload,
     Edit2, Check, X, RefreshCw, IndianRupee
@@ -196,7 +198,8 @@ export default function SalaryMasterPage() {
 
     // Download Excel template with current data pre-filled
     // Site-wise: when filterSite is set, the template includes only that site's employees
-    const handleDownloadTemplate = () => {
+    const handleDownloadTemplate = async () => {
+        const XLSX = await loadXLSX()
         const headers = [
             "EMP Code", "Employee Name", "Designation", "Site",
             "Basic", "DA", "HRA", "Washing", "Conveyance",
@@ -249,6 +252,7 @@ export default function SalaryMasterPage() {
         reader.onload = async (ev) => {
             setUploading(true)
             try {
+                const XLSX = await loadXLSX()
                 const wb   = XLSX.read(ev.target?.result as ArrayBuffer, { type: "array" })
                 const ws   = wb.Sheets[wb.SheetNames[0]]
                 const raw  = XLSX.utils.sheet_to_json(ws) as Record<string, unknown>[]

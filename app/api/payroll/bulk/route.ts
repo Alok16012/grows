@@ -34,14 +34,34 @@ export async function POST(req: Request) {
         let generated = 0
         const errors: string[] = []
 
-        for (const employee of employees) {
+        // One query for the whole month instead of one per employee. The old
+        // per-employee findMany + upsert loop was ~2 serial round trips per
+        // employee, which blew past the 30s function limit on a real roster.
+        const allAttendance = await prisma.attendance.findMany({
+            where: {
+                employeeId: { in: employees.map(e => e.id) },
+                date: { gte: startDate, lt: endDate },
+            },
+            select: { employeeId: true, status: true, overtimeHrs: true },
+        })
+
+        const attendanceByEmployee = new Map<string, typeof allAttendance>()
+        for (const record of allAttendance) {
+            const list = attendanceByEmployee.get(record.employeeId)
+            if (list) list.push(record)
+            else attendanceByEmployee.set(record.employeeId, [record])
+        }
+
+        // Upserts still have to run per employee (composite unique key), but in
+        // bounded-concurrency batches rather than strictly one after another.
+        // Kept small: Prisma's default pool is num_cpus * 2 + 1, which is only 3
+        // on a 1-vCPU serverless container, and overflow surfaces as P2024.
+        const CONCURRENCY = 5
+        for (let i = 0; i < employees.length; i += CONCURRENCY) {
+            const batch = employees.slice(i, i + CONCURRENCY)
+            await Promise.all(batch.map(async (employee) => {
             try {
-                const attendances = await prisma.attendance.findMany({
-                    where: {
-                        employeeId: employee.id,
-                        date: { gte: startDate, lt: endDate },
-                    },
-                })
+                const attendances = attendanceByEmployee.get(employee.id) ?? []
 
                 const presentDays = attendances.filter(a => a.status === "PRESENT" || a.status === "HALF_DAY").length
                 const leaveDays = attendances.filter(a => a.status === "LEAVE").length
@@ -95,6 +115,7 @@ export async function POST(req: Request) {
             } catch (err) {
                 errors.push(`Employee ${employee.id}: ${String(err)}`)
             }
+            }))
         }
 
         return NextResponse.json({ generated, total: employees.length, errors })

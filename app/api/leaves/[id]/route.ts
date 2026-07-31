@@ -57,10 +57,23 @@ export async function PUT(
         const existing = await prisma.leave.findUnique({ where: { id: params.id } })
         if (!existing) return new NextResponse("Not found", { status: 404 })
 
-        const isAdminOrManager = checkAccess(session, ["MANAGER"], "leaves.view")
+        // Approving/rejecting leaves needs the dedicated approve permission (or the
+        // broader manage). A read-only `leaves.view` role must NOT be able to
+        // approve — it may only cancel its own pending request below.
+        const isAdminOrManager =
+            checkAccess(session, [], "leaves.approve") || checkAccess(session, [], "leaves.manage")
 
         if (!isAdminOrManager) {
-            // Owner can only cancel their own PENDING leave
+            // Owner can only cancel their own PENDING leave. The ownership check
+            // was missing entirely, so any signed-in user could cancel anyone's
+            // pending leave by passing its id.
+            const linkedEmployee = await prisma.employee.findFirst({
+                where: { userId: session.user.id },
+                select: { id: true },
+            })
+            if (!linkedEmployee || existing.employeeId !== linkedEmployee.id) {
+                return new NextResponse("Forbidden", { status: 403 })
+            }
             if (status !== "CANCELLED") return new NextResponse("Forbidden", { status: 403 })
             if (existing.status !== "PENDING") return new NextResponse("Only PENDING leaves can be cancelled", { status: 400 })
         }
@@ -145,10 +158,19 @@ export async function DELETE(
         const existing = await prisma.leave.findUnique({ where: { id: params.id } })
         if (!existing) return new NextResponse("Not found", { status: 404 })
 
-        const isAdminOrManager = checkAccess(session, ["MANAGER"], "leaves.view")
+        const isAdminOrManager = checkAccess(session, [], "leaves.manage")
 
-        // Only admin/manager or leave creator (PENDING only)
+        // Only admin/manager or the leave's own employee (PENDING only). The
+        // ownership half of that rule was never enforced, so any signed-in user
+        // could delete anyone's pending leave.
         if (!isAdminOrManager) {
+            const linkedEmployee = await prisma.employee.findFirst({
+                where: { userId: session.user.id },
+                select: { id: true },
+            })
+            if (!linkedEmployee || existing.employeeId !== linkedEmployee.id) {
+                return new NextResponse("Forbidden", { status: 403 })
+            }
             if (existing.status !== "PENDING") {
                 return new NextResponse("Only PENDING leaves can be deleted", { status: 400 })
             }

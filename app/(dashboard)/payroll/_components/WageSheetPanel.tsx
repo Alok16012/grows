@@ -2,7 +2,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import { Loader2, RefreshCw, MapPin, Building2, Search, FileSpreadsheet, FileDown, Lock, X } from "lucide-react"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import { printHTML } from "@/lib/print-html"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -97,6 +99,7 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
         if (!selectedSiteIds.size) return
         setDlCombined(true)
         try {
+            const XLSX = await loadXLSX()
             const wb=XLSX.utils.book_new(); const m=parseInt(month); const y=parseInt(year); let sheetsAdded=0
             for (const siteId of selectedSiteIds) {
                 const site=sites.find(s=>s.id===siteId)
@@ -115,7 +118,8 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
         finally { setDlCombined(false) }
     }
 
-    const handleNEFT = ()=>{
+    const handleNEFT = async ()=>{
+        const XLSX = await loadXLSX()
         const exportRows=selectedIds.size>0?data.filter(p=>selectedIds.has(p.id)):data
         if (!exportRows.length) return
         const site=sites.find(s=>s.id===selId)
@@ -131,7 +135,8 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
         XLSX.writeFile(wb,`NEFT_${site?.name??"Site"}_${MONTHS[m-1]}_${y}.xlsx`)
     }
 
-    const handleStatementExcel = ()=>{
+    const handleStatementExcel = async ()=>{
+        const XLSX = await loadXLSX()
         const exportRows=selectedIds.size>0?data.filter(p=>selectedIds.has(p.id)):data
         if (!exportRows.length) return
         const site=sites.find(s=>s.id===selId); const m=parseInt(month); const y=parseInt(year)
@@ -158,7 +163,8 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
         printHTML(html)
     }
 
-    const handleExport = ()=>{
+    const handleExport = async ()=>{
+        const XLSX = await loadXLSX()
         const exportRows=selectedIds.size>0?data.filter(p=>selectedIds.has(p.id)):data
         if (!exportRows.length) return
         const site=sites.find(s=>s.id===selId); const m=parseInt(month); const y=parseInt(year)

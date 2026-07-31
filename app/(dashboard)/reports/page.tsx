@@ -154,7 +154,10 @@ export default function ReportsPage() {
     const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
     const [selectedYear, setSelectedYear] = useState(now.getFullYear())
     const [dateFilterMode, setDateFilterMode] = useState<"month" | "single" | "range">("month")
-    const todayStr = now.toISOString().slice(0, 10)
+    // Local calendar date, not UTC. toISOString() rolls over at 00:00 UTC, so for
+    // IST users between midnight and 05:30 it yields yesterday — which the date
+    // inputs then enforce as `max`, blocking selection of today.
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
     const [dateFrom, setDateFrom] = useState(todayStr)
     const [dateTo, setDateTo] = useState(todayStr)
     const [mounted, setMounted] = useState(false)
@@ -246,9 +249,19 @@ export default function ReportsPage() {
             if (selectedInspectorId !== "all") params.set("inspectorId", selectedInspectorId)
 
             const res = await fetch(`/api/reports?${params.toString()}`)
+            if (!res.ok) {
+                setData(null)
+                toast.error("Failed to load report")
+                return
+            }
             const d = await res.json()
-            setData(d)
+            // The tabs below index into d.dayWise / d.partWise / d.locationWise
+            // unguarded, so anything that isn't a well-formed report must become
+            // null and fall through to the "No data loaded" branch instead.
+            setData(d && Array.isArray(d.records) ? d : null)
         } catch {
+            setData(null)
+            toast.error("Failed to load report")
         } finally {
             setLoading(false)
         }
@@ -296,6 +309,16 @@ export default function ReportsPage() {
         })
         return rows
     }, [data?.records, searchTerm, colFilters, sortKey, sortDir])
+
+    // Period label that follows the active date mode. Export filenames and the
+    // PDF header used to hardcode the month/year even when the report was
+    // actually filtered to a single day or a custom range.
+    const periodLabel = dateFilterMode === "month"
+        ? `${MONTHS[selectedMonth - 1]} ${selectedYear}`
+        : dateFilterMode === "single"
+            ? dateFrom
+            : `${dateFrom} to ${dateTo}`
+    const periodSlug = periodLabel.replace(/\s+/g, "")
 
     const handleExportExcel = async () => {
         const XLSX = await loadXLSX()
@@ -366,7 +389,7 @@ export default function ReportsPage() {
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
 
         const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global"
-        const fileName = `${fileNamePrefix}_${siteName.replace(/\s+/g, '')}_${MONTHS[selectedMonth - 1]}_${selectedYear}.xlsx`
+        const fileName = `${fileNamePrefix}_${siteName.replace(/\s+/g, '')}_${periodSlug}.xlsx`
         XLSX.writeFile(workbook, fileName)
     }
 
@@ -391,7 +414,7 @@ export default function ReportsPage() {
                 import("./ReportPDF")
             ])
             const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global View"
-            const period = `${MONTHS[selectedMonth - 1]} ${selectedYear}`
+            const period = periodLabel
             const project = projects.find(p => p.id === selectedProjectId)?.name || "All Projects"
             const inspector = inspectors.find(i => i.id === selectedInspectorId)?.name || "All Inspectors"
             const logoUrl = `${window.location.origin}/logo.png`
@@ -411,7 +434,7 @@ export default function ReportsPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement("a")
             a.href = url
-            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${MONTHS[selectedMonth - 1]}_${selectedYear}.pdf`
+            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${periodSlug}.pdf`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
@@ -431,11 +454,11 @@ export default function ReportsPage() {
             if (!res.ok) throw new Error("Delete failed")
             toast.success("Inspection record deleted")
             setDeleteConfirmId(null)
-            // Remove from local data
-            setData((prev: any) => {
-                if (!prev?.records) return prev
-                return { ...prev, records: prev.records.filter((r: any) => r.id !== inspectionId) }
-            })
+            // Refetch rather than splicing the row out locally: the summary cards,
+            // day-wise/part-wise tables and every chart are server-computed
+            // aggregates, so filtering `records` alone left them showing the
+            // deleted inspection's quantities.
+            await fetchReport()
         } catch {
             toast.error("Failed to delete record")
         } finally {
@@ -659,7 +682,7 @@ export default function ReportsPage() {
                 <div className="hidden print:block mb-[24px] border-b border-[#1a1a18] pb-[16px]">
                     <h1 className="text-[24px] font-[700] text-[#1a1a18]">{sites.find(c => c.id === selectedSiteId)?.name || "Global View"} - {activeTab}</h1>
                     <p className="text-[12px] font-[500] text-[#6b6860] mt-[4px]">
-                        Period: {MONTHS[selectedMonth - 1]} {selectedYear} •
+                        Period: {periodLabel} •
                         Project: {projects.find(p => p.id === selectedProjectId)?.name || "All"} •
                         Inspector: {inspectors.find(i => i.id === selectedInspectorId)?.name || "All"}
                     </p>

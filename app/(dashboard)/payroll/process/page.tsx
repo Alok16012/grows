@@ -3,7 +3,9 @@ import { Suspense } from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import {
     Loader2, Play, RefreshCw, ChevronRight,
     AlertCircle, CheckCircle2, Users, MapPin, Building2, Search,
@@ -188,6 +190,7 @@ function ProcessPayrollPage() {
     const handleAttFileUpload = async (file: File) => {
         if (!employees.length) { toast.error("Load employees first"); return }
         try {
+            const XLSX = await loadXLSX()
             const buf = await file.arrayBuffer()
             const wb  = XLSX.read(buf, { type: "array" })
             const ws  = wb.Sheets[wb.SheetNames[0]]

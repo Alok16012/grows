@@ -35,6 +35,12 @@ async function withTable<T>(op: () => Promise<T>): Promise<T> {
 }
 
 export async function GET(req: Request) {
+  // API routes are NOT covered by middleware, so without this check the whole
+  // AppSetting table is readable by anyone on the internet. Any signed-in user
+  // may read settings; writes stay gated in POST below.
+  const session = await getServerSession(authOptions)
+  if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const key = searchParams.get("key")
   try {

@@ -108,24 +108,36 @@ export async function GET(req: Request) {
         const monthStart = new Date()
         monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
         const inMonth = { dateOfJoining: { gte: monthStart } }
-        const [
-            cTotal, cActive, cOnLeave, cInactive, cTerminated, cResigned,
-            mTotal, mActive, mTerminated,
-        ] = await Promise.all([
-            prisma.employee.count({ where: { ...countsWhere, status: { notIn: ["ONBOARDING"] } } }),
-            prisma.employee.count({ where: { ...countsWhere, status: "ACTIVE" } }),
-            prisma.employee.count({ where: { ...countsWhere, status: "ON_LEAVE" } }),
-            prisma.employee.count({ where: { ...countsWhere, status: "INACTIVE" } }),
-            prisma.employee.count({ where: { ...countsWhere, status: "TERMINATED" } }),
-            prisma.employee.count({ where: { ...countsWhere, status: "RESIGNED" } }),
-            prisma.employee.count({ where: { ...countsWhere, status: { notIn: ["ONBOARDING"] }, ...inMonth } }),
-            prisma.employee.count({ where: { ...countsWhere, status: "ACTIVE", ...inMonth } }),
-            prisma.employee.count({ where: { ...countsWhere, status: { in: ["TERMINATED", "RESIGNED"] }, ...inMonth } }),
+        // Two grouped aggregates instead of nine separate counts. Each of those
+        // counts re-ran the same onboardingRecord join, so the stat cards alone
+        // cost nine round trips on every list load.
+        const [byStatus, byStatusThisMonth] = await Promise.all([
+            prisma.employee.groupBy({ by: ["status"], where: countsWhere, _count: { _all: true } }),
+            prisma.employee.groupBy({ by: ["status"], where: { ...countsWhere, ...inMonth }, _count: { _all: true } }),
         ])
+
+        const tally = (rows: typeof byStatus) => {
+            const out: Record<string, number> = {}
+            for (const row of rows) out[row.status] = row._count._all
+            return out
+        }
+        const all = tally(byStatus)
+        const month = tally(byStatusThisMonth)
+        const sumExcludingOnboarding = (m: Record<string, number>) =>
+            Object.entries(m).reduce((sum, [status, n]) => status === "ONBOARDING" ? sum : sum + n, 0)
+
         const counts = {
-            total: cTotal, active: cActive, onLeave: cOnLeave,
-            inactive: cInactive, terminated: cTerminated, resigned: cResigned,
-            newThisMonth: { total: mTotal, active: mActive, terminated: mTerminated },
+            total: sumExcludingOnboarding(all),
+            active: all.ACTIVE ?? 0,
+            onLeave: all.ON_LEAVE ?? 0,
+            inactive: all.INACTIVE ?? 0,
+            terminated: all.TERMINATED ?? 0,
+            resigned: all.RESIGNED ?? 0,
+            newThisMonth: {
+                total: sumExcludingOnboarding(month),
+                active: month.ACTIVE ?? 0,
+                terminated: (month.TERMINATED ?? 0) + (month.RESIGNED ?? 0),
+            },
         }
 
         // Backfill profile photo from an uploaded Photo document for any

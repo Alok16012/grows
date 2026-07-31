@@ -34,21 +34,34 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
 
     useEffect(() => { setMounted(true) }, [])
 
-    const fetchNotifs = async () => {
+    // countOnly: the 30s badge poll. The full list is only fetched when the
+    // dropdown is actually opened.
+    const fetchNotifs = async (countOnly = false) => {
         try {
-            const res = await fetch("/api/notifications")
+            const res = await fetch(countOnly ? "/api/notifications?count=true" : "/api/notifications")
             if (res.ok) {
                 const data = await res.json()
-                setNotifications(data.notifications || [])
+                if (!countOnly) setNotifications(data.notifications || [])
                 setUnreadCount(data.unreadCount || 0)
             }
         } catch { }
     }
 
+    // Poll every 30s, but skip while the tab is hidden — background tabs were
+    // pulling the full notification list around the clock. Refetch immediately
+    // when the tab becomes visible again so the badge is never stale on return.
     useEffect(() => {
+        const tick = () => { if (!document.hidden) fetchNotifs(true) }
+        // One full fetch on mount so the dropdown has rows to show the first
+        // time it is opened; the recurring poll only refreshes the badge count.
         fetchNotifs()
-        const interval = setInterval(fetchNotifs, 30000) // poll every 30s
-        return () => clearInterval(interval)
+        const interval = setInterval(tick, 30000)
+        const onVisible = () => { if (!document.hidden) fetchNotifs(true) }
+        document.addEventListener("visibilitychange", onVisible)
+        return () => {
+            clearInterval(interval)
+            document.removeEventListener("visibilitychange", onVisible)
+        }
     }, [])
 
     useEffect(() => {
@@ -57,8 +70,14 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                 setLoading(true)
                 try {
                     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
-                    const data = await res.json()
-                    setResults(data)
+                    // An error payload here would be rendered as results and crash
+                    // the nav (and with it every page), so normalise to empty lists.
+                    const data = res.ok ? await res.json() : null
+                    setResults({
+                        sites: data?.sites ?? [],
+                        projects: data?.projects ?? [],
+                        inspections: data?.inspections ?? [],
+                    })
                     setIsOpen(true)
                 } catch {
                     console.error("Search fetch failed")
@@ -135,7 +154,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                     {loading && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--text3)]" /></div>}
                 </div>
 
-                {isOpen && (results?.sites.length || results?.projects.length || results?.inspections.length) ? (
+                {isOpen && (results?.sites?.length || results?.projects?.length || results?.inspections?.length) ? (
                     <div className="absolute top-full left-0 mt-2 w-full max-h-[400px] overflow-y-auto rounded-[12px] border border-[var(--border)] bg-[var(--surface)] shadow-xl z-50 p-2 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
                         {results.sites.length > 0 && (
                             <section>
@@ -195,7 +214,13 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                     {/* Notification Bell */}
                     <div className="relative" ref={notifRef}>
                         <button
-                            onClick={() => setIsNotifOpen(!isNotifOpen)}
+                            onClick={() => {
+                                const opening = !isNotifOpen
+                                setIsNotifOpen(opening)
+                                // The poll only keeps the badge count fresh, so pull
+                                // the actual rows when the panel is opened.
+                                if (opening) fetchNotifs()
+                            }}
                             className="h-[34px] w-[34px] rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors relative"
                         >
                             <Bell size={18} />

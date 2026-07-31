@@ -363,6 +363,9 @@ model Lead {
   @@index([status])
   @@index([assignedTo])
   @@index([createdAt])
+  // Both are used by the recruitment ownership filter (createdBy / formSlug OR).
+  @@index([createdBy])
+  @@index([formSlug])
 }
 
 model LeadForm {
@@ -703,6 +706,9 @@ model Employee {
 
   @@index([branchId])
   @@index([status])
+  @@index([departmentId])
+  // The employee list always sorts by createdAt desc within a status filter.
+  @@index([status, createdAt])
 }
 
 model EmployeeDocument {
@@ -1320,6 +1326,9 @@ model FieldCheckIn {
 
   @@index([employeeId])
   @@index([checkedInAt])
+  // Backs the DISTINCT ON (employeeId) ORDER BY checkedInAt DESC lookup used by
+  // /api/field/checkins/latest.
+  @@index([employeeId, checkedInAt])
 }
 
 // ─── LMS ──────────────────────────────────────────────────────────────────────

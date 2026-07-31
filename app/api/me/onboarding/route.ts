@@ -39,13 +39,18 @@ export async function PATCH(req: Request) {
 
     if (!taskId || !status) return new NextResponse("taskId and status required", { status: 400 })
 
-    const task = await prisma.onboardingTask.update({
-        where: { id: taskId },
+    // Scope the update to the caller's OWN tasks. Without the employeeId filter
+    // any user could flip any employee's onboarding task by guessing a taskId.
+    const result = await prisma.onboardingTask.updateMany({
+        where: { id: taskId, employeeId: emp.id },
         data: {
             status,
             completedAt: status === "COMPLETED" ? new Date() : null,
             completedBy: status === "COMPLETED" ? `${emp.firstName} ${emp.lastName}` : null
         }
     })
+    if (result.count === 0) return new NextResponse("Not found", { status: 404 })
+
+    const task = await prisma.onboardingTask.findUnique({ where: { id: taskId } })
     return NextResponse.json(task)
 }

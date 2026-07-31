@@ -25,39 +25,63 @@ export async function GET() {
             },
         })
 
-        // Get latest check-in per employee
-        const latestCheckIns = await Promise.all(
-            employees.map(async (emp) => {
-                const lastCheckIn = await prisma.fieldCheckIn.findFirst({
-                    where: { employeeId: emp.id },
-                    orderBy: { checkedInAt: "desc" },
-                })
+        // Latest check-in per employee in ONE query. Doing this per-employee
+        // meant 2N+1 round trips, which also exhausted the connection pool and
+        // stalled unrelated requests.
+        //
+        // DISTINCT ON rather than Prisma's `distinct`: the latter de-duplicates
+        // in the client, so it would still pull every historical check-in row
+        // for these employees over the wire just to keep the newest one.
+        type CheckInRow = {
+            id: string
+            employeeId: string
+            siteId: string | null
+            latitude: number
+            longitude: number
+            accuracy: number | null
+            checkedInAt: Date
+            notes: string | null
+            isGeofenced: boolean
+            distanceFromSite: number | null
+        }
+        const employeeIds = employees.map(e => e.id)
+        const checkIns: CheckInRow[] = employeeIds.length
+            ? await prisma.$queryRaw<CheckInRow[]>`
+                SELECT DISTINCT ON ("employeeId")
+                    "id", "employeeId", "siteId", "latitude", "longitude",
+                    "accuracy", "checkedInAt", "notes", "isGeofenced", "distanceFromSite"
+                FROM "FieldCheckIn"
+                WHERE "employeeId" = ANY(${employeeIds}::text[])
+                ORDER BY "employeeId", "checkedInAt" DESC
+            `
+            : []
 
-                let siteName: string | null = null
-                if (lastCheckIn?.siteId) {
-                    const site = await prisma.site.findUnique({
-                        where: { id: lastCheckIn.siteId },
-                        select: { name: true },
-                    })
-                    siteName = site?.name || null
-                }
-
-                // Check if checked in today
-                const todayStart = new Date()
-                todayStart.setHours(0, 0, 0, 0)
-                const checkedInToday = lastCheckIn
-                    ? lastCheckIn.checkedInAt >= todayStart
-                    : false
-
-                return {
-                    employee: emp,
-                    lastCheckIn: lastCheckIn
-                        ? { ...lastCheckIn, siteName }
-                        : null,
-                    checkedInToday,
-                }
-            })
+        const siteIds = Array.from(
+            new Set(checkIns.map(c => c.siteId).filter((id): id is string => !!id))
         )
+        const sites = siteIds.length
+            ? await prisma.site.findMany({
+                where: { id: { in: siteIds } },
+                select: { id: true, name: true },
+            })
+            : []
+
+        const siteNameById = new Map(sites.map(s => [s.id, s.name]))
+        const checkInByEmployee = new Map(checkIns.map(c => [c.employeeId, c]))
+
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+
+        const latestCheckIns = employees.map(emp => {
+            const lastCheckIn = checkInByEmployee.get(emp.id) ?? null
+            return {
+                employee: emp,
+                lastCheckIn: lastCheckIn
+                    ? { ...lastCheckIn, siteName: lastCheckIn.siteId ? (siteNameById.get(lastCheckIn.siteId) ?? null) : null }
+                    : null,
+                checkedInToday: lastCheckIn ? lastCheckIn.checkedInAt >= todayStart : false,
+            }
+        })
 
         return NextResponse.json(latestCheckIns)
     } catch (error) {

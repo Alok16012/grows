@@ -125,7 +125,11 @@ export default function PayrollPage() {
         setLoading(true)
         try {
             const res = await fetch(`/api/payroll/runs?year=${yearFilter}`)
-            if (res.ok) setRuns(await res.json())
+            // A non-OK response used to be ignored entirely, leaving the previous
+            // year's runs on screen with no indication anything failed.
+            if (!res.ok) { setRuns([]); toast.error("Failed to load payroll runs"); return }
+            const data = await res.json()
+            setRuns(Array.isArray(data) ? data : [])
         } catch { toast.error("Failed to load payroll runs") }
         finally { setLoading(false) }
     }, [yearFilter])

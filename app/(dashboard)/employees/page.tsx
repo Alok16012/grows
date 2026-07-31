@@ -1167,10 +1167,15 @@ function EmployeesPage() {
         fetch("/api/sites?isActive=true").then(r => r.json()).then(data => setSites(Array.isArray(data) ? data : [])).catch(() => {})
     }, [])
 
-    // Auto-open drawer when ?id= param is present (e.g. from recruitment "View Employee")
+    // Auto-open drawer when ?id= param is present (e.g. from recruitment "View Employee").
+    // Only fires once per id: `employees` gets a fresh identity on every refetch,
+    // so without this guard closing the drawer would be undone by the next reload.
+    const autoOpenedIdRef = useRef<string | null>(null)
     useEffect(() => {
         const id = searchParams.get("id")
         if (!id || loading) return
+        if (autoOpenedIdRef.current === id) return
+        autoOpenedIdRef.current = id
         const emp = employees.find(e => e.id === id)
         if (emp) {
             setDrawerEmployee(emp)
@@ -1504,12 +1509,12 @@ function EmployeesPage() {
     const total = totalCount || employees.length
     const active = employees.filter(e => e.status === "ACTIVE").length
     const onLeave = employees.filter(e => e.status === "ON_LEAVE").length
-    const now = new Date()
-    const terminatedResignedThisMonth = employees.filter(e => {
-        if (e.status !== "TERMINATED" && e.status !== "RESIGNED") return false
-        const updated = new Date(e.createdAt)
-        return updated.getMonth() === now.getMonth() && updated.getFullYear() === now.getFullYear()
-    }).length
+    // Fallback for the "Terminated / Resigned" card when server counts haven't
+    // loaded. It backs a total, so it must not be filtered to the current month —
+    // and the old month filter used createdAt (join date), not the exit date.
+    const terminatedResigned = employees.filter(
+        e => e.status === "TERMINATED" || e.status === "RESIGNED"
+    ).length
 
 
     return (
@@ -1609,7 +1614,7 @@ function EmployeesPage() {
                     trend={{ dir: "flat", text: "No change" }}
                 />
                 <StatCard
-                    label="Terminated / Resigned" value={counts ? counts.terminated + counts.resigned : terminatedResignedThisMonth}
+                    label="Terminated / Resigned" value={counts ? counts.terminated + counts.resigned : terminatedResigned}
                     icon={<TrendingDown size={18} />} color="#dc2626" bg="#fef2f2" sparkColor="#ef4444" seed={1}
                     trend={counts && counts.newThisMonth.terminated > 0 ? { dir: "down", text: `${counts.newThisMonth.terminated} this month` } : { dir: "flat", text: "No change" }}
                 />

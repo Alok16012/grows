@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
 
 export async function POST(
@@ -11,6 +12,13 @@ export async function POST(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        // This route assigns system roles and custom roles. Without a permission
+        // gate any signed-in employee could promote themselves to MANAGER with an
+        // arbitrary custom role, so it needs the same `users.manage` gate as the
+        // Employee Logins screen it backs.
+        if (!checkAccess(session, ["ADMIN"], "users.manage")) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
 
         const { customRoleId } = await req.json()
 

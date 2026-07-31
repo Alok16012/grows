@@ -1,6 +1,9 @@
 "use client"
 import { useState, useEffect } from "react"
-import * as XLSX from "xlsx"
+import type { Range as XLSXRange } from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
 import { Loader2, Download, ShieldCheck, FileSpreadsheet, TableProperties, RefreshCw, X } from "lucide-react"
 
@@ -43,7 +46,8 @@ const REPORT_SECTIONS: Record<string, SectionMap> = {
     "pt-challan":    [["Employee Info",3],["Period",1],["Wages",1],["Contribution",1],["Attendance",2]],
 }
 
-function buildHierarchicalSheet(data: Record<string,string|number>[], reportType: string, title: string, m: number, y: number) {
+async function buildHierarchicalSheet(data: Record<string,string|number>[], reportType: string, title: string, m: number, y: number) {
+    const XLSX = await loadXLSX()
     const cols = Object.keys(data[0]||{})
     const nCols = cols.length
     const sections: SectionMap = REPORT_SECTIONS[reportType]?[...REPORT_SECTIONS[reportType]]:[["Data",nCols]]
@@ -55,7 +59,7 @@ function buildHierarchicalSheet(data: Record<string,string|number>[], reportType
     for (const [label,span] of sections) { sectionRow.push(label); for (let i=1;i<span;i++) sectionRow.push("") }
     const aoa: (string|number)[][] = [titleRow,subTitleRow,sectionRow,cols,...data.map(r=>cols.map(c=>r[c]??""))]
     const ws = XLSX.utils.aoa_to_sheet(aoa)
-    const merges: XLSX.Range[] = [
+    const merges: XLSXRange[] = [
         {s:{r:0,c:0},e:{r:0,c:nCols-1}},
         {s:{r:1,c:0},e:{r:1,c:nCols-1}},
     ]
@@ -119,6 +123,7 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
         const key=`${item.id}-${month}-${year}`
         setDlLoading(key)
         try {
+            const XLSX = await loadXLSX()
             const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}`)
             if (!r.ok) { toast.error("No data found for this period"); return }
             const data = await r.json()
@@ -135,7 +140,7 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                 ],{origin:"A1"})
                 XLSX.utils.book_append_sheet(wb,ws,"Wage Sheet")
             } else {
-                const ws=buildHierarchicalSheet(data,item.type,item.label,month,year)
+                const ws=await buildHierarchicalSheet(data,item.type,item.label,month,year)
                 XLSX.utils.book_append_sheet(wb,ws,item.label.substring(0,31))
             }
             XLSX.writeFile(wb,`${item.label.replace(/[^a-zA-Z0-9 ]/g,"").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)

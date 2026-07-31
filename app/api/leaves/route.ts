@@ -90,12 +90,20 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         // Self-service: anyone WITHOUT the management permission can apply leave
-        // only for their own linked employee. Role-independent.
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
+        // only for their own linked employee. Creating leave for an arbitrary
+        // employeeId (the branch below) requires leaves.manage — a read-only
+        // leaves.view role must fall through to self-service here.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.manage")) {
             const linkedEmployee = await prisma.employee.findUnique({ where: { userId: session.user.id } })
             if (!linkedEmployee) return new NextResponse("No employee record linked", { status: 400 })
             const body = await req.json()
             const { type, startDate, endDate, days, reason } = body
+            // Refuse rather than silently redirecting the row: this branch always
+            // writes against the caller, so a request naming someone else must
+            // fail loudly instead of filing their leave under the caller's name.
+            if (body.employeeId && body.employeeId !== linkedEmployee.id) {
+                return new NextResponse("You can only apply leave for yourself", { status: 403 })
+            }
             if (!type || !startDate || !endDate || !days) {
                 return new NextResponse("type, startDate, endDate and days are required", { status: 400 })
             }

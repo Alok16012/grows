@@ -564,8 +564,8 @@ function InitiateExitModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [empSearch, setEmpSearch] = useState("")
 
   useEffect(() => {
-    fetch("/api/employees?status=ACTIVE&limit=200")
-      .then(r => r.json())
+    fetch("/api/employees?status=ACTIVE&pageSize=1000")
+      .then(r => r.ok ? r.json() : { employees: [] })
       .then(d => setEmployees(Array.isArray(d) ? d : d.employees || []))
       .catch(() => {})
   }, [])

@@ -238,6 +238,9 @@ export function EmployeeModal({
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
     const { data: session } = useSession()
     const canViewSalary = can(session, "employees.viewSalary")
+    // Fix Login assigns system + custom roles, so it needs the same permission as
+    // the Employee Logins screen. Showing it to everyone meant a guaranteed 403.
+    const canManageLogins = can(session, "users.manage")
     const sites = allSites
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents" | "history">("personal")
     type HistoryData = {
@@ -770,7 +773,7 @@ export function EmployeeModal({
                                             )}
                                         </div>
                                     </div>
-                                    <button
+                                    {canManageLogins && <button
                                         type="button"
                                         onClick={async () => {
                                             if (!employee) return
@@ -781,6 +784,9 @@ export function EmployeeModal({
                                                     headers: { "Content-Type": "application/json" },
                                                     body: JSON.stringify({ customRoleId: form.customRoleId })
                                                 })
+                                                // The route replies with a plain-text body on failure, so
+                                                // parsing it as JSON would throw and surface a bare "Error".
+                                                if (!res.ok) { alert(await res.text() || "Failed to fix login"); return }
                                                 const data = await res.json()
                                                 if (data.created) {
                                                     setNewCredentials({ email: data.email, password: data.password })
@@ -792,7 +798,7 @@ export function EmployeeModal({
                                         className="px-3 py-1.5 bg-amber-500 text-white text-[12px] font-semibold rounded-lg hover:bg-amber-600"
                                     >
                                         Fix Login
-                                    </button>
+                                    </button>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>System Role (Login Access)</label>

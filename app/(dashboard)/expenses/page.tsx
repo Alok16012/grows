@@ -12,7 +12,9 @@ import {
     type LucideIcon
 } from "lucide-react"
 import { format } from "date-fns"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -2361,8 +2363,9 @@ export default function ExpensesPage() {
 
     const STATUS_FILTERS: StatusFilter[] = ["ALL", "DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"]
 
-    function exportExpenses(fmt: "xlsx" | "csv") {
+    async function exportExpenses(fmt: "xlsx" | "csv") {
         if (expenses.length === 0) { toast.error("No expenses to export"); return }
+        const XLSX = await loadXLSX()
         const rows = expenses.map(e => ({
             "Expense No": e.expenseNo,
             "Title": e.title,

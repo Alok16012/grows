@@ -3,7 +3,9 @@ import { Suspense, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2, Lock, RefreshCw, ChevronRight, MapPin, Building2, CheckCircle2, AlertCircle, Download } from "lucide-react"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const fmt = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
@@ -79,8 +81,9 @@ function FinalPayrollInner() {
         finally { setLocking(false) }
     }
 
-    const handleExport = () => {
+    const handleExport = async () => {
         if (!data.length) return
+        const XLSX = await loadXLSX()
         const rows = data.map((p, i) => ({
             "SL": i+1,
             "Emp ID": p.employee.employeeId,

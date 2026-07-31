@@ -8,7 +8,9 @@ import {
     Users, UserCheck, UserX, CalendarOff, UserMinus,
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
 } from "lucide-react"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -729,11 +731,12 @@ export default function EmployeeMasterPage() {
     }
 
     // ── Bulk download selected ────────────────────────────────────────────────
-    const handleDownloadSelected = () => {
+    const handleDownloadSelected = async () => {
         const selected = filteredEmployees.filter(e => selectedIds.has(e.id))
         if (!selected.length) return
         if (visibleCols.length === 0) { toast.error("Pick at least one column to export"); return }
         try {
+            const XLSX = await loadXLSX()
             // Export exactly the columns currently visible (group + column picker),
             // which already excludes salary for users without permission.
             const exportCols = visibleCols
@@ -771,10 +774,11 @@ export default function EmployeeMasterPage() {
     }
 
     // ── Excel export ──────────────────────────────────────────────────────────
-    const handleExport = () => {
+    const handleExport = async () => {
         if (visibleCols.length === 0) { toast.error("Pick at least one column to export"); return }
         setExporting(true)
         try {
+            const XLSX = await loadXLSX()
             // Honor the column selection — export only the visible columns.
             const headers = visibleCols.map(c => c.label)
             const rows = filteredEmployees.map(emp => visibleCols.map(c => c.get(emp)))

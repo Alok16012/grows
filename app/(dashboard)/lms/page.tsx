@@ -1199,9 +1199,9 @@ function EnrollModal({ open, onClose, onSaved, courses, preselectedCourseId }: {
         setSearchEmp("")
 
         setLoadingEmps(true)
-        fetch("/api/employees?status=ACTIVE")
-            .then(r => r.json())
-            .then(d => setEmployees(Array.isArray(d) ? d : []))
+        fetch("/api/employees?status=ACTIVE&pageSize=1000")
+            .then(r => r.ok ? r.json() : { employees: [] })
+            .then(d => setEmployees(Array.isArray(d) ? d : (d.employees ?? [])))
             .catch(() => setEmployees([]))
             .finally(() => setLoadingEmps(false))
     }, [open, preselectedCourseId])

@@ -8,7 +8,9 @@ import {
     IndianRupee, Users, ChevronDown, ChevronUp, Edit2, Save, X, FileSpreadsheet,
     Upload, FileDown
 } from "lucide-react"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -249,13 +251,15 @@ export default function PayrollPage() {
         setLoading(true)
         try {
             const [empRes, payRes] = await Promise.all([
-                fetch("/api/employees?limit=1000"),
+                fetch("/api/employees?pageSize=1000"),
                 fetch(`/api/payroll?month=${month}&year=${year}&limit=1000`)
             ])
             const emps = empRes.ok ? await empRes.json() : []
-            const pays = payRes.ok ? await payRes.json() : []
+            const paysRaw = payRes.ok ? await payRes.json() : []
+            const empList: any[] = Array.isArray(emps) ? emps : (emps.employees ?? [])
+            const pays: any[] = Array.isArray(paysRaw) ? paysRaw : (paysRaw.payrolls ?? [])
 
-            const rows: EmpRow[] = (emps.data ?? emps).map((e: any) => {
+            const rows: EmpRow[] = empList.map((e: any) => {
                 const pay = pays.find((p: any) => p.employeeId === e.id)
                 return {
                     id: e.id, employeeId: e.employeeId,
@@ -325,6 +329,7 @@ export default function PayrollPage() {
 
     const exportExcel = async () => {
         try {
+            const XLSX = await loadXLSX()
             const res = await fetch(`/api/payroll/export?month=${month}&year=${year}`)
             if (!res.ok) throw new Error("No payroll data found. Process payroll first.")
             const rows = await res.json()
@@ -336,7 +341,8 @@ export default function PayrollPage() {
         } catch (e: any) { toast.error(e.message) }
     }
 
-    const downloadSalaryTemplate = () => {
+    const downloadSalaryTemplate = async () => {
+        const XLSX = await loadXLSX()
         const headers = [["Employee ID", "Basic", "DA", "HRA", "Bonus", "Washing", "Conveyance", "Leave With Wages", "Other Allowance", "OT Rate/Hour", "Canteen Rate/Day", "Compliance Type (OR/CALL)"]]
         const sampleRows = employees.slice(0, 3).map(e => [
             e.employeeId,
@@ -365,6 +371,7 @@ export default function PayrollPage() {
         if (!file) return
         setBulkUploading(true)
         try {
+            const XLSX = await loadXLSX()
             const ab = await file.arrayBuffer()
             const wb = XLSX.read(ab)
             const ws = wb.Sheets[wb.SheetNames[0]]

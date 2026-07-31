@@ -18,7 +18,7 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "attendance.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "attendance.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -66,8 +66,8 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, [], "attendance.view")) {
-            return new NextResponse("Forbidden — ADMIN only", { status: 403 })
+        if (!checkAccess(session, [], "attendance.manage")) {
+            return new NextResponse("Forbidden", { status: 403 })
         }
 
         await prisma.attendance.delete({ where: { id: params.id } })

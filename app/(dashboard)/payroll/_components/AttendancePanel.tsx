@@ -1,6 +1,8 @@
 "use client"
 import { useState, useRef, useCallback, useEffect } from "react"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import {
     Upload, Download, CheckCircle2, XCircle, Loader2,
     FileSpreadsheet, AlertCircle, Users, MapPin, RefreshCw, X
@@ -24,7 +26,8 @@ const TEMPLATE_SAMPLE = [
     ["EMP-0003","Amit Singh",    26,26,1,200,10,26,100,500,0],
 ]
 
-function downloadTemplate(siteName: string, employees: Employee[]) {
+async function downloadTemplate(siteName: string, employees: Employee[]) {
+    const XLSX = await loadXLSX()
     const wb = XLSX.utils.book_new()
     const sheetName = `${siteName.slice(0,20)} Attendance`
     const header = [`SITE: ${siteName}`,"","","","","","","","","",""]
@@ -81,6 +84,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
         if (!file)   { toast.error("Choose an Excel file first"); return }
         setParsing(true); setMatched(null)
         try {
+            const XLSX = await loadXLSX()
             const buf = await file.arrayBuffer()
             const wb  = XLSX.read(buf,{type:"array"})
             const ws  = wb.Sheets[wb.SheetNames[0]]

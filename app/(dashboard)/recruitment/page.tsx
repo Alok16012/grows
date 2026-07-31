@@ -19,7 +19,9 @@ import {
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
-import * as XLSX from "xlsx"
+// xlsx is lazy-loaded — only needed when a sheet is actually read or written.
+// Eager import adds ~430KB to this page's initial bundle.
+const loadXLSX = () => import("xlsx")
 import dynamic from "next/dynamic"
 import type { AnalyticsData } from "./RecruitmentAnalytics"
 
@@ -33,6 +35,13 @@ const RecruitmentAnalytics = dynamic(() => import("./RecruitmentAnalytics"), {
         </div>
     ),
 })
+
+// Today as yyyy-MM-dd in the *local* calendar. toISOString() rolls over at 00:00
+// UTC, so for IST users between midnight and 05:30 it returns yesterday.
+function todayLocalISO(): string {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -306,6 +315,10 @@ export default function RecruitmentPage() {
     const router = useRouter()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [searchQ, setSearchQ] = useState("")
+    // The lead list is fetched server-side, so typing must not fire one
+    // full-table request per character.
+    const [debouncedSearchQ, setDebouncedSearchQ] = useState("")
+    const latestLeadsRequestRef = useRef(0)
     const [filterStatus, setFilterStatus] = useState("ALL")
     const [filterPriority, setFilterPriority] = useState("ALL")
     const [filterScore, setFilterScore] = useState("ALL")
@@ -428,7 +441,8 @@ export default function RecruitmentPage() {
         }
     }
 
-    function handleDownloadTemplate() {
+    async function handleDownloadTemplate() {
+        const XLSX = await loadXLSX()
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([[
             "Candidate Name", "Phone", "Email", "City", "Locality", "Position", "Source",
@@ -446,7 +460,8 @@ export default function RecruitmentPage() {
         const file = e.target.files?.[0]
         if (!file) return
         try {
-            let wb: XLSX.WorkBook
+            const XLSX = await loadXLSX()
+            let wb: import("xlsx").WorkBook
             if (file.name.endsWith(".csv")) {
                 const text = await file.text()
                 wb = XLSX.read(text, { type: "string" })
@@ -487,19 +502,28 @@ export default function RecruitmentPage() {
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
     async function fetchLeads() {
+        // Every keystroke used to fire a request with no ordering guarantee, so a
+        // slow early response could land after a fast later one and repopulate the
+        // list with stale results. Only the newest request may commit.
+        const requestId = ++latestLeadsRequestRef.current
         setLoading(true)
         try {
             const params = new URLSearchParams()
             if (filterStatus !== "ALL") params.set("status", filterStatus)
             if (filterPriority !== "ALL") params.set("priority", filterPriority)
             if (filterScore !== "ALL") params.set("score", filterScore)
-            if (searchQ) params.set("search", searchQ)
+            if (debouncedSearchQ) params.set("search", debouncedSearchQ)
             const res = await fetch(`/api/recruitment?${params}`)
             if (!res.ok) throw new Error()
-            setLeads(await res.json())
+            const data = await res.json()
+            if (requestId !== latestLeadsRequestRef.current) return
+            setLeads(Array.isArray(data) ? data : [])
         } catch {
+            if (requestId !== latestLeadsRequestRef.current) return
             toast.error("Failed to load candidates")
-        } finally { setLoading(false) }
+        } finally {
+            if (requestId === latestLeadsRequestRef.current) setLoading(false)
+        }
     }
 
     async function fetchUsers() {
@@ -600,10 +624,15 @@ export default function RecruitmentPage() {
     const isAuthorized = status === "authenticated" && can(session, "recruitment.view")
 
     useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearchQ(searchQ), 300)
+        return () => clearTimeout(timer)
+    }, [searchQ])
+
+    useEffect(() => {
         if (isAuthorized) {
             fetchLeads()
         }
-    }, [filterStatus, filterPriority, filterScore, searchQ, isAuthorized])
+    }, [filterStatus, filterPriority, filterScore, debouncedSearchQ, isAuthorized])
 
     useEffect(() => {
         if (isAuthorized) {
@@ -2021,7 +2050,7 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
                                 <td className={td + " font-semibold"}>
                                     <div className="flex items-center gap-2">
                                         <div className="w-7 h-7 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0 text-[var(--accent)] font-bold text-[11px] overflow-hidden" style={{ position: "relative" }}>
-                                            {lead.candidateName.charAt(0).toUpperCase()}
+                                            {(lead.candidateName || "?").charAt(0).toUpperCase()}
                                             {lead.profileUrl && (
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover"
@@ -2052,7 +2081,7 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
                                         <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                                             <Edit2 size={13} />
                                         </button>
-                                        {can(session, "recruitment.view") && (
+                                        {can(session, "recruitment.manage") && (
                                             <button onClick={() => onDelete(lead.id)} className="p-1.5 rounded-[6px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                                 <Trash2 size={13} />
                                             </button>
@@ -2288,7 +2317,7 @@ function DetailDrawer({
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-white z-10 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent)] font-bold text-[15px] overflow-hidden" style={{ position: "relative" }}>
-                            {lead.candidateName.charAt(0).toUpperCase()}
+                            {(lead.candidateName || "?").charAt(0).toUpperCase()}
                             {lead.profileUrl && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={lead.profileUrl} alt={lead.candidateName} className="w-full h-full object-cover"
@@ -2308,7 +2337,7 @@ function DetailDrawer({
                         <button onClick={onEdit} className="p-1.5 rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                             <Edit2 size={15} />
                         </button>
-                        {can(session, "recruitment.view") && (
+                        {can(session, "recruitment.manage") && (
                             <button onClick={onDelete} className="p-1.5 rounded-[7px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                 <Trash2 size={15} />
                             </button>
@@ -2875,7 +2904,9 @@ function ConvertModal({ lead, onClose, onConverted }: {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState("")
 
-    const nameParts = lead.candidateName.trim().split(/\s+/)
+    // Excel-imported leads can land without a name — the kanban already guards
+    // for this, so the list, drawer and this modal must too.
+    const nameParts = (lead.candidateName || "").trim().split(/\s+/).filter(Boolean)
     const [form, setForm] = useState<ConvertForm>({
         firstName: nameParts[0] || "",
         middleName: "",
@@ -2899,13 +2930,17 @@ function ConvertModal({ lead, onClose, onConverted }: {
         departmentId: "",
         siteId: "",
         managerId: "",
-        dateOfJoining: new Date().toISOString().slice(0, 10),
+        dateOfJoining: todayLocalISO(),
         employmentType: "Full-time",
         salaryType: "Monthly",
         basicSalary: lead.expectedSalary?.toString() ?? "",
         deployRole: lead.position || "",
         deployShift: "",
-        deployStartDate: "",
+        // Default to today so the date shown in the field is the date submitted.
+        // The input previously fell back to today for display only, leaving the
+        // POSTed value empty unless the user edited it. Built from local parts,
+        // not toISOString(), which would back-date it for IST users before 05:30.
+        deployStartDate: todayLocalISO(),
         notes: "",
         da: "", washing: "", conveyance: "", leaveWithWages: "",
         otherAllowance: "", otRatePerHour: "170", canteenRatePerDay: "55",
@@ -3127,7 +3162,7 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                                 <option>Morning</option><option>Evening</option><option>Night</option><option>Rotating</option>
                                             </select>
                                         </div>
-                                        <div><label className={lCls}>Deployment Start Date</label><input type="date" value={form.deployStartDate || new Date().toISOString().split("T")[0]} onChange={set("deployStartDate")} className={iCls} /></div>
+                                        <div><label className={lCls}>Deployment Start Date</label><input type="date" value={form.deployStartDate || todayLocalISO()} onChange={set("deployStartDate")} className={iCls} /></div>
                                     </>)}
                                 </div>
                             </div>
