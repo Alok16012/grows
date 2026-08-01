@@ -39,6 +39,18 @@ export async function GET(
 
         if (!review) return new NextResponse("Not Found", { status: 404 })
 
+        // Same scoping as the list route: without performance.view a user only
+        // sees their own review.
+        if (!checkAccess(session, ["MANAGER"], "performance.view")) {
+            const emp = await prisma.employee.findFirst({
+                where: { email: session.user.email ?? undefined },
+                select: { id: true },
+            })
+            if (!emp || review.employeeId !== emp.id) {
+                return new NextResponse("Forbidden", { status: 403 })
+            }
+        }
+
         return NextResponse.json(review)
     } catch (error) {
         console.error("[PERFORMANCE_GET_ID]", error)
@@ -54,6 +66,25 @@ export async function PATCH(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        // Ratings, increments and status are manager/HR territory. The employee
+        // the review belongs to may only fill in their self-appraisal and
+        // acknowledge the finished review.
+        const canManage = checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")
+        if (!canManage) {
+            const target = await prisma.performanceReview.findUnique({
+                where: { id: params.id },
+                select: { employeeId: true },
+            })
+            if (!target) return new NextResponse("Not Found", { status: 404 })
+            const emp = await prisma.employee.findFirst({
+                where: { email: session.user.email ?? undefined },
+                select: { id: true },
+            })
+            if (!emp || emp.id !== target.employeeId) {
+                return new NextResponse("Forbidden", { status: 403 })
+            }
+        }
+
         const body = await req.json()
         const {
             status,
@@ -67,29 +98,33 @@ export async function PATCH(
             selfRating,
             selfComments,
             hrApprovedAt,
-            hrApprovedBy,
             bonusPercent,
             performanceRank,
             pipRequired,
         } = body
 
         const updateData: Record<string, unknown> = {}
-        if (overallRating !== undefined) updateData.overallRating = overallRating
-        if (strengths !== undefined) updateData.strengths = strengths
-        if (improvements !== undefined) updateData.improvements = improvements
-        if (managerComments !== undefined) updateData.managerComments = managerComments
+        if (canManage) {
+            if (overallRating !== undefined) updateData.overallRating = overallRating
+            if (strengths !== undefined) updateData.strengths = strengths
+            if (improvements !== undefined) updateData.improvements = improvements
+            if (managerComments !== undefined) updateData.managerComments = managerComments
+            if (promotionRecommended !== undefined) updateData.promotionRecommended = promotionRecommended
+            if (incrementPercent !== undefined) updateData.incrementPercent = incrementPercent
+            if (hrApprovedAt !== undefined) {
+                updateData.hrApprovedAt = hrApprovedAt ? new Date(hrApprovedAt) : null
+                // The approver is always the caller — never taken from the body.
+                updateData.hrApprovedBy = hrApprovedAt ? session.user.id : null
+            }
+            if (bonusPercent !== undefined) updateData.bonusPercent = bonusPercent
+            if (performanceRank !== undefined) updateData.performanceRank = performanceRank
+            if (pipRequired !== undefined) updateData.pipRequired = pipRequired
+        }
         if (employeeComments !== undefined) updateData.employeeComments = employeeComments
-        if (promotionRecommended !== undefined) updateData.promotionRecommended = promotionRecommended
-        if (incrementPercent !== undefined) updateData.incrementPercent = incrementPercent
         if (selfRating !== undefined) updateData.selfRating = selfRating
         if (selfComments !== undefined) updateData.selfComments = selfComments
-        if (hrApprovedAt !== undefined) updateData.hrApprovedAt = hrApprovedAt ? new Date(hrApprovedAt) : null
-        if (hrApprovedBy !== undefined) updateData.hrApprovedBy = hrApprovedBy
-        if (bonusPercent !== undefined) updateData.bonusPercent = bonusPercent
-        if (performanceRank !== undefined) updateData.performanceRank = performanceRank
-        if (pipRequired !== undefined) updateData.pipRequired = pipRequired
 
-        if (status !== undefined) {
+        if (status !== undefined && (canManage || status === "ACKNOWLEDGED")) {
             updateData.status = status
             if (status === "SUBMITTED") updateData.submittedAt = new Date()
             if (status === "ACKNOWLEDGED") updateData.acknowledgedAt = new Date()
@@ -135,6 +170,9 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
 
         const body = await req.json()
         const {
@@ -149,7 +187,6 @@ export async function PUT(
             selfRating,
             selfComments,
             hrApprovedAt,
-            hrApprovedBy,
             bonusPercent,
             performanceRank,
             pipRequired,
@@ -165,8 +202,11 @@ export async function PUT(
         if (incrementPercent !== undefined) updateData.incrementPercent = incrementPercent
         if (selfRating !== undefined) updateData.selfRating = selfRating
         if (selfComments !== undefined) updateData.selfComments = selfComments
-        if (hrApprovedAt !== undefined) updateData.hrApprovedAt = hrApprovedAt ? new Date(hrApprovedAt) : null
-        if (hrApprovedBy !== undefined) updateData.hrApprovedBy = hrApprovedBy
+        if (hrApprovedAt !== undefined) {
+            updateData.hrApprovedAt = hrApprovedAt ? new Date(hrApprovedAt) : null
+            // The approver is always the caller — never taken from the body.
+            updateData.hrApprovedBy = hrApprovedAt ? session.user.id : null
+        }
         if (bonusPercent !== undefined) updateData.bonusPercent = bonusPercent
         if (performanceRank !== undefined) updateData.performanceRank = performanceRank
         if (pipRequired !== undefined) updateData.pipRequired = pipRequired

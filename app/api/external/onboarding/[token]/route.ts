@@ -2,6 +2,13 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getHrContacts } from "@/lib/hr-contacts"
 import { isPhotoDoc } from "@/lib/employee-photo"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validatePincode, validateUAN, validateESIC,
+    validatePFNumber, validateDateOfBirth,
+    normalizePhone, normalizeUpper, digitsOnly,
+} from "@/lib/validation"
 
 // GET external candidate data using secure token.
 // Also returns the active site + HR user lists so the public onboarding form
@@ -80,6 +87,27 @@ export async function POST(req: Request, { params }: { params: { token: string }
             esiNumber,    // previous ESIC number
         } = body
 
+        // This endpoint is UNAUTHENTICATED — anyone holding the token can POST
+        // straight to it, so the form's own checks guarantee nothing. Everything
+        // that lands in the employee record is re-checked here.
+        const errors = collectErrors({
+            dateOfBirth: validateDateOfBirth(dateOfBirth),
+            alternatePhone: validatePhone(alternatePhone),
+            pincode: validatePincode(pincode),
+            permanentPincode: validatePincode(permanentPincode),
+            emergencyContact1Phone: validatePhone(emergencyContact1Phone),
+            emergencyContact2Phone: validatePhone(emergencyContact2Phone),
+            aadharNumber: validateAadhaar(aadharNumber),
+            panNumber: validatePAN(panNumber),
+            bankAccountNumber: validateBankAccount(bankAccountNumber),
+            bankIFSC: validateIFSC(bankIFSC),
+            uan: validateUAN(uan),
+            pfNumber: validatePFNumber(pfNumber),
+            esiNumber: validateESIC(esiNumber),
+        })
+        // The onboarding form reads a failed response with res.text().
+        if (errors) return new NextResponse(validationResponse(errors).message, { status: 400 })
+
         // 1. Update Employee Record
         const updatedEmployee = await prisma.employee.update({
             where: { id: existing.id },
@@ -102,10 +130,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
                 emergencyContact1Phone: emergencyContact1Phone || existing.emergencyContact1Phone,
                 emergencyContact2Name: emergencyContact2Name || existing.emergencyContact2Name,
                 emergencyContact2Phone: emergencyContact2Phone || existing.emergencyContact2Phone,
-                aadharNumber: aadharNumber ?? existing.aadharNumber,
-                panNumber: panNumber ?? existing.panNumber,
+                aadharNumber: aadharNumber ? digitsOnly(aadharNumber) : (aadharNumber ?? existing.aadharNumber),
+                panNumber: panNumber ? normalizeUpper(panNumber) : (panNumber ?? existing.panNumber),
                 bankAccountNumber: bankAccountNumber ?? existing.bankAccountNumber,
-                bankIFSC: bankIFSC ?? existing.bankIFSC,
+                bankIFSC: bankIFSC ? normalizeUpper(bankIFSC) : (bankIFSC ?? existing.bankIFSC),
                 bankName: bankName ?? existing.bankName,
                 bankBranch: bankBranch || existing.bankBranch,
                 designation: designation || existing.designation,
@@ -114,7 +142,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
                 nationality: nationality || existing.nationality,
                 religion: religion || existing.religion,
                 caste: caste || existing.caste,
-                alternatePhone: alternatePhone || existing.alternatePhone,
+                alternatePhone: alternatePhone ? normalizePhone(alternatePhone) : existing.alternatePhone,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : existing.dateOfJoining,
                 employmentType: employmentType || existing.employmentType,
                 labourCardNo: labourCardNo || existing.labourCardNo,

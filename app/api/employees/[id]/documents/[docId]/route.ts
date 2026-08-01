@@ -6,6 +6,16 @@ import { checkAccess } from "@/lib/permissions"
 
 const VALID_STATUSES = ["PENDING", "VERIFIED", "REJECTED"]
 
+// These documents are KYC (Aadhaar / PAN / bank proof), so anyone without the
+// relevant documents.* permission may only touch their OWN employee record.
+async function isSelf(userId: string, employeeId: string) {
+    const self = await prisma.employee.findFirst({
+        where: { userId },
+        select: { id: true },
+    })
+    return self?.id === employeeId
+}
+
 // On-demand fetch of a single document's file blob. The master documents grid
 // no longer ships base64 `fileUrl` in its bulk list (that made it ~15s slow);
 // View/Download call this only for the one document the user actually opened.
@@ -17,6 +27,10 @@ export async function GET(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         if (session.user.role === "CLIENT") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+            && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -41,6 +55,10 @@ export async function PATCH(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         if (session.user.role === "CLIENT") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+        // Verifying / rejecting is never a self-service action.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.verify")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -87,6 +105,10 @@ export async function DELETE(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         if (session.user.role === "CLIENT") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload")
+            && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

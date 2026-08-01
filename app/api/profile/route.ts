@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { collectErrors, validationResponse, validatePhone, normalizePhone } from "@/lib/validation"
 
 export async function PUT(req: Request) {
     try {
@@ -13,11 +14,15 @@ export async function PUT(req: Request) {
         const data = await req.json()
         const { name, phone, image } = data
 
+        const errors = collectErrors({ phone: validatePhone(phone) })
+        // The profile page reads a failed response with res.text().
+        if (errors) return new NextResponse(validationResponse(errors).message, { status: 400 })
+
         const updatedUser = await prisma.user.update({
             where: { id: session.user.id },
             data: {
                 ...(name !== undefined ? { name } : {}),
-                ...(phone !== undefined ? { phone } : {}),
+                ...(phone !== undefined ? { phone: phone ? normalizePhone(phone) : phone } : {}),
                 ...(image !== undefined ? { image } : {}),
             }
         })

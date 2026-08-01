@@ -81,6 +81,9 @@ export async function PATCH(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
 
         const body = await req.json()
         const { status, managerNotes, goals, startDate, endDate } = body

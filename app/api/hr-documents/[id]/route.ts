@@ -18,6 +18,22 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
             }
         })
         if (!doc) return new NextResponse("Not found", { status: 404 })
+
+        // Same visibility rules as the list route: ADMIN sees everything, a
+        // sender only what they issued, everyone else only their own ISSUED doc.
+        if (session.user.role !== "ADMIN") {
+            if (canViewDocuments(session)) {
+                if (doc.createdBy !== session.user.id && doc.issuedBy !== session.user.id) {
+                    return new NextResponse("Forbidden", { status: 403 })
+                }
+            } else {
+                const emp = await prisma.employee.findFirst({ where: { userId: session.user.id } })
+                if (!emp || doc.employeeId !== emp.id || doc.status !== "ISSUED") {
+                    return new NextResponse("Forbidden", { status: 403 })
+                }
+            }
+        }
+
         return NextResponse.json(doc)
     } catch (e) {
         console.error("[HR_DOC_GET]", e)
@@ -37,6 +53,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             if (body.action === "acknowledge") {
                 const doc = await prisma.hrDocument.findUnique({ where: { id: params.id } })
                 if (!doc) return new NextResponse("Not found", { status: 404 })
+                // Only the recipient may acknowledge, and only once it's issued.
+                const emp = await prisma.employee.findFirst({ where: { userId: session.user.id } })
+                if (!emp || doc.employeeId !== emp.id || doc.status !== "ISSUED") {
+                    return new NextResponse("Forbidden", { status: 403 })
+                }
                 const now = new Date()
                 const updated = await prisma.hrDocument.update({
                     where: { id: params.id },

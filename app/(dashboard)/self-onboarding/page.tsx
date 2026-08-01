@@ -9,6 +9,11 @@ import {
     RefreshCw, BadgeCheck, Clock, Building2, CalendarDays,
     FileText, UploadCloud
 } from "lucide-react"
+import {
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validateUAN, validateESIC, validateEmail,
+    validatePincode, validateDateOfBirth,
+} from "@/lib/validation"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type EmpProfile = {
@@ -71,10 +76,13 @@ const DOC_UPLOAD_TYPES = [
 function Label({ children }: { children: React.ReactNode }) {
     return <label style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", display: "block", marginBottom: 4 }}>{children}</label>
 }
-function Input({ value, onChange, placeholder, type = "text" }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+function Input({ value, onChange, placeholder, type = "text", maxLength, error }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string; maxLength?: number; error?: string | null }) {
     return (
-        <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, outline: "none", background: "var(--surface2)", color: "var(--text)", boxSizing: "border-box" }} />
+        <>
+            <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength}
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${error ? "var(--red)" : "var(--border)"}`, fontSize: 13, outline: "none", background: "var(--surface2)", color: "var(--text)", boxSizing: "border-box" }} />
+            {error && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{error}</div>}
+        </>
     )
 }
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) {
@@ -149,7 +157,27 @@ export default function SelfOnboardingPage() {
         }
     }, [sameAddr, form.address, form.city, form.state, form.pincode])
 
+    const errors = {
+        phone:             validatePhone(f("phone")),
+        alternatePhone:    validatePhone(f("alternatePhone")),
+        email:             validateEmail(f("email")),
+        dateOfBirth:       validateDateOfBirth(f("dateOfBirth")),
+        pincode:           validatePincode(f("pincode")),
+        permanentPincode:  validatePincode(f("permanentPincode")),
+        aadharNumber:      validateAadhaar(f("aadharNumber")),
+        panNumber:         validatePAN(f("panNumber")),
+        uan:               validateUAN(f("uan")),
+        esiNumber:         validateESIC(f("esiNumber")),
+        bankAccountNumber: validateBankAccount(f("bankAccountNumber")),
+        bankIFSC:          validateIFSC(f("bankIFSC")),
+        emergencyContact1Phone: validatePhone(f("emergencyContact1Phone")),
+        emergencyContact2Phone: validatePhone(f("emergencyContact2Phone")),
+    }
+
     const save = async () => {
+        // Name the failing field — the offender is often on a step that isn't open.
+        const firstError = Object.values(errors).find(Boolean)
+        if (firstError) { toast.error(firstError); return }
         setSaving(true)
         try {
             const res = await fetch("/api/employee/self-profile", {
@@ -352,7 +380,7 @@ export default function SelfOnboardingPage() {
                                 <Input value={f("fathersName")} onChange={set("fathersName")} placeholder="Father's full name" />
                             </Field>
                             <Field label="Date of Birth">
-                                <Input type="date" value={f("dateOfBirth")} onChange={set("dateOfBirth")} />
+                                <Input type="date" value={f("dateOfBirth")} onChange={set("dateOfBirth")} error={errors.dateOfBirth} />
                             </Field>
                             <Field label="Gender">
                                 <Select value={f("gender")} onChange={set("gender")} options={[
@@ -383,13 +411,13 @@ export default function SelfOnboardingPage() {
                                 ]} />
                             </Field>
                             <Field label="Mobile Number">
-                                <Input value={f("phone")} onChange={set("phone")} placeholder="10-digit mobile" />
+                                <Input value={f("phone")} onChange={set("phone")} placeholder="10-digit mobile" maxLength={10} error={errors.phone} />
                             </Field>
                             <Field label="Alternate Mobile">
-                                <Input value={f("alternatePhone")} onChange={set("alternatePhone")} placeholder="Alternate number" />
+                                <Input value={f("alternatePhone")} onChange={set("alternatePhone")} placeholder="Alternate number" maxLength={10} error={errors.alternatePhone} />
                             </Field>
                             <FieldFull label="Personal Email">
-                                <Input type="email" value={f("email")} onChange={set("email")} placeholder="your@email.com" />
+                                <Input type="email" value={f("email")} onChange={set("email")} placeholder="your@email.com" error={errors.email} />
                             </FieldFull>
                         </Grid>
                     </div>
@@ -411,7 +439,7 @@ export default function SelfOnboardingPage() {
                                     <Input value={f("state")} onChange={set("state")} placeholder="State" />
                                 </Field>
                                 <Field label="Pincode">
-                                    <Input value={f("pincode")} onChange={set("pincode")} placeholder="6-digit pincode" />
+                                    <Input value={f("pincode")} onChange={set("pincode")} placeholder="6-digit pincode" maxLength={6} error={errors.pincode} />
                                 </Field>
                             </Grid>
                         </div>
@@ -437,7 +465,7 @@ export default function SelfOnboardingPage() {
                                     <Input value={f("permanentState")} onChange={set("permanentState")} placeholder="State" />
                                 </Field>
                                 <Field label="Pincode">
-                                    <Input value={f("permanentPincode")} onChange={set("permanentPincode")} placeholder="6-digit pincode" />
+                                    <Input value={f("permanentPincode")} onChange={set("permanentPincode")} placeholder="6-digit pincode" maxLength={6} error={errors.permanentPincode} />
                                 </Field>
                             </Grid>
                         </div>
@@ -452,19 +480,19 @@ export default function SelfOnboardingPage() {
                         </div>
                         <Grid cols={2}>
                             <Field label="Aadhar Number">
-                                <Input value={f("aadharNumber")} onChange={set("aadharNumber")} placeholder="12-digit Aadhar number" />
+                                <Input value={f("aadharNumber")} onChange={set("aadharNumber")} placeholder="12-digit Aadhar number" maxLength={12} error={errors.aadharNumber} />
                             </Field>
                             <Field label="PAN Number">
-                                <Input value={f("panNumber")} onChange={set("panNumber")} placeholder="e.g. ABCDE1234F" />
+                                <Input value={f("panNumber")} onChange={v => set("panNumber")(v.toUpperCase())} placeholder="e.g. ABCDE1234F" maxLength={10} error={errors.panNumber} />
                             </Field>
                             <Field label="UAN (Universal Account No.)">
-                                <Input value={f("uan")} onChange={set("uan")} placeholder="12-digit UAN" />
+                                <Input value={f("uan")} onChange={set("uan")} placeholder="12-digit UAN" maxLength={12} error={errors.uan} />
                             </Field>
                             <Field label="PF Number">
                                 <Input value={f("pfNumber")} onChange={set("pfNumber")} placeholder="PF Account Number" />
                             </Field>
                             <Field label="ESIC Number">
-                                <Input value={f("esiNumber")} onChange={set("esiNumber")} placeholder="ESIC Insurance Number" />
+                                <Input value={f("esiNumber")} onChange={set("esiNumber")} placeholder="ESIC Insurance Number" maxLength={17} error={errors.esiNumber} />
                             </Field>
                             <Field label="Labour Card No.">
                                 <Input value={f("labourCardNo")} onChange={set("labourCardNo")} placeholder="Labour Card Number" />
@@ -487,10 +515,10 @@ export default function SelfOnboardingPage() {
                                 <Input value={f("bankName")} onChange={set("bankName")} placeholder="e.g. State Bank of India" />
                             </Field>
                             <Field label="Account Number">
-                                <Input value={f("bankAccountNumber")} onChange={set("bankAccountNumber")} placeholder="Bank account number" />
+                                <Input value={f("bankAccountNumber")} onChange={set("bankAccountNumber")} placeholder="Bank account number" maxLength={18} error={errors.bankAccountNumber} />
                             </Field>
                             <Field label="IFSC Code">
-                                <Input value={f("bankIFSC")} onChange={set("bankIFSC")} placeholder="e.g. SBIN0001234" />
+                                <Input value={f("bankIFSC")} onChange={v => set("bankIFSC")(v.toUpperCase())} placeholder="e.g. SBIN0001234" maxLength={11} error={errors.bankIFSC} />
                             </Field>
                             <FieldFull label="Branch Name">
                                 <Input value={f("bankBranch")} onChange={set("bankBranch")} placeholder="Branch name & city" />
@@ -509,7 +537,7 @@ export default function SelfOnboardingPage() {
                                     <Input value={f("emergencyContact1Name")} onChange={set("emergencyContact1Name")} placeholder="Contact person name" />
                                 </Field>
                                 <Field label="Phone Number">
-                                    <Input value={f("emergencyContact1Phone")} onChange={set("emergencyContact1Phone")} placeholder="Mobile number" />
+                                    <Input value={f("emergencyContact1Phone")} onChange={set("emergencyContact1Phone")} placeholder="Mobile number" maxLength={10} error={errors.emergencyContact1Phone} />
                                 </Field>
                             </Grid>
                         </div>
@@ -520,7 +548,7 @@ export default function SelfOnboardingPage() {
                                     <Input value={f("emergencyContact2Name")} onChange={set("emergencyContact2Name")} placeholder="Contact person name" />
                                 </Field>
                                 <Field label="Phone Number">
-                                    <Input value={f("emergencyContact2Phone")} onChange={set("emergencyContact2Phone")} placeholder="Mobile number" />
+                                    <Input value={f("emergencyContact2Phone")} onChange={set("emergencyContact2Phone")} placeholder="Mobile number" maxLength={10} error={errors.emergencyContact2Phone} />
                                 </Field>
                             </Grid>
                         </div>

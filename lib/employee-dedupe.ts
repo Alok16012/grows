@@ -33,6 +33,31 @@ const noSpace = (s?: string | null) => (s || "").replace(/\s+/g, "")
 const fullName = (e: { firstName: string; lastName: string | null }) =>
     `${e.firstName} ${e.lastName ?? ""}`.trim()
 
+type EmployeeHit = { id: string; employeeId: string; firstName: string; lastName: string | null }
+
+// Compare a digits-only value against a column whose stored values may carry
+// spaces or dashes. Prisma has no "strip non-digits" filter, so the column is
+// normalised in SQL with regexp_replace. The column name is a literal from the
+// two call sites below, never user input; the value is parameterised.
+async function findByNormalizedDigits(
+    column: "aadharNumber" | "bankAccountNumber",
+    digits: string,
+    excludeId?: string,
+): Promise<EmployeeHit | null> {
+    if (!digits) return null
+    const rows = await prisma.$queryRawUnsafe<EmployeeHit[]>(
+        `SELECT "id", "employeeId", "firstName", "lastName"
+         FROM "Employee"
+         WHERE "${column}" IS NOT NULL
+           AND regexp_replace("${column}", '[^0-9]', '', 'g') = $1
+           AND ($2::text IS NULL OR "id" <> $2)
+         LIMIT 1`,
+        digits,
+        excludeId ?? null,
+    )
+    return rows[0] ?? null
+}
+
 /**
  * Returns the list of fields on `input` that collide with an existing employee.
  * Pass `excludeId` when editing so the employee doesn't match itself.
@@ -49,12 +74,11 @@ export async function findEmployeeDuplicates(input: DupInput, excludeId?: string
     const select = { id: true, employeeId: true, firstName: true, lastName: true } as const
     const conflicts: DuplicateConflict[] = []
 
-    // Aadhaar — match the raw input or its digit-only form (covers stored spaces).
+    // Aadhaar — strip formatting on BOTH sides in SQL. Matching the raw input or
+    // its digit-only form only normalises what was typed; a row stored as
+    // "1234 5678 9012" would still slip past a digits-only input.
     if (aadhar.length >= 12) {
-        const hit = await prisma.employee.findFirst({
-            where: { ...notSelf, OR: [{ aadharNumber: input.aadharNumber ?? undefined }, { aadharNumber: aadhar }] },
-            select,
-        })
+        const hit = await findByNormalizedDigits("aadharNumber", aadhar, excludeId)
         if (hit) conflicts.push({ field: "aadhar", label: "Aadhaar number", value: aadhar, employee: { id: hit.id, employeeId: hit.employeeId, name: fullName(hit) } })
     }
 
@@ -85,13 +109,10 @@ export async function findEmployeeDuplicates(input: DupInput, excludeId?: string
         if (hit) conflicts.push({ field: "email", label: "email", value: email, employee: { id: hit.id, employeeId: hit.employeeId, name: fullName(hit) } })
     }
 
-    // Bank account number — exact (match the raw input or its space-stripped
-    // form). Skip very short values to avoid false positives.
+    // Bank account number — same normalisation on both sides. Skip very short
+    // values to avoid false positives.
     if (bankAccount.length >= 5) {
-        const hit = await prisma.employee.findFirst({
-            where: { ...notSelf, OR: [{ bankAccountNumber: input.bankAccountNumber ?? undefined }, { bankAccountNumber: bankAccount }] },
-            select,
-        })
+        const hit = await findByNormalizedDigits("bankAccountNumber", onlyDigits(input.bankAccountNumber), excludeId)
         if (hit) conflicts.push({ field: "bankAccount", label: "bank account number", value: bankAccount, employee: { id: hit.id, employeeId: hit.employeeId, name: fullName(hit) } })
     }
 

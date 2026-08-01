@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getHrContacts } from "@/lib/hr-contacts"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateEmail, validateAadhaar, validatePAN,
+    validateIFSC, validateBankAccount, validatePincode, validateUAN,
+    validateESIC, validateDateOfBirth,
+    normalizePhone, normalizeUpper, digitsOnly,
+} from "@/lib/validation"
 import crypto from "crypto"
 
 // Public route — returns site + HR lists so the /join form can render
@@ -90,16 +97,36 @@ export async function POST(req: Request) {
             )
         }
 
-        if (!/^[6-9]\d{9}$/.test(phone.replace(/\s/g, ""))) {
-            return NextResponse.json({ error: "Enter a valid 10-digit phone number" }, { status: 400 })
-        }
+        // Public endpoint — the form's own checks are advisory only, so every
+        // field is re-validated here with the shared rules.
+        const errors = collectErrors({
+            phone: validatePhone(phone),
+            alternatePhone: validatePhone(alternatePhone),
+            email: validateEmail(email),
+            dateOfBirth: validateDateOfBirth(dateOfBirth),
+            pincode: validatePincode(pincode),
+            permanentPincode: validatePincode(permanentPincode),
+            emergencyContact1Phone: validatePhone(emergencyContact1Phone),
+            emergencyContact2Phone: validatePhone(emergencyContact2Phone),
+            aadharNumber: validateAadhaar(aadharNumber),
+            panNumber: validatePAN(panNumber),
+            bankAccountNumber: validateBankAccount(bankAccountNumber),
+            bankIFSC: validateIFSC(bankIFSC),
+            uan: validateUAN(uan),
+            esiNumber: validateESIC(esiNumber),
+        })
+        // The join form reads `data.message || data.error` off the JSON body.
+        if (errors) return NextResponse.json(validationResponse(errors), { status: 400 })
+
+        // Store and dedupe on the same canonical form of the number.
+        const normalizedPhone = normalizePhone(phone)
 
         // Check if phone or email already exists
         if (email?.trim()) {
             const byEmail = await prisma.employee.findFirst({ where: { email: email.trim() } })
             if (byEmail) return NextResponse.json({ error: "This email is already registered" }, { status: 409 })
         }
-        const byPhone = await prisma.employee.findFirst({ where: { phone: phone.trim() } })
+        const byPhone = await prisma.employee.findFirst({ where: { phone: normalizedPhone } })
         if (byPhone) return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 })
 
         // Generate onboarding token for the external form link
@@ -118,7 +145,7 @@ export async function POST(req: Request) {
                 firstName:  firstName.trim(),
                 lastName:   lastName.trim(),
                 middleName: middleName?.trim() || null,
-                phone:      phone.trim(),
+                phone:      normalizedPhone,
                 email:      email?.trim() || null,
                 designation: designation?.trim() || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
@@ -139,13 +166,13 @@ export async function POST(req: Request) {
                 emergencyContact1Phone: emergencyContact1Phone || null,
                 emergencyContact2Name:  emergencyContact2Name  || null,
                 emergencyContact2Phone: emergencyContact2Phone || null,
-                aadharNumber:     aadharNumber     || null,
-                panNumber:        panNumber        || null,
+                aadharNumber:     aadharNumber ? digitsOnly(aadharNumber)  : null,
+                panNumber:        panNumber    ? normalizeUpper(panNumber) : null,
                 uan:              uan              || null,
                 labourCardNo:     labourCardNo     || null,
                 esiNumber:        esiNumber        || null,
                 bankAccountNumber: bankAccountNumber || null,
-                bankIFSC:          bankIFSC          || null,
+                bankIFSC:          bankIFSC ? normalizeUpper(bankIFSC) : null,
                 bankName:          bankName          || null,
                 bankBranch:        bankBranch        || null,
                 // employmentType is non-nullable in the schema with a default —
@@ -155,7 +182,7 @@ export async function POST(req: Request) {
                 religion:          religion          || null,
                 caste:             caste             || null,
                 nameAsPerAadhar:   nameAsPerAadhar   || null,
-                alternatePhone:    alternatePhone    || null,
+                alternatePhone:    alternatePhone ? normalizePhone(alternatePhone) : null,
                 // HR assignment from self-registration form
                 managerId:         hrId              || null,
                 // Safety equipment declared by employee
@@ -183,7 +210,7 @@ export async function POST(req: Request) {
                 await prisma.lead.create({
                     data: {
                         candidateName,
-                        phone:    phone.trim(),
+                        phone:    normalizedPhone,
                         email:    email?.trim() || null,
                         city:     city || null,
                         position: designation?.trim() || "Not Specified",

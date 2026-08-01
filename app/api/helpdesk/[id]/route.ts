@@ -23,16 +23,21 @@ export async function GET(
 
         if (!ticket) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = checkAccess(session, ["MANAGER"], "helpdesk.view")
+        const isPrivileged = checkAccess(session, ["MANAGER"], "helpdesk.manage")
         if (!isPrivileged && ticket.raisedBy !== session.user.id) {
             return new NextResponse("Forbidden", { status: 403 })
         }
+
+        // Internal agent notes must never reach the person who raised the ticket.
+        const visibleComments = isPrivileged
+            ? ticket.comments
+            : ticket.comments.filter(c => !c.isInternal)
 
         // Fetch user info for raisedBy, assignedTo, and comment authors
         const userIds = new Set<string>()
         userIds.add(ticket.raisedBy)
         if (ticket.assignedTo) userIds.add(ticket.assignedTo)
-        ticket.comments.forEach(c => userIds.add(c.userId))
+        visibleComments.forEach(c => userIds.add(c.userId))
 
         const users = await prisma.user.findMany({
             where: { id: { in: Array.from(userIds) } },
@@ -40,7 +45,7 @@ export async function GET(
         })
         const userMap = Object.fromEntries(users.map(u => [u.id, u]))
 
-        const commentsWithUser = ticket.comments.map(c => ({
+        const commentsWithUser = visibleComments.map(c => ({
             ...c,
             user: userMap[c.userId] || null,
         }))
@@ -68,7 +73,7 @@ export async function PUT(
         const ticket = await prisma.ticket.findUnique({ where: { id: params.id } })
         if (!ticket) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = checkAccess(session, ["MANAGER"], "helpdesk.view")
+        const isPrivileged = checkAccess(session, ["MANAGER"], "helpdesk.manage")
         if (!isPrivileged && ticket.raisedBy !== session.user.id) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -118,7 +123,7 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "helpdesk.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "helpdesk.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

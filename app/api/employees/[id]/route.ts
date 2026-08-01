@@ -6,6 +6,13 @@ import { checkAccess } from "@/lib/permissions"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import { pickPhotoUrl } from "@/lib/employee-photo"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateEmail, validateAadhaar, validatePAN,
+    validateIFSC, validateBankAccount, validatePincode, validateUAN,
+    validateESIC, validatePFNumber, validateDateOfBirth, validateAmount,
+    normalizePhone, normalizeUpper, digitsOnly,
+} from "@/lib/validation"
 
 export async function GET(
     req: Request,
@@ -89,6 +96,30 @@ export async function PUT(
             systemRole, customRoleId,
         } = body
 
+        // Format checks before anything is written. This is a partial update, so
+        // only the keys actually present are checked; an empty value is still
+        // valid (clearing an optional field must keep working).
+        const errors = collectErrors({
+            email: validateEmail(email),
+            phone: validatePhone(phone),
+            alternatePhone: validatePhone(alternatePhone),
+            dateOfBirth: validateDateOfBirth(dateOfBirth),
+            pincode: validatePincode(pincode),
+            permanentPincode: validatePincode(permanentPincode),
+            aadharNumber: validateAadhaar(aadharNumber),
+            panNumber: validatePAN(panNumber),
+            bankAccountNumber: validateBankAccount(bankAccountNumber),
+            bankIFSC: validateIFSC(bankIFSC),
+            uan: validateUAN(uan),
+            pfNumber: validatePFNumber(pfNumber),
+            esiNumber: validateESIC(esiNumber),
+            emergencyContact1Phone: validatePhone(emergencyContact1Phone),
+            emergencyContact2Phone: validatePhone(emergencyContact2Phone),
+            basicSalary: validateAmount(basicSalary, "Basic salary"),
+        })
+        // Callers (EmployeeModal, employee list) read this body with res.text().
+        if (errors) return new NextResponse(validationResponse(errors).message, { status: 400 })
+
         // Block edits that would collide with ANOTHER employee's Aadhaar / PAN /
         // mobile / email / bank account (self is excluded). Only check fields present.
         if (aadharNumber !== undefined || panNumber !== undefined || phone !== undefined || email !== undefined || bankAccountNumber !== undefined) {
@@ -102,18 +133,20 @@ export async function PUT(
         if (firstName !== undefined) updateData.firstName = firstName
         if (lastName !== undefined) updateData.lastName = lastName
         if (email !== undefined) updateData.email = email
-        if (phone !== undefined) updateData.phone = phone
-        if (alternatePhone !== undefined) updateData.alternatePhone = alternatePhone
+        // Phone / PAN / IFSC / Aadhaar are normalised on write so the same value
+        // typed two ways doesn't end up stored two ways.
+        if (phone !== undefined) updateData.phone = phone ? normalizePhone(phone) : phone
+        if (alternatePhone !== undefined) updateData.alternatePhone = alternatePhone ? normalizePhone(alternatePhone) : alternatePhone
         if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null
         if (gender !== undefined) updateData.gender = gender
         if (address !== undefined) updateData.address = address
         if (city !== undefined) updateData.city = city
         if (state !== undefined) updateData.state = state
         if (pincode !== undefined) updateData.pincode = pincode
-        if (aadharNumber !== undefined) updateData.aadharNumber = aadharNumber
-        if (panNumber !== undefined) updateData.panNumber = panNumber
+        if (aadharNumber !== undefined) updateData.aadharNumber = aadharNumber ? digitsOnly(aadharNumber) : aadharNumber
+        if (panNumber !== undefined) updateData.panNumber = panNumber ? normalizeUpper(panNumber) : panNumber
         if (bankAccountNumber !== undefined) updateData.bankAccountNumber = bankAccountNumber
-        if (bankIFSC !== undefined) updateData.bankIFSC = bankIFSC
+        if (bankIFSC !== undefined) updateData.bankIFSC = bankIFSC ? normalizeUpper(bankIFSC) : bankIFSC
         if (bankName !== undefined) updateData.bankName = bankName
         if (photo !== undefined) updateData.photo = photo
         if (designation !== undefined) updateData.designation = designation

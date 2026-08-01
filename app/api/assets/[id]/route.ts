@@ -51,7 +51,7 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "assets.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "assets.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -104,7 +104,7 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, [], "assets.view")) {
+        if (!checkAccess(session, [], "assets.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

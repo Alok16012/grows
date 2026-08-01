@@ -4,6 +4,11 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateEmail, validateAadhaar,
+    validateDateOfBirth, validateAmount, normalizePhone, digitsOnly,
+} from "@/lib/validation"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -148,6 +153,23 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Candidate name, phone, position and source are required" }, { status: 400 })
         }
 
+        const errors = collectErrors({
+            phone: validatePhone(phone),
+            altPhone: validatePhone(altPhone),
+            email: validateEmail(email),
+            aadharNumber: validateAadhaar(aadharNumber),
+            dateOfBirth: validateDateOfBirth(dateOfBirth),
+            expectedSalary: validateAmount(expectedSalary, "Expected salary"),
+            currentSalary: validateAmount(currentSalary, "Current salary"),
+        })
+        // The recruitment form reads this body with res.json() and toasts `error`.
+        if (errors) return NextResponse.json(validationResponse(errors), { status: 400 })
+
+        // Store the phone in one canonical form, and dedupe against that same
+        // form — checking the raw input while storing a normalised value would
+        // let the identical number through twice.
+        const normalizedPhone = normalizePhone(phone)
+
         // Resolve real user ID from DB (session.user.id may be a demo-xxx string)
         const realUser = await prisma.user.findUnique({ where: { id: session.user.id } })
             ?? await prisma.user.findUnique({ where: { email: session.user.email ?? "" } })
@@ -157,7 +179,7 @@ export async function POST(req: Request) {
         const creatorId = realUser.id
 
         // Duplicate check on phone
-        const existing = await prisma.lead.findFirst({ where: { phone } })
+        const existing = await prisma.lead.findFirst({ where: { phone: normalizedPhone } })
         if (existing) {
             return NextResponse.json({
                 error: `Duplicate: ${existing.candidateName} already exists with this phone`,
@@ -167,7 +189,7 @@ export async function POST(req: Request) {
         }
 
         const coreData: any = {
-            candidateName, phone, position, source,
+            candidateName, phone: normalizedPhone, position, source,
             email: email || null,
             city: city || null,
             experience: experience ? parseFloat(experience) : null,
@@ -203,7 +225,7 @@ export async function POST(req: Request) {
         const newFieldsData = {
             tshirtSize: tshirtSize || null,
             bloodGroup: bloodGroup || null,
-            altPhone: altPhone || null,
+            altPhone: altPhone ? normalizePhone(altPhone) : null,
             dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
             fatherName: fatherName || null,
             fatherOccupation: fatherOccupation || null,
@@ -211,7 +233,7 @@ export async function POST(req: Request) {
             motherOccupation: motherOccupation || null,
             maritalStatus: maritalStatus || null,
             nationality: nationality || null,
-            aadharNumber: aadharNumber || null,
+            aadharNumber: aadharNumber ? digitsOnly(aadharNumber) : null,
             presentAddress: presentAddress || null,
             permanentAddress: permanentAddress || null,
             currentDesignation: currentDesignation || null,

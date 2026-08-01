@@ -6,6 +6,13 @@ import { checkAccess } from "@/lib/permissions"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { pickPhotoUrl } from "@/lib/employee-photo"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateEmail, validateAadhaar, validatePAN,
+    validateIFSC, validateBankAccount, validatePincode, validateUAN,
+    validateESIC, validatePFNumber, validateDateOfBirth, validateAmount,
+    normalizePhone, normalizeUpper, digitsOnly,
+} from "@/lib/validation"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
@@ -246,6 +253,30 @@ export async function POST(req: Request) {
             return new NextResponse("firstName is required", { status: 400 })
         }
 
+        // Server-side format checks. The form does the same checks for feedback,
+        // but a direct POST bypasses them entirely. Empty values stay valid —
+        // this only rejects malformed input, it never makes a field required.
+        const errors = collectErrors({
+            email: validateEmail(email),
+            phone: validatePhone(phone),
+            alternatePhone: validatePhone(alternatePhone),
+            dateOfBirth: validateDateOfBirth(dateOfBirth),
+            pincode: validatePincode(pincode),
+            permanentPincode: validatePincode(permanentPincode),
+            aadharNumber: validateAadhaar(aadharNumber),
+            panNumber: validatePAN(panNumber),
+            bankAccountNumber: validateBankAccount(bankAccountNumber),
+            bankIFSC: validateIFSC(bankIFSC),
+            uan: validateUAN(uan),
+            pfNumber: validatePFNumber(pfNumber),
+            esiNumber: validateESIC(esiNumber),
+            emergencyContact1Phone: validatePhone(emergencyContact1Phone),
+            emergencyContact2Phone: validatePhone(emergencyContact2Phone),
+            basicSalary: validateAmount(basicSalary, "Basic salary"),
+        })
+        // EmployeeModal reads this body with res.text(), so send a plain sentence.
+        if (errors) return new NextResponse(validationResponse(errors).message, { status: 400 })
+
         // Block duplicates — same Aadhaar / PAN / mobile / email as an existing
         // employee. Returns 409 with the conflicting fields so the UI can flag it.
         const conflicts = await findEmployeeDuplicates({ aadharNumber, panNumber, phone, email, bankAccountNumber })
@@ -272,18 +303,20 @@ export async function POST(req: Request) {
                 firstName,
                 lastName: lastName || "",
                 email,
-                phone: phone || "",
-                alternatePhone,
+                // Normalised on write so the same person can't be stored twice
+                // in two formats ("+91 98765 43210" vs "9876543210").
+                phone: phone ? normalizePhone(phone) : "",
+                alternatePhone: alternatePhone ? normalizePhone(alternatePhone) : alternatePhone,
                 dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
                 gender,
                 address,
                 city,
                 state,
                 pincode,
-                aadharNumber,
-                panNumber,
+                aadharNumber: aadharNumber ? digitsOnly(aadharNumber) : aadharNumber,
+                panNumber: panNumber ? normalizeUpper(panNumber) : panNumber,
                 bankAccountNumber,
-                bankIFSC,
+                bankIFSC: bankIFSC ? normalizeUpper(bankIFSC) : bankIFSC,
                 bankName,
                 photo,
                 designation,

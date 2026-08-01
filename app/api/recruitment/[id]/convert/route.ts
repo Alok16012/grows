@@ -4,6 +4,13 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import prisma from "@/lib/prisma"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateEmail, validateAadhaar, validatePAN,
+    validateIFSC, validateBankAccount, validatePincode, validateUAN,
+    validateESIC, validatePFNumber, validateDateOfBirth, validateAmount,
+    normalizePhone, normalizeUpper, digitsOnly,
+} from "@/lib/validation"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
@@ -54,6 +61,32 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             safetyGoggles, safetyGloves, safetyHelmet,
             safetyMask, safetyJacket, safetyEarMuffs, safetyShoes,
         } = body
+
+        // ── Validate the KYC the operator typed ───────────────────────────────
+        // This is the handoff where a candidate's identity/bank data becomes an
+        // employee record, so it is the last point where bad values can be
+        // stopped. Only the form-supplied values are checked — falling back to
+        // the lead's own phone/email must keep working for legacy leads.
+        const errors = collectErrors({
+            phone: validatePhone(formPhone),
+            email: validateEmail(formEmail),
+            alternatePhone: validatePhone(alternatePhone),
+            dateOfBirth: validateDateOfBirth(dateOfBirth),
+            aadharNumber: validateAadhaar(aadharNumber),
+            panNumber: validatePAN(panNumber),
+            bankAccountNumber: validateBankAccount(bankAccountNumber),
+            bankIFSC: validateIFSC(bankIFSC),
+            pincode: validatePincode(pincode),
+            permanentPincode: validatePincode(permanentPincode),
+            uan: validateUAN(uan),
+            pfNumber: validatePFNumber(pfNumber),
+            esiNumber: validateESIC(esiNumber),
+            emergencyContact1Phone: validatePhone(emergencyContact1Phone),
+            emergencyContact2Phone: validatePhone(emergencyContact2Phone),
+            basicSalary: validateAmount(basicSalary, "Basic salary"),
+        })
+        // The convert modal reads this body with res.json() and toasts `error`.
+        if (errors) return NextResponse.json(validationResponse(errors), { status: 400 })
 
         // ── Employee ID (temporary until onboarding approval) ──────────────────
         // A converted candidate is in ONBOARDING status — they don't get a real
@@ -107,7 +140,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 firstName,
                 lastName,
                 middleName:    middleName   || null,
-                phone:         formPhone?.trim() || lead.phone,
+                phone:         normalizePhone(formPhone?.trim() || lead.phone),
                 email:         resolvedEmail !== `${lead.phone}@cims.local` ? resolvedEmail : (lead.email || null),
                 alternatePhone: alternatePhone || null,
                 designation:   designation || lead.position || null,
@@ -125,8 +158,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 createdBy:     session.user.id,
                 // Personal
                 dateOfBirth:   dateOfBirth ? new Date(dateOfBirth) : null,
-                aadharNumber:  aadharNumber  || null,
-                panNumber:     panNumber     || null,
+                aadharNumber:  aadharNumber ? digitsOnly(aadharNumber)  : null,
+                panNumber:     panNumber    ? normalizeUpper(panNumber) : null,
                 address:       address       || null,
                 city:          formCity      || lead.city || null,
                 state:         state         || null,
@@ -139,7 +172,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 bankName:          bankName          || null,
                 bankBranch:        bankBranch        || null,
                 bankAccountNumber: bankAccountNumber || null,
-                bankIFSC:          bankIFSC          || null,
+                bankIFSC:          bankIFSC ? normalizeUpper(bankIFSC) : null,
                 // Compliance / Identity
                 nameAsPerAadhar:   nameAsPerAadhar   || null,
                 fathersName:       fathersName        || null,

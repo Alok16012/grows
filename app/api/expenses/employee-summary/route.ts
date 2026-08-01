@@ -16,6 +16,18 @@ export async function GET(req: Request) {
 
     if (!employeeId) return new NextResponse("employeeId required", { status: 400 })
 
+    // Reading anyone else's expense history needs expenses.view; a caller can
+    // always pull their own (by employee id or by their own user id).
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.view")) {
+      const self = await prisma.employee.findFirst({
+        where: { userId: session.user.id },
+        select: { id: true }
+      })
+      if (employeeId !== session.user.id && employeeId !== self?.id) {
+        return new NextResponse("Forbidden", { status: 403 })
+      }
+    }
+
     // Find the employee + their user id
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },

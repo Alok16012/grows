@@ -8,6 +8,11 @@ import {
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { can } from "@/lib/can"
+import {
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validateUAN, validateESIC, validateEmail,
+    validatePincode, validateDateOfBirth,
+} from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -390,17 +395,21 @@ export function EmployeeModal({
     const set = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setForm(f => ({ ...f, [key]: e.target.value }))
 
-    const digits = (v: string) => v.replace(/\D/g, "")
-    const isPhoneValid   = (v: string) => !v || digits(v).length === 10
-    const isAadharValid  = (v: string) => !v || digits(v).length === 12
-    const isPANValid     = (v: string) => !v || /^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(v.trim())
-
     const fieldErrors = {
-        phone:           !isPhoneValid(form.phone)           ? "Phone must be 10 digits" : "",
-        alternatePhone:  !isPhoneValid(form.alternatePhone)  ? "Phone must be 10 digits" : "",
-        aadharNumber:    !isAadharValid(form.aadharNumber)   ? "Aadhar must be 12 digits" : "",
-        panNumber:       !isPANValid(form.panNumber)         ? "PAN format: AAAAA9999A (10 chars)" : "",
-        emergencyContact1Phone: !isPhoneValid((form as any).emergencyContact1Phone) ? "Phone must be 10 digits" : "",
+        phone:            validatePhone(form.phone) || "",
+        alternatePhone:   validatePhone(form.alternatePhone) || "",
+        email:            validateEmail(form.email) || "",
+        dateOfBirth:      validateDateOfBirth(form.dateOfBirth) || "",
+        aadharNumber:     validateAadhaar(form.aadharNumber) || "",
+        panNumber:        validatePAN(form.panNumber) || "",
+        pincode:          validatePincode(form.pincode) || "",
+        permanentPincode: validatePincode(form.permanentPincode) || "",
+        bankIFSC:         validateIFSC(form.bankIFSC) || "",
+        bankAccountNumber: validateBankAccount(form.bankAccountNumber) || "",
+        uan:              validateUAN(form.uan) || "",
+        esiNumber:        validateESIC(form.esiNumber) || "",
+        emergencyContact1Phone: validatePhone(form.emergencyContact1Phone) || "",
+        emergencyContact2Phone: validatePhone(form.emergencyContact2Phone) || "",
     }
     const hasFieldErrors = Object.values(fieldErrors).some(Boolean)
 
@@ -417,7 +426,8 @@ export function EmployeeModal({
 
     const doSave = async (keepOpen: boolean) => {
         if (!form.firstName.trim()) { toast.error("First name is required"); return }
-        if (hasFieldErrors) { toast.error("Please fix validation errors before saving"); return }
+        // Name the failing field — the offender is often on a tab that isn't open.
+        if (hasFieldErrors) { toast.error(Object.values(fieldErrors).find(Boolean) || "Please fix validation errors before saving"); return }
         if (missingRequiredDocs.length > 0) {
             toast.error(`Upload required documents: ${missingRequiredDocs.map(d => d.label).join(", ")}`)
             setActiveTab("documents")
@@ -671,7 +681,9 @@ export function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Email</label>
-                                    <input type="email" value={form.email} onChange={set("email")} className={inputCls} placeholder="Email address" />
+                                    <input type="email" value={form.email} onChange={set("email")}
+                                        className={inputCls + (fieldErrors.email ? " !border-red-400" : "")} placeholder="Email address" />
+                                    {fieldErrors.email && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.email}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Alternate Phone</label>
@@ -681,7 +693,9 @@ export function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Date of Birth</label>
-                                    <input type="date" value={form.dateOfBirth} onChange={set("dateOfBirth")} className={inputCls} />
+                                    <input type="date" value={form.dateOfBirth} onChange={set("dateOfBirth")}
+                                        className={inputCls + (fieldErrors.dateOfBirth ? " !border-red-400" : "")} />
+                                    {fieldErrors.dateOfBirth && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.dateOfBirth}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Gender</label>
@@ -722,7 +736,9 @@ export function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Pincode</label>
-                                    <input value={form.pincode} onChange={set("pincode")} className={inputCls} placeholder="Pincode" />
+                                    <input value={form.pincode} onChange={set("pincode")} maxLength={6}
+                                        className={inputCls + (fieldErrors.pincode ? " !border-red-400" : "")} placeholder="Pincode" />
+                                    {fieldErrors.pincode && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.pincode}</p>}
                                 </div>
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Permanent Address</p>
@@ -751,7 +767,9 @@ export function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Pincode</label>
-                                    <input value={form.permanentPincode} onChange={set("permanentPincode")} className={inputCls} placeholder="Pincode" disabled={sameAsCurrent} />
+                                    <input value={form.permanentPincode} onChange={set("permanentPincode")} maxLength={6}
+                                        className={inputCls + (fieldErrors.permanentPincode ? " !border-red-400" : "")} placeholder="Pincode" disabled={sameAsCurrent} />
+                                    {fieldErrors.permanentPincode && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.permanentPincode}</p>}
                                 </div>
                             </div>
                         </div>
@@ -1031,11 +1049,15 @@ export function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>IFSC Code</label>
-                                    <input value={form.bankIFSC} onChange={set("bankIFSC")} className={inputCls} placeholder="IFSC code" />
+                                    <input value={form.bankIFSC} onChange={e => setForm(f => ({ ...f, bankIFSC: e.target.value.toUpperCase() }))} maxLength={11}
+                                        className={inputCls + (fieldErrors.bankIFSC ? " !border-red-400" : "")} placeholder="IFSC code" />
+                                    {fieldErrors.bankIFSC && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.bankIFSC}</p>}
                                 </div>
                                 <div className="col-span-2">
                                     <label className={labelCls}>Account Number</label>
-                                    <input value={form.bankAccountNumber} onChange={set("bankAccountNumber")} className={inputCls} placeholder="Account number" />
+                                    <input value={form.bankAccountNumber} onChange={set("bankAccountNumber")} maxLength={18}
+                                        className={inputCls + (fieldErrors.bankAccountNumber ? " !border-red-400" : "")} placeholder="Account number" />
+                                    {fieldErrors.bankAccountNumber && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.bankAccountNumber}</p>}
                                 </div>
                             </div>
                         </div>
@@ -1082,11 +1104,15 @@ export function EmployeeModal({
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelCls}>UAN (PF)</label>
-                                    <input value={form.uan} onChange={set("uan")} className={inputCls} placeholder="Universal Account Number" />
+                                    <input value={form.uan} onChange={set("uan")} maxLength={12}
+                                        className={inputCls + (fieldErrors.uan ? " !border-red-400" : "")} placeholder="Universal Account Number" />
+                                    {fieldErrors.uan && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.uan}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>ESIC Number</label>
-                                    <input value={form.esiNumber} onChange={set("esiNumber")} className={inputCls} placeholder="ESIC number" />
+                                    <input value={form.esiNumber} onChange={set("esiNumber")} maxLength={17}
+                                        className={inputCls + (fieldErrors.esiNumber ? " !border-red-400" : "")} placeholder="ESIC number" />
+                                    {fieldErrors.esiNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.esiNumber}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Labour Card No.</label>

@@ -5,6 +5,11 @@ import {
     Loader2, CheckCircle2, Copy, Check, AlertCircle,
     ChevronRight, ChevronLeft, Upload, X, FileText, ImageIcon, Lock
 } from "lucide-react"
+import {
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validateUAN, validateESIC, validateEmail,
+    validatePincode, validateDateOfBirth, type FieldError,
+} from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,8 +195,9 @@ export default function JoinPage() {
 
     // ── Validation ────────────────────────────────────────────────────────────
 
-    function validate(t: string): boolean {
+    function errorsFor(t: string): Partial<Record<keyof FormData, string>> {
         const e: Partial<Record<keyof FormData, string>> = {}
+        const put = (k: keyof FormData, msg: FieldError) => { if (msg) e[k] = msg }
         if (t === "personal") {
             if (!form.siteId)               e.siteId        = "Required"
             if (!form.hrId)                 e.hrId          = "Required"
@@ -199,16 +205,20 @@ export default function JoinPage() {
             if (!form.lastName.trim())  e.lastName  = "Required"
             if (!form.gender)           e.gender    = "Required"
             if (!form.dateOfBirth)      e.dateOfBirth = "Required"
+            else put("dateOfBirth", validateDateOfBirth(form.dateOfBirth))
             if (!form.phone.trim())     e.phone     = "Required"
-            else if (!/^[6-9]\d{9}$/.test(form.phone.replace(/\s/g,""))) e.phone = "Enter valid 10-digit mobile"
-            if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter valid email"
+            else put("phone", validatePhone(form.phone))
+            put("email", validateEmail(form.email))
+            put("alternatePhone", validatePhone(form.alternatePhone))
             if (!form.address.trim())   e.address   = "Required"
             if (!form.city.trim())      e.city      = "Required"
             if (!form.state.trim())     e.state     = "Required"
             if (!form.pincode.trim())   e.pincode   = "Required"
+            else put("pincode", validatePincode(form.pincode))
+            put("permanentPincode", validatePincode(form.permanentPincode))
             if (!form.emergencyContact1Name.trim())  e.emergencyContact1Name  = "Required"
             if (!form.emergencyContact1Phone.trim()) e.emergencyContact1Phone = "Required"
-            else if (!/^\d{10}$/.test(form.emergencyContact1Phone.replace(/\s/g,""))) e.emergencyContact1Phone = "Valid 10-digit number required"
+            else put("emergencyContact1Phone", validatePhone(form.emergencyContact1Phone))
         }
         if (t === "employment") {
             if (!form.designation.trim())   e.designation   = "Required"
@@ -218,15 +228,37 @@ export default function JoinPage() {
         if (t === "bank") {
             if (!form.bankName.trim())          e.bankName          = "Required"
             if (!form.bankAccountNumber.trim()) e.bankAccountNumber = "Required"
+            else put("bankAccountNumber", validateBankAccount(form.bankAccountNumber))
             if (!form.bankIFSC.trim())          e.bankIFSC          = "Required"
-            else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bankIFSC)) e.bankIFSC = "Enter valid IFSC (e.g. SBIN0001234)"
+            else put("bankIFSC", validateIFSC(form.bankIFSC))
             if (!form.aadharNumber.trim())      e.aadharNumber      = "Required"
-            else if (form.aadharNumber.length !== 12) e.aadharNumber = "Must be exactly 12 digits"
+            else put("aadharNumber", validateAadhaar(form.aadharNumber))
             if (!form.panNumber.trim())         e.panNumber         = "Required"
-            else if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.panNumber)) e.panNumber = "Enter valid PAN (e.g. ABCDE1234F)"
+            else put("panNumber", validatePAN(form.panNumber))
+            put("uan", validateUAN(form.uan))
+            put("esiNumber", validateESIC(form.esiNumber))
         }
+        return e
+    }
+
+    function validate(t: string): boolean {
+        const e = errorsFor(t)
         setErrors(e)
         return Object.keys(e).length === 0
+    }
+
+    /**
+     * Every step, not just the one on screen. The stepper lets you walk back to
+     * an earlier tab and jump forward again without re-validating, so submitting
+     * from the last tab would otherwise skip the personal / bank checks entirely.
+     */
+    function validateAll(): boolean {
+        for (const t of tabOrder) {
+            const e = errorsFor(t)
+            if (Object.keys(e).length) { setErrors(e); setTab(t); return false }
+        }
+        setErrors({})
+        return true
     }
 
     function goNext() { if (!validate(tab)) return; setTab(tabOrder[tabIdx + 1]) }
@@ -274,7 +306,7 @@ export default function JoinPage() {
     // ── Submit ────────────────────────────────────────────────────────────────
 
     async function handleSubmit() {
-        if (!validate(tab)) return
+        if (!validateAll()) return
 
         // Required documents must actually be uploaded, not just marked with an
         // asterisk — same rule as the Employee form.
@@ -590,7 +622,8 @@ export default function JoinPage() {
                                         </div>
                                         <div>
                                             <Lbl text="Alternate Phone" />
-                                            <input style={inp} placeholder="9876543210" maxLength={10} value={form.alternatePhone} onChange={e => set("alternatePhone", e.target.value.replace(/\D/g,""))} />
+                                            <input style={{ ...inp, borderColor: errors.alternatePhone ? "var(--red)" : undefined }} placeholder="9876543210" maxLength={10} value={form.alternatePhone} onChange={e => { set("alternatePhone", e.target.value.replace(/\D/g,"")); clrErr("alternatePhone") }} />
+                                            <Err msg={errors.alternatePhone} />
                                         </div>
                                     </div>
                                 </div>
@@ -635,7 +668,7 @@ export default function JoinPage() {
                                         </div>
                                         <div><Lbl text="City" /><input style={{ ...inp, opacity: form.sameAsCurrent ? 0.6 : 1 }} disabled={form.sameAsCurrent} placeholder="Delhi" value={form.permanentCity} onChange={e => set("permanentCity", e.target.value)} /></div>
                                         <div><Lbl text="State" /><input style={{ ...inp, opacity: form.sameAsCurrent ? 0.6 : 1 }} disabled={form.sameAsCurrent} placeholder="Delhi" value={form.permanentState} onChange={e => set("permanentState", e.target.value)} /></div>
-                                        <div><Lbl text="PIN Code" /><input style={{ ...inp, opacity: form.sameAsCurrent ? 0.6 : 1 }} disabled={form.sameAsCurrent} placeholder="110001" maxLength={6} value={form.permanentPincode} onChange={e => set("permanentPincode", e.target.value.replace(/\D/g,""))} /></div>
+                                        <div><Lbl text="PIN Code" /><input style={{ ...inp, opacity: form.sameAsCurrent ? 0.6 : 1, borderColor: errors.permanentPincode ? "var(--red)" : undefined }} disabled={form.sameAsCurrent} placeholder="110001" maxLength={6} value={form.permanentPincode} onChange={e => { set("permanentPincode", e.target.value.replace(/\D/g,"")); clrErr("permanentPincode") }} /><Err msg={errors.permanentPincode} /></div>
                                     </div>
                                 </div>
 
@@ -713,7 +746,7 @@ export default function JoinPage() {
                                         <div><Lbl text="Branch Name" /><input style={inp} placeholder="Andheri West" value={form.bankBranch} onChange={e => set("bankBranch", e.target.value)} /></div>
                                         <div style={span2}>
                                             <Lbl text="Account Number" required />
-                                            <input style={{ ...inp, borderColor: errors.bankAccountNumber ? "var(--red)" : undefined }} placeholder="Your account number" value={form.bankAccountNumber} onChange={e => { set("bankAccountNumber", e.target.value.replace(/\D/g,"")); clrErr("bankAccountNumber") }} />
+                                            <input style={{ ...inp, borderColor: errors.bankAccountNumber ? "var(--red)" : undefined }} placeholder="Your account number" maxLength={18} value={form.bankAccountNumber} onChange={e => { set("bankAccountNumber", e.target.value.replace(/\D/g,"")); clrErr("bankAccountNumber") }} />
                                             <Err msg={errors.bankAccountNumber} />
                                         </div>
                                         <div>
@@ -746,7 +779,8 @@ export default function JoinPage() {
                                     <div style={{ ...g2, marginTop: 14 }}>
                                         <div>
                                             <Lbl text="UAN (PF) Number" />
-                                            <input style={inp} placeholder="12-digit UAN" maxLength={12} value={form.uan} onChange={e => set("uan", e.target.value.replace(/\D/g,""))} />
+                                            <input style={{ ...inp, borderColor: errors.uan ? "var(--red)" : undefined }} placeholder="12-digit UAN" maxLength={12} value={form.uan} onChange={e => { set("uan", e.target.value.replace(/\D/g,"")); clrErr("uan") }} />
+                                            <Err msg={errors.uan} />
                                         </div>
                                         <div>
                                             <Lbl text="Labour Card No." />
@@ -754,7 +788,8 @@ export default function JoinPage() {
                                         </div>
                                         <div>
                                             <Lbl text="ESIC Number" />
-                                            <input style={inp} placeholder="ESIC IP number" value={form.esiNumber} onChange={e => set("esiNumber", e.target.value)} />
+                                            <input style={{ ...inp, borderColor: errors.esiNumber ? "var(--red)" : undefined }} placeholder="ESIC IP number" maxLength={17} value={form.esiNumber} onChange={e => { set("esiNumber", e.target.value); clrErr("esiNumber") }} />
+                                            <Err msg={errors.esiNumber} />
                                         </div>
                                     </div>
                                 </div>

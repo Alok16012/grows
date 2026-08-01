@@ -9,6 +9,11 @@ import {
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
     UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut
 } from "lucide-react"
+import {
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validateUAN, validateESIC, validateEmail,
+    validatePincode, validateDateOfBirth,
+} from "@/lib/validation"
 
 // ─── Self-service Details Tab ────────────────────────────────────────────────
 const DETAILS_FIELDS = [
@@ -36,14 +41,16 @@ function Section({ title, icon: Icon, children }: { title: string; icon: any; ch
     )
 }
 
-function Field({ label, value, onChange, type = "text", placeholder, colSpan = 1 }: {
+function Field({ label, value, onChange, type = "text", placeholder, colSpan = 1, maxLength, error }: {
     label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; colSpan?: 1 | 2
+    maxLength?: number; error?: string | null
 }) {
     return (
         <div className={colSpan === 2 ? "sm:col-span-2" : ""}>
             <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide block mb-1">{label}</label>
-            <input type={type} value={value ?? ""} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-[13px] outline-none focus:border-[var(--accent)]" />
+            <input type={type} value={value ?? ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength}
+                className={`w-full px-3 py-2 border rounded-lg text-[13px] outline-none focus:border-[var(--accent)] ${error ? "border-red-400" : "border-[var(--border)]"}`} />
+            {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
         </div>
     )
 }
@@ -87,7 +94,28 @@ function MyDetailsTab() {
 
     const set = (k: DetailsKey) => (v: string) => setData(d => ({ ...d, [k]: v }))
 
+    const v = (k: DetailsKey) => data[k] ?? ""
+    const errors = {
+        phone:             validatePhone(v("phone")),
+        alternatePhone:    validatePhone(v("alternatePhone")),
+        email:             validateEmail(v("email")),
+        dateOfBirth:       validateDateOfBirth(v("dateOfBirth")),
+        pincode:           validatePincode(v("pincode")),
+        permanentPincode:  validatePincode(v("permanentPincode")),
+        aadharNumber:      validateAadhaar(v("aadharNumber")),
+        panNumber:         validatePAN(v("panNumber")),
+        uan:               validateUAN(v("uan")),
+        esiNumber:         validateESIC(v("esiNumber")),
+        bankAccountNumber: validateBankAccount(v("bankAccountNumber")),
+        bankIFSC:          validateIFSC(v("bankIFSC")),
+        emergencyContact1Phone: validatePhone(v("emergencyContact1Phone")),
+        emergencyContact2Phone: validatePhone(v("emergencyContact2Phone")),
+    }
+
     const save = async () => {
+        // Name the failing field — the offender is often in a section scrolled out of view.
+        const firstError = Object.values(errors).find(Boolean)
+        if (firstError) { toast.error(firstError); return }
         setSaving(true)
         try {
             const res = await fetch("/api/me/employee", {
@@ -128,7 +156,7 @@ function MyDetailsTab() {
                 <Field label="Last Name" value={data.lastName ?? ""} onChange={set("lastName")} />
                 <Field label="Name (as per Aadhaar)" value={data.nameAsPerAadhar ?? ""} onChange={set("nameAsPerAadhar")} />
                 <Field label="Father's Name" value={data.fathersName ?? ""} onChange={set("fathersName")} />
-                <Field label="Date of Birth" type="date" value={data.dateOfBirth ?? ""} onChange={set("dateOfBirth")} />
+                <Field label="Date of Birth" type="date" value={data.dateOfBirth ?? ""} onChange={set("dateOfBirth")} error={errors.dateOfBirth} />
                 <SelectField label="Gender" value={data.gender ?? ""} onChange={set("gender")}
                     options={[{ value: "MALE", label: "Male" }, { value: "FEMALE", label: "Female" }, { value: "OTHER", label: "Other" }]} />
                 <SelectField label="Blood Group" value={data.bloodGroup ?? ""} onChange={set("bloodGroup")}
@@ -139,46 +167,46 @@ function MyDetailsTab() {
                 <Field label="Nationality" value={data.nationality ?? ""} onChange={set("nationality")} placeholder="Indian" />
                 <Field label="Religion" value={data.religion ?? ""} onChange={set("religion")} />
                 <Field label="Caste" value={data.caste ?? ""} onChange={set("caste")} />
-                <Field label="Phone" value={data.phone ?? ""} onChange={set("phone")} />
-                <Field label="Alternate Phone" value={data.alternatePhone ?? ""} onChange={set("alternatePhone")} />
-                <Field label="Email" type="email" value={data.email ?? ""} onChange={set("email")} colSpan={2} />
+                <Field label="Phone" value={data.phone ?? ""} onChange={set("phone")} maxLength={10} error={errors.phone} />
+                <Field label="Alternate Phone" value={data.alternatePhone ?? ""} onChange={set("alternatePhone")} maxLength={10} error={errors.alternatePhone} />
+                <Field label="Email" type="email" value={data.email ?? ""} onChange={set("email")} colSpan={2} error={errors.email} />
             </Section>
 
             <Section title="Current Address" icon={MapPin}>
                 <Field label="Address Line" value={data.address ?? ""} onChange={set("address")} colSpan={2} />
                 <Field label="City" value={data.city ?? ""} onChange={set("city")} />
                 <Field label="State" value={data.state ?? ""} onChange={set("state")} />
-                <Field label="Pincode" value={data.pincode ?? ""} onChange={set("pincode")} />
+                <Field label="Pincode" value={data.pincode ?? ""} onChange={set("pincode")} maxLength={6} error={errors.pincode} />
             </Section>
 
             <Section title="Permanent Address" icon={MapPin}>
                 <Field label="Address Line" value={data.permanentAddress ?? ""} onChange={set("permanentAddress")} colSpan={2} />
                 <Field label="City" value={data.permanentCity ?? ""} onChange={set("permanentCity")} />
                 <Field label="State" value={data.permanentState ?? ""} onChange={set("permanentState")} />
-                <Field label="Pincode" value={data.permanentPincode ?? ""} onChange={set("permanentPincode")} />
+                <Field label="Pincode" value={data.permanentPincode ?? ""} onChange={set("permanentPincode")} maxLength={6} error={errors.permanentPincode} />
             </Section>
 
             <Section title="Identity & Employment IDs" icon={Contact}>
-                <Field label="Aadhaar Number" value={data.aadharNumber ?? ""} onChange={set("aadharNumber")} />
-                <Field label="PAN Number" value={data.panNumber ?? ""} onChange={set("panNumber")} />
-                <Field label="UAN" value={data.uan ?? ""} onChange={set("uan")} />
+                <Field label="Aadhaar Number" value={data.aadharNumber ?? ""} onChange={set("aadharNumber")} maxLength={12} error={errors.aadharNumber} />
+                <Field label="PAN Number" value={data.panNumber ?? ""} onChange={v => set("panNumber")(v.toUpperCase())} maxLength={10} error={errors.panNumber} />
+                <Field label="UAN" value={data.uan ?? ""} onChange={set("uan")} maxLength={12} error={errors.uan} />
                 <Field label="PF Number" value={data.pfNumber ?? ""} onChange={set("pfNumber")} />
-                <Field label="ESI Number" value={data.esiNumber ?? ""} onChange={set("esiNumber")} />
+                <Field label="ESI Number" value={data.esiNumber ?? ""} onChange={set("esiNumber")} maxLength={17} error={errors.esiNumber} />
                 <Field label="Labour Card No." value={data.labourCardNo ?? ""} onChange={set("labourCardNo")} />
             </Section>
 
             <Section title="Bank Details" icon={CreditCard}>
-                <Field label="Account Number" value={data.bankAccountNumber ?? ""} onChange={set("bankAccountNumber")} />
-                <Field label="IFSC Code" value={data.bankIFSC ?? ""} onChange={set("bankIFSC")} />
+                <Field label="Account Number" value={data.bankAccountNumber ?? ""} onChange={set("bankAccountNumber")} maxLength={18} error={errors.bankAccountNumber} />
+                <Field label="IFSC Code" value={data.bankIFSC ?? ""} onChange={v => set("bankIFSC")(v.toUpperCase())} maxLength={11} error={errors.bankIFSC} />
                 <Field label="Bank Name" value={data.bankName ?? ""} onChange={set("bankName")} />
                 <Field label="Branch" value={data.bankBranch ?? ""} onChange={set("bankBranch")} />
             </Section>
 
             <Section title="Emergency Contacts" icon={Contact}>
                 <Field label="Contact 1 – Name" value={data.emergencyContact1Name ?? ""} onChange={set("emergencyContact1Name")} />
-                <Field label="Contact 1 – Phone" value={data.emergencyContact1Phone ?? ""} onChange={set("emergencyContact1Phone")} />
+                <Field label="Contact 1 – Phone" value={data.emergencyContact1Phone ?? ""} onChange={set("emergencyContact1Phone")} maxLength={10} error={errors.emergencyContact1Phone} />
                 <Field label="Contact 2 – Name" value={data.emergencyContact2Name ?? ""} onChange={set("emergencyContact2Name")} />
-                <Field label="Contact 2 – Phone" value={data.emergencyContact2Phone ?? ""} onChange={set("emergencyContact2Phone")} />
+                <Field label="Contact 2 – Phone" value={data.emergencyContact2Phone ?? ""} onChange={set("emergencyContact2Phone")} maxLength={10} error={errors.emergencyContact2Phone} />
             </Section>
 
             <div className="sticky bottom-4 flex justify-end">

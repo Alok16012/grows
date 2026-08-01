@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 import {
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validateUAN, validateESIC, validateEmail,
+    validatePincode, validateDateOfBirth,
+} from "@/lib/validation"
+import {
     Plus, Search, Phone, Mail, MapPin, Calendar, Users,
     Target, X, ChevronRight, Briefcase,
     MessageSquare, PhoneCall, Send, Clock, Filter,
@@ -762,11 +767,14 @@ export default function RecruitmentPage() {
         setShowForm(true)
     }
 
-    // ── Validation helpers ──
-    const rDigits = (v: string) => v.replace(/\D/g, "")
-    const isPhoneOk  = (v: string) => !v || rDigits(v).length === 10
-    const isAadharOk = (v: string) => !v || rDigits(v).length === 12
-    const isPANOk    = (v: string) => !v || /^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(v.trim())
+    // ── Validation ──
+    const leadErrors = {
+        phone:        validatePhone(form.phone),
+        altPhone:     validatePhone(form.altPhone),
+        email:        validateEmail(form.email),
+        dateOfBirth:  validateDateOfBirth(form.dateOfBirth),
+        aadharNumber: validateAadhaar(form.aadharNumber),
+    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -774,8 +782,9 @@ export default function RecruitmentPage() {
             toast.error(duplicateWarning)
             return
         }
-        if (form.phone && !isPhoneOk(form.phone)) {
-            toast.error("Phone number must be exactly 10 digits")
+        const firstLeadError = Object.values(leadErrors).find(Boolean)
+        if (firstLeadError) {
+            toast.error(firstLeadError)
             return
         }
         setSaving(true)
@@ -1306,13 +1315,13 @@ export default function RecruitmentPage() {
                                                 checkDuplicate(e.target.value)
                                             }}
                                             placeholder="10-digit mobile number"
-                                            className={inputCls + (form.phone && !isPhoneOk(form.phone) ? " !border-red-400" : "")} />
-                                        {form.phone && !isPhoneOk(form.phone) && (
+                                            className={inputCls + (leadErrors.phone ? " !border-red-400" : "")} />
+                                        {leadErrors.phone && (
                                             <p className="text-[11px] text-red-500 flex items-center gap-1">
-                                                <AlertCircle size={11} /> Phone must be exactly 10 digits
+                                                <AlertCircle size={11} /> {leadErrors.phone}
                                             </p>
                                         )}
-                                        {duplicateWarning && isPhoneOk(form.phone) && (
+                                        {duplicateWarning && !leadErrors.phone && (
                                             <p className="text-[11px] text-amber-600 flex items-center gap-1">
                                                 <AlertCircle size={11} />
                                                 {duplicateWarning}
@@ -1322,7 +1331,12 @@ export default function RecruitmentPage() {
                                 </Field>
                                 <Field label="Email">
                                     <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                                        placeholder="Email address" className={inputCls} />
+                                        placeholder="Email address" className={inputCls + (leadErrors.email ? " !border-red-400" : "")} />
+                                    {leadErrors.email && (
+                                        <p className="text-[11px] text-red-500 flex items-center gap-1">
+                                            <AlertCircle size={11} /> {leadErrors.email}
+                                        </p>
+                                    )}
                                 </Field>
                                 <Field label="City">
                                     <input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
@@ -1512,10 +1526,22 @@ export default function RecruitmentPage() {
                                     </select>
                                 </Field>
                                 <Field label="Alternative Number">
-                                    <input value={form.altPhone} onChange={e => setForm(p => ({ ...p, altPhone: e.target.value }))} maxLength={10} className={inputCls} />
+                                    <input value={form.altPhone} onChange={e => setForm(p => ({ ...p, altPhone: e.target.value }))} maxLength={10}
+                                        className={inputCls + (leadErrors.altPhone ? " !border-red-400" : "")} />
+                                    {leadErrors.altPhone && (
+                                        <p className="text-[11px] text-red-500 flex items-center gap-1">
+                                            <AlertCircle size={11} /> {leadErrors.altPhone}
+                                        </p>
+                                    )}
                                 </Field>
                                 <Field label="Date of Birth">
-                                    <input type="date" value={form.dateOfBirth} onChange={e => setForm(p => ({ ...p, dateOfBirth: e.target.value }))} className={inputCls} />
+                                    <input type="date" value={form.dateOfBirth} onChange={e => setForm(p => ({ ...p, dateOfBirth: e.target.value }))}
+                                        className={inputCls + (leadErrors.dateOfBirth ? " !border-red-400" : "")} />
+                                    {leadErrors.dateOfBirth && (
+                                        <p className="text-[11px] text-red-500 flex items-center gap-1">
+                                            <AlertCircle size={11} /> {leadErrors.dateOfBirth}
+                                        </p>
+                                    )}
                                 </Field>
                                 <Field label="Marital Status">
                                     <select value={form.maritalStatus} onChange={e => setForm(p => ({ ...p, maritalStatus: e.target.value }))} className={inputCls}>
@@ -1539,7 +1565,13 @@ export default function RecruitmentPage() {
                                     <input value={form.motherOccupation} onChange={e => setForm(p => ({ ...p, motherOccupation: e.target.value }))} className={inputCls} />
                                 </Field>
                                 <Field label="Aadhar Number">
-                                    <input value={form.aadharNumber} onChange={e => setForm(p => ({ ...p, aadharNumber: e.target.value }))} maxLength={14} className={inputCls} />
+                                    <input value={form.aadharNumber} onChange={e => setForm(p => ({ ...p, aadharNumber: e.target.value.replace(/\D/g, "") }))} maxLength={12}
+                                        className={inputCls + (leadErrors.aadharNumber ? " !border-red-400" : "")} />
+                                    {leadErrors.aadharNumber && (
+                                        <p className="text-[11px] text-red-500 flex items-center gap-1">
+                                            <AlertCircle size={11} /> {leadErrors.aadharNumber}
+                                        </p>
+                                    )}
                                 </Field>
                             </div>
                         </div>
@@ -2977,29 +3009,34 @@ function ConvertModal({ lead, onClose, onConverted }: {
         setForm(p => ({ ...p, [k]: e.target.checked }))
 
     const iCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
-    const errCls = (bad: boolean) => iCls + (bad ? " !border-red-400" : "")
+    const errCls = (bad: string | null | boolean) => iCls + (bad ? " !border-red-400" : "")
     const lCls = "block text-[12px] text-[var(--text2)] mb-1"
     const tabCls = (t: string) => `px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${activeTab === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`
 
     // Validation
-    const cDigits = (v: string) => (v || "").replace(/\D/g, "")
-    const cPhoneOk  = (v: string) => !v || cDigits(v).length === 10
-    const cAadharOk = (v: string) => !v || cDigits(v).length === 12
-    const cPANOk    = (v: string) => !v || /^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(v.trim())
     const cErrors = {
-        phone:  !cPhoneOk(form.phone),
-        alternatePhone: !cPhoneOk((form as any).alternatePhone),
-        aadharNumber: !cAadharOk((form as any).aadharNumber),
-        panNumber: !cPANOk((form as any).panNumber),
-        ec1Phone: !cPhoneOk((form as any).emergencyContact1Phone),
-        ec2Phone: !cPhoneOk((form as any).emergencyContact2Phone),
+        phone:             validatePhone(form.phone),
+        alternatePhone:    validatePhone(form.alternatePhone),
+        email:             validateEmail(form.email),
+        dateOfBirth:       validateDateOfBirth(form.dateOfBirth),
+        aadharNumber:      validateAadhaar(form.aadharNumber),
+        panNumber:         validatePAN(form.panNumber),
+        pincode:           validatePincode(form.pincode),
+        permanentPincode:  validatePincode(form.permanentPincode),
+        bankIFSC:          validateIFSC(form.bankIFSC),
+        bankAccountNumber: validateBankAccount(form.bankAccountNumber),
+        uan:               validateUAN(form.uan),
+        esiNumber:         validateESIC(form.esiNumber),
+        ec1Phone:          validatePhone(form.emergencyContact1Phone),
+        ec2Phone:          validatePhone(form.emergencyContact2Phone),
     }
-    const cHasErrors = Object.values(cErrors).some(Boolean)
+    const cFirstError = Object.values(cErrors).find(Boolean)
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         if (!form.firstName.trim()) { toast.error("First name is required"); return }
-        if (cHasErrors) { toast.error("Please fix validation errors before saving"); return }
+        // Name the failing field — the offender is often on a tab that isn't open.
+        if (cFirstError) { toast.error(cFirstError); return }
         setSubmitting(true)
         try {
             const res = await fetch(`/api/recruitment/${lead.id}/convert`, {
@@ -3064,15 +3101,23 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                 <div>
                                     <label className={lCls}>Phone</label>
                                     <input value={form.phone} onChange={set("phone")} maxLength={10} className={errCls(cErrors.phone)} placeholder="10-digit mobile number" />
-                                    {cErrors.phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                    {cErrors.phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.phone}</p>}
                                 </div>
-                                <div><label className={lCls}>Email</label><input type="email" value={form.email} onChange={set("email")} className={iCls} placeholder="Email address" /></div>
+                                <div>
+                                    <label className={lCls}>Email</label>
+                                    <input type="email" value={form.email} onChange={set("email")} className={errCls(cErrors.email)} placeholder="Email address" />
+                                    {cErrors.email && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.email}</p>}
+                                </div>
                                 <div>
                                     <label className={lCls}>Alternate Phone</label>
                                     <input value={form.alternatePhone} onChange={set("alternatePhone")} maxLength={10} className={errCls(cErrors.alternatePhone)} placeholder="10-digit (optional)" />
-                                    {cErrors.alternatePhone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                    {cErrors.alternatePhone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.alternatePhone}</p>}
                                 </div>
-                                <div><label className={lCls}>Date of Birth</label><input type="date" value={form.dateOfBirth} onChange={set("dateOfBirth")} className={iCls} /></div>
+                                <div>
+                                    <label className={lCls}>Date of Birth</label>
+                                    <input type="date" value={form.dateOfBirth} onChange={set("dateOfBirth")} className={errCls(cErrors.dateOfBirth)} />
+                                    {cErrors.dateOfBirth && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.dateOfBirth}</p>}
+                                </div>
                                 <div>
                                     <label className={lCls}>Gender</label>
                                     <select value={form.gender} onChange={set("gender")} className={iCls}>
@@ -3085,12 +3130,12 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                 <div>
                                     <label className={lCls}>Aadhar Number</label>
                                     <input value={form.aadharNumber} onChange={set("aadharNumber")} maxLength={12} className={errCls(cErrors.aadharNumber)} placeholder="12-digit Aadhar number" />
-                                    {cErrors.aadharNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ Aadhar must be 12 digits</p>}
+                                    {cErrors.aadharNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.aadharNumber}</p>}
                                 </div>
                                 <div>
                                     <label className={lCls}>PAN Number</label>
                                     <input value={form.panNumber} onChange={e => setForm(p => ({ ...p, panNumber: e.target.value.toUpperCase() }))} maxLength={10} className={errCls(cErrors.panNumber)} placeholder="AAAAA9999A" />
-                                    {cErrors.panNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ PAN format: AAAAA9999A (10 chars)</p>}
+                                    {cErrors.panNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.panNumber}</p>}
                                 </div>
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Current Address</p>
@@ -3098,7 +3143,11 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                 <div className="col-span-2"><label className={lCls}>Address</label><input value={form.address} onChange={set("address")} className={iCls} placeholder="Street address" /></div>
                                 <div><label className={lCls}>City</label><input value={form.city} onChange={set("city")} className={iCls} placeholder="City" /></div>
                                 <div><label className={lCls}>State</label><input value={form.state} onChange={set("state")} className={iCls} placeholder="State" /></div>
-                                <div><label className={lCls}>Pincode</label><input value={form.pincode} onChange={set("pincode")} className={iCls} placeholder="Pincode" /></div>
+                                <div>
+                                    <label className={lCls}>Pincode</label>
+                                    <input value={form.pincode} onChange={set("pincode")} maxLength={6} className={errCls(cErrors.pincode)} placeholder="Pincode" />
+                                    {cErrors.pincode && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.pincode}</p>}
+                                </div>
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Permanent Address</p>
                             <div className="grid grid-cols-2 gap-3">
@@ -3112,7 +3161,11 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                 <div className="col-span-2"><label className={lCls}>Address</label><input value={form.permanentAddress} onChange={set("permanentAddress")} className={iCls} placeholder="Street address" disabled={sameAsCurrent} /></div>
                                 <div><label className={lCls}>City</label><input value={form.permanentCity} onChange={set("permanentCity")} className={iCls} placeholder="City" disabled={sameAsCurrent} /></div>
                                 <div><label className={lCls}>State</label><input value={form.permanentState} onChange={set("permanentState")} className={iCls} placeholder="State" disabled={sameAsCurrent} /></div>
-                                <div><label className={lCls}>Pincode</label><input value={form.permanentPincode} onChange={set("permanentPincode")} className={iCls} placeholder="Pincode" disabled={sameAsCurrent} /></div>
+                                <div>
+                                    <label className={lCls}>Pincode</label>
+                                    <input value={form.permanentPincode} onChange={set("permanentPincode")} maxLength={6} className={errCls(cErrors.permanentPincode)} placeholder="Pincode" disabled={sameAsCurrent} />
+                                    {cErrors.permanentPincode && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.permanentPincode}</p>}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -3217,8 +3270,16 @@ function ConvertModal({ lead, onClose, onConverted }: {
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase">Bank Details</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div><label className={lCls}>Bank Name</label><input value={form.bankName} onChange={set("bankName")} className={iCls} placeholder="Bank name" /></div>
-                                <div><label className={lCls}>IFSC Code</label><input value={form.bankIFSC} onChange={set("bankIFSC")} className={iCls} placeholder="IFSC code" /></div>
-                                <div className="col-span-2"><label className={lCls}>Account Number</label><input value={form.bankAccountNumber} onChange={set("bankAccountNumber")} className={iCls} placeholder="Account number" /></div>
+                                <div>
+                                    <label className={lCls}>IFSC Code</label>
+                                    <input value={form.bankIFSC} onChange={e => setForm(p => ({ ...p, bankIFSC: e.target.value.toUpperCase() }))} maxLength={11} className={errCls(cErrors.bankIFSC)} placeholder="IFSC code" />
+                                    {cErrors.bankIFSC && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.bankIFSC}</p>}
+                                </div>
+                                <div className="col-span-2">
+                                    <label className={lCls}>Account Number</label>
+                                    <input value={form.bankAccountNumber} onChange={set("bankAccountNumber")} maxLength={18} className={errCls(cErrors.bankAccountNumber)} placeholder="Account number" />
+                                    {cErrors.bankAccountNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.bankAccountNumber}</p>}
+                                </div>
                                 <div><label className={lCls}>Branch</label><input value={form.bankBranch} onChange={set("bankBranch")} className={iCls} placeholder="Bank branch" /></div>
                             </div>
                         </div>
@@ -3250,9 +3311,17 @@ function ConvertModal({ lead, onClose, onConverted }: {
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Statutory Numbers</p>
                             <div className="grid grid-cols-2 gap-3">
-                                <div><label className={lCls}>UAN (PF)</label><input value={form.uan} onChange={set("uan")} className={iCls} placeholder="Universal Account Number" /></div>
+                                <div>
+                                    <label className={lCls}>UAN (PF)</label>
+                                    <input value={form.uan} onChange={set("uan")} maxLength={12} className={errCls(cErrors.uan)} placeholder="Universal Account Number" />
+                                    {cErrors.uan && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.uan}</p>}
+                                </div>
                                 <div><label className={lCls}>PF Number</label><input value={form.pfNumber} onChange={set("pfNumber")} className={iCls} placeholder="PF number" /></div>
-                                <div><label className={lCls}>ESIC Number</label><input value={form.esiNumber} onChange={set("esiNumber")} className={iCls} placeholder="ESIC number" /></div>
+                                <div>
+                                    <label className={lCls}>ESIC Number</label>
+                                    <input value={form.esiNumber} onChange={set("esiNumber")} maxLength={17} className={errCls(cErrors.esiNumber)} placeholder="ESIC number" />
+                                    {cErrors.esiNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.esiNumber}</p>}
+                                </div>
                                 <div><label className={lCls}>Labour Card No.</label><input value={form.labourCardNo} onChange={set("labourCardNo")} className={iCls} placeholder="Labour card number" /></div>
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Emergency Contacts</p>
@@ -3261,13 +3330,13 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                 <div>
                                     <label className={lCls}>EC1 Phone</label>
                                     <input value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} maxLength={10} className={errCls(cErrors.ec1Phone)} placeholder="10-digit number" />
-                                    {cErrors.ec1Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                    {cErrors.ec1Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.ec1Phone}</p>}
                                 </div>
                                 <div><label className={lCls}>EC2 Name</label><input value={form.emergencyContact2Name} onChange={set("emergencyContact2Name")} className={iCls} placeholder="Contact person name" /></div>
                                 <div>
                                     <label className={lCls}>EC2 Phone</label>
                                     <input value={form.emergencyContact2Phone} onChange={set("emergencyContact2Phone")} maxLength={10} className={errCls(cErrors.ec2Phone)} placeholder="10-digit number" />
-                                    {cErrors.ec2Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ Must be 10 digits</p>}
+                                    {cErrors.ec2Phone && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.ec2Phone}</p>}
                                 </div>
                             </div>
                         </div>

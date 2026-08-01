@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
 import { Loader2, CheckCircle2, AlertCircle, Send, Briefcase, User, MapPin, Camera, Plus, Trash2 } from "lucide-react"
+import { validatePhone, validateEmail, validateAadhaar, validateDateOfBirth } from "@/lib/validation"
 
 const POSITIONS = [
     "Quality Inspector",
@@ -113,7 +114,13 @@ export default function ApplyPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!form.candidateName.trim() || !form.phone.trim()) { setError("Name and phone are required"); return }
-        if (!/^[6-9]\d{9}$/.test(form.phone.replace(/\s/g, ""))) { setError("Enter a valid 10-digit mobile number"); return }
+        const invalid =
+            validatePhone(form.phone) ||
+            validatePhone(form.altPhone) ||
+            validateEmail(form.email) ||
+            validateDateOfBirth(form.dateOfBirth) ||
+            validateAadhaar(form.aadharNumber)
+        if (invalid) { setError(invalid); return }
         setSubmitting(true); setError("")
         try {
             const payload = {
@@ -332,7 +339,7 @@ export default function ApplyPage() {
                                 </select>
                             </div>
                             <div><label style={lbl}>Nationality</label><input value={form.nationality} onChange={set("nationality")} style={inp} /></div>
-                            <div style={{ gridColumn: "span 2" }}><label style={lbl}>Aadhar Number</label><input value={form.aadharNumber} onChange={set("aadharNumber")} placeholder="12-digit Aadhar" maxLength={14} style={inp} /></div>
+                            <div style={{ gridColumn: "span 2" }}><label style={lbl}>Aadhar Number</label><input value={form.aadharNumber} onChange={e => setForm(prev => ({ ...prev, aadharNumber: e.target.value.replace(/\D/g, "") }))} placeholder="12-digit Aadhar" maxLength={12} style={inp} /></div>
                         </div>
                     </div>
 

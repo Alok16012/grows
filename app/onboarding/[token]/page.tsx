@@ -7,6 +7,11 @@ import {
     User, Banknote, ShieldAlert, Phone, MapPin, ChevronRight, ChevronLeft, Camera
 } from "lucide-react"
 import { toast } from "sonner"
+import {
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validateUAN, validateESIC,
+    validatePincode, validateDateOfBirth,
+} from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,11 +109,12 @@ const STEPS = [
 const inp = "w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-indigo-500 transition-colors placeholder:text-white/30"
 const lbl = "block text-[11px] font-medium text-white/50 mb-1.5 uppercase tracking-wider"
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string | null }) {
     return (
         <div>
             <label className={lbl}>{label}</label>
             {children}
+            {error && <p className="text-[11px] text-red-400 mt-1">{error}</p>}
         </div>
     )
 }
@@ -255,7 +261,24 @@ export default function OnboardingPortal() {
         r => !docs.some(d => d.fileUrl && (d.type === r.type || r.match(normType(d.type))))
     )
 
+    const errors = {
+        dateOfBirth:            validateDateOfBirth(form.dateOfBirth),
+        alternatePhone:         validatePhone(form.alternatePhone),
+        pincode:                validatePincode(form.pincode),
+        permanentPincode:       validatePincode(form.permanentPincode),
+        emergencyContact1Phone: validatePhone(form.emergencyContact1Phone),
+        aadharNumber:           validateAadhaar(form.aadharNumber),
+        panNumber:              validatePAN(form.panNumber),
+        uan:                    validateUAN(form.uan),
+        esiNumber:              validateESIC(form.esiNumber),
+        bankAccountNumber:      validateBankAccount(form.bankAccountNumber),
+        bankIFSC:               validateIFSC(form.bankIFSC),
+    }
+
     const handleSubmit = async () => {
+        // Name the failing field — the offender is often on a step that isn't open.
+        const firstError = Object.values(errors).find(Boolean)
+        if (firstError) { toast.error(firstError); return }
         if (missingRequiredDocs.length > 0) {
             toast.error(`Upload required documents: ${missingRequiredDocs.map(d => d.label).join(", ")}`)
             setStep(6)
@@ -447,7 +470,7 @@ export default function OnboardingPortal() {
                             </div>
 
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                                <Field label="Date of Birth *">
+                                <Field label="Date of Birth *" error={errors.dateOfBirth}>
                                     <input type="date" value={form.dateOfBirth} onChange={set("dateOfBirth")} className={inp} required />
                                 </Field>
                                 <Field label="Gender *">
@@ -488,7 +511,7 @@ export default function OnboardingPortal() {
                                 <Field label="Caste">
                                     <input type="text" value={form.caste} onChange={set("caste")} placeholder="General / OBC / SC / ST" className={inp} />
                                 </Field>
-                                <Field label="Alternate Phone">
+                                <Field label="Alternate Phone" error={errors.alternatePhone}>
                                     <input type="tel" maxLength={10} value={form.alternatePhone} onChange={set("alternatePhone")} placeholder="10-digit number" className={inp} />
                                 </Field>
                             </div>
@@ -513,7 +536,7 @@ export default function OnboardingPortal() {
                                 <Field label="State *">
                                     <input type="text" value={form.state} onChange={set("state")} placeholder="State" className={inp} required />
                                 </Field>
-                                <Field label="Pincode *">
+                                <Field label="Pincode *" error={errors.pincode}>
                                     <input type="text" maxLength={6} value={form.pincode} onChange={set("pincode")} placeholder="6-digit PIN" className={inp} required />
                                 </Field>
                             </div>
@@ -537,7 +560,7 @@ export default function OnboardingPortal() {
                                 <Field label="State">
                                     <input type="text" value={form.permanentState} onChange={set("permanentState")} placeholder="State" className={inp} />
                                 </Field>
-                                <Field label="Pincode">
+                                <Field label="Pincode" error={errors.permanentPincode}>
                                     <input type="text" maxLength={6} value={form.permanentPincode} onChange={set("permanentPincode")} placeholder="6-digit PIN" className={inp} />
                                 </Field>
                             </div>
@@ -555,7 +578,7 @@ export default function OnboardingPortal() {
                                     <Field label="Full Name">
                                         <input type="text" value={form.emergencyContact1Name} onChange={set("emergencyContact1Name")} placeholder="Contact name" className={inp} />
                                     </Field>
-                                    <Field label="Phone Number">
+                                    <Field label="Phone Number" error={errors.emergencyContact1Phone}>
                                         <input type="tel" maxLength={10} value={form.emergencyContact1Phone} onChange={set("emergencyContact1Phone")} placeholder="10-digit mobile" className={inp} />
                                     </Field>
                                 </div>
@@ -569,14 +592,14 @@ export default function OnboardingPortal() {
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>KYC Verification</h2>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                                 <div style={{ gridColumn: "1 / -1" }}>
-                                    <Field label="Aadhaar Number *">
+                                    <Field label="Aadhaar Number *" error={errors.aadharNumber}>
                                         <input type="text" maxLength={12} value={form.aadharNumber}
                                             onChange={e => setForm(f => ({ ...f, aadharNumber: e.target.value.replace(/\D/g, "") }))}
                                             placeholder="12-digit Aadhaar number" className={inp} required />
                                     </Field>
                                 </div>
                                 <div style={{ gridColumn: "1 / -1" }}>
-                                    <Field label="PAN Number *">
+                                    <Field label="PAN Number *" error={errors.panNumber}>
                                         <input type="text" maxLength={10} value={form.panNumber}
                                             onChange={e => setForm(f => ({ ...f, panNumber: e.target.value.toUpperCase() }))}
                                             placeholder="ABCDE1234F" className={inp} required />
@@ -592,7 +615,7 @@ export default function OnboardingPortal() {
                                     If you worked before and have a PF (UAN) or ESIC number, enter it so your account continues. Leave blank if this is your first job.
                                 </p>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                                    <Field label="Previous PF / UAN Number">
+                                    <Field label="Previous PF / UAN Number" error={errors.uan}>
                                         <input type="text" maxLength={12} value={form.uan}
                                             onChange={e => setForm(f => ({ ...f, uan: e.target.value.replace(/\D/g, "") }))}
                                             placeholder="12-digit UAN" className={inp} />
@@ -601,7 +624,7 @@ export default function OnboardingPortal() {
                                         <input type="text" value={form.labourCardNo} onChange={set("labourCardNo")}
                                             placeholder="Labour card number" className={inp} />
                                     </Field>
-                                    <Field label="Previous ESIC Number">
+                                    <Field label="Previous ESIC Number" error={errors.esiNumber}>
                                         <input type="text" maxLength={17} value={form.esiNumber}
                                             onChange={e => setForm(f => ({ ...f, esiNumber: e.target.value.replace(/\D/g, "") }))}
                                             placeholder="ESIC IP number" className={inp} />
@@ -626,12 +649,12 @@ export default function OnboardingPortal() {
                                     </Field>
                                 </div>
                                 <div style={{ gridColumn: "1 / -1" }}>
-                                    <Field label="Account Number *">
-                                        <input type="text" value={form.bankAccountNumber} onChange={set("bankAccountNumber")} placeholder="Account number" className={inp} required />
+                                    <Field label="Account Number *" error={errors.bankAccountNumber}>
+                                        <input type="text" maxLength={18} value={form.bankAccountNumber} onChange={set("bankAccountNumber")} placeholder="Account number" className={inp} required />
                                     </Field>
                                 </div>
-                                <Field label="IFSC Code *">
-                                    <input type="text" value={form.bankIFSC}
+                                <Field label="IFSC Code *" error={errors.bankIFSC}>
+                                    <input type="text" maxLength={11} value={form.bankIFSC}
                                         onChange={e => setForm(f => ({ ...f, bankIFSC: e.target.value.toUpperCase() }))}
                                         placeholder="IFSC Code" className={inp} required />
                                 </Field>

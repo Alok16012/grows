@@ -6,6 +6,16 @@ import { checkAccess } from "@/lib/permissions"
 
 const VALID_TYPES = ["RESUME", "AADHAAR", "PAN", "PHOTO", "BANK_DETAILS", "CERTIFICATE", "OFFER_LETTER", "OTHER"]
 
+// These documents are KYC (Aadhaar / PAN / bank proof), so anyone without the
+// relevant documents.* permission may only touch their OWN employee record.
+async function isSelf(userId: string, employeeId: string) {
+    const self = await prisma.employee.findFirst({
+        where: { userId },
+        select: { id: true },
+    })
+    return self?.id === employeeId
+}
+
 export async function GET(
     req: Request,
     { params }: { params: { id: string } }
@@ -14,6 +24,10 @@ export async function GET(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         if (session.user.role === "CLIENT") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+            && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -36,8 +50,11 @@ export async function POST(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        // Any authenticated staff user can save employee docs; block clients only.
         if (session.user.role === "CLIENT") {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload")
+            && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

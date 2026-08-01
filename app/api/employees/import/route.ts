@@ -4,6 +4,10 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
 import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
+import {
+    validatePhone, validateAadhaar, validatePAN, validateIFSC,
+    validateBankAccount, validateEmail, validatePincode, validateUAN,
+} from "@/lib/validation"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
@@ -155,6 +159,23 @@ export async function POST(req: Request) {
                 if (!firstName) {
                     return { skip: true, rowNum, reason: "Missing required field (First Name)" }
                 }
+                // Format checks before anything else. Import was the one bulk path
+                // with no validation at all, so a spreadsheet could load hundreds
+                // of rows with unusable Aadhaar / PAN / IFSC values in one go.
+                // Blank stays acceptable — these columns are optional.
+                const formatError =
+                    validatePhone(row.phone as string)
+                    ?? validateAadhaar(row.aadharNumber as string)
+                    ?? validatePAN(row.panNumber as string)
+                    ?? validateIFSC(row.bankIFSC as string)
+                    ?? validateBankAccount(row.bankAccountNumber as string)
+                    ?? validateEmail(row.email as string)
+                    ?? validatePincode(row.pincode as string)
+                    ?? validateUAN(row.uan as string)
+                if (formatError) {
+                    return { skip: true, rowNum, reason: formatError }
+                }
+
                 // Duplicate check: phone first, then name+site
                 if (phone && existingPhones.has(phone)) {
                     return { skip: true, rowNum, reason: `Duplicate: phone ${phone} already exists` }

@@ -2,6 +2,13 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateEmail, validateAadhaar, validatePAN,
+    validateIFSC, validateBankAccount, validatePincode, validateUAN,
+    validateESIC, validatePFNumber, validateDateOfBirth,
+    normalizePhone, normalizeUpper, digitsOnly,
+} from "@/lib/validation"
 
 const ALLOWED_FIELDS = [
     "firstName", "middleName", "lastName", "nameAsPerAadhar", "fathersName",
@@ -56,12 +63,43 @@ export async function PATCH(req: Request) {
         if (!employee) return NextResponse.json({ error: "No employee profile found" }, { status: 404 })
 
         const body = await req.json()
+
+        // Employees edit their own KYC here, so the same format rules apply as on
+        // the HR-facing routes — otherwise this is the one way to get a malformed
+        // Aadhaar or IFSC into the record.
+        const errors = collectErrors({
+            phone: validatePhone(body.phone),
+            alternatePhone: validatePhone(body.alternatePhone),
+            email: validateEmail(body.email),
+            dateOfBirth: validateDateOfBirth(body.dateOfBirth),
+            pincode: validatePincode(body.pincode),
+            permanentPincode: validatePincode(body.permanentPincode),
+            aadharNumber: validateAadhaar(body.aadharNumber),
+            panNumber: validatePAN(body.panNumber),
+            bankAccountNumber: validateBankAccount(body.bankAccountNumber),
+            bankIFSC: validateIFSC(body.bankIFSC),
+            uan: validateUAN(body.uan),
+            pfNumber: validatePFNumber(body.pfNumber),
+            esiNumber: validateESIC(body.esiNumber),
+            emergencyContact1Phone: validatePhone(body.emergencyContact1Phone),
+            emergencyContact2Phone: validatePhone(body.emergencyContact2Phone),
+        })
+        if (errors) return NextResponse.json(validationResponse(errors), { status: 400 })
+
         const data: Record<string, unknown> = {}
 
         for (const key of ALLOWED_FIELDS) {
             if (key in body) {
                 if (key === "dateOfBirth") {
                     data[key] = body[key] ? new Date(body[key]) : null
+                } else if (key === "phone" || key === "alternatePhone"
+                    || key === "emergencyContact1Phone" || key === "emergencyContact2Phone") {
+                    // Stored normalised so the same number typed two ways matches.
+                    data[key] = body[key] ? normalizePhone(body[key]) : null
+                } else if (key === "panNumber" || key === "bankIFSC") {
+                    data[key] = body[key] ? normalizeUpper(body[key]) : null
+                } else if (key === "aadharNumber") {
+                    data[key] = body[key] ? digitsOnly(body[key]) : null
                 } else {
                     data[key] = body[key] || null
                 }

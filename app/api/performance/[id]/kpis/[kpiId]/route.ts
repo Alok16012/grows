@@ -11,6 +11,9 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
 
         const body = await req.json()
         const { actual, rating, remarks, title, target, weightage } = body
@@ -22,6 +25,13 @@ export async function PUT(
         if (title !== undefined) updateData.title = title
         if (target !== undefined) updateData.target = target
         if (weightage !== undefined) updateData.weightage = weightage
+
+        // The KPI must belong to the review in the URL.
+        const existing = await prisma.kPI.findFirst({
+            where: { id: params.kpiId, reviewId: params.id },
+            select: { id: true },
+        })
+        if (!existing) return new NextResponse("KPI not found", { status: 404 })
 
         const kpi = await prisma.kPI.update({
             where: { id: params.kpiId },

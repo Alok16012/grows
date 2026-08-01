@@ -2279,14 +2279,17 @@ export default function ExpensesPage() {
             const res = await fetch("/api/expenses?status=SUBMITTED")
             const data: Expense[] = res.ok ? await res.json() : []
             if (!Array.isArray(data) || data.length === 0) { toast.info("No pending expenses"); return }
-            await Promise.all(data.map(e =>
+            const results = await Promise.all(data.map(e =>
                 fetch(`/api/expenses/${e.id}`, {
-                    method: "PATCH",
+                    method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action: "APPROVE" }),
-                })
+                }).then(r => r.ok).catch(() => false)
             ))
-            toast.success(`Approved ${data.length} expense(s)`)
+            const ok = results.filter(Boolean).length
+            const failed = results.length - ok
+            if (ok > 0) toast.success(`Approved ${ok} expense(s)`)
+            if (failed > 0) toast.error(`Couldn't approve ${failed} expense(s)`)
             fetchExpenses()
             refreshPendingCount()
         } catch {

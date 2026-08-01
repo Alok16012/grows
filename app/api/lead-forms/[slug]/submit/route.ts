@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import {
+    collectErrors, validationResponse,
+    validatePhone, validateEmail, validateAadhaar,
+    validateDateOfBirth, validateAmount, normalizePhone, digitsOnly,
+} from "@/lib/validation"
 
 // Public POST — no auth required
 export async function POST(req: Request, { params }: { params: { slug: string } }) {
@@ -29,6 +34,19 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             return NextResponse.json({ error: "Name and phone are required" }, { status: 400 })
         }
 
+        // Public endpoint — re-check every format the apply form claims to check.
+        const errors = collectErrors({
+            phone: validatePhone(phone),
+            altPhone: validatePhone(altPhone),
+            email: validateEmail(email),
+            aadharNumber: validateAadhaar(aadharNumber),
+            dateOfBirth: validateDateOfBirth(dateOfBirth),
+            expectedSalary: validateAmount(expectedSalary, "Expected salary"),
+            currentSalary: validateAmount(currentSalary, "Current salary"),
+        })
+        // The apply page reads this body with res.json() and shows `error`.
+        if (errors) return NextResponse.json(validationResponse(errors), { status: 400 })
+
         // The lead's owner is the HR/recruiter who created the form — this ensures the
         // lead shows up in their recruitment tab (the GET route filters by createdBy / assignedTo).
         // Fall back to the first admin only if the form creator cannot be verified.
@@ -47,7 +65,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
 
         const leadData: any = {
             candidateName: String(candidateName).trim(),
-            phone:         String(phone).trim(),
+            phone:         normalizePhone(String(phone)),
             email:         email ? String(email).trim() : null,
             city:          city  ? String(city).trim()  : null,
             position:      position ? String(position).trim() : "Not Specified",
@@ -70,7 +88,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             // ─── New candidate-form fields ───
             tshirtSize:         tshirtSize || null,
             bloodGroup:         bloodGroup || null,
-            altPhone:           altPhone || null,
+            altPhone:           altPhone ? normalizePhone(altPhone) : null,
             dateOfBirth:        dateOfBirth ? new Date(dateOfBirth) : null,
             fatherName:         fatherName || null,
             fatherOccupation:   fatherOccupation || null,
@@ -78,7 +96,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             motherOccupation:   motherOccupation || null,
             maritalStatus:      maritalStatus || null,
             nationality:        nationality || null,
-            aadharNumber:       aadharNumber || null,
+            aadharNumber:       aadharNumber ? digitsOnly(aadharNumber) : null,
             presentAddress:     presentAddress || null,
             permanentAddress:   permanentAddress || null,
             currentCompany:     currentCompany || null,
