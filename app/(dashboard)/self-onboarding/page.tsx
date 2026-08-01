@@ -216,7 +216,7 @@ export default function SelfOnboardingPage() {
     )
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48 }}>
 
             {/* ── Header card ─────────────────────────────────────────────── */}
             <div style={{ background: "linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%)", borderRadius: 16, padding: "20px 24px", color: "#fff", position: "relative", overflow: "hidden" }}>
@@ -263,7 +263,7 @@ export default function SelfOnboardingPage() {
                     <div style={{ height: 8, background: "rgba(255,255,255,0.2)", borderRadius: 99 }}>
                         <div style={{ height: "100%", width: `${pct}%`, background: "#fff", borderRadius: 99, transition: "width 0.5s ease" }} />
                     </div>
-                    <p style={{ fontSize: 10, opacity: 0.65, marginTop: 4 }}>
+                    <p style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
                         {pct < 100 ? `${SCORE_FIELDS.length - Math.round(pct / 100 * SCORE_FIELDS.length)} fields remaining to complete your onboarding` : "Profile is fully complete!"}
                     </p>
                 </div>

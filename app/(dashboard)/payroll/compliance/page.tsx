@@ -163,7 +163,7 @@ function ComplianceInner() {
     }
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 }}>
 
             {/* Breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
@@ -196,10 +196,11 @@ function ComplianceInner() {
                 </div>
             </div>
 
-            {/* Table */}
-            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+            {/* Table — 5 fixed columns are wider than a phone, so the card
+                itself scrolls horizontally instead of clipping the pills. */}
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflowX: "auto" }}>
                 {/* Table header */}
-                <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 2fr 1.5fr 1.5fr", borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 2fr 1.5fr 1.5fr", minWidth: 900, borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
                     <div style={thStyle}>Month</div>
                     {COLS.map(col => (
                         <div key={col.key} style={{ ...thStyle, color: col.color, borderLeft: "1px solid var(--border)" }}>
@@ -225,6 +226,7 @@ function ComplianceInner() {
                             style={{
                                 display: "grid",
                                 gridTemplateColumns: "160px 1fr 2fr 1.5fr 1.5fr",
+                                minWidth: 900,
                                 borderBottom: idx < runs.length - 1 ? "1px solid var(--border)" : "none",
                                 background: idx % 2 === 0 ? "var(--surface)" : "var(--surface2)",
                                 alignItems: "stretch",

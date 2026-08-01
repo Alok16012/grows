@@ -427,8 +427,10 @@ function CategoryLine({
                         </span>
                     </div>
 
-                    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, padding: "0 2px" }}>
+                    {/* The six fixed tracks total more than a phone's width, so the
+                        row scrolls sideways inside the modal instead of overflowing it. */}
+                    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8, overflowX: "auto" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, padding: "0 2px", minWidth: 520 }}>
                             {["Date", "From", "To", "KMs", "Amount", ""].map(h => (
                                 <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>{h}</span>
                             ))}
@@ -436,7 +438,7 @@ function CategoryLine({
                         {line.travelRows.map(row => {
                             const amt = (parseFloat(row.kms) || 0) * perKmRate
                             return (
-                                <div key={row._id} style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, alignItems: "center" }}>
+                                <div key={row._id} style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, alignItems: "center", minWidth: 520 }}>
                                     <input type="date" value={row.date}
                                         onChange={e => updateRow(row._id, "date", e.target.value)}
                                         style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%" }} />

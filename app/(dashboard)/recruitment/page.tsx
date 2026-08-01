@@ -925,7 +925,9 @@ export default function RecruitmentPage() {
                         <h1 className="text-[22px] font-bold text-[var(--text)] tracking-tight">Candidate Pipeline</h1>
                         <p className="text-[13px] text-[var(--text2)] mt-0.5">Track candidates from lead to joining</p>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {/* Wraps on narrow screens — four nowrap buttons on one row ran
+                        past the viewport edge at phone width. */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                         <button
                             onClick={() => setShareOpen(true)}
                             title="Share the onboarding form link with a candidate"
@@ -974,7 +976,9 @@ export default function RecruitmentPage() {
                                     <s.icon size={20} style={{ color: s.color }} />
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="text-[10.5px] font-semibold text-[var(--text3)] tracking-wider uppercase whitespace-nowrap">{s.label}</p>
+                                    {/* Wraps on phones: beside the 44px icon these cards leave
+                                        ~100px, so nowrap clipped "TOTAL CANDIDATES" mid-word. */}
+                                    <p className="text-[10.5px] font-semibold text-[var(--text3)] tracking-wider uppercase whitespace-normal sm:whitespace-nowrap">{s.label}</p>
                                     <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
                                         <span className="text-[28px] font-bold leading-none tabular-nums" style={{ color: s.color }}>{s.value}</span>
                                         {s.month > 0 && (

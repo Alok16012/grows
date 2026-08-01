@@ -182,15 +182,15 @@ export default function AnnouncementsPage() {
     const upcomingHolidays = holidays.filter(h => new Date(h.date) >= startOfToday)
 
     return (
-        <div className="max-w-[1180px] mx-auto px-1">
+        <div className="max-w-[1180px] mx-auto px-4 lg:px-1">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Announcements</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Company notices &amp; holiday calendar.</p>
                 </div>
                 {canManage && (
-                    <div className="flex gap-2.5">
+                    <div className="flex flex-wrap gap-2.5">
                         <button onClick={() => setShowHolForm(true)}
                             className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
                             <Plus size={16} /> Add Holiday
@@ -253,7 +253,7 @@ export default function AnnouncementsPage() {
                                         </div>
                                         {canManage && (
                                             <button onClick={() => handleDeleteAnn(a.id)}
-                                                className="p-1 text-[var(--text3)] hover:text-[var(--red)] rounded-md hover:bg-[var(--surface2)] shrink-0">
+                                                className="p-2 md:p-1 text-[var(--text3)] hover:text-[var(--red)] rounded-md hover:bg-[var(--surface2)] shrink-0">
                                                 <Trash2 size={14} />
                                             </button>
                                         )}
@@ -407,7 +407,7 @@ export default function AnnouncementsPage() {
                                         </div>
                                         {canManage && (
                                             <button onClick={() => handleDeleteHoliday(h.id)}
-                                                className="p-1 text-[var(--text3)] hover:text-[var(--red)] rounded-md hover:bg-[var(--surface2)] shrink-0">
+                                                className="p-2 md:p-1 text-[var(--text3)] hover:text-[var(--red)] rounded-md hover:bg-[var(--surface2)] shrink-0">
                                                 <Trash2 size={14} />
                                             </button>
                                         )}
@@ -610,7 +610,7 @@ function Drawer({ title, onClose, children }: { title: string; onClose: () => vo
             <div className="fixed top-0 right-0 h-full w-[420px] max-w-full z-50 bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl flex flex-col">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
                     <h2 className="text-[15px] font-semibold text-[var(--text)]">{title}</h2>
-                    <button onClick={onClose} className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)]"><X size={18} /></button>
+                    <button onClick={onClose} className="p-2 md:p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)]"><X size={18} /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5">{children}</div>
             </div>

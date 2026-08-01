@@ -1450,7 +1450,7 @@ function CourseDrawer({ courseId, onClose, onEdit, onEnroll, onRefresh }: {
                             </div>
 
                             {/* Stats row */}
-                            <div className="grid grid-cols-4 gap-3 mt-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                                 {[
                                     { label: "Duration", value: `${course.duration}m` },
                                     { label: "Modules", value: course.modules.length },
@@ -1710,7 +1710,7 @@ export default function LMSPage() {
                         <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Training (LMS)</h1>
                         <p className="text-[13.5px] text-[var(--text3)] mt-1">Training courses &amp; employee development.</p>
                     </div>
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2.5">
                         <button
                             onClick={() => { setEnrollCourseId(undefined); setShowEnrollModal(true) }}
                             className="h-[42px] px-4 text-[13px] font-semibold border border-[var(--border)] bg-[var(--surface)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center gap-2"
@@ -2000,7 +2000,7 @@ export default function LMSPage() {
                                     ))}
                                 </div>
                             </div>
-                            <div className="flex gap-3">
+                            <div className="flex flex-wrap gap-3">
                                 <select
                                     value={enrollCourseFilter}
                                     onChange={e => setEnrollCourseFilter(e.target.value)}
@@ -2036,7 +2036,7 @@ export default function LMSPage() {
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full">
+                                    <table className="w-full min-w-[960px]">
                                         <thead>
                                             <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
                                                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px]">Employee</th>
@@ -2190,7 +2190,7 @@ function DashboardTab() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-[16px] font-semibold text-[var(--text)]">Training Overview</h2>
                 <select
                     value={period}
@@ -2386,7 +2386,7 @@ function ComplianceTab() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-[16px] font-semibold text-[var(--text)]">Compliance Tracking</h2>
                 <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2623,7 +2623,7 @@ function ILTTab() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-[16px] font-semibold text-[var(--text)]">Instructor-Led Training Sessions</h2>
                 {isAdmin && (
                     <button onClick={() => setShowCreate(true)}
@@ -2898,7 +2898,7 @@ function PoliciesTab() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-[16px] font-semibold text-[var(--text)]">Document Policies & SOPs</h2>
                 {isAdmin && (
                     <button onClick={() => setShowCreate(true)}
@@ -3101,7 +3101,7 @@ function NotificationsTab() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-[16px] font-semibold text-[var(--text)]">Training Alerts & Reminders</h2>
                 <button onClick={handleSendReminders} disabled={sending}
                     className="h-9 px-4 text-[13px] bg-[var(--accent)] text-white rounded-[8px] font-medium flex items-center gap-2 disabled:opacity-60">

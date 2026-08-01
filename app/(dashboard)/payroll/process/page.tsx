@@ -494,11 +494,13 @@ function ProcessPayrollPage() {
                 </div>
             </div>
 
-            {/* Two-panel layout */}
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            {/* Two-panel layout — stacks below md. Side by side, the fixed 256px
+                rail left ~100px for the work area at phone width, which pushed the
+                whole page into a horizontal scroll. */}
+            <div className="flex flex-col md:flex-row md:items-start gap-3">
 
                 {/* ── LEFT: Site list ──────────────────────────────────── */}
-                <div style={{ width: 256, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                <div className="w-full md:w-64 md:shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Sites</span>
                         <span style={{ fontSize: 10, color: "var(--text3)", background: "var(--surface2)", borderRadius: 10, padding: "2px 7px" }}>{activeSites.length}</span>

@@ -152,7 +152,7 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
     return (
         <div style={{ display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
             {/* Panel Header */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, flexWrap:"wrap", padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <ShieldCheck size={18} style={{ color:"var(--accent)" }} />
                     <div>
@@ -160,7 +160,7 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                         <p style={{ fontSize:12, color:"var(--text3)", margin:"2px 0 0 0" }}>Download PF, ESIC, PT and wage sheet reports for all processed months</p>
                     </div>
                 </div>
-                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
                     <button onClick={fetchRuns} disabled={loading}
                         style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)", fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer" }}>
                         <RefreshCw size={13} className={loading?"animate-spin":""} /> Refresh
@@ -181,9 +181,10 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                 </div>
             </div>
 
-            {/* Table */}
-            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:14, overflow:"hidden" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"160px 1fr 2fr 1.5fr 1.5fr", borderBottom:"2px solid var(--border)", background:"var(--surface2)" }}>
+            {/* Table — 5 fixed columns are wider than a phone, so the card
+                itself scrolls horizontally instead of clipping the pills. */}
+            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:14, overflowX:"auto" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"160px 1fr 2fr 1.5fr 1.5fr", minWidth:900, borderBottom:"2px solid var(--border)", background:"var(--surface2)" }}>
                     <div style={thStyle}>Month</div>
                     {COLS.map(col=>(
                         <div key={col.key} style={{...thStyle, color:col.color, borderLeft:"1px solid var(--border)"}}>
@@ -202,7 +203,7 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                     </div>
                 ) : (
                     runs.map((run,idx)=>(
-                        <div key={run.id} style={{ display:"grid", gridTemplateColumns:"160px 1fr 2fr 1.5fr 1.5fr", borderBottom:idx<runs.length-1?"1px solid var(--border)":"none", background:idx%2===0?"var(--surface)":"var(--surface2)", alignItems:"stretch" }}>
+                        <div key={run.id} style={{ display:"grid", gridTemplateColumns:"160px 1fr 2fr 1.5fr 1.5fr", minWidth:900, borderBottom:idx<runs.length-1?"1px solid var(--border)":"none", background:idx%2===0?"var(--surface)":"var(--surface2)", alignItems:"stretch" }}>
                             <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", justifyContent:"center", gap:2 }}>
                                 <span style={{ fontSize:14, fontWeight:800, color:"var(--text)" }}>{MONTHS[run.month-1]}</span>
                                 <span style={{ fontSize:11, color:"var(--text3)" }}>{run.year}</span>

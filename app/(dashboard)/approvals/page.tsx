@@ -120,7 +120,7 @@ export default function ApprovalsPage() {
                 <div className="flex items-center bg-white border border-[#e8e6e1] rounded-[10px] p-1 overflow-x-auto">
                     <button
                         onClick={() => setActiveTab("pending")}
-                        className={`px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "pending"
                                 ? "bg-[#fef3c7] text-[#d97706]"
                                 : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
@@ -130,7 +130,7 @@ export default function ApprovalsPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab("approved")}
-                        className={`px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "approved"
                                 ? "bg-[#e8f7f1] text-[#0d6b4a]"
                                 : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
@@ -140,7 +140,7 @@ export default function ApprovalsPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab("rejected")}
-                        className={`px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "rejected"
                                 ? "bg-[#fef2f2] text-[#dc2626]"
                                 : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
@@ -150,7 +150,7 @@ export default function ApprovalsPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab("all")}
-                        className={`px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "all"
                                 ? "bg-[#1a1a18] text-white"
                                 : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"

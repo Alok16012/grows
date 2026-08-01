@@ -220,15 +220,16 @@ function AssignTaskModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] shadow-xl w-full max-w-lg mx-4 overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+            {/* Capped height + scrolling body so the whole form stays reachable on short screens. */}
+            <div className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
                     <h2 className="font-semibold text-[var(--text)] text-[16px]">Assign Field Task</h2>
-                    <button onClick={onClose} className="p-1 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)]">
+                    <button onClick={onClose} className="p-2 sm:p-1 shrink-0 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)]">
                         <X size={18} />
                     </button>
                 </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
                     {error && (
                         <div className="text-[13px] text-red-600 bg-red-50 border border-red-200 rounded-[8px] px-3 py-2">{error}</div>
                     )}
@@ -287,7 +288,7 @@ function AssignTaskModal({
                             </div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Priority</label>
                             <div className="relative">
@@ -385,7 +386,7 @@ function TaskDrawer({
                             {task.status.replace("_", " ")}
                         </span>
                     </div>
-                    <button onClick={onClose} className="p-1 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)]">
+                    <button onClick={onClose} className="p-2 sm:p-1 shrink-0 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)]">
                         <X size={18} />
                     </button>
                 </div>
@@ -516,7 +517,7 @@ function TaskMenu({
         <div className="relative">
             <button
                 onClick={() => setOpen((o) => !o)}
-                className="p-1.5 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)]"
+                className="p-2 sm:p-1.5 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)]"
             >
                 <MoreHorizontal size={16} />
             </button>
@@ -740,8 +741,8 @@ export default function FieldPage() {
     return (
         <div className="flex-1 flex flex-col min-h-0">
             {/* Header */}
-            <div className="px-6 pt-6 pb-0 shrink-0">
-                <div className="flex items-center justify-between mb-5">
+            <div className="px-4 sm:px-6 pt-6 pb-0 shrink-0">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
                     <div className="flex items-center gap-2.5">
                         <div className="h-9 w-9 rounded-[10px] bg-[var(--accent-light)] flex items-center justify-center">
                             <Navigation size={18} className="text-[var(--accent)]" />
@@ -813,7 +814,7 @@ export default function FieldPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
                 {activeTab === "tasks" && (
                     <div className="space-y-4">
                         {/* Filters */}
@@ -889,7 +890,8 @@ export default function FieldPage() {
                             </div>
                         ) : (
                             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
-                                <table className="w-full">
+                                <div className="overflow-x-auto">
+                                <table className="w-full min-w-[640px]">
                                     <thead>
                                         <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
                                             <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Task</th>
@@ -967,6 +969,7 @@ export default function FieldPage() {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -994,7 +997,8 @@ export default function FieldPage() {
                                 <div className="text-center py-10 text-[var(--text3)] text-[14px]">No employees found</div>
                             ) : (
                                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
-                                    <table className="w-full">
+                                    <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[560px]">
                                         <thead>
                                             <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
                                                 <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Employee</th>
@@ -1086,6 +1090,7 @@ export default function FieldPage() {
                                             ))}
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1108,7 +1113,8 @@ export default function FieldPage() {
                                 <div className="text-center py-8 text-[var(--text3)] text-[14px]">No check-ins for this date</div>
                             ) : (
                                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
-                                    <table className="w-full">
+                                    <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[560px]">
                                         <thead>
                                             <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
                                                 <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wide">Employee</th>
@@ -1168,6 +1174,7 @@ export default function FieldPage() {
                                             ))}
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
                             )}
                         </div>

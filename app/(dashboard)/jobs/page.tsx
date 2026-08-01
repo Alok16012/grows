@@ -150,7 +150,7 @@ export default function JobsPage() {
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Jobs</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage internal job postings across departments and sites.</p>
                 </div>
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
                     <button onClick={exportCsv}
                         className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <Download size={16} /> Export
@@ -202,7 +202,7 @@ export default function JobsPage() {
                         placeholder="Search by title, role, department or location..."
                         className="w-full h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13px] outline-none focus:border-[var(--accent)]" />
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                     {STATUS_FILTERS.map(s => (
                         <button key={s} onClick={() => setStatus(s)}
                             className={`px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${status === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
@@ -310,7 +310,7 @@ export default function JobsPage() {
                                 )}
 
                                 {/* Actions */}
-                                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+                                <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-[var(--border)]">
                                     <button onClick={e => goTo(e, `/jobs/${job.id}`)}
                                         className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] border border-[var(--border)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                                         <Eye size={14} /> View

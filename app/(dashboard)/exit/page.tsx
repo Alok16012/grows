@@ -280,7 +280,7 @@ export default function ExitPage() {
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Exit Management</h1>
           <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 4 }}>Manage employee exits, clearance &amp; F&amp;F settlements.</p>
@@ -340,7 +340,7 @@ export default function ExitPage() {
           ))}
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
           {/* Exit Type dropdown */}
           <select
             value={filterType}
@@ -401,15 +401,15 @@ export default function ExitPage() {
               style={{
                 background: "var(--surface)", border: "1px solid var(--border)",
                 borderRadius: 12, padding: "14px 16px",
-                display: "flex", alignItems: "center", gap: 14,
+                display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
                 cursor: "pointer", transition: "border-color 0.15s",
               }}
               onClick={() => openDrawer(exit.id)}
             >
               <Avatar first={emp.firstName} last={emp.lastName} photo={emp.photo} />
 
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
                     {emp.firstName} {emp.lastName}
                   </span>
@@ -801,8 +801,8 @@ function ExitDrawer({
           display: "flex", alignItems: "center", gap: 14, flexShrink: 0,
         }}>
           <Avatar first={emp.firstName} last={emp.lastName} photo={emp.photo} size={44} />
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>
                 {emp.firstName} {emp.lastName}
               </span>
@@ -841,7 +841,7 @@ function ExitDrawer({
         </div>
 
         {/* Tabs */}
-        <div style={{
+        <div className="overflow-x-auto max-w-full" style={{
           display: "flex", gap: 0, borderBottom: "1px solid var(--border)",
           padding: "0 24px", flexShrink: 0,
         }}>
@@ -855,6 +855,7 @@ function ExitDrawer({
                 color: tab === t ? "var(--accent)" : "var(--text2)",
                 borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`,
                 cursor: "pointer", textTransform: "capitalize",
+                whiteSpace: "nowrap", flexShrink: 0,
               }}
             >
               {t === "timeline" ? "Timeline" : t === "clearance" ? "Clearance Checklist" : "F&F Settlement"}

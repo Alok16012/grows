@@ -426,6 +426,9 @@ export default function PerformancePage() {
         border: "none",
         background: "none",
         cursor: "pointer",
+        // The strip scrolls horizontally on narrow screens — tabs must not squash.
+        flexShrink: 0,
+        whiteSpace: "nowrap" as const,
         fontWeight: active ? 700 : 500,
         fontSize: 14,
         color: active ? "var(--accent)" : "var(--text)",
@@ -436,7 +439,7 @@ export default function PerformancePage() {
     return (
         <div style={{ padding: "24px 28px", minHeight: "100vh", background: "var(--surface)" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: "var(--text)", letterSpacing: "-0.5px" }}>
                         Performance
@@ -462,7 +465,7 @@ export default function PerformancePage() {
             </div>
 
             {/* Tab Bar */}
-            <div style={{
+            <div className="overflow-x-auto max-w-full" style={{
                 display: "flex",
                 borderBottom: "1px solid var(--border)",
                 marginBottom: 24,
@@ -601,7 +604,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
             </div>
 
             {/* Ranking & Actions Ribbons */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #e8f7f1 100%)", borderRadius: 12, padding: 18, border: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{ width: 40, height: 40, background: "#1a9e6e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><Award color="#fff" size={20} /></div>
                     <div>
@@ -639,7 +642,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                 ))}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 20 }}>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-5">
                 {/* Top 5 Performers */}
                 <div style={{
                     background: "#fff",
@@ -934,7 +937,7 @@ function ReviewDrawer({
     return (
         <div style={{
             position: "fixed", right: 0, top: 0, bottom: 0,
-            width: 640, background: "#fff",
+            width: "min(640px, 100vw)", background: "#fff",
             boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
             zIndex: 1000, display: "flex", flexDirection: "column",
             borderLeft: "1px solid var(--border)",
@@ -972,6 +975,7 @@ function ReviewDrawer({
                             color: tab === t.id ? "var(--accent)" : "#6b7280",
                             borderBottom: tab === t.id ? "2px solid var(--accent)" : "2px solid transparent",
                             whiteSpace: "nowrap",
+                            flexShrink: 0,
                         }}
                     >
                         {t.label}
@@ -1580,10 +1584,8 @@ function KPIRow({
     }
 
     return (
-        <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 80px 80px 100px 60px 36px",
-            gap: 8, padding: "10px 0", borderBottom: "1px solid var(--border)",
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_80px_80px_100px_60px_36px] gap-2" style={{
+            padding: "10px 0", borderBottom: "1px solid var(--border)",
             alignItems: "center", fontSize: 12,
         }}>
             <div>
@@ -1772,7 +1774,7 @@ function DrawerManagerReview({
                 </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                     <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Increment %</label>
                     <input
@@ -2094,7 +2096,7 @@ function DrawerPIP({
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                             {goals.map((g, i) => (
-                                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 80px 110px 28px", gap: 6, alignItems: "center" }}>
+                                <div key={i} className="grid grid-cols-1 md:grid-cols-[1fr_80px_110px_28px] gap-1.5" style={{ alignItems: "center" }}>
                                     <input
                                         value={g.goal}
                                         onChange={e => updateGoal(i, "goal", e.target.value)}
@@ -2215,7 +2217,8 @@ function TemplatesTab({ templates, loading }: { templates: KPITemplate[]; loadin
                                 <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", marginBottom: 8 }}>
                                     KRA: {kraTitle}
                                 </div>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                <div className="overflow-x-auto">
+                                <table style={{ width: "100%", minWidth: 460, borderCollapse: "collapse", fontSize: 12 }}>
                                     <thead>
                                         <tr style={{ background: "#f9fafb" }}>
                                             <th style={{ padding: "6px 10px", textAlign: "left", color: "#6b7280", fontWeight: 600, border: "1px solid var(--border)" }}>KPI Title</th>
@@ -2233,6 +2236,7 @@ function TemplatesTab({ templates, loading }: { templates: KPITemplate[]; loadin
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -2257,10 +2261,11 @@ function CreateReviewModal({
     return (
         <div style={{
             position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000,
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16,
         }}>
             <div style={{
-                background: "#fff", borderRadius: 14, width: 480,
+                background: "#fff", borderRadius: 14, width: "100%", maxWidth: 480,
+                maxHeight: "90vh", overflowY: "auto",
                 padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
             }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -2306,7 +2311,7 @@ function CreateReviewModal({
                         </select>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 5 }}>Period Start *</label>
                             <input

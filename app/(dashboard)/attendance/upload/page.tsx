@@ -274,7 +274,7 @@ export default function AttendanceUploadPage() {
     const unmatchedCount = matched?.filter(r => !r.matched).length  ?? 0
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 1100, paddingBottom: 32 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 1100, paddingBottom: 32 }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                 <div>
@@ -296,7 +296,9 @@ export default function AttendanceUploadPage() {
                     <div style={stepBadge}>1</div>
                     <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>Select Site & Month</p>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12 }}>
+                {/* Media queries can't live in inline styles — the column count
+                    moves to Tailwind so the three selects stack on mobile. */}
+                <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr]" style={{ gap: 12 }}>
                     <div>
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 5 }}>Site *</label>
                         {sitesLoading ? (
@@ -503,7 +505,7 @@ export default function AttendanceUploadPage() {
 
                     {/* Process Button */}
                     {matchedCount > 0 && (
-                        <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                        <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
                             <button onClick={() => { setFile(null); setMatched(null) }} style={btnOutline}>
                                 Upload Another Site
                             </button>

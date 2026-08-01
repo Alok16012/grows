@@ -249,7 +249,7 @@ ${records.map(p => buildSlipHTML(p)).join("")}
     const done       = status.filter(s => (s.processedCount ?? 0) > 0).length
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
             {/* Breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
                 <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>
@@ -257,9 +257,9 @@ ${records.map(p => buildSlipHTML(p)).join("")}
                 <span style={{ fontWeight: 600, color: "var(--text2)" }}>Salary Slips</span>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                 <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Payslip Generation</h1>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11, flexWrap: "wrap" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#15803d" }}><CheckCircle2 size={12} /> {paid} Credited</span>
                     <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#1d4ed8" }}><Clock size={12} /> {processed} Ready</span>
                     <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text3)" }}><FileText size={12} /> {draft} Draft</span>
@@ -267,7 +267,7 @@ ${records.map(p => buildSlipHTML(p)).join("")}
             </div>
 
             {/* Month/Year */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
                 <span style={lbl}>Month</span>
                 <select value={month} onChange={e => setMonth(Number(e.target.value))} style={sel}>
                     {MONTHS_LONG.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
@@ -281,10 +281,10 @@ ${records.map(p => buildSlipHTML(p)).join("")}
                 </button>
             </div>
 
-            {/* Two-panel */}
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            {/* Two-panel — the site rail stacks above the list on mobile */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-start" style={{ gap: 12 }}>
                 {/* LEFT: Site list */}
-                <div style={{ width: 220, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                <div className="w-full md:w-[220px] md:shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Filter by Site</span>
                     </div>
@@ -324,7 +324,7 @@ ${records.map(p => buildSlipHTML(p)).join("")}
                 </div>
 
                 {/* RIGHT: Employee list + slip preview */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 12 }}>
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-start" style={{ flex: 1, minWidth: 0, gap: 12 }}>
                     {/* Employee list */}
                     <div style={{ flex: 1, minWidth: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                         {/* Search bar */}
@@ -341,7 +341,9 @@ ${records.map(p => buildSlipHTML(p)).join("")}
                             )}
                         </div>
                         {/* Column headers */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 100px 60px", padding: "8px 16px", background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                        {/* Narrower fixed columns on phones so the employee
+                            name still gets usable width. */}
+                        <div className="grid grid-cols-[1fr_72px_76px_44px] sm:grid-cols-[1fr_90px_100px_60px]" style={{ padding: "8px 16px", background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Employee</span>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Net Salary</span>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Status</span>
@@ -363,7 +365,8 @@ ${records.map(p => buildSlipHTML(p)).join("")}
                                 const statusBg    = r.status === "PAID" ? "#dcfce7" : r.status === "PROCESSED" ? "#dbeafe" : "#f3f4f6"
                                 return (
                                     <div key={r.id} onClick={() => setSelected(r)}
-                                        style={{ display: "grid", gridTemplateColumns: "1fr 90px 100px 60px", alignItems: "center", padding: "10px 16px", cursor: "pointer",
+                                        className="grid grid-cols-[1fr_72px_76px_44px] sm:grid-cols-[1fr_90px_100px_60px]"
+                                        style={{ alignItems: "center", padding: "10px 16px", cursor: "pointer",
                                             background: selected?.id === r.id ? "#f0fdf4" : idx % 2 === 0 ? "var(--surface)" : "var(--surface2)",
                                             borderBottom: "1px solid var(--border)" }}>
                                         <div>
@@ -387,7 +390,7 @@ ${records.map(p => buildSlipHTML(p)).join("")}
 
                     {/* Slip Preview Panel */}
                     {selected && (
-                        <div style={{ width: 310, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", alignSelf: "flex-start", position: "sticky", top: 16 }}>
+                        <div className="w-full lg:w-[310px] lg:shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", alignSelf: "flex-start", position: "sticky", top: 16 }}>
                             <div style={{ background: "#1a9e6e", color: "#fff", padding: "14px 16px" }}>
                                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                                     <div>

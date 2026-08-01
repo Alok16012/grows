@@ -532,7 +532,7 @@ export default function LeavesPage() {
     const pageRows = leaves.slice((safePage - 1) * perPage, safePage * perPage)
 
     return (
-        <div className="space-y-5">
+        <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
             <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
@@ -570,10 +570,12 @@ export default function LeavesPage() {
 
             {/* Filter tabs + search */}
             <div className="flex flex-wrap items-center gap-2.5">
-                <div className="flex items-center gap-1">
+                {/* Scrolls sideways on a phone — five tabs don't fit, and the global
+                    overflow-x:hidden was clipping "Cancelled" out of reach entirely. */}
+                <div className="flex items-center gap-1 overflow-x-auto max-w-full">
                     {(["", "PENDING", "APPROVED", "REJECTED", "CANCELLED"] as const).map(s => (
                         <button key={s} onClick={() => setStatusFilter(s)}
-                            className={`px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${statusFilter === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
+                            className={`shrink-0 px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${statusFilter === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
                             {s === "" ? "All" : STATUS_CONFIG[s]?.label}
                         </button>
                     ))}
@@ -656,9 +658,9 @@ export default function LeavesPage() {
                                         </td>
                                         <td className="px-5 py-3 text-right" onClick={e => e.stopPropagation()}>
                                             {isAdminOrManager && leave.status === "PENDING" && (
-                                                <div className="flex items-center justify-end gap-1.5">
+                                                <div className="flex flex-wrap items-center justify-end gap-1.5">
                                                     <button onClick={() => setSelectedLeave(leave)}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] border border-[#fecaca] bg-[#fef2f2] text-[#dc2626] text-[11px] font-medium hover:bg-[#fee2e2] transition-colors">
+                                                        className="inline-flex items-center gap-1 px-2.5 py-2 rounded-[7px] border border-[#fecaca] bg-[#fef2f2] text-[#dc2626] text-[12px] font-medium hover:bg-[#fee2e2] transition-colors">
                                                         <XCircle size={11} /> Reject
                                                     </button>
                                                     <button onClick={async (e) => {
@@ -670,7 +672,7 @@ export default function LeavesPage() {
                                                             fetchLeaves()
                                                         } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Failed") }
                                                     }}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] border border-[#6ee7b7] bg-[#e8f7f1] text-[#1a9e6e] text-[11px] font-medium hover:bg-[#d1f5e6] transition-colors">
+                                                        className="inline-flex items-center gap-1 px-2.5 py-2 rounded-[7px] border border-[#6ee7b7] bg-[#e8f7f1] text-[#1a9e6e] text-[12px] font-medium hover:bg-[#d1f5e6] transition-colors">
                                                         <CheckCircle size={11} /> Approve
                                                     </button>
                                                 </div>

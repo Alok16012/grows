@@ -836,7 +836,7 @@ export default function EmployeeMasterPage() {
 
     return (
         <>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", minHeight: 0 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", minHeight: 0 }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -1127,8 +1127,11 @@ export default function EmployeeMasterPage() {
             <div style={{
                 position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
                 background: "#1e293b", color: "#fff", borderRadius: 14, padding: "10px 16px",
-                display: "flex", alignItems: "center", gap: 10, zIndex: 60,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.28)", minWidth: 340
+                display: "flex", alignItems: "center", gap: 10, zIndex: 60, flexWrap: "wrap",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.28)", minWidth: 340,
+                // Never wider than the viewport — the bar is centred, so an
+                // oversized bar would run off both edges on a phone.
+                maxWidth: "calc(100vw - 24px)"
             }}>
                 <CheckSquare size={15} style={{ color: "#60a5fa", flexShrink: 0 }} />
                 <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>

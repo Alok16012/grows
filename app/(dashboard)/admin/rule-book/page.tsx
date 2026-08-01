@@ -116,9 +116,10 @@ export default function RuleBookPage() {
                 <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)" }}>Wage Sheet Rule Book</span>
             </div>
 
-            <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+            {/* Section nav stacks above the content on mobile */}
+            <div className="flex flex-col md:flex-row" style={{ flex: 1, minHeight: 0 }}>
                 {/* Left Sidebar — Section Nav */}
-                <div style={{ width: 220, background: "var(--surface)", borderRight: "1px solid var(--border)", padding: "20px 12px", display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+                <div className="w-full md:w-[220px] md:shrink-0" style={{ background: "var(--surface)", borderRight: "1px solid var(--border)", padding: "20px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, paddingLeft: 8 }}>
                         <BookOpen size={16} style={{ color: "var(--accent)" }} />
                         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Rule Book</span>
@@ -143,7 +144,7 @@ export default function RuleBookPage() {
                 </div>
 
                 {/* Main Content */}
-                <div style={{ flex: 1, overflow: "auto", padding: "24px 28px" }}>
+                <div className="p-4 md:p-[24px_28px]" style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
 
                     {active === "Earnings" && (
                         <Section title="Earnings — Salary Structure (Manual Input)" icon={<Pencil size={16} />}
@@ -382,7 +383,7 @@ export default function RuleBookPage() {
                     {active === "Compliance Types" && (
                         <Section title="Compliance Types — OR vs CALL" icon={<ShieldCheck size={16} />}
                             desc="Every employee is assigned a compliance type in their salary structure. This determines which statutory deductions and allowances apply.">
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+                            <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16, marginBottom: 24 }}>
                                 <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 12, padding: 20 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                                         <CheckCircle2 size={18} style={{ color: "#15803d" }} />
@@ -454,7 +455,9 @@ function Section({ title, icon, desc, children }: { title: string; icon: React.R
                 <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", margin: 0 }}>{title}</h2>
             </div>
             <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16, lineHeight: 1.6 }}>{desc}</p>
-            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+            {/* Reference tables are wider than a phone — scroll them sideways
+                rather than letting the rounded card clip the last columns. */}
+            <div className="overflow-x-auto [&_table]:min-w-[560px] md:[&_table]:min-w-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
                 {children}
             </div>
         </div>

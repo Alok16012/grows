@@ -199,7 +199,7 @@ export default function PayrollPage() {
     const progressPct = Math.round(((doneCount + (openStepNum !== null ? 0.5 : 0)) / STEPS.length) * 100)
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48, maxWidth: 1200 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48, maxWidth: 1200 }}>
 
             {/* ── Page Header ── */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
@@ -209,7 +209,7 @@ export default function PayrollPage() {
                         {MONTHS[currentMonth - 1]} {currentYear} · Monthly payroll workflow
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}
                         style={{ height: 42, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer" }}>
                         {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
@@ -259,9 +259,11 @@ export default function PayrollPage() {
                     <div style={{ height: "100%", width: `${progressPct}%`, background: "linear-gradient(90deg, #16a34a, #22c55e)", transition: "width 0.6s ease" }} />
                 </div>
 
-                {/* Stepper Rail */}
-                <div style={{ padding: "24px 24px 0" }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", position: "relative" }}>
+                {/* Stepper Rail — scrolls sideways on narrow screens. Each step gets
+                    a floor width so the nowrap labels ("Upload Attendance") stop
+                    colliding once five of them no longer fit across the viewport. */}
+                <div style={{ padding: "24px 24px 0", overflowX: "auto" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", position: "relative", minWidth: 540 }}>
                         {/* Connecting line behind circles */}
                         <div style={{
                             position: "absolute",

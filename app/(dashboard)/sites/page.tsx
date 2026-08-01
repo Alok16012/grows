@@ -943,7 +943,9 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                                     <Navigation size={14} className="text-[var(--accent)]" />
                                     <span className="text-[13px] font-semibold text-[var(--accent)]">GPS Geofencing Active</span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
+                                {/* Six-decimal coordinates need the room — three across
+                                    crams them inside the drawer on a phone. */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                     {[
                                         { label: "Latitude", value: s.latitude?.toFixed(6) || "—" },
                                         { label: "Longitude", value: s.longitude?.toFixed(6) || "—" },

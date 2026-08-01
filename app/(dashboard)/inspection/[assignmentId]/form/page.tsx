@@ -672,17 +672,17 @@ export default function InspectionFormPage() {
         <div className="flex flex-col min-h-[100vh] bg-[#f5f4f0] p-0">
 
             {/* INNER HEADER */}
-            <div className="bg-white border-b border-[#e8e6e1] p-[12px_24px] flex justify-between items-center sticky top-0 z-40">
-                <div className="flex items-center">
+            <div className="bg-white border-b border-[#e8e6e1] p-[12px_16px] sm:p-[12px_24px] flex justify-between items-center gap-2 sticky top-0 z-40">
+                <div className="flex items-center min-w-0">
                     <button
                         onClick={() => router.push(isAdmin ? "/approvals" : "/inspection")}
-                        className="w-[30px] h-[30px] border border-[#e8e6e1] bg-white rounded-[8px] flex items-center justify-center text-[#6b6860] hover:bg-[#f9f8f5] transition-colors"
+                        className="w-[38px] h-[38px] sm:w-[30px] sm:h-[30px] shrink-0 border border-[#e8e6e1] bg-white rounded-[8px] flex items-center justify-center text-[#6b6860] hover:bg-[#f9f8f5] transition-colors"
                     >
                         <ChevronLeft size={16} />
                     </button>
-                    <span className="text-[14px] font-[600] text-[#1a1a18] ml-[10px]">{assignment?.project?.name}</span>
-                    <span className="text-[#9e9b95] mx-[8px]">•</span>
-                    <span className="text-[13px] text-[#6b6860]">{assignment?.project?.site?.name}</span>
+                    <span className="text-[14px] font-[600] text-[#1a1a18] ml-[10px] truncate">{assignment?.project?.name}</span>
+                    <span className="text-[#9e9b95] mx-[8px] shrink-0">•</span>
+                    <span className="text-[13px] text-[#6b6860] truncate">{assignment?.project?.site?.name}</span>
                 </div>
 
                 {!isSubmitted && (
@@ -838,7 +838,7 @@ export default function InspectionFormPage() {
                         <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px] mt-[24px]">
                             Defect Entry
                         </div>
-                        <div className="grid grid-cols-3 gap-[8px]">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-[8px]">
                             {defectFields.map(t => (
                                 <div key={t.id} id={`field-${t.id}`} className="bg-white border border-[#e8e6e1] rounded-[9px] p-[9px_10px] focus-within:border-[#d97706] focus-within:shadow-[0_0_0_3px_rgba(217,119,6,0.06)] transition-all">
                                     <div className="text-[10px] font-[500] text-[#9e9b95] uppercase leading-[1.3] mb-[5px] truncate" title={t.fieldLabel}>
@@ -930,7 +930,7 @@ export default function InspectionFormPage() {
             </div>
 
             {/* STICKY BOTTOM BAR — wizard navigation + actions */}
-            <div className="fixed bottom-0 md:left-[220px] left-0 right-0 bg-white border-t border-[#e8e6e1] p-[12px_24px] flex justify-between items-center z-50">
+            <div className="fixed bottom-0 md:left-[220px] left-0 right-0 bg-white border-t border-[#e8e6e1] p-[12px_16px] sm:p-[12px_24px] flex justify-between items-center gap-2 z-50">
                 {/* Left: Back + save status */}
                 <div className="flex items-center gap-[10px] flex-shrink-0">
                     <button
@@ -996,6 +996,7 @@ export default function InspectionFormPage() {
                                 className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[#f9f8f5] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                             >
                                 <span className="hidden sm:inline">Force Save</span>
+                                <span className="sm:hidden inline">Save</span>
                             </button>
                             <button
                                 type="button"
@@ -1039,7 +1040,7 @@ export default function InspectionFormPage() {
                                 </h2>
                                 <p className="text-[12px] text-[#9e9b95] mt-0.5">You have {otherPending.length + 1} pending inspections.</p>
                             </div>
-                            <button onClick={dismissChooser} className="p-1 text-[#9e9b95] hover:text-[#1a1a18] rounded-md hover:bg-[#f9f8f5] transition-colors">
+                            <button onClick={dismissChooser} className="p-2 sm:p-1 shrink-0 text-[#9e9b95] hover:text-[#1a1a18] rounded-md hover:bg-[#f9f8f5] transition-colors">
                                 <X size={17} />
                             </button>
                         </div>

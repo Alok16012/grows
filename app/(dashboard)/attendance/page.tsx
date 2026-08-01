@@ -310,11 +310,13 @@ function BulkMarkModal({ open, onClose, onSaved, employees }: {
                 </div>
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
                     <div className="px-5 py-3 border-b border-[var(--border)] shrink-0">
-                        <div className="flex items-center gap-3">
+                        {/* Wraps on narrow screens — the modal body is overflow-hidden, so
+                            an unwrapped row put the bulk-status buttons out of reach. */}
+                        <div className="flex flex-wrap items-center gap-3">
                             <label className="text-[13px] font-medium text-[var(--text2)]">Date</label>
                             <input type="date" value={date} onChange={e => setDate(e.target.value)}
                                 className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
-                            <div className="flex items-center gap-2 ml-auto">
+                            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                                 {BULK_STATUSES.map(s => (
                                     <button key={s} type="button"
                                         onClick={() => setStatuses(prev => {
@@ -893,7 +895,7 @@ function AdminView() {
     ]
 
     return (
-        <div className="space-y-5">
+        <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
@@ -928,12 +930,12 @@ function AdminView() {
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] px-3 py-2">
                             <button onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n })}
-                                className="p-0.5 text-[var(--text3)] hover:text-[var(--text)] transition-colors"><ChevronLeft size={16} /></button>
+                                className="p-2 text-[var(--text3)] hover:text-[var(--text)] transition-colors"><ChevronLeft size={16} /></button>
                             <input type="date" value={format(selectedDate, "yyyy-MM-dd")}
                                 onChange={e => { const d = new Date(e.target.value); if (!isNaN(d.getTime())) setSelectedDate(d) }}
                                 className="text-[13px] font-medium text-[var(--text)] outline-none bg-transparent cursor-pointer" />
                             <button onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n })}
-                                className="p-0.5 text-[var(--text3)] hover:text-[var(--text)] transition-colors"><ChevronRight size={16} /></button>
+                                className="p-2 text-[var(--text3)] hover:text-[var(--text)] transition-colors"><ChevronRight size={16} /></button>
                         </div>
                         <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
                             className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">

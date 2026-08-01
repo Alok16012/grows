@@ -349,7 +349,7 @@ export default function SalaryMasterPage() {
     const noSal    = data.length - withSal
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 40 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 40 }}>
             {/* Breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
                 <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>
@@ -368,7 +368,7 @@ export default function SalaryMasterPage() {
                         </span>
                     )}
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <button onClick={load} style={btnGhost}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
                     </button>

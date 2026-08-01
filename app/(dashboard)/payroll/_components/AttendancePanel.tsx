@@ -167,7 +167,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
     return (
         <div style={{ display:"flex", flexDirection:"column", gap:18, paddingBottom:32 }}>
             {/* Panel Header */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
                 <div>
                     <p style={{ fontSize:16, fontWeight:800, color:"var(--text)", margin:0 }}>Upload Attendance</p>
                     <p style={{ fontSize:12, color:"var(--text3)", margin:"2px 0 0 0" }}>Site-wise bulk attendance upload for payroll processing</p>
@@ -183,7 +183,9 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                     <div style={stepBadge}>1</div>
                     <p style={{ fontSize:14, fontWeight:700, color:"var(--text)", margin:0 }}>Select Site & Month</p>
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:12 }}>
+                {/* Media queries can't live in inline styles — the column count
+                    moves to Tailwind so the three selects stack on mobile. */}
+                <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr]" style={{ gap:12 }}>
                     <div>
                         <label style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:5 }}>Site *</label>
                         {sitesLoading ? (
@@ -363,7 +365,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                         </table>
                     </div>
                     {matchedCount>0 && (
-                        <div style={{ marginTop:16, display:"flex", justifyContent:"flex-end", gap:10 }}>
+                        <div style={{ marginTop:16, display:"flex", justifyContent:"flex-end", gap:10, flexWrap:"wrap" }}>
                             <button onClick={()=>{setFile(null);setMatched(null)}} style={btnOutline}>Upload Another Site</button>
                             <button onClick={handleProcess} disabled={processing}
                                 style={{...btnPrimary, background:"#16a34a", opacity:processing?0.7:1, fontSize:13, padding:"9px 20px"}}>

@@ -539,10 +539,12 @@ function WageSheetInner() {
                 </button>
             </div>
 
-            {/* Two-panel */}
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            {/* Two-panel — stacks below md. Side by side, the fixed 256px rail left
+                ~100px for the work area at phone width and forced a page-wide
+                horizontal scroll. */}
+            <div className="flex flex-col md:flex-row md:items-start gap-3">
                 {/* LEFT */}
-                <div style={{ width: 256, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div className="w-full md:w-64 md:shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <input type="checkbox"

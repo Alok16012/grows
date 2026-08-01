@@ -132,7 +132,7 @@ function Field({ label, value }: { label: string; value?: string | number | bool
     const display = typeof value === "boolean" ? (value ? "Yes" : "No") : String(value)
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</span>
+            <span className="text-[11px] md:text-[10px]" style={{ fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</span>
             <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{display}</span>
         </div>
     )
@@ -233,6 +233,8 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
     const tabCls = (t: string) => ({
         padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
         border: "none", background: "none",
+        // The strip scrolls horizontally on narrow screens — tabs must not squash.
+        flexShrink: 0, whiteSpace: "nowrap",
         borderBottom: tab === t ? "2px solid var(--accent)" : "2px solid transparent",
         color: tab === t ? "var(--accent)" : "var(--text3)",
     } as React.CSSProperties)
@@ -393,7 +395,7 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                     {docs.map((doc) => (
                                         <div key={doc.id} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)" }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                                                 <FileText size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                     <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{doc.type.replace(/_/g, " ")}</div>
@@ -402,7 +404,7 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
                                                         <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2 }}>Reason: {doc.rejectionReason}</div>
                                                     )}
                                                 </div>
-                                                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 700, background: doc.status === "VERIFIED" ? "#dcfce7" : doc.status === "REJECTED" ? "#fee2e2" : "#fef3c7", color: doc.status === "VERIFIED" ? "#15803d" : doc.status === "REJECTED" ? "#dc2626" : "#d97706" }}>
+                                                <span className="text-[11px] md:text-[10px]" style={{ padding: "2px 8px", borderRadius: 10, fontWeight: 700, background: doc.status === "VERIFIED" ? "#dcfce7" : doc.status === "REJECTED" ? "#fee2e2" : "#fef3c7", color: doc.status === "VERIFIED" ? "#15803d" : doc.status === "REJECTED" ? "#dc2626" : "#d97706" }}>
                                                     {doc.status}
                                                 </span>
                                                 {doc.fileUrl && (
@@ -481,11 +483,11 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
                     </div>
                 )}
 
-                <div style={{ padding: "16px 24px", borderTop: "1px solid var(--border)", display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <div style={{ padding: "16px 24px", borderTop: "1px solid var(--border)", display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
                     {record.status !== "COMPLETED" && record.status !== "ON_HOLD" ? (
                         <>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Notes (optional)</label>
+                            <div style={{ flex: 1, minWidth: 180 }}>
+                                <label className="text-[11px] md:text-[10px]" style={{ fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Notes (optional)</label>
                                 <input
                                     value={approveNotes}
                                     onChange={e => setApproveNotes(e.target.value)}
@@ -525,9 +527,9 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
 
                 {/* Reject reason panel */}
                 {showReject && record.status !== "COMPLETED" && (
-                    <div style={{ padding: "0 24px 16px", display: "flex", gap: 8, alignItems: "flex-end" }}>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: 10, fontWeight: 700, color: "#dc2626", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Rejection Reason *</label>
+                    <div style={{ padding: "0 24px 16px", display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                        <div style={{ flex: 1, minWidth: 180 }}>
+                            <label className="text-[11px] md:text-[10px]" style={{ fontWeight: 700, color: "#dc2626", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Rejection Reason *</label>
                             <textarea
                                 value={rejectReason}
                                 onChange={e => setRejectReason(e.target.value)}
@@ -826,7 +828,7 @@ export default function OnboardingPage() {
     const pageRows = records.slice((safePage - 1) * perPage, safePage * perPage)
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 32 }}>
+        <div className="px-4 lg:px-0" style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 32 }}>
 
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -866,9 +868,9 @@ export default function OnboardingPage() {
 
             {/* Filter tabs + search */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ display: "flex", gap: 4 }}>
+                <div className="flex gap-1 overflow-x-auto max-w-full">
                     {FILTER_TABS.map(t => (
-                        <button key={t.key} onClick={() => setFilter(t.key)}
+                        <button key={t.key} onClick={() => setFilter(t.key)} className="shrink-0"
                             style={{ padding: "8px 16px", borderRadius: 9, border: "none", background: filter === t.key ? "var(--accent)" : "transparent", color: filter === t.key ? "#fff" : "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                             {t.label}
                         </button>

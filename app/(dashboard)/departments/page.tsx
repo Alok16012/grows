@@ -75,7 +75,7 @@ function DeptModal({
                     <h2 className="text-[16px] font-semibold text-[var(--text)]">
                         {editDept ? "Edit Department" : "Add Department"}
                     </h2>
-                    <button onClick={onClose} className="text-[var(--text3)] hover:text-[var(--text)] p-1 rounded-md hover:bg-[var(--surface2)] transition-colors">
+                    <button onClick={onClose} className="text-[var(--text3)] hover:text-[var(--text)] p-2 md:p-1 rounded-md hover:bg-[var(--surface2)] transition-colors">
                         <X size={18} />
                     </button>
                 </div>
@@ -235,9 +235,9 @@ export default function DepartmentsPage() {
     }
 
     return (
-        <div className="space-y-5">
+        <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Departments</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">
@@ -317,14 +317,14 @@ export default function DepartmentsPage() {
                                     <button
                                         onClick={() => { setEditDept(dept); setShowModal(true) }}
                                         title="Edit"
-                                        className="p-1.5 rounded-[7px] text-[var(--text3)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors"
+                                        className="p-2 md:p-1.5 rounded-[7px] text-[var(--text3)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors"
                                     >
                                         <Pencil size={14} />
                                     </button>
                                     <button
                                         onClick={() => setDeleteDept(dept)}
                                         title="Delete"
-                                        className="p-1.5 rounded-[7px] text-[var(--text3)] hover:text-red-600 hover:bg-red-50 transition-colors"
+                                        className="p-2 md:p-1.5 rounded-[7px] text-[var(--text3)] hover:text-red-600 hover:bg-red-50 transition-colors"
                                     >
                                         <Trash2 size={14} />
                                     </button>

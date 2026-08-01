@@ -59,7 +59,7 @@ export default function SelectSitesPage() {
     const totalNet   = selSites.reduce((a, s) => a + s.totalNet, 0)
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 }}>
             {/* Breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
                 <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>
@@ -73,7 +73,7 @@ export default function SelectSitesPage() {
                     <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Select Sites — Wage Sheet</h1>
                     <p style={{ fontSize: 12, color: "var(--text3)", margin: "3px 0 0 0" }}>Only sites with processed payroll for the selected month are shown</p>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <select value={month} onChange={e => setMonth(e.target.value)}
                         style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, fontWeight: 700, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
                         {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
@@ -120,7 +120,7 @@ export default function SelectSitesPage() {
                         </span>
                         <span style={{ fontSize: 11, color: "var(--text3)" }}>({sites.length} sites)</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                         {/* Select all */}
                         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text2)", cursor: "pointer", fontWeight: 600 }}>
                             <input type="checkbox"

@@ -220,7 +220,7 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
     return (
         <div style={{ display:"flex", flexDirection:"column", gap:12, paddingBottom:32 }}>
             {/* Panel Header */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
                 <div>
                     <p style={{ fontSize:16, fontWeight:800, color:"var(--text)", margin:0 }}>Site Wise Wage Sheet</p>
                     <p style={{ fontSize:12, color:"var(--text3)", margin:"2px 0 0 0" }}>{done}/{sites.length} sites processed</p>
@@ -231,7 +231,7 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
             </div>
 
             {/* Month/Year */}
-            <div style={{ display:"flex", alignItems:"center", gap:10, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, padding:"11px 16px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, padding:"11px 16px" }}>
                 <span style={lbl}>Month</span>
                 <select value={month} onChange={e=>{setMonth(e.target.value);setSelId("");setData([])}} style={sel}>
                     {MONTHS.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
@@ -245,10 +245,10 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
                 </button>
             </div>
 
-            {/* Two-panel */}
-            <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+            {/* Two-panel — the site rail stacks above the sheet on mobile */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-start" style={{ gap:12 }}>
                 {/* LEFT */}
-                <div style={{ width:256, flexShrink:0, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden", display:"flex", flexDirection:"column" }}>
+                <div className="w-full md:w-64 md:shrink-0" style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden", display:"flex", flexDirection:"column" }}>
                     <div style={{ padding:"11px 14px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                             <input type="checkbox"
@@ -351,15 +351,15 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
                                     <span style={{ fontSize:14, fontWeight:800, color:"var(--text)" }}>{selSite?.name}</span>
                                     {selSite?.code && <span style={{ fontSize:11, color:"var(--text3)" }}>{selSite.code}</span>}
                                 </div>
-                                <div style={{ display:"flex", background:"var(--surface2)", borderRadius:8, padding:3, gap:2 }}>
+                                <div style={{ display:"flex", background:"var(--surface2)", borderRadius:8, padding:3, gap:2, overflowX:"auto", maxWidth:"100%" }}>
                                     {([{key:"wagesheet",label:"Wage Sheet"},{key:"neft",label:"NEFT File"},{key:"statement",label:"Bank Statement"}] as const).map(v=>(
                                         <button key={v.key} onClick={()=>setActiveView(v.key)}
-                                            style={{ padding:"5px 14px", borderRadius:6, border:"none", fontSize:12, fontWeight:600, cursor:"pointer", background:activeView===v.key?"var(--accent)":"transparent", color:activeView===v.key?"#fff":"var(--text3)" }}>
+                                            style={{ padding:"5px 14px", borderRadius:6, border:"none", fontSize:12, fontWeight:600, cursor:"pointer", flexShrink:0, whiteSpace:"nowrap", background:activeView===v.key?"var(--accent)":"transparent", color:activeView===v.key?"#fff":"var(--text3)" }}>
                                             {v.label}
                                         </button>
                                     ))}
                                 </div>
-                                <div style={{ display:"flex", gap:8 }}>
+                                <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                                     <button onClick={()=>fetchData(selId)} disabled={ldData} style={{ display:"flex", alignItems:"center", gap:5, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"none", fontSize:12, color:"var(--text2)", cursor:"pointer" }}>
                                         <RefreshCw size={12} className={ldData?"animate-spin":""} /> Refresh
                                     </button>

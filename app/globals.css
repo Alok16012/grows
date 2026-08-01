@@ -95,4 +95,12 @@
     overflow-x: hidden;
     max-width: 100%;
   }
+
+  /* Sonner sizes its container to 100vw and then offsets it from the left, so
+     on a phone the toast hung off the right edge and its close button was
+     unreachable. Let the left/right offsets define the width instead. */
+  [data-sonner-toaster] {
+    width: auto !important;
+    max-width: calc(100vw - 32px);
+  }
 }

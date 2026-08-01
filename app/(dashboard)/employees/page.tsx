@@ -1041,7 +1041,7 @@ function RowActions({
         <div className="relative" ref={ref}>
             <button
                 onClick={() => setOpen(v => !v)}
-                className="p-1.5 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors"
+                className="p-2.5 rounded-md hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors"
             >
                 <MoreVertical size={15} />
             </button>
@@ -1740,7 +1740,9 @@ function EmployeesPage() {
                 )}
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        {/* Nine columns cannot share 375px — without a floor the table
+                            squeezed every cell instead of scrolling inside its wrapper. */}
+                        <table className="w-full min-w-[900px]">
                             <thead>
                                 <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
                                     {canDelete && (
@@ -1821,8 +1823,11 @@ function EmployeesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
+                                                {/* inline-block + nowrap: as a plain inline span, a long
+                                                    department name wrapped and split the pill's border and
+                                                    background into separate fragments per line. */}
                                                 {emp.department ? (
-                                                    <span className="px-2 py-0.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] text-[12px] text-[var(--text2)] font-medium">
+                                                    <span className="inline-block whitespace-nowrap px-2 py-0.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] text-[12px] text-[var(--text2)] font-medium">
                                                         {emp.department.name}
                                                     </span>
                                                 ) : (
@@ -1881,7 +1886,7 @@ function EmployeesPage() {
 
             {/* Bulk Delete Confirmation Modal */}
             {showBulkDeleteConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-6 w-full max-w-sm shadow-xl">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">

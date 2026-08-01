@@ -113,7 +113,7 @@ function RowMenu({ assignment, onDelete, onStopRecurrence }: {
     return (
         <div className="relative inline-block" ref={ref}>
             <button onClick={() => setOpen(o => !o)}
-                className="p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
+                className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                 <MoreVertical size={13} />
             </button>
             {open && (
@@ -704,7 +704,7 @@ export default function AssignmentsPage() {
                             <p className="text-center text-[13px] text-[var(--text3)] py-12">No assignments found.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full" style={{ fontSize: 12.5 }}>
+                                <table className="w-full min-w-[720px]" style={{ fontSize: 12.5 }}>
                                     <thead>
                                         <tr className="bg-[var(--surface2)]/60 text-[11px] text-[var(--text3)] uppercase tracking-wide">
                                             <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Assignment #</th>
@@ -743,7 +743,7 @@ export default function AssignmentsPage() {
                                                     <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                         <div className="inline-flex items-center gap-1.5">
                                                             <button onClick={() => setDetail(a)} title="View details"
-                                                                className="p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
+                                                                className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                                                                 <Eye size={13} />
                                                             </button>
                                                             <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} />
@@ -801,19 +801,19 @@ export default function AssignmentsPage() {
             {/* Detail modal */}
             {detail && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setDetail(null)}>
-                    <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-md shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+                    <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-md max-h-[90vh] flex flex-col shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
                             <div>
                                 <h2 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2">
                                     <FileText size={15} className="text-[var(--accent)]" /> Assignment Details
                                 </h2>
                                 <p className="font-mono text-[11.5px] font-semibold text-[var(--accent)] mt-0.5">{assignmentNo(detail)}</p>
                             </div>
-                            <button onClick={() => setDetail(null)} className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
+                            <button onClick={() => setDetail(null)} className="p-2 sm:p-1 shrink-0 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
                                 <X size={17} />
                             </button>
                         </div>
-                        <div className="p-5 space-y-2.5">
+                        <div className="p-5 space-y-2.5 overflow-y-auto">
                             {[
                                 { label: "Project", value: detail.project?.name || "—" },
                                 { label: "Site", value: detail.project?.site?.name || "—" },

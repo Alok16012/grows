@@ -692,7 +692,11 @@ export default function PayrollPage() {
                             </label>
                         </div>
                     </div>
-                    <table className="w-full text-[12px]">
+                    {/* The card is overflow-hidden, so without this scroller the
+                        right-hand salary columns are clipped off-screen on mobile
+                        with no way to reach them. */}
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-[12px] min-w-[820px]">
                         <thead>
                             <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                                 <th className="px-4 py-3 text-left text-[var(--text3)] font-semibold">Employee</th>
@@ -743,6 +747,7 @@ export default function PayrollPage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
 

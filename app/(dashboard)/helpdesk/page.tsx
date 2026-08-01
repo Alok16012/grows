@@ -192,7 +192,7 @@ function NewTicketModal({
             <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-white rounded-t-[16px]">
                     <h2 className="text-[15px] font-semibold text-[var(--text)]">New Ticket</h2>
-                    <button onClick={onClose} className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
+                    <button onClick={onClose} className="p-2 md:p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
                         <X size={18} />
                     </button>
                 </div>
@@ -478,7 +478,7 @@ function TicketDrawer({
                                             <button
                                                 onClick={() => isPrivileged && !updatingStatus && handleStatusChange(s)}
                                                 disabled={!isPrivileged || updatingStatus}
-                                                className={`flex-1 py-1.5 px-1 text-[10.5px] font-semibold rounded-[6px] text-center transition-all ${
+                                                className={`flex-1 py-1.5 px-1 text-[11px] md:text-[10.5px] font-semibold rounded-[6px] text-center transition-all ${
                                                     isCurrent
                                                         ? "text-white"
                                                         : isDone
@@ -547,7 +547,7 @@ function TicketDrawer({
                                             <UserAvatar name={c.user?.name || "?"} size={24} />
                                             <span className="text-[12px] font-semibold text-[var(--text)]">{c.user?.name || "Unknown"}</span>
                                             {c.isInternal && (
-                                                <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                                                <span className="flex items-center gap-1 text-[11px] md:text-[10px] text-amber-600 font-medium">
                                                     <Lock size={10} /> Internal Note
                                                 </span>
                                             )}
@@ -686,9 +686,9 @@ export default function HelpdeskPage() {
     }
 
     return (
-        <div className="space-y-5">
+        <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Helpdesk</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage and track support tickets.</p>
@@ -808,7 +808,7 @@ export default function HelpdeskPage() {
                                         <p className="text-[13px] font-medium text-[var(--text)] truncate">{t.title}</p>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <span
-                                                className="text-[10.5px] font-medium px-1.5 py-0.5 rounded-full"
+                                                className="text-[11px] md:text-[10.5px] font-medium px-1.5 py-0.5 rounded-full"
                                                 style={{ background: cc.bg, color: cc.color }}
                                             >
                                                 {t.category}

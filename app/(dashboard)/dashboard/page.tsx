@@ -441,7 +441,7 @@ export default function UniversalDashboard() {
                                     </div>
                                     <div className="flex gap-[6px] pl-9 mt-1.5">
                                         {week7.map(d => (
-                                            <span key={d.day} className="flex-1 text-center text-[9.5px] text-[var(--text3)] font-medium">
+                                            <span key={d.day} className="flex-1 text-center text-[11px] text-[var(--text3)] font-medium">
                                                 {format(new Date(d.day), "EEE")}
                                             </span>
                                         ))}

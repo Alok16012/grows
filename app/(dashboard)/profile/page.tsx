@@ -262,8 +262,8 @@ function DocsTab() {
                     const isUploading = uploading === type
                     return (
                         <div key={type} className={`border rounded-xl p-4 ${existing?.status === "REJECTED" ? "border-red-200 bg-red-50" : "border-[var(--border)] bg-white"}`}>
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${existing ? "bg-green-100" : "bg-[var(--surface)]"}`}>
                                         <FileText size={15} className={existing ? "text-green-600" : "text-[var(--text3)]"} />
                                     </div>
@@ -430,7 +430,7 @@ function PayslipTab() {
                 <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
                     {/* Header */}
                     <div className="bg-[var(--accent)] text-white px-6 py-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <p className="text-[18px] font-bold">{data.employee.firstName} {data.employee.lastName}</p>
                                 <p className="text-[12px] opacity-80 mt-0.5">{data.employee.employeeId} · {data.employee.designation}</p>
@@ -513,7 +513,7 @@ function PayslipTab() {
                     </div>
 
                     {/* CTC row */}
-                    <div className="border-t border-[var(--border)] px-5 py-3 flex items-center justify-between text-[12px] text-[var(--text3)]">
+                    <div className="border-t border-[var(--border)] px-5 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[12px] text-[var(--text3)]">
                         <span>Employer PF: <b className="text-[var(--text)]">₹{p.pfEmployer}</b></span>
                         <span>Employer ESIC: <b className="text-[var(--text)]">₹{p.esiEmployer}</b></span>
                         <span>CTC: <b className="text-purple-700">₹{Math.round(p.ctc).toLocaleString("en-IN")}</b></span>
@@ -565,8 +565,8 @@ function LettersTab() {
         <div className="space-y-3">
             <p className="text-[13px] text-[var(--text3)]">{letters.length} letter{letters.length !== 1 ? "s" : ""} issued to you</p>
             {letters.map((letter: any) => (
-                <div key={letter.id} className="bg-white border border-[var(--border)] rounded-xl p-4 flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
+                <div key={letter.id} className="bg-white border border-[var(--border)] rounded-xl p-4 flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                             style={{ background: `${typeColors[letter.type?.name] ?? "#6366f1"}18` }}>
                             <FileText size={16} style={{ color: typeColors[letter.type?.name] ?? "#6366f1" }} />
@@ -704,7 +704,7 @@ function AttendanceTab() {
                 ) : (
                     <div className="divide-y divide-[var(--border)]">
                         {history.map((a: any) => (
-                            <div key={a.id} className="px-4 py-2.5 flex items-center justify-between text-[13px]">
+                            <div key={a.id} className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[13px]">
                                 <span className="text-[var(--text)]">{new Date(a.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", weekday: "short" })}</span>
                                 <span className="text-[var(--text3)]">{fmtTime(a.checkIn)} – {fmtTime(a.checkOut)}</span>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${a.status === "PRESENT" ? "bg-green-100 text-green-700" : a.status === "ABSENT" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>{a.status}</span>
@@ -865,7 +865,7 @@ export default function ProfilePage() {
     ] as { key: typeof activeTab; label: string; icon: any }[]
 
     return (
-        <div className="max-w-3xl mx-auto pb-12 space-y-5">
+        <div className="max-w-3xl mx-auto p-4 pb-12 lg:px-0 lg:pt-0 space-y-5">
             {/* Header card */}
             <div className="bg-white border border-[var(--border)] rounded-2xl p-6 flex items-center gap-4">
                 <div className="relative shrink-0">
@@ -908,10 +908,11 @@ export default function ProfilePage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-[var(--surface)] rounded-xl p-1 w-fit">
+            {/* Up to 6 tabs — the strip scrolls sideways instead of overflowing narrow screens. */}
+            <div className="flex gap-1 bg-[var(--surface)] rounded-xl p-1 w-fit max-w-full overflow-x-auto">
                 {tabs.map(({ key, label, icon: Icon }) => (
                     <button key={key} onClick={() => setActiveTab(key)}
-                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${activeTab === key ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text3)] hover:text-[var(--text)]"}`}>
+                        className={`shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${activeTab === key ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text3)] hover:text-[var(--text)]"}`}>
                         <Icon size={14} />{label}
                     </button>
                 ))}

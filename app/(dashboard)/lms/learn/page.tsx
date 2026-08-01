@@ -691,7 +691,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                     {course.description && (
                         <p className="text-[13px] text-[var(--text3)] mt-2">{course.description}</p>
                     )}
-                    <div className="flex items-center gap-4 mt-4">
+                    <div className="flex flex-wrap items-center gap-4 mt-4">
                         <div className="flex items-center gap-1.5 text-[12px] text-[var(--text3)]">
                             <Clock size={14} /> {course.duration} min
                         </div>
@@ -707,7 +707,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                 </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
                 <button
                     onClick={() => setActiveView("modules")}
                     className={`px-4 py-2 rounded-[8px] text-[13px] font-medium transition-colors ${

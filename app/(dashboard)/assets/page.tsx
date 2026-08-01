@@ -844,7 +844,8 @@ export default function AssetsPage() {
                                     <p className="text-[12px] mt-1">Add your first asset to get started</p>
                                 </div>
                             ) : (
-                                <table className="w-full text-[13px]">
+                                <div className="overflow-x-auto">
+                                <table className="w-full min-w-[900px] text-[13px]">
                                     <thead>
                                         <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
                                             <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px]">Asset</th>
@@ -897,15 +898,15 @@ export default function AssetsPage() {
                                                             Issue
                                                         </button>
                                                         <button onClick={() => setEditAsset(asset)} title="Edit"
-                                                            className="p-1.5 hover:bg-[var(--surface2)] rounded-lg text-[var(--text3)] hover:text-[var(--text)] transition-colors">
+                                                            className="p-2 md:p-1.5 hover:bg-[var(--surface2)] rounded-lg text-[var(--text3)] hover:text-[var(--text)] transition-colors">
                                                             <Edit2 size={14} />
                                                         </button>
                                                         <button onClick={() => handleDelete(asset)} title="Delete"
-                                                            className="p-1.5 hover:bg-red-50 rounded-lg text-[var(--text3)] hover:text-red-500 transition-colors">
+                                                            className="p-2 md:p-1.5 hover:bg-red-50 rounded-lg text-[var(--text3)] hover:text-red-500 transition-colors">
                                                             <Trash2 size={14} />
                                                         </button>
                                                         <button onClick={() => setDrawerAssetId(asset.id)} title="Details"
-                                                            className="p-1.5 hover:bg-[var(--surface2)] rounded-lg text-[var(--text3)] hover:text-[var(--accent)] transition-colors">
+                                                            className="p-2 md:p-1.5 hover:bg-[var(--surface2)] rounded-lg text-[var(--text3)] hover:text-[var(--accent)] transition-colors">
                                                             <ChevronRight size={14} />
                                                         </button>
                                                     </div>
@@ -914,6 +915,7 @@ export default function AssetsPage() {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             )}
                         </div>
                     </>
@@ -955,7 +957,8 @@ export default function AssetsPage() {
                                     <p className="text-[14px] font-medium">No issued items found</p>
                                 </div>
                             ) : (
-                                <table className="w-full text-[13px]">
+                                <div className="overflow-x-auto">
+                                <table className="w-full min-w-[820px] text-[13px]">
                                     <thead>
                                         <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
                                             <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px]">Employee</th>
@@ -1020,6 +1023,7 @@ export default function AssetsPage() {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             )}
                         </div>
                     </>

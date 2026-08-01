@@ -83,7 +83,7 @@ function ProjectMenu({ project, onDelete }: { project: Project; onDelete: () => 
     return (
         <div className="relative" ref={ref}>
             <button onClick={() => setOpen(o => !o)}
-                className="p-1 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] hover:text-[var(--text)] transition-colors">
+                className="p-2 sm:p-1 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] hover:text-[var(--text)] transition-colors">
                 <MoreVertical size={15} />
             </button>
             {open && (
@@ -245,7 +245,7 @@ export default function ProjectsPage() {
                 </div>
             </div>
             {isAdminOrManager && (
-                <div className="flex items-center gap-1.5 mt-auto pt-1">
+                <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
                     <Link href={`/projects/${project.id}/form-builder`} className={actionBtn}>
                         <LayoutTemplate size={12} /> Form Builder
                     </Link>

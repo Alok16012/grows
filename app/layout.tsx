@@ -35,7 +35,10 @@ export default function RootLayout({
         {/* Cache Bust: 1773724001 */}
         <Providers>
           {children}
-          <Toaster position="top-right" richColors />
+          {/* mobileOffset keeps the toast inside the viewport on phones — the
+            default top-right offset pushed a full-width toast 16px off the
+            right edge, clipping its close button. */}
+        <Toaster position="top-right" richColors mobileOffset={{ left: "16px", right: "16px", top: "16px" }} />
         </Providers>
       </body>
     </html>

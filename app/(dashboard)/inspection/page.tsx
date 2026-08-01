@@ -139,19 +139,19 @@ export default function InspectionDashboard() {
                 <div className="flex items-center gap-2 mt-3">
                     <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
                         <p className="text-[20px] font-bold tabular-nums">{activeCount}</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Active</p>
+                        <p className="text-[11px] opacity-70 mt-0.5">Active</p>
                     </div>
                     <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
                         <p className="text-[20px] font-bold tabular-nums">{draftCount}</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Drafts</p>
+                        <p className="text-[11px] opacity-70 mt-0.5">Drafts</p>
                     </div>
                     <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
                         <p className="text-[20px] font-bold tabular-nums">{pendingCount}</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Pending</p>
+                        <p className="text-[11px] opacity-70 mt-0.5">Pending</p>
                     </div>
                     <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
                         <p className="text-[20px] font-bold tabular-nums">{approvedCount}</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Approved</p>
+                        <p className="text-[11px] opacity-70 mt-0.5">Approved</p>
                     </div>
                 </div>
             </div>
@@ -412,13 +412,13 @@ export default function InspectionDashboard() {
                                                 ? { label: "Rejected", cls: "bg-[#fef2f2] text-[#dc2626]" }
                                                 : { label: "Pending Review", cls: "bg-[#fef3c7] text-[#d97706]" }
                                     return (
-                                        <div key={a.id} className="bg-white border border-[#e8e6e1] rounded-[10px] p-[12px_14px] flex items-center justify-between">
-                                            <div>
+                                        <div key={a.id} className="bg-white border border-[#e8e6e1] rounded-[10px] p-[12px_14px] flex flex-wrap items-center justify-between gap-2">
+                                            <div className="min-w-0">
                                                 <p className="text-[10.5px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-[2px]">{a.project?.site?.name}</p>
                                                 <p className="text-[13.5px] font-semibold text-[#1a1a18]">{a.project?.name}</p>
                                                 <p className="text-[11.5px] text-[#9e9b95] mt-[2px]">{safeFormat(a.createdAt, "MMM d, yyyy")}</p>
                                             </div>
-                                            <div className="flex items-center gap-[8px]">
+                                            <div className="flex flex-wrap items-center gap-[8px]">
                                                 {a.recurrenceType && a.recurrenceType !== "none" && (
                                                     <span className="bg-[#eff6ff] text-[#1d4ed8] text-[10.5px] font-[500] px-[7px] py-[2px] rounded-[20px]">
                                                         {a.recurrenceType === "daily" ? "📅 Daily" : "🗓️ Weekly"}
@@ -451,8 +451,8 @@ export default function InspectionDashboard() {
 
                     <div className="bg-white border border-[#e8e6e1] rounded-[12px] overflow-hidden">
                         {recentSubmissions.slice(0, 10).map((s) => (
-                            <div key={s.id} className="p-4 border-b border-[#e8e6e1] last:border-b-0 flex items-center justify-between hover:bg-[#f9f8f5] transition-colors">
-                                <div>
+                            <div key={s.id} className="p-4 border-b border-[#e8e6e1] last:border-b-0 flex flex-wrap items-center justify-between gap-2 hover:bg-[#f9f8f5] transition-colors">
+                                <div className="min-w-0">
                                     <p className="text-[13px] font-medium text-[#1a1a18] mb-1">{s.assignment.project.name}</p>
                                     <div className="flex items-center gap-1.5 text-[12px] text-[#9e9b95]">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -462,7 +462,7 @@ export default function InspectionDashboard() {
                                         {safeDistance(s.submittedAt || s.createdAt)} ago
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     {s.status === "draft" && (
                                         <span className="bg-[#fef3c7] text-[#d97706] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Draft</span>
                                     )}

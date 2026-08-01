@@ -436,7 +436,7 @@ function ComplianceMasterInner() {
     )
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingBottom: 32 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 14, paddingBottom: 32 }}>
             {/* Breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
                 <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>

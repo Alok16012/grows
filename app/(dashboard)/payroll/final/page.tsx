@@ -108,14 +108,14 @@ function FinalPayrollInner() {
     const totNet   = data.reduce((s, p) => s + p.netSalary, 0)
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
                 <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>
                 <ChevronRight size={11} />
                 <span style={{ fontWeight: 600, color: "var(--text2)" }}>Final Payroll & Lock</span>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                 <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Final Payroll Review & Lock</h1>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>{done}/{sites.length} sites processed</span>
             </div>
@@ -138,7 +138,7 @@ function FinalPayrollInner() {
             </div>
 
             {/* Month/Year */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
                 <span style={lbl}>Month</span>
                 <select value={month} onChange={e => { setMonth(e.target.value); setSelId(""); setData([]) }} style={sel}>
                     {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
@@ -160,10 +160,10 @@ function FinalPayrollInner() {
                 </div>
             </div>
 
-            {/* Two-panel */}
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            {/* Two-panel — the site rail stacks above the detail pane on mobile */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-start" style={{ gap: 12 }}>
                 {/* LEFT */}
-                <div style={{ width: 256, flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                <div className="w-full md:w-64 md:shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                     <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>Sites</span>
                         <span style={{ fontSize: 10, color: "var(--text3)", background: "var(--surface2)", borderRadius: 10, padding: "2px 7px" }}>{sites.length}</span>
@@ -253,7 +253,7 @@ function FinalPayrollInner() {
                                     <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{selSite?.name}</span>
                                     {selSite?.code && <span style={{ fontSize: 11, color: "var(--text3)" }}>{selSite.code}</span>}
                                 </div>
-                                <div style={{ display: "flex", gap: 8 }}>
+                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                     <button onClick={() => fetchData(selId)} disabled={ldData}
                                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={12} className={ldData ? "animate-spin" : ""} /> Refresh
