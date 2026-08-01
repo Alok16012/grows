@@ -52,7 +52,7 @@ async function mintResponse(user: any) {
 
     // Only current staff may sign in — terminated / inactive employees are
     // locked out of the mobile app just like the web (see lib/auth.ts).
-    if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE")) {
+    if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE" || employee.status === "RESIGNED")) {
         return NextResponse.json({ error: "Your account is inactive. Please contact HR." }, { status: 403 })
     }
 

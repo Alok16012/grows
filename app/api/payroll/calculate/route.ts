@@ -5,6 +5,14 @@ import { authOptions } from "@/lib/auth"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { checkAccess } from "@/lib/permissions"
 
+// Zero is a legitimate value here (an employee who worked no days), so `||`
+// cannot be used to apply the default — it would silently pay a full month.
+function numOrDefault(value: unknown, fallback: number): number {
+    if (value === null || value === undefined || value === "") return fallback
+    const n = Number(value)
+    return Number.isFinite(n) ? n : fallback
+}
+
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -27,17 +35,19 @@ export async function POST(req: Request) {
         // PROCESSED run destroyed figures that PF/ESI challans were already
         // filed against. Unlocking is a deliberate act via
         // POST /api/payroll/reset?action=unlock.
+        // PayrollRun.status is month-wide, but processing is done site by site,
+        // and final/lock flips the whole run to PROCESSED even for a partial
+        // lock. Refusing on the run would therefore block processing a site that
+        // has never been run. Locked *rows* are protected individually below
+        // instead, which is where the filed figures actually live.
         let runId: string
         const existing = await prisma.payrollRun.findUnique({ where: { month_year: { month, year } } })
         if (existing) {
             if (existing.status !== "DRAFT") {
-                // Plain text, not JSON: every caller surfaces this via
-                // `throw new Error(await res.text())`, so the sentence lands in
-                // the toast as-is.
-                return new NextResponse(
-                    `Payroll for ${month}/${year} is locked (${existing.status}). Unlock it from the payroll run before reprocessing.`,
-                    { status: 409 }
-                )
+                await prisma.payrollRun.update({
+                    where: { id: existing.id },
+                    data: { status: "DRAFT", processedBy: session.user.id ?? "system" }
+                })
             }
             runId = existing.id
         } else {
@@ -77,12 +87,36 @@ export async function POST(req: Request) {
             if (branchId) whereClause.branchId = branchId
         }
 
-        const employees = await prisma.employee.findMany({
+        let employees = await prisma.employee.findMany({
             where: whereClause,
             include: { employeeSalary: true },
         })
 
         if (!employees.length) return new NextResponse("No active employees found", { status: 404 })
+
+        // Rows already locked (PROCESSED/PAID) are left completely alone: the step
+        // below deletes and recreates rows, which would otherwise wipe figures a
+        // PF/ESI challan was already filed against. Processing another site, or
+        // re-running this one, still works — those rows are DRAFT.
+        const lockedRows = await prisma.payroll.findMany({
+            where: {
+                month, year,
+                employeeId: { in: employees.map(e => e.id) },
+                status: { not: "DRAFT" },
+            },
+            select: { employeeId: true },
+        })
+        const lockedEmployeeIds = new Set(lockedRows.map(r => r.employeeId))
+        const skippedLocked = lockedEmployeeIds.size
+        if (skippedLocked) {
+            employees = employees.filter(e => !lockedEmployeeIds.has(e.id))
+            if (!employees.length) {
+                return new NextResponse(
+                    `All ${skippedLocked} employee(s) for ${month}/${year} have locked payroll. Unlock before reprocessing.`,
+                    { status: 409 }
+                )
+            }
+        }
 
         const defaultMonthDays = 26
         let totalGross = 0, totalNet = 0, totalPfE = 0, totalEsiE = 0
@@ -112,7 +146,10 @@ export async function POST(req: Request) {
             const attInput = (attendance as any[])?.find((a: any) => a.employeeId === emp.id) ?? {}
             const att = {
                 monthDays:           parseInt(String(attInput.monthDays  ?? defaultMonthDays)) || defaultMonthDays,
-                workedDays:          parseInt(String(attInput.workedDays ?? defaultMonthDays)) || defaultMonthDays,
+                // `|| defaultMonthDays` treated 0 as missing, so marking an
+                // employee as having worked zero days paid them a full month.
+                // Only fall back when the value is genuinely absent or unparseable.
+                workedDays:          numOrDefault(attInput.workedDays, defaultMonthDays),
                 otDays:              Number(attInput.otDays)              || 0,
                 canteenDays:         Math.round(Number(attInput.canteenDays) || 0),
                 penalty:             Number(attInput.penalty)             || 0,
@@ -170,6 +207,9 @@ export async function POST(req: Request) {
             where: {
                 month, year,
                 employeeId: { in: employees.map(e => e.id) },
+                // Never delete a locked row, even if one slipped past the filter
+                // above (e.g. locked by someone else mid-request).
+                status: "DRAFT",
             },
         })
 
@@ -190,6 +230,9 @@ export async function POST(req: Request) {
             runId,
             failedCount: 0,
             totalEmployees: employees.length,
+            // Locked rows left untouched, so the caller can say so rather than
+            // silently reporting a lower processed count.
+            skippedLocked,
         })
     } catch (error) {
         console.error("[PAYROLL_CALCULATE]", error)

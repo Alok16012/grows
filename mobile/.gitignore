@@ -10,6 +10,11 @@ expo-env.d.ts
 # Native
 *.orig.*
 *.jks
+# *.keystore was not covered here, which is how the release signing key ended up
+# committed. debug.keystore is Android's public well-known debug key and is
+# deliberately kept.
+*.keystore
+!debug.keystore
 *.p8
 *.p12
 *.key

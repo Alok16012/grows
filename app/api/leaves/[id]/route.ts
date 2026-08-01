@@ -161,6 +161,9 @@ export async function DELETE(
         }
 
         await prisma.leave.delete({ where: { id: params.id } })
+        // Deleting an approved leave that covers today would otherwise leave the
+        // employee badged ON_LEAVE with nothing backing it.
+        await syncLeaveStatus(existing.employeeId)
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error("[LEAVE_DELETE]", error)

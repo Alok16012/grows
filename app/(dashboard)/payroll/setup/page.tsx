@@ -244,7 +244,10 @@ export default function PayrollPage() {
         setLoading(true)
         try {
             const [empRes, payRes] = await Promise.all([
-                fetch("/api/employees?pageSize=1000"),
+                // Only current staff. The default list also returns TERMINATED /
+                // RESIGNED / INACTIVE people, and processing posts every loaded
+                // row, so leavers were still being given payroll rows.
+                fetch("/api/employees?pageSize=1000&status=ACTIVE"),
                 fetch(`/api/payroll?month=${month}&year=${year}&limit=1000`)
             ])
             const emps = empRes.ok ? await empRes.json() : []
@@ -522,7 +525,11 @@ export default function PayrollPage() {
                                     {employees.map((emp, idx) => {
                                         const att = attInputs[emp.id] ?? defaultAtt()
                                         const lop = att.monthDays - att.workedDays
-                                        const preview = emp.salary
+                                        {/* Process only applies an APPROVED structure — anything
+                                            else falls back to bare basic. Preview must do the same,
+                                            or a pending structure shows full allowances here and
+                                            saves basic-only. */}
+                                        const preview = emp.salary && emp.salary.status === "APPROVED"
                                             ? calcPreview(emp.salary, att, emp.gender, emp.isHandicap, month)
                                             : null
                                         const isExpanded = expandedId === emp.id

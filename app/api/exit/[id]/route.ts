@@ -79,57 +79,72 @@ export async function PUT(
     if (fnfPaidBy !== undefined) updateData.fnfPaidBy = fnfPaidBy
     if (approvedBy !== undefined) updateData.approvedBy = approvedBy
 
-    const exit = await prisma.exitRequest.update({
+    // Read the previous status first: offboarding must run only on the
+    // transition into COMPLETED, so a later PUT that happens to carry the same
+    // status can't re-terminate someone HR has since reinstated.
+    const before = await prisma.exitRequest.findUnique({
       where: { id: params.id },
-      data: updateData,
-      include: {
-        clearanceTasks: { orderBy: { order: "asc" } },
-        employee: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            employeeId: true,
-            designation: true,
+      select: { status: true },
+    })
+    if (!before) return new NextResponse("Exit request not found", { status: 404 })
+    const isCompleting = status === "COMPLETED" && before.status !== "COMPLETED"
+
+    // The ExitRequest update and the offboarding happen together. Splitting them
+    // meant a failure after the first write left the exit marked COMPLETED while
+    // the employee was still active with a working login — and the UI hides the
+    // action once an exit is complete, so it could not be retried.
+    const exit = await prisma.$transaction(async (tx) => {
+      const updated = await tx.exitRequest.update({
+        where: { id: params.id },
+        data: updateData,
+        include: {
+          clearanceTasks: { orderBy: { order: "asc" } },
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              employeeId: true,
+              designation: true,
+            },
           },
         },
-      },
-    })
+      })
 
-    // Completing an exit actually offboards the person. Until now this route
-    // only moved the ExitRequest row, so a fully-processed leaver stayed ACTIVE,
-    // kept their site deployment, kept counting in headcount and payroll, and
-    // could still sign in — offboarding had to be repeated by hand on the
-    // employee screen.
-    if (status === "COMPLETED") {
-      const leftAs = exit.exitType === "TERMINATION" || exit.exitType === "ABSCONDING"
-        ? "TERMINATED"
-        : "RESIGNED"
-      const leavingDate = exit.lastWorkingDate ?? new Date()
+      // Completing an exit actually offboards the person. This route used to
+      // move only the ExitRequest row, so a fully-processed leaver stayed
+      // ACTIVE, kept their site deployment, kept counting in headcount and
+      // payroll, and could still sign in.
+      if (isCompleting) {
+        // Only a dismissal is a termination. Retirement and contract end are
+        // neither that nor a resignation, but RESIGNED is the closest status
+        // this enum offers for a voluntary or scheduled departure.
+        const leftAs = updated.exitType === "TERMINATION" || updated.exitType === "ABSCONDING"
+          ? "TERMINATED"
+          : "RESIGNED"
+        const leavingDate = updated.lastWorkingDate ?? new Date()
 
-      await prisma.$transaction(async (tx) => {
-        await tx.employee.update({
-          where: { id: exit.employeeId },
+        const emp = await tx.employee.update({
+          where: { id: updated.employeeId },
           data: { status: leftAs, dateOfLeaving: leavingDate },
+          select: { userId: true },
         })
 
         // Free the site slot so the leaver stops appearing under it.
         await tx.deployment.updateMany({
-          where: { employeeId: exit.employeeId, isActive: true },
+          where: { employeeId: updated.employeeId, isActive: true },
           data: { isActive: false, endDate: leavingDate, relievedAt: leavingDate },
         })
 
         // Revoke the login. lib/auth.ts also invalidates any live session on its
         // next refresh once the employee is in a terminal status.
-        const emp = await tx.employee.findUnique({
-          where: { id: exit.employeeId },
-          select: { userId: true },
-        })
-        if (emp?.userId) {
+        if (emp.userId) {
           await tx.user.update({ where: { id: emp.userId }, data: { isActive: false } })
         }
-      })
-    }
+      }
+
+      return updated
+    })
 
     return NextResponse.json(exit)
   } catch (error) {
