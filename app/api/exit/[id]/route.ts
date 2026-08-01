@@ -96,6 +96,41 @@ export async function PUT(
       },
     })
 
+    // Completing an exit actually offboards the person. Until now this route
+    // only moved the ExitRequest row, so a fully-processed leaver stayed ACTIVE,
+    // kept their site deployment, kept counting in headcount and payroll, and
+    // could still sign in — offboarding had to be repeated by hand on the
+    // employee screen.
+    if (status === "COMPLETED") {
+      const leftAs = exit.exitType === "TERMINATION" || exit.exitType === "ABSCONDING"
+        ? "TERMINATED"
+        : "RESIGNED"
+      const leavingDate = exit.lastWorkingDate ?? new Date()
+
+      await prisma.$transaction(async (tx) => {
+        await tx.employee.update({
+          where: { id: exit.employeeId },
+          data: { status: leftAs, dateOfLeaving: leavingDate },
+        })
+
+        // Free the site slot so the leaver stops appearing under it.
+        await tx.deployment.updateMany({
+          where: { employeeId: exit.employeeId, isActive: true },
+          data: { isActive: false, endDate: leavingDate, relievedAt: leavingDate },
+        })
+
+        // Revoke the login. lib/auth.ts also invalidates any live session on its
+        // next refresh once the employee is in a terminal status.
+        const emp = await tx.employee.findUnique({
+          where: { id: exit.employeeId },
+          select: { userId: true },
+        })
+        if (emp?.userId) {
+          await tx.user.update({ where: { id: emp.userId }, data: { isActive: false } })
+        }
+      })
+    }
+
     return NextResponse.json(exit)
   } catch (error) {
     console.error("[EXIT_PUT]", error)

@@ -43,7 +43,22 @@ pooler** URL (port `6543`) and set it as `DATABASE_URL` on Vercel, with:
 
 Keep the direct connection (port `5432`) as `DIRECT_URL` for migrations.
 
-## 3. Confirm demo login is off in production
+## 3. Set CRON_SECRET (required for the leave-status job)
+
+`vercel.json` now schedules `/api/cron/sync-leave-status` daily at 18:45 UTC
+(00:15 IST). It moves employees into `ON_LEAVE` on the day an approved leave
+starts and back to `ACTIVE` once it ends — previously `ON_LEAVE` was set on
+approval and never cleared, so anyone who took a day off stayed badged on leave
+until an admin edited them by hand.
+
+Add a `CRON_SECRET` environment variable on Vercel (any long random string).
+Vercel sends it as `Authorization: Bearer <CRON_SECRET>` on cron invocations.
+
+**Until it is set the route returns 503 and the job does nothing.** That is
+deliberate: an unauthenticated endpoint that rewrites employee statuses would be
+worse than one that is switched off.
+
+## 4. Confirm demo login is off in production
 
 `lib/auth.ts` enables two auto-heal paths when `ENABLE_DEMO_LOGIN=true`. Either
 one lets anyone who knows an employee's phone number set that account's

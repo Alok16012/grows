@@ -73,7 +73,25 @@ export async function GET(req: Request) {
     }
 }
 
+// DISABLED. This handler wrote to the same Payroll rows as the real engine but
+// computed them from a different, wrong source: Employee.basicSalary instead of
+// the EmployeeSalary structure, a fabricated 20% HRA, a flat 12% employer PF,
+// and no DA / washing / conveyance / PT / LWF / compliance-type handling. It
+// also paid a FULL month to anyone with no attendance
+// (`presentDays > 0 ? presentDays : workingDays`).
+//
+// It has no callers anywhere in the repo. Payroll generation goes through
+// POST /api/payroll/calculate, which uses lib/payroll-calc.ts. Left in place and
+// failing loudly rather than deleted, so any forgotten caller surfaces instead
+// of silently corrupting a month of salary data.
 export async function POST(req: Request) {
+    return NextResponse.json(
+        { error: "This endpoint is disabled. Use POST /api/payroll/calculate, which applies the salary structure and statutory rules." },
+        { status: 410 }
+    )
+}
+
+async function _disabledLegacyPost(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })

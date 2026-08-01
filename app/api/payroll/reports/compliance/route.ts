@@ -256,6 +256,10 @@ export async function GET(req: Request) {
                 const slab0   = rows.filter(p => p.pt === 0).length
                 const slab175 = rows.filter(p => p.pt === 175).length
                 const slab200 = rows.filter(p => p.pt === 200).length
+                // February carries a ₹300 slab (see lib/payroll-calc.ts). Without
+                // this column those employees landed in no bucket, so the slab
+                // counts never added up to Total Employees in a Feb register.
+                const slab300 = rows.filter(p => p.pt === 300).length
                 const totAmt  = rows.reduce((s, p) => s + p.pt, 0)
                 data.push({
                     "Sr.No": sr++,
@@ -263,6 +267,7 @@ export async function GET(req: Request) {
                     "0": slab0,
                     "175": slab175,
                     "200": slab200,
+                    "300": slab300,
                     "Total Employees": rows.length,
                     "Total Amt": Math.round(totAmt),
                 })
@@ -276,6 +281,7 @@ export async function GET(req: Request) {
                     "0": all.filter(p => p.pt === 0).length,
                     "175": all.filter(p => p.pt === 175).length,
                     "200": all.filter(p => p.pt === 200).length,
+                    "300": all.filter(p => p.pt === 300).length,
                     "Total Employees": all.length,
                     "Total Amt": Math.round(all.reduce((s, p) => s + p.pt, 0)),
                 })

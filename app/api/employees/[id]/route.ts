@@ -205,10 +205,11 @@ export async function PUT(
                 if (email && email.trim() && !email.includes("@cims.local")) {
                     userUpdate.email = email.trim()
                 }
-                // Terminated / inactive employees lose login access; restoring
-                // the employee to ACTIVE / ON_LEAVE restores it.
+                // Employees who have left lose login access; restoring them to
+                // ACTIVE / ON_LEAVE restores it. RESIGNED counts as left — it was
+                // missing here, so resigned staff kept a working login.
                 if (status !== undefined) {
-                    userUpdate.isActive = !(status === "TERMINATED" || status === "INACTIVE")
+                    userUpdate.isActive = !(status === "TERMINATED" || status === "INACTIVE" || status === "RESIGNED")
                 }
                 if (Object.keys(userUpdate).length > 0) {
                     await prisma.user.update({ where: { id: empWithUser.userId }, data: userUpdate })

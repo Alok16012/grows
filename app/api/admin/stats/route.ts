@@ -86,7 +86,11 @@ const getStats = unstable_cache(
             // Daily submitted counts for the 30-day chart
             safe(
                 (prisma as any).$queryRawUnsafe(
-                    `SELECT to_char(date_trunc('day', "submittedAt"), 'YYYY-MM-DD') AS day, COUNT(*)::int AS count
+                    // Bucketed on IST days, matching the 7-day attendance trend
+                    // below. date_trunc alone truncates in the session timezone
+                    // (UTC here), which put an inspection submitted before
+                    // 05:30 IST on the previous day's bar.
+                    `SELECT to_char(date_trunc('day', "submittedAt" + interval '330 minutes'), 'YYYY-MM-DD') AS day, COUNT(*)::int AS count
                      FROM "Inspection" WHERE "submittedAt" >= $1 GROUP BY 1 ORDER BY 1`,
                     ago30d
                 ) as Promise<{ day: string; count: number }[]>,
@@ -160,11 +164,15 @@ const getStats = unstable_cache(
         const lowAttendanceSites = topSites.filter(s => s.pct < 80).length
 
         // ── 30-day inspection trend, missing days filled with 0 ──
+        // Keys must be IST days to match the shifted bucketing in the SQL above;
+        // a plain toISOString() here would look up UTC keys and silently miss.
+        const IST_OFFSET_MS = 330 * 60 * 1000
+        const istKey = (d: Date) => new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10)
         const byDay = new Map(trendRows.map(r => [r.day, Number(r.count)]))
         const trend: { day: string; count: number }[] = []
         for (let i = 29; i >= 0; i--) {
             const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-            const key = d.toISOString().slice(0, 10)
+            const key = istKey(d)
             trend.push({ day: key, count: byDay.get(key) ?? 0 })
         }
         const completedDeltaPct = completedPrev30d > 0
@@ -181,8 +189,7 @@ const getStats = unstable_cache(
         }
 
         // ── 7-day attendance trend, bucketed on IST day boundaries ──
-        const IST_MS = 330 * 60 * 1000
-        const dayKey = (d: Date) => new Date(d.getTime() + IST_MS).toISOString().slice(0, 10)
+        const dayKey = istKey
         const weekCounts = new Map<string, number>()
         for (const r of weekAttendanceRows) {
             const k = dayKey(new Date(r.date))

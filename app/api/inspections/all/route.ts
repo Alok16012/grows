@@ -42,7 +42,11 @@ export async function GET(req: Request) {
                                 select: {
                                     id: true,
                                     name: true,
-                                    company: { select: { id: true, name: true } }
+                                    // The queue renders and searches on project.site.name.
+                                    // This selected the legacy `company` relation instead,
+                                    // which no longer gets written — so every row showed a
+                                    // blank site and the site search never matched.
+                                    site: { select: { id: true, name: true } }
                                 }
                             }
                         }

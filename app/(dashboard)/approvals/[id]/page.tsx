@@ -287,7 +287,7 @@ export default function ReviewInspectionPage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p className="text-[12px] text-[#9e9b95] mb-1">
-                            {inspection.assignment?.project?.company?.name}
+                            {inspection.assignment?.project?.site?.name}
                             <span className="mx-1.5 opacity-40">/</span>
                             {inspection.assignment?.project?.name}
                         </p>
@@ -415,7 +415,7 @@ export default function ReviewInspectionPage() {
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] mb-0.5">Client / Project</p>
-                                    <p className="text-[13px] font-semibold text-[#1a1a18]">{inspection.assignment?.project?.company?.name}</p>
+                                    <p className="text-[13px] font-semibold text-[#1a1a18]">{inspection.assignment?.project?.site?.name}</p>
                                     <p className="text-[11px] text-[#9e9b95]">{inspection.assignment?.project?.name}</p>
                                 </div>
                             </div>

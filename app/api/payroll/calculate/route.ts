@@ -22,15 +22,22 @@ export async function POST(req: Request) {
 
         if (!month || !year) return new NextResponse("Month and Year required", { status: 400 })
 
-        // Get or create payroll run — always allow recalculation by resetting to DRAFT
+        // Get or create the payroll run. A locked run is refused: processing
+        // deletes and recreates the month's rows, so silently reopening a
+        // PROCESSED run destroyed figures that PF/ESI challans were already
+        // filed against. Unlocking is a deliberate act via
+        // POST /api/payroll/reset?action=unlock.
         let runId: string
         const existing = await prisma.payrollRun.findUnique({ where: { month_year: { month, year } } })
         if (existing) {
             if (existing.status !== "DRAFT") {
-                await prisma.payrollRun.update({
-                    where: { id: existing.id },
-                    data: { status: "DRAFT", processedBy: session.user.id ?? "system" }
-                })
+                // Plain text, not JSON: every caller surfaces this via
+                // `throw new Error(await res.text())`, so the sentence lands in
+                // the toast as-is.
+                return new NextResponse(
+                    `Payroll for ${month}/${year} is locked (${existing.status}). Unlock it from the payroll run before reprocessing.`,
+                    { status: 409 }
+                )
             }
             runId = existing.id
         } else {

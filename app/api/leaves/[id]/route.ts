@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { syncLeaveStatus } from "@/lib/leave-status"
 
 export async function GET(
     req: Request,
@@ -117,28 +118,11 @@ export async function PUT(
             },
         })
 
-        // Sync employee status
-        if (status === "APPROVED") {
-            await prisma.employee.update({
-                where: { id: leave.employeeId },
-                data: { status: "ON_LEAVE" },
-            })
-        } else if (status === "REJECTED" || status === "CANCELLED") {
-            const activeLeaves = await prisma.leave.count({
-                where: {
-                    employeeId: leave.employeeId,
-                    status: "APPROVED",
-                    endDate: { gte: new Date() },
-                    id: { not: params.id },
-                },
-            })
-            if (activeLeaves === 0) {
-                await prisma.employee.update({
-                    where: { id: leave.employeeId },
-                    data: { status: "ACTIVE" },
-                })
-            }
-        }
+        // Recompute ACTIVE / ON_LEAVE from the approved leaves that actually
+        // cover today. Approving a future-dated leave no longer marks the
+        // employee ON_LEAVE straight away; the daily cron moves them on the day
+        // it starts and back when it ends.
+        await syncLeaveStatus(leave.employeeId)
 
         return NextResponse.json(leave)
     } catch (error) {

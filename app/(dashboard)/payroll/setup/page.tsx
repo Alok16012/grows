@@ -12,6 +12,7 @@ import {
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
 import { can } from "@/lib/can"
+import { calcGrowusPayroll } from "@/lib/payroll-calc"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SalarySalary = {
@@ -43,6 +44,7 @@ type CalcResult = {
 type EmpRow = {
     id: string; employeeId: string; name: string; designation: string; site: string
     salary: SalarySalary | null; payroll: CalcResult | null; payrollId: string | null
+    gender: string; isHandicap: boolean
 }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -51,40 +53,31 @@ function fmt(n: number) {
     return "₹" + Math.round(n).toLocaleString("en-IN")
 }
 
-// ─── Growus formula (client-side preview) ────────────────────────────────────
-function calcPreview(sal: SalarySalary, att: AttInput, gender = "Male"): CalcResult {
-    const { basic, da, hra: hraStored, bonus: bonusStored, washing, conveyance, leaveWithWages, otherAllowance, otRatePerHour, canteenRatePerDay, complianceType } = sal
-    const { monthDays, workedDays, otDays, canteenDays, penalty, advance, otherDeductions, productionIncentive, lwf } = att
-    const isCALL = complianceType === "CALL"
-    const isFemale = gender?.toLowerCase() === "female"
-    const hraFull = isCALL ? 0 : (hraStored ?? 0)
-    const bonusFull = isCALL ? 0 : (bonusStored ?? 0)
-    const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
-    const r = (x: number) => Math.round(x / monthDays * workedDays)
-    const basicSalary = r(basic), daE = r(da), hraE = r(hraFull)
-    const washingE = r(washing), convE = r(conveyance), lwwE = r(leaveWithWages)
-    const bonusE = r(bonusFull), otherE = r(otherAllowance)
-    const otPay = Math.round(otRatePerHour * otDays * 4)
-    const grossSalary = basicSalary + daE + hraE + washingE + convE + lwwE + bonusE + otherE + otPay + (productionIncentive || 0)
-    const pfEmployee = isCALL ? 0 : (workedDays > 26 ? 1800 : Math.round((15000 / 26) * workedDays * 0.12))
-    const esiEmployee = (isCALL || grossSalary > 21000) ? 0 : Math.ceil((grossSalary - washingE - bonusE) * 0.0075)
-    const pt = isFemale ? 0 : 200
-    const canteen = canteenDays * canteenRatePerDay
-    const totalDeductions = pfEmployee + esiEmployee + pt + (lwf||0) + (otherDeductions||0) + canteen + (penalty||0) + (advance||0)
-    const netSalary = grossSalary - totalDeductions
-    const pfEmployer = isCALL ? 0 : Math.round(15000 * 0.13)
-    const esiEmployer = (isCALL || grossSalary > 21000) ? 0 : Math.ceil((grossFullMonth - washing - bonusFull) * 0.0325)
-    const ctc = grossFullMonth + pfEmployer + esiEmployer
-    return {
-        basicFull: basic, daFull: da, hraFull, washingFull: washing, conveyanceFull: conveyance,
-        lwwFull: leaveWithWages, bonusFull, otherFull: otherAllowance, grossFullMonth,
-        basicSalary, da: daE, hra: hraE, washing: washingE, conveyance: convE, lwwEarned: lwwE,
-        bonus: bonusE, allowances: otherE, otDays, overtimePay: otPay,
-        productionIncentive: productionIncentive || 0, grossSalary,
-        pfEmployee, esiEmployee, pfEmployer, esiEmployer, pt, lwf: lwf||0,
-        canteenDays, canteen, penalty: penalty||0, advance: advance||0,
-        otherDeductions: otherDeductions||0, totalDeductions, netSalary, ctc,
-    }
+// ─── Preview ─────────────────────────────────────────────────────────────────
+// Delegates to the same engine the server runs on Process (lib/payroll-calc.ts).
+// This used to be a second, hand-written copy of the formula, and the two had
+// drifted apart on PF (prorated ₹15,000 base vs 12% of capped basic+DA), PT
+// (flat ₹200 vs the Maharashtra slab, including February's ₹300), employer PF
+// (flat ₹1,950 vs four components), and ESIC eligibility (earned gross vs
+// structure gross) — so the Net shown before Process differed from the Net saved
+// after it. Keep this a thin adapter; the rules belong in payroll-calc.
+function calcPreview(
+    sal: SalarySalary,
+    att: AttInput,
+    gender = "Male",
+    isHandicap = false,
+    month?: number,
+): CalcResult {
+    return calcGrowusPayroll(
+        {
+            basic: sal.basic, da: sal.da, washing: sal.washing, conveyance: sal.conveyance,
+            leaveWithWages: sal.leaveWithWages, otherAllowance: sal.otherAllowance,
+            otRatePerHour: sal.otRatePerHour, canteenRatePerDay: sal.canteenRatePerDay,
+            hra: sal.hra, bonus: sal.bonus, complianceType: sal.complianceType,
+            isHandicap,
+        },
+        { ...att, gender, month },
+    )
 }
 
 // ─── Salary Setup Modal ───────────────────────────────────────────────────────
@@ -269,6 +262,10 @@ export default function PayrollPage() {
                     salary: e.employeeSalary ?? null,
                     payroll: pay ?? null,
                     payrollId: pay?.id ?? null,
+                    // Both feed statutory rules (PT female exemption, ESIC limit),
+                    // so the preview must know them to match what Process saves.
+                    gender: e.gender ?? "Male",
+                    isHandicap: !!e.isHandicap,
                 }
             })
             setEmployees(rows)
@@ -525,7 +522,9 @@ export default function PayrollPage() {
                                     {employees.map((emp, idx) => {
                                         const att = attInputs[emp.id] ?? defaultAtt()
                                         const lop = att.monthDays - att.workedDays
-                                        const preview = emp.salary ? calcPreview(emp.salary, att) : null
+                                        const preview = emp.salary
+                                            ? calcPreview(emp.salary, att, emp.gender, emp.isHandicap, month)
+                                            : null
                                         const isExpanded = expandedId === emp.id
 
                                         return (

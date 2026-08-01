@@ -155,8 +155,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 })
             }
 
-            // TRIGGER ONBOARDING if JOINED
-            if (body.status === "JOINED") {
+            // TRIGGER ONBOARDING if JOINED.
+            // Skipped once the lead has already been converted: this legacy path
+            // creates a bare INACTIVE employee with no salary, deployment or
+            // onboarding tasks, and repoints lead.convertedEmployeeId at it. Moving
+            // an already-converted candidate back through "Joined" therefore
+            // produced a duplicate employee and orphaned the real one. Proper
+            // conversion goes through POST /api/recruitment/[id]/convert.
+            if (body.status === "JOINED" && !prev.convertedEmployeeId) {
                 try {
                     // Generate EMP-XXXX ID
                     const lastEmployee = await prisma.employee.findFirst({

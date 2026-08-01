@@ -4,7 +4,24 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 
+// DISABLED. Same problem as the legacy POST /api/payroll handler: it wrote real
+// Payroll rows from Employee.basicSalary rather than the EmployeeSalary
+// structure, invented a 20% HRA and a flat 12% employer PF, skipped DA /
+// washing / conveyance / PT / LWF / compliance type, and paid a FULL month to
+// anyone with no attendance (`presentDays > 0 ? presentDays : workingDays`).
+//
+// No callers anywhere in the repo. Bulk generation belongs to
+// POST /api/payroll/calculate (lib/payroll-calc.ts). Kept and failing loudly
+// rather than deleted so a forgotten caller surfaces instead of silently
+// writing a month of wrong salaries.
 export async function POST(req: Request) {
+    return NextResponse.json(
+        { error: "This endpoint is disabled. Use POST /api/payroll/calculate, which applies the salary structure and statutory rules." },
+        { status: 410 }
+    )
+}
+
+async function _disabledLegacyBulk(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })

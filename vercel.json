@@ -6,5 +6,11 @@
     "app/api/**": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/sync-leave-status",
+      "schedule": "45 18 * * *"
+    }
+  ]
 }

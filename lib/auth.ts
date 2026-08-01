@@ -216,7 +216,7 @@ export const authOptions: NextAuthOptions = {
                     // Only current staff may sign in: terminated / inactive
                     // employees are blocked even if their User row is active
                     // (e.g. status was changed before user-sync existed).
-                    if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE")) {
+                    if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE" || employee.status === "RESIGNED")) {
                         throw new Error("Your account is inactive. Please contact HR.")
                     }
 
@@ -277,7 +277,7 @@ export const authOptions: NextAuthOptions = {
                     const isDemo = String(token.id).startsWith("demo-")
                     const lockedOut = !isDemo && (
                         !dbUser || !dbUser.isActive ||
-                        (employee ? (employee.status === "TERMINATED" || employee.status === "INACTIVE") : false)
+                        (employee ? (employee.status === "TERMINATED" || employee.status === "INACTIVE" || employee.status === "RESIGNED") : false)
                     )
                     if (lockedOut) {
                         ;(token as any).invalidated = true
