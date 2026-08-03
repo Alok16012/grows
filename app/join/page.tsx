@@ -356,8 +356,12 @@ export default function JoinPage() {
                 setCreated({ token, employeeId })
             }
 
-            // 2. Upload selected documents in parallel — track failures
-            const filledDocs = docs.map((d, i) => ({ ...d, idx: i })).filter(d => d.file)
+            // 2. Upload selected documents in parallel — track failures.
+            // `!d.url` matters: uploadDoc records the returned URL on success, and
+            // a retry must skip those. Filtering on `d.file` alone re-sent every
+            // file on every attempt, so each retry added another copy of the whole
+            // set — the reason one applicant's profile ended up with 34 documents.
+            const filledDocs = docs.map((d, i) => ({ ...d, idx: i })).filter(d => d.file && !d.url)
             const uploadResults = await Promise.all(filledDocs.map(d => uploadDoc(d.idx, token)))
             const failedUploads = uploadResults.filter(r => !r).length
 

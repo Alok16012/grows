@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { isPhotoDoc } from "@/lib/employee-photo"
+import { SINGLE_INSTANCE_DOC_TYPES } from "@/lib/document-types"
 
 // Public route — authenticated via onboardingToken only
 // POST /api/join/documents — saves uploaded document record for an onboarding employee
@@ -26,6 +27,18 @@ export async function POST(req: Request) {
 
         if (employee.status !== "ONBOARDING") {
             return NextResponse.json({ error: "Onboarding already completed" }, { status: 403 })
+        }
+
+        // Re-uploading a KYC document replaces the previous one instead of adding
+        // another copy. Nothing here used to dedupe, so a form that re-sent its
+        // files — a retry, a double submit — appended every time, and HR opened a
+        // profile listing the same Aadhaar and PAN thirty-odd times.
+        // Types where several files are legitimate (certificates, other) are left
+        // alone. Mirrors the replace behaviour in /api/me/documents.
+        if (SINGLE_INSTANCE_DOC_TYPES.has(String(type).toUpperCase())) {
+            await prisma.employeeDocument.deleteMany({
+                where: { employeeId: employee.id, type },
+            })
         }
 
         const doc = await prisma.employeeDocument.create({

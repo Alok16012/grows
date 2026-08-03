@@ -245,3 +245,37 @@ ORDER BY cardinality(
            WHERE t NOT IN (SELECT upper(d."type") FROM "EmployeeDocument" d
                             WHERE d."employeeId" = e."id"))
 ) DESC;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 8. Duplicate KYC documents
+-- ═══════════════════════════════════════════════════════════════════════════
+-- The joining form re-sent every file on each retry, and nothing on the server
+-- deduped, so one applicant could accumulate the same Aadhaar and PAN dozens of
+-- times. Prevented going forward; the copies already stored are listed here.
+
+SELECT e."employeeId",
+       e."firstName" || ' ' || COALESCE(e."lastName", '') AS name,
+       d."type",
+       count(*)                                           AS copies
+FROM "EmployeeDocument" d
+JOIN "Employee" e ON e."id" = d."employeeId"
+WHERE upper(d."type") IN ('AADHAAR','PAN','PHOTO','BANK_DETAILS')
+GROUP BY e."employeeId", e."firstName", e."lastName", d."type"
+HAVING count(*) > 1
+ORDER BY copies DESC, e."employeeId";
+
+
+-- Clean-up: keeps the NEWEST file of each single-instance type per employee and
+-- removes the older copies. Review the SELECT above first.
+--
+-- BEGIN;
+-- DELETE FROM "EmployeeDocument" d
+--  WHERE upper(d."type") IN ('AADHAAR','PAN','PHOTO','BANK_DETAILS')
+--    AND d."id" NOT IN (
+--        SELECT DISTINCT ON ("employeeId", upper("type")) "id"
+--          FROM "EmployeeDocument"
+--         WHERE upper("type") IN ('AADHAAR','PAN','PHOTO','BANK_DETAILS')
+--         ORDER BY "employeeId", upper("type"), "uploadedAt" DESC
+--    );
+-- COMMIT;
