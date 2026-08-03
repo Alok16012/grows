@@ -5,7 +5,7 @@ import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
     validateIFSC, validateBankAccount, validatePincode, validateUAN,
-    validateESIC, validateDateOfBirth,
+    validateESIC, validateDateOfBirth, validatePFNumber,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import crypto from "crypto"
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
             // KYC
             aadharNumber, panNumber,
             // PF / ESIC (flows into the Employee record after onboarding)
-            uan, esiNumber, labourCardNo,
+            uan, pfNumber, esiNumber, labourCardNo,
             // Bank
             bankAccountNumber, bankIFSC, bankName, bankBranch,
             // Employment
@@ -113,6 +113,7 @@ export async function POST(req: Request) {
             bankAccountNumber: validateBankAccount(bankAccountNumber),
             bankIFSC: validateIFSC(bankIFSC),
             uan: validateUAN(uan),
+            pfNumber: validatePFNumber(pfNumber),
             esiNumber: validateESIC(esiNumber),
         })
         // The join form reads `data.message || data.error` off the JSON body.
@@ -169,6 +170,7 @@ export async function POST(req: Request) {
                 aadharNumber:     aadharNumber ? digitsOnly(aadharNumber)  : null,
                 panNumber:        panNumber    ? normalizeUpper(panNumber) : null,
                 uan:              uan              || null,
+                pfNumber:         pfNumber         || null,
                 labourCardNo:     labourCardNo     || null,
                 esiNumber:        esiNumber        || null,
                 bankAccountNumber: bankAccountNumber || null,

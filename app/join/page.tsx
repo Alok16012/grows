@@ -8,7 +8,7 @@ import {
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
-    validatePincode, validateDateOfBirth, type FieldError,
+    validatePincode, validateDateOfBirth, validatePFNumber, type FieldError,
 } from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -34,8 +34,10 @@ type FormData = {
     // Bank & Compliance
     bankName: string; bankBranch: string; bankAccountNumber: string; bankIFSC: string
     aadharNumber: string; panNumber: string
-    // PF / ESIC — carried into the Employee record after onboarding
-    uan: string; esiNumber: string; labourCardNo: string
+    // PF / ESIC — carried into the Employee record after onboarding.
+    // UAN and the PF account number are different identifiers and are stored
+    // separately, so they are collected separately too.
+    uan: string; pfNumber: string; esiNumber: string; labourCardNo: string
 }
 
 type DocFile = { type: string; label: string; file: File | null; uploading: boolean; url: string | null; error: string | null }
@@ -54,7 +56,7 @@ const INITIAL: FormData = {
     siteId: "", hrId: "",
     bankName: "", bankBranch: "", bankAccountNumber: "", bankIFSC: "",
     aadharNumber: "", panNumber: "",
-    uan: "", esiNumber: "", labourCardNo: "",
+    uan: "", pfNumber: "", esiNumber: "", labourCardNo: "",
 }
 
 const TABS = [
@@ -111,6 +113,9 @@ export default function JoinPage() {
     const [loading, setLoading] = useState(false)
     const [submitted, setSubmitted] = useState(false)
     const [result, setResult] = useState<{ employeeId: string; uploadWarning?: number } | null>(null)
+    // Set once the employee record exists. A retry after a failed document
+    // upload must reuse it, not create a second employee.
+    const [created, setCreated] = useState<{ token: string; employeeId: string } | null>(null)
     const [copied, setCopied] = useState(false)
     // Site + HR dropdown options, loaded from /api/join (public GET)
     const [sites, setSites] = useState<{ id: string; name: string; code?: string | null }[]>([])
@@ -236,6 +241,7 @@ export default function JoinPage() {
             if (!form.panNumber.trim())         e.panNumber         = "Required"
             else put("panNumber", validatePAN(form.panNumber))
             put("uan", validateUAN(form.uan))
+            put("pfNumber", validatePFNumber(form.pfNumber))
             put("esiNumber", validateESIC(form.esiNumber))
         }
         return e
@@ -324,29 +330,57 @@ export default function JoinPage() {
 
         setLoading(true)
         try {
-            // 1. Create employee record
-            const { sameAsCurrent, ...payload } = form
-            const res = await fetch("/api/join", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...payload, photo: photo || undefined }),
-            })
-            const data = await res.json()
-            if (!res.ok) {
-                const msg = data.message || data.error || "Submission failed"
-                setErrors({ firstName: msg })
-                setLoading(false)
-                return
+            // 1. Create the employee record — unless a previous attempt already
+            // did and only the document upload failed.
+            let token: string
+            let employeeId: string
+            if (created) {
+                token = created.token
+                employeeId = created.employeeId
+            } else {
+                const { sameAsCurrent, ...payload } = form
+                const res = await fetch("/api/join", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...payload, photo: photo || undefined }),
+                })
+                const data = await res.json()
+                if (!res.ok) {
+                    const msg = data.message || data.error || "Submission failed"
+                    setErrors({ firstName: msg })
+                    setLoading(false)
+                    return
+                }
+                token = data.onboardingToken
+                employeeId = data.employeeId
+                setCreated({ token, employeeId })
             }
-
-            const token: string = data.onboardingToken
 
             // 2. Upload selected documents in parallel — track failures
             const filledDocs = docs.map((d, i) => ({ ...d, idx: i })).filter(d => d.file)
             const uploadResults = await Promise.all(filledDocs.map(d => uploadDoc(d.idx, token)))
             const failedUploads = uploadResults.filter(r => !r).length
 
-            setResult({ employeeId: data.employeeId, ...(failedUploads > 0 ? { uploadWarning: failedUploads } : {}) })
+            // A required document that failed to upload is a failure, not a
+            // footnote. The record is created before the files are sent (the
+            // upload needs the onboarding token), so without this the applicant
+            // saw "You're all set" while HR received a profile with no KYC at
+            // all. Keep them on the form so they can retry.
+            const requiredTypes = new Set(DOC_TYPES.filter(d => d.required).map(d => d.type))
+            const failedRequired = filledDocs.filter(
+                (d, i) => !uploadResults[i] && requiredTypes.has(d.type)
+            )
+            if (failedRequired.length > 0) {
+                setTab("documents")
+                setDocError(
+                    `Could not upload: ${failedRequired.map(d => d.label).join(", ")}. ` +
+                    `Your details are saved — tap Submit again to retry the upload.`
+                )
+                setLoading(false)
+                return
+            }
+
+            setResult({ employeeId, ...(failedUploads > 0 ? { uploadWarning: failedUploads } : {}) })
             setSubmitted(true)
         } catch {
             setErrors({ firstName: "Network error. Check your connection." })
@@ -778,9 +812,17 @@ export default function JoinPage() {
                                     </p>
                                     <div style={{ ...g2, marginTop: 14 }}>
                                         <div>
-                                            <Lbl text="UAN (PF) Number" />
+                                            <Lbl text="UAN Number" />
                                             <input style={{ ...inp, borderColor: errors.uan ? "var(--red)" : undefined }} placeholder="12-digit UAN" maxLength={12} value={form.uan} onChange={e => { set("uan", e.target.value.replace(/\D/g,"")); clrErr("uan") }} />
                                             <Err msg={errors.uan} />
+                                        </div>
+                                        <div>
+                                            {/* A PF account number is not a UAN — it is shorter and can
+                                                contain letters and slashes, so it gets its own field
+                                                rather than being rejected by the 12-digit UAN rule. */}
+                                            <Lbl text="PF Number" />
+                                            <input style={{ ...inp, borderColor: errors.pfNumber ? "var(--red)" : undefined }} placeholder="PF account number" maxLength={30} value={form.pfNumber} onChange={e => { set("pfNumber", e.target.value); clrErr("pfNumber") }} />
+                                            <Err msg={errors.pfNumber} />
                                         </div>
                                         <div>
                                             <Lbl text="Labour Card No." />

@@ -139,6 +139,36 @@ export async function PUT(
         if (!onboardingRecord) return new NextResponse("Not found", { status: 404 })
 
         if (action === "approve") {
+            // KYC has to actually be on file before someone becomes an employee.
+            // The joining forms ask for these, but they upload the files after the
+            // record is created, so a failed or skipped upload could still leave a
+            // profile with no documents — and the onboarding checklist items
+            // ("Collect Aadhar Card") are only text, they check nothing.
+            // Only the three every joining route collects. Self-onboarding has no
+            // bank-proof upload, so requiring BANK_DETAILS here would permanently
+            // block anyone who came in that way.
+            const REQUIRED_DOCS = ["AADHAAR", "PAN", "PHOTO"] as const
+            const held = await prisma.employeeDocument.findMany({
+                where: { employeeId: onboardingRecord.employeeId },
+                select: { type: true },
+            })
+            // Types are stored inconsistently cased ("PHOTO" vs "Photo").
+            const heldTypes = new Set(held.map(d => d.type.toUpperCase()))
+            const missing = REQUIRED_DOCS.filter(t => !heldTypes.has(t))
+            // `force` lets HR approve a record that predates this check, or one
+            // whose documents were collected on paper, rather than being stuck.
+            if (missing.length > 0 && !body.force) {
+                const label: Record<string, string> = {
+                    AADHAAR: "Aadhaar card", PAN: "PAN card", PHOTO: "Passport photo",
+                }
+                return NextResponse.json({
+                    error: "Missing documents",
+                    missing,
+                    canForce: true,
+                    message: `Cannot approve — not on file: ${missing.map(m => label[m]).join(", ")}.`,
+                }, { status: 400 })
+            }
+
             // Approval is the moment a pending candidate becomes a real employee:
             //  1. Assign the real EMP-NNNN code (replaces the PENDING-xxxx placeholder).
             //  2. Flip status to ACTIVE so they show up in the Employee Master.

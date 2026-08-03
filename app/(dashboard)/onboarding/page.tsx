@@ -782,14 +782,32 @@ export default function OnboardingPage() {
 
     useEffect(() => { fetchRecords() }, [fetchRecords])
 
-    const handleAction = async (id: string, action: "approve" | "reject", reason?: string) => {
+    const handleAction = async (id: string, action: "approve" | "reject", reason?: string, force?: boolean) => {
         try {
             const res = await fetch(`/api/onboarding/${id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action, rejectionReason: reason, notes: action === "approve" ? reason : undefined }),
+                body: JSON.stringify({ action, rejectionReason: reason, notes: action === "approve" ? reason : undefined, force }),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) {
+                const raw = await res.text()
+                // Approval is refused when required KYC documents are missing.
+                // Offer to go ahead anyway, for records collected on paper or
+                // created before the check existed.
+                try {
+                    const err = JSON.parse(raw)
+                    if (err?.canForce) {
+                        if (confirm(`${err.message}\n\nApprove anyway?`)) {
+                            return handleAction(id, action, reason, true)
+                        }
+                        return
+                    }
+                    throw new Error(err?.message || err?.error || raw)
+                } catch (parseErr) {
+                    if (parseErr instanceof Error && parseErr.message !== raw) throw parseErr
+                    throw new Error(raw)
+                }
+            }
             if (action === "approve") {
                 toast.success("Onboarding Approved! Employee is now Active.")
                 setSelected(null)

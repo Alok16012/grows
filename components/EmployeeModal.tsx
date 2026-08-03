@@ -11,7 +11,7 @@ import { can } from "@/lib/can"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
-    validatePincode, validateDateOfBirth,
+    validatePincode, validateDateOfBirth, validatePFNumber,
 } from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -407,6 +407,7 @@ export function EmployeeModal({
         bankIFSC:         validateIFSC(form.bankIFSC) || "",
         bankAccountNumber: validateBankAccount(form.bankAccountNumber) || "",
         uan:              validateUAN(form.uan) || "",
+        pfNumber:         validatePFNumber(form.pfNumber) || "",
         esiNumber:        validateESIC(form.esiNumber) || "",
         emergencyContact1Phone: validatePhone(form.emergencyContact1Phone) || "",
         emergencyContact2Phone: validatePhone(form.emergencyContact2Phone) || "",
@@ -1103,10 +1104,19 @@ export function EmployeeModal({
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Statutory Numbers</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={labelCls}>UAN (PF)</label>
+                                    <label className={labelCls}>UAN</label>
                                     <input value={form.uan} onChange={set("uan")} maxLength={12}
                                         className={inputCls + (fieldErrors.uan ? " !border-red-400" : "")} placeholder="Universal Account Number" />
                                     {fieldErrors.uan && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.uan}</p>}
+                                </div>
+                                <div>
+                                    {/* Separate from UAN: a PF account number is shorter and may
+                                        contain letters and slashes. It was already loaded and saved
+                                        but had no input, so it could never be entered or corrected. */}
+                                    <label className={labelCls}>PF Number</label>
+                                    <input value={form.pfNumber} onChange={set("pfNumber")} maxLength={30}
+                                        className={inputCls + (fieldErrors.pfNumber ? " !border-red-400" : "")} placeholder="PF account number" />
+                                    {fieldErrors.pfNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.pfNumber}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>ESIC Number</label>
