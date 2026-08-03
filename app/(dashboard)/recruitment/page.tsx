@@ -103,36 +103,21 @@ function openContactChannel(type: string, phone?: string | null, email?: string 
     }
 }
 
-const POSITIONS = [
-    "Quality Inspector",
-    "Quality Supervisor",
-    "QRE",
-    "CMM Operator",
-    "Designer",
-    "Security Guard",
-    "Security Supervisor",
-    "Driver",
-    "Heavy Vehicle Driver",
-    "Helper / Labour",
-    "Electrician",
-    "Plumber",
-    "Housekeeping Staff",
-    "Peon / Office Boy",
-    "Data Entry Operator",
-    "HR Recruiter",
-    "HR Recruiter TL",
-    "HR Executive",
-    "HR Manager",
-    "Field Recruiter",
-    "Payroll Executive",
-    "Compliance Executive",
-    "Account Executive",
-    "MIS Executive",
-    "Dispatch Executive",
-    "Operations Manager",
-    "Operations Head",
-    "Other",
+// Grouped for the dropdown. As one flat list of 28 the browser rendered a wall
+// of options tall enough that it opened upward over the rest of the form.
+// The stored values are unchanged — grouping only affects how they are shown.
+const POSITION_GROUPS: { group: string; positions: string[] }[] = [
+    { group: "Quality & Engineering", positions: ["Quality Inspector", "Quality Supervisor", "QRE", "CMM Operator", "Designer"] },
+    { group: "Security",              positions: ["Security Guard", "Security Supervisor"] },
+    { group: "Drivers",               positions: ["Driver", "Heavy Vehicle Driver"] },
+    { group: "Facility & Support",    positions: ["Helper / Labour", "Electrician", "Plumber", "Housekeeping Staff", "Peon / Office Boy"] },
+    { group: "HR",                    positions: ["HR Recruiter", "HR Recruiter TL", "HR Executive", "HR Manager", "Field Recruiter"] },
+    { group: "Office & Admin",        positions: ["Data Entry Operator", "MIS Executive", "Dispatch Executive", "Account Executive", "Compliance Executive", "Payroll Executive"] },
+    { group: "Operations",            positions: ["Operations Manager", "Operations Head"] },
+    { group: "Other",                 positions: ["Other"] },
 ]
+
+const POSITIONS = POSITION_GROUPS.flatMap(g => g.positions)
 
 const SOURCES = ["Walk-in", "LinkedIn", "Naukri", "Indeed", "WorkIndia", "Referral", "WhatsApp", "Agency", "Newspaper Ad", "Other"]
 const QUALIFICATIONS = ["8th Pass", "10th Pass", "12th Pass", "ITI", "Diploma", "Graduate", "Post Graduate", "Other"]
@@ -1353,7 +1338,11 @@ export default function RecruitmentPage() {
                                 <Field label="Position Applied For *">
                                     <select required value={form.position} onChange={e => setForm(p => ({ ...p, position: e.target.value }))} className={inputCls}>
                                         <option value="">Select position</option>
-                                        {POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                                        {POSITION_GROUPS.map(g => (
+                                            <optgroup key={g.group} label={g.group}>
+                                                {g.positions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                                            </optgroup>
+                                        ))}
                                     </select>
                                 </Field>
                                 <Field label="Experience (Years)">

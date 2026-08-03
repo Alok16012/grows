@@ -4,35 +4,17 @@ import { useParams } from "next/navigation"
 import { Loader2, CheckCircle2, AlertCircle, Send, Briefcase, User, MapPin, Camera, Plus, Trash2 } from "lucide-react"
 import { validatePhone, validateEmail, validateAadhaar, validateDateOfBirth } from "@/lib/validation"
 
-const POSITIONS = [
-    "Quality Inspector",
-    "Quality Supervisor",
-    "QRE",
-    "CMM Operator",
-    "Designer",
-    "Security Guard",
-    "Security Supervisor",
-    "Driver",
-    "Heavy Vehicle Driver",
-    "Helper / Labour",
-    "Electrician",
-    "Plumber",
-    "Housekeeping Staff",
-    "Peon / Office Boy",
-    "Data Entry Operator",
-    "HR Recruiter",
-    "HR Recruiter TL",
-    "HR Executive",
-    "HR Manager",
-    "Field Recruiter",
-    "Payroll Executive",
-    "Compliance Executive",
-    "Account Executive",
-    "MIS Executive",
-    "Dispatch Executive",
-    "Operations Manager",
-    "Operations Head",
-    "Other",
+// Keep in step with POSITION_GROUPS in app/(dashboard)/recruitment/page.tsx —
+// a position offered internally but missing here is one an applicant cannot pick.
+const POSITION_GROUPS: { group: string; positions: string[] }[] = [
+    { group: "Quality & Engineering", positions: ["Quality Inspector", "Quality Supervisor", "QRE", "CMM Operator", "Designer"] },
+    { group: "Security",              positions: ["Security Guard", "Security Supervisor"] },
+    { group: "Drivers",               positions: ["Driver", "Heavy Vehicle Driver"] },
+    { group: "Facility & Support",    positions: ["Helper / Labour", "Electrician", "Plumber", "Housekeeping Staff", "Peon / Office Boy"] },
+    { group: "HR",                    positions: ["HR Recruiter", "HR Recruiter TL", "HR Executive", "HR Manager", "Field Recruiter"] },
+    { group: "Office & Admin",        positions: ["Data Entry Operator", "MIS Executive", "Dispatch Executive", "Account Executive", "Compliance Executive", "Payroll Executive"] },
+    { group: "Operations",            positions: ["Operations Manager", "Operations Head"] },
+    { group: "Other",                 positions: ["Other"] },
 ]
 const TSHIRT_SIZES = ["S", "M", "L", "XL", "XXL"]
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
@@ -284,7 +266,11 @@ export default function ApplyPage() {
                             <label style={lbl}>Position Applied For</label>
                             <select value={form.position} onChange={set("position")} style={inp}>
                                 <option value="">Select position…</option>
-                                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                                {POSITION_GROUPS.map(g => (
+                                    <optgroup key={g.group} label={g.group}>
+                                        {g.positions.map(p => <option key={p} value={p}>{p}</option>)}
+                                    </optgroup>
+                                ))}
                             </select>
                         </div>
                     </div>
