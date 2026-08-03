@@ -328,7 +328,13 @@ export function EmployeeModal({
                 dateOfJoining: employee.dateOfJoining ? employee.dateOfJoining.split("T")[0] : "",
                 employmentType: employee.employmentType,
                 salaryType: employee.salaryType || "Monthly",
-                basicSalary: String(employee.employeeSalary?.basic ?? employee.basicSalary),
+                // Blank, not the strings "null"/"undefined". /api/employees masks
+                // salary to null for anyone without employees.viewSalary, and
+                // String(null) produced a value that looked filled in but was not
+                // a number.
+                basicSalary: (employee.employeeSalary?.basic ?? employee.basicSalary) != null
+                    ? String(employee.employeeSalary?.basic ?? employee.basicSalary)
+                    : "",
                 address: employee.address || "",
                 city: employee.city || "",
                 state: employee.state || "",
@@ -470,7 +476,12 @@ export function EmployeeModal({
 
             if (!draftEmpId && empId) setDraftEmpId(empId)
 
-            if (empId && form.basicSalary) {
+            // Never write the salary structure from a form that was not allowed to
+            // read it. The API blanks these fields for anyone without
+            // employees.viewSalary, so saving would have posted the blanked values
+            // over the real ones — wiping an employee's whole salary structure as
+            // a side effect of editing their phone number.
+            if (canViewSalary && empId && form.basicSalary) {
                 try {
                     const salRes = await fetch(`/api/payroll/salary-structure/${empId}`, {
                         method: "POST",

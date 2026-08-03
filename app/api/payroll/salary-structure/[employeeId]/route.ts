@@ -4,9 +4,17 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 
+// Reading needs a salary permission — this returns an individual's full pay
+// breakdown, and previously any signed-in employee could fetch anyone's.
+// `employees.viewSalary` is accepted alongside `payroll.view` because the
+// employee drawer's Salary tab is gated on it.
+const CAN_READ_SALARY = (session: any) =>
+    checkAccess(session, [], "payroll.view") || checkAccess(session, [], "employees.viewSalary")
+
 export async function GET(_req: Request, { params }: { params: { employeeId: string } }) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    if (!CAN_READ_SALARY(session)) return new NextResponse("Forbidden", { status: 403 })
 
     const sal = await prisma.employeeSalary.findUnique({
         where: { employeeId: params.employeeId }
@@ -16,8 +24,9 @@ export async function GET(_req: Request, { params }: { params: { employeeId: str
 
 export async function POST(req: Request, { params }: { params: { employeeId: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
-        return new NextResponse("Unauthorized", { status: 401 })
+    // Writing a salary structure was gated on `payroll.view`, a read permission.
+    if (!session || !(checkAccess(session, [], "payroll.manage") || checkAccess(session, [], "employees.viewSalary"))) {
+        return new NextResponse("Forbidden", { status: 403 })
     }
 
     const body = await req.json()
