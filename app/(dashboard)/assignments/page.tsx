@@ -140,6 +140,10 @@ export default function AssignmentsPage() {
 
     const [mounted, setMounted] = useState(false)
     const isManagerOrAdmin = can(session, "assignments.view")
+    // Creating / deleting assignments needs the write permission — the API
+    // already requires assignments.manage, so read-only roles must not see the
+    // wizard or the row actions.
+    const canManageAssignments = can(session, "assignments.manage")
 
     useEffect(() => { setMounted(true) }, [])
 
@@ -401,9 +405,10 @@ export default function AssignmentsPage() {
                 <p className="text-[13px] text-[var(--text3)] mt-0.5">Assign inspectors and managers to projects and define access, scope, and schedules.</p>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[440px_1fr] gap-4 items-start">
+            <div className={canManageAssignments ? "grid grid-cols-1 xl:grid-cols-[440px_1fr] gap-4 items-start" : "grid grid-cols-1 gap-4 items-start"}>
 
                 {/* ── LEFT: New Assignment wizard ── */}
+                {canManageAssignments && (
                 <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
                     <div className="flex items-center gap-2 mb-0.5">
                         <Sparkles size={15} className="text-[var(--accent)]" />
@@ -649,6 +654,7 @@ export default function AssignmentsPage() {
                         </div>
                     </div>
                 </div>
+                )}
 
                 {/* ── RIGHT: stats + table ── */}
                 <div className="space-y-4 min-w-0">
@@ -746,7 +752,9 @@ export default function AssignmentsPage() {
                                                                 className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                                                                 <Eye size={13} />
                                                             </button>
-                                                            <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} />
+                                                            {canManageAssignments && (
+                                                                <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} />
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

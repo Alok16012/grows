@@ -59,16 +59,35 @@ export default withAuth(
         // reports.view permission to load its data, so a custom-role MANAGER that
         // lacks it is sent to their own landing page instead of a broken dashboard.
         if (path.startsWith("/manager")) {
-            if (role !== "MANAGER" && role !== "ADMIN") {
+            // /manager/analytics is a pure reporting screen — its API is gated on
+            // `reports.view`, and the sidebar shows it to anyone holding that
+            // permission. Let those users through instead of bouncing them to
+            // their dashboard, which is what made the link look broken.
+            const canViewAnalytics =
+                path.startsWith("/manager/analytics") && permissions.includes("reports.view")
+            if (role !== "MANAGER" && role !== "ADMIN" && !canViewAnalytics) {
                 return NextResponse.redirect(new URL(ownDashboard, req.url))
             }
             if (role === "MANAGER" && customRoleName && !permissions.includes("reports.view")) {
                 return NextResponse.redirect(new URL("/dashboard", req.url))
             }
         }
-        // /inspection → INSPECTION_BOY or ADMIN
-        if (path.startsWith("/inspection") && role !== "INSPECTION_BOY" && role !== "ADMIN") {
-            return NextResponse.redirect(new URL(ownDashboard, req.url))
+        // /inspection → the inspector workspace.
+        // Base role alone is not enough to decide this: every route that assigns a
+        // custom role sets the system role to MANAGER (see fix-login,
+        // employee-logins, employees/import), so a "Quality Inspector" custom role
+        // does NOT carry INSPECTION_BOY. Gating on the base role therefore bounced
+        // real inspectors off their own workspace — they could see an assignment
+        // but had no way to open and fill it.
+        if (path.startsWith("/inspection")) {
+            const canInspect =
+                role === "INSPECTION_BOY" || role === "ADMIN" ||
+                permissions.includes("inspection.view") ||
+                permissions.includes("inspection.submit") ||
+                permissions.includes("inspection.history")
+            if (!canInspect) {
+                return NextResponse.redirect(new URL(ownDashboard, req.url))
+            }
         }
         // /client → CLIENT only
         if (path.startsWith("/client") && role !== "CLIENT") {

@@ -14,6 +14,7 @@ import {
     CheckCircle, Loader2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -301,7 +302,9 @@ export default function AnalyticsPage() {
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && session?.user?.role === "INSPECTION_BOY") router.push("/")
+        // Gated on the permission the page's API already requires, not on the
+        // base role — a custom role holding reports.view may view analytics.
+        if (status === "authenticated" && !can(session, "reports.view")) router.push("/")
     }, [status, session, router])
 
     useEffect(() => {

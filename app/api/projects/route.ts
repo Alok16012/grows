@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { ensureSiteAssignmentSchema } from "@/lib/site-assignment-schema"
 import { ensureProjectSchema } from "@/lib/prisma"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     try {
@@ -68,14 +69,15 @@ export async function POST(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        // Creating a project is a write — same gate as PUT / DELETE on
+        // /api/projects/[id]. Without this any signed-in user could create one.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.manage")) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+
         // Resolve real DB user ID
         const actorId = await resolveUserId(session)
         if (!actorId) return NextResponse.json({ error: "User not found. Please log in again." }, { status: 403 })
-
-        // Role check
-        if (session.user.role === "CLIENT") {
-            return new NextResponse("Forbidden", { status: 403 })
-        }
 
         const body = await req.json()
         const { name, description, siteId, managerIds, inspectorIds, projectType, priority, status, startDate, endDate } = body
@@ -167,7 +169,18 @@ export async function POST(req: Request) {
                 where: { siteId, status: "active" },
                 select: { inspectionBoyId: true, assignedBy: true, recurrenceType: true },
             })
+            // Skip inspectors that were already picked in the Team step above —
+            // otherwise they end up with two active assignments on this project
+            // and see the same inspection twice.
+            const alreadyAssigned = new Set(
+                (await prisma.assignment.findMany({
+                    where: { projectId: project.id, status: "active" },
+                    select: { inspectionBoyId: true },
+                })).map(a => a.inspectionBoyId)
+            )
             for (const sa of siteAssignments) {
+                if (alreadyAssigned.has(sa.inspectionBoyId)) continue
+                alreadyAssigned.add(sa.inspectionBoyId)
                 await prisma.assignment.create({
                     data: {
                         projectId: project.id,

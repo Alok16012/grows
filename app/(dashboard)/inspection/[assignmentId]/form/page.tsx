@@ -55,7 +55,10 @@ export default function InspectionFormPage() {
     const [showChooser, setShowChooser] = useState(false)
 
     useEffect(() => {
-        if (authStatus !== "authenticated" || session?.user?.role !== "INSPECTION_BOY") return
+        // Same reasoning as the access guard below: a custom-role inspector's base
+        // role is MANAGER, so keying this on INSPECTION_BOY hid their other pending
+        // forms from them.
+        if (authStatus !== "authenticated") return
         fetch("/api/assignments?status=all")
             .then(r => (r.ok ? r.json() : []))
             .then((list: any[]) => {
@@ -112,8 +115,20 @@ export default function InspectionFormPage() {
     useEffect(() => {
         if (authStatus === "unauthenticated") {
             router.push("/login")
-        } else if (authStatus === "authenticated" && session?.user?.role !== "INSPECTION_BOY" && session?.user?.role !== "ADMIN") {
-            router.push("/")
+            return
+        }
+        // Mirrors middleware.ts: a custom-role inspector carries the MANAGER base
+        // role (every route that assigns a custom role sets it), so checking the
+        // base role alone locked real inspectors out of the form.
+        if (authStatus === "authenticated") {
+            const role = session?.user?.role
+            const perms = (session?.user as any)?.permissions ?? []
+            const canInspect =
+                role === "INSPECTION_BOY" || role === "ADMIN" ||
+                perms.includes("inspection.view") ||
+                perms.includes("inspection.submit") ||
+                perms.includes("inspection.history")
+            if (!canInspect) router.push("/")
         }
     }, [authStatus, session, router])
 

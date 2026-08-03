@@ -207,7 +207,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "MY WORK",
             links: [
-                { name: "My Assignments",   href: "/assignments",    icon: HardHat,      roles: ["INSPECTION_BOY"] },
+                // Points at the Inspector Workspace (/inspection) — the only screen
+                // that can open and submit an inspection form. /assignments is the
+                // manager-side wizard and just bounces inspectors back here.
+                { name: "My Assignments",   href: "/inspection",     icon: HardHat,      roles: ["INSPECTION_BOY"], permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"] },
                 { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"], permission: "self.view" },
                 { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"], permission: "self.view" },
             ],
