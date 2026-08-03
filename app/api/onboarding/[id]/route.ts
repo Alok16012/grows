@@ -144,10 +144,8 @@ export async function PUT(
             // record is created, so a failed or skipped upload could still leave a
             // profile with no documents — and the onboarding checklist items
             // ("Collect Aadhar Card") are only text, they check nothing.
-            // Only the three every joining route collects. Self-onboarding has no
-            // bank-proof upload, so requiring BANK_DETAILS here would permanently
-            // block anyone who came in that way.
-            const REQUIRED_DOCS = ["AADHAAR", "PAN", "PHOTO"] as const
+            // Every joining route now offers all four, so all four are required.
+            const REQUIRED_DOCS = ["AADHAAR", "PAN", "PHOTO", "BANK_DETAILS"] as const
             const held = await prisma.employeeDocument.findMany({
                 where: { employeeId: onboardingRecord.employeeId },
                 select: { type: true },
@@ -160,6 +158,7 @@ export async function PUT(
             if (missing.length > 0 && !body.force) {
                 const label: Record<string, string> = {
                     AADHAAR: "Aadhaar card", PAN: "PAN card", PHOTO: "Passport photo",
+                    BANK_DETAILS: "Bank passbook / cancelled cheque",
                 }
                 return NextResponse.json({
                     error: "Missing documents",

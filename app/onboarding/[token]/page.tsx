@@ -252,10 +252,14 @@ export default function OnboardingPortal() {
     // the enum key, so match loosely — otherwise an already-uploaded document
     // reads as missing and the candidate can never submit.
     const normType = (t?: string | null) => (t || "").toUpperCase().replace(/[^A-Z]/g, "")
+    // Must match the set HR approval enforces (app/api/onboarding/[id]/route.ts),
+    // otherwise an applicant submits successfully and HR is then blocked from
+    // approving them.
     const REQUIRED_DOCS = [
         { type: "AADHAAR", label: "Aadhaar Card", match: (n: string) => n.includes("AADHA") },
         { type: "PAN", label: "PAN Card", match: (n: string) => n.startsWith("PAN") },
         { type: "BANK_DETAILS", label: "Bank Proof", match: (n: string) => n.includes("BANK") },
+        { type: "PHOTO", label: "Photo", match: (n: string) => n.includes("PHOTO") },
     ]
     const missingRequiredDocs = REQUIRED_DOCS.filter(
         r => !docs.some(d => d.fileUrl && (d.type === r.type || r.match(normType(d.type))))

@@ -64,12 +64,15 @@ const STEPS = [
 ]
 
 const DOC_UPLOAD_TYPES = [
-    { type: "AADHAAR",     label: "Aadhaar Card" },
-    { type: "PAN",         label: "PAN Card" },
-    { type: "PHOTO",       label: "Passport Photo" },
-    { type: "RESUME",      label: "Resume / CV" },
-    { type: "CERTIFICATE", label: "Educational Certificate" },
-    { type: "OTHER",       label: "Other Document" },
+    { type: "AADHAAR",      label: "Aadhaar Card" },
+    { type: "PAN",          label: "PAN Card" },
+    { type: "PHOTO",        label: "Passport Photo" },
+    // Bank proof is required before HR can approve, and this form had no way to
+    // upload one — anyone joining through it could never satisfy that check.
+    { type: "BANK_DETAILS", label: "Bank Passbook / Cancelled Cheque" },
+    { type: "RESUME",       label: "Resume / CV" },
+    { type: "CERTIFICATE",  label: "Educational Certificate" },
+    { type: "OTHER",        label: "Other Document" },
 ]
 
 // ── Small UI helpers ─────────────────────────────────────────────────────────
