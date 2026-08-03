@@ -825,10 +825,6 @@ export default function JoinPage() {
                                             <Err msg={errors.pfNumber} />
                                         </div>
                                         <div>
-                                            <Lbl text="Labour Card No." />
-                                            <input style={inp} placeholder="Labour card number" value={form.labourCardNo} onChange={e => set("labourCardNo", e.target.value)} />
-                                        </div>
-                                        <div>
                                             <Lbl text="ESIC Number" />
                                             <input style={{ ...inp, borderColor: errors.esiNumber ? "var(--red)" : undefined }} placeholder="ESIC IP number" maxLength={17} value={form.esiNumber} onChange={e => { set("esiNumber", e.target.value); clrErr("esiNumber") }} />
                                             <Err msg={errors.esiNumber} />

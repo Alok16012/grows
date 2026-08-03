@@ -1124,10 +1124,6 @@ export function EmployeeModal({
                                         className={inputCls + (fieldErrors.esiNumber ? " !border-red-400" : "")} placeholder="ESIC number" />
                                     {fieldErrors.esiNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.esiNumber}</p>}
                                 </div>
-                                <div>
-                                    <label className={labelCls}>Labour Card No.</label>
-                                    <input value={form.labourCardNo} onChange={set("labourCardNo")} className={inputCls} placeholder="Labour card number" />
-                                </div>
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Emergency Contacts</p>
                             <div className="grid grid-cols-2 gap-3">

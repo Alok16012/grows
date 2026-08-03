@@ -9,7 +9,7 @@ import {
 import { toast } from "sonner"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
-    validateBankAccount, validateUAN, validateESIC,
+    validateBankAccount, validateUAN, validateESIC, validatePFNumber,
     validatePincode, validateDateOfBirth,
 } from "@/lib/validation"
 
@@ -54,10 +54,11 @@ type FormData = {
     // KYC
     aadharNumber: string
     panNumber: string
-    // Statutory numbers (previous employment)
+    // Statutory numbers (previous employment). UAN and the PF account number are
+    // different identifiers and are stored separately.
     uan: string
+    pfNumber: string
     esiNumber: string
-    labourCardNo: string
     // Bank
     bankName: string
     bankAccountNumber: string
@@ -77,7 +78,7 @@ const EMPTY: FormData = {
     permanentAddress: "", permanentCity: "", permanentState: "", permanentPincode: "", sameAsCurrent: false,
     emergencyContact1Name: "", emergencyContact1Phone: "",
     aadharNumber: "", panNumber: "",
-    uan: "", esiNumber: "", labourCardNo: "",
+    uan: "", pfNumber: "", esiNumber: "",
     bankName: "", bankAccountNumber: "", bankIFSC: "", bankBranch: "",
 }
 
@@ -177,8 +178,8 @@ export default function OnboardingPortal() {
                         aadharNumber: data.aadharNumber || "",
                         panNumber: data.panNumber || "",
                         uan: data.uan || "",
+                        pfNumber: data.pfNumber || "",
                         esiNumber: data.esiNumber || "",
-                        labourCardNo: data.labourCardNo || "",
                         bankName: data.bankName || "",
                         bankAccountNumber: data.bankAccountNumber || "",
                         bankIFSC: data.bankIFSC || "",
@@ -274,6 +275,7 @@ export default function OnboardingPortal() {
         aadharNumber:           validateAadhaar(form.aadharNumber),
         panNumber:              validatePAN(form.panNumber),
         uan:                    validateUAN(form.uan),
+        pfNumber:               validatePFNumber(form.pfNumber),
         esiNumber:              validateESIC(form.esiNumber),
         bankAccountNumber:      validateBankAccount(form.bankAccountNumber),
         bankIFSC:               validateIFSC(form.bankIFSC),
@@ -616,17 +618,19 @@ export default function OnboardingPortal() {
                                     Previous Employment — PF &amp; ESIC
                                 </p>
                                 <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 12 }}>
-                                    If you worked before and have a PF (UAN) or ESIC number, enter it so your account continues. Leave blank if this is your first job.
+                                    If you worked before and have a UAN, PF or ESIC number, enter it so your account continues. Leave blank if this is your first job.
                                 </p>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                                    <Field label="Previous PF / UAN Number" error={errors.uan}>
+                                    <Field label="Previous UAN" error={errors.uan}>
                                         <input type="text" maxLength={12} value={form.uan}
                                             onChange={e => setForm(f => ({ ...f, uan: e.target.value.replace(/\D/g, "") }))}
                                             placeholder="12-digit UAN" className={inp} />
                                     </Field>
-                                    <Field label="Labour Card No.">
-                                        <input type="text" value={form.labourCardNo} onChange={set("labourCardNo")}
-                                            placeholder="Labour card number" className={inp} />
+                                    {/* A PF account number is not a UAN — shorter, and it can contain
+                                        letters and slashes, so it cannot share the 12-digit field. */}
+                                    <Field label="Previous PF Number" error={errors.pfNumber}>
+                                        <input type="text" maxLength={30} value={form.pfNumber} onChange={set("pfNumber")}
+                                            placeholder="PF account number" className={inp} />
                                     </Field>
                                     <Field label="Previous ESIC Number" error={errors.esiNumber}>
                                         <input type="text" maxLength={17} value={form.esiNumber}

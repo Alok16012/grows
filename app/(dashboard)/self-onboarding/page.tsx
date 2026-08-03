@@ -497,9 +497,6 @@ export default function SelfOnboardingPage() {
                             <Field label="ESIC Number">
                                 <Input value={f("esiNumber")} onChange={set("esiNumber")} placeholder="ESIC Insurance Number" maxLength={17} error={errors.esiNumber} />
                             </Field>
-                            <Field label="Labour Card No.">
-                                <Input value={f("labourCardNo")} onChange={set("labourCardNo")} placeholder="Labour Card Number" />
-                            </Field>
                         </Grid>
                     </div>
                 )}

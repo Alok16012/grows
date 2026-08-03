@@ -3312,17 +3312,16 @@ function ConvertModal({ lead, onClose, onConverted }: {
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Statutory Numbers</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={lCls}>UAN (PF)</label>
-                                    <input value={form.uan} onChange={set("uan")} maxLength={12} className={errCls(cErrors.uan)} placeholder="Universal Account Number" />
+                                    <label className={lCls}>UAN</label>
+                                    <input value={form.uan} onChange={set("uan")} maxLength={12} className={errCls(cErrors.uan)} placeholder="12-digit UAN" />
                                     {cErrors.uan && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.uan}</p>}
                                 </div>
-                                <div><label className={lCls}>PF Number</label><input value={form.pfNumber} onChange={set("pfNumber")} className={iCls} placeholder="PF number" /></div>
+                                <div><label className={lCls}>PF Number</label><input value={form.pfNumber} onChange={set("pfNumber")} className={iCls} placeholder="PF account number" /></div>
                                 <div>
                                     <label className={lCls}>ESIC Number</label>
                                     <input value={form.esiNumber} onChange={set("esiNumber")} maxLength={17} className={errCls(cErrors.esiNumber)} placeholder="ESIC number" />
                                     {cErrors.esiNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.esiNumber}</p>}
                                 </div>
-                                <div><label className={lCls}>Labour Card No.</label><input value={form.labourCardNo} onChange={set("labourCardNo")} className={iCls} placeholder="Labour card number" /></div>
                             </div>
                             <p className="text-[11px] font-semibold text-[var(--text3)] tracking-[0.5px] uppercase mt-2">Emergency Contacts</p>
                             <div className="grid grid-cols-2 gap-3">

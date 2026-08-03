@@ -192,7 +192,6 @@ function MyDetailsTab() {
                 <Field label="UAN" value={data.uan ?? ""} onChange={set("uan")} maxLength={12} error={errors.uan} />
                 <Field label="PF Number" value={data.pfNumber ?? ""} onChange={set("pfNumber")} />
                 <Field label="ESI Number" value={data.esiNumber ?? ""} onChange={set("esiNumber")} maxLength={17} error={errors.esiNumber} />
-                <Field label="Labour Card No." value={data.labourCardNo ?? ""} onChange={set("labourCardNo")} />
             </Section>
 
             <Section title="Bank Details" icon={CreditCard}>

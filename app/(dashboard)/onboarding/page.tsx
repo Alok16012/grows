@@ -359,7 +359,6 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
                                 <Field label="UAN" value={e.uan} />
                                 <Field label="PF Number" value={e.pfNumber} />
                                 <Field label="ESI Number" value={e.esiNumber} />
-                                <Field label="Labour Card No" value={e.labourCardNo} />
                             </Section>
                         </>
                     )}
