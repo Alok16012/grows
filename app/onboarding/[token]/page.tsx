@@ -629,13 +629,14 @@ export default function OnboardingPortal() {
                                     {/* A PF account number is not a UAN — shorter, and it can contain
                                         letters and slashes, so it cannot share the 12-digit field. */}
                                     <Field label="Previous PF Number" error={errors.pfNumber}>
-                                        <input type="text" maxLength={30} value={form.pfNumber} onChange={set("pfNumber")}
-                                            placeholder="PF account number" className={inp} />
+                                        <input type="text" maxLength={12} value={form.pfNumber}
+                                            onChange={e => setForm(f => ({ ...f, pfNumber: e.target.value.replace(/\D/g, "") }))}
+                                            placeholder="12-digit PF number" className={inp} />
                                     </Field>
                                     <Field label="Previous ESIC Number" error={errors.esiNumber}>
-                                        <input type="text" maxLength={17} value={form.esiNumber}
+                                        <input type="text" maxLength={10} value={form.esiNumber}
                                             onChange={e => setForm(f => ({ ...f, esiNumber: e.target.value.replace(/\D/g, "") }))}
-                                            placeholder="ESIC IP number" className={inp} />
+                                            placeholder="10-digit ESIC number" className={inp} />
                                     </Field>
                                 </div>
                             </div>

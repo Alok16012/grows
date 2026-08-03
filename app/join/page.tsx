@@ -821,12 +821,12 @@ export default function JoinPage() {
                                                 contain letters and slashes, so it gets its own field
                                                 rather than being rejected by the 12-digit UAN rule. */}
                                             <Lbl text="PF Number" />
-                                            <input style={{ ...inp, borderColor: errors.pfNumber ? "var(--red)" : undefined }} placeholder="PF account number" maxLength={30} value={form.pfNumber} onChange={e => { set("pfNumber", e.target.value); clrErr("pfNumber") }} />
+                                            <input style={{ ...inp, borderColor: errors.pfNumber ? "var(--red)" : undefined }} placeholder="12-digit PF number" maxLength={12} value={form.pfNumber} onChange={e => { set("pfNumber", e.target.value.replace(/\D/g,"")); clrErr("pfNumber") }} />
                                             <Err msg={errors.pfNumber} />
                                         </div>
                                         <div>
                                             <Lbl text="ESIC Number" />
-                                            <input style={{ ...inp, borderColor: errors.esiNumber ? "var(--red)" : undefined }} placeholder="ESIC IP number" maxLength={17} value={form.esiNumber} onChange={e => { set("esiNumber", e.target.value); clrErr("esiNumber") }} />
+                                            <input style={{ ...inp, borderColor: errors.esiNumber ? "var(--red)" : undefined }} placeholder="10-digit ESIC number" maxLength={10} value={form.esiNumber} onChange={e => { set("esiNumber", e.target.value.replace(/\D/g,"")); clrErr("esiNumber") }} />
                                             <Err msg={errors.esiNumber} />
                                         </div>
                                     </div>

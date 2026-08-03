@@ -12,7 +12,7 @@ import {
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
-    validatePincode, validateDateOfBirth,
+    validatePincode, validateDateOfBirth, validatePFNumber,
 } from "@/lib/validation"
 
 // ─── Self-service Details Tab ────────────────────────────────────────────────
@@ -105,6 +105,7 @@ function MyDetailsTab() {
         aadharNumber:      validateAadhaar(v("aadharNumber")),
         panNumber:         validatePAN(v("panNumber")),
         uan:               validateUAN(v("uan")),
+        pfNumber:          validatePFNumber(v("pfNumber")),
         esiNumber:         validateESIC(v("esiNumber")),
         bankAccountNumber: validateBankAccount(v("bankAccountNumber")),
         bankIFSC:          validateIFSC(v("bankIFSC")),
@@ -190,8 +191,8 @@ function MyDetailsTab() {
                 <Field label="Aadhaar Number" value={data.aadharNumber ?? ""} onChange={set("aadharNumber")} maxLength={12} error={errors.aadharNumber} />
                 <Field label="PAN Number" value={data.panNumber ?? ""} onChange={v => set("panNumber")(v.toUpperCase())} maxLength={10} error={errors.panNumber} />
                 <Field label="UAN" value={data.uan ?? ""} onChange={set("uan")} maxLength={12} error={errors.uan} />
-                <Field label="PF Number" value={data.pfNumber ?? ""} onChange={set("pfNumber")} />
-                <Field label="ESI Number" value={data.esiNumber ?? ""} onChange={set("esiNumber")} maxLength={17} error={errors.esiNumber} />
+                <Field label="PF Number" value={data.pfNumber ?? ""} onChange={set("pfNumber")} maxLength={12} error={errors.pfNumber} />
+                <Field label="ESI Number" value={data.esiNumber ?? ""} onChange={set("esiNumber")} maxLength={10} error={errors.esiNumber} />
             </Section>
 
             <Section title="Bank Details" icon={CreditCard}>

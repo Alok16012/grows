@@ -1114,14 +1114,14 @@ export function EmployeeModal({
                                         contain letters and slashes. It was already loaded and saved
                                         but had no input, so it could never be entered or corrected. */}
                                     <label className={labelCls}>PF Number</label>
-                                    <input value={form.pfNumber} onChange={set("pfNumber")} maxLength={30}
-                                        className={inputCls + (fieldErrors.pfNumber ? " !border-red-400" : "")} placeholder="PF account number" />
+                                    <input value={form.pfNumber} onChange={set("pfNumber")} maxLength={12}
+                                        className={inputCls + (fieldErrors.pfNumber ? " !border-red-400" : "")} placeholder="12-digit PF number" />
                                     {fieldErrors.pfNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.pfNumber}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>ESIC Number</label>
-                                    <input value={form.esiNumber} onChange={set("esiNumber")} maxLength={17}
-                                        className={inputCls + (fieldErrors.esiNumber ? " !border-red-400" : "")} placeholder="ESIC number" />
+                                    <input value={form.esiNumber} onChange={set("esiNumber")} maxLength={10}
+                                        className={inputCls + (fieldErrors.esiNumber ? " !border-red-400" : "")} placeholder="10-digit ESIC number" />
                                     {fieldErrors.esiNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.esiNumber}</p>}
                                 </div>
                             </div>

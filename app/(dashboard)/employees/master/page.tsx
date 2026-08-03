@@ -508,6 +508,8 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
                                 <Field label="Aadhaar No."    value={form.aadharNumber}     onChange={set("aadharNumber")} />
                                 <Field label="PAN No."        value={form.panNumber}        onChange={set("panNumber")} />
                                 <Field label="UAN"            value={form.uan}              onChange={set("uan")} />
+                                {/* This local Field has no maxLength prop; the server rejects
+                                    a wrong-length PF (12) or ESIC (10) either way. */}
                                 <Field label="PF Number"      value={form.pfNumber}         onChange={set("pfNumber")} />
                                 <Field label="ESIC Number"    value={form.esiNumber}        onChange={set("esiNumber")} />
                                 <Field label="Labour Card No." value={form.labourCardNo}    onChange={set("labourCardNo")} />

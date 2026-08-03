@@ -145,14 +145,14 @@ export function validateUAN(value: string | null | undefined): FieldError {
 export function validateESIC(value: string | null | undefined): FieldError {
     const d = digitsOnly(value)
     if (!d) return null
-    if (d.length !== 17) return "ESIC number must be 17 digits"
+    if (d.length !== 10) return "ESIC number must be 10 digits"
     return null
 }
 
 export function validatePFNumber(value: string | null | undefined): FieldError {
-    const v = (value ?? "").trim()
-    if (!v) return null
-    if (v.length < 5) return "PF number looks too short"
+    const d = digitsOnly(value)
+    if (!d) return null
+    if (d.length !== 12) return "PF number must be 12 digits"
     return null
 }
 

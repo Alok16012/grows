@@ -7,7 +7,7 @@ import { can } from "@/lib/can"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
-    validatePincode, validateDateOfBirth,
+    validatePincode, validateDateOfBirth, validatePFNumber,
 } from "@/lib/validation"
 import {
     Plus, Search, Phone, Mail, MapPin, Calendar, Users,
@@ -3026,6 +3026,7 @@ function ConvertModal({ lead, onClose, onConverted }: {
         bankIFSC:          validateIFSC(form.bankIFSC),
         bankAccountNumber: validateBankAccount(form.bankAccountNumber),
         uan:               validateUAN(form.uan),
+        pfNumber:          validatePFNumber(form.pfNumber),
         esiNumber:         validateESIC(form.esiNumber),
         ec1Phone:          validatePhone(form.emergencyContact1Phone),
         ec2Phone:          validatePhone(form.emergencyContact2Phone),
@@ -3316,10 +3317,14 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                     <input value={form.uan} onChange={set("uan")} maxLength={12} className={errCls(cErrors.uan)} placeholder="12-digit UAN" />
                                     {cErrors.uan && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.uan}</p>}
                                 </div>
-                                <div><label className={lCls}>PF Number</label><input value={form.pfNumber} onChange={set("pfNumber")} className={iCls} placeholder="PF account number" /></div>
+                                <div>
+                                    <label className={lCls}>PF Number</label>
+                                    <input value={form.pfNumber} onChange={set("pfNumber")} maxLength={12} className={errCls(cErrors.pfNumber)} placeholder="12-digit PF number" />
+                                    {cErrors.pfNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.pfNumber}</p>}
+                                </div>
                                 <div>
                                     <label className={lCls}>ESIC Number</label>
-                                    <input value={form.esiNumber} onChange={set("esiNumber")} maxLength={17} className={errCls(cErrors.esiNumber)} placeholder="ESIC number" />
+                                    <input value={form.esiNumber} onChange={set("esiNumber")} maxLength={10} className={errCls(cErrors.esiNumber)} placeholder="10-digit ESIC number" />
                                     {cErrors.esiNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {cErrors.esiNumber}</p>}
                                 </div>
                             </div>

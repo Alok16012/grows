@@ -12,7 +12,7 @@ import {
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
-    validatePincode, validateDateOfBirth,
+    validatePincode, validateDateOfBirth, validatePFNumber,
 } from "@/lib/validation"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -170,6 +170,7 @@ export default function SelfOnboardingPage() {
         aadharNumber:      validateAadhaar(f("aadharNumber")),
         panNumber:         validatePAN(f("panNumber")),
         uan:               validateUAN(f("uan")),
+        pfNumber:          validatePFNumber(f("pfNumber")),
         esiNumber:         validateESIC(f("esiNumber")),
         bankAccountNumber: validateBankAccount(f("bankAccountNumber")),
         bankIFSC:          validateIFSC(f("bankIFSC")),
@@ -492,10 +493,10 @@ export default function SelfOnboardingPage() {
                                 <Input value={f("uan")} onChange={set("uan")} placeholder="12-digit UAN" maxLength={12} error={errors.uan} />
                             </Field>
                             <Field label="PF Number">
-                                <Input value={f("pfNumber")} onChange={set("pfNumber")} placeholder="PF Account Number" />
+                                <Input value={f("pfNumber")} onChange={set("pfNumber")} placeholder="12-digit PF number" maxLength={12} error={errors.pfNumber} />
                             </Field>
                             <Field label="ESIC Number">
-                                <Input value={f("esiNumber")} onChange={set("esiNumber")} placeholder="ESIC Insurance Number" maxLength={17} error={errors.esiNumber} />
+                                <Input value={f("esiNumber")} onChange={set("esiNumber")} placeholder="10-digit ESIC number" maxLength={10} error={errors.esiNumber} />
                             </Field>
                         </Grid>
                     </div>
