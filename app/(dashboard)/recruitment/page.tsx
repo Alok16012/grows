@@ -128,6 +128,7 @@ const POSITIONS = [
     "Compliance Executive",
     "Account Executive",
     "MIS Executive",
+    "Dispatch Executive",
     "Operations Manager",
     "Operations Head",
     "Other",
