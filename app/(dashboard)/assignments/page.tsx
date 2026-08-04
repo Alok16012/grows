@@ -38,6 +38,12 @@ type Assignment = {
 // Older assignments predate the ASG-… codes — derive a stable readable
 // number from the row id so every assignment has one.
 function assignmentNo(a: Assignment) {
+    // Manager-only rows are not stored assignments: the API invents one per
+    // project that has a manager but no inspector yet, with the id
+    // "virtual-<projectId>". Running that through the fallback produced
+    // "ASG-VIRTUA" on every such row, which read as a set of identical broken
+    // assignments that could not be deleted.
+    if (a.id.startsWith("virtual-")) return "—"
     return a.code ?? `ASG-${a.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`
 }
 
@@ -734,7 +740,11 @@ export default function AssignmentsPage() {
                                                     </td>
                                                     <td className="px-3 py-2.5">
                                                         <p className="font-semibold text-[var(--text)] leading-tight">{a.inspectionBoy?.name || "—"}</p>
-                                                        <p className="text-[10.5px] text-[var(--text3)]">Inspector</p>
+                                                        {/* A manager-only row has no inspector, so labelling it
+                                                            "Inspector" made it look like a real assignment. */}
+                                                        <p className="text-[10.5px] text-[var(--text3)]">
+                                                            {a.id.startsWith("virtual-") ? "Not assigned yet" : "Inspector"}
+                                                        </p>
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text2)] max-w-[150px] truncate">{a.project?.name || "—"}</td>
                                                     <td className="px-3 py-2.5">
