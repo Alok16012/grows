@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
-import { ensureSiteAssignmentSchema } from "@/lib/site-assignment-schema"
 import { ensureProjectSchema } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
@@ -281,28 +280,15 @@ export async function POST(req: Request) {
             }
         }
 
-        // Persist the "Whole Site" intent so projects added later are
-        // auto-assigned to these inspectors.
-        if (wholeSite && siteId && hasInspectors) {
-            try {
-                await ensureSiteAssignmentSchema()
-                for (const inspectionBoyId of inspectorIds) {
-                    await prisma.siteAssignment.upsert({
-                        where: { siteId_inspectionBoyId: { siteId, inspectionBoyId } },
-                        create: {
-                            siteId,
-                            inspectionBoyId,
-                            assignedBy: session!.user.id,
-                            recurrenceType: recurType,
-                            status: "active",
-                        },
-                        update: { recurrenceType: recurType, status: "active" },
-                    })
-                }
-            } catch (siteErr) {
-                console.log("Site assignment persistence skipped:", siteErr)
-            }
-        }
+        // "Whole Site" now means exactly what it says on the wizard: assign these
+        // inspectors to every project currently under the site, which the loop
+        // above has already done.
+        //
+        // It used to also write a SiteAssignment row so that projects created
+        // later were auto-assigned too. That happened silently — the project form
+        // never mentioned it — so people turned up on projects nobody had put them
+        // on. The auto-assign was removed from POST /api/projects, so persisting
+        // the intent here would only write a record nothing reads.
 
         // Attach managers to every target project
         if (mgrIds.length > 0) {

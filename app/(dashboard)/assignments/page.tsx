@@ -476,7 +476,9 @@ export default function AssignmentsPage() {
                                             </span>
                                             <span>
                                                 <span className="block text-[12.5px] font-semibold text-[var(--text)] underline decoration-transparent">All Projects</span>
-                                                <span className="block text-[11px] text-[var(--text3)]">Every project under this site — future ones auto-included.</span>
+                                                {/* Future projects are no longer auto-included — creating a
+                                                    project assigns only the inspectors picked in its Team step. */}
+                                                <span className="block text-[11px] text-[var(--text3)]">Every project currently under this site.</span>
                                             </span>
                                         </button>
                                         <button type="button" onClick={() => setWholeSite(false)}

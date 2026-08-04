@@ -4,7 +4,6 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
-import { ensureSiteAssignmentSchema } from "@/lib/site-assignment-schema"
 import { ensureProjectSchema } from "@/lib/prisma"
 import { checkAccess } from "@/lib/permissions"
 
@@ -161,40 +160,13 @@ export async function POST(req: Request) {
             console.log("Project inspector attach skipped:", insErr)
         }
 
-        // Auto-include this new project in any "Whole Site" assignment: create
-        // an Assignment for every inspector who was granted access to the Site.
-        try {
-            await ensureSiteAssignmentSchema()
-            const siteAssignments = await prisma.siteAssignment.findMany({
-                where: { siteId, status: "active" },
-                select: { inspectionBoyId: true, assignedBy: true, recurrenceType: true },
-            })
-            // Skip inspectors that were already picked in the Team step above —
-            // otherwise they end up with two active assignments on this project
-            // and see the same inspection twice.
-            const alreadyAssigned = new Set(
-                (await prisma.assignment.findMany({
-                    where: { projectId: project.id, status: "active" },
-                    select: { inspectionBoyId: true },
-                })).map(a => a.inspectionBoyId)
-            )
-            for (const sa of siteAssignments) {
-                if (alreadyAssigned.has(sa.inspectionBoyId)) continue
-                alreadyAssigned.add(sa.inspectionBoyId)
-                await prisma.assignment.create({
-                    data: {
-                        projectId: project.id,
-                        inspectionBoyId: sa.inspectionBoyId,
-                        assignedBy: sa.assignedBy,
-                        status: "active",
-                        recurrenceType: sa.recurrenceType,
-                        recurrenceActive: sa.recurrenceType !== "none",
-                    },
-                })
-            }
-        } catch (autoErr) {
-            console.log("Whole-site auto-assign skipped:", autoErr)
-        }
+        // Creating a project used to ALSO assign every inspector holding a
+        // "Whole Site" grant for this site, on top of the ones picked in the Team
+        // step. Nothing in the create form said so, so people appeared on projects
+        // nobody had put them on. Removed deliberately: only the inspectors chosen
+        // in the Team step are assigned.
+        //
+        // Existing SiteAssignment rows are left untouched — no longer read here.
 
         return NextResponse.json(project)
     } catch (error) {
