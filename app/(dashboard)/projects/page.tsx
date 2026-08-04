@@ -6,7 +6,7 @@ import Link from "next/link"
 import {
     Plus, Loader2, FolderOpen, Search, LayoutTemplate, Settings2,
     Pencil, Calendar, Building2, FolderKanban, MoreVertical,
-    Users, ChevronLeft, ChevronRight, LayoutGrid, List, X, Trash2,
+    Users, ChevronLeft, ChevronRight, LayoutGrid, List, X, Trash2, AlertCircle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
@@ -115,6 +115,7 @@ export default function ProjectsPage() {
 
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
     const [search, setSearch] = useState("")
     const [siteFilter, setSiteFilter] = useState("all")
     const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("ALL")
@@ -127,12 +128,22 @@ export default function ProjectsPage() {
 
     const fetchProjects = useCallback(async () => {
         setLoading(true)
+        setLoadError(null)
         try {
             const res = await fetch("/api/projects")
+            // A failed request used to fall through to setProjects([]), so a 403,
+            // a 500 or a timeout was indistinguishable from genuinely having no
+            // projects — the screen just said "No projects found".
+            if (!res.ok) {
+                const detail = (await res.text()).slice(0, 200)
+                throw new Error(detail || `Request failed (${res.status})`)
+            }
             const data = await res.json()
-            setProjects(Array.isArray(data) ? data : [])
-        } catch {
+            if (!Array.isArray(data)) throw new Error("Unexpected response from the server")
+            setProjects(data)
+        } catch (e) {
             setProjects([])
+            setLoadError(e instanceof Error ? e.message : "Could not load projects")
         } finally {
             setLoading(false)
         }
@@ -369,7 +380,21 @@ export default function ProjectsPage() {
             </div>
 
             {/* Content */}
-            {filtered.length === 0 ? (
+            {loadError ? (
+                /* Distinct from the empty state — "no projects" and "we couldn't
+                   load your projects" mean very different things to the user. */
+                <div className="flex flex-col items-center justify-center min-h-[36vh] gap-4 rounded-[14px] border-2 border-dashed border-red-200 bg-red-50/40 p-8 text-center">
+                    <AlertCircle className="h-12 w-12 text-red-400" />
+                    <div>
+                        <p className="text-[15px] font-semibold text-[var(--text)]">Couldn&apos;t load projects</p>
+                        <p className="text-[13px] text-[var(--text3)] mt-1 max-w-md break-words">{loadError}</p>
+                    </div>
+                    <button onClick={fetchProjects}
+                        className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
+                        Try again
+                    </button>
+                </div>
+            ) : filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center min-h-[36vh] gap-4 rounded-[14px] border-2 border-dashed border-[var(--border)] bg-white p-8 text-center">
                     <FolderOpen className="h-12 w-12 text-[var(--text3)] opacity-40" />
                     <div>

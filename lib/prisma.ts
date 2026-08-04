@@ -57,9 +57,22 @@ if (process.env.NODE_ENV !== "production") globalThis.prismaGlobal = prisma
 // fire-and-forget below heals cold starts before any other route touches
 // Project.
 let projectSchemaEnsured = false
+// The in-flight run, so concurrent callers await the SAME work. The boolean
+// alone only flips after every statement finishes, so on a cold start the
+// fire-and-forget below and the first request each kicked off their own copy of
+// the DDL — five ALTER TABLE round trips, twice, before the page could load.
+let projectSchemaInFlight: Promise<void> | null = null
 
-export async function ensureProjectSchema() {
+export async function ensureProjectSchema(): Promise<void> {
     if (projectSchemaEnsured) return
+    if (projectSchemaInFlight) return projectSchemaInFlight
+    projectSchemaInFlight = runProjectSchemaHeal().finally(() => {
+        projectSchemaInFlight = null
+    })
+    return projectSchemaInFlight
+}
+
+async function runProjectSchemaHeal(): Promise<void> {
     try {
         await (prisma as any).$executeRawUnsafe(`
             ALTER TABLE "Project"
