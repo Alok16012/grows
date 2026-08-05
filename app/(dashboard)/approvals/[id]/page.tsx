@@ -141,7 +141,14 @@ export default function ReviewInspectionPage() {
     const submitSignature = async () => {
         const canvas = canvasRef.current; if (!canvas || !hasSig) return
         const sig = canvas.toDataURL("image/png")
-        await fetch(`/api/inspections/${inspectionId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: sig }) })
+        const res = await fetch(`/api/inspections/${inspectionId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: sig }) })
+        // Was fire-and-forget: every reviewer except ADMIN got a 403 here and was
+        // still told the signature had been saved.
+        if (!res.ok) {
+            const err = await res.json().catch(() => null)
+            toast.error(err?.error || "Could not save the signature")
+            return
+        }
         toast.success("Signature saved!"); setShowSignature(false); fetchInspection()
     }
 
@@ -252,7 +259,12 @@ export default function ReviewInspectionPage() {
                             <div className="space-y-3">
                                 <img src={inspection.signature} alt="signature" className="border border-[#e8e6e1] rounded-[10px] w-full bg-[#f9f8f5]" />
                                 <button onClick={async () => {
-                                    await fetch(`/api/inspections/${inspectionId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: null }) })
+                                    const res = await fetch(`/api/inspections/${inspectionId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: null }) })
+                                    if (!res.ok) {
+                                        const err = await res.json().catch(() => null)
+                                        toast.error(err?.error || "Could not remove the signature")
+                                        return
+                                    }
                                     toast.success("Signature removed"); setShowSignature(false); fetchInspection()
                                 }} className="flex items-center gap-1.5 text-[12px] text-red-500 hover:text-red-600 mt-1">
                                     <Trash2 className="h-3.5 w-3.5" /> Remove Signature

@@ -152,8 +152,12 @@ export async function PATCH(
                     }
                 })
 
-                // Auto-create next recurring assignment
-                if (assignment && assignment.recurrenceType !== "none" && assignment.recurrenceActive) {
+                // Auto-create next recurring assignment.
+                // Belt-and-braces with the disarm on project edit: never recur from
+                // an assignment that was deactivated, or approving the last pending
+                // inspection would put a removed inspector back on the project.
+                if (assignment && assignment.recurrenceType !== "none" && assignment.recurrenceActive
+                    && assignment.status !== "inactive") {
                     await tx.assignment.create({
                         data: {
                             projectId: assignment.projectId,

@@ -153,7 +153,15 @@ export async function PUT(
                     if (inspCount === 0) {
                         await prisma.assignment.delete({ where: { id: a.id } })
                     } else {
-                        await prisma.assignment.update({ where: { id: a.id }, data: { status: "inactive" } })
+                        // Disarm recurrence as well. Marking it inactive alone left
+                        // `recurrenceActive` true, and approving the inspector's last
+                        // pending inspection then minted a fresh ACTIVE assignment for
+                        // them (app/api/approvals/[id]/route.ts) — putting someone the
+                        // manager had just removed straight back on the project.
+                        await prisma.assignment.update({
+                            where: { id: a.id },
+                            data: { status: "inactive", recurrenceActive: false },
+                        })
                     }
                 }
             } catch (insErr) {

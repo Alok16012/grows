@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 
 export async function DELETE(
     req: Request,
@@ -56,25 +57,39 @@ export async function PATCH(
         // one of them locked the rightful inspector out of their own inspection
         // ("Save Failed: Forbidden" part-way through filling it in), and the
         // colleague who created it kept the ability to edit.
-        if (!isAdmin && inspection.assignment.inspectionBoyId !== session.user.id) {
+        // The reviewer's counter-signature is the one exception: it is applied from
+        // the approvals screen, on a submitted inspection, by someone who is
+        // deliberately NOT the inspector. Without this the signature silently
+        // 403'd for every reviewer except ADMIN while the UI reported success.
+        const bodyKeys = Object.keys(body).filter(k => body[k] !== undefined)
+        const isSignatureOnly = bodyKeys.length === 1 && bodyKeys[0] === "signature"
+        const isReviewer = checkAccess(session, [], "approvals.manage")
+
+        if (!isAdmin && !(isSignatureOnly && isReviewer)
+            && inspection.assignment.inspectionBoyId !== session.user.id) {
             return NextResponse.json(
                 { error: "This inspection belongs to another inspector" },
                 { status: 403 }
             )
         }
 
-        // Cannot edit if not in draft, unless admin or reverting pending back to draft
+        // Cannot edit if not in draft, unless admin or reverting pending back to draft.
+        // A reviewer signature is exempt — it is applied precisely once the
+        // inspection has left draft.
         const isRevertToDraft = status === "draft" && inspection.status === "pending"
-        if (!isAdmin && inspection.status !== "draft" && !isRevertToDraft) {
+        if (!isAdmin && !(isSignatureOnly && isReviewer)
+            && inspection.status !== "draft" && !isRevertToDraft) {
             return NextResponse.json({ error: "Inspection is already submitted and cannot be edited" }, { status: 400 })
         }
 
         // Update status and submittedAt if pending
         const updateData: any = {}
-        // Correct the recorded author when the assigned inspector edits a draft a
+        // Correct the recorded author when the ASSIGNED INSPECTOR edits a draft a
         // colleague had started, so the report and the audit trail name the person
-        // who actually did the work.
-        if (!isAdmin && inspection.submittedBy !== session.user.id) {
+        // who actually did the work. Restricted to them on purpose: a reviewer
+        // counter-signing must not become the recorded author.
+        const isAssignedInspector = inspection.assignment.inspectionBoyId === session.user.id
+        if (isAssignedInspector && inspection.submittedBy !== session.user.id) {
             updateData.submittedBy = session.user.id
         }
         if (status) {
@@ -123,12 +138,20 @@ export async function PATCH(
             }))
         }
 
-        ops.push(prisma.inspectionData.deleteMany({ where: { inspectionId } }))
+        // Only rewrite the answers when this request actually carries them.
+        // The delete used to run unconditionally, so ANY partial PATCH wiped the
+        // whole inspection: the reviewer's signature save sends `{ signature }`
+        // alone, which deleted every recorded answer and re-inserted none.
+        // `responses === undefined` means "not part of this update"; an explicitly
+        // empty array still means "clear them".
+        if (responses !== undefined) {
+            ops.push(prisma.inspectionData.deleteMany({ where: { inspectionId } }))
 
-        for (const { fieldId, value } of filteredResponses) {
-            ops.push(prisma.inspectionData.create({
-                data: { inspectionId, fieldId, value: value || "" }
-            }))
+            for (const { fieldId, value } of filteredResponses) {
+                ops.push(prisma.inspectionData.create({
+                    data: { inspectionId, fieldId, value: value || "" }
+                }))
+            }
         }
 
         await prisma.$transaction(ops)
