@@ -29,11 +29,26 @@ export async function GET(req: Request) {
         }
 
         if (role === "INSPECTION_BOY") {
+            // Anyone who can actually do inspection work, not just the base role.
+            // Assigning a custom role sets the system role to MANAGER, so a
+            // "Quality Inspector" never matched here — they could not be picked
+            // for a project team at all, and once removed there was no way to add
+            // them back.
             const users = await prisma.user.findMany({
                 where: {
-                    role: Role.INSPECTION_BOY,
                     // Only real staff — users with a linked Employee record.
                     employeeProfile: { isNot: null },
+                    OR: [
+                        { role: Role.INSPECTION_BOY },
+                        {
+                            customRole: {
+                                isActive: true,
+                                permissions: {
+                                    hasSome: ["inspection.view", "inspection.submit", "inspection.history"],
+                                },
+                            },
+                        },
+                    ],
                 },
                 select: {
                     id: true,
