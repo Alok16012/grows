@@ -16,6 +16,7 @@ import {
     Timer,
     ClipboardList,
     ArrowRight,
+    AlertCircle,
     X
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -780,7 +781,18 @@ export default function InspectionFormPage() {
                     </div>
                 )}
 
-                {isSubmitted && !isAdmin && (
+                {/* A rejected inspection is also "submitted", and used to fall into the
+                    else-branch below — so the inspector was shown a green tick reading
+                    "pending approval" on work that had actually been turned down. */}
+                {isSubmitted && !isAdmin && inspection?.status === "rejected" && (
+                    <div className="bg-[#fef2f2] border border-[rgba(220,38,38,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
+                        <AlertCircle className="h-[20px] w-[20px] text-[#dc2626] shrink-0" />
+                        <span className="text-[13px] font-[500] text-[#991b1b] flex-1">
+                            This inspection was rejected and can no longer be edited. Your manager must assign a new inspection to redo it.
+                        </span>
+                    </div>
+                )}
+                {isSubmitted && !isAdmin && inspection?.status !== "rejected" && (
                     <div className="bg-[#f0fdf4] border border-[rgba(26,158,110,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
                         <CheckCircle2 className="h-[20px] w-[20px] text-[#1a9e6e] shrink-0" />
                         <span className="text-[13px] font-[500] text-[#0d6b4a] flex-1">

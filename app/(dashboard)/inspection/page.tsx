@@ -477,8 +477,12 @@ export default function InspectionDashboard() {
                                     {s.status === "rejected" && (
                                         <span className="bg-[#fef2f2] text-[#dc2626] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Rejected</span>
                                     )}
+                                    {/* Only a draft can actually be resumed — the form is
+                                        read-only once submitted, so "Resume" on a pending,
+                                        approved or rejected row promised an edit that the
+                                        server would refuse. */}
                                     <Link href={`/inspection/${s.assignmentId}/form`} className="text-[12.5px] font-medium text-[#1a9e6e] hover:underline">
-                                        {s.status === "draft" ? "Complete Inspection" : "Resume"} →
+                                        {s.status === "draft" ? "Complete Inspection" : "View"} →
                                     </Link>
                                 </div>
                             </div>
