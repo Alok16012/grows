@@ -57,7 +57,9 @@ export default function InspectionDashboard() {
         const fetchMain = async () => {
             try {
                 const [asgnRes, subRes] = await Promise.all([
-                    fetch("/api/assignments?status=all"),
+                    // `mine=1`: this screen is the inspector's own workspace and
+                    // must never list work assigned to someone else.
+                    fetch("/api/assignments?status=all&mine=1"),
                     fetch("/api/inspections?recent=20"),
                 ])
                 const [asgnData, subData] = await Promise.all([

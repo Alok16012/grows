@@ -59,7 +59,9 @@ export default function InspectionFormPage() {
         // role is MANAGER, so keying this on INSPECTION_BOY hid their other pending
         // forms from them.
         if (authStatus !== "authenticated") return
-        fetch("/api/assignments?status=all")
+        // `mine=1` — this drives "your other pending forms", so it must never
+        // surface a colleague's assignment.
+        fetch("/api/assignments?status=all&mine=1")
             .then(r => (r.ok ? r.json() : []))
             .then((list: any[]) => {
                 if (!Array.isArray(list)) return

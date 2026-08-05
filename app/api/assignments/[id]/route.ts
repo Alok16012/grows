@@ -37,8 +37,18 @@ export async function GET(
             return NextResponse.json({ error: "Assignment not found" }, { status: 404 })
         }
 
-        // Access control: only assigned inspector or admin/manager can see it
-        if (session.user.role === Role.INSPECTION_BOY && assignment.inspectionBoyId !== session.user.id) {
+        // Access control: the assigned inspector, or someone who manages
+        // assignments, may see it.
+        //
+        // Keying this on the INSPECTION_BOY base role missed custom-role
+        // inspectors entirely — assigning a custom role sets the system role to
+        // MANAGER — so they could open any colleague's assignment by URL.
+        const perms = (session.user as any).permissions ?? []
+        const isOwner = assignment.inspectionBoyId === session.user.id
+        const canSeeAnyAssignment =
+            session.user.role === Role.ADMIN ||
+            perms.includes("assignments.manage")
+        if (!isOwner && !canSeeAnyAssignment) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
 

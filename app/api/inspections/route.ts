@@ -50,12 +50,18 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Assignment not found" }, { status: 404 })
         }
 
-        // Access check: Inspector assigned or ADMIN/MANAGER (or custom role with permission)
+        // Filling in an inspection is the assigned inspector's job, so ownership is
+        // the gate — only they, or an ADMIN, may open one against an assignment.
+        //
+        // This used to also let anyone holding `assignments.view` through. That is
+        // a READ permission, and inspector roles carry it so they can see the
+        // module, so in practice any inspector could start and submit an
+        // inspection against work assigned to a colleague.
         if (
-            !checkAccess(session, ["MANAGER"], "assignments.view") &&
-            assignment.inspectionBoyId !== session.user.id
+            assignment.inspectionBoyId !== session.user.id &&
+            session.user.role !== Role.ADMIN
         ) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+            return NextResponse.json({ error: "This assignment belongs to another inspector" }, { status: 403 })
         }
 
         const inspection = await prisma.inspection.findFirst({

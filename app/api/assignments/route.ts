@@ -21,7 +21,29 @@ export async function GET(req: Request) {
     const status = searchParams.get("status")
     const where: any = {}
 
-    if (user.role === Role.INSPECTION_BOY || user.role.toString() === "INSPECTION_BOY") {
+    // Who is asking as an INSPECTOR — i.e. should only ever see their own work?
+    //
+    // The base role alone can't answer this: every route that assigns a custom
+    // role sets the system role to MANAGER, so a "Quality Inspector" does not
+    // carry INSPECTION_BOY. Keying the scoping on the base role therefore let
+    // such a user through to the unfiltered manager list, and the Inspector
+    // Workspace showed — and let them fill in — assignments belonging to other
+    // inspectors.
+    //
+    // `?mine=1` lets a caller demand its own rows regardless; the workspace uses
+    // it so that screen can never render someone else's assignment.
+    const perms = (user as any).permissions ?? []
+    const holdsInspectionPermission =
+        perms.includes("inspection.view") ||
+        perms.includes("inspection.submit") ||
+        perms.includes("inspection.history")
+    const isBaseInspector =
+        user.role === Role.INSPECTION_BOY || user.role.toString() === "INSPECTION_BOY"
+    const wantsOwnOnly = searchParams.get("mine") === "1"
+    const scopeToSelf =
+        wantsOwnOnly || isBaseInspector || (holdsInspectionPermission && user.role !== Role.ADMIN)
+
+    if (scopeToSelf) {
         where.inspectionBoyId = user.id
         // Only default to active if no status is specified
         if (!status) {
@@ -38,7 +60,11 @@ export async function GET(req: Request) {
     try {
         await ensureProjectSchema()
 
-        if (user.role === Role.INSPECTION_BOY) {
+        // Same reasoning as the scoping above — a custom-role inspector carries
+        // the MANAGER base role, so this has to follow scopeToSelf rather than the
+        // base role, or they'd get the manager-shaped project list instead of
+        // their own assignments.
+        if (scopeToSelf) {
             const assignments = await prisma.assignment.findMany({
                 where,
                 include: {
