@@ -279,3 +279,44 @@ ORDER BY copies DESC, e."employeeId";
 --         ORDER BY "employeeId", upper("type"), "uploadedAt" DESC
 --    );
 -- COMMIT;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 9. Inspections filled in by someone other than the assigned inspector
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Until ad96287, holding `assignments.view` was enough to open and submit an
+-- inspection against ANY assignment — and inspector roles carry that permission
+-- so the module appears at all. So one inspector could fill in work assigned to
+-- a colleague, and the record would carry the wrong person's name.
+--
+-- Rows here are inspections whose submitter is not the assigned inspector.
+-- ADMIN submissions are usually legitimate (HR entering a paper form), so the
+-- admin_submitted column is there to help you tell them apart.
+
+SELECT i."id"                                   AS inspection_id,
+       i."status",
+       i."submittedAt",
+       pr."name"                                AS project,
+       assigned."name"                          AS assigned_to,
+       submitter."name"                         AS actually_filled_by,
+       (submitter."role" = 'ADMIN')             AS admin_submitted
+FROM "Inspection" i
+JOIN "Assignment" a  ON a."id"  = i."assignmentId"
+JOIN "Project"    pr ON pr."id" = a."projectId"
+JOIN "User" assigned  ON assigned."id"  = a."inspectionBoyId"
+JOIN "User" submitter ON submitter."id" = i."submittedBy"
+WHERE i."submittedBy" <> a."inspectionBoyId"
+ORDER BY (submitter."role" = 'ADMIN'), i."submittedAt" DESC NULLS LAST;
+
+
+-- Same thing counted per person, to see whether it was one mistake or a habit.
+SELECT submitter."name"                         AS filled_by,
+       count(*)                                 AS inspections_not_theirs,
+       count(DISTINCT a."inspectionBoyId")      AS colleagues_affected
+FROM "Inspection" i
+JOIN "Assignment" a   ON a."id"  = i."assignmentId"
+JOIN "User" submitter ON submitter."id" = i."submittedBy"
+WHERE i."submittedBy" <> a."inspectionBoyId"
+  AND submitter."role" <> 'ADMIN'
+GROUP BY submitter."name"
+ORDER BY inspections_not_theirs DESC;
