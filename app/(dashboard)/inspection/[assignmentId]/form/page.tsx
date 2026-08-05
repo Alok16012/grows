@@ -139,7 +139,13 @@ export default function InspectionFormPage() {
         try {
             const assRes = await fetch(`/api/assignments/${assignmentId}`)
             if (!assRes.ok) {
-                console.error("Assignment fetch failed")
+                // Say why rather than bouncing silently — a 403 here means the
+                // assignment belongs to someone else, which is worth knowing
+                // before you go looking for the form again.
+                console.error("Assignment fetch failed", assRes.status)
+                if (assRes.status === 403) {
+                    alert("This assignment belongs to another inspector.")
+                }
                 router.push("/inspection")
                 return
             }

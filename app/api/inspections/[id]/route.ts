@@ -50,9 +50,17 @@ export async function PATCH(
 
         const isAdmin = session.user.role === "ADMIN"
 
-        // Only the assigned inspector or admin can update
-        if (!isAdmin && inspection.submittedBy !== session.user.id) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        // Keyed on who the work is ASSIGNED to, not on who happened to create the
+        // draft row. `submittedBy` was the wrong test in both directions: while
+        // colleagues could still open each other's assignments, a draft created by
+        // one of them locked the rightful inspector out of their own inspection
+        // ("Save Failed: Forbidden" part-way through filling it in), and the
+        // colleague who created it kept the ability to edit.
+        if (!isAdmin && inspection.assignment.inspectionBoyId !== session.user.id) {
+            return NextResponse.json(
+                { error: "This inspection belongs to another inspector" },
+                { status: 403 }
+            )
         }
 
         // Cannot edit if not in draft, unless admin or reverting pending back to draft
@@ -63,6 +71,12 @@ export async function PATCH(
 
         // Update status and submittedAt if pending
         const updateData: any = {}
+        // Correct the recorded author when the assigned inspector edits a draft a
+        // colleague had started, so the report and the audit trail name the person
+        // who actually did the work.
+        if (!isAdmin && inspection.submittedBy !== session.user.id) {
+            updateData.submittedBy = session.user.id
+        }
         if (status) {
             updateData.status = status
             if (status === "pending") {
