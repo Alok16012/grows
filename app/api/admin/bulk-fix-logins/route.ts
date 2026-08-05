@@ -60,7 +60,8 @@ export async function POST(req: Request) {
                             data: {
                                 email,
                                 name,
-                                role: "INSPECTION_BOY",
+                                // Base role is vestigial; access comes from the custom role.
+                                role: "MANAGER",
                                 isActive: true,
                                 password: hash,
                             },

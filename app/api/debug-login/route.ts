@@ -110,9 +110,10 @@ export async function POST(req: Request) {
     const hash = await bcrypt.hash(password, 10)
     const email = `${employee.phone}@cims.local`
 
-    // Custom role assigned → MANAGER dashboard; no custom role → field worker
+    // The base system role is vestigial — access comes from the custom role's
+    // permissions, so every fixed login gets MANAGER regardless.
     const existingCustomRoleId = employee.user?.customRoleId || null
-    const systemRole = existingCustomRoleId ? "MANAGER" : "INSPECTION_BOY"
+    const systemRole = "MANAGER"
 
     let user
     if (employee.userId) {
@@ -133,10 +134,9 @@ export async function POST(req: Request) {
             select: { id: true, customRoleId: true }
         })
         if (existing) {
-            const role = existing.customRoleId ? "MANAGER" : "INSPECTION_BOY"
             user = await prisma.user.update({
                 where: { id: existing.id },
-                data: { isActive: true, password: hash, name: `${employee.firstName} ${employee.lastName}`.trim(), role: role as any },
+                data: { isActive: true, password: hash, name: `${employee.firstName} ${employee.lastName}`.trim(), role: systemRole as any },
                 select: { id: true, email: true, role: true, isActive: true, customRoleId: true }
             })
             await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id } })

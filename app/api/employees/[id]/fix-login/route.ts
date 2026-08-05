@@ -29,10 +29,9 @@ export async function POST(
 
         if (!employee) return new NextResponse("Employee not found", { status: 404 })
 
-        // Custom role assigned → system role should be MANAGER so they get
-        // the manager dashboard & sidebar, not the inspector workflow.
-        // No custom role → INSPECTION_BOY (field worker default).
-        const systemRole = customRoleId ? "MANAGER" : "INSPECTION_BOY"
+        // The base system role is vestigial — access comes from the custom role's
+        // permissions, so every provisioned login gets MANAGER regardless.
+        const systemRole = "MANAGER"
 
         // If employee already has a linked user → update customRole + system role
         if (employee.userId) {
@@ -40,7 +39,6 @@ export async function POST(
                 where: { id: employee.userId },
                 data: {
                     customRoleId: customRoleId || null,
-                    // Upgrade to MANAGER if custom role assigned; downgrade if removed
                     role: systemRole as any,
                 }
             })

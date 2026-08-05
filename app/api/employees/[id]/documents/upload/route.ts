@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import prisma from "@/lib/prisma"
+import { checkAccess } from "@/lib/permissions"
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import { v4 as uuidv4 } from "uuid"
+
+// Mirrors app/api/employees/[id]/documents/route.ts: without documents.upload a
+// user may only put files against their OWN employee record.
+async function isSelf(userId: string, employeeId: string) {
+    const self = await prisma.employee.findFirst({
+        where: { userId },
+        select: { id: true },
+    })
+    return self?.id === employeeId
+}
 
 // Lazy Supabase client — constructing at module load fails Vercel's
 // "collect page data" build step when env vars aren't yet injected.
@@ -24,9 +36,12 @@ export async function POST(
 ) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    // Any authenticated staff user can upload employee docs.
-    // Block only CLIENT role (they shouldn't be touching employee data).
-    if (session.user.role === "CLIENT") {
+    // Gated on the documents.upload permission (or your own record) — matching the
+    // sibling route that records the document. The previous "any logged-in user who
+    // isn't a CLIENT" test let the base role decide, so every staff account could
+    // push files into any colleague's KYC folder.
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload")
+        && !(await isSelf(session.user.id, params.id))) {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

@@ -308,6 +308,31 @@ export function checkAccess(
 
 type PermSession = { user: { role: string; permissions?: string[] } } | null | undefined
 
+// ─── Inspector Helpers ───────────────────────────────────────────────────────
+// "Is this person an inspector?" is answered by the inspection permissions, NEVER
+// by the INSPECTION_BOY base role: every route that assigns a custom role sets the
+// base role to MANAGER (fix-login, employee-logins, debug-login, employees/import),
+// so a "Quality Inspector" custom role does not carry INSPECTION_BOY at all.
+
+export const INSPECTION_PERMISSIONS = ["inspection.view", "inspection.submit", "inspection.history"]
+
+// Raw-array form, for callers that only hold a JWT token (e.g. middleware).
+export function hasInspectionPermission(permissions: readonly string[] | null | undefined): boolean {
+    return INSPECTION_PERMISSIONS.some(p => permissions?.includes(p))
+}
+
+// May reach the inspector workspace at all. ADMIN passes (via checkAccess).
+export function canAccessInspection(session: PermSession): boolean {
+    return INSPECTION_PERMISSIONS.some(p => checkAccess(session, [], p))
+}
+
+// Should this caller only ever see their OWN rows? ADMIN is deliberately excluded
+// — the superuser must keep seeing everyone's work, so self-scoping never catches it.
+export function isSelfScopedInspector(session: PermSession): boolean {
+    if (!session || session.user.role === "ADMIN") return false
+    return hasInspectionPermission(session.user.permissions)
+}
+
 // Sending / issuing documents (Send Documents module, recall, clear, doc types)
 // is granted by the dedicated `documents.send` permission OR the broader
 // `documents.view` — the latter kept for backward compatibility with roles

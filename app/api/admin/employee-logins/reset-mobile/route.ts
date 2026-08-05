@@ -70,7 +70,8 @@ export async function POST() {
                             password: hashed,
                             plainPassword: mobile,
                             phone: e.phone || null,
-                            role: "INSPECTION_BOY",
+                            // Base role is vestigial; access comes from the custom role.
+                            role: "MANAGER",
                         },
                     })
                     await prisma.employee.update({ where: { id: e.id }, data: { userId: user.id } })

@@ -16,7 +16,9 @@ export async function POST(req: Request) {
         const result = await prisma.user.updateMany({
             where: {
                 customRoleId: { not: null },   // has a custom role
-                role: "INSPECTION_BOY",         // but still on inspector level
+                // Deliberate: INSPECTION_BOY is no longer assigned anywhere, so this
+                // is the legacy population this repair tool exists to find and migrate.
+                role: "INSPECTION_BOY",
             },
             data: { role: "MANAGER" },          // upgrade to manager dashboard
         })

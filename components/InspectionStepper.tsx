@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Check, ChevronLeft } from "lucide-react"
+import { canAny } from "@/lib/can"
 
 // Guided setup flow for the INSPECTIONS module. Each step is still its own
 // independent page (reachable from the sidebar), but this rail ties them into
@@ -23,9 +24,13 @@ export function InspectionStepper() {
     const router = useRouter()
     const { data: session } = useSession()
 
-    // Setup flow is for managers/admins — hide for inspectors & clients.
+    // This rail walks the project SETUP flow, so show it to whoever can actually
+    // set projects or assignments up. Hiding it from "anyone with an inspection
+    // permission" was the wrong test — a lead who both inspects and configures
+    // projects lost the rail. ADMIN passes via canAny.
     const role = session?.user?.role
-    if (role === "INSPECTION_BOY" || role === "CLIENT") return null
+    if (role === "CLIENT") return null
+    if (!canAny(session, ["projects.manage", "assignments.manage"])) return null
 
     const currentIndex = STEPS.findIndex(
         (s) => pathname === s.href || pathname.startsWith(s.href + "/")

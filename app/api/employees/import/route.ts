@@ -366,7 +366,8 @@ export async function POST(req: Request) {
                                     password: await bcrypt.hash(plain, 8),
                                     plainPassword: plain,
                                     phone: phone || null,
-                                    role: customRoleId ? "MANAGER" : "INSPECTION_BOY",
+                                    // Base role is vestigial; access comes from the custom role.
+                                    role: "MANAGER",
                                     customRoleId,
                                 },
                             })

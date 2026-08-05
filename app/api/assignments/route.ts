@@ -3,8 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { Role } from "@prisma/client"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, isSelfScopedInspector } from "@/lib/permissions"
 import { ensureProjectSchema } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
@@ -23,25 +22,16 @@ export async function GET(req: Request) {
 
     // Who is asking as an INSPECTOR — i.e. should only ever see their own work?
     //
-    // The base role alone can't answer this: every route that assigns a custom
-    // role sets the system role to MANAGER, so a "Quality Inspector" does not
-    // carry INSPECTION_BOY. Keying the scoping on the base role therefore let
-    // such a user through to the unfiltered manager list, and the Inspector
-    // Workspace showed — and let them fill in — assignments belonging to other
-    // inspectors.
+    // Decided purely by the inspection permissions: every route that assigns a
+    // custom role sets the system role to MANAGER, so a "Quality Inspector" does
+    // not carry INSPECTION_BOY. Keying the scoping on the base role let such a
+    // user through to the unfiltered manager list, and the Inspector Workspace
+    // showed — and let them fill in — assignments belonging to other inspectors.
     //
     // `?mine=1` lets a caller demand its own rows regardless; the workspace uses
     // it so that screen can never render someone else's assignment.
-    const perms = (user as any).permissions ?? []
-    const holdsInspectionPermission =
-        perms.includes("inspection.view") ||
-        perms.includes("inspection.submit") ||
-        perms.includes("inspection.history")
-    const isBaseInspector =
-        user.role === Role.INSPECTION_BOY || user.role.toString() === "INSPECTION_BOY"
     const wantsOwnOnly = searchParams.get("mine") === "1"
-    const scopeToSelf =
-        wantsOwnOnly || isBaseInspector || (holdsInspectionPermission && user.role !== Role.ADMIN)
+    const scopeToSelf = wantsOwnOnly || isSelfScopedInspector(session)
 
     if (scopeToSelf) {
         where.inspectionBoyId = user.id

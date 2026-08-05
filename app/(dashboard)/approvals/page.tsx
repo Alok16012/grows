@@ -13,6 +13,7 @@ import {
     ClipboardCheck
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { can } from "@/lib/can"
 import Link from "next/link"
 
 export default function ApprovalsPage() {
@@ -33,7 +34,11 @@ export default function ApprovalsPage() {
     useEffect(() => {
         if (authStatus === "unauthenticated") {
             router.push("/login")
-        } else if (authStatus === "authenticated" && session?.user?.role === "INSPECTION_BOY") {
+        } else if (authStatus === "authenticated" && !can(session, "approvals.view")) {
+            // Match the API, which gates this queue on `approvals.view`.
+            // Blocking on "is an inspector" instead was too wide: a lead who
+            // reviews submissions holds an inspection permission AND approvals.view,
+            // and was bounced off a screen they are meant to run.
             router.push("/")
         }
     }, [authStatus, session, router])

@@ -164,7 +164,8 @@ export const authOptions: NextAuthOptions = {
                             })
                         } else {
                             user = await prisma.user.create({
-                                data: { email, name, role: "INSPECTION_BOY", isActive: true, password: hash },
+                                // Base role is vestigial — access comes from the custom role.
+                                data: { email, name, role: "MANAGER", isActive: true, password: hash },
                                 include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                             })
                         }

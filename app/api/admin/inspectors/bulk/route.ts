@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
 
 function generateTempPassword(): string {
@@ -28,6 +29,23 @@ export async function POST(req: Request) {
 
         if (!Array.isArray(inspectors) || inspectors.length === 0) {
             return NextResponse.json({ error: "No inspectors provided" }, { status: 400 })
+        }
+
+        // These accounts are created specifically to be given inspection work, and
+        // access now comes only from the custom role — the base role grants nothing.
+        // Without one they could sign in, be handed assignments, and still have no
+        // way to open a single inspection. Refuse rather than create dead logins.
+        const inspectorRole = await prisma.customRole.findFirst({
+            where: { isActive: true, permissions: { hasSome: INSPECTION_PERMISSIONS } },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, name: true },
+        })
+        if (!inspectorRole) {
+            return NextResponse.json({
+                error: "No inspector role available",
+                message: "Create a role holding an inspection permission under Admin → Roles first — " +
+                    "imported inspectors are given one so they can actually open their assignments.",
+            }, { status: 400 })
         }
 
         const created: any[] = []
@@ -60,7 +78,9 @@ export async function POST(req: Request) {
                             name,
                             email,
                             password: hashedPassword,
-                            role: Role.INSPECTION_BOY
+                            // Base role is vestigial; access comes from the custom role.
+                            role: Role.MANAGER,
+                            customRoleId: inspectorRole.id,
                         }
                     })
 

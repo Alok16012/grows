@@ -19,6 +19,7 @@ import {
     X
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { canAccessInspection } from "@/lib/permissions"
 import CameraCapture from "@/components/CameraCapture"
 import { DocumentViewer } from "@/components/DocumentViewer"
 
@@ -120,17 +121,10 @@ export default function InspectionFormPage() {
             return
         }
         // Mirrors middleware.ts: a custom-role inspector carries the MANAGER base
-        // role (every route that assigns a custom role sets it), so checking the
-        // base role alone locked real inspectors out of the form.
-        if (authStatus === "authenticated") {
-            const role = session?.user?.role
-            const perms = (session?.user as any)?.permissions ?? []
-            const canInspect =
-                role === "INSPECTION_BOY" || role === "ADMIN" ||
-                perms.includes("inspection.view") ||
-                perms.includes("inspection.submit") ||
-                perms.includes("inspection.history")
-            if (!canInspect) router.push("/")
+        // role (every route that assigns a custom role sets it), so the inspection
+        // permissions — not the base role — decide who may open the form.
+        if (authStatus === "authenticated" && !canAccessInspection(session)) {
+            router.push("/")
         }
     }, [authStatus, session, router])
 

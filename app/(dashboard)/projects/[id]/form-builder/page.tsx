@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { checkAccess } from "@/lib/permissions"
 import FormBuilderClient from "./FormBuilderClient"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -13,8 +14,10 @@ export default async function FormBuilderPage({ params }: { params: { id: string
 
     if (!session) redirect("/login")
 
-    // Only ADMIN and MANAGER can access
-    if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    // Building a project's inspection form is a project-management action: every
+    // /api/form-templates write behind this page is gated on `projects.manage`,
+    // so the page guard must ask the same question (ADMIN passes implicitly).
+    if (!checkAccess(session, [], "projects.manage")) {
         redirect("/")
     }
 

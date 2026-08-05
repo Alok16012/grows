@@ -26,7 +26,7 @@ export async function GET(
         if (session.user.role === "CLIENT") {
             return new NextResponse("Forbidden", { status: 403 })
         }
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.view")
+        if (!checkAccess(session, [], "documents.view")
             && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -53,7 +53,7 @@ export async function POST(
         if (session.user.role === "CLIENT") {
             return new NextResponse("Forbidden", { status: 403 })
         }
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload")
+        if (!checkAccess(session, [], "documents.upload")
             && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }

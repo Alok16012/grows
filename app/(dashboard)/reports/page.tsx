@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { format, parseISO } from "date-fns"
-import { can } from "@/lib/can"
+import { can, canAny } from "@/lib/can"
+import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -204,7 +205,11 @@ export default function ReportsPage() {
         if (can(session, "reports.view")) {
             fetch("/api/sites?isActive=true").then(r => r.json()).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => { })
             fetch("/api/users?role=INSPECTION_BOY").then(r => r.json()).then(d => setInspectors(Array.isArray(d) ? d : [])).catch(() => { })
-        } else if (role === "INSPECTION_BOY") {
+        } else if (canAny(session, INSPECTION_PERMISSIONS)) {
+            // Mirrors /api/reports: full-report holders get every site + inspector,
+            // inspectors get the narrow self-scoped shape. Membership is decided by
+            // the inspection permissions — a custom role sets the base role to
+            // MANAGER, so the old INSPECTION_BOY test never matched an inspector.
             // Fetch projects the inspector is assigned to, derive unique sites
             fetch("/api/projects").then(r => r.json()).then((allProjects: any[]) => {
                 if (!Array.isArray(allProjects)) return

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
 
 export async function GET(req: Request) {
@@ -28,27 +27,22 @@ export async function GET(req: Request) {
             return NextResponse.json(users)
         }
 
+        // `?role=` is the caller's filter name, not a base-role lookup: who counts
+        // as an inspector / a manager is decided by the custom-role permissions.
+        // Assigning a custom role sets the system role to MANAGER, so INSPECTION_BOY
+        // never matched a real inspector, and Role.MANAGER matched every staff user
+        // regardless of what they do.
         if (role === "INSPECTION_BOY") {
-            // Anyone who can actually do inspection work, not just the base role.
-            // Assigning a custom role sets the system role to MANAGER, so a
-            // "Quality Inspector" never matched here — they could not be picked
-            // for a project team at all, and once removed there was no way to add
-            // them back.
             const users = await prisma.user.findMany({
                 where: {
                     // Only real staff — users with a linked Employee record.
                     employeeProfile: { isNot: null },
-                    OR: [
-                        { role: Role.INSPECTION_BOY },
-                        {
-                            customRole: {
-                                isActive: true,
-                                permissions: {
-                                    hasSome: ["inspection.view", "inspection.submit", "inspection.history"],
-                                },
-                            },
+                    customRole: {
+                        isActive: true,
+                        permissions: {
+                            hasSome: ["inspection.view", "inspection.submit", "inspection.history"],
                         },
-                    ],
+                    },
                 },
                 select: {
                     id: true,
@@ -63,9 +57,14 @@ export async function GET(req: Request) {
         if (role === "MANAGER") {
             const users = await prisma.user.findMany({
                 where: {
-                    role: Role.MANAGER,
                     // Only real staff — users with a linked Employee record.
                     employeeProfile: { isNot: null },
+                    customRole: {
+                        isActive: true,
+                        permissions: {
+                            hasSome: ["projects.manage", "assignments.manage"],
+                        },
+                    },
                 },
                 select: {
                     id: true,

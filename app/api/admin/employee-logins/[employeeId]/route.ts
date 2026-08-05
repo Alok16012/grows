@@ -34,8 +34,9 @@ export async function PATCH(
 
         const normalizedEmail = loginEmail?.trim().toLowerCase()
 
-        // Custom role decides the system role: MANAGER (dashboard) vs INSPECTION_BOY (field).
-        const systemRole = customRoleId ? "MANAGER" : "INSPECTION_BOY"
+        // The base system role is vestigial — access comes from the custom role's
+        // permissions, so every provisioned login gets MANAGER regardless.
+        const systemRole = "MANAGER"
 
         // No login yet → create one.
         if (!employee.userId) {

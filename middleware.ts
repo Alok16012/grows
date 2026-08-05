@@ -1,6 +1,7 @@
 
 import { withAuth } from "next-auth/middleware"
 import { NextResponse } from "next/server"
+import { hasInspectionPermission } from "@/lib/permissions"
 
 const rolePaths: Record<string, string> = {
     "ADMIN": "/admin",
@@ -55,38 +56,29 @@ export default withAuth(
                 return NextResponse.redirect(new URL(ownDashboard, req.url))
             }
         }
-        // /manager → MANAGER or ADMIN. The manager dashboard also needs the
-        // reports.view permission to load its data, so a custom-role MANAGER that
-        // lacks it is sent to their own landing page instead of a broken dashboard.
+        // /manager → both the manager dashboard and /manager/analytics are pure
+        // reporting screens whose APIs are gated on `reports.view`. That permission
+        // (or ADMIN) decides access — not the MANAGER base role, which every
+        // custom-role user carries regardless of what they actually do.
+        // Bounce to /dashboard, never to `ownDashboard`: a base MANAGER's landing
+        // page IS /manager, which would loop.
         if (path.startsWith("/manager")) {
-            // /manager/analytics is a pure reporting screen — its API is gated on
-            // `reports.view`, and the sidebar shows it to anyone holding that
-            // permission. Let those users through instead of bouncing them to
-            // their dashboard, which is what made the link look broken.
-            const canViewAnalytics =
-                path.startsWith("/manager/analytics") && permissions.includes("reports.view")
-            if (role !== "MANAGER" && role !== "ADMIN" && !canViewAnalytics) {
-                return NextResponse.redirect(new URL(ownDashboard, req.url))
-            }
-            if (role === "MANAGER" && customRoleName && !permissions.includes("reports.view")) {
+            if (role !== "ADMIN" && !permissions.includes("reports.view")) {
                 return NextResponse.redirect(new URL("/dashboard", req.url))
             }
         }
-        // /inspection → the inspector workspace.
-        // Base role alone is not enough to decide this: every route that assigns a
-        // custom role sets the system role to MANAGER (see fix-login,
-        // employee-logins, employees/import), so a "Quality Inspector" custom role
-        // does NOT carry INSPECTION_BOY. Gating on the base role therefore bounced
-        // real inspectors off their own workspace — they could see an assignment
-        // but had no way to open and fill it.
+        // /inspection → the inspector workspace, decided purely by the inspection
+        // permissions. Every route that assigns a custom role sets the system role
+        // to MANAGER (see fix-login, employee-logins, employees/import), so a
+        // "Quality Inspector" custom role does NOT carry INSPECTION_BOY, and gating
+        // on the base role bounced real inspectors off their own workspace.
         if (path.startsWith("/inspection")) {
-            const canInspect =
-                role === "INSPECTION_BOY" || role === "ADMIN" ||
-                permissions.includes("inspection.view") ||
-                permissions.includes("inspection.submit") ||
-                permissions.includes("inspection.history")
+            const canInspect = role === "ADMIN" || hasInspectionPermission(permissions)
             if (!canInspect) {
-                return NextResponse.redirect(new URL(ownDashboard, req.url))
+                // A legacy INSPECTION_BOY's own landing page is /inspection itself,
+                // which would loop now that the base role grants nothing.
+                const target = ownDashboard.startsWith("/inspection") ? "/dashboard" : ownDashboard
+                return NextResponse.redirect(new URL(target, req.url))
             }
         }
         // /client → CLIENT only

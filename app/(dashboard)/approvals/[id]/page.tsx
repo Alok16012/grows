@@ -13,6 +13,7 @@ import {
 import Link from "next/link"
 import { toast } from "sonner"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { can } from "@/lib/can"
 
 export default function ReviewInspectionPage() {
     const { data: session, status: authStatus } = useSession()
@@ -34,7 +35,9 @@ export default function ReviewInspectionPage() {
 
     useEffect(() => {
         if (authStatus === "unauthenticated") router.push("/login")
-        else if (authStatus === "authenticated" && session?.user?.role === "INSPECTION_BOY") router.push("/")
+        // Matches the API gate (`approvals.view`). Blocking on "is an inspector"
+        // locked out leads who review submissions and legitimately hold both.
+        else if (authStatus === "authenticated" && !can(session, "approvals.view")) router.push("/")
     }, [authStatus, session, router])
 
     const fetchInspection = useCallback(async () => {

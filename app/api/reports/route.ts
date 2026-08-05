@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { isSelfScopedInspector } from "@/lib/permissions"
 
 // Helper to parse a number value safely
 function parseNum(val: string | null | undefined): number {
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
     if (canViewAllReports) {
         siteId = searchParams.get("siteId") || null
         inspectorId = searchParams.get("inspectorId") || null
-    } else if (role === "INSPECTION_BOY") {
+    } else if (isSelfScopedInspector(session)) {
         // Always restrict to their own inspections only
         inspectorId = session.user.id
         // Honor site/project filters if provided

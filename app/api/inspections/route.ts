@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
-import { checkAccess } from "@/lib/permissions"
+import { canAccessInspection } from "@/lib/permissions"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -16,7 +16,9 @@ export async function GET(req: Request) {
     if (!assignmentId) {
         // Support ?recent=N for inspectors to fetch their recent submissions
         const recent = searchParams.get("recent")
-        if (recent && (session.user.role === Role.INSPECTION_BOY || session.user.role.toString() === "INSPECTION_BOY")) {
+        // Self-scoped by `submittedBy` below, so the gate is simply "does this
+        // user do inspection work" — a permission question, not a base-role one.
+        if (recent && canAccessInspection(session)) {
             const limit = Math.min(20, Math.max(1, parseInt(recent) || 5))
             const recentInspections = await prisma.inspection.findMany({
                 where: { submittedBy: session.user.id },
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    if (session.user.role !== Role.INSPECTION_BOY) {
+    if (!canAccessInspection(session)) {
         return NextResponse.json({ error: "Only inspectors can create inspections" }, { status: 403 })
     }
 

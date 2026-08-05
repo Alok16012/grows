@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
 
 export async function GET(req: Request) {
@@ -80,7 +81,21 @@ export async function POST(req: Request) {
         })
 
         // Auto-create Employee record for inspectors so they appear in HR workflows
-        if (role === Role.INSPECTION_BOY) {
+        // and inspector pickers — those match on a linked Employee record. Who counts
+        // as an inspector comes from the assigned custom role's inspection permissions:
+        // this screen always sends base role MANAGER alongside a custom role, so the
+        // INSPECTION_BOY base role never identified a real inspector here.
+        const isInspector = customRoleId
+            ? !!(await prisma.customRole.findFirst({
+                where: {
+                    id: customRoleId,
+                    permissions: { hasSome: INSPECTION_PERMISSIONS },
+                },
+                select: { id: true },
+            }))
+            : false
+
+        if (isInspector) {
             const nameParts = name.trim().split(" ")
             const firstName = nameParts[0]
             const lastName = nameParts.slice(1).join(" ") || "-"

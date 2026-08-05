@@ -117,7 +117,8 @@ export async function POST(req: Request) {
                         name: [firstName, str(row["LastName"])].filter(Boolean).join(" "),
                         email: emailRaw,
                         password: passwordHash,
-                        role: "INSPECTION_BOY",
+                        // Base role is vestigial — access comes from the custom role.
+                        role: "MANAGER",
                     },
                 })
                 userId = newUser.id

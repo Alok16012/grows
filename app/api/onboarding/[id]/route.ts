@@ -56,7 +56,8 @@ async function ensureLogin(employeeId: string) {
                 password: hashed,
                 plainPassword: plain,
                 phone: emp.phone || null,
-                role: "INSPECTION_BOY",
+                // Base role is vestigial — access comes from the custom role an admin assigns.
+                role: "MANAGER",
             },
         })
         await prisma.employee.update({ where: { id: emp.id }, data: { userId: user.id } })

@@ -8,7 +8,8 @@ import {
     Users, Sparkles, Eye, MoreVertical, Calendar, RefreshCw,
     ClipboardList, StopCircle, FileText,
 } from "lucide-react"
-import { can } from "@/lib/can"
+import { can, canAny } from "@/lib/can"
+import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,10 @@ export default function AssignmentsPage() {
         if (status === "unauthenticated") {
             router.push("/login")
         } else if (status === "authenticated" && !isManagerOrAdmin) {
-            router.push(session?.user?.role === "INSPECTION_BOY" ? "/inspection" : "/")
+            // Where to send them depends on whether they are an inspector, and a
+            // custom-role inspector's base role is MANAGER — so the inspection
+            // permissions decide the destination, not the base role.
+            router.push(canAny(session, INSPECTION_PERMISSIONS) ? "/inspection" : "/")
         }
     }, [status, session, router, isManagerOrAdmin, mounted])
 

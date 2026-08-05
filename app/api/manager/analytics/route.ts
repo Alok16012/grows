@@ -2,8 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { Role } from "@prisma/client"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, INSPECTION_PERMISSIONS } from "@/lib/permissions"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
@@ -208,7 +207,16 @@ export async function GET() {
 
         // Inspection data (existing)
         prisma.user.findMany({
-            where: { role: Role.INSPECTION_BOY, isActive: true },
+            // "Who is an inspector" is decided by the custom role's permissions —
+            // the INSPECTION_BOY base role is never assigned, so counting it
+            // reported zero inspectors.
+            where: {
+                isActive: true,
+                customRole: {
+                    isActive: true,
+                    permissions: { hasSome: INSPECTION_PERMISSIONS },
+                },
+            },
             select: {
                 id: true,
                 name: true,
