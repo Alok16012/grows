@@ -77,6 +77,28 @@ function PersonCard({ person, checked, onToggle, showContact }: {
     )
 }
 
+// Tells the user which pool they are looking at, and lets them widen it. Without
+// this the site-scoped list is indistinguishable from "there is nobody here".
+function ScopeNote({ siteName, showAll, onToggle, loading }: {
+    siteName: string; showAll: boolean; onToggle: () => void; loading: boolean
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3 mt-3 rounded-[10px] bg-[var(--surface2)] border border-[var(--border)] px-3 py-2">
+            <span className="text-[11.5px] text-[var(--text3)]">
+                {loading
+                    ? "Loading staff…"
+                    : showAll
+                        ? "Showing all staff, including those not linked to this site."
+                        : `Showing staff who work at ${siteName}.`}
+            </span>
+            <button type="button" onClick={onToggle}
+                className="text-[11.5px] font-medium text-[var(--accent)] hover:underline shrink-0">
+                {showAll ? "Only this site" : "Show all staff"}
+            </button>
+        </div>
+    )
+}
+
 function SummaryRow({ icon, label, value, valueClass }: {
     icon: React.ReactNode; label: string; value: React.ReactNode; valueClass?: string
 }) {
@@ -109,6 +131,12 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     const [managers, setManagers] = useState<Person[]>([])
     const [inspectors, setInspectors] = useState<Person[]>([])
     const [inspectorSearch, setInspectorSearch] = useState("")
+    const [loadingPeople, setLoadingPeople] = useState(false)
+    const [showAllStaff, setShowAllStaff] = useState(false)
+    // Who was on the project when this page opened. They stay in the pickers even
+    // if they are not on the selected site's team, so editing an unrelated field
+    // can never silently drop the team the project already has.
+    const [pinned, setPinned] = useState<{ managers: string[]; inspectors: string[] }>({ managers: [], inspectors: [] })
 
     useEffect(() => {
         const toDateInput = (s?: string | null) => (s ? new Date(s).toISOString().slice(0, 10) : "")
@@ -126,20 +154,57 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                     priority: d.priority || "Medium",
                     status: d.status || "ACTIVE",
                 })
-                setManagerIds(Array.isArray(d.managerIds) ? d.managerIds : [])
-                setInspectorIds(Array.isArray(d.inspectorIds) ? d.inspectorIds : [])
+                const mIds = Array.isArray(d.managerIds) ? d.managerIds : []
+                const iIds = Array.isArray(d.inspectorIds) ? d.inspectorIds : []
+                setManagerIds(mIds)
+                setInspectorIds(iIds)
+                setPinned({ managers: mIds, inspectors: iIds })
             })
             .catch(() => setProject(null))
             .finally(() => setLoading(false))
 
         fetch("/api/sites?isActive=true").then(r => r.ok ? r.json() : []).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {})
-        fetch("/api/users?role=MANAGER").then(r => r.ok ? r.json() : []).then(d => setManagers(Array.isArray(d) ? d : [])).catch(() => {})
-        fetch("/api/users?role=INSPECTION_BOY").then(r => r.ok ? r.json() : []).then(d => setInspectors(Array.isArray(d) ? d : [])).catch(() => {})
     }, [params.id])
+
+    // Pickers follow the selected site — see the create page for the reasoning.
+    // The difference here is that the project's existing members are merged back in
+    // rather than dropped, so a team assembled before the site link existed survives.
+    const pinnedKey = pinned.managers.join(",") + "|" + pinned.inspectors.join(",")
+    useEffect(() => {
+        if (!form.siteId) { setManagers([]); setInspectors([]); return }
+        const scope = showAllStaff ? "" : `&siteId=${encodeURIComponent(form.siteId)}`
+        const existing = [...pinned.managers, ...pinned.inspectors]
+        let cancelled = false
+        setLoadingPeople(true)
+        Promise.all([
+            fetch(`/api/users?role=MANAGER${scope}`).then(r => r.ok ? r.json() : []),
+            fetch(`/api/users?role=INSPECTION_BOY${scope}`).then(r => r.ok ? r.json() : []),
+            existing.length
+                ? fetch(`/api/users?ids=${existing.join(",")}`).then(r => r.ok ? r.json() : [])
+                : Promise.resolve([]),
+        ]).then(([m, i, current]: [Person[], Person[], Person[]]) => {
+            if (cancelled) return
+            const byId = new Map((Array.isArray(current) ? current : []).map(p => [p.id, p]))
+            const merge = (list: Person[], keep: string[]) => {
+                const seen = new Set(list.map(p => p.id))
+                const extra = keep.filter(id => !seen.has(id)).map(id => byId.get(id)).filter(Boolean) as Person[]
+                return [...list, ...extra]
+            }
+            setManagers(merge(Array.isArray(m) ? m : [], pinned.managers))
+            setInspectors(merge(Array.isArray(i) ? i : [], pinned.inspectors))
+        }).catch(() => { /* non-fatal */ })
+            .finally(() => { if (!cancelled) setLoadingPeople(false) })
+        return () => { cancelled = true }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.siteId, showAllStaff, pinnedKey])
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
     const toggle = (id: string, setter: React.Dispatch<React.SetStateAction<string[]>>) =>
         setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+    const selectedSiteName = useMemo(
+        () => sites.find(s => s.id === form.siteId)?.name || "this site",
+        [sites, form.siteId])
 
     const filteredInspectors = useMemo(() => {
         const q = inspectorSearch.trim().toLowerCase()
@@ -302,13 +367,23 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Managers</h2>
-                                    <p className="text-[11.5px] text-[var(--text3)]">Select managers who can oversee and manage this project.</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who can approve reports or manage assignments.</p>
                                 </div>
                             </div>
                             <span className="text-[12px] font-medium text-[var(--accent)]">{managerIds.length} selected</span>
                         </div>
-                        {managers.length === 0 ? (
-                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">No managers available.</p>
+                        {form.siteId && (
+                            <ScopeNote siteName={selectedSiteName} showAll={showAllStaff}
+                                onToggle={() => setShowAllStaff(v => !v)} loading={loadingPeople} />
+                        )}
+                        {!form.siteId ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">Select a site first to see who works there.</p>
+                        ) : managers.length === 0 ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">
+                                {loadingPeople ? "Loading…" : showAllStaff
+                                    ? "No staff hold approval or assignment permissions yet."
+                                    : `Nobody at ${selectedSiteName} can approve reports or manage assignments. Add them to the site team, or use "Show all staff".`}
+                            </p>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
                                 {managers.map(m => (
@@ -327,19 +402,31 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspectors</h2>
-                                    <p className="text-[11.5px] text-[var(--text3)]">Select inspectors who will be assigned to this project.</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission.</p>
                                 </div>
                             </div>
                             <span className="text-[12px] font-medium text-[var(--accent)]">{inspectorIds.length} selected</span>
                         </div>
+                        {form.siteId && (
+                            <ScopeNote siteName={selectedSiteName} showAll={showAllStaff}
+                                onToggle={() => setShowAllStaff(v => !v)} loading={loadingPeople} />
+                        )}
                         <div className="relative mt-3 mb-2">
                             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                             <input value={inspectorSearch} onChange={e => setInspectorSearch(e.target.value)}
                                 placeholder="Search inspectors by name or phone..."
                                 className={inputCls + " pl-8"} />
                         </div>
-                        {filteredInspectors.length === 0 ? (
-                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">No inspectors found.</p>
+                        {!form.siteId ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">Select a site first to see who works there.</p>
+                        ) : filteredInspectors.length === 0 ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">
+                                {loadingPeople ? "Loading…" : inspectorSearch.trim()
+                                    ? "No inspectors match that search."
+                                    : showAllStaff
+                                        ? "No staff hold the Inspection (Inspector) permission yet."
+                                        : `No inspectors work at ${selectedSiteName} yet. Add them to the site team, or use "Show all staff".`}
+                            </p>
                         ) : (
                             <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">

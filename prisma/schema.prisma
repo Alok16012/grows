@@ -39,7 +39,7 @@ model User {
   hrApprovedReviews      PerformanceReview[] @relation("HRApprover")
   employeeProfile        Employee?           @relation("EmployeeUser")
   jobPostingsCreated     JobPosting[]        @relation("JobCreator")
-  siteAssignmentsAsInspector SiteAssignment[] @relation("SiteAssignmentInspector")
+  siteMemberships            SiteAssignment[] @relation("SiteAssignmentUser")
   siteAssignmentsAsAssigner  SiteAssignment[] @relation("SiteAssignmentAssigner")
 }
 
@@ -72,21 +72,31 @@ model Company {
 // A "Whole Site" grant: an inspector is assigned to a real HR Site as a whole.
 // All current projects under that Site get an Assignment row at creation time,
 // and any project added to the Site later is auto-assigned to these inspectors.
+// Site team membership: which staff work at a site. Deliberately many-to-many —
+// one person can hold `inspection.*` and cover several sites at once, which the
+// HR `Deployment` record cannot express (that one is exclusive: an employee is
+// posted to a single site until relieved).
+// Whether a member shows up as an inspector or as a manager is NOT stored here —
+// it is read off their custom-role permissions, so somebody who holds both
+// appears in both pickers and nothing has to be kept in sync.
 model SiteAssignment {
   id              String   @id @default(uuid())
   siteId          String
-  inspectionBoyId String
+  // The DB column is still named `inspectionBoyId` — it predates managers being
+  // stored here. Mapped rather than renamed so no production SQL is required;
+  // the index names below are pinned for the same reason.
+  userId          String   @map("inspectionBoyId")
   assignedBy      String
   recurrenceType  String   @default("none")
   status          String   @default("active")
   createdAt       DateTime @default(now())
   site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  inspectionBoy   User     @relation("SiteAssignmentInspector", fields: [inspectionBoyId], references: [id])
+  user            User     @relation("SiteAssignmentUser", fields: [userId], references: [id])
   assigner        User     @relation("SiteAssignmentAssigner", fields: [assignedBy], references: [id])
 
-  @@unique([siteId, inspectionBoyId])
+  @@unique([siteId, userId], map: "SiteAssignment_siteId_inspectionBoyId_key")
   @@index([siteId])
-  @@index([inspectionBoyId])
+  @@index([userId], map: "SiteAssignment_inspectionBoyId_idx")
 }
 
 model Project {

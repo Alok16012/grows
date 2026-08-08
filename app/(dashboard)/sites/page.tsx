@@ -738,6 +738,215 @@ function RelieveDialog({ deployment, onRelieved, onCancel }: {
 
 // ─── Site Detail Drawer ───────────────────────────────────────────────────────
 
+// ─── Site Team ────────────────────────────────────────────────────────────────
+// Who is available to be picked as a manager or inspector when a project is
+// created at this site. Separate from Deployment on purpose: a deployment is the
+// HR posting and is exclusive (one site until relieved), while an inspector with
+// the Inspection (Inspector) permission routinely covers several sites at once.
+
+type TeamMember = {
+    id: string
+    userId: string
+    name: string
+    email: string
+    phone: string | null
+    isInspector: boolean
+    isManager: boolean
+}
+
+type StaffOption = { id: string; name: string; email: string; phone?: string | null }
+
+function SiteTeamSection({ siteId, canManage }: { siteId: string; canManage: boolean }) {
+    const [members, setMembers] = useState<TeamMember[]>([])
+    const [loading, setLoading] = useState(true)
+    const [adding, setAdding] = useState(false)
+    const [options, setOptions] = useState<StaffOption[]>([])
+    const [loadingOptions, setLoadingOptions] = useState(false)
+    const [search, setSearch] = useState("")
+    const [saving, setSaving] = useState(false)
+
+    const fetchTeam = useCallback(async () => {
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/sites/${siteId}/team`)
+            const data = res.ok ? await res.json() : []
+            setMembers(Array.isArray(data) ? data : [])
+        } catch {
+            setMembers([])
+        } finally {
+            setLoading(false)
+        }
+    }, [siteId])
+
+    useEffect(() => { fetchTeam() }, [fetchTeam])
+
+    // The picker deliberately queries WITHOUT a siteId — this is where somebody
+    // gets linked to the site, so scoping it to the site would only ever offer
+    // people who are already on it.
+    const openAdd = async () => {
+        setAdding(true)
+        setLoadingOptions(true)
+        try {
+            const [m, i] = await Promise.all([
+                fetch("/api/users?role=MANAGER").then(r => r.ok ? r.json() : []),
+                fetch("/api/users?role=INSPECTION_BOY").then(r => r.ok ? r.json() : []),
+            ])
+            const merged = new Map<string, StaffOption>()
+            for (const p of [...(Array.isArray(m) ? m : []), ...(Array.isArray(i) ? i : [])]) {
+                merged.set(p.id, p)
+            }
+            const already = new Set(members.map(x => x.userId))
+            setOptions([...merged.values()].filter(p => !already.has(p.id)))
+        } catch {
+            setOptions([])
+        } finally {
+            setLoadingOptions(false)
+        }
+    }
+
+    const add = async (userId: string) => {
+        setSaving(true)
+        try {
+            const res = await fetch(`/api/sites/${siteId}/team`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userIds: [userId] }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Added to site team")
+            setAdding(false)
+            setSearch("")
+            fetchTeam()
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Failed to add")
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const remove = async (userId: string, name: string) => {
+        try {
+            const res = await fetch(`/api/sites/${siteId}/team?userId=${encodeURIComponent(userId)}`, { method: "DELETE" })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(`${name} removed from site team`)
+            fetchTeam()
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Failed to remove")
+        }
+    }
+
+    const q = search.trim().toLowerCase()
+    const shown = q
+        ? options.filter(o => (o.name || "").toLowerCase().includes(q)
+            || (o.email || "").toLowerCase().includes(q)
+            || (o.phone || "").toLowerCase().includes(q))
+        : options
+
+    return (
+        <div className="p-5 border-b border-[var(--border)]">
+            <div className="flex items-center justify-between mb-1">
+                <h3 className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px]">Site Team</h3>
+                <span className="text-[11px] text-[var(--text3)]">{members.length} member{members.length === 1 ? "" : "s"}</span>
+            </div>
+            <p className="text-[11.5px] text-[var(--text3)] mb-3">
+                Managers and inspectors offered when a project is created at this site. One person can be on several sites.
+            </p>
+
+            {loading ? (
+                <div className="flex items-center justify-center py-6">
+                    <Loader2 size={18} className="animate-spin text-[var(--accent)]" />
+                </div>
+            ) : members.length > 0 ? (
+                <div className="space-y-2">
+                    {members.map(m => (
+                        <div key={m.id} className="flex items-center gap-2.5 border border-[var(--border)] rounded-[10px] p-2.5">
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[13px] font-medium text-[var(--text)] truncate">{m.name}</p>
+                                <p className="text-[11px] text-[var(--text3)] truncate">{m.phone || m.email}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                                {m.isInspector && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309] border border-[#fcd34d]">Inspector</span>
+                                )}
+                                {m.isManager && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">Manager</span>
+                                )}
+                                {/* A member whose custom role lost both permissions stays
+                                    listed but can no longer be picked anywhere — say so
+                                    rather than showing an unexplained blank row. */}
+                                {!m.isInspector && !m.isManager && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#f9fafb] text-[#6b7280] border border-[#e5e7eb]">No permission</span>
+                                )}
+                            </div>
+                            {canManage && (
+                                <button onClick={() => remove(m.userId, m.name)}
+                                    className="p-1.5 text-[var(--text3)] hover:text-[var(--red)] rounded-[7px] hover:bg-red-50 transition-colors shrink-0"
+                                    title="Remove from site team">
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-6 border border-dashed border-[var(--border)] rounded-[10px]">
+                    <Users size={24} className="text-[var(--text3)] mx-auto mb-1.5" />
+                    <p className="text-[12px] text-[var(--text3)]">No one added to this site team yet</p>
+                </div>
+            )}
+
+            {canManage && !adding && (
+                <button onClick={openAdd}
+                    className="mt-3 w-full flex items-center justify-center gap-2 h-9 border border-dashed border-[var(--accent)]/50 rounded-[9px] text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors">
+                    <Plus size={15} /> Add Manager / Inspector
+                </button>
+            )}
+
+            {canManage && adding && (
+                <div className="mt-3 border border-[var(--border)] rounded-[10px] p-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[12px] font-medium text-[var(--text)]">Add to site team</span>
+                        <button onClick={() => { setAdding(false); setSearch("") }}
+                            className="p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-[6px]">
+                            <X size={14} />
+                        </button>
+                    </div>
+                    <div className="relative mb-2">
+                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                        <input value={search} onChange={e => setSearch(e.target.value)}
+                            placeholder="Search staff by name or phone..."
+                            className="w-full h-9 pl-8 pr-3 text-[13px] border border-[var(--border)] rounded-[8px] focus:outline-none focus:border-[var(--accent)]" />
+                    </div>
+                    {loadingOptions ? (
+                        <div className="flex items-center justify-center py-4">
+                            <Loader2 size={16} className="animate-spin text-[var(--accent)]" />
+                        </div>
+                    ) : shown.length === 0 ? (
+                        <p className="text-[12px] text-[var(--text3)] text-center py-4">
+                            {options.length === 0
+                                ? "Everyone with inspection or approval permissions is already on this team."
+                                : "No staff match that search."}
+                        </p>
+                    ) : (
+                        <div className="max-h-[220px] overflow-y-auto space-y-1.5 pr-1">
+                            {shown.map(o => (
+                                <button key={o.id} type="button" disabled={saving} onClick={() => add(o.id)}
+                                    className="w-full flex items-center gap-2 text-left border border-[var(--border)] rounded-[8px] p-2 hover:border-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors disabled:opacity-50">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[12.5px] font-medium text-[var(--text)] truncate">{o.name}</p>
+                                        <p className="text-[10.5px] text-[var(--text3)] truncate">{o.phone || o.email}</p>
+                                    </div>
+                                    <Plus size={14} className="text-[var(--accent)] shrink-0" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
 function SiteDrawer({ site, onClose, onRefresh, session }: {
     site: Site; onClose: () => void; onRefresh: () => void; session?: any
 }) {
@@ -931,6 +1140,8 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                             />
                         )}
                     </div>
+
+                    <SiteTeamSection siteId={site.id} canManage={can(session, "sites.manage")} />
 
                     {/* Geofence Section */}
                     {hasGeo && (

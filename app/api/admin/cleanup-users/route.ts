@@ -44,7 +44,7 @@ async function findReferencedIds(ids: string[]): Promise<Set<string>> {
         { key: "submittedBy", run: () => prisma.inspection.findMany({ where: { submittedBy: q }, select: { submittedBy: true }, distinct: ["submittedBy"] }) },
         { key: "managerId", run: () => prisma.projectManager.findMany({ where: { managerId: q }, select: { managerId: true }, distinct: ["managerId"] }) },
         { key: "assignedBy", run: () => prisma.projectManager.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }) },
-        { key: "inspectionBoyId", run: () => prisma.siteAssignment.findMany({ where: { inspectionBoyId: q }, select: { inspectionBoyId: true }, distinct: ["inspectionBoyId"] }) },
+        { key: "userId", run: () => prisma.siteAssignment.findMany({ where: { userId: q }, select: { userId: true }, distinct: ["userId"] }) },
         { key: "assignedBy", run: () => prisma.siteAssignment.findMany({ where: { assignedBy: q }, select: { assignedBy: true }, distinct: ["assignedBy"] }) },
         { key: "assignedTo", run: () => prisma.lead.findMany({ where: { assignedTo: q }, select: { assignedTo: true }, distinct: ["assignedTo"] }) },
         { key: "createdBy", run: () => prisma.lead.findMany({ where: { createdBy: q }, select: { createdBy: true }, distinct: ["createdBy"] }) },

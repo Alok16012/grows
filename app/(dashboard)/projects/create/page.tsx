@@ -64,6 +64,28 @@ function PersonCard({ person, checked, onToggle, showContact }: {
     )
 }
 
+// Tells the user which pool they are looking at, and lets them widen it. Without
+// this the site-scoped list is indistinguishable from "there is nobody here".
+function ScopeNote({ siteName, showAll, onToggle, loading }: {
+    siteName: string; showAll: boolean; onToggle: () => void; loading: boolean
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3 mt-3 rounded-[10px] bg-[var(--surface2)] border border-[var(--border)] px-3 py-2">
+            <span className="text-[11.5px] text-[var(--text3)]">
+                {loading
+                    ? "Loading staff…"
+                    : showAll
+                        ? "Showing all staff, including those not linked to this site."
+                        : `Showing staff who work at ${siteName}.`}
+            </span>
+            <button type="button" onClick={onToggle}
+                className="text-[11.5px] font-medium text-[var(--accent)] hover:underline shrink-0">
+                {showAll ? "Only this site" : "Show all staff"}
+            </button>
+        </div>
+    )
+}
+
 function CreateProjectForm() {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -75,6 +97,8 @@ function CreateProjectForm() {
     const [managers, setManagers] = useState<Person[]>([])
     const [inspectors, setInspectors] = useState<Person[]>([])
     const [inspectorSearch, setInspectorSearch] = useState("")
+    const [loadingPeople, setLoadingPeople] = useState(false)
+    const [showAllStaff, setShowAllStaff] = useState(false)
 
     const [form, setForm] = useState({
         name: "", description: "", siteId: "", projectType: "",
@@ -94,18 +118,45 @@ function CreateProjectForm() {
             .then(d => setSites(Array.isArray(d) ? d : []))
             .catch(() => toast.error("Failed to load sites"))
             .finally(() => setLoadingSites(false))
-        Promise.all([
-            fetch("/api/users?role=MANAGER").then(r => r.ok ? r.json() : []),
-            fetch("/api/users?role=INSPECTION_BOY").then(r => r.ok ? r.json() : []),
-        ]).then(([m, i]) => {
-            setManagers(Array.isArray(m) ? m : [])
-            setInspectors(Array.isArray(i) ? i : [])
-        }).catch(() => { /* non-fatal */ })
     }, [])
+
+    // People are fetched per SITE, not once on mount. Managers and inspectors are
+    // scoped to the site the project runs at — an inspector may hold the permission
+    // company-wide but only work a few sites, and the whole-company list made the
+    // picker useless at scale. `showAllStaff` drops the scope for the case where
+    // someone genuinely new to the site has to be put on the project.
+    useEffect(() => {
+        if (!form.siteId) { setManagers([]); setInspectors([]); return }
+        const scope = showAllStaff ? "" : `&siteId=${encodeURIComponent(form.siteId)}`
+        let cancelled = false
+        setLoadingPeople(true)
+        Promise.all([
+            fetch(`/api/users?role=MANAGER${scope}`).then(r => r.ok ? r.json() : []),
+            fetch(`/api/users?role=INSPECTION_BOY${scope}`).then(r => r.ok ? r.json() : []),
+        ]).then(([m, i]) => {
+            if (cancelled) return
+            const nextManagers: Person[] = Array.isArray(m) ? m : []
+            const nextInspectors: Person[] = Array.isArray(i) ? i : []
+            setManagers(nextManagers)
+            setInspectors(nextInspectors)
+            // Drop anyone already ticked who is not on the new site's list, or the
+            // form would silently submit people the picker no longer even shows.
+            const mIds = new Set(nextManagers.map(p => p.id))
+            const iIds = new Set(nextInspectors.map(p => p.id))
+            setManagerIds(prev => prev.filter(id => mIds.has(id)))
+            setInspectorIds(prev => prev.filter(id => iIds.has(id)))
+        }).catch(() => { /* non-fatal */ })
+            .finally(() => { if (!cancelled) setLoadingPeople(false) })
+        return () => { cancelled = true }
+    }, [form.siteId, showAllStaff])
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
     const toggle = (id: string, setter: React.Dispatch<React.SetStateAction<string[]>>) =>
         setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+    const selectedSiteName = useMemo(
+        () => sites.find(s => s.id === form.siteId)?.name || "this site",
+        [sites, form.siteId])
 
     const filteredInspectors = useMemo(() => {
         const q = inspectorSearch.trim().toLowerCase()
@@ -242,7 +293,7 @@ function CreateProjectForm() {
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Managers</h2>
-                                    <p className="text-[11.5px] text-[var(--text3)]">Select one or more managers who will oversee this project.</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who can approve reports or manage assignments.</p>
                                 </div>
                             </div>
                             <button type="button"
@@ -251,8 +302,18 @@ function CreateProjectForm() {
                                 {managerIds.length === managers.length && managers.length > 0 ? "Clear All" : "Select All"}
                             </button>
                         </div>
-                        {managers.length === 0 ? (
-                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">No managers available.</p>
+                        {form.siteId && (
+                            <ScopeNote siteName={selectedSiteName} showAll={showAllStaff}
+                                onToggle={() => setShowAllStaff(v => !v)} loading={loadingPeople} />
+                        )}
+                        {!form.siteId ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">Select a site first to see who works there.</p>
+                        ) : managers.length === 0 ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">
+                                {loadingPeople ? "Loading…" : showAllStaff
+                                    ? "No staff hold approval or assignment permissions yet."
+                                    : `Nobody at ${selectedSiteName} can approve reports or manage assignments. Add them to the site team, or use "Show all staff".`}
+                            </p>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
                                 {managers.map(m => (
@@ -271,7 +332,7 @@ function CreateProjectForm() {
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspectors</h2>
-                                    <p className="text-[11.5px] text-[var(--text3)]">Select inspectors who will perform inspections in this project.</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission.</p>
                                 </div>
                             </div>
                             <button type="button"
@@ -280,14 +341,26 @@ function CreateProjectForm() {
                                 {inspectorIds.length === inspectors.length && inspectors.length > 0 ? "Clear All" : "Select All"}
                             </button>
                         </div>
+                        {form.siteId && (
+                            <ScopeNote siteName={selectedSiteName} showAll={showAllStaff}
+                                onToggle={() => setShowAllStaff(v => !v)} loading={loadingPeople} />
+                        )}
                         <div className="relative mt-3 mb-2">
                             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                             <input value={inspectorSearch} onChange={e => setInspectorSearch(e.target.value)}
                                 placeholder="Search inspectors by name or phone..."
                                 className={inputCls + " pl-8"} />
                         </div>
-                        {filteredInspectors.length === 0 ? (
-                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">No inspectors found.</p>
+                        {!form.siteId ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">Select a site first to see who works there.</p>
+                        ) : filteredInspectors.length === 0 ? (
+                            <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">
+                                {loadingPeople ? "Loading…" : inspectorSearch.trim()
+                                    ? "No inspectors match that search."
+                                    : showAllStaff
+                                        ? "No staff hold the Inspection (Inspector) permission yet."
+                                        : `No inspectors work at ${selectedSiteName} yet. Add them to the site team, or use "Show all staff".`}
+                            </p>
                         ) : (
                             <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">

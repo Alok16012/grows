@@ -316,6 +316,13 @@ type PermSession = { user: { role: string; permissions?: string[] } } | null | u
 
 export const INSPECTION_PERMISSIONS = ["inspection.view", "inspection.submit", "inspection.history"]
 
+// Who may be picked as a PROJECT MANAGER. A project manager reviews and approves
+// what the inspectors submit and hands out their assignments, so the two "manage"
+// capabilities that describe that work are the test. `projects.manage` is
+// deliberately NOT here: being allowed to create a project does not make someone a
+// candidate to be supervised on one.
+export const PROJECT_MANAGER_PERMISSIONS = ["approvals.manage", "assignments.manage"]
+
 // Raw-array form, for callers that only hold a JWT token (e.g. middleware).
 export function hasInspectionPermission(permissions: readonly string[] | null | undefined): boolean {
     return INSPECTION_PERMISSIONS.some(p => permissions?.includes(p))
