@@ -2,42 +2,37 @@
 //
 // Verified against actual VARROC PUNE wage sheet (MAR CAL) — all 11 employees ✓
 //
+// Every statutory rate, ceiling and slab below comes from a PayrollRules
+// object (lib/payroll-rules.ts). DEFAULT_PAYROLL_RULES reproduces the verified
+// sheet exactly; companies can override rates from Payroll → Calculation
+// Settings, and the server passes the stored rules in.
+//
 // complianceType:
 //   "CALL" → No PF, No ESIC  (temporary / contract / non-compliance roles)
 //   "OR"   → PF + ESIC apply  (full-time / full-compliance roles)
 //
-// HRA:    (Basic + DA) × 5%
-// Bonus:  Use stored value from salary structure if provided; else (Basic + DA) × 8.33%
-//         Minimum-wage-based bonus (e.g. ₹625 = 7500×8.33%, ₹650 = 7800×8.33%)
-//         is stored per employee in salary structure per Payment of Bonus Act cap.
+// HRA / Bonus: manual values from the salary structure — no auto-calculation.
 //
 // Proration: ROUND(component × WorkedDays / MonthDays)  ← multiply FIRST (Excel-exact)
 //
-// OT Pay: ROUND(otRatePerHour × 4 × OT_Days, 0)
-//   Each OT_Day = 4 extra hrs at the configured per-hour rate (e.g. ₹170/hr × 4 = ₹680/day)
-//   OT_Days × 4 = actual OT hours (col I in Excel sheet)
+// OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
+//   Default hoursPerDay = 4 (e.g. ₹170/hr × 4 = ₹680/day)
 //
-// PF Employee:  pfBase = min(Basic + DA, ₹15,000)  — statutory ceiling
-//               IF(WorkedDays >= 26, ROUND(pfBase × 12%), ROUND(pfBase/26 × WorkedDays × 12%))
+// PF Employee:  pfBase = min(Basic + DA, wageCeiling ₹15,000)
+//               Default: pfBase × 12% with NO proration (full PF regardless of
+//               worked days). Optional rule: prorate below the threshold days.
 // PF Employer (all on pfBase):
-//   Employer EPS      = pfBase × 8.33%
-//   Employer EPF diff = pfBase × 3.67%
-//   EDLI              = pfBase × 0.50%
-//   EPF Admin charges = pfBase × 0.50%
-//   Total pfEmployer  = sum of above (≈ 13%)
+//   EPS 8.33% + EPF diff 3.67% + EDLI 0.50% + admin 0.50%  (≈ 13%)
 //
 // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
-//   ESIC wages = EarnedGross − Washing − Bonus  (OT included; washing & bonus excluded)
-//   Employee ESIC: CEIL(esicWages × 0.75%)
-//   Employer ESIC: CEIL(esicWages × 3.25%)
+//   ESIC wages = EarnedGross − Washing − Bonus  (OT included)
+//   Employee CEIL(0.75%), Employer CEIL(3.25%)
 //
-// PT (Professional Tax – Maharashtra slab, on earned gross):
-//   Female, Gross ≤ ₹25,000    → ₹0   (Maharashtra female exemption)
-//   Gross ≤ ₹7,500             → ₹0
-//   Gross ₹7,501–₹10,000      → ₹175
-//   Gross > ₹10,000 (non-Feb) → ₹200
-//   Gross > ₹10,000 (February) → ₹300  (annual ₹100 adjustment)
+// PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
+//   200 (300 in February). Female employees exempt up to ₹25,000.
 //
+import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt } from "./payroll-rules"
+
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number
@@ -52,7 +47,7 @@ export function calcGrowusPayroll(sal: {
     otherDeductions: number; productionIncentive: number; lwf: number
     gender?: string            // "Male" | "Female" (default "Male")
     month?: number             // 1–12, used for February PT (default: current month)
-}) {
+}, rules: PayrollRules = DEFAULT_PAYROLL_RULES) {
     const {
         basic, da, washing, conveyance, leaveWithWages, otherAllowance,
         otRatePerHour, canteenRatePerDay,
@@ -92,34 +87,40 @@ export function calcGrowusPayroll(sal: {
     const bonusEarned   = r(bonusFull)
     const otherEarned   = r(otherAllowance)
 
-    // OT Pay: ROUND(otRatePerHour × 4 × OT_Days, 0)  [col I = OT_Days × 4 = actual OT hours]
-    const otPay = Math.round(otRatePerHour * 4 * otDays)
+    // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
+    const otPay = Math.round(otRatePerHour * rules.ot.hoursPerDay * otDays)
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
         lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)
 
     // ─── Deductions ───────────────────────────────────────────────────────────
 
-    // PF base = min(Basic + DA, ₹15,000) — capped at statutory ceiling
-    // Employee PF: pfBase × 12% (no proration — full PF regardless of worked days)
-    const pfBase     = Math.min(basic + da, 15000)
-    const pfEmployee = isCALL ? 0 : Math.round(pfBase * 0.12)
+    // Percentage application is ALWAYS multiply-first (x × pct / 100), the
+    // same Excel-exact order as proration — dividing the pct first drifts a
+    // ulp and flips .5 rounding boundaries (e.g. 5000 × 8.33%).
+    const pctOf  = (x: number, pct: number) => Math.round(x * pct / 100)
+    const pctCeil = (x: number, pct: number) => Math.ceil(x * pct / 100)
 
-    // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
-    // Contribution base = EarnedGross − Washing − Bonus (OT included; washing & bonus excluded)
-    const esicLimit    = isHandicap ? 25000 : 21000
-    const esicWages    = grossEarned - washingEarned - bonusEarned
-    const esicEligible = !isCALL && grossFullMonth <= esicLimit
-    // Employee ESIC = esicWages × 0.75%
-    const esiEmployee  = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
+    // PF base = min(Basic + DA, wage ceiling) — capped at statutory ceiling.
+    // Default: full PF regardless of worked days; optional proration rule.
+    const pfApplies  = rules.pf.enabled && !isCALL
+    const pfBase     = Math.min(basic + da, rules.pf.wageCeiling)
+    const pfProrated = rules.pf.prorateEmployee && workedDays < rules.pf.prorationThresholdDays
+    const pfEmployee = !pfApplies ? 0 : pfProrated
+        ? Math.round(pfBase / rules.pf.prorationThresholdDays * workedDays * rules.pf.employeePct / 100)
+        : pctOf(pfBase, rules.pf.employeePct)
 
-    // PT: Maharashtra slab on earned gross
-    // Female employees are exempt up to ₹25,000 (Maharashtra notification)
-    const pt = (isFemale && grossEarned <= 25000) ? 0
-             : grossEarned <= 7500  ? 0
-             : grossEarned <= 10000 ? 175
-             : isFeb                ? 300
-             :                        200
+    // ESIC eligibility: full-month structure gross ≤ limit
+    // Contribution base = EarnedGross minus excluded components (OT included)
+    const esicLimit    = isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
+    const esicWages    = grossEarned
+        - (rules.esic.excludeWashing ? washingEarned : 0)
+        - (rules.esic.excludeBonus ? bonusEarned : 0)
+    const esicEligible = rules.esic.enabled && !isCALL && grossFullMonth <= esicLimit
+    const esiEmployee  = esicEligible ? pctCeil(esicWages, rules.esic.employeePct) : 0
+
+    // PT: slab on earned gross (February top-slab override, female exemption)
+    const pt = computePt(grossEarned, rules.pt, { isFebruary: isFeb, isFemale, isCall: isCALL })
 
     // Canteen & other deductions
     const canteen = canteenDays * canteenRatePerDay
@@ -132,15 +133,15 @@ export function calcGrowusPayroll(sal: {
     const netSalary = grossEarned - totalDeductions
 
     // ─── Employer Contributions ───────────────────────────────────────────────
-    // Employer PF — 4 components on pfBase = min(Basic+DA, ₹15,000)
-    const eps         = isCALL ? 0 : Math.round(pfBase * 0.0833)  // EPS  8.33%
-    const epfEmployer = isCALL ? 0 : Math.round(pfBase * 0.0367)  // EPF diff 3.67%
-    const edli        = isCALL ? 0 : Math.round(pfBase * 0.005)   // EDLI 0.50%
-    const epfAdmin    = isCALL ? 0 : Math.round(pfBase * 0.005)   // Admin 0.50%
-    const pfEmployer  = eps + epfEmployer + edli + epfAdmin        // total ≈ 13%
+    // Employer PF — 4 components on pfBase = min(Basic+DA, ceiling)
+    const eps         = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.epsPct)
+    const epfEmployer = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.epfPct)
+    const edli        = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.edliPct)
+    const epfAdmin    = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.adminPct)
+    const pfEmployer  = eps + epfEmployer + edli + epfAdmin
 
-    // ESIC Employer: CEIL(esicWages × 3.25%)
-    const esiEmployer = esicEligible ? Math.ceil(esicWages * 0.0325) : 0
+    // ESIC Employer: CEIL(esicWages × employer %)
+    const esiEmployer = esicEligible ? pctCeil(esicWages, rules.esic.employerPct) : 0
 
     const ctc = grossFullMonth + pfEmployer + esiEmployer
 
@@ -162,4 +163,31 @@ export function calcGrowusPayroll(sal: {
         otherDeductions: otherDeductions || 0,
         totalDeductions, netSalary, ctc,
     }
+}
+
+// ─── Full-month cost preview ─────────────────────────────────────────────────
+// Structure screens (Salary Master, Setup, Compliance Master) show what a
+// full 26/26 month costs: gross, statutory deductions, employer contributions
+// and CTC — with zero attendance-driven inputs. One shared helper so every
+// preview matches the engine exactly instead of re-implementing the formula.
+
+export function calcFullMonthCosts(sal: {
+    basic: number; da: number; washing: number; conveyance: number
+    leaveWithWages: number; otherAllowance: number
+    hra?: number; bonus?: number
+    complianceType?: string
+    isHandicap?: boolean
+}, opts: { gender?: string } = {}, rules: PayrollRules = DEFAULT_PAYROLL_RULES) {
+    return calcGrowusPayroll(
+        { ...sal, otRatePerHour: 0, canteenRatePerDay: 0 },
+        {
+            monthDays: 26, workedDays: 26,
+            otDays: 0, canteenDays: 0,
+            penalty: 0, advance: 0, otherDeductions: 0,
+            productionIncentive: 0, lwf: 0,
+            gender: opts.gender ?? "Male",
+            month: 1, // standard month — previews never show the February PT special
+        },
+        rules
+    )
 }

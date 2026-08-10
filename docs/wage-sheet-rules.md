@@ -3,6 +3,11 @@
 > Verified against VARROC PUNE wage sheet (MAR CAL) — all 11 employees ✓  
 > Compliance Types: **OR** = Full compliance (PF + ESIC apply) | **CALL** = Contract / No PF / No ESIC
 
+> **Configurable since Aug 2026:** every rate, ceiling and slab below is the
+> **default**. Admins can change them from **Payroll → Calculation Settings**
+> (stored in AppSetting `payrollRules`; engine: `lib/payroll-rules.ts` +
+> `lib/payroll-calc.ts`). This document describes the defaults.
+
 ---
 
 ## 🟦 EARNINGS (Manual — Stored in Salary Structure)
@@ -57,9 +62,9 @@
 
 | Column | Formula | Eligibility | CALL |
 |--------|---------|-------------|------|
-| **PF Employee** | IF WorkedDays ≥ 26 → **₹1,800**; ELSE `ROUND(15000/26 × WorkedDays × 12%)` | OR compliance only | **₹0** |
+| **PF Employee** | `ROUND(min(Basic + DA, ₹15,000) × 12%)` — **no proration** by default (full PF regardless of worked days; proration below 26 days is an optional setting) | OR compliance only | **₹0** |
 | **ESIC Employee** | `CEIL(ESIC_Wages × 0.75%)` | Structure Gross ≤ ₹21,000 (₹25,000 for Handicap) | **₹0** |
-| **PT** (Professional Tax) | Maharashtra slab on Earned Gross (see PT slab below) | All employees | **₹0** |
+| **PT** (Professional Tax) | Maharashtra slab on Earned Gross (see PT slab below). Female employees exempt up to ₹25,000 | All employees (system default charges CALL too — configurable) | default charged |
 | **LWF Employee** | Maharashtra: **₹6/month** | All employees | varies |
 | **Canteen** | `Canteen_Days × Canteen_Rate_Per_Day` | All employees | same |
 | **Penalty** | As entered | — | — |
@@ -70,10 +75,13 @@
 
 | Earned Gross | PT Amount |
 |-------------|-----------|
+| Female, ≤ ₹25,000 | **₹0** (Maharashtra exemption) |
 | ≤ ₹7,500 | **₹0** |
 | ₹7,501 – ₹10,000 | **₹175** |
 | > ₹10,000 (standard month) | **₹200** |
 | > ₹10,000 (February only) | **₹300** ← annual ₹100 adjustment |
+
+> Slabs, the February amount and the female-exemption limit are editable in Payroll → Calculation Settings.
 
 ### ESIC Wage Base
 ```
@@ -87,10 +95,10 @@ ESIC Wages = Earned Gross − Washing (prorated) − Bonus (prorated)
 
 | Column | Formula | Eligibility | CALL |
 |--------|---------|-------------|------|
-| **PF Employer** | `ROUND(15000 × 13%)` = **₹1,950** | OR compliance only | **₹0** |
+| **PF Employer** | `pfBase = min(Basic + DA, ₹15,000)`; EPS 8.33% + EPF 3.67% + EDLI 0.50% + Admin 0.50% on pfBase (≈ 13%, each part rounded) | OR compliance only | **₹0** |
 | **ESIC Employer** | `CEIL(ESIC_Wages × 3.25%)` | Structure Gross ≤ ₹21,000 | **₹0** |
 
-> PF Employer breakdown: 12% EPF + 0.5% EDLI + 0.5% admin = 13% on ₹15,000 wage ceiling = ₹1,950/month (fixed)
+> PF Employer is **not** a flat ₹1,950: when Basic + DA is below the ₹15,000 ceiling, each of the four parts is computed on the actual Basic + DA.
 
 ---
 
@@ -167,4 +175,4 @@ ESIC Wages = Earned Gross − Washing (prorated) − Bonus (prorated)
 
 ---
 
-*Last updated: May 2026 | Verified against VARROC PUNE MAR CAL wage sheet*
+*Last updated: August 2026 | Verified against VARROC PUNE MAR CAL wage sheet | Rates configurable via Payroll → Calculation Settings*
