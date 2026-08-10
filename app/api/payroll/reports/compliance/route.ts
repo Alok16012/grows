@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { PayrollRules } from "@/lib/payroll-rules"
+import { getPayrollRules } from "@/lib/payroll-rules-server"
 
 type PayrollRow = {
     id: string
@@ -18,6 +20,7 @@ type PayrollRow = {
     bonus: number
     allowances: number
     overtimePay: number
+    otDays: number
     grossSalary: number
     pfEmployee: number
     pfEmployer: number
@@ -56,16 +59,19 @@ type PayrollRow = {
     }
 }
 
-function pfWages(p: PayrollRow) {
-    return Math.min(p.basicSalary + p.da, 15000)
+function pfWages(p: PayrollRow, rules: PayrollRules) {
+    return Math.min(p.basicSalary + p.da, rules.pf.wageCeiling)
 }
-function epsContrib(p: PayrollRow) {
-    return Math.round(pfWages(p) * 0.0833)
+function epsContrib(p: PayrollRow, rules: PayrollRules) {
+    return Math.round(pfWages(p, rules) * rules.pf.employer.epsPct / 100)
 }
-function esiWages(p: PayrollRow) {
+function esiWages(p: PayrollRow, rules: PayrollRules) {
     // Clamp at 0 — bonus/washing > gross (e.g., zero-day month) was producing
     // negative ESI wages, which EPFO/ESIC challan validators reject.
-    return Math.max(0, p.grossSalary - (p.washing ?? 0) - (p.bonus ?? 0))
+    return Math.max(0,
+        p.grossSalary
+        - (rules.esic.excludeWashing ? (p.washing ?? 0) : 0)
+        - (rules.esic.excludeBonus ? (p.bonus ?? 0) : 0))
 }
 function ncpDays(p: PayrollRow) {
     // Clamp at 0 — present > working (OT-padded zero-day months) was producing
@@ -90,6 +96,13 @@ export async function GET(req: Request) {
         if (!month || !year) {
             return new NextResponse("Month and Year required", { status: 400 })
         }
+
+        // Company-configured rates/ceilings — report columns must mirror the
+        // rules the amounts were computed with.
+        const { rules } = await getPayrollRules()
+        const fmtPct = (n: number) => `${parseFloat(n.toFixed(2))}%`
+        const pfErTotalPct = rules.pf.employer.epsPct + rules.pf.employer.epfPct +
+            rules.pf.employer.edliPct + rules.pf.employer.adminPct
 
         const where: Record<string, unknown> = { month, year }
         if (siteId) where.siteId = siteId
@@ -149,12 +162,12 @@ export async function GET(req: Request) {
             let sr = 1
             for (const [sid, rows] of siteMap) {
                 const siteName = sid === "NO_SITE" ? "Unassigned" : (nameMap.get(sid) ?? sid)
-                const totPfWages   = rows.reduce((s, p) => s + pfWages(p), 0)
+                const totPfWages   = rows.reduce((s, p) => s + pfWages(p, rules), 0)
                 const tot12        = rows.reduce((s, p) => s + p.pfEmployee, 0)
-                const totEPS       = rows.reduce((s, p) => s + epsContrib(p), 0)
-                const totER367     = rows.reduce((s, p) => s + Math.max(0, p.pfEmployer - epsContrib(p)), 0)
-                const totEDLI      = Math.round(totPfWages * 0.005)
-                const totAdmin     = Math.round(totPfWages * 0.005)
+                const totEPS       = rows.reduce((s, p) => s + epsContrib(p, rules), 0)
+                const totER367     = rows.reduce((s, p) => s + Math.max(0, p.pfEmployer - epsContrib(p, rules)), 0)
+                const totEDLI      = Math.round(totPfWages * rules.pf.employer.edliPct / 100)
+                const totAdmin     = Math.round(totPfWages * rules.pf.employer.adminPct / 100)
                 const exemptRows   = rows.filter(p => p.pfEmployee === 0 && p.grossSalary > 0)
                 data.push({
                     "Sr": sr++,
@@ -163,11 +176,11 @@ export async function GET(req: Request) {
                     "EPF Sal/Wag": Math.round(totPfWages),
                     "EPS Sal/Wag": Math.round(totPfWages),
                     "EDLI Sal/Wag": Math.round(totPfWages),
-                    "12%": Math.round(tot12),
-                    "3.67%": Math.round(totER367),
-                    "8.33%": Math.round(totEPS),
-                    "0.50% (EDLI)": totEDLI,
-                    "0.50% (Admin)": totAdmin,
+                    [fmtPct(rules.pf.employeePct)]: Math.round(tot12),
+                    [fmtPct(rules.pf.employer.epfPct)]: Math.round(totER367),
+                    [fmtPct(rules.pf.employer.epsPct)]: Math.round(totEPS),
+                    [`${fmtPct(rules.pf.employer.edliPct)} (EDLI)`]: totEDLI,
+                    [`${fmtPct(rules.pf.employer.adminPct)} (Admin)`]: totAdmin,
                     "0.00%": 0,
                     "Total": Math.round(tot12 + totEPS + totER367 + totEDLI + totAdmin),
                     "Exm Emp": exemptRows.length,
@@ -177,12 +190,12 @@ export async function GET(req: Request) {
             // Grand total row
             if (siteMap.size > 1) {
                 const all = filtered
-                const totPfW = all.reduce((s, p) => s + pfWages(p), 0)
+                const totPfW = all.reduce((s, p) => s + pfWages(p, rules), 0)
                 const t12    = all.reduce((s, p) => s + p.pfEmployee, 0)
-                const tEPS   = all.reduce((s, p) => s + epsContrib(p), 0)
-                const tER    = all.reduce((s, p) => s + Math.max(0, p.pfEmployer - epsContrib(p)), 0)
-                const tEDLI  = Math.round(totPfW * 0.005)
-                const tAdmin = Math.round(totPfW * 0.005)
+                const tEPS   = all.reduce((s, p) => s + epsContrib(p, rules), 0)
+                const tER    = all.reduce((s, p) => s + Math.max(0, p.pfEmployer - epsContrib(p, rules)), 0)
+                const tEDLI  = Math.round(totPfW * rules.pf.employer.edliPct / 100)
+                const tAdmin = Math.round(totPfW * rules.pf.employer.adminPct / 100)
                 const exEmps = all.filter(p => p.pfEmployee === 0 && p.grossSalary > 0)
                 data.push({
                     "Sr": "",
@@ -191,11 +204,11 @@ export async function GET(req: Request) {
                     "EPF Sal/Wag": Math.round(totPfW),
                     "EPS Sal/Wag": Math.round(totPfW),
                     "EDLI Sal/Wag": Math.round(totPfW),
-                    "12%": Math.round(t12),
-                    "3.67%": Math.round(tER),
-                    "8.33%": Math.round(tEPS),
-                    "0.50% (EDLI)": tEDLI,
-                    "0.50% (Admin)": tAdmin,
+                    [fmtPct(rules.pf.employeePct)]: Math.round(t12),
+                    [fmtPct(rules.pf.employer.epfPct)]: Math.round(tER),
+                    [fmtPct(rules.pf.employer.epsPct)]: Math.round(tEPS),
+                    [`${fmtPct(rules.pf.employer.edliPct)} (EDLI)`]: tEDLI,
+                    [`${fmtPct(rules.pf.employer.adminPct)} (Admin)`]: tAdmin,
                     "0.00%": 0,
                     "Total": Math.round(t12 + tEPS + tER + tEDLI + tAdmin),
                     "Exm Emp": exEmps.length,
@@ -210,8 +223,8 @@ export async function GET(req: Request) {
             for (const [sid, rows] of siteMap) {
                 const siteName   = sid === "NO_SITE" ? "Unassigned" : (nameMap.get(sid) ?? sid)
                 const esiRows    = rows.filter(p => p.esiEmployee > 0)
-                const exemptRows = rows.filter(p => p.esiEmployee === 0 && p.grossSalary > 21000)
-                const totWages   = esiRows.reduce((s, p) => s + esiWages(p), 0)
+                const exemptRows = rows.filter(p => p.esiEmployee === 0 && p.grossSalary > rules.esic.eligibilityLimit)
+                const totWages   = esiRows.reduce((s, p) => s + esiWages(p, rules), 0)
                 const totEmpCont = esiRows.reduce((s, p) => s + p.esiEmployee, 0)
                 const totErCont  = esiRows.reduce((s, p) => s + p.esiEmployer, 0)
                 data.push({
@@ -230,8 +243,8 @@ export async function GET(req: Request) {
             if (siteMap.size > 1) {
                 const all        = filtered
                 const esiAll     = all.filter(p => p.esiEmployee > 0)
-                const exAll      = all.filter(p => p.esiEmployee === 0 && p.grossSalary > 21000)
-                const totW       = esiAll.reduce((s, p) => s + esiWages(p), 0)
+                const exAll      = all.filter(p => p.esiEmployee === 0 && p.grossSalary > rules.esic.eligibilityLimit)
+                const totW       = esiAll.reduce((s, p) => s + esiWages(p, rules), 0)
                 const tEmp       = esiAll.reduce((s, p) => s + p.esiEmployee, 0)
                 const tEr        = esiAll.reduce((s, p) => s + p.esiEmployer, 0)
                 data.push({
@@ -250,24 +263,23 @@ export async function GET(req: Request) {
 
         else if (type === "pt-summary") {
             const { siteMap, nameMap } = await groupBySite(filtered)
+            // Slab buckets come from the configured PT rules (plus the February
+            // amount, plus any stray stored amount from an older rule set), so
+            // the counts always add up to Total Employees.
+            const bucketSet = new Set<number>(rules.pt.slabs.map(s => s.amount))
+            if (rules.pt.februaryAmount !== null) bucketSet.add(rules.pt.februaryAmount)
+            for (const p of filtered) bucketSet.add(p.pt)
+            const buckets = [...bucketSet].sort((a, b) => a - b)
+            const bucketRow = (rows: PayrollRow[]) =>
+                Object.fromEntries(buckets.map(b => [String(b), rows.filter(p => p.pt === b).length]))
             let sr = 1
             for (const [sid, rows] of siteMap) {
                 const siteName = sid === "NO_SITE" ? "Unassigned" : (nameMap.get(sid) ?? sid)
-                const slab0   = rows.filter(p => p.pt === 0).length
-                const slab175 = rows.filter(p => p.pt === 175).length
-                const slab200 = rows.filter(p => p.pt === 200).length
-                // February carries a ₹300 slab (see lib/payroll-calc.ts). Without
-                // this column those employees landed in no bucket, so the slab
-                // counts never added up to Total Employees in a Feb register.
-                const slab300 = rows.filter(p => p.pt === 300).length
                 const totAmt  = rows.reduce((s, p) => s + p.pt, 0)
                 data.push({
                     "Sr.No": sr++,
                     "Site Name": siteName,
-                    "0": slab0,
-                    "175": slab175,
-                    "200": slab200,
-                    "300": slab300,
+                    ...bucketRow(rows),
                     "Total Employees": rows.length,
                     "Total Amt": Math.round(totAmt),
                 })
@@ -278,10 +290,7 @@ export async function GET(req: Request) {
                 data.push({
                     "Sr.No": "",
                     "Site Name": "GRAND TOTAL",
-                    "0": all.filter(p => p.pt === 0).length,
-                    "175": all.filter(p => p.pt === 175).length,
-                    "200": all.filter(p => p.pt === 200).length,
-                    "300": all.filter(p => p.pt === 300).length,
+                    ...bucketRow(all),
                     "Total Employees": all.length,
                     "Total Amt": Math.round(all.reduce((s, p) => s + p.pt, 0)),
                 })
@@ -298,9 +307,9 @@ export async function GET(req: Request) {
                         "UAN": p.employee.uan ?? "",
                         "PF Number": p.employee.pfNumber ?? "",
                         "Gross Salary": p.grossSalary,
-                        "PF Wages": pfWages(p),
-                        "PF Employee (12%)": p.pfEmployee,
-                        "PF Employer (13%)": p.pfEmployer,
+                        "PF Wages": pfWages(p, rules),
+                        [`PF Employee (${fmtPct(rules.pf.employeePct)})`]: p.pfEmployee,
+                        [`PF Employer (${fmtPct(pfErTotalPct)})`]: p.pfEmployer,
                         "Total PF": p.pfEmployee + p.pfEmployer,
                         "Month": month,
                         "Year": year,
@@ -314,11 +323,11 @@ export async function GET(req: Request) {
                         "Emp ID": p.employee.employeeId,
                         "PF Number": p.employee.pfNumber ?? "",
                         "Gross Wages": p.grossSalary,
-                        "EPF Wages": pfWages(p),
-                        "EPS Wages": pfWages(p),
+                        "EPF Wages": pfWages(p, rules),
+                        "EPS Wages": pfWages(p, rules),
                         "EPF Contribution (EE)": p.pfEmployee,
-                        "EPS Contribution (ER)": epsContrib(p),
-                        "EPF Contribution (ER)": Math.max(0, p.pfEmployer - epsContrib(p)),
+                        "EPS Contribution (ER)": epsContrib(p, rules),
+                        "EPF Contribution (ER)": Math.max(0, p.pfEmployer - epsContrib(p, rules)),
                         "NCP Days": ncpDays(p),
                         "Refund of Advances": 0,
                     }))
@@ -329,11 +338,11 @@ export async function GET(req: Request) {
                         "UAN": p.employee.uan ?? "",
                         "Member Name": `${p.employee.firstName} ${p.employee.lastName}`,
                         "Gross Wages": p.grossSalary,
-                        "EPF Wages": pfWages(p),
-                        "EPS Wages": pfWages(p),
+                        "EPF Wages": pfWages(p, rules),
+                        "EPS Wages": pfWages(p, rules),
                         "EPF Contribution (EE)": p.pfEmployee,
                         "EPF Contribution (ER)": p.pfEmployer,
-                        "EPS Contribution": epsContrib(p),
+                        "EPS Contribution": epsContrib(p, rules),
                         "NCP Days": ncpDays(p),
                         "Refund of Advances": 0,
                     }))
@@ -348,7 +357,7 @@ export async function GET(req: Request) {
                         "Month": month,
                         "Year": year,
                         "Basic + DA": p.basicSalary + p.da,
-                        "PF Wages (Capped 15000)": pfWages(p),
+                        [`PF Wages (Capped ${rules.pf.wageCeiling})`]: pfWages(p, rules),
                         "Employee PF": p.pfEmployee,
                         "Employer PF": p.pfEmployer,
                         "Total PF Contribution": p.pfEmployee + p.pfEmployer,
@@ -364,7 +373,7 @@ export async function GET(req: Request) {
                         "Employee Code": p.employee.employeeId,
                         "Employee Name": `${p.employee.firstName} ${p.employee.lastName}`,
                         "Pay Days": p.presentDays ?? p.workingDays ?? 0,
-                        "Gross": Math.round(esiWages(p)),
+                        "Gross": Math.round(esiWages(p, rules)),
                         "ESI Employee": p.esiEmployee,
                         "ESI Employer": parseFloat(p.esiEmployer.toFixed(2)),
                     }))
@@ -378,9 +387,9 @@ export async function GET(req: Request) {
                         "Employee Name": `${p.employee.firstName} ${p.employee.lastName}`,
                         "Emp ID": p.employee.employeeId,
                         "Contribution Month": `${month}/${year}`,
-                        "ESI Wages": Math.round(esiWages(p)),
-                        "Employee Contribution (0.75%)": p.esiEmployee,
-                        "Employer Contribution (3.25%)": parseFloat(p.esiEmployer.toFixed(2)),
+                        "ESI Wages": Math.round(esiWages(p, rules)),
+                        [`Employee Contribution (${fmtPct(rules.esic.employeePct)})`]: p.esiEmployee,
+                        [`Employer Contribution (${fmtPct(rules.esic.employerPct)})`]: parseFloat(p.esiEmployer.toFixed(2)),
                         "Total Contribution": parseFloat((p.esiEmployee + p.esiEmployer).toFixed(2)),
                         "Working Days": p.workingDays ?? 26,
                         "Present Days": p.presentDays ?? p.workingDays ?? 26,
@@ -422,7 +431,7 @@ export async function GET(req: Request) {
                         "IFSC CODE": p.employee.bankIFSC ?? "",
                         "ACCOUNT NO.": p.employee.bankAccountNumber ?? "",
                         "Days Paid": p.presentDays ?? p.workingDays ?? 0,
-                        "OT Hrs": 0,
+                        "OT Hrs": Math.round((p.otDays ?? 0) * rules.ot.hoursPerDay),
                         // CTC (full month) rate columns
                         "Basic_R": Math.round(p.basicFull ?? p.basicSalary),
                         "DA_R": Math.round(p.daFull ?? p.da),

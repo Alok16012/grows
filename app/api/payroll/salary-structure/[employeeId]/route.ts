@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { calcFullMonthCosts } from "@/lib/payroll-calc"
+import { getPayrollRules } from "@/lib/payroll-rules-server"
 
 // Reading needs a salary permission — this returns an individual's full pay
 // breakdown, and previously any signed-in employee could fetch anyone's.
@@ -39,11 +41,30 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     const isCALL = complianceType === "CALL"
     const hra = isCALL ? 0 : (Number(hraInput) || 0)
     const bonus = isCALL ? 0 : (Number(bonusInput) || 0)
-    const grossFull = Number(basic) + Number(da) + hra + Number(washing) + Number(conveyance) +
-        Number(leaveWithWages) + bonus + Number(otherAllowance)
-    const empPF = isCALL ? 0 : Math.round(15000 * 0.13)
-    const empESIC = (isCALL || grossFull > 21000) ? 0 : Math.ceil((grossFull - Number(washing) - bonus) * 0.0325)
-    const ctcMonthly = grossFull + empPF + empESIC
+
+    // CTC preview must match what the wage engine will actually produce, so
+    // compute it with the shared engine + the company's configured rules
+    // (the old inline math used a flat ₹1,950 employer PF regardless of basic).
+    const [{ rules }, emp] = await Promise.all([
+        getPayrollRules(),
+        prisma.employee.findUnique({
+            where: { id: params.employeeId },
+            select: { gender: true, isHandicap: true },
+        }),
+    ])
+    const costs = calcFullMonthCosts({
+        basic: Number(basic) || 0,
+        da: Number(da) || 0,
+        washing: Number(washing) || 0,
+        conveyance: Number(conveyance) || 0,
+        leaveWithWages: Number(leaveWithWages) || 0,
+        otherAllowance: Number(otherAllowance) || 0,
+        hra,
+        bonus,
+        complianceType: isCALL ? "CALL" : "OR",
+        isHandicap: emp?.isHandicap ?? false,
+    }, { gender: emp?.gender ?? "Male" }, rules)
+    const ctcMonthly = costs.ctc
 
     const sal = await prisma.employeeSalary.upsert({
         where: { employeeId: params.employeeId },
@@ -55,8 +76,8 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             conveyance: Number(conveyance) || 0,
             leaveWithWages: Number(leaveWithWages) || 0,
             otherAllowance: Number(otherAllowance) || 0,
-            otRatePerHour: Number(otRatePerHour) || 170,
-            canteenRatePerDay: Number(canteenRatePerDay) || 55,
+            otRatePerHour: Number(otRatePerHour) || rules.defaults.otRatePerHour,
+            canteenRatePerDay: Number(canteenRatePerDay) || rules.defaults.canteenRatePerDay,
             hra,
             bonus,
             ctcMonthly,
@@ -73,8 +94,8 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             conveyance: Number(conveyance) || 0,
             leaveWithWages: Number(leaveWithWages) || 0,
             otherAllowance: Number(otherAllowance) || 0,
-            otRatePerHour: Number(otRatePerHour) || 170,
-            canteenRatePerDay: Number(canteenRatePerDay) || 55,
+            otRatePerHour: Number(otRatePerHour) || rules.defaults.otRatePerHour,
+            canteenRatePerDay: Number(canteenRatePerDay) || rules.defaults.canteenRatePerDay,
             hra,
             bonus,
             ctcMonthly,

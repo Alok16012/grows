@@ -23,7 +23,9 @@ export async function GET(req: Request) {
 
         // Include DRAFT, PROCESSED, and PAID payrolls for bank transfer
         const where: any = { month, year, status: { in: ["DRAFT", "PROCESSED", "PAID"] } }
-        if (siteId) where.employee = { branchId: siteId }
+        // Payroll rows carry the site they were processed under — filtering by
+        // employee.branchId compared a Site id against Branch ids and matched nothing.
+        if (siteId) where.siteId = siteId
 
         const payrolls = await prisma.payroll.findMany({
             where,

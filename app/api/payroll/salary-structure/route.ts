@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { calcFullMonthCosts } from "@/lib/payroll-calc"
+import { getPayrollRules } from "@/lib/payroll-rules-server"
 
 // GET /api/payroll/salary-structure
 // Returns all employees (active) with their salary structure (null if not set)
@@ -60,6 +62,17 @@ export async function POST(req: Request) {
 
     if (!rows.length) return NextResponse.json({ updated: 0 })
 
+    // Rules drive default rates and the CTC preview; employee gender/handicap
+    // feed the same engine the wage run uses, so stored CTC matches reality.
+    const [{ rules }, empDetails] = await Promise.all([
+        getPayrollRules(),
+        prisma.employee.findMany({
+            where: { id: { in: rows.map(r => r.employeeId) } },
+            select: { id: true, gender: true, isHandicap: true },
+        }),
+    ])
+    const empById = new Map(empDetails.map(e => [e.id, e]))
+
     let updated = 0
     const errors: { employeeId: string; reason: string }[] = []
 
@@ -73,10 +86,19 @@ export async function POST(req: Request) {
             const other      = Number(row.otherAllowance) || 0
             const bonus      = Number(row.bonus) || 0
             const hra        = Number(row.hra) || 0
-            const otRate     = Number(row.otRatePerHour) || 170
-            const canteen    = Number(row.canteenRatePerDay) || 55
+            const otRate     = Number(row.otRatePerHour) || rules.defaults.otRatePerHour
+            const canteen    = Number(row.canteenRatePerDay) || rules.defaults.canteenRatePerDay
             const cType      = String(row.complianceType || "OR").toUpperCase() === "CALL" ? "CALL" : "OR"
-            const ctcM       = basic + da + hra + washing + conveyance + lww + bonus + other
+            const emp        = empById.get(row.employeeId)
+            // Full CTC (gross + employer PF/ESIC) from the shared engine — the
+            // old inline sum stored gross-only, disagreeing with every other
+            // CTC in the app.
+            const ctcM       = calcFullMonthCosts({
+                basic, da, washing, conveyance,
+                leaveWithWages: lww, otherAllowance: other, hra, bonus,
+                complianceType: cType,
+                isHandicap: emp?.isHandicap ?? false,
+            }, { gender: emp?.gender ?? "Male" }, rules).ctc
 
             await prisma.employeeSalary.upsert({
                 where: { employeeId: row.employeeId },

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
+import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { checkAccess } from "@/lib/permissions"
 
 // Zero is a legitimate value here (an employee who worked no days), so `||`
@@ -118,7 +119,9 @@ export async function POST(req: Request) {
             }
         }
 
-        const defaultMonthDays = 26
+        // Company-configurable calculation rules (Payroll → Calculation Settings)
+        const { rules } = await getPayrollRules()
+        const defaultMonthDays = rules.defaults.monthDays
         let totalGross = 0, totalNet = 0, totalPfE = 0, totalEsiE = 0
 
         // ── STEP 1: Calculate ALL payroll values in memory (pure JS, zero DB calls) ──
@@ -168,15 +171,15 @@ export async function POST(req: Request) {
                 leaveWithWages:    salData?.leaveWithWages   ?? 0,
                 otherAllowance:    salData?.otherAllowance   ?? 0,
                 bonus:             salData?.bonus            ?? undefined,
-                otRatePerHour:     salData?.otRatePerHour    ?? 170,
-                canteenRatePerDay: salData?.canteenRatePerDay ?? 55,
+                otRatePerHour:     salData?.otRatePerHour    ?? rules.defaults.otRatePerHour,
+                canteenRatePerDay: salData?.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType:    salData?.complianceType   ?? "OR",
                 isHandicap:        emp.isHandicap            ?? false,
             }, {
                 ...att,
                 gender: emp.gender ?? "Male",
                 month,
-            })
+            }, rules)
 
             totalGross += calc.grossSalary
             totalNet   += calc.netSalary
@@ -193,7 +196,9 @@ export async function POST(req: Request) {
                 workingDays: att.monthDays,
                 presentDays: att.workedDays,
                 lwpDays:     att.monthDays - att.workedDays,
-                overtimeHrs: Math.round(att.otDays * 8),
+                // Actual OT hours: 1 OT day = rules.ot.hoursPerDay extra hours
+                // (was hardcoded ×8 while pay was computed at ×4).
+                overtimeHrs: Math.round(att.otDays * rules.ot.hoursPerDay),
                 status:      "DRAFT" as const,
                 processedBy: session.user.id ?? "system",
             }

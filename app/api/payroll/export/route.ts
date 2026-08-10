@@ -18,7 +18,9 @@ export async function GET(req: Request) {
     if (!month || !year) return new NextResponse("month and year required", { status: 400 })
 
     const where: Record<string, unknown> = { month, year }
-    if (siteId) where.employee = { branchId: siteId }
+    // Payroll rows carry the site they were processed under — filtering by
+    // employee.branchId compared a Site id against Branch ids and matched nothing.
+    if (siteId) where.siteId = siteId
 
     const payrolls = await prisma.payroll.findMany({
         where,

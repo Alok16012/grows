@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { computePt } from "@/lib/payroll-rules"
+import { getPayrollRules } from "@/lib/payroll-rules-server"
 
 export async function GET(
     req: Request,
@@ -49,7 +51,8 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
+        // Writing amounts/status is a manage operation — payroll.view is read-only.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -82,24 +85,74 @@ export async function PUT(
             }
         }
 
-        // Recalculate if financial fields changed
-        const newAllowances = allowances !== undefined ? allowances : existing.allowances
-        const newOvertimePay = overtimePay !== undefined ? overtimePay : existing.overtimePay
-        const newTds = tds !== undefined ? tds : existing.tds
-        const newOtherDeductions = otherDeductions !== undefined ? otherDeductions : existing.otherDeductions
+        // Recalculate ONLY when a financial field actually changed. This used
+        // to run on every request with legacy math (basic + hra + allowances,
+        // no DA/washing/bonus, deductions without PT/LWF/canteen/advance) — so
+        // a bare status update like "mark credited" silently rewrote gross and
+        // net with wrong figures.
+        const hasFinancialEdit = [allowances, tds, otherDeductions, overtimePay]
+            .some(v => v !== undefined)
 
-        const grossSalary = existing.basicSalary + existing.hra + newAllowances + newOvertimePay
-        const esicWages = grossSalary - (existing.washing || 0)
-        const esiEmployee = esicWages <= 21000 ? Math.ceil(esicWages * 0.0075) : 0
-        const esiEmployer = esicWages <= 21000 ? Math.ceil(esicWages * 0.0325) : 0
-        const totalDeductions = existing.pfEmployee + esiEmployee + newTds + newOtherDeductions
-        const netSalary = grossSalary - totalDeductions
+        if (hasFinancialEdit) {
+            // Locked rows are what challans were filed against — never rewrite
+            // their amounts. (Status/remarks updates above remain allowed.)
+            if (existing.status !== "DRAFT") {
+                return new NextResponse("Amounts on a locked payroll cannot be edited. Unlock the run first.", { status: 409 })
+            }
 
-        updateData.grossSalary = Math.round(grossSalary)
-        updateData.esiEmployee = esiEmployee
-        updateData.esiEmployer = esiEmployer
-        updateData.totalDeductions = totalDeductions
-        updateData.netSalary = Math.round(netSalary)
+            const [{ rules }, employee] = await Promise.all([
+                getPayrollRules(),
+                prisma.employee.findUnique({
+                    where: { id: existing.employeeId },
+                    select: { gender: true, isHandicap: true, employeeSalary: { select: { complianceType: true } } },
+                }),
+            ])
+            const isCALL = employee?.employeeSalary?.complianceType === "CALL"
+            const isFemale = (employee?.gender ?? "").toLowerCase() === "female"
+
+            const newAllowances = allowances !== undefined ? Number(allowances) || 0 : existing.allowances
+            const newOvertimePay = overtimePay !== undefined ? Number(overtimePay) || 0 : existing.overtimePay
+            const newTds = tds !== undefined ? Number(tds) || 0 : existing.tds
+            const newOtherDeductions = otherDeductions !== undefined ? Number(otherDeductions) || 0 : existing.otherDeductions
+
+            // Earned gross = every earned component stored on the row, with the
+            // edited allowances/OT applied — mirrors lib/payroll-calc.ts.
+            const grossSalary =
+                existing.basicSalary + existing.da + existing.hra + existing.washing +
+                existing.conveyance + existing.lwwEarned + existing.bonus +
+                newAllowances + newOvertimePay + existing.productionIncentive
+
+            // ESIC follows the engine: eligibility on FULL-MONTH structure
+            // gross, wages exclude washing/bonus per rules, CALL exempt.
+            const esicLimit = employee?.isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
+            const esicEligible = rules.esic.enabled && !isCALL && existing.grossFullMonth <= esicLimit
+            const esicWages = Math.max(0,
+                grossSalary
+                - (rules.esic.excludeWashing ? existing.washing : 0)
+                - (rules.esic.excludeBonus ? existing.bonus : 0))
+            const esiEmployee = esicEligible ? Math.ceil(esicWages * rules.esic.employeePct / 100) : 0
+            const esiEmployer = esicEligible ? Math.ceil(esicWages * rules.esic.employerPct / 100) : 0
+
+            // PT slab can shift when gross changes.
+            const pt = computePt(grossSalary, rules.pt, {
+                isFebruary: existing.month === 2,
+                isFemale,
+                isCall: isCALL,
+            })
+
+            const totalDeductions =
+                existing.pfEmployee + esiEmployee + pt + existing.lwf +
+                existing.canteen + existing.penalty + existing.advance +
+                newTds + newOtherDeductions
+            const netSalary = grossSalary - totalDeductions
+
+            updateData.grossSalary = Math.round(grossSalary)
+            updateData.esiEmployee = esiEmployee
+            updateData.esiEmployer = esiEmployer
+            updateData.pt = pt
+            updateData.totalDeductions = totalDeductions
+            updateData.netSalary = Math.round(netSalary)
+        }
 
         const payroll = await prisma.payroll.update({
             where: { id: params.id },
@@ -134,7 +187,8 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, [], "payroll.view")) {
+        // Deleting a payroll row is a manage operation — payroll.view is read-only.
+        if (!checkAccess(session, [], "payroll.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
