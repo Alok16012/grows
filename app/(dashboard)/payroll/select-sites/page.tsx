@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
 import {
     Search, CheckCircle2, ChevronRight,
@@ -23,7 +24,7 @@ const MONTHS = ["January","February","March","April","May","June",
                  "July","August","September","October","November","December"]
 const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 
-export default function SelectSitesPage() {
+function SelectSitesInner() {
     const router  = useRouter()
     const [month, setMonth] = useState(String(new Date().getMonth() + 1))
     const [year,  setYear]  = useState(String(new Date().getFullYear()))
@@ -230,4 +231,8 @@ export default function SelectSitesPage() {
             )}
         </div>
     )
+}
+
+export default function SelectSitesPage() {
+    return <RequirePayrollView><SelectSitesInner /></RequirePayrollView>
 }

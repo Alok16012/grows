@@ -1,5 +1,6 @@
 "use client"
 import { Suspense, useState, useEffect, useCallback, useRef } from "react"
+import RequirePayrollView from "../../_components/RequirePayrollView"
 import { useRouter, useSearchParams } from "next/navigation"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -7,6 +8,7 @@ const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
 import { Loader2, Download, Printer, RefreshCw, ChevronRight, ShieldCheck, FileSpreadsheet } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
+import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -53,7 +55,9 @@ type Row = {
     siteName: string | null
 }
 
-function masterPrintHTML(rows: Row[], month: number, year: number): string {
+function masterPrintHTML(rows: Row[], month: number, year: number, rules: PayrollRules): string {
+    const er = rules.pf.employer
+    const pctLbl = (n: number) => `${parseFloat(n.toFixed(2))}%`
     const totals = {
         basic: rows.reduce((s, r) => s + r.basicSalary, 0),
         da: rows.reduce((s, r) => s + r.da, 0),
@@ -164,10 +168,10 @@ function masterPrintHTML(rows: Row[], month: number, year: number): string {
                 <th ${thStyleE}>OT</th>
                 <th ${thStyleE}>Gross</th>
                 <th ${thStyleD}>PF (EE)</th>
-                <th ${thStyleP}>EPS<br/>8.33%</th>
-                <th ${thStyleP}>EPF Er<br/>3.67%</th>
-                <th ${thStyleP}>EDLI<br/>0.50%</th>
-                <th ${thStyleP}>Admin<br/>0.50%</th>
+                <th ${thStyleP}>EPS<br/>${pctLbl(er.epsPct)}</th>
+                <th ${thStyleP}>EPF Er<br/>${pctLbl(er.epfPct)}</th>
+                <th ${thStyleP}>EDLI<br/>${pctLbl(er.edliPct)}</th>
+                <th ${thStyleP}>Admin<br/>${pctLbl(er.adminPct)}</th>
                 <th ${thStyleP}>PF Er<br/>Total</th>
                 <th ${thStyleD}>ESI (EE)</th>
                 <th ${thStyleD}>ESI (ER)</th>
@@ -223,6 +227,14 @@ function ComplianceMasterInner() {
     const [month,   setMonth]   = useState(Number(params.get("month")) || new Date().getMonth() + 1)
     const [year,    setYear]    = useState(Number(params.get("year"))  || new Date().getFullYear())
     const [rows,    setRows]    = useState<Row[]>([])
+    // Company calculation rules — the employer-PF split below must mirror them
+    const [rules,   setRules]   = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
+    useEffect(() => {
+        fetch("/api/payroll/rules")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.rules) setRules(d.rules) })
+            .catch(() => { /* fall back to defaults */ })
+    }, [])
     const [loading, setLoading] = useState(false)
     const [search,  setSearch]  = useState("")
 
@@ -259,12 +271,15 @@ function ComplianceMasterInner() {
                     grossSalary:     Number(p.grossSalary ?? 0),
                     pfEmployee:      Number(p.pfEmployee ?? 0),
                     ...(() => {
-                        const pfBase = Math.min(Number(p.basicSalary ?? 0) + Number(p.da ?? 0), 15000)
+                        // Same multiply-first math as lib/payroll-calc.ts, driven
+                        // by the configured rules instead of hardcoded rates.
+                        const pfBase = Math.min(Number(p.basicSalary ?? 0) + Number(p.da ?? 0), rules.pf.wageCeiling)
+                        const er = rules.pf.employer
                         return {
-                            eps:      Math.round(pfBase * 0.0833),
-                            epfEr:    Math.round(pfBase * 0.0367),
-                            edli:     Math.round(pfBase * 0.005),
-                            epfAdmin: Math.round(pfBase * 0.005),
+                            eps:      Math.round(pfBase * er.epsPct / 100),
+                            epfEr:    Math.round(pfBase * er.epfPct / 100),
+                            edli:     Math.round(pfBase * er.edliPct / 100),
+                            epfAdmin: Math.round(pfBase * er.adminPct / 100),
                         }
                     })(),
                     pfEmployer:      Number(p.pfEmployer ?? 0),
@@ -285,7 +300,7 @@ function ComplianceMasterInner() {
             toast.success(`Loaded ${mapped.length} employees`)
         } catch { toast.error("Failed to load data") }
         finally { setLoading(false) }
-    }, [month, year])
+    }, [month, year, rules])
 
     useEffect(() => { fetchData() }, [fetchData])
 
@@ -351,10 +366,10 @@ function ComplianceMasterInner() {
             "OT Pay": r.overtimePay,
             "Gross Salary": r.grossSalary,
             "PF Employee (12%)": r.pfEmployee,
-            "EPS - Employer (8.33%)": r.eps,
-            "EPF - Employer (3.67%)": r.epfEr,
-            "EDLI (0.50%)": r.edli,
-            "EPF Admin (0.50%)": r.epfAdmin,
+            [`EPS - Employer (${parseFloat(rules.pf.employer.epsPct.toFixed(2))}%)`]: r.eps,
+            [`EPF - Employer (${parseFloat(rules.pf.employer.epfPct.toFixed(2))}%)`]: r.epfEr,
+            [`EDLI (${parseFloat(rules.pf.employer.edliPct.toFixed(2))}%)`]: r.edli,
+            [`EPF Admin (${parseFloat(rules.pf.employer.adminPct.toFixed(2))}%)`]: r.epfAdmin,
             "Total Employer PF": r.pfEmployer,
             "Total PF (EE+ER)": r.pfEmployee + r.pfEmployer,
             "ESI Employee (0.75%)": r.esiEmployee,
@@ -382,10 +397,10 @@ function ComplianceMasterInner() {
             "Leave With Wages": totals.lww, "Bonus": totals.bonus,
             "OT Pay": totals.ot, "Gross Salary": totals.gross,
             "PF Employee (12%)": totals.pfEE,
-            "EPS - Employer (8.33%)": totals.eps,
-            "EPF - Employer (3.67%)": totals.epfEr,
-            "EDLI (0.50%)": totals.edli,
-            "EPF Admin (0.50%)": totals.epfAdmin,
+            [`EPS - Employer (${parseFloat(rules.pf.employer.epsPct.toFixed(2))}%)`]: totals.eps,
+            [`EPF - Employer (${parseFloat(rules.pf.employer.epfPct.toFixed(2))}%)`]: totals.epfEr,
+            [`EDLI (${parseFloat(rules.pf.employer.edliPct.toFixed(2))}%)`]: totals.edli,
+            [`EPF Admin (${parseFloat(rules.pf.employer.adminPct.toFixed(2))}%)`]: totals.epfAdmin,
             "Total Employer PF": totals.pfER,
             "Total PF (EE+ER)": totals.pfEE + totals.pfER,
             "ESI Employee (0.75%)": totals.esiEE, "ESI Employer (3.25%)": totals.esiER,
@@ -410,7 +425,7 @@ function ComplianceMasterInner() {
 
     const handlePrint = () => {
         if (!filtered.length) { toast.error("No data to print"); return }
-        printHTML(masterPrintHTML(filtered, month, year))
+        printHTML(masterPrintHTML(filtered, month, year, rules))
     }
 
     const th0 = { background: "#1e293b", color: "#fff" }
@@ -534,10 +549,10 @@ function ComplianceMasterInner() {
                                     <TH key={h} s={thE}>{h}</TH>
                                 ))}
                                 {["PF (EE)"].map(h => <TH key={h} s={thD}>{h}</TH>)}
-                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EPS<br/><span style={{fontSize:8,opacity:0.8}}>8.33%</span></TH>
-                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EPF Er<br/><span style={{fontSize:8,opacity:0.8}}>3.67%</span></TH>
-                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EDLI<br/><span style={{fontSize:8,opacity:0.8}}>0.50%</span></TH>
-                                <TH s={{ background: "#7c3aed", color: "#fff" }}>Admin<br/><span style={{fontSize:8,opacity:0.8}}>0.50%</span></TH>
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EPS<br/><span style={{fontSize:8,opacity:0.8}}>{parseFloat(rules.pf.employer.epsPct.toFixed(2))}%</span></TH>
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EPF Er<br/><span style={{fontSize:8,opacity:0.8}}>{parseFloat(rules.pf.employer.epfPct.toFixed(2))}%</span></TH>
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>EDLI<br/><span style={{fontSize:8,opacity:0.8}}>{parseFloat(rules.pf.employer.edliPct.toFixed(2))}%</span></TH>
+                                <TH s={{ background: "#7c3aed", color: "#fff" }}>Admin<br/><span style={{fontSize:8,opacity:0.8}}>{parseFloat(rules.pf.employer.adminPct.toFixed(2))}%</span></TH>
                                 <TH s={{ background: "#5b21b6", color: "#fff" }}>PF Er<br/><span style={{fontSize:8,opacity:0.8}}>Total</span></TH>
                                 {["ESI (EE)","ESI (ER)","PT","LWF","Canteen","Penalty","Advance","Other","Tot Ded"].map(h => (
                                     <TH key={h} s={thD}>{h}</TH>
@@ -620,7 +635,7 @@ function ComplianceMasterInner() {
 }
 
 export default function ComplianceMasterPage() {
-    return <Suspense><ComplianceMasterInner /></Suspense>
+    return <RequirePayrollView><Suspense><ComplianceMasterInner /></Suspense></RequirePayrollView>
 }
 
 const selStyle: React.CSSProperties = {

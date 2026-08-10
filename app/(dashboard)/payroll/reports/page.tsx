@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 const loadXLSX = () => import("xlsx")
 import {
     Download, Loader2, FileText, RefreshCw, ArrowLeft,
-    LayoutDashboard, AlertCircle, Search, Info, Building2
+    LayoutDashboard, AlertCircle, Info, Building2
 } from "lucide-react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
@@ -37,6 +37,12 @@ type DownloadHistoryItem = {
     option: string
     downloadedBy: string
     downloadedOn: string
+    // Exact request params, so "Download Again" reproduces THIS download
+    // instead of whatever the filters happen to be set to now.
+    monthNum?: number
+    yearNum?: number
+    siteId?: string
+    format?: "excel" | "pdf"
 }
 
 const HISTORY_KEY = "payroll_download_history"
@@ -65,7 +71,6 @@ export default function ReportsDownloadsPage() {
     const now = new Date()
     const [month, setMonth] = useState(now.getMonth() + 1)
     const [year, setYear] = useState(now.getFullYear())
-    const [reportType, setReportType] = useState("Select Report")
     const [selectedSite, setSelectedSite] = useState("all")
     const [downloadOption, setDownloadOption] = useState<"site-wise" | "combine">("site-wise")
 
@@ -73,7 +78,6 @@ export default function ReportsDownloadsPage() {
     const [loadingSites, setLoadingSites] = useState(false)
 
     const [wageFormat, setWageFormat] = useState<"excel" | "pdf">("excel")
-    const [bankFormat, setBankFormat] = useState(BANK_FORMATS[0])
 
     const [downloadingWage, setDownloadingWage] = useState(false)
     const [downloadingBank, setDownloadingBank] = useState(false)
@@ -111,32 +115,24 @@ export default function ReportsDownloadsPage() {
         ? "All Sites"
         : sites.find(s => s.id === selectedSite)?.name ?? "All Sites"
 
-    const handleViewSummary = () => {
-        if (reportType === "Select Report") {
-            toast.error("Please select a Report Type.")
-            return
-        }
-        toast.info(`Showing summary for ${reportType} — ${monthLabel}`)
-    }
-
     const handleReset = () => {
         setMonth(now.getMonth() + 1)
         setYear(now.getFullYear())
-        setReportType("Select Report")
         setSelectedSite("all")
         setDownloadOption("site-wise")
         setWageFormat("excel")
-        setBankFormat(BANK_FORMATS[0])
     }
 
-    const handleDownloadWage = async () => {
+    const handleDownloadWage = async (again?: DownloadHistoryItem) => {
         setDownloadingWage(true)
         try {
             const XLSX = await loadXLSX()
-            const siteParam = downloadOption === "site-wise" && selectedSite !== "all"
-                ? `&siteId=${encodeURIComponent(selectedSite)}`
-                : ""
-            const res = await fetch(`/api/payroll/export?month=${month}&year=${year}${siteParam}`)
+            const m = again?.monthNum ?? month
+            const y = again?.yearNum ?? year
+            const siteId = again ? (again.siteId ?? "") : (downloadOption === "site-wise" && selectedSite !== "all" ? selectedSite : "")
+            const fmt = again?.format ?? wageFormat
+            const siteParam = siteId ? `&siteId=${encodeURIComponent(siteId)}` : ""
+            const res = await fetch(`/api/payroll/export?month=${m}&year=${y}${siteParam}`)
             if (!res.ok) {
                 const msg = await res.text()
                 toast.error(msg || "No payroll data found for this period.")
@@ -148,13 +144,13 @@ export default function ReportsDownloadsPage() {
                 return
             }
 
-            if (wageFormat === "pdf") {
+            if (fmt === "pdf") {
                 // Generate printable PDF via print window
                 const cols = Object.keys(data[0] || {})
                 const tableRows = data.map((row: Record<string, unknown>) =>
                     `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join("")}</tr>`
                 ).join("")
-                const html = `<!DOCTYPE html><html><head><title>Wage Sheet - ${MONTHS[month - 1]} ${year}</title>
+                const html = `<!DOCTYPE html><html><head><title>Wage Sheet - ${MONTHS[m - 1]} ${y}</title>
 <style>
   body { font-family: Arial, sans-serif; font-size: 9px; margin: 10mm; }
   h2 { font-size: 13px; text-align: center; margin-bottom: 4px; }
@@ -166,7 +162,7 @@ export default function ReportsDownloadsPage() {
   @media print { @page { size: A3 landscape; margin: 8mm; } }
 </style></head><body>
 <h2>GROWUS — WAGE SHEET</h2>
-<p class="sub">${MONTHS[month - 1]} ${year} &nbsp;|&nbsp; ${siteName}</p>
+<p class="sub">${MONTHS[m - 1]} ${y} &nbsp;|&nbsp; ${again ? again.site : siteName}</p>
 <table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table>
 </body></html>`
                 const w = window.open("", "_blank")
@@ -182,18 +178,19 @@ export default function ReportsDownloadsPage() {
                 const cols = Object.keys(data[0] || {})
                 ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 14) }))
                 XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
-                const fileName = `Wage_Sheet_${MONTHS[month - 1]}_${year}.xlsx`
+                const fileName = `Wage_Sheet_${MONTHS[m - 1]}_${y}.xlsx`
                 XLSX.writeFile(wb, fileName)
                 toast.success(`Downloaded: ${fileName}`)
             }
 
             const updated = saveHistory({
                 reportType: "Wage Sheet",
-                month: monthLabel,
-                site: siteName,
-                option: downloadOption === "combine" ? "Combined" : "Site Wise",
+                month: again ? again.month : monthLabel,
+                site: again ? again.site : siteName,
+                option: again ? again.option : (downloadOption === "combine" ? "Combined" : "Site Wise"),
                 downloadedBy: session?.user?.name ?? "Admin",
                 downloadedOn: new Date().toLocaleString("en-IN"),
+                monthNum: m, yearNum: y, siteId: siteId || undefined, format: fmt,
             })
             setHistory(updated)
         } catch (err) {
@@ -204,14 +201,15 @@ export default function ReportsDownloadsPage() {
         }
     }
 
-    const handleDownloadBank = async () => {
+    const handleDownloadBank = async (again?: DownloadHistoryItem) => {
         setDownloadingBank(true)
         try {
             const XLSX = await loadXLSX()
-            const siteParam = downloadOption === "site-wise" && selectedSite !== "all"
-                ? `&siteId=${encodeURIComponent(selectedSite)}`
-                : ""
-            const res = await fetch(`/api/payroll/reports/bank-sheet?month=${month}&year=${year}${siteParam}`)
+            const m = again?.monthNum ?? month
+            const y = again?.yearNum ?? year
+            const siteId = again ? (again.siteId ?? "") : (downloadOption === "site-wise" && selectedSite !== "all" ? selectedSite : "")
+            const siteParam = siteId ? `&siteId=${encodeURIComponent(siteId)}` : ""
+            const res = await fetch(`/api/payroll/reports/bank-sheet?month=${m}&year=${y}${siteParam}`)
             if (!res.ok) {
                 const msg = await res.text()
                 toast.error(msg || "No processed payroll data found.")
@@ -228,16 +226,17 @@ export default function ReportsDownloadsPage() {
             const cols = Object.keys(data[0] || {})
             ws["!cols"] = cols.map(k => ({ wch: Math.max(k.length + 2, 16) }))
             XLSX.utils.book_append_sheet(wb, ws, "Bank NEFT")
-            const fileName = `Bank_NEFT_${MONTHS[month - 1]}_${year}.xlsx`
+            const fileName = `Bank_NEFT_${MONTHS[m - 1]}_${y}.xlsx`
             XLSX.writeFile(wb, fileName)
 
             const updated = saveHistory({
                 reportType: "Bank NEFT File",
-                month: monthLabel,
-                site: siteName,
-                option: downloadOption === "combine" ? "Combined" : "Site Wise",
+                month: again ? again.month : monthLabel,
+                site: again ? again.site : siteName,
+                option: again ? again.option : (downloadOption === "combine" ? "Combined" : "Site Wise"),
                 downloadedBy: session?.user?.name ?? "Admin",
                 downloadedOn: new Date().toLocaleString("en-IN"),
+                monthNum: m, yearNum: y, siteId: siteId || undefined,
             })
             setHistory(updated)
             toast.success(`Downloaded: ${fileName}`)
@@ -250,10 +249,14 @@ export default function ReportsDownloadsPage() {
     }
 
     const handleDownloadAgain = async (item: DownloadHistoryItem) => {
+        if (item.monthNum === undefined) {
+            // Row saved before params were recorded — fall back to current filters
+            toast.info("Re-downloading with the current filter settings (older history row)")
+        }
         if (item.reportType === "Wage Sheet") {
-            await handleDownloadWage()
+            await handleDownloadWage(item.monthNum !== undefined ? item : undefined)
         } else {
-            await handleDownloadBank()
+            await handleDownloadBank(item.monthNum !== undefined ? item : undefined)
         }
     }
 
@@ -313,22 +316,6 @@ export default function ReportsDownloadsPage() {
                         </div>
                     </div>
 
-                    {/* Report Type */}
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[12px] font-medium text-[var(--text3)]">
-                            Report Type <span className="text-[var(--red)]">*</span>
-                        </label>
-                        <select
-                            value={reportType}
-                            onChange={e => setReportType(e.target.value)}
-                            className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 min-w-[160px]"
-                        >
-                            {REPORT_TYPES.map(r => (
-                                <option key={r} value={r}>{r}</option>
-                            ))}
-                        </select>
-                    </div>
-
                     {/* Site */}
                     <div className="flex flex-col gap-1">
                         <label className="text-[12px] font-medium text-[var(--text3)]">Site</label>
@@ -376,13 +363,6 @@ export default function ReportsDownloadsPage() {
 
                     {/* Buttons */}
                     <div className="flex gap-2 ml-auto">
-                        <button
-                            onClick={handleViewSummary}
-                            className="flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 text-white rounded-[10px] text-[13px] font-medium px-4 py-2 transition-all h-9"
-                        >
-                            <Search size={13} />
-                            View Summary
-                        </button>
                         <button
                             onClick={handleReset}
                             className="flex items-center gap-2 border border-[var(--border)] hover:bg-[var(--surface2)] text-[var(--text2)] rounded-[10px] text-[13px] font-medium px-4 py-2 transition-colors h-9"
@@ -451,7 +431,7 @@ export default function ReportsDownloadsPage() {
                     </div>
 
                     <button
-                        onClick={handleDownloadWage}
+                        onClick={() => handleDownloadWage()}
                         disabled={downloadingWage}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-[10px] text-[13px] font-medium px-4 py-3 transition-all mt-auto"
                     >
@@ -488,22 +468,8 @@ export default function ReportsDownloadsPage() {
                         </p>
                     </div>
 
-                    {/* Bank format select */}
-                    <div>
-                        <p className="text-[12px] font-medium text-[var(--text3)] mb-2">Bank Format</p>
-                        <select
-                            value={bankFormat}
-                            onChange={e => setBankFormat(e.target.value)}
-                            className="w-full h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        >
-                            {BANK_FORMATS.map(f => (
-                                <option key={f} value={f}>{f}</option>
-                            ))}
-                        </select>
-                    </div>
-
                     <button
-                        onClick={handleDownloadBank}
+                        onClick={() => handleDownloadBank()}
                         disabled={downloadingBank}
                         className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-[10px] text-[13px] font-medium px-4 py-3 transition-all mt-auto"
                     >

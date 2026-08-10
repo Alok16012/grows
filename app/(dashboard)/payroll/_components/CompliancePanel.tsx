@@ -5,6 +5,7 @@ import type { Range as XLSXRange } from "xlsx"
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
+import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
 import { Loader2, Download, ShieldCheck, FileSpreadsheet, TableProperties, RefreshCw, X } from "lucide-react"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -46,7 +47,7 @@ const REPORT_SECTIONS: Record<string, SectionMap> = {
     "pt-challan":    [["Employee Info",3],["Period",1],["Wages",1],["Contribution",1],["Attendance",2]],
 }
 
-async function buildHierarchicalSheet(data: Record<string,string|number>[], reportType: string, title: string, m: number, y: number) {
+async function buildHierarchicalSheet(data: Record<string,string|number>[], reportType: string, title: string, m: number, y: number, codes: PayrollRules["codes"]) {
     const XLSX = await loadXLSX()
     const cols = Object.keys(data[0]||{})
     const nCols = cols.length
@@ -54,7 +55,7 @@ async function buildHierarchicalSheet(data: Record<string,string|number>[], repo
     const totalSpan = sections.reduce((s,[,n])=>s+n,0)
     if (totalSpan<nCols) sections.push(["",nCols-totalSpan])
     const titleRow:    (string|number)[] = [`${title} — ${MONTHS[m-1].toUpperCase()} ${y}`]
-    const subTitleRow: (string|number)[] = [`Generated: ${new Date().toLocaleDateString("en-IN")}  |  PF: PUPUN2450654000  |  ESIC: 33000891430000999`]
+    const subTitleRow: (string|number)[] = [`Generated: ${new Date().toLocaleDateString("en-IN")}  |  PF: ${codes.pfEstablishment}  |  ESIC: ${codes.esicEstablishment}`]
     const sectionRow:  (string|number)[] = []
     for (const [label,span] of sections) { sectionRow.push(label); for (let i=1;i<span;i++) sectionRow.push("") }
     const aoa: (string|number)[][] = [titleRow,subTitleRow,sectionRow,cols,...data.map(r=>cols.map(c=>r[c]??""))]
@@ -106,6 +107,14 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
     const [runs,      setRuns]      = useState<PayrollRun[]>([])
     const [loading,   setLoading]   = useState(true)
     const [dlLoading, setDlLoading] = useState<string|null>(null)
+    // Establishment codes on report headers come from Payroll → Calculation Settings
+    const [rules,     setRules]     = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
+    useEffect(() => {
+        fetch("/api/payroll/rules")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.rules) setRules(d.rules) })
+            .catch(() => { /* fall back to defaults */ })
+    }, [])
 
     const fetchRuns = async () => {
         setLoading(true)
@@ -136,11 +145,11 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                 XLSX.utils.sheet_add_aoa(ws,[
                     [`FORM (II) M.W. RULES Rule (27)(1)`],
                     [`SALARIES / WAGES REGISTER FOR THE MONTH OF ${MONTHS[month-1].toUpperCase()} ${year}`],
-                    ["PF CODE: PUPUN2450654000","","ESIC CODE: 33000891430000999"],
+                    [`PF CODE: ${rules.codes.pfEstablishment}`,"",`ESIC CODE: ${rules.codes.esicEstablishment}`],
                 ],{origin:"A1"})
                 XLSX.utils.book_append_sheet(wb,ws,"Wage Sheet")
             } else {
-                const ws=await buildHierarchicalSheet(data,item.type,item.label,month,year)
+                const ws=await buildHierarchicalSheet(data,item.type,item.label,month,year,rules.codes)
                 XLSX.utils.book_append_sheet(wb,ws,item.label.substring(0,31))
             }
             XLSX.writeFile(wb,`${item.label.replace(/[^a-zA-Z0-9 ]/g,"").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)
@@ -207,7 +216,7 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                             <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", justifyContent:"center", gap:2 }}>
                                 <span style={{ fontSize:14, fontWeight:800, color:"var(--text)" }}>{MONTHS[run.month-1]}</span>
                                 <span style={{ fontSize:11, color:"var(--text3)" }}>{run.year}</span>
-                                <span style={{ fontSize:10, color:run.status==="COMPLETED"?"#16a34a":"#d97706", fontWeight:600, marginTop:2 }}>{run._count.payrolls} emp</span>
+                                <span style={{ fontSize:10, color:(run.status==="PROCESSED"||run.status==="PAID")?"#16a34a":"#d97706", fontWeight:600, marginTop:2 }}>{run._count.payrolls} emp</span>
                             </div>
                             <PillCell items={WAGE_ITEMS} run={run} color="#0f766e" dlLoading={dlLoading} onDownload={handleDownload} />
                             <PillCell items={PF_ITEMS}   run={run} color="#1d4ed8" dlLoading={dlLoading} onDownload={handleDownload} />

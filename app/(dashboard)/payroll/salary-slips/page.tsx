@@ -1,7 +1,10 @@
 "use client"
 import { Suspense, useState, useEffect, useCallback } from "react"
+import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import { Loader2, Search, Printer, CheckCircle2, RefreshCw, ChevronRight, MapPin, Building2, Clock, FileText, IndianRupee } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
 
@@ -29,6 +32,7 @@ type PayrollRecord = {
     id: string; month: number; year: number; status: string
     basicSalary: number; da: number; hra: number; washing: number; conveyance: number
     lwwEarned: number; bonus: number; overtimePay: number; grossSalary: number
+    allowances: number; productionIncentive: number; tds: number
     pfEmployee: number; esiEmployee: number; pt: number; lwf: number
     canteen: number; penalty: number; advance: number; otherDeductions: number
     totalDeductions: number; netSalary: number
@@ -42,6 +46,9 @@ type PayrollRecord = {
 }
 
 function SalarySlipsInner() {
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
+
     const router = useRouter()
     const [month,    setMonth]    = useState(new Date().getMonth() + 1)
     const [year,     setYear]     = useState(new Date().getFullYear())
@@ -115,16 +122,16 @@ function SalarySlipsInner() {
         const earnings = [
             { label: "Basic",                  fullRate: rate(p.basicSalary), amt: p.basicSalary },
             { label: "DA",                      fullRate: rate(p.da),          amt: p.da },
-            { label: "HRA",                     fullRate: 0,                   amt: 0 },
+            { label: "HRA",                     fullRate: rate(p.hra),         amt: p.hra },
             { label: "Educational Allowance",   fullRate: 0,                   amt: 0 },
             { label: "Conveyance Allow.",       fullRate: rate(p.conveyance),  amt: p.conveyance },
             { label: "Medical Allowance",       fullRate: 0,                   amt: 0 },
-            { label: "Other Allowance",         fullRate: 0,                   amt: 0 },
+            { label: "Other Allowance",         fullRate: rate(p.allowances || 0), amt: p.allowances || 0 },
             { label: "Washing Allowance",       fullRate: rate(p.washing),     amt: p.washing },
             { label: "Leave with Wages",        fullRate: rate(p.lwwEarned),   amt: p.lwwEarned },
             { label: "Bonus",                   fullRate: rate(p.bonus),       amt: p.bonus },
             { label: "O.T.",                    fullRate: 0,                   amt: p.overtimePay },
-            { label: "Performance Allow.",      fullRate: 0,                   amt: 0 },
+            { label: "Performance Allow.",      fullRate: 0,                   amt: p.productionIncentive || 0 },
             { label: "COVID All + Incentives",  fullRate: 0,                   amt: 0 },
         ]
         const deductions = [
@@ -133,7 +140,7 @@ function SalarySlipsInner() {
             { label: "P.Tax",            amt: p.pt },
             { label: "ESI",              amt: p.esiEmployee },
             { label: "Salary Advance",   amt: p.advance },
-            { label: "TDS",              amt: 0 },
+            { label: "TDS",              amt: p.tds || 0 },
             { label: "Other Deduction",  amt: p.otherDeductions },
             { label: "Canteen Ded",      amt: p.canteen },
             { label: "MLWF",             amt: p.lwf },
@@ -447,7 +454,7 @@ ${records.map(p => buildSlipHTML(p)).join("")}
                                     <Printer size={13} /> Print
                                 </button>
                                 {selected.status !== "PAID" && (
-                                    <button onClick={() => handleMarkPaid(selected.id)} disabled={!!actLoad}
+                                    <button onClick={() => handleMarkPaid(selected.id)} disabled={!!actLoad || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                         style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", background: "#1a9e6e", opacity: actLoad ? 0.6 : 1 }}>
                                         {actLoad === selected.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                                         Mark Credited
@@ -463,7 +470,7 @@ ${records.map(p => buildSlipHTML(p)).join("")}
 }
 
 export default function SalarySlipsPage() {
-    return <Suspense><SalarySlipsInner /></Suspense>
+    return <RequirePayrollView><Suspense><SalarySlipsInner /></Suspense></RequirePayrollView>
 }
 
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }

@@ -1,8 +1,11 @@
 "use client"
 import { Suspense } from "react"
+import RequirePayrollView from "../_components/RequirePayrollView"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
@@ -17,13 +20,13 @@ type Site = { id: string; name: string; code?: string; city?: string }
 type SiteStatus = { siteId: string | null; processedCount: number }
 type PayrollRunStatus = { status: string; month: number; year: number } | null
 
+// Same 5 steps as the payroll hub — locking happens inside the Wage Sheet step.
 const WORKFLOW_STEPS = [
-    { num: 1, label: "Upload Attendance", href: "/attendance/upload" },
-    { num: 2, label: "Process Payroll",   href: "/payroll/process" },
-    { num: 3, label: "Wage Sheet",        href: "/payroll/wagesheet" },
-    { num: 4, label: "Lock Wage Sheet",   href: "/payroll/compliance" },
-    { num: 5, label: "Compliance",        href: "/payroll/compliance" },
-    { num: 6, label: "Payslip",           href: "/payroll/salary-slips" },
+    { num: 1, label: "Upload Attendance",  href: "/payroll" },
+    { num: 2, label: "Process Payroll",    href: "/payroll/process" },
+    { num: 3, label: "Wage Sheet & Lock",  href: "/payroll/wagesheet" },
+    { num: 4, label: "Compliance",         href: "/payroll/compliance" },
+    { num: 5, label: "Payslips",           href: "/payroll/salary-slips" },
 ]
 
 type Employee = {
@@ -49,6 +52,9 @@ const fmt = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "
 function ProcessPayrollPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
+
 
     const [month, setMonth] = useState(String(searchParams.get("month") ?? new Date().getMonth() + 1))
     const [year,  setYear]  = useState(String(searchParams.get("year")  ?? new Date().getFullYear()))
@@ -105,13 +111,13 @@ function ProcessPayrollPage() {
 
     useEffect(() => { fetchSiteStatus() }, [fetchSiteStatus])
 
-    // Step status for stepper
+    // Step status for stepper — mirrors the hub's 5-step logic
     const getStepStatus = (stepNum: number): "done" | "active" | "pending" => {
-        if (!payrollRun) return stepNum === 1 ? "done" : stepNum === 2 ? "active" : "pending"
+        if (!payrollRun) return stepNum === 1 ? "active" : "pending"
         if (payrollRun.status === "PAID") return "done"
         if (payrollRun.status === "PROCESSED") {
             if (stepNum <= 2) return "done"
-            if (stepNum === 3 || stepNum === 4) return "active"
+            if (stepNum === 3) return "active"
             return "pending"
         }
         if (payrollRun.status === "DRAFT") {
@@ -649,21 +655,21 @@ function ProcessPayrollPage() {
                                     </button>
                                     {getStatus(selectedSiteId) && (
                                         <>
-                                            <button onClick={handleUnlock} disabled={resetting || deleting}
-                                                title="Unlock payroll to reprocess"
+                                            <button onClick={handleUnlock} disabled={resetting || deleting || !canManage}
+                                                title={canManage ? "Unlock payroll to reprocess" : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #f59e0b", background: "#fffbeb", fontSize: 12, color: "#b45309", fontWeight: 600, cursor: "pointer", opacity: (resetting || deleting) ? 0.6 : 1 }}>
                                                 {resetting ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />}
                                                 {resetting ? "Unlocking…" : "Unlock"}
                                             </button>
-                                            <button onClick={handleDelete} disabled={resetting || deleting}
-                                                title="Delete payroll for this site"
+                                            <button onClick={handleDelete} disabled={resetting || deleting || !canManage}
+                                                title={canManage ? "Delete payroll for this site" : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 12, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: (resetting || deleting) ? 0.6 : 1 }}>
                                                 {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                                                 {deleting ? "Deleting…" : "Delete"}
                                             </button>
                                         </>
                                     )}
-                                    <button onClick={handleProcess} disabled={processing || !fetched || employees.length === 0}
+                                    <button onClick={handleProcess} disabled={processing || !fetched || employees.length === 0 || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: (processing || !fetched) ? 0.6 : 1 }}>
                                         {processing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                                         {processing ? "Processing…" : "Process Payroll"}
@@ -936,8 +942,10 @@ const attInput: React.CSSProperties = {
 
 export default function ProcessPayrollPageWrapper() {
     return (
-        <Suspense>
-            <ProcessPayrollPage />
-        </Suspense>
+        <RequirePayrollView>
+            <Suspense>
+                <ProcessPayrollPage />
+            </Suspense>
+        </RequirePayrollView>
     )
 }

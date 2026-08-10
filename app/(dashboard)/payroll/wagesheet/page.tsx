@@ -1,7 +1,10 @@
 "use client"
 import { Suspense, useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import RequirePayrollView from "../_components/RequirePayrollView"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import { Loader2, RefreshCw, ChevronRight, MapPin, Building2, Search, FileSpreadsheet, FileDown, Lock } from "lucide-react"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -41,11 +44,18 @@ type Payroll = {
 
 function WageSheetInner() {
     const router = useRouter()
-    const [month,   setMonth]   = useState(String(new Date().getMonth() + 1))
-    const [year,    setYear]    = useState(String(new Date().getFullYear()))
+    // Honor the handoff from /payroll/select-sites (?siteIds=&month=&year=) —
+    // these params used to be pushed and then silently ignored.
+    const params = useSearchParams()
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
+
+    const paramSiteIds = (params.get("siteIds") ?? "").split(",").filter(Boolean)
+    const [month,   setMonth]   = useState(params.get("month") || String(new Date().getMonth() + 1))
+    const [year,    setYear]    = useState(params.get("year")  || String(new Date().getFullYear()))
     const [sites,   setSites]   = useState<Site[]>([])
     const [status,  setStatus]  = useState<SiteStatus[]>([])
-    const [selId,      setSelId]      = useState("")
+    const [selId,      setSelId]      = useState(paramSiteIds[0] ?? "")
     const [data,       setData]       = useState<Payroll[]>([])
     const [search,     setSearch]     = useState("")
     const [ldSites,    setLdSites]    = useState(true)
@@ -56,7 +66,7 @@ function WageSheetInner() {
     const [hdfcGenBy,        setHdfcGenBy]        = useState("")
     const [selectedIds,      setSelectedIds]      = useState<Set<string>>(new Set())
     const [locking,          setLocking]          = useState(false)
-    const [selectedSiteIds,  setSelectedSiteIds]  = useState<Set<string>>(new Set())
+    const [selectedSiteIds,  setSelectedSiteIds]  = useState<Set<string>>(new Set(paramSiteIds))
     const [lockingSites,     setLockingSites]     = useState(false)
     const [dlCombined,       setDlCombined]       = useState(false)
 
@@ -509,17 +519,17 @@ function WageSheetInner() {
 
             {/* Stepper */}
             <div style={{ display: "flex", alignItems: "center", gap: 4, overflowX: "auto", whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
-                {["Upload Attendance","Process Payroll","Wage Sheet","Lock Wage Sheet","Compliance","Payslip"].map((s, i) => (
+                {["Upload Attendance","Process Payroll","Wage Sheet & Lock","Compliance","Payslips"].map((s, i) => (
                     <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 7,
-                            background: i === 2 || i === 3 ? "var(--accent-light)" : "transparent",
-                            color: i === 2 || i === 3 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 2 || i === 3 ? 700 : 400 }}>
-                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i === 2 || i === 3 ? "var(--accent)" : "var(--border)",
+                            background: i === 2 ? "var(--accent-light)" : "transparent",
+                            color: i === 2 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 2 ? 700 : 400 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i === 2 ? "var(--accent)" : "var(--border)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                color: i === 2 || i === 3 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i+1}</div>
+                                color: i === 2 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i+1}</div>
                             {s}
                         </div>
-                        {i < 5 && <ChevronRight size={11} style={{ color: "var(--text3)", opacity: 0.3 }} />}
+                        {i < 4 && <ChevronRight size={11} style={{ color: "var(--text3)", opacity: 0.3 }} />}
                     </div>
                 ))}
             </div>
@@ -610,7 +620,7 @@ function WageSheetInner() {
                                 {dlCombined ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
                                 {dlCombined ? "Downloading…" : "Download Form II (Combined)"}
                             </button>
-                            <button onClick={handleLockSites} disabled={lockingSites}
+                            <button onClick={handleLockSites} disabled={lockingSites || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                 style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                                     padding: "8px 12px", borderRadius: 8, border: "none",
                                     background: lockingSites ? "#a78bfa" : "#7c3aed", color: "#fff",
@@ -720,7 +730,7 @@ function WageSheetInner() {
                                         </>
                                     )}
                                     {selectedCount > 0 && (
-                                        <button onClick={handleLock} disabled={locking}
+                                        <button onClick={handleLock} disabled={locking || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                             style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: locking ? 0.6 : 1 }}>
                                             {locking ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
                                             Lock & Send to Compliance ({selectedCount})
@@ -1047,7 +1057,7 @@ function WageSheetInner() {
 }
 
 export default function WageSheetPage() {
-    return <Suspense><WageSheetInner /></Suspense>
+    return <RequirePayrollView><Suspense><WageSheetInner /></Suspense></RequirePayrollView>
 }
 
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }

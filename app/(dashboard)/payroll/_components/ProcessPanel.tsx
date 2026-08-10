@@ -1,6 +1,8 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
@@ -42,6 +44,9 @@ const attInput: React.CSSProperties = { width: 50, padding: "3px 4px", borderRad
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProcessPanel({ onClose, onDone }: { onClose: () => void; onDone?: () => void }) {
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
+
     const [month, setMonth] = useState(String(new Date().getMonth() + 1))
     const [year,  setYear]  = useState(String(new Date().getFullYear()))
 
@@ -103,7 +108,10 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                             otDays: p.otDays ?? 0, canteenDays: p.canteenDays ?? 0,
                             penalty: p.penalty ?? 0, advance: p.advance ?? 0,
                             otherDeductions: p.otherDeductions ?? 0, productionIncentive: p.productionIncentive ?? 0,
-                            lwf: 0, // always manual — don't auto-fill from saved data
+                            // Restore what was entered for this saved run — the
+                            // standalone Process page does the same; forcing 0
+                            // here silently dropped LWF on every reprocess.
+                            lwf: p.lwf ?? 0,
                         }
                     }
                     setAttRows(filled)
@@ -157,7 +165,9 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                     workedDays: workedDaysRaw !== undefined && workedDaysRaw !== "" ? Number(workedDaysRaw) : defaultDays,
                     otDays: Number(col(obj,"OT DAYS","OT HRS","OTDAYS","OTHOURS","OT","OVERTIME","OT HOURS","OVER TIME") ?? 0),
                     otherDeductions: Number(col(obj,"OTHER DEDUCTION","OTHER DED","OTHER DEDUCTIONS","OTHER","OTH DED") ?? 0),
-                    lwf: 0, // manual only — don't import from attendance file
+                    // The attendance template has an LWF column — honor it like
+                    // the standalone Process page does.
+                    lwf: Number(col(obj,"LWF","LABOUR WELFARE FUND") ?? 0),
                     canteenDays: Number(col(obj,"CANTEEN DAYS","CANTEEN","MESS DAYS","FOOD DAYS") ?? 0),
                     penalty: Number(col(obj,"PENALTY","FINE") ?? 0),
                     advance: Number(col(obj,"ADVANCE","ADV","LOAN") ?? 0),
@@ -382,19 +392,19 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                     </button>
                                     {getStatus(selectedSiteId) && (
                                         <>
-                                            <button onClick={handleUnlock} disabled={resetting || deleting}
+                                            <button onClick={handleUnlock} disabled={resetting || deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #f59e0b", background: "#fffbeb", fontSize: 11, color: "#b45309", fontWeight: 600, cursor: "pointer", opacity: (resetting||deleting) ? 0.6 : 1 }}>
                                                 {resetting ? <Loader2 size={11} className="animate-spin" /> : <Unlock size={11} />}
                                                 {resetting ? "Unlocking…" : "Unlock"}
                                             </button>
-                                            <button onClick={handleDelete} disabled={resetting || deleting}
+                                            <button onClick={handleDelete} disabled={resetting || deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 11, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: (resetting||deleting) ? 0.6 : 1 }}>
                                                 {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                                                 {deleting ? "Deleting…" : "Delete"}
                                             </button>
                                         </>
                                     )}
-                                    <button onClick={handleProcess} disabled={processing || !fetched || employees.length === 0}
+                                    <button onClick={handleProcess} disabled={processing || !fetched || employees.length === 0 || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 7, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: (processing||!fetched) ? 0.6 : 1 }}>
                                         {processing ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                                         {processing ? "Processing…" : "Process Payroll"}

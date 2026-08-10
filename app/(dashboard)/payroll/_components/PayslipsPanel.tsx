@@ -1,6 +1,8 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import { Loader2, Search, Printer, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
 
@@ -28,6 +30,7 @@ type PayrollRecord = {
     id: string; month: number; year: number; status: string
     basicSalary: number; da: number; hra: number; washing: number; conveyance: number
     lwwEarned: number; bonus: number; overtimePay: number; grossSalary: number
+    allowances: number; productionIncentive: number; tds: number
     pfEmployee: number; esiEmployee: number; pt: number; lwf: number
     canteen: number; penalty: number; advance: number; otherDeductions: number
     totalDeductions: number; netSalary: number
@@ -40,6 +43,9 @@ const lbl: React.CSSProperties = { fontSize:11, fontWeight:700, color:"var(--tex
 const sel: React.CSSProperties = { padding:"6px 10px", borderRadius:7, border:"1px solid var(--border)", fontSize:12, background:"var(--surface)", color:"var(--text)", outline:"none" }
 
 export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
+
     const [month,    setMonth]    = useState(new Date().getMonth()+1)
     const [year,     setYear]     = useState(new Date().getFullYear())
     const [sites,    setSites]    = useState<Site[]>([])
@@ -98,12 +104,12 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
             {label:"Educational Allowance",  fullRate:0,                   amt:0},
             {label:"Conveyance Allow.",      fullRate:rate(p.conveyance),  amt:p.conveyance},
             {label:"Medical Allowance",      fullRate:0,                   amt:0},
-            {label:"Other Allowance",        fullRate:0,                   amt:0},
+            {label:"Other Allowance",        fullRate:rate(p.allowances||0), amt:p.allowances||0},
             {label:"Washing Allowance",      fullRate:rate(p.washing),     amt:p.washing},
             {label:"Leave with Wages",       fullRate:rate(p.lwwEarned),   amt:p.lwwEarned},
             {label:"Bonus",                  fullRate:rate(p.bonus),       amt:p.bonus},
             {label:"O.T.",                   fullRate:0,                   amt:p.overtimePay},
-            {label:"Performance Allow.",     fullRate:0,                   amt:0},
+            {label:"Performance Allow.",     fullRate:0,                   amt:p.productionIncentive||0},
             {label:"COVID All + Incentives", fullRate:0,                   amt:0},
         ]
         const deductions=[
@@ -112,7 +118,7 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
             {label:"P.Tax",          amt:p.pt},
             {label:"ESI",            amt:p.esiEmployee},
             {label:"Salary Advance", amt:p.advance},
-            {label:"TDS",            amt:0},
+            {label:"TDS",            amt:p.tds||0},
             {label:"Other Deduction",amt:p.otherDeductions},
             {label:"Canteen Ded",    amt:p.canteen},
             {label:"MLWF",           amt:p.lwf},
@@ -361,7 +367,7 @@ ${recs.map(p=>buildSlipHTML(p)).join("")}
                                     <Printer size={13} /> Print
                                 </button>
                                 {selected.status!=="PAID" && (
-                                    <button onClick={()=>handleMarkPaid(selected.id)} disabled={!!actLoad}
+                                    <button onClick={()=>handleMarkPaid(selected.id)} disabled={!!actLoad || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                         style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px", border:"none", borderRadius:8, fontSize:12, fontWeight:600, color:"#fff", cursor:"pointer", background:"#1a9e6e", opacity:actLoad?0.6:1 }}>
                                         {actLoad===selected.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                                         Mark Credited

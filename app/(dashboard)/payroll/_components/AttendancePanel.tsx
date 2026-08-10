@@ -8,6 +8,7 @@ import {
     FileSpreadsheet, AlertCircle, Users, MapPin, RefreshCw, X
 } from "lucide-react"
 import { toast } from "sonner"
+import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
 
 type Site = { id: string; name: string; code?: string; city?: string }
 type ParsedRow = {
@@ -21,18 +22,23 @@ type Employee  = { id: string; employeeId: string; firstName: string; lastName: 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const TEMPLATE_COLS = ["Employee ID","Employee Name","MONTH DAYS","DAYS","OT DAYS","OTHER DEDUCTION","LWF","CANTEEN DAYS","PENALTY","ADVANCE","PRODUCTION INCENTIVE"]
 const TEMPLATE_SAMPLE = [
-    ["EMP-0001","Rahul Kumar",   26,26,2,150,10,24,50,1000,0],
-    ["EMP-0002","Priya Sharma",  26,25,0,0,  10,20,0,0,  500],
-    ["EMP-0003","Amit Singh",    26,26,1,200,10,26,100,500,0],
+    ["EMP-0001","Rahul Kumar",   26,26,2,150,6,24,50,1000,0],
+    ["EMP-0002","Priya Sharma",  26,25,0,0,  6,20,0,0,  500],
+    ["EMP-0003","Amit Singh",    26,26,1,200,6,26,100,500,0],
 ]
 
-async function downloadTemplate(siteName: string, employees: Employee[]) {
+async function downloadTemplate(siteName: string, employees: Employee[], rules: PayrollRules) {
     const XLSX = await loadXLSX()
     const wb = XLSX.utils.book_new()
     const sheetName = `${siteName.slice(0,20)} Attendance`
     const header = [`SITE: ${siteName}`,"","","","","","","","","",""]
+    // Prefill from configured rules (Payroll → Calculation Settings) — the LWF
+    // column used to be hardcoded to ₹10, which is neither the Maharashtra ₹6
+    // nor "manual", and flowed straight into processing when uploaded unedited.
+    const md  = rules.defaults.monthDays
+    const lwf = rules.lwf.employeeDefault
     const empRows = employees.length > 0
-        ? employees.map(e => [e.employeeId,`${e.firstName} ${e.lastName}`,26,26,0,0,10,0,0,0,0])
+        ? employees.map(e => [e.employeeId,`${e.firstName} ${e.lastName}`,md,md,0,0,lwf,0,0,0,0])
         : TEMPLATE_SAMPLE
     const wsData = [header,TEMPLATE_COLS,...empRows]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -55,6 +61,13 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
     const [sites,    setSites]    = useState<Site[]>([])
     const [sitesLoading, setSitesLoading] = useState(true)
     const [file,     setFile]     = useState<File|null>(null)
+    const [rules,    setRules]    = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
+    useEffect(() => {
+        fetch("/api/payroll/rules")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.rules) setRules(d.rules) })
+            .catch(() => { /* template falls back to defaults */ })
+    }, [])
     const [parsing,  setParsing]  = useState(false)
     const [matched,  setMatched]  = useState<MatchedRow[]|null>(null)
     const [processing, setProcessing] = useState(false)
@@ -109,8 +122,8 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                 rowIndex: i+2,
                 rawEmployeeId: String(pick(row,"EMPLOYEE ID","EMP ID","EMP CODE","EMPLOYEE CODE","EMPLOYEE NO","EMP NO","EMPCODE","EMPLOYEEID")??"").trim(),
                 rawName:       String(pick(row,"EMPLOYEE NAME","NAME","EMPLOYEE","EMP NAME")??"").trim(),
-                monthDays:     (() => { const v = pick(row,"MONTH DAYS","MONTHDAYS","TOTAL DAYS","WORKING DAYS IN MONTH"); return v !== undefined && v !== null && v !== "" ? Number(v) : 26 })(),
-                days:          (() => { const v = pick(row,"DAYS WORKED","DAYS","PRESENT DAYS","WORKED DAYS","PRESENT","PAID DAYS","ATT DAYS","ATTENDANCE"); return v !== undefined && v !== null && v !== "" ? Number(v) : 26 })(),
+                monthDays:     (() => { const v = pick(row,"MONTH DAYS","MONTHDAYS","TOTAL DAYS","WORKING DAYS IN MONTH"); return v !== undefined && v !== null && v !== "" ? Number(v) : rules.defaults.monthDays })(),
+                days:          (() => { const v = pick(row,"DAYS WORKED","DAYS","PRESENT DAYS","WORKED DAYS","PRESENT","PAID DAYS","ATT DAYS","ATTENDANCE"); return v !== undefined && v !== null && v !== "" ? Number(v) : rules.defaults.monthDays })(),
                 otDays:        Number(pick(row,"OT DAYS","OTDAYS","OVERTIME","OT")??0),
                 otherDeduction:Number(pick(row,"OTHER DEDUCTION","OTHER DED","OTH DED")??0),
                 lwf:           Number(pick(row,"LWF","LABOUR WELFARE FUND")??0),
@@ -232,7 +245,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                             <p style={{ fontSize:12, color:"var(--text3)", margin:"2px 0 0 0" }}>Fill in the Excel template with attendance data for this site and month</p>
                         </div>
                     </div>
-                    <button onClick={()=>downloadTemplate(selectedSite!.name,siteEmployees)} disabled={!siteId}
+                    <button onClick={()=>downloadTemplate(selectedSite!.name,siteEmployees, rules)} disabled={!siteId}
                         style={{...btnPrimary, background:"#16a34a", opacity:!siteId?0.5:1}}>
                         <Download size={14} /> Download Template{selectedSite?` — ${selectedSite.name}`:""}
                     </button>

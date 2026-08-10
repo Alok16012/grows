@@ -1,7 +1,10 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
@@ -10,47 +13,44 @@ import {
     Edit2, Check, X, RefreshCw, IndianRupee
 } from "lucide-react"
 
+import { calcFullMonthCosts } from "@/lib/payroll-calc"
+import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
+
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 
-// PT slab — Maharashtra (standard month, not February)
-function calcPT(gross: number, gender?: string | null): number {
-    // Female employees: exempt up to ₹25,000 (Maharashtra notification)
-    if (gender?.toLowerCase() === "female" && gross <= 25000) return 0
-    if (gross > 10000) return 200
-    if (gross >= 7500) return 175
-    return 0
-}
-
-// Derived calculations (full-month preview — no proration)
-function calc(s: SalaryRow, isHandicap = false, gender?: string | null) {
-    const basic  = s.basic || 0
-    const da     = s.da || 0
-    const wash   = s.washing || 0
-    const conv   = s.conveyance || 0
-    const lww    = s.leaveWithWages || 0
-    const other  = s.otherAllowance || 0
-    const isCALL = s.complianceType === "CALL"
-    const bonus  = isCALL ? 0 : (s.bonus ?? 0)
-    const hra    = isCALL ? 0 : (s.hra || 0)
-    const gross  = basic + (isCALL ? 0 : da + hra + wash + conv + lww + bonus + other)
-    const empPF  = isCALL ? 0 : 1950
-    // ESIC wages = (gross − washing); limit ₹21,000 (₹25,000 for Handicap)
-    const esicLimit    = isHandicap ? 25000 : 21000
-    const esicWages    = gross - wash
-    const esicEligible = !isCALL && esicWages <= esicLimit
-    // Employee ESIC: esicWages × 0.75%
-    const empESIDed = esicEligible ? Math.ceil(esicWages * 0.0075) : 0
-    // Employer ESIC: esicWages × 3.25%
-    const empESI    = esicEligible ? Math.ceil(esicWages * 0.0325) : 0
-    // Employee PF: min(Basic + DA, ₹15,000) × 12%
-    const pfBase    = isCALL ? 0 : Math.min(basic + da, 15000)
-    const empPFDed  = isCALL ? 0 : Math.round(pfBase * 0.12)
-    const pt        = isCALL ? 0 : calcPT(gross, gender)
-    const totalDed  = empPFDed + empESIDed + pt
-    const netSalary = gross - totalDed
-    const ctc       = gross + empPF + empESI
-    return { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc }
+// Derived calculations (full-month preview — no proration).
+// Delegates to the SAME engine the wage run uses (lib/payroll-calc.ts) with the
+// company's configured rules, so this table can never drift from actual pay.
+// (The previous hand-rolled copy here had: flat ₹1,950 employer PF, ESIC
+// eligibility on gross−washing instead of structure gross, and PT skipped for
+// CALL — all disagreeing with the engine.)
+function calc(s: SalaryRow, isHandicap = false, gender?: string | null, rules: PayrollRules = DEFAULT_PAYROLL_RULES) {
+    const res = calcFullMonthCosts({
+        basic: s.basic || 0,
+        da: s.da || 0,
+        washing: s.washing || 0,
+        conveyance: s.conveyance || 0,
+        leaveWithWages: s.leaveWithWages || 0,
+        otherAllowance: s.otherAllowance || 0,
+        hra: s.hra || 0,
+        bonus: s.bonus ?? 0,
+        complianceType: s.complianceType || "OR",
+        isHandicap,
+    }, { gender: gender ?? "Male" }, rules)
+    return {
+        hra: res.hraFull,
+        bonus: res.bonusFull,
+        gross: res.grossFullMonth,
+        empPF: res.pfEmployer,
+        empESI: res.esiEmployer,
+        empPFDed: res.pfEmployee,
+        empESIDed: res.esiEmployee,
+        pt: res.pt,
+        totalDed: res.totalDeductions,
+        netSalary: res.netSalary,
+        ctc: res.ctc,
+    }
 }
 
 type SalaryRow = {
@@ -74,8 +74,20 @@ const EMPTY_SALARY: SalaryRow = {
     otRatePerHour: 170, canteenRatePerDay: 55, complianceType: "OR",
 }
 
-export default function SalaryMasterPage() {
+// New-structure defaults come from the company's configured rules
+// (Payroll → Calculation Settings), not the hardcoded constants above.
+const structureDefaults = (r: PayrollRules): SalaryRow => ({
+    ...EMPTY_SALARY,
+    da: r.defaults.da,
+    bonus: r.defaults.bonus,
+    otRatePerHour: r.defaults.otRatePerHour,
+    canteenRatePerDay: r.defaults.canteenRatePerDay,
+})
+
+function SalaryMasterInner() {
     const router  = useRouter()
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
     const [data,       setData]       = useState<EmpSalary[]>([])
     const [loading,    setLoading]    = useState(true)
     const [search,     setSearch]     = useState("")
@@ -92,6 +104,8 @@ export default function SalaryMasterPage() {
     // Quick-change compliance type without entering full edit mode
     const [typeOverride, setTypeOverride] = useState<Record<string, string>>({})
     const [savingType,   setSavingType]   = useState<string | null>(null)
+    // Company calculation rules — drive every auto column in this table
+    const [rules, setRules] = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -103,6 +117,12 @@ export default function SalaryMasterPage() {
     }, [])
 
     useEffect(() => { load() }, [load])
+    useEffect(() => {
+        fetch("/api/payroll/rules")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.rules) setRules(d.rules) })
+            .catch(() => { /* previews fall back to defaults */ })
+    }, [])
 
     const startEdit = (emp: EmpSalary) => {
         const s = emp.employeeSalary
@@ -113,7 +133,7 @@ export default function SalaryMasterPage() {
             bonus: s.bonus ?? 0,
             otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
             complianceType: compType,
-        } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
+        } : { ...structureDefaults(rules), basic: emp.basicSalary || 0 })
         setEditId(emp.id)
     }
 
@@ -126,7 +146,7 @@ export default function SalaryMasterPage() {
             bonus: s.bonus ?? 0,
             otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
             complianceType: s.complianceType ?? "OR",
-        } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
+        } : { ...structureDefaults(rules), basic: emp.basicSalary || 0 })
         setDrawerEmp(emp)
     }
     const closeDrawer = () => { if (!drawerSaving) setDrawerEmp(null) }
@@ -209,7 +229,7 @@ export default function SalaryMasterPage() {
         const rows = filtered.map(emp => {
             const s = emp.employeeSalary
             const basic = s?.basic ?? emp.basicSalary ?? 0
-            const da    = s?.da ?? 2511
+            const da    = s?.da ?? rules.defaults.da
             const compType = s?.complianceType ?? "OR"
             const bonus  = compType === "CALL" ? 0 : ((s as { bonus?: number } | null)?.bonus ?? 0)
             return [
@@ -225,8 +245,8 @@ export default function SalaryMasterPage() {
                 s?.leaveWithWages ?? 0,
                 s?.otherAllowance ?? 0,
                 bonus,
-                s?.otRatePerHour ?? 170,
-                s?.canteenRatePerDay ?? 55,
+                s?.otRatePerHour ?? rules.defaults.otRatePerHour,
+                s?.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 compType,
             ]
         })
@@ -290,15 +310,15 @@ export default function SalaryMasterPage() {
                     rows.push({
                         employeeId:       uuid,
                         basic:            Number(get("Basic") ?? 0),
-                        da:               Number(get("DA") ?? 2511),
+                        da:               Number(get("DA") ?? rules.defaults.da),
                         hra:              hraVal,
                         washing:          Number(get("Washing") ?? 0),
                         conveyance:       Number(get("Conveyance") ?? 0),
                         leaveWithWages:   Number(get("LeaveWithWages") ?? get("Leave With Wages") ?? 0),
                         otherAllowance:   Number(get("OtherAllowance") ?? get("Other Allowance") ?? 0),
                         bonus:            bonusVal || 0,
-                        otRatePerHour:    Number(get("OTRatePerHour") ?? get("OT Rate Per Hour") ?? 170),
-                        canteenRatePerDay: Number(get("CanteenRatePerDay") ?? get("Canteen Rate Per Day") ?? 55),
+                        otRatePerHour:    Number(get("OTRatePerHour") ?? get("OT Rate Per Hour") ?? rules.defaults.otRatePerHour),
+                        canteenRatePerDay: Number(get("CanteenRatePerDay") ?? get("Canteen Rate Per Day") ?? rules.defaults.canteenRatePerDay),
                         complianceType:   compType || "OR",
                     })
                 }
@@ -379,7 +399,7 @@ export default function SalaryMasterPage() {
                         title={filterSite ? `Upload affects only ${filterSite} employees` : "Upload affects all matched employees"}>
                         {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                         {uploading ? "Uploading…" : (filterSite ? `Upload (${filterSite})` : "Bulk Upload Excel")}
-                        <input type="file" accept=".xlsx,.csv" onChange={handleUpload} style={{ display: "none" }} disabled={uploading} />
+                        <input type="file" accept=".xlsx,.csv" onChange={handleUpload} style={{ display: "none" }} disabled={uploading || !canManage} />
                     </label>
                 </div>
             </div>
@@ -470,13 +490,13 @@ export default function SalaryMasterPage() {
                                 const s = emp.employeeSalary
                                 const row: SalaryRow = isEditing ? editForm : (s ? {
                                     basic: s.basic, da: s.da, hra: s.hra ?? 0, washing: s.washing, conveyance: s.conveyance,
-                                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? 583,
+                                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance, bonus: s.bonus ?? rules.defaults.bonus,
                                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                                     complianceType: s.complianceType,
-                                } : { ...EMPTY_SALARY, basic: emp.basicSalary || 0 })
+                                } : { ...structureDefaults(rules), basic: emp.basicSalary || 0 })
                                 const effectiveType = typeOverride[emp.id] ?? row.complianceType
                                 const displayRow = { ...row, complianceType: effectiveType }
-                                const { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc } = calc(displayRow, emp.isHandicap, emp.gender)
+                                const { hra, bonus, gross, empPF, empESI, empPFDed, empESIDed, pt, totalDed, netSalary, ctc } = calc(displayRow, emp.isHandicap, emp.gender, rules)
 
                                 const numIn = (field: keyof EditForm, bg = "transparent") => (
                                     <input
@@ -583,14 +603,14 @@ export default function SalaryMasterPage() {
                                                 </div>
                                             ) : (
                                                 <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
-                                                    <button onClick={() => openDrawer(emp)}
-                                                        title="Open detailed edit form"
+                                                    <button onClick={() => openDrawer(emp)} disabled={!canManage}
+                                                        title={canManage ? "Open detailed edit form" : "Requires payroll manage permission"}
                                                         style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                                                         <Edit2 size={11} /> {s ? "Edit" : "Add Salary"}
                                                     </button>
                                                     {s && (
-                                                        <button onClick={() => startEdit(emp)}
-                                                            title="Quick inline edit"
+                                                        <button onClick={() => startEdit(emp)} disabled={!canManage}
+                                                            title={canManage ? "Quick inline edit" : "Requires payroll manage permission"}
                                                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, cursor: "pointer", color: "var(--text3)" }}>
                                                             ⚡
                                                         </button>
@@ -616,37 +636,37 @@ export default function SalaryMasterPage() {
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.washing || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.conveyance || 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.leaveWithWages || 0), 0),
-                                        filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary, e.isHandicap, e.gender).bonus : 0), 0),
+                                        filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary, e.isHandicap, e.gender, rules).bonus : 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.otherAllowance || 0), 0),
                                     ].map((v, i) => (
                                         <td key={i} style={{ ...td, background: "#eff6ff", fontWeight: 700 }}>{fmtN(v)}</td>
                                     ))}
                                     <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).gross : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).gross : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empPF : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).empPF : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef2f2" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empESI : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).empESI : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#f0fdf4", color: "#15803d" }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).ctc : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).ctc : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empPFDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).empPFDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e" }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).empESIDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).empESIDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#92400e", fontWeight: 700 }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).pt : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).pt : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#fef9c3", color: "#b91c1c", fontWeight: 700 }}>
-                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).totalDed : 0), 0))}
+                                        {fmtN(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).totalDed : 0), 0))}
                                     </td>
                                     <td style={{ ...td, background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
-                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender).netSalary : 0), 0))}
+                                        {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).netSalary : 0), 0))}
                                     </td>
                                     <td colSpan={4} />
                                 </tr>
@@ -662,7 +682,7 @@ export default function SalaryMasterPage() {
 
             {/* ── Manual Edit Drawer ─────────────────────────────────────── */}
             {drawerEmp && (() => {
-                const live = calc({ ...drawerForm, complianceType: drawerForm.complianceType || "OR" })
+                const live = calc({ ...drawerForm, complianceType: drawerForm.complianceType || "OR" }, drawerEmp?.isHandicap ?? false, drawerEmp?.gender, rules)
                 const isCALL = drawerForm.complianceType === "CALL"
                 const numField = (key: keyof EditForm, label: string, hint?: string) => (
                     <div style={{ marginBottom: 10 }}>
@@ -786,3 +806,7 @@ const td: React.CSSProperties = { padding: "6px 10px", textAlign: "center", colo
 const calcTag: React.CSSProperties = { marginLeft: 3, fontSize: 8, background: "#dbeafe", color: "#1d4ed8", borderRadius: 3, padding: "1px 3px", fontWeight: 400, letterSpacing: 0, textTransform: "none" }
 const btnGhost: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer", fontWeight: 600 }
 const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 12, fontWeight: 700 }
+
+export default function SalaryMasterPage() {
+    return <RequirePayrollView><SalaryMasterInner /></RequirePayrollView>
+}

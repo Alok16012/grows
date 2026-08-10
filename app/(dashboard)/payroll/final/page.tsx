@@ -1,7 +1,10 @@
 "use client"
 import { Suspense, useState, useEffect, useCallback } from "react"
+import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import { Loader2, Lock, RefreshCw, ChevronRight, MapPin, Building2, CheckCircle2, AlertCircle, Download } from "lucide-react"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -20,6 +23,9 @@ type Payroll = {
 
 function FinalPayrollInner() {
     const router = useRouter()
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
+
     const [month,    setMonth]    = useState(String(new Date().getMonth() + 1))
     const [year,     setYear]     = useState(String(new Date().getFullYear()))
     const [sites,    setSites]    = useState<Site[]>([])
@@ -122,14 +128,14 @@ function FinalPayrollInner() {
 
             {/* Stepper */}
             <div style={{ display: "flex", alignItems: "center", gap: 4, overflowX: "auto", whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
-                {["Upload Attendance","Process Payroll","Wage Sheet","Compliance","Lock Payroll"].map((s, i) => (
+                {["Upload Attendance","Process Payroll","Wage Sheet & Lock","Compliance","Payslips"].map((s, i) => (
                     <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 7,
-                            background: i === 4 ? "var(--accent-light)" : "transparent",
-                            color: i === 4 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 4 ? 700 : 400 }}>
-                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i === 4 ? "var(--accent)" : "var(--border)",
+                            background: i === 2 ? "var(--accent-light)" : "transparent",
+                            color: i === 2 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 2 ? 700 : 400 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: 4, background: i === 2 ? "var(--accent)" : "var(--border)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                color: i === 4 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i+1}</div>
+                                color: i === 2 ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700 }}>{i+1}</div>
                             {s}
                         </div>
                         {i < 4 && <ChevronRight size={11} style={{ color: "var(--text3)", opacity: 0.3 }} />}
@@ -270,7 +276,7 @@ function FinalPayrollInner() {
                                     ) : (
                                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                             <span style={{ fontSize: 11, color: "#854d0e", fontWeight: 600 }}>Confirm lock?</span>
-                                            <button onClick={() => handleLock(lockAll)} disabled={locking}
+                                            <button onClick={() => handleLock(lockAll)} disabled={locking || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                                                 {locking ? <Loader2 size={12} className="animate-spin" /> : <Lock size={11} />}
                                                 {locking ? "Locking…" : "Yes, Lock"}
@@ -379,7 +385,7 @@ function FinalPayrollInner() {
 }
 
 export default function FinalPayrollPage() {
-    return <Suspense><FinalPayrollInner /></Suspense>
+    return <RequirePayrollView><Suspense><FinalPayrollInner /></Suspense></RequirePayrollView>
 }
 
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }

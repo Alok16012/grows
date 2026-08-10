@@ -8,7 +8,7 @@ import {
     Loader2, RefreshCw, Play, FileSpreadsheet,
     ShieldCheck, Upload, IndianRupee,
     Clock, Trash2, TrendingUp, Settings2, Lock,
-    CheckCircle2, ArrowRight, ChevronRight,
+    CheckCircle2, ChevronRight, SlidersHorizontal,
     CalendarRange, Users, Wallet,
 } from "lucide-react"
 import { can } from "@/lib/can"
@@ -222,6 +222,13 @@ export default function PayrollPage() {
                         style={{ display: "flex", alignItems: "center", gap: 7, height: 42, padding: "0 18px", borderRadius: 10, border: "none", background: "var(--accent)", fontSize: 13, color: "#fff", cursor: "pointer", fontWeight: 600, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                         <Settings2 size={15} /> Salary Structure
                     </button>
+                    {can(session, "payroll.manage") && (
+                        <button onClick={() => router.push("/payroll/settings")}
+                            title="Edit PF / ESIC / PT rates, slabs and defaults — how salary is calculated"
+                            style={{ display: "flex", alignItems: "center", gap: 7, height: 42, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
+                            <SlidersHorizontal size={15} /> Calculation Settings
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -540,7 +547,7 @@ export default function PayrollPage() {
                 <div style={{ padding: "10px 20px 14px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", gap: 8 }}>
                     <Lock size={11} style={{ color: "var(--text3)", flexShrink: 0 }} />
                     <p style={{ fontSize: 11, color: "var(--text3)", margin: 0 }}>
-                        Lock payroll via <b>Compliance</b> before generating payslips. Locked payrolls cannot be edited.
+                        Lock payroll from the <b>Wage Sheet</b> step before generating payslips. Locked payrolls cannot be edited.
                     </p>
                 </div>
             </div>
@@ -680,7 +687,7 @@ export default function PayrollPage() {
                                                         style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                                         Slips
                                                     </button>
-                                                    <button onClick={() => deleteRun(run)} disabled={deleting === run.id}
+                                                    <button onClick={() => deleteRun(run)} disabled={deleting === run.id || !can(session, "payroll.manage")} title={can(session, "payroll.manage") ? undefined : "Requires payroll manage permission"}
                                                         style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #fca5a5", background: "none", fontSize: 11, color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
                                                         {deleting === run.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                                                     </button>

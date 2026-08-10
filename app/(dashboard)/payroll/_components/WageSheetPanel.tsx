@@ -1,6 +1,8 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
 import { Loader2, RefreshCw, MapPin, Building2, Search, FileSpreadsheet, FileDown, Lock, X } from "lucide-react"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -41,6 +43,9 @@ const thSec: React.CSSProperties = { padding:"5px 8px", fontSize:9, fontWeight:8
 const td:  React.CSSProperties = { padding:"5px 9px", textAlign:"center", color:"var(--text)", whiteSpace:"nowrap" }
 
 export default function WageSheetPanel({ onClose, onDone }: { onClose: () => void; onDone?: (next?: string) => void }) {
+    const { data: session } = useSession()
+    const canManage = can(session, "payroll.manage")
+
     const [month,   setMonth]   = useState(String(new Date().getMonth()+1))
     const [year,    setYear]    = useState(String(new Date().getFullYear()))
     const [sites,   setSites]   = useState<Site[]>([])
@@ -297,7 +302,7 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
                                 {dlCombined?<Loader2 size={13} className="animate-spin"/>:<FileSpreadsheet size={13}/>}
                                 {dlCombined?"Downloading…":"Download Form II (Combined)"}
                             </button>
-                            <button onClick={handleLockSites} disabled={lockingSites}
+                            <button onClick={handleLockSites} disabled={lockingSites || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                 style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"none", background:lockingSites?"#a78bfa":"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:lockingSites?"not-allowed":"pointer" }}>
                                 {lockingSites?<Loader2 size={13} className="animate-spin"/>:<Lock size={13}/>}
                                 {lockingSites?"Locking…":"Lock & Go to Compliance"}
@@ -384,7 +389,7 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
                                         </>
                                     )}
                                     {selectedCount>0 && (
-                                        <button onClick={handleLock} disabled={locking} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:locking?0.6:1 }}>
+                                        <button onClick={handleLock} disabled={locking || !canManage} title={canManage ? undefined : "Requires payroll manage permission"} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:locking?0.6:1 }}>
                                             {locking?<Loader2 size={13} className="animate-spin"/>:<Lock size={13}/>}
                                             Lock & Compliance ({selectedCount})
                                         </button>

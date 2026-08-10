@@ -1,11 +1,13 @@
 "use client"
 import { Suspense, useState, useEffect } from "react"
+import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
 import type { Range as XLSXRange } from "xlsx"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
+import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
 import {
     Loader2, Download, ChevronRight, ShieldCheck,
     FileSpreadsheet, TableProperties, RefreshCw
@@ -57,7 +59,8 @@ async function buildHierarchicalSheet(
     data: Record<string, string | number>[],
     reportType: string,
     title: string,
-    m: number, y: number
+    m: number, y: number,
+    codes: PayrollRules["codes"]
 ) {
     const XLSX = await loadXLSX()
     const cols = Object.keys(data[0] || {})
@@ -68,7 +71,7 @@ async function buildHierarchicalSheet(
     if (totalSpan < nCols) sections.push(["", nCols - totalSpan])
 
     const titleRow:    (string | number)[] = [`${title} — ${MONTHS[m-1].toUpperCase()} ${y}`]
-    const subTitleRow: (string | number)[] = [`Generated: ${new Date().toLocaleDateString("en-IN")}  |  PF: PUPUN2450654000  |  ESIC: 33000891430000999`]
+    const subTitleRow: (string | number)[] = [`Generated: ${new Date().toLocaleDateString("en-IN")}  |  PF: ${codes.pfEstablishment}  |  ESIC: ${codes.esicEstablishment}`]
     const sectionRow:  (string | number)[] = []
     for (const [label, span] of sections) {
         sectionRow.push(label)
@@ -111,6 +114,14 @@ function ComplianceInner() {
     const [runs,      setRuns]      = useState<PayrollRun[]>([])
     const [loading,   setLoading]   = useState(true)
     const [dlLoading, setDlLoading] = useState<string | null>(null)
+    // Establishment codes on report headers come from Payroll → Calculation Settings
+    const [rules,     setRules]     = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
+    useEffect(() => {
+        fetch("/api/payroll/rules")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.rules) setRules(d.rules) })
+            .catch(() => { /* fall back to defaults */ })
+    }, [])
 
     const fetchRuns = async () => {
         setLoading(true)
@@ -146,11 +157,11 @@ function ComplianceInner() {
                 XLSX.utils.sheet_add_aoa(ws, [
                     [`FORM (II) M.W. RULES Rule (27)(1)`],
                     [`SALARIES / WAGES REGISTER FOR THE MONTH OF ${MONTHS[month-1].toUpperCase()} ${year}`],
-                    ["PF CODE: PUPUN2450654000", "", "ESIC CODE: 33000891430000999"],
+                    [`PF CODE: ${rules.codes.pfEstablishment}`, "", `ESIC CODE: ${rules.codes.esicEstablishment}`],
                 ], { origin: "A1" })
                 XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
             } else {
-                const ws = await buildHierarchicalSheet(data, item.type, item.label, month, year)
+                const ws = await buildHierarchicalSheet(data, item.type, item.label, month, year, rules.codes)
                 XLSX.utils.book_append_sheet(wb, ws, item.label.substring(0, 31))
             }
             XLSX.writeFile(wb, `${item.label.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)
@@ -238,7 +249,7 @@ function ComplianceInner() {
                                     {MONTHS[run.month - 1]}
                                 </span>
                                 <span style={{ fontSize: 11, color: "var(--text3)" }}>{run.year}</span>
-                                <span style={{ fontSize: 10, color: run.status === "COMPLETED" ? "#16a34a" : "#d97706", fontWeight: 600, marginTop: 2 }}>
+                                <span style={{ fontSize: 10, color: (run.status === "PROCESSED" || run.status === "PAID") ? "#16a34a" : "#d97706", fontWeight: 600, marginTop: 2 }}>
                                     {run._count.payrolls} emp
                                 </span>
                             </div>
@@ -335,7 +346,7 @@ function PillCell({
 }
 
 export default function CompliancePage() {
-    return <Suspense><ComplianceInner /></Suspense>
+    return <RequirePayrollView><Suspense><ComplianceInner /></Suspense></RequirePayrollView>
 }
 
 const thStyle: React.CSSProperties = {

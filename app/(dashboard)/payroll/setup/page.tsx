@@ -12,7 +12,8 @@ import {
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
 import { can } from "@/lib/can"
-import { calcGrowusPayroll } from "@/lib/payroll-calc"
+import { calcFullMonthCosts, calcGrowusPayroll } from "@/lib/payroll-calc"
+import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SalarySalary = {
@@ -67,6 +68,7 @@ function calcPreview(
     gender = "Male",
     isHandicap = false,
     month?: number,
+    rules: PayrollRules = DEFAULT_PAYROLL_RULES,
 ): CalcResult {
     return calcGrowusPayroll(
         {
@@ -77,23 +79,33 @@ function calcPreview(
             isHandicap,
         },
         { ...att, gender, month },
+        rules,
     )
 }
 
 // ─── Salary Setup Modal ───────────────────────────────────────────────────────
-function SalaryModal({ emp, onClose, onSaved }: {
-    emp: EmpRow; onClose: () => void; onSaved: (s: SalarySalary) => void
+function SalaryModal({ emp, rules, onClose, onSaved }: {
+    emp: EmpRow; rules: PayrollRules; onClose: () => void; onSaved: (s: SalarySalary) => void
 }) {
     const [form, setForm] = useState<SalarySalary>(emp.salary ?? {
         basic: 0, da: 0, hra: 0, bonus: 0, washing: 0, conveyance: 0, leaveWithWages: 0,
-        otherAllowance: 0, otRatePerHour: 170, canteenRatePerDay: 55,
+        otherAllowance: 0,
+        otRatePerHour: rules.defaults.otRatePerHour,
+        canteenRatePerDay: rules.defaults.canteenRatePerDay,
         status: "APPROVED", complianceType: "OR"
     })
     const [saving, setSaving] = useState(false)
 
-    const hra = form.hra ?? 0
-    const bonus = form.bonus ?? 0
-    const gross = form.basic + form.da + hra + form.washing + form.conveyance + form.leaveWithWages + bonus + form.otherAllowance
+    // Preview through the shared engine with the company's configured rules —
+    // the same figures Process will save (the old panel hardcoded ₹1,800 PF
+    // and ₹200 PT regardless of the numbers being typed).
+    const costs = calcFullMonthCosts({
+        basic: form.basic, da: form.da, washing: form.washing, conveyance: form.conveyance,
+        leaveWithWages: form.leaveWithWages, otherAllowance: form.otherAllowance,
+        hra: form.hra ?? 0, bonus: form.bonus ?? 0,
+        complianceType: form.complianceType, isHandicap: emp.isHandicap,
+    }, { gender: emp.gender }, rules)
+    const gross = costs.grossFullMonth
 
     const save = async () => {
         setSaving(true)
@@ -158,7 +170,7 @@ function SalaryModal({ emp, onClose, onSaved }: {
                             ))}
                         </div>
                         <p className="text-[11px] text-[var(--text3)] mt-1.5 px-1">
-                            PT = ₹200/month (Male) · ₹0 (Female) — auto-applied in both modes
+                            PT is auto-applied per the configured slabs (female exemption applies) in both modes
                         </p>
                     </div>
 
@@ -180,27 +192,31 @@ function SalaryModal({ emp, onClose, onSaved }: {
                             </div>
                         ))}
                     </div>
-                    {/* Auto-calculated preview */}
+                    {/* Auto-calculated preview — shared engine + configured rules */}
                     <div className="bg-[var(--surface)] rounded-xl p-4 text-[12px] space-y-1">
-                        <div className="font-semibold text-[var(--text)] mb-2">Auto-calculated</div>
-                        <div className="flex justify-between"><span className="text-[var(--text3)]">HRA (Basic+DA × 5%)</span><span className="font-medium">₹{Math.round(hra).toLocaleString()}</span></div>
-                        <div className="flex justify-between"><span className="text-[var(--text3)]">Statutory Bonus</span><span className="font-medium">₹{Math.round(7000/12).toLocaleString()}</span></div>
+                        <div className="font-semibold text-[var(--text)] mb-2">Auto-calculated (full month)</div>
+                        <div className="flex justify-between"><span className="text-[var(--text3)]">HRA (manual entry)</span><span className="font-medium">₹{Math.round(costs.hraFull).toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span className="text-[var(--text3)]">Bonus (manual entry)</span><span className="font-medium">₹{Math.round(costs.bonusFull).toLocaleString()}</span></div>
                         <div className="flex justify-between border-t border-[var(--border)] pt-1 mt-1">
                             <span className="font-semibold">Full Month GROSS</span>
                             <span className="font-bold text-[var(--accent)]">₹{Math.round(gross).toLocaleString()}</span>
                         </div>
                         {/* Compliance preview */}
                         <div className="border-t border-[var(--border)] pt-2 mt-1 space-y-1">
-                            <div className="text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-1">Deductions (approx. for Male)</div>
+                            <div className="text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-1">Deductions ({emp.gender || "Male"})</div>
                             {form.complianceType === "OR" ? (
                                 <>
-                                    <div className="flex justify-between"><span className="text-[var(--text3)]">PF (Employee 12%)</span><span className="text-red-600">-₹1,800</span></div>
-                                    <div className="flex justify-between"><span className="text-[var(--text3)]">ESIC {gross > 21000 ? "(gross > ₹21k, N/A)" : "(0.75%)"}</span><span className="text-red-600">{gross > 21000 ? "₹0" : `-₹${Math.ceil((gross - 0) * 0.0075).toLocaleString()}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text3)]">PF (Employee {rules.pf.employeePct}%)</span><span className="text-red-600">-₹{costs.pfEmployee.toLocaleString()}</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text3)]">ESIC {costs.esiEmployee === 0 ? `(gross > ₹${Math.round(rules.esic.eligibilityLimit / 1000)}k, N/A)` : `(${rules.esic.employeePct}%)`}</span><span className="text-red-600">{costs.esiEmployee === 0 ? "₹0" : `-₹${costs.esiEmployee.toLocaleString()}`}</span></div>
                                 </>
                             ) : (
                                 <div className="flex justify-between text-amber-700"><span>PF & ESIC</span><span className="font-semibold">Not Applicable</span></div>
                             )}
-                            <div className="flex justify-between"><span className="text-[var(--text3)]">PT (Male)</span><span className="text-red-600">-₹200</span></div>
+                            <div className="flex justify-between"><span className="text-[var(--text3)]">PT</span><span className="text-red-600">{costs.pt ? `-₹${costs.pt.toLocaleString()}` : "₹0"}</span></div>
+                            <div className="flex justify-between border-t border-[var(--border)] pt-1 mt-1">
+                                <span className="font-semibold">Net (full month)</span>
+                                <span className="font-bold text-emerald-700">₹{Math.round(costs.netSalary).toLocaleString()}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -226,6 +242,14 @@ export default function PayrollPage() {
     const [loading, setLoading] = useState(true)
     const [processing, setProcessing] = useState(false)
     const [salaryModal, setSalaryModal] = useState<EmpRow | null>(null)
+    // Company calculation rules — previews must match what Process will save
+    const [rules, setRules] = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
+    useEffect(() => {
+        fetch("/api/payroll/rules")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.rules) setRules(d.rules) })
+            .catch(() => { /* previews fall back to defaults */ })
+    }, [])
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [tab, setTab] = useState<"payroll"|"setup">("payroll")
     // Attendance inputs per employee
@@ -407,8 +431,8 @@ export default function PayrollPage() {
             )
             const success = results.filter(r => r.status === "fulfilled").length
             const failed  = results.filter(r => r.status === "rejected").length
-            if (success > 0) toast.success(`${success} employees ka salary set ho gaya${failed > 0 ? `, ${failed} fail hue` : ""}!`)
-            else toast.error(`Sabhi ${failed} rows fail ho gayi — Employee ID check karein.`)
+            if (success > 0) toast.success(`Salary set for ${success} employee(s)${failed > 0 ? `, ${failed} failed` : ""}.`)
+            else toast.error(`All ${failed} rows failed — check the Employee ID column.`)
             await loadData()
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : "File read karne mein error.")
@@ -530,7 +554,7 @@ export default function PayrollPage() {
                                             or a pending structure shows full allowances here and
                                             saves basic-only. */}
                                         const preview = emp.salary && emp.salary.status === "APPROVED"
-                                            ? calcPreview(emp.salary, att, emp.gender, emp.isHandicap, month)
+                                            ? calcPreview(emp.salary, att, emp.gender, emp.isHandicap, month, rules)
                                             : null
                                         const isExpanded = expandedId === emp.id
 
@@ -594,7 +618,7 @@ export default function PayrollPage() {
                                                                     {[
                                                                         ["BASIC", preview.basicFull],["DA", preview.daFull],
                                                                         ["HRA (5%)", preview.hraFull],["Washing", preview.washingFull],
-                                                                        ["Conveyance", preview.conveyanceFull],["Bonus (₹7000/12)", preview.bonusFull],
+                                                                        ["Conveyance", preview.conveyanceFull],["Bonus", preview.bonusFull],
                                                                     ].map(([k, v]) => (
                                                                         <div key={k as string} className="flex justify-between py-0.5">
                                                                             <span className="text-[var(--text3)]">{k}</span>
@@ -720,12 +744,17 @@ export default function PayrollPage() {
                             {employees.map(emp => {
                                 const s = emp.salary
                                 const isCALL = s?.complianceType === "CALL"
-                                const hra   = s ? (isCALL ? 0 : (s.hra ?? 0)) : 0
-                                const bonus = s ? (isCALL ? 0 : (s.bonus ?? 0)) : 0
-                                const gross = s ? s.basic + s.da + hra + s.washing + s.conveyance + s.leaveWithWages + bonus + s.otherAllowance : 0
-                                const empPF = (s && !isCALL) ? Math.round(15000 * 0.13) : 0
-                                const empESIC = (s && !isCALL && gross <= 21000) ? Math.ceil((gross - (s?.washing ?? 0) - bonus) * 0.0325) : 0
-                                const ctc   = s ? gross + empPF + empESIC : 0
+                                // Shared engine + configured rules — no local statutory math
+                                const costs = s ? calcFullMonthCosts({
+                                    basic: s.basic, da: s.da, washing: s.washing, conveyance: s.conveyance,
+                                    leaveWithWages: s.leaveWithWages, otherAllowance: s.otherAllowance,
+                                    hra: s.hra ?? 0, bonus: s.bonus ?? 0,
+                                    complianceType: s.complianceType, isHandicap: emp.isHandicap,
+                                }, { gender: emp.gender }, rules) : null
+                                const hra   = costs?.hraFull ?? 0
+                                const bonus = costs?.bonusFull ?? 0
+                                const gross = costs?.grossFullMonth ?? 0
+                                const ctc   = costs?.ctc ?? 0
                                 return (
                                     <tr key={emp.id} className="hover:bg-[var(--surface)]">
                                         <td className="px-4 py-3">
@@ -761,6 +790,7 @@ export default function PayrollPage() {
             {salaryModal && (
                 <SalaryModal
                     emp={salaryModal}
+                    rules={rules}
                     onClose={() => setSalaryModal(null)}
                     onSaved={(sal) => {
                         setEmployees(prev => prev.map(e => e.id === salaryModal.id ? { ...e, salary: sal } : e))
