@@ -5,7 +5,23 @@ const bcrypt = require('bcryptjs')
 const prisma = new PrismaClient()
 
 async function main() {
-    const password = await bcrypt.hash('password123', 10)
+    // The seed password used to be the literal 'password123', committed to a
+    // public repository alongside an `admin@cims.com` ADMIN account — so anyone
+    // who read the repo could sign in as administrator on any database this
+    // seed had ever touched. It now has to be supplied explicitly.
+    const seedPassword = process.env.SEED_PASSWORD
+    if (!seedPassword || seedPassword.length < 8) {
+        console.error(
+            'Refusing to seed: set SEED_PASSWORD (at least 8 characters) first.\n' +
+            '  SEED_PASSWORD="$(openssl rand -base64 18)" npx prisma db seed'
+        )
+        process.exit(1)
+    }
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PROD_SEED !== 'true') {
+        console.error('Refusing to seed with NODE_ENV=production. Set ALLOW_PROD_SEED=true if you really mean it.')
+        process.exit(1)
+    }
+    const password = await bcrypt.hash(seedPassword, 10)
 
     const users = [
         {
