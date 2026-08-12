@@ -45,7 +45,14 @@ export default function LoginPage() {
             })
 
             if (result?.error) {
-                setError("Invalid credentials. Please check your email and password.")
+                // authorize() throws a coarse code (lib/auth.ts) — the precise
+                // reason is logged server-side rather than shown here, so the
+                // login form can't be used to discover which accounts exist.
+                // Anything we don't recognise falls back to the generic text,
+                // including NextAuth's own "CredentialsSignin".
+                setError(result.error === "ACCOUNT_INACTIVE"
+                    ? "This account is inactive. Please contact HR."
+                    : "Invalid credentials. Please check your email and password.")
             } else if (result?.ok) {
                 router.refresh()
                 window.location.href = "/"

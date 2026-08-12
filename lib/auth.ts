@@ -35,6 +35,33 @@ const DEMO_ENABLED = process.env.NODE_ENV !== "production" || process.env.ENABLE
 const DEV_LOG = process.env.NODE_ENV !== "production"
 const dlog = (...args: unknown[]) => { if (DEV_LOG) console.log(...args) }
 
+// ─── Login failure reporting ─────────────────────────────────────────────────
+// The client is deliberately told only two things: "this account is inactive"
+// or a generic invalid-credentials message. It is NOT told whether the account
+// exists, because the login form would otherwise let an anonymous caller
+// enumerate which phone numbers and employee IDs are registered.
+//
+// The precise reason is logged server-side instead — in production too, since
+// previously every login failure was silent there and the only way to diagnose
+// one was to query the database by hand.
+const AUTH_INACTIVE = "ACCOUNT_INACTIVE"
+const AUTH_INVALID = "INVALID_CREDENTIALS"
+
+// Enough of the identifier to match against a support ticket, not enough for
+// the log stream to become a directory of employee phone numbers.
+function maskLoginId(v: string | null | undefined): string {
+    const s = (v ?? "").trim()
+    if (!s) return "(empty)"
+    if (s.length <= 4) return `${s.slice(0, 1)}***(len ${s.length})`
+    return `${s.slice(0, 2)}***${s.slice(-2)}(len ${s.length})`
+}
+
+// Log the real reason, then throw the coarse code the client is allowed to see.
+function authFail(clientCode: string, reason: string, loginId?: string | null): never {
+    console.warn(`[AUTH] login failed — reason=${reason} id=${maskLoginId(loginId)}`)
+    throw new Error(clientCode)
+}
+
 export const authOptions: NextAuthOptions = {
     // PrismaAdapter removed — we use Credentials provider with JWT strategy,
     // so the adapter is not required. Removing it also eliminates a major
@@ -56,7 +83,7 @@ export const authOptions: NextAuthOptions = {
             },
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) {
-                    throw new Error("Invalid credentials")
+                    authFail(AUTH_INVALID, "missing email or password", credentials?.email)
                 }
 
                 const passwordRaw = credentials.password
@@ -175,7 +202,11 @@ export const authOptions: NextAuthOptions = {
                         })
                     }
 
-                    if (!user) throw new Error("Invalid credentials")
+                    if (!user) {
+                        authFail(AUTH_INVALID,
+                            "no user matched this login id (tried email, phone and employee id)",
+                            inputRaw)
+                    }
 
                     // Verify password
                     let passwordOk = false
@@ -199,13 +230,23 @@ export const authOptions: NextAuthOptions = {
                         passwordOk = true
                     }
 
-                    if (!passwordOk) throw new Error("Invalid credentials")
+                    if (!passwordOk) {
+                        // Distinguish a genuinely wrong password from a stored
+                        // value that is not a bcrypt hash at all (soft-deleted
+                        // accounts have their password replaced with a plain
+                        // marker string, and those can never compare true).
+                        const looksHashed = typeof user.password === "string" && /^\$2[aby]\$/.test(user.password)
+                        authFail(AUTH_INVALID,
+                            looksHashed ? "password did not match the stored hash"
+                                        : "stored password is not a bcrypt hash (account disabled or never set)",
+                            inputRaw)
+                    }
 
                     // Deactivated accounts stay locked out. Users are deactivated
                     // when their employee is terminated or deleted — a correct
                     // password must NOT silently revive the account.
                     if (!user.isActive) {
-                        throw new Error("Your account is inactive. Please contact HR.")
+                        authFail(AUTH_INACTIVE, "User.isActive is false", inputRaw)
                     }
 
                     // Look up employee record (photo + employment status)
@@ -218,7 +259,7 @@ export const authOptions: NextAuthOptions = {
                     // employees are blocked even if their User row is active
                     // (e.g. status was changed before user-sync existed).
                     if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE" || employee.status === "RESIGNED")) {
-                        throw new Error("Your account is inactive. Please contact HR.")
+                        authFail(AUTH_INACTIVE, `linked employee status is ${employee.status}`, inputRaw)
                     }
 
                     return {
@@ -232,8 +273,18 @@ export const authOptions: NextAuthOptions = {
                         photo: employee?.photo || null,
                     } as any
                 } catch (error) {
-                    // Never log raw credentials — only the bare error for ops debugging
-                    if (DEV_LOG) console.error("[AUTH] Error:", error)
+                    // Expected outcomes (wrong password, inactive account) have
+                    // already been logged with their reason by authFail. Anything
+                    // else is a real fault — a database that is unreachable or out
+                    // of connections, a schema mismatch — and must be visible in
+                    // production, where this used to be logged only in dev and so
+                    // surfaced to the user as an indistinguishable
+                    // "invalid credentials".
+                    const msg = error instanceof Error ? error.message : String(error)
+                    if (msg !== AUTH_INVALID && msg !== AUTH_INACTIVE) {
+                        // Never log raw credentials — only the error itself.
+                        console.error("[AUTH] unexpected error during sign-in:", error)
+                    }
                     throw error
                 }
             },
