@@ -75,17 +75,38 @@ export async function GET(req: Request) {
             return [{ category: exp.category as string, amount: exp.amount ?? 0 }]
         }
 
-        // Fetch all active employees with their user ids
-        const employees = await prisma.employee.findMany({
-            where: { status: { not: "ONBOARDING" } },
-            select: {
-                id: true, firstName: true, lastName: true,
-                employeeId: true, designation: true,
-                department: { select: { name: true } },
-                user: { select: { id: true } },
-            },
-            orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-        })
+        // Only the people this month's expenses actually reference.
+        //
+        // This used to load the ENTIRE roster — every non-onboarding employee,
+        // with a department join, on every admin dashboard load — and then throw
+        // all but a handful away at the `filter(emp => totals[emp.id])` below.
+        // At 722 employees that was the single heaviest query on the page, for a
+        // list that is usually a few dozen rows.
+        const expenseEmpIds = [...new Set(
+            rawExpenses.map(e => e.employeeId).filter(Boolean)
+        )] as string[]
+        const expenseUserIds = [...new Set(
+            rawExpenses.map(e => e.submittedBy).filter(Boolean)
+        )] as string[]
+
+        const employees = (expenseEmpIds.length || expenseUserIds.length)
+            ? await prisma.employee.findMany({
+                where: {
+                    status: { not: "ONBOARDING" },
+                    OR: [
+                        ...(expenseEmpIds.length  ? [{ id:     { in: expenseEmpIds } }]  : []),
+                        ...(expenseUserIds.length ? [{ userId: { in: expenseUserIds } }] : []),
+                    ],
+                },
+                select: {
+                    id: true, firstName: true, lastName: true,
+                    employeeId: true, designation: true,
+                    department: { select: { name: true } },
+                    user: { select: { id: true } },
+                },
+                orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+            })
+            : []
 
         // Build userId → employee map
         const byUserId: Record<string, typeof employees[0]> = {}
@@ -180,6 +201,12 @@ export async function GET(req: Request) {
             columns:   COLS,
             rows,
             totals:    colTotals,
+        }, {
+            headers: {
+                // A month's expense totals don't move second to second, and this
+                // runs on every admin dashboard load. Matches /api/admin/stats.
+                "Cache-Control": "private, max-age=15, stale-while-revalidate=60",
+            },
         })
     } catch (error) {
         console.error("[TEAM_SUMMARY_GET]", error)
