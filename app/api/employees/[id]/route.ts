@@ -218,10 +218,59 @@ export async function PUT(
         if (safetyShoesDate !== undefined) updateData.safetyShoesDate = safetyShoesDate ? new Date(safetyShoesDate) : null
         if (bankBranch !== undefined) updateData.bankBranch = bankBranch || null
 
+        // ─── Rejoin ──────────────────────────────────────────────────────────
+        // Marking someone TERMINATED / RESIGNED — or completing their exit —
+        // does three things: sets the status, ends their site deployment, and
+        // disables their login. Flipping the status back to ACTIVE only undid
+        // the status and the login, so a rehired employee came back with no
+        // site posting, a stale leaving date, and an exit record that still
+        // counted them as gone.
+        const TERMINAL_STATUSES: string[] = ["TERMINATED", "RESIGNED", "INACTIVE"]
+        let isRejoining = false
+        if (status === "ACTIVE") {
+            const before = await prisma.employee.findUnique({
+                where: { id: params.id },
+                select: { status: true },
+            })
+            isRejoining = !!before && TERMINAL_STATUSES.includes(before.status)
+            // Someone who is back should not carry a leaving date — unless this
+            // same request deliberately set one.
+            if (isRejoining && dateOfLeaving === undefined) updateData.dateOfLeaving = null
+        }
+
         const employee = await prisma.employee.update({
             where: { id: params.id },
             data: updateData,
         })
+
+        if (isRejoining) {
+            // Put them back on the site they were relieved from, unless they
+            // already have a live posting. Deployments carry no capacity limit,
+            // so restoring the most recent one cannot over-book a site.
+            const stillPosted = await prisma.deployment.findFirst({
+                where: { employeeId: params.id, isActive: true },
+                select: { id: true },
+            })
+            if (!stillPosted) {
+                const last = await prisma.deployment.findFirst({
+                    where: { employeeId: params.id },
+                    orderBy: [{ endDate: "desc" }, { startDate: "desc" }],
+                    select: { id: true },
+                })
+                if (last) {
+                    await prisma.deployment.update({
+                        where: { id: last.id },
+                        data: { isActive: true, endDate: null, relievedAt: null },
+                    })
+                }
+            }
+            // A completed (or in-flight) exit must stop treating this person as
+            // a leaver, or they keep showing up in exit reports and headcount.
+            await prisma.exitRequest.updateMany({
+                where: { employeeId: params.id, status: { not: "CANCELLED" } },
+                data: { status: "CANCELLED" },
+            })
+        }
 
         // Update linked User account (role + email + login-access sync)
         const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"]
