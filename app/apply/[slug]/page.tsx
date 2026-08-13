@@ -97,6 +97,11 @@ export default function ApplyPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!form.candidateName.trim() || !form.phone.trim()) { setError("Name and phone are required"); return }
+        // The photo is part of the candidate record HR works from, so it is
+        // required here and re-checked on the server (this page is public, so a
+        // client-side check alone can be skipped).
+        if (photoUploading) { setError("Please wait for the photo to finish uploading"); return }
+        if (!photo) { setError("Passport size photo is required"); return }
         const invalid =
             validatePhone(form.phone) ||
             validatePhone(form.altPhone) ||
@@ -219,8 +224,8 @@ export default function ApplyPage() {
                             {photo ? (
                                 <img src={photo} alt="Profile" style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "2.5px solid #6366f1" }} />
                             ) : (
-                                <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center", border: "2px dashed #6366f1" }}>
-                                    <User size={24} color="#6366f1" />
+                                <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", border: "2px dashed #fca5a5" }}>
+                                    <User size={24} color="#ef4444" />
                                 </div>
                             )}
                             {photoUploading && (
@@ -230,12 +235,16 @@ export default function ApplyPage() {
                             )}
                         </div>
                         <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 12, fontWeight: 700, color: "#374151", margin: "0 0 5px" }}>Passport Size Photo</p>
+                            <p style={{ fontSize: 12, fontWeight: 700, color: "#374151", margin: "0 0 5px" }}>
+                                Passport Size Photo <span style={{ color: "#dc2626" }}>*</span>
+                            </p>
                             <button type="button" onClick={() => photoRef.current?.click()} disabled={photoUploading}
                                 style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 7, background: photo ? "#f0fdf4" : "#ede9fe", color: photo ? "#047857" : "#6366f1", fontSize: 11, fontWeight: 600, border: `1px solid ${photo ? "#86efac" : "#c4b5fd"}`, cursor: "pointer" }}>
                                 <Camera size={11} /> {photoUploading ? "Uploading…" : photo ? "Change Photo" : "Upload Photo"}
                             </button>
-                            <p style={{ fontSize: 10, color: "#9ca3af", margin: "4px 0 0" }}>JPG / PNG • max 2MB</p>
+                            <p style={{ fontSize: 10, color: photo ? "#9ca3af" : "#dc2626", margin: "4px 0 0" }}>
+                                {photo ? "JPG / PNG • max 2MB" : "Required • JPG / PNG • max 2MB"}
+                            </p>
                         </div>
                         <input ref={photoRef} type="file" accept="image/*" style={{ display: "none" }}
                             onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); e.target.value = "" }} />

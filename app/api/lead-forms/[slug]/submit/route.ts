@@ -34,6 +34,12 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             return NextResponse.json({ error: "Name and phone are required" }, { status: 400 })
         }
 
+        // The passport photo is mandatory. This endpoint is public, so the check
+        // on the apply page can be skipped — it has to be enforced here too.
+        if (!profileUrl || typeof profileUrl !== "string" || !profileUrl.trim()) {
+            return NextResponse.json({ error: "Passport size photo is required" }, { status: 400 })
+        }
+
         // Public endpoint — re-check every format the apply form claims to check.
         const errors = collectErrors({
             phone: validatePhone(phone),
