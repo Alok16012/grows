@@ -333,11 +333,28 @@ export function canAccessInspection(session: PermSession): boolean {
     return INSPECTION_PERMISSIONS.some(p => checkAccess(session, [], p))
 }
 
+// Permissions that mean "you oversee this work" rather than "you perform it".
+// Holding one of these must cancel inspector self-scoping.
+export const ASSIGNMENT_OVERSIGHT_PERMISSIONS = ["assignments.view", "assignments.manage"]
+
 // Should this caller only ever see their OWN rows? ADMIN is deliberately excluded
 // — the superuser must keep seeing everyone's work, so self-scoping never catches it.
-export function isSelfScopedInspector(session: PermSession): boolean {
+//
+// `oversightPermissions` lists the permissions that make the caller a supervisor
+// of the resource being queried. Without it, granting a coordinator EVERY right
+// made them see LESS: "all permissions" includes the inspection ones, which made
+// them look like an inspector, which narrowed the query to rows where they
+// personally were the assigned inspector — usually none, so the screen came up
+// empty. Someone who may view assignments is watching other people's work, not
+// doing their own.
+export function isSelfScopedInspector(
+    session: PermSession,
+    oversightPermissions: readonly string[] = [],
+): boolean {
     if (!session || session.user.role === "ADMIN") return false
-    return hasInspectionPermission(session.user.permissions)
+    if (!hasInspectionPermission(session.user.permissions)) return false
+    const held = session.user.permissions ?? []
+    return !oversightPermissions.some(p => held.includes(p))
 }
 
 // Sending / issuing documents (Send Documents module, recall, clear, doc types)
