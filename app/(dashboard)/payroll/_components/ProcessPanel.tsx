@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { can } from "@/lib/can"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -91,13 +92,17 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
     const fetchEmployees = useCallback(async (siteId: string) => {
         setLoadingEmployees(true); setFetched(false); setEmployees([])
         try {
-            const [empRes, payRes] = await Promise.all([
-                fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=500`),
+            // Every employee on the site, not just the first page: this grid is
+            // what tells /api/payroll/calculate who to pay, so anyone missing
+            // here is simply never paid.
+            const [empAll, payRes] = await Promise.all([
+                fetchAllEmployees<Employee>({ siteId, status: "ACTIVE" }),
                 fetch(`/api/payroll?siteId=${siteId}&month=${month}&year=${year}`),
             ])
-            if (!empRes.ok) throw new Error(await empRes.text())
-            const empData = await empRes.json()
-            setEmployees(Array.isArray(empData) ? empData : (empData.employees ?? []))
+            setEmployees(empAll.employees)
+            if (empAll.truncated) {
+                toast.warning(`Loaded ${empAll.employees.length} of ${empAll.total} employees on this site — process in smaller batches so nobody is left out.`)
+            }
             if (payRes.ok) {
                 const payrolls: any[] = await payRes.json()
                 if (Array.isArray(payrolls) && payrolls.length > 0) {

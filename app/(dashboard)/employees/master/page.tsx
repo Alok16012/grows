@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import {
     Search, Loader2, RefreshCw, FileSpreadsheet, Pencil, X, Save, Trash2, CheckSquare,
     Users, UserCheck, UserX, CalendarOff, UserMinus,
@@ -286,6 +287,7 @@ const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
 ]
 
 const ALL_COLS = COLUMN_GROUPS.flatMap(g => g.cols)
+
 
 const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
     ACTIVE:     { bg: "#dcfce7", color: "#16a34a" },
@@ -629,17 +631,27 @@ export default function EmployeeMasterPage() {
     const fetchEmployees = useCallback(async () => {
         setLoading(true)
         try {
-            const params = new URLSearchParams()
-            if (statusFilter) params.set("status", statusFilter)
-            if (siteFilter) params.set("siteId", siteFilter)
-            if (search) params.set("search", search)
-            params.set("pageSize", "500")
-            // Master grid never renders avatars — skip the heavy base64 photo
-            // payload so the list loads fast (was ~15s with photos inlined).
-            params.set("lite", "1")
-            const res = await fetch(`/api/employees?${params.toString()}`)
-            const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
+            // This grid filters, sorts and exports client-side, so it needs the
+            // whole roster. It used to ask for a single page of 500 and ignore
+            // the `totalPages` in the reply, so on a larger roster the extra
+            // people were invisible AND the "Total Employees" card counted only
+            // what had been fetched — reporting exactly 500 out of 722.
+            //
+            // `lite=1` drops the base64 photo blob; this grid renders no avatars
+            // and inlining them made the list take ~15s.
+            const { employees, total, truncated } = await fetchAllEmployees<Employee>({
+                status: statusFilter || undefined,
+                siteId: siteFilter || undefined,
+                search: search || undefined,
+                lite: "1",
+            })
+            setEmployees(employees)
+            // Never truncate silently — that is the bug being fixed here.
+            if (truncated) {
+                toast.warning(
+                    `Showing the first ${employees.length.toLocaleString("en-IN")} of ${total.toLocaleString("en-IN")} employees. Narrow the filters to see the rest.`
+                )
+            }
         } catch {
             toast.error("Failed to load employees")
         } finally {
