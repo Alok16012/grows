@@ -51,16 +51,10 @@ function fmtAdmin(n: number) {
 function AdminExpenseTable() {
     const now = new Date()
     const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
-    const [data, setData] = useState<any>(null)
-    const [loadingExp, setLoadingExp] = useState(true)
-
-    useEffect(() => {
-        setLoadingExp(true)
-        fetch(`/api/expenses/team-summary?month=${month}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(d => { setData(d); setLoadingExp(false) })
-            .catch(() => setLoadingExp(false))
-    }, [month])
+    // Cached per month: the server is ~400ms away, so re-fetching on every visit
+    // meant staring at a skeleton for data that hadn't changed. Paints the last
+    // response instantly, then refreshes in the background.
+    const { data, loading: loadingExp } = useCachedFetch<any>(`/api/expenses/team-summary?month=${month}`)
 
     const monthOptions = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -143,17 +137,10 @@ function AdminExpenseTable() {
 function AdminRecruitmentTable() {
     const now = new Date()
     const [month, setMonth] = useState("ALL")
-    const [data, setData] = useState<any>(null)
-    const [loadingRec, setLoadingRec] = useState(true)
-
-    useEffect(() => {
-        setLoadingRec(true)
-        const qs = month === "ALL" ? "" : `?month=${month}`
-        fetch(`/api/admin/recruitment-summary${qs}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(d => { setData(d); setLoadingRec(false) })
-            .catch(() => setLoadingRec(false))
-    }, [month])
+    // Same treatment as the expense table above — cached per month selection.
+    const { data, loading: loadingRec } = useCachedFetch<any>(
+        `/api/admin/recruitment-summary${month === "ALL" ? "" : `?month=${month}`}`
+    )
 
     const monthOptions = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
