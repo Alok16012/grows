@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -564,9 +565,8 @@ function InitiateExitModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [empSearch, setEmpSearch] = useState("")
 
   useEffect(() => {
-    fetch("/api/employees?status=ACTIVE&pageSize=1000")
-      .then(r => r.ok ? r.json() : { employees: [] })
-      .then(d => setEmployees(Array.isArray(d) ? d : d.employees || []))
+    fetchAllEmployees({ status: "ACTIVE" })
+      .then(d => setEmployees(d.employees as any))
       .catch(() => {})
   }, [])
 

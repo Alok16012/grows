@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -613,10 +614,9 @@ function AssignForm({ siteId, onAssigned, onCancel }: {
 
     useEffect(() => {
         setFetching(true)
-        fetch("/api/employees?status=ACTIVE&pageSize=1000")
-            .then(r => r.ok ? r.json() : { employees: [] })
-            .then(async (data: any) => {
-                const all: Employee[] = Array.isArray(data) ? data : (data.employees ?? [])
+        fetchAllEmployees<Employee>({ status: "ACTIVE" })
+            .then(async (data) => {
+                const all: Employee[] = data.employees
                 // filter out already deployed employees
                 const depsRes = await fetch("/api/deployments?isActive=true")
                 const deps: Deployment[] = depsRes.ok ? await depsRes.json() : []

@@ -1,5 +1,6 @@
 "use client"
 import { useState, useRef, useCallback, useEffect } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useRouter } from "next/navigation"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -101,10 +102,8 @@ export default function AttendanceUploadPage() {
 
     useEffect(() => {
         if (!siteId) { setSiteEmployees([]); return }
-        // pageSize=1000 to get all employees; API returns { employees:[...], total } not plain array
-        fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=1000`)
-            .then(r => r.json())
-            .then(d => setSiteEmployees(Array.isArray(d) ? d : (d.employees ?? [])))
+        fetchAllEmployees({ siteId, status: "ACTIVE" })
+            .then(d => setSiteEmployees(d.employees as any))
             .catch(() => setSiteEmployees([]))
     }, [siteId])
 
@@ -201,14 +200,12 @@ export default function AttendanceUploadPage() {
 
             // Fetch ALL active employees (not just site-deployed) so attendance
             // can be processed even if deployment record is missing for some employees
-            const [siteEmpRes, allEmpRes] = await Promise.all([
-                fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=1000`),
-                fetch(`/api/employees?status=ACTIVE&pageSize=1000`),
+            const [siteEmpAll, allEmpAll] = await Promise.all([
+                fetchAllEmployees<Employee>({ siteId, status: "ACTIVE" }),
+                fetchAllEmployees<Employee>({ status: "ACTIVE" }),
             ])
-            const siteEmpData = await siteEmpRes.json()
-            const allEmpData  = await allEmpRes.json()
-            const siteEmployees: Employee[] = Array.isArray(siteEmpData) ? siteEmpData : (siteEmpData.employees ?? [])
-            const allEmployees:  Employee[] = Array.isArray(allEmpData)  ? allEmpData  : (allEmpData.employees  ?? [])
+            const siteEmployees: Employee[] = siteEmpAll.employees
+            const allEmployees:  Employee[] = allEmpAll.employees
 
             // Build map — site-deployed employees take priority, then fall back to all
             const empMap = new Map<string, Employee>()

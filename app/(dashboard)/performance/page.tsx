@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -350,11 +351,8 @@ export default function PerformancePage() {
     }, [])
 
     const fetchEmployees = useCallback(async () => {
-        const res = await fetch("/api/employees?pageSize=1000")
-        if (res.ok) {
-            const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
-        }
+        const { employees } = await fetchAllEmployees()
+        setEmployees(employees as any)
     }, [])
 
     useEffect(() => {

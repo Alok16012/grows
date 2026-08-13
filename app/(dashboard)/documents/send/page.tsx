@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -85,11 +86,11 @@ export default function SendDocumentsPage() {
                 const [t, ro, e] = await Promise.all([
                     fetch("/api/hr-documents/types").then(r => r.ok ? r.json() : []),
                     fetch("/api/admin/roles").then(r => r.ok ? r.json() : []),
-                    fetch("/api/employees?pageSize=1000").then(r => r.ok ? r.json() : { employees: [] }),
+                    fetchAllEmployees(),
                 ])
                 setDocTypes(t)
                 setRoles(ro)
-                setEmployees(e.employees || [])
+                setEmployees(e.employees as any)
                 await fetchIssued()
             } finally {
                 setLoading(false)

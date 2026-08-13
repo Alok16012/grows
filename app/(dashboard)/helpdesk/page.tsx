@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -144,9 +145,8 @@ function NewTicketModal({
         if (open) {
             setForm({ title: "", description: "", category: "IT", priority: "MEDIUM", employeeId: "", dueDate: "" })
             setEmpSearch("")
-            fetch("/api/employees?status=ACTIVE&pageSize=1000")
-                .then(r => r.ok ? r.json() : { employees: [] })
-                .then(data => setEmployees(Array.isArray(data) ? data : (data.employees ?? [])))
+            fetchAllEmployees({ status: "ACTIVE" })
+                .then(r => setEmployees(r.employees as any))
                 .catch(() => setEmployees([]))
         }
     }, [open])

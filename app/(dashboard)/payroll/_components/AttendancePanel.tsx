@@ -1,5 +1,6 @@
 "use client"
 import { useState, useRef, useCallback, useEffect } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
@@ -76,8 +77,8 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
 
     useEffect(() => {
         if (!siteId) { setSiteEmployees([]); return }
-        fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=1000`)
-            .then(r=>r.json()).then(d=>setSiteEmployees(Array.isArray(d)?d:(d.employees??[]))).catch(()=>setSiteEmployees([]))
+        fetchAllEmployees<Employee>({ siteId, status: "ACTIVE" })
+            .then(d=>setSiteEmployees(d.employees)).catch(()=>setSiteEmployees([]))
     }, [siteId])
 
     useEffect(() => {
@@ -133,14 +134,12 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                 productionIncentive: Number(pick(row,"PRODUCTION INCENTIVE","PROD INCENTIVE","PROD INC","INCENTIVE","PI")??0)||0,
             })).filter(r=>r.rawEmployeeId&&!/^(SR|TOTAL|GRAND TOTAL|—)$/i.test(r.rawEmployeeId))
             if (!parsed.length) { toast.error("No valid Employee ID rows found"); setParsing(false); return }
-            const [siteEmpRes,allEmpRes] = await Promise.all([
-                fetch(`/api/employees?siteId=${siteId}&status=ACTIVE&pageSize=1000`),
-                fetch(`/api/employees?status=ACTIVE&pageSize=1000`),
+            const [siteEmpAll,allEmpAll] = await Promise.all([
+                fetchAllEmployees<Employee>({ siteId, status: "ACTIVE" }),
+                fetchAllEmployees<Employee>({ status: "ACTIVE" }),
             ])
-            const siteEmpData = await siteEmpRes.json()
-            const allEmpData  = await allEmpRes.json()
-            const siteEmps: Employee[] = Array.isArray(siteEmpData)?siteEmpData:(siteEmpData.employees??[])
-            const allEmps:  Employee[] = Array.isArray(allEmpData)?allEmpData:(allEmpData.employees??[])
+            const siteEmps: Employee[] = siteEmpAll.employees
+            const allEmps:  Employee[] = allEmpAll.employees
             const empMap = new Map<string,Employee>()
             allEmps.forEach(e=>empMap.set(e.employeeId.toUpperCase(),e))
             siteEmps.forEach(e=>empMap.set(e.employeeId.toUpperCase(),e))

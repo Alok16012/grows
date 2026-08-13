@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -250,14 +251,11 @@ export default function MasterDocumentsPage() {
     const fetchAll = async () => {
         setLoading(true)
         try {
-            const [eRes, dRes] = await Promise.all([
-                fetch("/api/employees?pageSize=500"),
+            const [empAll, dRes] = await Promise.all([
+                fetchAllEmployees<Employee>(),
                 fetch("/api/employees/all-documents"),
             ])
-            if (eRes.ok) {
-                const data = await eRes.json()
-                setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
-            }
+            setEmployees(empAll.employees)
             if (dRes.ok) setDocs(await dRes.json())
         } catch { toast.error("Failed to load") }
         finally { setLoading(false) }

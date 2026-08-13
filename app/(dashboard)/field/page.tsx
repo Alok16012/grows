@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import {
@@ -624,11 +625,8 @@ export default function FieldPage() {
 
     const fetchEmployees = useCallback(async () => {
         try {
-            const res = await fetch("/api/employees?status=ACTIVE&pageSize=1000")
-            if (res.ok) {
-                const data = await res.json()
-                setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
-            }
+            const { employees } = await fetchAllEmployees({ status: "ACTIVE" })
+            setEmployees(employees as any)
         } catch {
             // ignore
         }

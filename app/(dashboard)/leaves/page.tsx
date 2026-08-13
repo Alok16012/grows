@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -116,9 +117,8 @@ function ApplyLeaveModal({ open, onClose, onSaved, canManage }: {
             // and /api/employees would 403 for them anyway — which used to leave a
             // required dropdown permanently empty and the form unsubmittable.
             if (canManage) {
-                fetch("/api/employees?status=ACTIVE&pageSize=1000")
-                    .then(r => r.ok ? r.json() : { employees: [] })
-                    .then(data => setEmployees(Array.isArray(data) ? data : (data.employees ?? [])))
+                fetchAllEmployees({ status: "ACTIVE" })
+                    .then(r => setEmployees(r.employees as any))
                     .catch(() => {})
             }
             setForm({ employeeId: "", type: "CL", startDate: "", endDate: "", days: "", reason: "" })
