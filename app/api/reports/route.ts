@@ -278,17 +278,30 @@ export async function GET(req: Request) {
                     rework: 0,
                     rejected: 0,
                     partName: "General",
-                    location: "Main"
+                    partNumber: "",
+                    shift: "",
+                    location: "Main",
+                    // Every answer keyed by its own label. The named keys above
+                    // only cover the handful of labels this mapping knows; any
+                    // other field the inspector filled — shift codes, dropdown
+                    // selections, remarks, per-project custom columns — had
+                    // nowhere to go and vanished from the export entirely.
+                    fields: {} as Record<string, string>,
                 }
                 for (const resp of i.responses) {
-                    const label = resp.field.fieldLabel.toLowerCase()
+                    const rawLabel = resp.field.fieldLabel
+                    const label = rawLabel.toLowerCase()
                     const val = resp.value || ""
                     if (label.includes("part name") || label.includes("partname")) r.partName = val
+                    if (label.includes("part number") || label.includes("part no") || label.includes("partnumber")) r.partNumber = val
+                    // "Shift Location" is a location field, not a shift field.
+                    if (label.includes("shift") && !label.includes("location")) r.shift = val
                     if (label.includes("inspected")) r.inspected = parseNum(val)
                     if (label.includes("accepted")) r.accepted = parseNum(val)
                     if (label.includes("rework qty") || label.includes("total rework")) r.rework = parseNum(val)
                     if (label.includes("rejected qty") || label.includes("rejection qty") || label.includes("total rejected")) r.rejected = parseNum(val)
                     if (label.includes("location")) r.location = val
+                    if (val !== "") r.fields[rawLabel] = val
                 }
                 if (r.inspected === 0) r.inspected = r.accepted + r.rework + r.rejected
                 return r

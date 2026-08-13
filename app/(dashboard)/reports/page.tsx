@@ -59,6 +59,11 @@ const MONTHS = [
 
 const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030]
 
+// "Part Number", "part number" and "partNumber" are one column. Compare on
+// letters and digits alone so a form label doesn't duplicate a named column in
+// the exported sheet.
+const normalizeHeader = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "")
+
 function useCountUp(target: number, duration = 1000) {
     const [value, setValue] = useState(0)
 
@@ -377,10 +382,21 @@ export default function ReportsPage() {
                     "Inspector Name": r.inspector || "—"
                 }
 
-                const baseKeys = ["id", "date", "shift", "site", "project", "location", "partName", "partNumber", "inspected", "accepted", "rework", "rejected", "inspector"]
+                const baseKeys = ["id", "date", "shift", "site", "project", "location", "partName", "partNumber", "inspected", "accepted", "rework", "rejected", "inspector", "fields"]
                 Object.keys(r).forEach(k => {
                     if (!baseKeys.includes(k) && typeof r[k] === 'number') {
                         row[k] = r[k]
+                    }
+                })
+
+                // Every remaining answer, under its own form label. Previously an
+                // extra field only survived if its value happened to be a number,
+                // so dropdown selections and free-text answers were dropped from
+                // the sheet even though the inspector had filled them in.
+                const named = new Set(Object.keys(row).map(normalizeHeader))
+                Object.entries((r.fields ?? {}) as Record<string, string>).forEach(([label, value]) => {
+                    if (!named.has(normalizeHeader(label)) && row[label] === undefined) {
+                        row[label] = value
                     }
                 })
                 return row
