@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { checkAccess, isSelfScopedInspector } from "@/lib/permissions"
+import { ASSIGNMENT_OVERSIGHT_PERMISSIONS, checkAccess, isSelfScopedInspector } from "@/lib/permissions"
 import { ensureProjectSchema } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
@@ -30,8 +30,14 @@ export async function GET(req: Request) {
     //
     // `?mine=1` lets a caller demand its own rows regardless; the workspace uses
     // it so that screen can never render someone else's assignment.
+    //
+    // Holding assignments.view / assignments.manage cancels the self-scoping: a
+    // coordinator granted every permission also picks up the inspection ones,
+    // which used to make them look like an inspector and narrow this list to
+    // assignments where they personally were the inspector — i.e. an empty
+    // screen, precisely because they had been given MORE rights.
     const wantsOwnOnly = searchParams.get("mine") === "1"
-    const scopeToSelf = wantsOwnOnly || isSelfScopedInspector(session)
+    const scopeToSelf = wantsOwnOnly || isSelfScopedInspector(session, ASSIGNMENT_OVERSIGHT_PERMISSIONS)
 
     if (scopeToSelf) {
         where.inspectionBoyId = user.id
@@ -77,14 +83,18 @@ export async function GET(req: Request) {
                         },
                         orderBy: { createdAt: "desc" },
                         take: 1
-                    }
+                    },
+                    // How many parts have been filed so far — a multi-part
+                    // assignment can hold several inspections.
+                    _count: { select: { inspections: true } }
                 },
                 orderBy: { createdAt: "desc" }
             });
 
-            const result = assignments.map(({ inspections, project, ...a }) => ({
+            const result = assignments.map(({ inspections, project, _count, ...a }) => ({
                 ...a,
                 inspection: inspections?.[0] || null,
+                partCount: _count?.inspections ?? 0,
                 project: {
                     id: project.id,
                     name: project.name,
@@ -126,6 +136,7 @@ export async function GET(req: Request) {
                         code: true,
                         recurrenceType: true,
                         recurrenceActive: true,
+                        isMultiPart: true,
                         startDate: true,
                         notes: true,
                         createdAt: true,
@@ -210,8 +221,13 @@ export async function POST(req: Request) {
             recurrenceType,
             startDate,
             notes,
+            isMultiPart,
         } = body
         const recurType: string = ["daily", "weekly"].includes(recurrenceType) ? recurrenceType : "none"
+        // Multi-part: inspected over several visits. The inspector can start the
+        // next part once the previous one is filed, and approving a part does not
+        // close the assignment.
+        const multiPart = !!isMultiPart
         const start = startDate ? new Date(startDate) : null
         const noteText = typeof notes === "string" && notes.trim() ? notes.trim().slice(0, 250) : null
 
@@ -286,6 +302,7 @@ export async function POST(req: Request) {
                                 code: nextCode(),
                                 startDate: start,
                                 notes: noteText,
+                                isMultiPart: multiPart,
                             },
                         })
                         created.push(assignment)

@@ -82,15 +82,18 @@ export async function PATCH(
 
     try {
         const body = await req.json()
-        const { status, recurrenceActive } = body
+        const { status, recurrenceActive, isMultiPart } = body
 
-        if (!status && recurrenceActive === undefined) {
+        if (!status && recurrenceActive === undefined && isMultiPart === undefined) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 })
         }
 
         const updateData: any = {}
+        // `status: "completed"` is how a manager closes a multi-part assignment
+        // once every visit is done — approving a part no longer does it.
         if (status) updateData.status = status
         if (recurrenceActive !== undefined) updateData.recurrenceActive = recurrenceActive
+        if (isMultiPart !== undefined) updateData.isMultiPart = !!isMultiPart
 
         const assignment = await prisma.assignment.update({
             where: { id: params.id },

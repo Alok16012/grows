@@ -136,10 +136,17 @@ export async function PATCH(
             })
 
             if (action === "approve") {
-                await tx.assignment.update({
-                    where: { id: inspection.assignmentId },
-                    data: { status: "completed" }
-                })
+                // A multi-part assignment covers several visits, so approving one
+                // part must not close it — it stays active on the inspector's
+                // list until a manager closes it deliberately (PATCH the
+                // assignment with status "completed"). Single-visit assignments
+                // still close on approval, exactly as before.
+                if (!assignment?.isMultiPart) {
+                    await tx.assignment.update({
+                        where: { id: inspection.assignmentId },
+                        data: { status: "completed" }
+                    })
+                }
 
                 // Notify inspector
                 await tx.notification.create({
@@ -156,8 +163,11 @@ export async function PATCH(
                 // Belt-and-braces with the disarm on project edit: never recur from
                 // an assignment that was deactivated, or approving the last pending
                 // inspection would put a removed inspector back on the project.
+                // Not for a multi-part assignment: it hasn't finished yet, so
+                // spawning the next cycle on every approved part would pile up
+                // duplicate assignments. It recurs when a manager closes it.
                 if (assignment && assignment.recurrenceType !== "none" && assignment.recurrenceActive
-                    && assignment.status !== "inactive") {
+                    && assignment.status !== "inactive" && !assignment.isMultiPart) {
                     await tx.assignment.create({
                         data: {
                             projectId: assignment.projectId,

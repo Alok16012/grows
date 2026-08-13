@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import {
     Loader2, Check, ChevronLeft, ChevronRight, Search, Trash2, X,
     Users, Sparkles, Eye, MoreVertical, Calendar, RefreshCw,
-    ClipboardList, StopCircle, FileText,
+    ClipboardList, StopCircle, FileText, CheckCircle2, Layers,
 } from "lucide-react"
 import { can, canAny } from "@/lib/can"
 import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
@@ -23,6 +23,7 @@ type Assignment = {
     code?: string | null
     recurrenceType?: string
     recurrenceActive?: boolean
+    isMultiPart?: boolean
     startDate?: string | null
     notes?: string | null
     createdAt: string
@@ -101,10 +102,11 @@ function PersonRow({ person, checked, onToggle }: { person: Person; checked: boo
     )
 }
 
-function RowMenu({ assignment, onDelete, onStopRecurrence }: {
+function RowMenu({ assignment, onDelete, onStopRecurrence, onClose }: {
     assignment: Assignment
     onDelete: () => void
     onStopRecurrence: () => void
+    onClose: () => void
 }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
@@ -125,6 +127,12 @@ function RowMenu({ assignment, onDelete, onStopRecurrence }: {
             </button>
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-20 py-1 overflow-hidden">
+                    {assignment.isMultiPart && assignment.status !== "completed" && (
+                        <button onClick={() => { onClose(); setOpen(false) }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                            <CheckCircle2 size={13} /> Close Assignment
+                        </button>
+                    )}
                     {assignment.recurrenceActive && (
                         <button onClick={() => { onStopRecurrence(); setOpen(false) }}
                             className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
@@ -182,6 +190,7 @@ export default function AssignmentsPage() {
     const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
     const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
     const [recurrenceType, setRecurrenceType] = useState("none")
+    const [isMultiPart, setIsMultiPart] = useState(false)
     const [startDate, setStartDate] = useState("")
     const [notes, setNotes] = useState("")
     const [loading, setLoading] = useState(false)
@@ -272,6 +281,7 @@ export default function AssignmentsPage() {
         setWholeSite(true)
         setSelectedSiteId("")
         setRecurrenceType("none")
+        setIsMultiPart(false)
         setStartDate("")
         setNotes("")
         setWizardStep(0)
@@ -292,6 +302,7 @@ export default function AssignmentsPage() {
                     inspectorIds: selectedInspectorIds.length > 0 ? selectedInspectorIds : undefined,
                     managerIds: selectedManagerIds.length > 0 ? selectedManagerIds : undefined,
                     recurrenceType,
+                    isMultiPart,
                     startDate: startDate || undefined,
                     notes: notes || undefined,
                 }),
@@ -319,6 +330,20 @@ export default function AssignmentsPage() {
         } catch {
             alert("An error occurred while deleting")
         }
+    }
+
+    // Closing is a manager action for multi-part assignments: approving one part
+    // deliberately leaves them open, so somebody has to say when the work is done.
+    const handleCloseAssignment = async (id: string) => {
+        if (!confirm("Close this multi-part assignment? It will stop appearing on the inspector's list.")) return
+        try {
+            const res = await fetch(`/api/assignments/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "completed" }),
+            })
+            if (res.ok) setAssignments(prev => prev.map(a => a.id === id ? { ...a, status: "completed" } : a))
+        } catch { /* ignore */ }
     }
 
     const handleStopRecurrence = async (id: string) => {
@@ -547,6 +572,19 @@ export default function AssignmentsPage() {
                                 </div>
                             </div>
 
+                            <label className="flex items-start gap-2.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5 cursor-pointer">
+                                <input type="checkbox" checked={isMultiPart} onChange={e => setIsMultiPart(e.target.checked)}
+                                    className="mt-0.5 accent-[var(--accent)]" />
+                                <span>
+                                    <span className="block text-[12.5px] font-medium text-[var(--text)]">Multi-part inspection</span>
+                                    <span className="block text-[11px] text-[var(--text3)] leading-relaxed">
+                                        For work covered over several visits. The inspector can start the next part once
+                                        the previous one is submitted, and the assignment stays on their list until you
+                                        close it — approving a part won&apos;t close it.
+                                    </span>
+                                </span>
+                            </label>
+
                             <div>
                                 <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Notes / Summary <span className="text-[var(--text3)] font-normal">(Optional)</span></label>
                                 <textarea value={notes} onChange={e => setNotes(e.target.value.slice(0, 250))} rows={3}
@@ -760,6 +798,12 @@ export default function AssignmentsPage() {
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text2)] whitespace-nowrap">
                                                         {(a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring"}
+                                                        {a.isMultiPart && (
+                                                            <span title="Inspected over several visits — stays open until closed"
+                                                                className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#eef2ff] text-[#4338ca] text-[10px] font-semibold align-middle">
+                                                                <Layers size={9} /> Multi-part
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{fmtDate(a.startDate ?? a.createdAt)}</td>
                                                     <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
@@ -769,7 +813,7 @@ export default function AssignmentsPage() {
                                                                 <Eye size={13} />
                                                             </button>
                                                             {canManageAssignments && (
-                                                                <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} />
+                                                                <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} />
                                                             )}
                                                         </div>
                                                     </td>

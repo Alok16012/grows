@@ -115,14 +115,18 @@ export default function InspectionDashboard() {
     }
 
     const submittedAssignmentIds = new Set(recentSubmissions.map((s: any) => s.assignmentId))
-    // Active: no inspection yet, or inspection is still a draft
+    // Active: no inspection yet, or inspection is still a draft.
+    // A multi-part assignment stays here after a part is filed — the next visit
+    // is still to come, so it must not vanish the moment one part is submitted.
+    // It leaves this list only when a manager closes it.
     const activeAssignments = assignments.filter(a =>
-        a.status === "active" && (!a.inspection || a.inspection.status === "draft")
+        a.status === "active" && (a.isMultiPart || !a.inspection || a.inspection.status === "draft")
     )
-    // Completed: assignment marked completed in DB, OR has a submitted (non-draft) inspection
+    // Completed: assignment marked completed in DB, OR (single-visit only) has a
+    // submitted (non-draft) inspection
     const completedAssignments = assignments.filter(a =>
         a.status === "completed" ||
-        (a.status === "active" && a.inspection && a.inspection.status !== "draft")
+        (a.status === "active" && !a.isMultiPart && a.inspection && a.inspection.status !== "draft")
     )
     const activeCount = activeAssignments.length
     const draftCount = recentSubmissions.filter(s => s.status === "draft").length
@@ -376,10 +380,16 @@ export default function InspectionDashboard() {
                                     </div>
                                 </div>
                                 <Link
-                                    href={`/inspection/${a.id}/form`}
+                                    href={a.isMultiPart && a.inspection && a.inspection.status !== "draft" && a.inspection.status !== "rejected"
+                                        ? `/inspection/${a.id}/form?newPart=1`
+                                        : `/inspection/${a.id}/form`}
                                     className="flex items-center justify-center gap-2 w-full bg-[#1a9e6e] text-white rounded-[9px] py-2.5 text-[13px] font-medium hover:bg-[#158a5e] transition-colors"
                                 >
-                                    {a.inspection?.status === "draft" ? "Complete Inspection" : "Start Inspection"}
+                                    {a.inspection?.status === "draft"
+                                        ? "Complete Inspection"
+                                        : a.isMultiPart && a.inspection
+                                            ? `Start Part ${(a.partCount ?? 1) + 1}`
+                                            : "Start Inspection"}
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <line x1="5" y1="12" x2="19" y2="12" />
                                         <polyline points="12 5 19 12 12 19" />

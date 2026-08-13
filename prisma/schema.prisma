@@ -141,6 +141,11 @@ model Assignment {
   code             String?      // e.g. ASG-2026-00012
   startDate        DateTime?
   notes            String?
+  // A multi-part assignment is inspected over several visits: the inspector can
+  // start a new report once the previous part is submitted, and approving a part
+  // does NOT close the assignment. It stays on the inspector's list until a
+  // manager closes it deliberately.
+  isMultiPart      Boolean      @default(false)
   createdAt        DateTime     @default(now())
   assigner         User         @relation("AssignmentAssigner", fields: [assignedBy], references: [id])
   inspectionBoy    User         @relation("AssignmentInspector", fields: [inspectionBoyId], references: [id])

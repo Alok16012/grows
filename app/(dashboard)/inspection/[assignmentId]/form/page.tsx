@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
     ChevronLeft,
@@ -28,6 +28,11 @@ export default function InspectionFormPage() {
     const { data: session, status: authStatus } = useSession()
     const router = useRouter()
     const { assignmentId } = useParams()
+    const searchParams = useSearchParams()
+    // `?newPart=1` is how the workspace's "Start Part N" action asks for the next
+    // part of a multi-part assignment. Opening the form without it just shows the
+    // part already on file, so a plain visit never creates a duplicate report.
+    const wantsNewPart = searchParams.get("newPart") === "1"
 
     const [assignment, setAssignment] = useState<any>(null)
     const [templates, setTemplates] = useState<any[]>([])
@@ -158,7 +163,14 @@ export default function InspectionFormPage() {
 
             let inspData = await inspRes.json()
 
-            if (!inspData || inspData.error || (Array.isArray(inspData) && inspData.length === 0)) {
+            const nothingOnFile = !inspData || inspData.error || (Array.isArray(inspData) && inspData.length === 0)
+            // A part that is filed and not sent back cannot be edited further, so
+            // an explicit request for the next part starts a fresh one. The server
+            // only honours this on a multi-part assignment — asking on a
+            // single-visit one safely returns the existing report.
+            const currentPartIsFiled = !nothingOnFile && inspData.status !== "draft" && inspData.status !== "rejected"
+
+            if (nothingOnFile || (wantsNewPart && currentPartIsFiled)) {
                 const createRes = await fetch("/api/inspections", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },

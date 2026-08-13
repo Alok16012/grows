@@ -66,8 +66,12 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "This assignment belongs to another inspector" }, { status: 403 })
         }
 
+        // A multi-part assignment holds several inspections, so this has to be
+        // the CURRENT one — without an order, Postgres was free to hand back an
+        // older part and the inspector would reopen work they had already filed.
         const inspection = await prisma.inspection.findFirst({
             where: { assignmentId },
+            orderBy: { createdAt: "desc" },
             include: {
                 responses: true
             }
@@ -103,13 +107,24 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid assignment" }, { status: 400 })
         }
 
-        // Check if exists
-        const existing = await prisma.inspection.findFirst({
-            where: { assignmentId }
+        const latest = await prisma.inspection.findFirst({
+            where: { assignmentId },
+            orderBy: { createdAt: "desc" },
         })
 
-        if (existing) {
-            return NextResponse.json(existing)
+        // A part still being worked on is always resumed, never duplicated —
+        // including one a colleague started, which is why this doesn't filter on
+        // submittedBy. A rejected part is also resumed: it was sent back for
+        // correction, so it has to be fixed rather than replaced by a new one.
+        const latestIsFinished = !!latest && latest.status !== "draft" && latest.status !== "rejected"
+
+        // On a multi-part assignment, asking for an inspection once the previous
+        // part is filed starts the NEXT part. Single-visit assignments keep
+        // returning their one and only inspection, exactly as before.
+        const startNewPart = latestIsFinished && assignment.isMultiPart
+
+        if (latest && !startNewPart) {
+            return NextResponse.json(latest)
         }
 
         const inspection = await prisma.inspection.create({
