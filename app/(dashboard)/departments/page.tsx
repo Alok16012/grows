@@ -214,10 +214,8 @@ export default function DepartmentsPage() {
     }, [])
 
     useEffect(() => {
-        if (status === "authenticated") {
-            fetchDepartments()
-        }
-    }, [status, fetchDepartments])
+        fetchDepartments()
+    }, [fetchDepartments])
 
     const filtered = departments.filter(d =>
         !search ||

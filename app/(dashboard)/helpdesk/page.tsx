@@ -654,8 +654,8 @@ export default function HelpdeskPage() {
     }, [statusFilter, priorityFilter, categoryFilter, search])
 
     useEffect(() => {
-        if (status === "authenticated") fetchTickets()
-    }, [status, fetchTickets])
+        fetchTickets()
+    }, [fetchTickets])
 
     // Stats
     const openCount = tickets.filter(t => t.status === "OPEN").length

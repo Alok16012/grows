@@ -323,9 +323,16 @@ export default function PayrollPage() {
     }, [month, year, defaultAtt])
 
     useEffect(() => {
+        // Fetch without waiting for the session round trip — the APIs
+        // authorize on their own cookie check anyway. The redirect for a
+        // signed-out visitor stays keyed on status alone so it can't refire
+        // the load.
+        loadData()
+    }, [loadData])
+
+    useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
-        else if (status === "authenticated") loadData()
-    }, [status, router, loadData])
+    }, [status, router])
 
     const setAtt = (empId: string, field: keyof AttInput, val: number) => {
         setAttInputs(prev => ({

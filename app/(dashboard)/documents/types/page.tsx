@@ -251,13 +251,16 @@ export default function DocumentTypesPage() {
         finally { setLoading(false) }
     }, [])
 
+    // Fetch immediately instead of waiting a full round trip for the session —
+    // the API rejects unauthorized callers on its own cookie check, so a
+    // non-admin briefly requests, gets a 403, and is redirected by the effect
+    // below. loadTypes is a mount-stable useCallback, so this runs once.
+    useEffect(() => { loadTypes() }, [loadTypes])
+
     useEffect(() => {
         if (status === "unauthenticated") { router.push("/login"); return }
-        if (status === "authenticated") {
-            if (!isAdmin) { router.push("/"); return }
-            loadTypes()
-        }
-    }, [status, isAdmin, router, loadTypes])
+        if (status === "authenticated" && !isAdmin) router.push("/")
+    }, [status, isAdmin, router])
 
     const handleDelete = async (id: string) => {
         if (!confirm("Deactivate this document type?")) return

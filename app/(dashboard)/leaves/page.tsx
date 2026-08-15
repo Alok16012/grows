@@ -480,8 +480,8 @@ export default function LeavesPage() {
     }, [statusFilter, typeFilter, monthFilter, search])
 
     useEffect(() => {
-        if (status === "authenticated") fetchLeaves()
-    }, [status, fetchLeaves])
+        fetchLeaves()
+    }, [fetchLeaves])
 
     // Stats
     const pending = leaves.filter(l => l.status === "PENDING").length

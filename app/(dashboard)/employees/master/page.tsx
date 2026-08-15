@@ -675,7 +675,7 @@ export default function EmployeeMasterPage() {
                 console.error("Failed to fetch sites", error)
             }
         }
-        if (status === "authenticated") fetchSites()
+        fetchSites()
     }, [status])
 
     // Removed branches derivation

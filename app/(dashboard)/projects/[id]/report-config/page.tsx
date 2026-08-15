@@ -54,7 +54,7 @@ export default function ReportConfigPage() {
                 setLoading(false)
             }
         }
-        if (status === "authenticated") load()
+        load()
     }, [projectId, status])
 
     const toggleField = (fieldId: string) => {
