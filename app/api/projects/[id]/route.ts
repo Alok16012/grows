@@ -23,7 +23,9 @@ export async function GET(
             include: {
                 site: { select: { id: true, name: true, code: true, city: true } },
                 projectManagers: { select: { managerId: true } },
-                assignments: { where: { status: "active" }, select: { inspectionBoyId: true } },
+                // Same rule as the projects grid: completed assignments still
+                // count as team; only "inactive" (removed) drops someone.
+                assignments: { where: { status: { not: "inactive" } }, select: { inspectionBoyId: true } },
             },
         })
 
@@ -136,17 +138,27 @@ export async function PUT(
         if (Array.isArray(inspectorIds) && actorId) {
             try {
                 const desired = new Set<string>(inspectorIds)
-                const active = await prisma.assignment.findMany({
-                    where: { projectId, status: "active" },
-                    select: { id: true, inspectionBoyId: true },
+                const existing = await prisma.assignment.findMany({
+                    where: { projectId, status: { not: "inactive" } },
+                    select: { id: true, inspectionBoyId: true, status: true },
                 })
-                const activeIds = new Set(active.map((a) => a.inspectionBoyId))
-                const toAdd = inspectorIds.filter((id: string) => !activeIds.has(id))
+                const active = existing.filter((a) => a.status === "active")
+                // Compare against EVERY non-inactive member, not just active
+                // ones. The edit form now prefills completed members too, so
+                // diffing on active alone would mint a fresh assignment for each
+                // of them on any unrelated save (a rename re-assigning the whole
+                // finished team). Giving someone a NEW round of work is the
+                // Assignments screen's job, not a side effect of editing.
+                const existingIds = new Set(existing.map((a) => a.inspectionBoyId))
+                const toAdd = inspectorIds.filter((id: string) => !existingIds.has(id))
                 for (const inspectionBoyId of toAdd) {
                     await prisma.assignment.create({
                         data: { projectId, inspectionBoyId, assignedBy: actorId, status: "active" },
                     })
                 }
+                // Removal still only ends OPEN assignments. Unchecking someone
+                // whose assignment already completed changes nothing — finished
+                // work keeps them in the team history.
                 const toRemove = active.filter((a) => !desired.has(a.inspectionBoyId))
                 for (const a of toRemove) {
                     const inspCount = await prisma.inspection.count({ where: { assignmentId: a.id } })

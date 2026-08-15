@@ -28,7 +28,13 @@ export async function GET(req: Request) {
                 // the projects grid team avatars) can show/pre-fill them.
                 projectManagers: { select: { managerId: true, manager: { select: { id: true, name: true } } } },
                 assignments: {
-                    where: { status: "active" },
+                    // Team membership survives the work being finished: an
+                    // approved inspection marks the assignment "completed", and
+                    // filtering on "active" here made the inspector vanish from
+                    // the project card the moment their report was approved.
+                    // Only "inactive" — a deliberate removal from the project —
+                    // takes someone off the team.
+                    where: { status: { not: "inactive" } },
                     select: { inspectionBoyId: true, inspectionBoy: { select: { id: true, name: true } } },
                 },
             },
