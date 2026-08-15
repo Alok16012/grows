@@ -64,6 +64,16 @@ const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030]
 // the exported sheet.
 const normalizeHeader = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "")
 
+// Monday–Sunday bounds of the week containing the given local date.
+function weekBoundsOf(isoDate: string): { start: string; end: string } {
+    const d = new Date(isoDate + "T00:00:00")
+    const toMonday = (d.getDay() + 6) % 7
+    const start = new Date(d); start.setDate(d.getDate() - toMonday)
+    const end = new Date(start); end.setDate(start.getDate() + 6)
+    const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
+    return { start: iso(start), end: iso(end) }
+}
+
 function useCountUp(target: number, duration = 1000) {
     const [value, setValue] = useState(0)
 
@@ -159,13 +169,17 @@ export default function ReportsPage() {
     const now = new Date()
     const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
     const [selectedYear, setSelectedYear] = useState(now.getFullYear())
-    const [dateFilterMode, setDateFilterMode] = useState<"month" | "single" | "range">("month")
+    const [dateFilterMode, setDateFilterMode] = useState<"month" | "week" | "single" | "range">("month")
     // Local calendar date, not UTC. toISOString() rolls over at 00:00 UTC, so for
     // IST users between midnight and 05:30 it yields yesterday — which the date
     // inputs then enforce as `max`, blocking selection of today.
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
     const [dateFrom, setDateFrom] = useState(todayStr)
     const [dateTo, setDateTo] = useState(todayStr)
+    // Week mode: any date inside the wanted week; the filter snaps it to
+    // Monday–Sunday. Kept separate from dateFrom/dateTo so switching between
+    // modes never clobbers the other modes' selections.
+    const [weekAnchor, setWeekAnchor] = useState(todayStr)
     const [mounted, setMounted] = useState(false)
     const [selectedSiteId, setSelectedSiteId] = useState("all")
     const [selectedProjectId, setSelectedProjectId] = useState("all")
@@ -276,6 +290,10 @@ export default function ReportsPage() {
             if (dateFilterMode === "month") {
                 params.set("month", String(selectedMonth))
                 params.set("year", String(selectedYear))
+            } else if (dateFilterMode === "week") {
+                const w = weekBoundsOf(weekAnchor)
+                params.set("dateFrom", w.start)
+                params.set("dateTo", w.end)
             } else if (dateFilterMode === "single") {
                 params.set("dateFrom", dateFrom)
                 params.set("dateTo", dateFrom)
@@ -304,7 +322,7 @@ export default function ReportsPage() {
         } finally {
             setLoading(false)
         }
-    }, [selectedMonth, selectedYear, dateFilterMode, dateFrom, dateTo, selectedSiteId, selectedProjectId, selectedInspectorId])
+    }, [selectedMonth, selectedYear, dateFilterMode, dateFrom, dateTo, weekAnchor, selectedSiteId, selectedProjectId, selectedInspectorId])
 
     useEffect(() => {
         fetchReport()
@@ -354,9 +372,11 @@ export default function ReportsPage() {
     // actually filtered to a single day or a custom range.
     const periodLabel = dateFilterMode === "month"
         ? `${MONTHS[selectedMonth - 1]} ${selectedYear}`
-        : dateFilterMode === "single"
-            ? dateFrom
-            : `${dateFrom} to ${dateTo}`
+        : dateFilterMode === "week"
+            ? `Week ${weekBoundsOf(weekAnchor).start} to ${weekBoundsOf(weekAnchor).end}`
+            : dateFilterMode === "single"
+                ? dateFrom
+                : `${dateFrom} to ${dateTo}`
     const periodSlug = periodLabel.replace(/\s+/g, "")
 
     const handleExportExcel = async () => {
@@ -594,7 +614,7 @@ export default function ReportsPage() {
                         <div className="flex items-center justify-between">
                             <label className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[0.6px]">Date Filter</label>
                             <div className="flex bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] p-[2px] gap-[2px]">
-                                {(["month", "single", "range"] as const).map(mode => (
+                                {(["month", "week", "single", "range"] as const).map(mode => (
                                     <button
                                         key={mode}
                                         onClick={() => setDateFilterMode(mode)}
@@ -603,7 +623,7 @@ export default function ReportsPage() {
                                             : "text-[#6b6860] hover:text-[#1a1a18]"
                                             }`}
                                     >
-                                        {mode === "month" ? "Month" : mode === "single" ? "Single Day" : "Date Range"}
+                                        {mode === "month" ? "Month" : mode === "week" ? "Week" : mode === "single" ? "Single Day" : "Date Range"}
                                     </button>
                                 ))}
                             </div>
@@ -632,6 +652,36 @@ export default function ReportsPage() {
                                     </select>
                                     <ChevronRight className="absolute right-[12px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none rotate-90" />
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Week mode — pick any day, the filter snaps to that Mon–Sun week */}
+                        {dateFilterMode === "week" && (
+                            <div className="flex items-center gap-[8px]">
+                                <button
+                                    type="button"
+                                    aria-label="Previous week"
+                                    onClick={() => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() - 7); setWeekAnchor(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`) }}
+                                    className="px-[8px] py-[7px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[#6b6860] hover:text-[#1a1a18] transition-colors"
+                                >‹</button>
+                                <div className="flex-1">
+                                    <input
+                                        type="date"
+                                        value={weekAnchor}
+                                        max={todayStr}
+                                        onChange={e => e.target.value && setWeekAnchor(e.target.value)}
+                                        className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[8px_12px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all focus:border-[#1a9e6e] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
+                                    />
+                                    <p className="text-[10.5px] text-[#9e9b95] mt-[3px] font-[600]">
+                                        {(() => { const w = weekBoundsOf(weekAnchor); return `${format(new Date(w.start + "T00:00:00"), "EEE d MMM")} – ${format(new Date(w.end + "T00:00:00"), "EEE d MMM yyyy")}` })()}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    aria-label="Next week"
+                                    onClick={() => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() + 7); const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; if (iso <= todayStr) setWeekAnchor(iso) }}
+                                    className="px-[8px] py-[7px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[#6b6860] hover:text-[#1a1a18] transition-colors"
+                                >›</button>
                             </div>
                         )}
 
