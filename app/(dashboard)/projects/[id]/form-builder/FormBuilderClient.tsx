@@ -35,8 +35,12 @@ type FormField = {
     defaultValue: string | null
     isRequired: boolean
     category: string
+    reportRole?: string | null
     displayOrder: number
 }
+
+// eslint-disable-next-line import/first
+import { REPORT_ROLES } from "@/lib/report-roles"
 
 const FIELD_TYPES: { value: FieldType; label: string; icon: React.ReactNode }[] = [
     { value: "text", label: "Text", icon: <AlignLeft className="h-[12px] w-[12px]" /> },
@@ -61,10 +65,17 @@ function FieldEditorForm({ initialData, onSave, onCancel, saving }: FieldEditorF
     const [required, setRequired] = useState(initialData?.isRequired || false)
     const [options, setOptions] = useState(initialData?.options || "")
     const [defaultValue, setDefaultValue] = useState(initialData?.defaultValue || "")
+    const [reportRole, setReportRole] = useState(initialData?.reportRole ?? "")
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        onSave({ fieldLabel: label, fieldType: type, isRequired: required, options: type === "dropdown" ? options : null, defaultValue: defaultValue || null })
+        onSave({
+            fieldLabel: label, fieldType: type, isRequired: required,
+            options: type === "dropdown" ? options : null,
+            defaultValue: defaultValue || null,
+            // "" = infer from the field name (legacy behaviour); the API stores null.
+            reportRole: reportRole || null,
+        })
     }
 
     return (
@@ -90,6 +101,22 @@ function FieldEditorForm({ initialData, onSave, onCancel, saving }: FieldEditorF
                         <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
                 </select>
+            </div>
+            <div>
+                <label className="block text-[12px] font-medium text-[#1a1a18] mb-[5px]">Use in reports as</label>
+                <select
+                    value={reportRole}
+                    onChange={e => setReportRole(e.target.value)}
+                    className="w-full p-[8px_12px] bg-white border border-[#e8e6e1] rounded-[8px] text-[13px] text-[#1a1a18] outline-none focus:border-[#1a9e6e] transition-colors appearance-none"
+                >
+                    <option value="">Auto (match by field name)</option>
+                    {REPORT_ROLES.map(r => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                </select>
+                <p className="text-[11px] text-[#9e9b95] mt-[4px]">
+                    Locks this field to a chart dimension, so renaming it never breaks the reports.
+                </p>
             </div>
             {type === "dropdown" && (
                 <div>

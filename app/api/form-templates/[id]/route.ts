@@ -1,7 +1,8 @@
 
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
+import prisma, { ensureProjectSchema } from "@/lib/prisma"
+import { REPORT_ROLE_VALUES } from "@/lib/report-roles"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 
@@ -16,10 +17,11 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category } = body
+        const { fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category, reportRole } = body
 
         const allowedCategories = ["FIXED", "DEFECT", "AUTO"]
 
+        await ensureProjectSchema()
         const field = await prisma.formTemplate.update({
             where: { id: params.id },
             data: {
@@ -30,6 +32,9 @@ export async function PUT(
                 ...(isRequired !== undefined && { isRequired }),
                 ...(displayOrder !== undefined && { displayOrder }),
                 ...(allowedCategories.includes(category) && { category }),
+                // null explicitly clears the mapping (back to infer-from-label);
+                // unknown strings are ignored rather than stored.
+                ...(reportRole === null || REPORT_ROLE_VALUES.includes(reportRole) ? { reportRole } : {}),
             },
         })
 

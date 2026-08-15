@@ -90,6 +90,10 @@ async function runProjectSchemaHeal(): Promise<void> {
                 ADD COLUMN IF NOT EXISTS "notes"       TEXT,
                 ADD COLUMN IF NOT EXISTS "isMultiPart" BOOLEAN NOT NULL DEFAULT false
         `)
+        await (prisma as any).$executeRawUnsafe(`
+            ALTER TABLE "FormTemplate"
+                ADD COLUMN IF NOT EXISTS "reportRole" TEXT
+        `)
         // Company/Branch concepts are retired — projects hang off Sites and
         // sites/departments stand alone. Legacy columns stay but become
         // nullable so new rows never need them. DROP NOT NULL is idempotent.

@@ -1,7 +1,8 @@
 
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
+import prisma, { ensureProjectSchema } from "@/lib/prisma"
+import { REPORT_ROLE_VALUES } from "@/lib/report-roles"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 
@@ -15,6 +16,10 @@ export async function GET(req: Request) {
 
         if (!projectId) return new NextResponse("projectId is required", { status: 400 })
 
+        // Heals the reportRole column on prod, where migrations are manual —
+        // findMany selects every column and would 500 without it. Memoized, so
+        // this is free after the first call.
+        await ensureProjectSchema()
         const fields = await prisma.formTemplate.findMany({
             where: { projectId },
             orderBy: { displayOrder: "asc" },
@@ -35,7 +40,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { projectId, fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category } = body
+        const { projectId, fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category, reportRole } = body
 
         if (!projectId || !fieldLabel || !fieldType) {
             return new NextResponse("projectId, fieldLabel, and fieldType are required", { status: 400 })
@@ -45,7 +50,10 @@ export async function POST(req: Request) {
         // back to FIXED so a stray value can't land a field in an unknown bucket.
         const allowedCategories = ["FIXED", "DEFECT", "AUTO"]
         const safeCategory = allowedCategories.includes(category) ? category : "FIXED"
+        // Unknown role values are stored as null (= infer from the label).
+        const safeReportRole = REPORT_ROLE_VALUES.includes(reportRole) ? reportRole : null
 
+        await ensureProjectSchema()
         const field = await prisma.formTemplate.create({
             data: {
                 projectId,
@@ -56,6 +64,7 @@ export async function POST(req: Request) {
                 isRequired: isRequired ?? false,
                 displayOrder: displayOrder ?? 0,
                 category: safeCategory,
+                reportRole: safeReportRole,
             },
         })
 

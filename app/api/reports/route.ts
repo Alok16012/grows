@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
+import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { isSelfScopedInspector } from "@/lib/permissions"
@@ -74,6 +74,11 @@ export async function GET(req: Request) {
     }
 
     try {
+        // Heals FormTemplate.reportRole on prod (migrations are manual there);
+        // the `field` include below selects every column. Memoized — free after
+        // the first call.
+        await ensureProjectSchema()
+
         // Fetch all relevant inspections with full relations
         const inspections = await prisma.inspection.findMany({
             where: {
@@ -154,6 +159,21 @@ export async function GET(req: Request) {
 
             for (const r of responses) {
                 const label = r.field.fieldLabel
+                // Explicit mapping set in the Form Builder wins outright — a
+                // renamed field keeps feeding its chart. Only unmapped fields
+                // fall through to the label-keyword guessing below, and a
+                // mapped field never leaks into another dimension via its name.
+                const role = (r.field as { reportRole?: string | null }).reportRole ?? null
+                if (role) {
+                    const val = r.value || ""
+                    if (role === "PART_NAME"   && val) partName = val
+                    if (role === "LOCATION"    && val) location = val
+                    if (role === "INSPECTED") inspected = parseNum(val)
+                    if (role === "ACCEPTED")  accepted  = parseNum(val)
+                    if (role === "REWORK")    rework    = parseNum(val)
+                    if (role === "REJECTED")  rejected  = parseNum(val)
+                    continue
+                }
                 const val = r.value || ""
 
                 if (matchesLabel(label, ["part name", "partname", "part"])) {
@@ -292,6 +312,19 @@ export async function GET(req: Request) {
                     const rawLabel = resp.field.fieldLabel
                     const label = rawLabel.toLowerCase()
                     const val = resp.value || ""
+                    const role = (resp.field as { reportRole?: string | null }).reportRole ?? null
+                    if (role) {
+                        if (role === "PART_NAME"   && val) r.partName   = val
+                        if (role === "PART_NUMBER" && val) r.partNumber = val
+                        if (role === "SHIFT"       && val) r.shift      = val
+                        if (role === "LOCATION"    && val) r.location   = val
+                        if (role === "INSPECTED") r.inspected = parseNum(val)
+                        if (role === "ACCEPTED")  r.accepted  = parseNum(val)
+                        if (role === "REWORK")    r.rework    = parseNum(val)
+                        if (role === "REJECTED")  r.rejected  = parseNum(val)
+                        if (val !== "") r.fields[rawLabel] = val
+                        continue
+                    }
                     if (label.includes("part name") || label.includes("partname")) r.partName = val
                     if (label.includes("part number") || label.includes("part no") || label.includes("partnumber")) r.partNumber = val
                     // "Shift Location" is a location field, not a shift field.

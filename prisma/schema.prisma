@@ -206,6 +206,12 @@ model FormTemplate {
   defaultValue String?
   isRequired   Boolean          @default(false)
   category     String           @default("FIXED")
+  // What this field means to the report charts: PART_NAME, PART_NUMBER,
+  // LOCATION, SHIFT, INSPECTED, ACCEPTED, REWORK, REJECTED. Null = infer from
+  // the label, which is how reports always worked — but renaming a label then
+  // silently unmapped the field and every chart fell back to "Main"/"General".
+  // (Created in prod at runtime via ensureProjectSchema — migrations are manual.)
+  reportRole   String?
   displayOrder Int              @default(0)
   createdAt    DateTime         @default(now())
   project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
