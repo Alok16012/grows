@@ -198,6 +198,35 @@ export default function ReportsPage() {
     const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
     // Column visibility
     const ALL_COLS = ["date", "inspector", "site", "project", "part", "location", "inspected", "accepted", "rework", "rejected"] as const
+
+    // Inspector options narrowed to the chosen site/project. The full list is a
+    // company-wide directory; once a site or project is picked, only the people
+    // actually on those projects' teams belong in the dropdown. Built from the
+    // projects response (team = managers + inspectors; inspectorIds tells the
+    // two apart), which also covers custom-role inspectors that the base-role
+    // directory query misses.
+    const scopedInspectors = useMemo(() => {
+        if (selectedSiteId === "all" || projects.length === 0) return inspectors
+        const source = selectedProjectId !== "all"
+            ? projects.filter((p: any) => p.id === selectedProjectId)
+            : projects
+        const seen = new Map<string, string>()
+        source.forEach((p: any) => {
+            const ids = new Set<string>(p.inspectorIds ?? [])
+            ;(p.team ?? []).forEach((m: { id: string; name: string }) => {
+                if (ids.has(m.id) && !seen.has(m.id)) seen.set(m.id, m.name)
+            })
+        })
+        return Array.from(seen, ([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+    }, [inspectors, projects, selectedSiteId, selectedProjectId])
+
+    // Keep the selection valid when the list narrows.
+    useEffect(() => {
+        if (selectedInspectorId !== "all" && !scopedInspectors.some(i => i.id === selectedInspectorId)) {
+            setSelectedInspectorId("all")
+        }
+    }, [scopedInspectors, selectedInspectorId])
     type ColKey = typeof ALL_COLS[number]
     const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(new Set(ALL_COLS))
     const [showColMenu, setShowColMenu] = useState(false)
@@ -538,7 +567,7 @@ export default function ReportsPage() {
                     {[
                         { label: "Site", value: selectedSiteId, options: sites, setter: setSelectedSiteId, allLabel: "Global View" },
                         { label: "Project", value: selectedProjectId, options: projects, setter: setSelectedProjectId, allLabel: "All Projects", disabled: selectedSiteId === "all" },
-                        { label: "Inspector", value: selectedInspectorId, options: inspectors, setter: setSelectedInspectorId, allLabel: "All Inspectors" },
+                        { label: "Inspector", value: selectedInspectorId, options: scopedInspectors, setter: setSelectedInspectorId, allLabel: "All Inspectors" },
                     ].map((filter, idx) => (
                         <div key={idx} className="flex flex-col">
                             <label className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[0.6px] mb-[5px]">{filter.label}</label>
