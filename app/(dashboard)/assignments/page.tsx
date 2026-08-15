@@ -102,11 +102,12 @@ function PersonRow({ person, checked, onToggle }: { person: Person; checked: boo
     )
 }
 
-function RowMenu({ assignment, onDelete, onStopRecurrence, onClose }: {
+function RowMenu({ assignment, onDelete, onStopRecurrence, onClose, onToggleMultiPart }: {
     assignment: Assignment
     onDelete: () => void
     onStopRecurrence: () => void
     onClose: () => void
+    onToggleMultiPart: () => void
 }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
@@ -127,6 +128,12 @@ function RowMenu({ assignment, onDelete, onStopRecurrence, onClose }: {
             </button>
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-20 py-1 overflow-hidden">
+                    {assignment.status !== "completed" && (
+                        <button onClick={() => { onToggleMultiPart(); setOpen(false) }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                            <Layers size={13} /> {assignment.isMultiPart ? "Make One-time" : "Convert to Multi-part"}
+                        </button>
+                    )}
                     {assignment.isMultiPart && assignment.status !== "completed" && (
                         <button onClick={() => { onClose(); setOpen(false) }}
                             className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
@@ -330,6 +337,22 @@ export default function AssignmentsPage() {
         } catch {
             alert("An error occurred while deleting")
         }
+    }
+
+    // Existing assignments can be flipped after the fact — the checkbox only
+    // exists on the create wizard, so anything made before the feature (or via
+    // the project Assign Team flow, which has no such option) was stuck as
+    // one-time with no way to change it.
+    const handleToggleMultiPart = async (a: Assignment) => {
+        const next = !a.isMultiPart
+        try {
+            const res = await fetch(`/api/assignments/${a.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isMultiPart: next }),
+            })
+            if (res.ok) setAssignments(prev => prev.map(x => x.id === a.id ? { ...x, isMultiPart: next } : x))
+        } catch { /* ignore */ }
     }
 
     // Closing is a manager action for multi-part assignments: approving one part
@@ -813,7 +836,7 @@ export default function AssignmentsPage() {
                                                                 <Eye size={13} />
                                                             </button>
                                                             {canManageAssignments && (
-                                                                <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} />
+                                                                <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
                                                             )}
                                                         </div>
                                                     </td>
