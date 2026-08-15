@@ -347,7 +347,15 @@ export default function JoinPage() {
                 const data = await res.json()
                 if (!res.ok) {
                     const msg = data.message || data.error || "Submission failed"
-                    setErrors({ firstName: msg })
+                    // Show the error under the field it is actually about, on the
+                    // tab that holds it. This used to pin every server error under
+                    // First Name — so "email already registered" appeared beneath
+                    // a perfectly valid name, and since submission happens from
+                    // the Documents tab, often on a tab the user wasn't even on.
+                    const lower = String(msg).toLowerCase()
+                    const field = lower.includes("email") ? "email" : lower.includes("phone") ? "phone" : "firstName"
+                    setErrors({ [field]: msg })
+                    setTab("personal")
                     setLoading(false)
                     return
                 }

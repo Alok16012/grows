@@ -122,13 +122,19 @@ export async function POST(req: Request) {
         // Store and dedupe on the same canonical form of the number.
         const normalizedPhone = normalizePhone(phone)
 
-        // Check if phone or email already exists
+        // Check if phone or email already exists. Case-insensitive on email so
+        // Sunil@x.com can't slip past a record stored as sunil@x.com. The
+        // messages tell the candidate what to DO — a bare "already registered"
+        // reads like a form bug and invites resubmitting; and being a public
+        // endpoint, they deliberately reveal nothing about the existing record.
         if (email?.trim()) {
-            const byEmail = await prisma.employee.findFirst({ where: { email: email.trim() } })
-            if (byEmail) return NextResponse.json({ error: "This email is already registered" }, { status: 409 })
+            const byEmail = await prisma.employee.findFirst({
+                where: { email: { equals: email.trim(), mode: "insensitive" } },
+            })
+            if (byEmail) return NextResponse.json({ error: "This email is already registered. If you submitted this form earlier, do not register again — contact HR to continue your onboarding." }, { status: 409 })
         }
         const byPhone = await prisma.employee.findFirst({ where: { phone: normalizedPhone } })
-        if (byPhone) return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 })
+        if (byPhone) return NextResponse.json({ error: "This phone number is already registered. If you submitted this form earlier, do not register again — contact HR to continue your onboarding." }, { status: 409 })
 
         // Generate onboarding token for the external form link
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
