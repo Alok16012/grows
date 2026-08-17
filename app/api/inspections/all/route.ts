@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
+import { inspectionScopeForApprover } from "@/lib/approval-scope"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -19,7 +20,11 @@ export async function GET(req: Request) {
         const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "50")))
         const skip = (page - 1) * limit
 
-        const where: any = {}
+        // Only the projects this approver manages. Without it, holding an
+        // approvals permission showed the whole company's pending queue.
+        const scope = await inspectionScopeForApprover(session)
+
+        const where: any = { ...(scope ?? {}) }
         if (status && status !== "all") {
             where.status = status
         }
@@ -61,10 +66,10 @@ export async function GET(req: Request) {
 
         if (withCounts) {
             queries.push(
-                prisma.inspection.count({ where: { status: "pending" } }),
-                prisma.inspection.count({ where: { status: "approved" } }),
-                prisma.inspection.count({ where: { status: "rejected" } }),
-                prisma.inspection.count({})
+                prisma.inspection.count({ where: { ...(scope ?? {}), status: "pending" } }),
+                prisma.inspection.count({ where: { ...(scope ?? {}), status: "approved" } }),
+                prisma.inspection.count({ where: { ...(scope ?? {}), status: "rejected" } }),
+                prisma.inspection.count({ where: { ...(scope ?? {}) } })
             )
         }
 

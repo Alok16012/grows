@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
+import { canApproveProject } from "@/lib/approval-scope"
 
 export async function GET(
     req: Request,
@@ -44,6 +45,12 @@ export async function GET(
             return NextResponse.json({ error: "Inspection not found" }, { status: 404 })
         }
 
+        // Filtering the queue is not enough on its own — the detail page is
+        // reachable by id, so the same rule has to hold here.
+        if (!(await canApproveProject(session, inspection.assignment?.project?.id))) {
+            return NextResponse.json({ error: "This inspection belongs to a project you don't manage" }, { status: 403 })
+        }
+
         return NextResponse.json(inspection)
     } catch (error) {
         console.error("GET_APPROVAL_DETAIL_ERROR", error)
@@ -74,6 +81,12 @@ export async function PATCH(
 
         if (!inspection) {
             return NextResponse.json({ error: "Inspection not found" }, { status: 404 })
+        }
+
+        // The decision itself is the thing that must be scoped: a hidden row is
+        // still approvable by id if only the list is filtered.
+        if (!(await canApproveProject(session, inspection.assignment?.project?.id))) {
+            return NextResponse.json({ error: "You can only approve inspections for projects you manage" }, { status: 403 })
         }
 
         if (inspection.status !== "pending") {
