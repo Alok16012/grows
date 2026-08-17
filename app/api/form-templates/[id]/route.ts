@@ -17,7 +17,7 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category, reportRole } = body
+        const { fieldLabel, fieldType, options, defaultValue, isRequired, displayOrder, category, reportRole, isHidden } = body
 
         const allowedCategories = ["FIXED", "DEFECT", "AUTO"]
 
@@ -35,6 +35,7 @@ export async function PUT(
                 // null explicitly clears the mapping (back to infer-from-label);
                 // unknown strings are ignored rather than stored.
                 ...(reportRole === null || REPORT_ROLE_VALUES.includes(reportRole) ? { reportRole } : {}),
+                ...(isHidden !== undefined && { isHidden: !!isHidden }),
             },
         })
 

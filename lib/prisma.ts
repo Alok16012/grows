@@ -92,7 +92,8 @@ async function runProjectSchemaHeal(): Promise<void> {
         `)
         await (prisma as any).$executeRawUnsafe(`
             ALTER TABLE "FormTemplate"
-                ADD COLUMN IF NOT EXISTS "reportRole" TEXT
+                ADD COLUMN IF NOT EXISTS "reportRole" TEXT,
+                ADD COLUMN IF NOT EXISTS "isHidden"   BOOLEAN NOT NULL DEFAULT false
         `)
         // Company/Branch concepts are retired — projects hang off Sites and
         // sites/departments stand alone. Legacy columns stay but become

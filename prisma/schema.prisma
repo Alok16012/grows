@@ -212,6 +212,12 @@ model FormTemplate {
   // silently unmapped the field and every chart fell back to "Main"/"General".
   // (Created in prod at runtime via ensureProjectSchema — migrations are manual.)
   reportRole   String?
+  // Retire a field WITHOUT destroying history. Deleting a FormTemplate cascades
+  // to InspectionData, wiping that field's answer from every past inspection, so
+  // "we don't collect this any more" must not mean "delete". Hidden fields stop
+  // appearing on the inspection form; answers already recorded stay readable in
+  // reports and PDFs.
+  isHidden     Boolean          @default(false)
   displayOrder Int              @default(0)
   createdAt    DateTime         @default(now())
   project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)

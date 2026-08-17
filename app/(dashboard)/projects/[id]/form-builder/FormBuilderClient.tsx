@@ -21,7 +21,8 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import {
     Plus, GripVertical, Pencil, Trash2, X, Save, Loader2,
-    AlignLeft, Hash, Calendar, ChevronDown, CheckSquare, FileText, FileUp, Copy, ChevronLeft
+    AlignLeft, Hash, Calendar, ChevronDown, CheckSquare, FileText, FileUp, Copy, ChevronLeft,
+    Eye, EyeOff
 } from "lucide-react"
 
 type FieldType = "text" | "number" | "date" | "dropdown" | "checkbox" | "textarea" | "file"
@@ -36,6 +37,7 @@ type FormField = {
     isRequired: boolean
     category: string
     reportRole?: string | null
+    isHidden?: boolean
     displayOrder: number
 }
 
@@ -183,7 +185,7 @@ function FieldEditorForm({ initialData, onSave, onCancel, saving }: FieldEditorF
     )
 }
 
-function SortableFieldRow({ field, onEdit, onDelete, isDeleting }: { field: FormField, onEdit: () => void, onDelete: () => void, isDeleting: boolean }) {
+function SortableFieldRow({ field, onEdit, onDelete, onToggleHidden, isDeleting }: { field: FormField, onEdit: () => void, onDelete: () => void, onToggleHidden: () => void, isDeleting: boolean }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: field.id,
         disabled: field.category === "AUTO"
@@ -207,7 +209,7 @@ function SortableFieldRow({ field, onEdit, onDelete, isDeleting }: { field: Form
     else if (isAuto) catBadge = "bg-[#e8f7f1] text-[#0d6b4a]"
 
     return (
-        <div ref={setNodeRef} style={style} className="flex items-center gap-[10px] p-[10px_14px] bg-white border-b border-[#e8e6e1] hover:bg-[#f9f8f5] transition-colors">
+        <div ref={setNodeRef} style={style} className={`flex items-center gap-[10px] p-[10px_14px] border-b border-[#e8e6e1] hover:bg-[#f9f8f5] transition-colors ${field.isHidden ? "bg-[#f9f8f5]" : "bg-white"}`}>
             {!isAuto ? (
                 <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-[#9e9b95] opacity-50 hover:opacity-100 touch-none shrink-0 w-[16px] flex justify-center">
                     <GripVertical className="h-[14px] w-[14px]" />
@@ -217,8 +219,11 @@ function SortableFieldRow({ field, onEdit, onDelete, isDeleting }: { field: Form
             )}
 
             <div className="flex-1 min-w-0 flex items-center pr-[10px]">
-                <span className="text-[12.5px] font-[500] text-[#1a1a18] truncate">{field.fieldLabel}</span>
-                {field.isRequired && <span className="text-[#dc2626] ml-[4px] text-[12px]">*</span>}
+                <span className={`text-[12.5px] font-[500] truncate ${field.isHidden ? "text-[#9e9b95] line-through" : "text-[#1a1a18]"}`}>{field.fieldLabel}</span>
+                {field.isRequired && !field.isHidden && <span className="text-[#dc2626] ml-[4px] text-[12px]">*</span>}
+                {field.isHidden && (
+                    <span className="ml-[6px] text-[10px] font-[700] rounded-[20px] px-[7px] py-[2px] bg-[#f3f4f6] text-[#6b7280] shrink-0">HIDDEN</span>
+                )}
             </div>
 
             <div className="flex items-center gap-[6px] shrink-0">
@@ -231,6 +236,15 @@ function SortableFieldRow({ field, onEdit, onDelete, isDeleting }: { field: Form
             </div>
 
             <div className="flex gap-[2px] shrink-0 ml-[4px]">
+                {!isAuto && (
+                    <button
+                        onClick={onToggleHidden}
+                        title={field.isHidden ? "Show on the inspection form" : "Hide from the inspection form (answers already recorded are kept)"}
+                        className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[#9e9b95] hover:bg-[#f9f8f5] hover:text-[#1a1a18] transition-colors"
+                    >
+                        {field.isHidden ? <EyeOff className="h-[14px] w-[14px]" /> : <Eye className="h-[14px] w-[14px]" />}
+                    </button>
+                )}
                 {!isAuto && (
                     <button onClick={onEdit} className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[#9e9b95] hover:bg-[#f9f8f5] hover:text-[#1a1a18] transition-colors">
                         <Pencil className="h-[14px] w-[14px]" />
@@ -346,6 +360,25 @@ export default function FormBuilderClient({
         finally { setSaving(false) }
     }
 
+    // Retire / restore a field. Deliberately NOT delete: InspectionData cascades
+    // on fieldId, so deleting erases that field's answer from every inspection
+    // ever submitted. Hiding keeps the history and stops the question being asked.
+    const handleToggleHidden = async (field: FormField) => {
+        const next = !field.isHidden
+        setFields(prev => prev.map(f => f.id === field.id ? { ...f, isHidden: next } : f))
+        try {
+            const res = await fetch(`/api/form-templates/${field.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isHidden: next }),
+            })
+            if (!res.ok) throw new Error()
+        } catch {
+            // Roll the optimistic flip back so the row never lies about the server.
+            setFields(prev => prev.map(f => f.id === field.id ? { ...f, isHidden: !next } : f))
+        }
+    }
+
     const handleDeleteField = async (id: string, label: string) => {
         if (!confirm(`Delete field "${label}"?`)) return
         setDeletingId(id)
@@ -453,6 +486,7 @@ export default function FormBuilderClient({
                                         field={field}
                                         onEdit={() => { setEditingId(field.id); setShowAddForm(false) }}
                                         onDelete={() => handleDeleteField(field.id, field.fieldLabel)}
+                                        onToggleHidden={() => handleToggleHidden(field)}
                                         isDeleting={deletingId === field.id}
                                     />
                                 )}

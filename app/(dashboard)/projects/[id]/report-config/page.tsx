@@ -125,7 +125,11 @@ export default function ReportConfigPage() {
                     <h2 className="text-[14px] font-semibold text-[#1a1a18]">PDF Report — Field Selection</h2>
                     <span className="ml-auto text-[11px] text-[#9e9b95]">{selectedFields.length}/{templates.length} fields included</span>
                 </div>
-                <p className="text-[12px] text-[#9e9b95] mb-4">Choose which fields appear in exported PDF reports for this project.</p>
+                <p className="text-[12px] text-[#9e9b95] mb-4">
+                    Choose which fields appear in the exported <b>PDF report</b> for this project. This does not
+                    change the inspection form itself — to stop a field being asked, hide it in the{" "}
+                    <Link href={`/projects/${projectId}/form-builder`} className="text-[#1a9e6e] hover:underline">Form Builder</Link>.
+                </p>
 
                 <div className="flex gap-2 mb-4">
                     <button onClick={() => setSelectedFields(templates.map(t => t.id))} className="text-[11px] text-[#1a9e6e] hover:underline">Select All</button>

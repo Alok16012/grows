@@ -235,6 +235,9 @@ export default function InspectionFormPage() {
         const defectIds: string[] = []
 
         templates.forEach(t => {
+            // Retired fields are not asked, so they must not feed the auto-calculated
+            // totals either — a hidden defect column would keep adding to the count.
+            if (t.isHidden) return
             const label = t.fieldLabel.toUpperCase().trim()
             fieldMap[label] = t.id
             if (t.category === "DEFECT") defectIds.push(t.id)
@@ -304,6 +307,9 @@ export default function InspectionFormPage() {
     const validateForm = () => {
         const newErrors: Record<string, string> = {}
         templates.forEach(t => {
+            // A hidden required field would make the form permanently
+            // unsubmittable: the error has no input to attach to.
+            if (t.isHidden) return
             if (t.isRequired && !responses[t.id]) {
                 newErrors[t.id] = "This field is required"
             }
@@ -319,8 +325,11 @@ export default function InspectionFormPage() {
         return true
     }
 
-    const fixedFields = templates.filter(t => t.category === "FIXED")
-    const defectFields = templates.filter(t => t.category === "DEFECT")
+    // Hidden fields are retired questions: kept so their past answers survive
+    // (deleting a field cascades and erases them), but no longer asked.
+    const visibleTemplates = templates.filter(t => !t.isHidden)
+    const fixedFields = visibleTemplates.filter(t => t.category === "FIXED")
+    const defectFields = visibleTemplates.filter(t => t.category === "DEFECT")
     const autoFields = templates.filter(t => t.category === "AUTO")
 
     // ── Step-wise wizard (payroll-style) ──────────────────────────────────────
