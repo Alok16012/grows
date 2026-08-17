@@ -8,7 +8,7 @@ import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
-    ComposedChart, Line, AreaChart, Area
+    ComposedChart, Line, AreaChart, Area, Legend
 } from "recharts"
 import {
     LayoutDashboard,
@@ -947,6 +947,32 @@ export default function ReportsPage() {
                                             </ResponsiveContainer>
                                         </div>
                                     ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[#9e9b95]">No locations data</div>}
+                                </div>
+                                {/* Inspector-wise comparison. The API has always aggregated this
+                                    (inspectorWise); nothing rendered it, so the one dimension a
+                                    quality lead actually reviews people on was missing from the
+                                    charts. Spans both columns so long names stay readable. */}
+                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card md:col-span-2">
+                                    <div className="flex items-center justify-between mb-[20px]">
+                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Inspector-Wise Comparison</h3>
+                                        <span className="text-[11px] font-[500] text-[#9e9b95]">{data.inspectorWise?.length ?? 0} inspectors</span>
+                                    </div>
+                                    {(data.inspectorWise?.length ?? 0) > 0 ? (
+                                        <div style={{ height: Math.max(240, (data.inspectorWise.length * 34) + 60) }} className="w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={data.inspectorWise} layout="vertical" margin={{ left: 20, right: 16 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                                                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                                                    <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} width={140} />
+                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
+                                                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                                                    <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
+                                                    <Bar dataKey="totalRework"   name="Rework"   stackId="a" fill={THEME.warning} />
+                                                    <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 4, 4, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No inspector data</div>}
                                 </div>
                             </div>
                         )}
