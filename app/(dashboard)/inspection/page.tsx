@@ -436,6 +436,12 @@ export default function InspectionDashboard() {
                                                         {a.recurrenceType === "daily" ? "📅 Daily" : "🗓️ Weekly"}
                                                     </span>
                                                 )}
+                                                {/* Whether an assignment is multi-part decides which list it belongs
+                                                    in, so say it on the card — otherwise "why has this closed after
+                                                    one part?" can only be answered by querying the database. */}
+                                                <span className={`text-[10.5px] font-[600] px-[7px] py-[2px] rounded-[20px] ${a.isMultiPart ? "bg-[#eef2ff] text-[#4338ca]" : "bg-[#f3f4f6] text-[#6b7280]"}`}>
+                                                    {a.isMultiPart ? `Multi-part · ${a.partCount ?? 1} filed` : "One-time"}
+                                                </span>
                                                 <span className={`text-[11px] font-[500] px-[10px] py-[3px] rounded-[20px] ${badge.cls}`}>{badge.label}</span>
                                                 <Link
                                                     href={`/inspection/${a.id}/form`}
