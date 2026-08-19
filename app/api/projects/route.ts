@@ -27,16 +27,10 @@ export async function GET(req: Request) {
                 // Current project members, so callers (e.g. the assignment wizard,
                 // the projects grid team avatars) can show/pre-fill them.
                 projectManagers: { select: { managerId: true, manager: { select: { id: true, name: true } } } },
-                assignments: {
-                    // Team membership survives the work being finished: an
-                    // approved inspection marks the assignment "completed", and
-                    // filtering on "active" here made the inspector vanish from
-                    // the project card the moment their report was approved.
-                    // Only "inactive" — a deliberate removal from the project —
-                    // takes someone off the team.
-                    where: { status: { not: "inactive" } },
-                    select: { inspectionBoyId: true, inspectionBoy: { select: { id: true, name: true } } },
-                },
+                // Membership, not work. Reading the team off Assignment rows tied
+                // "who is on this project" to "what has been handed out", so the
+                // team changed shape as work was issued and approved.
+                projectInspectors: { select: { inspectorId: true, inspector: { select: { id: true, name: true } } } },
             },
             orderBy: {
                 createdAt: "desc",
@@ -46,7 +40,7 @@ export async function GET(req: Request) {
         // Flatten member ids + display names alongside the raw relations.
         const withMembers = projects.map((p) => {
             const inspectorNames = Array.from(
-                new Map(p.assignments.map((a) => [a.inspectionBoyId, a.inspectionBoy?.name ?? ""])).entries()
+                new Map(p.projectInspectors.map((pi) => [pi.inspectorId, pi.inspector?.name ?? ""])).entries()
             )
             return {
                 ...p,
@@ -151,15 +145,20 @@ export async function POST(req: Request) {
         }
 
         try {
+            // Record membership only. This used to create an active Assignment per
+            // inspector, so creating a project silently issued work to everyone on
+            // its team — the job appeared in their workspace before anyone had
+            // decided what, or when, they were inspecting. Work is issued from the
+            // Assignments screen.
             const insIds: string[] = Array.isArray(inspectorIds) ? inspectorIds : []
-            for (const inspectionBoyId of insIds) {
-                await prisma.assignment.create({
-                    data: {
+            if (insIds.length > 0) {
+                await prisma.projectInspector.createMany({
+                    data: insIds.map((inspectorId) => ({
                         projectId: project.id,
-                        inspectionBoyId,
+                        inspectorId,
                         assignedBy: actorId!,
-                        status: "active",
-                    },
+                    })),
+                    skipDuplicates: true,
                 })
             }
         } catch (insErr) {

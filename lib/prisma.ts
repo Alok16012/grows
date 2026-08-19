@@ -95,6 +95,51 @@ async function runProjectSchemaHeal(): Promise<void> {
                 ADD COLUMN IF NOT EXISTS "reportRole" TEXT,
                 ADD COLUMN IF NOT EXISTS "isHidden"   BOOLEAN NOT NULL DEFAULT false
         `)
+        // Inspector membership table. Managers always had ProjectManager;
+        // inspectors' membership used to be inferred from Assignment rows, which
+        // is why putting someone on a project's Team handed them work. Created
+        // here because prod migrations are manual.
+        await (prisma as any).$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "ProjectInspector" (
+                "id"          TEXT NOT NULL,
+                "projectId"   TEXT NOT NULL,
+                "inspectorId" TEXT NOT NULL,
+                "assignedBy"  TEXT NOT NULL,
+                "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "ProjectInspector_pkey" PRIMARY KEY ("id")
+            )
+        `)
+        await (prisma as any).$executeRawUnsafe(`
+            CREATE UNIQUE INDEX IF NOT EXISTS "ProjectInspector_projectId_inspectorId_key"
+                ON "ProjectInspector"("projectId", "inspectorId")
+        `)
+        await (prisma as any).$executeRawUnsafe(`
+            CREATE INDEX IF NOT EXISTS "ProjectInspector_inspectorId_idx"
+                ON "ProjectInspector"("inspectorId")
+        `)
+        // Foreign keys: no IF NOT EXISTS for constraints, so swallow the
+        // duplicate_object error on re-run.
+        for (const fk of [
+            `ALTER TABLE "ProjectInspector" ADD CONSTRAINT "ProjectInspector_projectId_fkey"
+                 FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
+            `ALTER TABLE "ProjectInspector" ADD CONSTRAINT "ProjectInspector_inspectorId_fkey"
+                 FOREIGN KEY ("inspectorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`,
+            `ALTER TABLE "ProjectInspector" ADD CONSTRAINT "ProjectInspector_assignedBy_fkey"
+                 FOREIGN KEY ("assignedBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`,
+        ]) {
+            try { await (prisma as any).$executeRawUnsafe(fk) } catch { /* already present */ }
+        }
+        // Backfill membership from the assignments that were standing in for it,
+        // so nobody drops off a project the moment this ships. Idempotent.
+        await (prisma as any).$executeRawUnsafe(`
+            INSERT INTO "ProjectInspector" ("id", "projectId", "inspectorId", "assignedBy", "createdAt")
+            SELECT gen_random_uuid()::text, a."projectId", a."inspectionBoyId", a."assignedBy", MIN(a."createdAt")
+            FROM "Assignment" a
+            WHERE a."status" <> 'inactive'
+            GROUP BY a."projectId", a."inspectionBoyId", a."assignedBy"
+            ON CONFLICT ("projectId", "inspectorId") DO NOTHING
+        `)
+
         // Company/Branch concepts are retired — projects hang off Sites and
         // sites/departments stand alone. Legacy columns stay but become
         // nullable so new rows never need them. DROP NOT NULL is idempotent.

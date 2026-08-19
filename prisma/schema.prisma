@@ -29,6 +29,8 @@ model User {
   customRole             CustomRole?         @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
   managedProjects        ProjectManager[]    @relation("ProjectManagers")
   assignedProjects       ProjectManager[]    @relation("ProjectManagerAssigner")
+  inspectedProjects      ProjectInspector[]  @relation("ProjectInspectors")
+  inspectorAssignments   ProjectInspector[]  @relation("ProjectInspectorAssigner")
   notifications          Notification[]
   leadsAssigned          Lead[]              @relation("LeadAssignee")
   leadsCreated           Lead[]              @relation("LeadCreator")
@@ -118,6 +120,7 @@ model Project {
   createdBy       String
   createdAt       DateTime         @default(now())
   assignments     Assignment[]
+  projectInspectors ProjectInspector[]
   formTemplates   FormTemplate[]
   expenses        Expense[]
   company         Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -237,6 +240,28 @@ model ProjectManager {
   assigner   User     @relation("ProjectManagerAssigner", fields: [assignedBy], references: [id])
 
   @@unique([projectId, managerId])
+}
+
+// Who is ON a project, as distinct from what work they have been handed.
+//
+// Managers always had this (ProjectManager); inspectors never did, so their
+// membership was inferred from Assignment rows. That made the project's Team
+// step create real work: tick an inspector to say "he is on this project" and an
+// active assignment appeared in his workspace, as though a job had been issued.
+// Assignments are issued from the Assignments screen; this table only records
+// membership.
+model ProjectInspector {
+  id          String   @id @default(uuid())
+  projectId   String
+  inspectorId String
+  assignedBy  String
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inspector   User     @relation("ProjectInspectors", fields: [inspectorId], references: [id])
+  assigner    User     @relation("ProjectInspectorAssigner", fields: [assignedBy], references: [id])
+
+  @@unique([projectId, inspectorId])
+  @@index([inspectorId])
 }
 
 model Notification {

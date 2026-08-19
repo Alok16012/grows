@@ -23,9 +23,8 @@ export async function GET(
             include: {
                 site: { select: { id: true, name: true, code: true, city: true } },
                 projectManagers: { select: { managerId: true } },
-                // Same rule as the projects grid: completed assignments still
-                // count as team; only "inactive" (removed) drops someone.
-                assignments: { where: { status: { not: "inactive" } }, select: { inspectionBoyId: true } },
+                // Membership, not work — see ProjectInspector in the schema.
+                projectInspectors: { select: { inspectorId: true } },
             },
         })
 
@@ -33,7 +32,7 @@ export async function GET(
 
         // Flatten the current member selections so the edit form can prefill.
         const managerIds = project.projectManagers.map((m) => m.managerId)
-        const inspectorIds = Array.from(new Set(project.assignments.map((a) => a.inspectionBoyId)))
+        const inspectorIds = Array.from(new Set(project.projectInspectors.map((pi) => pi.inspectorId)))
 
         // Summary sidebar data: inspection counts + creator display name.
         const [total, approved, pending, sentBack, creator] = await Promise.all([
@@ -131,50 +130,33 @@ export async function PUT(
             }
         }
 
-        // Reconcile Inspectors (active Assignment rows). Newly selected inspectors
-        // get a fresh active assignment; deselected ones are removed — but if an
-        // inspector already has inspection history we deactivate instead of delete
-        // so their submitted data is never lost.
+        // Reconcile the project's inspector list. Membership only: ticking
+        // someone here says they are on the project, it does not hand them work,
+        // and unticking them does not cancel work already issued — assignments
+        // are created and withdrawn on the Assignments screen. This block used to
+        // create an active Assignment per newly-ticked inspector and
+        // delete/deactivate the assignments of anyone unticked, which is why
+        // editing a project's team quietly issued and revoked real jobs.
         if (Array.isArray(inspectorIds) && actorId) {
             try {
                 const desired = new Set<string>(inspectorIds)
-                const existing = await prisma.assignment.findMany({
-                    where: { projectId, status: { not: "inactive" } },
-                    select: { id: true, inspectionBoyId: true, status: true },
+                const current = await prisma.projectInspector.findMany({
+                    where: { projectId },
+                    select: { id: true, inspectorId: true },
                 })
-                const active = existing.filter((a) => a.status === "active")
-                // Compare against EVERY non-inactive member, not just active
-                // ones. The edit form now prefills completed members too, so
-                // diffing on active alone would mint a fresh assignment for each
-                // of them on any unrelated save (a rename re-assigning the whole
-                // finished team). Giving someone a NEW round of work is the
-                // Assignments screen's job, not a side effect of editing.
-                const existingIds = new Set(existing.map((a) => a.inspectionBoyId))
-                const toAdd = inspectorIds.filter((id: string) => !existingIds.has(id))
-                for (const inspectionBoyId of toAdd) {
-                    await prisma.assignment.create({
-                        data: { projectId, inspectionBoyId, assignedBy: actorId, status: "active" },
+                const currentIds = new Set(current.map((pi) => pi.inspectorId))
+
+                const toAdd = inspectorIds.filter((id: string) => !currentIds.has(id))
+                if (toAdd.length > 0) {
+                    await prisma.projectInspector.createMany({
+                        data: toAdd.map((inspectorId: string) => ({ projectId, inspectorId, assignedBy: actorId })),
+                        skipDuplicates: true,
                     })
                 }
-                // Removal still only ends OPEN assignments. Unchecking someone
-                // whose assignment already completed changes nothing — finished
-                // work keeps them in the team history.
-                const toRemove = active.filter((a) => !desired.has(a.inspectionBoyId))
-                for (const a of toRemove) {
-                    const inspCount = await prisma.inspection.count({ where: { assignmentId: a.id } })
-                    if (inspCount === 0) {
-                        await prisma.assignment.delete({ where: { id: a.id } })
-                    } else {
-                        // Disarm recurrence as well. Marking it inactive alone left
-                        // `recurrenceActive` true, and approving the inspector's last
-                        // pending inspection then minted a fresh ACTIVE assignment for
-                        // them (app/api/approvals/[id]/route.ts) — putting someone the
-                        // manager had just removed straight back on the project.
-                        await prisma.assignment.update({
-                            where: { id: a.id },
-                            data: { status: "inactive", recurrenceActive: false },
-                        })
-                    }
+
+                const toRemove = current.filter((pi) => !desired.has(pi.inspectorId)).map((pi) => pi.id)
+                if (toRemove.length > 0) {
+                    await prisma.projectInspector.deleteMany({ where: { id: { in: toRemove } } })
                 }
             } catch (insErr) {
                 console.log("Project inspector sync skipped:", insErr)

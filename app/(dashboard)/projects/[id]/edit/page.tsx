@@ -410,7 +410,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspectors</h2>
-                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission.</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission. This only sets the project team — work is handed out from the Assignments screen.</p>
                                 </div>
                             </div>
                             <button type="button"
