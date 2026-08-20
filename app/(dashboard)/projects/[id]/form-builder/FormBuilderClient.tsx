@@ -418,7 +418,7 @@ export default function FormBuilderClient({
     }
 
     const handleLoadDefaultForm = async () => {
-        if (!confirm("This will replace all your current fields with the default template. Continue?")) return
+        if (!confirm("Replace this project's form with the default template?\n\nFields that already have answers are hidden rather than removed, so past inspections keep their data. Unused fields are deleted.")) return
         setLoadingDefault(true)
         try {
             const res = await fetch("/api/form-templates/bulk-default", {

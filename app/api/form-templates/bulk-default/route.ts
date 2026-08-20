@@ -9,7 +9,6 @@ const FIXED_FIELDS = [
     { fieldLabel: "SHIFT", fieldType: "dropdown", options: "G, A, B, C", isRequired: true, category: "FIXED" },
     { fieldLabel: "LOCATION", fieldType: "dropdown", options: "JIJAU, DUROSEAT", isRequired: true, category: "FIXED" },
     { fieldLabel: "PART NAME", fieldType: "dropdown", options: "DRIVER SEAT, CARGO SEAT, NIGERIA SEAT, PF SEAT", isRequired: true, category: "FIXED" },
-    { fieldLabel: "PART NUMBER", fieldType: "text", isRequired: false, category: "FIXED" },
     { fieldLabel: "INSPECTED QTY", fieldType: "number", isRequired: true, category: "FIXED", defaultValue: "0" },
     { fieldLabel: "REWORK QTY", fieldType: "number", isRequired: true, category: "FIXED", defaultValue: "0" },
 ]
@@ -52,10 +51,29 @@ export async function POST(req: Request) {
             return new NextResponse("projectId is required", { status: 400 })
         }
 
-        // Wipe existing form fields for this project
-        await prisma.formTemplate.deleteMany({
-            where: { projectId }
+        // Clear the current form WITHOUT destroying inspection history.
+        //
+        // This used to deleteMany() every field on the project. InspectionData
+        // cascades on fieldId, so "replace the fields with the defaults" silently
+        // erased every answer ever recorded against them. Fields that have been
+        // answered are hidden instead — they stop being asked, their history
+        // stays readable in reports — and only never-used fields are deleted.
+        const existing = await prisma.formTemplate.findMany({
+            where: { projectId },
+            select: { id: true, _count: { select: { responses: true } } },
         })
+        const answered = existing.filter(f => f._count.responses > 0).map(f => f.id)
+        const unused = existing.filter(f => f._count.responses === 0).map(f => f.id)
+
+        if (unused.length > 0) {
+            await prisma.formTemplate.deleteMany({ where: { id: { in: unused } } })
+        }
+        if (answered.length > 0) {
+            await prisma.formTemplate.updateMany({
+                where: { id: { in: answered } },
+                data: { isHidden: true },
+            })
+        }
 
         // Combine all fields
         const allFields: any[] = [
