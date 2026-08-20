@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { toast } from "sonner"
 import { useState, useEffect, useCallback } from "react"
 import {
     DndContext,
@@ -372,10 +373,19 @@ export default function FormBuilderClient({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ isHidden: next }),
             })
-            if (!res.ok) throw new Error()
-        } catch {
-            // Roll the optimistic flip back so the row never lies about the server.
+            if (!res.ok) throw new Error(await res.text() || "Could not save")
+            // Say which project it applied to: the same field label exists on
+            // every project's form, and hiding it on one leaves the others
+            // untouched — silence here read as "it didn't work".
+            toast.success(next
+                ? `"${field.fieldLabel}" hidden from this project's form`
+                : `"${field.fieldLabel}" is back on this project's form`)
+        } catch (e) {
+            // Roll the optimistic flip back so the row never lies about the server,
+            // and say so — this used to fail silently, leaving the user to guess
+            // whether the click had registered.
             setFields(prev => prev.map(f => f.id === field.id ? { ...f, isHidden: !next } : f))
+            toast.error((e as Error).message || "Could not update the field")
         }
     }
 
