@@ -18,8 +18,13 @@ export default function DashboardLayout({
 
     return (
         <div className="flex min-h-screen w-full bg-muted/10">
+            {/* Skip navigation — hidden until focused */}
+            <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-[var(--accent)] focus:text-white focus:px-4 focus:py-2 focus:rounded-lg">
+                Skip to content
+            </a>
+
             {/* Sidebar Desktop */}
-            <div className="hidden bg-[#0e1c2b] md:block w-64 shrink-0 transition-all duration-300">
+            <div className="sidebar-dark hidden bg-[var(--surface)] md:block w-64 shrink-0 transition-all duration-300 border-r border-[var(--border)]">
                 <Sidebar />
             </div>
 
@@ -32,7 +37,7 @@ export default function DashboardLayout({
             )}
 
             <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-72 bg-[#0e1c2b] transform transition-transform duration-300 ease-in-out md:hidden",
+                "sidebar-dark fixed inset-y-0 left-0 z-50 w-72 bg-[var(--surface)] transform transition-transform duration-300 ease-in-out md:hidden",
                 isSidebarOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <Sidebar onMobileClose={() => setIsSidebarOpen(false)} />
@@ -43,7 +48,7 @@ export default function DashboardLayout({
                 <main className="flex-1 overflow-y-auto flex flex-col">
                     {/* Removed 500ms fade-in/slide animation — was adding
                         perceived 500ms latency to every page navigation. */}
-                    <div className="flex-1 mx-auto w-full flex flex-col gap-0 p-0 lg:gap-8 lg:p-8 max-w-7xl">
+                    <div id="main-content" className="flex-1 mx-auto w-full flex flex-col gap-0 p-0 lg:gap-8 lg:p-8 max-w-7xl">
                         <InspectionStepper />
                         {children}
                     </div>

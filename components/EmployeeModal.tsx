@@ -587,12 +587,12 @@ export function EmployeeModal({
     const labelCls = "block text-[12px] text-[var(--text2)] mb-1"
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="employee-modal-title" className="bg-[var(--surface)] rounded-[16px] border border-[var(--border)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-xl" onKeyDown={(e) => { if (e.key === "Escape") onClose() }}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
                     <div>
-                        <h2 className="text-[16px] font-semibold text-[var(--text)]">
+                        <h2 id="employee-modal-title" className="text-[16px] font-semibold text-[var(--text)]">
                             {employee ? `${employee.firstName} ${employee.lastName}` : "Add New Employee"}
                         </h2>
                         {employee && (

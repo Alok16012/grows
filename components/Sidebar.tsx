@@ -83,17 +83,18 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         const perms = (session?.user as any)?.permissions || []
         if (role !== "ADMIN" && !perms.includes("approvals.view")) return
         let stopped = false
+        const ac = new AbortController()
         const fetchCount = async () => {
             if (document.hidden) return
             try {
-                const res = await fetch("/api/approvals?count=true")
+                const res = await fetch("/api/approvals?count=true", { signal: ac.signal })
                 const data = await res.json()
                 if (!stopped) setPendingCount(data.count || 0)
             } catch { /* silent */ }
         }
         fetchCount()
         const interval = setInterval(fetchCount, 5 * 60_000)
-        return () => { stopped = true; clearInterval(interval) }
+        return () => { stopped = true; clearInterval(interval); ac.abort() }
     }, [role])
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
@@ -252,7 +253,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     <span className="font-bold text-[16px] tracking-tight text-[var(--text)]">Growus Auto</span>
                 </Link>
                 {onMobileClose && (
-                    <button onClick={onMobileClose} className="p-1 md:hidden hover:bg-[var(--surface2)] rounded-md transition-colors text-[var(--text3)]">
+                    <button onClick={onMobileClose} aria-label="Close sidebar" className="p-1 md:hidden hover:bg-[var(--surface2)] rounded-md transition-colors text-[var(--text3)] h-9 w-9 flex items-center justify-center">
                         <X size={20} />
                     </button>
                 )}
@@ -304,8 +305,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                             <Link
                                                 href={link.href}
                                                 onClick={onMobileClose}
+                                                aria-current={isItemActive && !hasSubLinks ? "page" : undefined}
                                                 className={cn(
-                                                    "flex items-center justify-between rounded-[8px] px-[10px] py-[7.5px] text-[13px] transition-all group",
+                                                    "flex items-center justify-between rounded-[8px] px-3 py-2 min-h-[40px] text-[13px] transition-all group",
                                                     isItemActive && !hasSubLinks
                                                         ? "bg-[var(--accent-light)] text-[var(--accent-text)] font-medium"
                                                         : (isSubActive || isItemActive)
@@ -315,12 +317,13 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <Icon
-                                                        size={16}
+                                                        size={18}
                                                         className={cn(
                                                             isItemActive || isSubActive
                                                                 ? "text-[var(--accent-text)]"
                                                                 : "text-[var(--text3)] group-hover:text-[var(--text2)]"
                                                         )}
+                                                        aria-hidden="true"
                                                     />
                                                     {link.name}
                                                 </div>

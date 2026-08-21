@@ -67,8 +67,8 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f5f4f0] flex items-center justify-center p-6">
-            <div className="bg-white border border-[#e8e6e1] rounded-[16px] w-[420px] max-w-full p-9" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+        <div className="min-h-screen bg-[#f5f4f0] flex items-center justify-center p-4">
+            <div className="bg-white border border-[#e8e6e1] rounded-[16px] w-full max-w-[400px] p-9 mx-4" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
                 <div className="text-center mb-7">
                     <div className="flex items-center justify-center gap-2.5 mb-4">
                         <div className="w-9 h-9 bg-[#1a9e6e] rounded-[10px] flex items-center justify-center">
@@ -86,11 +86,11 @@ export default function LoginPage() {
                     </p>
                 </div>
 
-                <div className="border-t border-[#e8e6e1] mb-6"></div>
+                <div className="border-t border-[#e8e6e1] mb-6" role="separator"></div>
 
                 <form onSubmit={handleSubmit}>
                     {error && (
-                        <div className="bg-[#fef2f2] border border-[#fca5a5] rounded-[8px] p-[10px_14px] mb-3 flex items-center gap-2 text-[13px] text-[#dc2626]">
+                        <div className="bg-[#fef2f2] border border-[#fca5a5] rounded-[8px] px-[14px] py-[10px] mb-3 flex items-center gap-2 text-[13px] text-[#dc2626]" role="alert" aria-live="polite">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="12" cy="12" r="10" />
                                 <line x1="12" y1="8" x2="12" y2="12" />

@@ -131,25 +131,27 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     }
 
     return (
-        <div className="sticky top-0 z-30 flex h-[54px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-3 md:px-6 shrink-0 gap-2">
+        <div className="sticky top-0 z-30 flex h-[54px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-3 md:px-6 shrink-0 gap-2" role="banner">
             {/* Left */}
             <div className="flex items-center gap-2 shrink-0">
-                <button onClick={onMenuClick} className="inline-flex items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] md:hidden transition-colors">
+                <button onClick={onMenuClick} aria-label="Open menu" className="inline-flex items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] md:hidden transition-colors">
                     <Menu size={20} />
                 </button>
             </div>
 
             {/* Center: Search */}
-            <div className="flex-1 max-w-[200px] sm:max-w-[400px] relative" ref={dropdownRef}>
+            <div className="flex-1 max-w-[200px] sm:max-w-[400px] md:max-w-[300px] relative" ref={dropdownRef}>
                 <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)] group-focus-within:text-[var(--accent)] transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)] group-focus-within:text-[var(--accent)] transition-colors" aria-hidden="true" />
                     <input
-                        type="text"
+                        type="search"
                         placeholder="Search for anything..."
-                        className="w-full h-9 pl-9 pr-4 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text)] placeholder-[var(--text3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] focus:bg-[var(--surface)] transition-all"
+                        aria-label="Search sites, projects, and inspections"
+                        className="w-full h-9 pl-9 pr-4 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] text-[16px] text-[var(--text)] placeholder-[var(--text3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] focus:bg-[var(--surface)] transition-all"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onFocus={() => query.length >= 2 && setIsOpen(true)}
+                        autoComplete="off"
                     />
                     {loading && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--text3)]" /></div>}
                 </div>
@@ -207,13 +209,16 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
             {/* Right */}
             <div className="flex items-center gap-2">
                 <div className="hidden sm:flex items-center gap-2">
-                    <button className="h-[34px] w-[34px] rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
+                    <button aria-label="Help" className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
                         <HelpCircle size={18} />
                     </button>
 
                     {/* Notification Bell */}
                     <div className="relative" ref={notifRef}>
                         <button
+                            aria-label="Notifications"
+                            aria-expanded={isNotifOpen}
+                            aria-controls="notifications-panel"
                             onClick={() => {
                                 const opening = !isNotifOpen
                                 setIsNotifOpen(opening)
@@ -221,18 +226,18 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 // the actual rows when the panel is opened.
                                 if (opening) fetchNotifs()
                             }}
-                            className="h-[34px] w-[34px] rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors relative"
+                            className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors relative"
                         >
                             <Bell size={18} />
                             {unreadCount > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-[var(--red)] text-white text-[9px] font-bold flex items-center justify-center">
                                     {unreadCount > 9 ? "9+" : unreadCount}
                                 </span>
                             )}
                         </button>
 
                         {isNotifOpen && (
-                            <div className="absolute right-0 mt-2 w-80 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div id="notifications-panel" role="region" aria-label="Notifications" className="absolute right-0 mt-2 w-80 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface2)]/50">
                                     <h3 className="text-[13px] font-semibold text-[var(--text)]">Notifications</h3>
                                     <div className="flex items-center gap-2">
