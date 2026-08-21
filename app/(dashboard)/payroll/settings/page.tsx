@@ -245,17 +245,20 @@ export default function PayrollSettingsPage() {
                 <div style={cardStyle}>
                     <div>
                         <h2 style={cardTitle}>Provident Fund (PF)</h2>
-                        <p style={cardHint}>PF base = min(Basic + DA, wage ceiling). Employer side is split into EPS / EPF / EDLI / Admin.</p>
+                        <p style={cardHint}>
+                            <b>Formula:</b> PF = 12% of (Basic + DA), capped at wage ceiling.
+                            If Basic + DA &gt; ₹15,000 → PF = ₹1,800 (fixed). If Basic + DA &le; ₹15,000 → PF = 12% of actual (Basic + DA).
+                        </p>
                     </div>
                     <Toggle label="PF enabled" checked={rules.pf.enabled} onChange={b => up("pf", { enabled: b })}
                         hint="Off = no employee PF deduction and no employer PF cost for anyone." />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                        <NumField label="Wage ceiling" suffix="₹" value={rules.pf.wageCeiling} onChange={n => up("pf", { wageCeiling: n })} />
-                        <NumField label="Employee rate" suffix="%" value={rules.pf.employeePct} onChange={n => up("pf", { employeePct: n })} />
+                        <NumField label="Wage ceiling (cap)" suffix="₹" value={rules.pf.wageCeiling} onChange={n => up("pf", { wageCeiling: n })} />
+                        <NumField label="Employee PF rate" suffix="%" value={rules.pf.employeePct} onChange={n => up("pf", { employeePct: n })} />
                     </div>
                     <Toggle label="Prorate employee PF for short months" checked={rules.pf.prorateEmployee}
                         onChange={b => up("pf", { prorateEmployee: b })}
-                        hint={`If on: below ${rules.pf.prorationThresholdDays} worked days, PF = base ÷ ${rules.pf.prorationThresholdDays} × worked days × rate. Default off — full PF regardless of attendance.`} />
+                        hint={`If on: below ${rules.pf.prorationThresholdDays} worked days, PF = (base ÷ ${rules.pf.prorationThresholdDays} × worked days) × rate. Default off — full PF regardless of attendance.`} />
                     {rules.pf.prorateEmployee && (
                         <NumField label="Proration threshold" suffix="days" value={rules.pf.prorationThresholdDays}
                             onChange={n => up("pf", { prorationThresholdDays: n })} />
@@ -431,23 +434,28 @@ export default function PayrollSettingsPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
                             <thead>
                                 <tr style={{ background: "var(--surface2)" }}>
-                                    {["Earned Gross", "PF (Emp)", "ESIC (Emp)", "PT", "LWF", "Total Ded.", "Net Pay", "PF (Emplr)", "ESIC (Emplr)", "CTC"].map(h => (
+                                    {["Basic + DA", "PF Base (capped)", "PF (Emp)", "ESIC (Emp)", "PT", "LWF", "Total Ded.", "Net Pay", "PF (Emplr)", "ESIC (Emplr)", "CTC"].map(h => (
                                         <th key={h} style={{ padding: "8px 10px", textAlign: "right", fontSize: 10.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.3px", borderBottom: "2px solid var(--border)" }}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    {[preview.grossSalary, preview.pfEmployee, preview.esiEmployee, preview.pt, preview.lwf,
-                                      preview.totalDeductions, preview.netSalary, preview.pfEmployer, preview.esiEmployer, preview.ctc,
-                                    ].map((v, i) => (
-                                        <td key={i} style={{
-                                            padding: "9px 10px", textAlign: "right", fontWeight: i === 6 || i === 9 ? 800 : 600,
-                                            color: i === 6 ? "#15803d" : i === 9 ? "#7c3aed" : "var(--text)",
-                                            borderBottom: "1px solid var(--border)",
-                                        }}>{fmt(v)}</td>
-                                    ))}
-                                </tr>
+                                {(() => {
+                                    const pfBase = Math.min(sample.basic + sample.da, rules.pf.wageCeiling)
+                                    return (
+                                        <tr>
+                                            {[sample.basic + sample.da, pfBase, preview.pfEmployee, preview.esiEmployee, preview.pt, preview.lwf,
+                                              preview.totalDeductions, preview.netSalary, preview.pfEmployer, preview.esiEmployer, preview.ctc,
+                                            ].map((v, i) => (
+                                                <td key={i} style={{
+                                                    padding: "9px 10px", textAlign: "right", fontWeight: i === 7 || i === 10 ? 800 : 600,
+                                                    color: i === 7 ? "#15803d" : i === 10 ? "#7c3aed" : i === 1 ? "#d97706" : "var(--text)",
+                                                    borderBottom: "1px solid var(--border)",
+                                                }}>{fmt(v)}</td>
+                                            ))}
+                                        </tr>
+                                    )
+                                })()}
                             </tbody>
                         </table>
                     </div>
