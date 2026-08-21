@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { csvSafe } from "@/lib/csv-safe"
 
 export async function GET(req: Request) {
     try {
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
             return new NextResponse("Month and Year required", { status: 400 })
         }
 
-        const where: any = { month, year }
+        const where: any = { month, year, status: { in: ["PROCESSED", "PAID"] } }
         if (siteId) where.siteId = siteId
 
         const payrolls = await prisma.payroll.findMany({
@@ -46,10 +47,10 @@ export async function GET(req: Request) {
 
         // Generate combined sheet JSON (easy to convert to CSV/Excel on frontend)
         const data = payrolls.map(p => ({
-            "Emp ID": p.employee.employeeId,
-            "Name": `${p.employee.firstName} ${p.employee.lastName}`,
-            "Designation": p.employee.designation,
-            "Branch": p.employee.branch?.name,
+            "Emp ID": csvSafe(p.employee.employeeId),
+            "Name": csvSafe(`${p.employee.firstName} ${p.employee.lastName}`),
+            "Designation": csvSafe(p.employee.designation ?? ""),
+            "Branch": csvSafe(p.employee.branch?.name ?? ""),
             "Working Days": p.workingDays,
             "Present Days": p.presentDays,
             "Basic Salary": p.basicSalary,

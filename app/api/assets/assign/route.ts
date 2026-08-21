@@ -90,54 +90,63 @@ export async function POST(req: Request) {
             return new NextResponse("employeeId and assetId are required", { status: 400 })
         }
 
-        // Check asset availability
-        const asset = await prisma.asset.findUnique({ where: { id: assetId } })
-        if (!asset) return new NextResponse("Asset not found", { status: 404 })
-        if (asset.available < 1) {
+        // Atomically check availability and decrement in one SQL step to
+        // prevent race conditions where two concurrent requests could both
+        // pass the check-then-act pattern.
+        const assetAfter = (await prisma.$queryRaw`
+            UPDATE "Asset"
+            SET "available" = "available" - 1
+            WHERE id = ${assetId} AND "available" > 0
+            RETURNING "available"
+        `) as { available: number }[]
+        if (assetAfter.length === 0 || assetAfter[0].available < 0) {
             return new NextResponse("No available stock for this asset", { status: 400 })
         }
 
-        // Check employee exists
-        const employee = await prisma.employee.findUnique({ where: { id: employeeId } })
-        if (!employee) return new NextResponse("Employee not found", { status: 404 })
-
-        const [assignment] = await prisma.$transaction([
-            prisma.employeeAsset.create({
-                data: {
-                    employeeId,
-                    assetId,
-                    issuedBy: session.user.id,
-                    condition: condition || "GOOD",
-                    notes: notes || null,
-                    isActive: true,
-                },
-                include: {
-                    employee: {
-                        select: {
-                            id: true,
-                            firstName: true,
-                            lastName: true,
-                            employeeId: true,
-                            designation: true,
-                            photo: true,
-                        },
-                    },
-                    asset: {
-                        select: {
-                            id: true,
-                            assetCode: true,
-                            name: true,
-                            category: true,
-                            serialNo: true,
-                        },
-                    },
-                },
-            }),
-            prisma.asset.update({
+        // Check for duplicate active assignment to the same employee
+        const existingAssignment = await prisma.employeeAsset.findFirst({
+            where: { employeeId, assetId, isActive: true },
+        })
+        if (existingAssignment) {
+            // Revert the decrement since we won't create a duplicate
+            await prisma.asset.update({
                 where: { id: assetId },
-                data: { available: { decrement: 1 } },
-            }),
-        ])
+                data: { available: { increment: 1 } },
+            })
+            return new NextResponse("This employee already has an active assignment for this asset", { status: 400 })
+        }
+
+        const assignment = await prisma.employeeAsset.create({
+            data: {
+                employeeId,
+                assetId,
+                issuedBy: session.user.id,
+                condition: condition || "GOOD",
+                notes: notes || null,
+                isActive: true,
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeId: true,
+                        designation: true,
+                        photo: true,
+                    },
+                },
+                asset: {
+                    select: {
+                        id: true,
+                        assetCode: true,
+                        name: true,
+                        category: true,
+                        serialNo: true,
+                    },
+                },
+            },
+        })
 
         return NextResponse.json(assignment)
     } catch (error) {

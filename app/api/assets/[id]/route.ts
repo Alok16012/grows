@@ -104,7 +104,7 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, [], "assets.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "assets.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

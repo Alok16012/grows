@@ -69,7 +69,7 @@ export async function PUT(
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         // Editable by HR/employee managers, OR by recruiters managing a joined
         // candidate (they reach this via Recruitment → Joined → employee).
-        const canEditEmployee = checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")
+        const canEditEmployee = checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit")
         const canEditViaRecruitment = checkAccess(session, [], "recruitment.manage")
         if (!canEditEmployee && !canEditViaRecruitment) {
             return new NextResponse("Forbidden", { status: 403 })
@@ -273,7 +273,12 @@ export async function PUT(
         }
 
         // Update linked User account (role + email + login-access sync)
-        const VALID_ROLES = ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"]
+        // System-role changes are reserved for account administrators.
+        // `canEditEmployee` (above) permits HR edits to employee data, but
+        // promoting someone to a base role — or worse, ADMIN — is an account
+        // change, not a profile edit. Use `users.manage`.
+        const VALID_ROLES = ["MANAGER", "HR_MANAGER", "INSPECTION_BOY"]
+        const canChangeRole = checkAccess(session, [], "users.manage")
         if (systemRole || customRoleId !== undefined || email !== undefined || status !== undefined) {
             const empWithUser = await prisma.employee.findUnique({
                 where: { id: params.id },
@@ -281,7 +286,10 @@ export async function PUT(
             })
             if (empWithUser?.userId) {
                 const userUpdate: Record<string, unknown> = {}
-                if (systemRole && VALID_ROLES.includes(systemRole)) userUpdate.role = systemRole
+                // Role changes require users.manage. Non-admins can still update
+                // the employee record itself (name, designation, salary …) but
+                // cannot grant or revoke system roles.
+                if (canChangeRole && systemRole && VALID_ROLES.includes(systemRole)) userUpdate.role = systemRole
                 if (customRoleId !== undefined) userUpdate.customRoleId = customRoleId || null
                 // Sync login email when employee email is updated
                 if (email && email.trim() && !email.includes("@cims.local")) {

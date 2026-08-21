@@ -28,6 +28,19 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
         if (!task) return new NextResponse("Not Found", { status: 404 })
 
+        // Non-admin users can only view their own tasks.
+        const isManager = checkAccess(session, ["MANAGER"], "field.manage")
+        const isAdmin = session.user.role === "ADMIN"
+        if (!isManager && !isAdmin) {
+            const employee = await prisma.employee.findFirst({
+                where: { email: session.user.email },
+                select: { id: true },
+            })
+            if (!employee || task.employeeId !== employee.id) {
+                return new NextResponse("Forbidden", { status: 403 })
+            }
+        }
+
         let siteName: string | null = null
         if (task.siteId) {
             const site = await prisma.site.findUnique({

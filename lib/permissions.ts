@@ -251,7 +251,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "recruitment.view", "recruitment.manage",
     "jobs.view", "jobs.manage",
     "onboarding.view", "onboarding.manage",
-    "documents.view", "documents.upload", "documents.verify",
+    "documents.view", "documents.upload", "documents.send", "documents.verify",
     "attendance.view", "attendance.manage",
     "leaves.view", "leaves.manage", "leaves.approve",
     "payroll.view", "payroll.manage",
@@ -358,11 +358,12 @@ export function isSelfScopedInspector(
 }
 
 // Sending / issuing documents (Send Documents module, recall, clear, doc types)
-// is granted by the dedicated `documents.send` permission OR the broader
-// `documents.view` — the latter kept for backward compatibility with roles
-// created before `documents.send` existed.
+// requires the dedicated `documents.send` permission. `documents.view` is a
+// read-only permission and does NOT grant send/issue access. (Backward compat
+// with roles that lack `documents.send` is handled at the role-assignment UI,
+// not here.)
 export function canSendDocuments(session: PermSession): boolean {
-    return checkAccess(session, [], "documents.send") || checkAccess(session, [], "documents.view")
+    return checkAccess(session, [], "documents.send")
 }
 
 // Viewing documents is granted by `documents.view` OR, for senders who need to

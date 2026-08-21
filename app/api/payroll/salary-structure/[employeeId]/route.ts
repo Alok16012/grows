@@ -26,8 +26,10 @@ export async function GET(_req: Request, { params }: { params: { employeeId: str
 
 export async function POST(req: Request, { params }: { params: { employeeId: string } }) {
     const session = await getServerSession(authOptions)
-    // Writing a salary structure was gated on `payroll.view`, a read permission.
-    if (!session || !(checkAccess(session, [], "payroll.manage") || checkAccess(session, [], "employees.viewSalary"))) {
+    // Writing a salary structure requires the manage permission, not just
+    // viewSalary. `employees.viewSalary` is accepted on reads (see CAN_READ_SALARY
+    // above) but must not grant write access.
+    if (!session || !checkAccess(session, [], "payroll.manage")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

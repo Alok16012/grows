@@ -16,6 +16,16 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
     try { return await p } catch { return fallback }
 }
 
+// IST day window expressed as UTC instants (server runs in UTC on Vercel).
+function istDayRange(offsetDays = 0) {
+    const IST_MS = 330 * 60 * 1000
+    const nowIst = new Date(Date.now() + IST_MS)
+    const dayStartIstAsUtc = Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate() + offsetDays)
+    const start = new Date(dayStartIstAsUtc - IST_MS)
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+    return { start, end }
+}
+
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -39,10 +49,9 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     const has = (p: string) => isAdmin || perms.includes(p)
 
     const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
-    const ago7d = new Date(todayStart); ago7d.setDate(ago7d.getDate() - 6)
-    const ago30d = new Date(now); ago30d.setDate(ago30d.getDate() - 30)
+    const today = istDayRange(0)
+    const yesterday = istDayRange(-1)
+    const week = istDayRange(-6) // start of the 7-day attendance window
     const month = now.getMonth() + 1
     const year = now.getFullYear()
 
@@ -54,7 +63,7 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
         jobs.push((async () => {
             const [active, new30d] = await Promise.all([
                 safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0),
-                safe(prisma.employee.count({ where: { status: "ACTIVE", createdAt: { gte: ago30d } } }), 0),
+                safe(prisma.employee.count({ where: { status: "ACTIVE", createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } } }), 0),
             ])
             out.employees = { active, new30d }
         })())
@@ -65,11 +74,11 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
         jobs.push((async () => {
             const [todayRows, weekRows, activeCount] = await Promise.all([
                 safe(prisma.attendance.findMany({
-                    where: { date: { gte: todayStart, lt: todayEnd } },
+                    where: { date: { gte: today.start, lt: today.end } },
                     select: { status: true },
                 }), [] as { status: string }[]),
                 safe(prisma.attendance.findMany({
-                    where: { date: { gte: ago7d, lt: todayEnd }, status: { notIn: ["ABSENT"] } },
+                    where: { date: { gte: week.start, lt: today.end }, status: { notIn: ["ABSENT"] } },
                     select: { date: true },
                 }), [] as { date: Date }[]),
                 safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0),
@@ -83,11 +92,11 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
 
             const byDay = new Map<string, number>()
             for (let i = 0; i < 7; i++) {
-                const d = new Date(ago7d); d.setDate(d.getDate() + i)
-                byDay.set(d.toISOString().slice(0, 10), 0)
+                const d = new Date(week.start); d.setDate(d.getDate() + i)
+                byDay.set(new Date(d.getTime() + 330*60*1000).toISOString().slice(0, 10), 0)
             }
             for (const r of weekRows) {
-                const k = new Date(r.date).toISOString().slice(0, 10)
+                const k = new Date(new Date(r.date).getTime() + 330*60*1000).toISOString().slice(0, 10)
                 if (byDay.has(k)) byDay.set(k, (byDay.get(k) || 0) + 1)
             }
             out.attendanceToday = { present, absent, onLeave, pct }
@@ -158,8 +167,8 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     if (has("recruitment.view")) {
         jobs.push((async () => {
             const [newLeads30d, joined30d, activeLeads] = await Promise.all([
-                safe(prisma.lead.count({ where: { createdAt: { gte: ago30d } } }), 0),
-                safe(prisma.lead.count({ where: { status: { in: ["JOINED", "ON_SITE_JOINED"] } as any, updatedAt: { gte: ago30d } } }), 0),
+                safe(prisma.lead.count({ where: { createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } } }), 0),
+                safe(prisma.lead.count({ where: { status: { in: ["JOINED", "ON_SITE_JOINED"] } as any, updatedAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } } }), 0),
                 safe(prisma.lead.count({ where: { status: { notIn: ["JOINED", "ON_SITE_JOINED", "REJECTED", "NOT_INTERESTED"] } as any } }), 0),
             ])
             out.recruitment = { newLeads30d, joined30d, activeLeads }

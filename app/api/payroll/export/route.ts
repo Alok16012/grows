@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { csvSafe } from "@/lib/csv-safe"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -17,9 +18,10 @@ export async function GET(req: Request) {
 
     if (!month || !year) return new NextResponse("month and year required", { status: 400 })
 
-    const where: Record<string, unknown> = { month, year }
-    // Payroll rows carry the site they were processed under — filtering by
-    // employee.branchId compared a Site id against Branch ids and matched nothing.
+    const where: Record<string, unknown> = {
+        month, year,
+        status: { in: ["PROCESSED", "PAID"] },
+    }
     if (siteId) where.siteId = siteId
 
     const payrolls = await prisma.payroll.findMany({
@@ -36,17 +38,15 @@ export async function GET(req: Request) {
         orderBy: { employee: { firstName: "asc" } }
     })
 
-    // Build rows in Growus Excel column order
     const rows = payrolls.map((p, i) => ({
         SR: i + 1,
-        EMPCODE: p.employee.employeeId,
-        NAME: `${p.employee.firstName} ${p.employee.lastName}`,
+        EMPCODE: csvSafe(p.employee.employeeId),
+        NAME: csvSafe(`${p.employee.firstName} ${p.employee.lastName}`),
         "MONTH DAYS": p.workingDays,
         LOP: p.workingDays - p.presentDays,
         DAYS: p.presentDays,
         "OT DAYS": p.otDays,
         "OT HRS (Calc)": p.otDays * 4,
-        // Full month
         "BASIC (Full)": p.basicFull,
         "DA (Full)": p.daFull,
         "HRA (Full)": Math.round(p.hraFull),
@@ -55,7 +55,6 @@ export async function GET(req: Request) {
         "LWW (Full)": p.lwwFull,
         "BONUS (Full)": Math.round(p.bonusFull),
         "GROSS (Full Month)": Math.round(p.grossFullMonth),
-        // Earned
         "BASIC (Earned)": p.basicSalary,
         "DA (Earned)": p.da,
         "HRA (Earned)": p.hra,
@@ -65,7 +64,6 @@ export async function GET(req: Request) {
         "OT PAY": p.overtimePay,
         "PROD INCENTIVE": p.productionIncentive,
         "GROSS (Earned)": p.grossSalary,
-        // Deductions
         PF: p.pfEmployee,
         ESIC: p.esiEmployee,
         PT: p.pt,
@@ -76,12 +74,11 @@ export async function GET(req: Request) {
         ADVANCE: p.advance,
         "OTHER DEDUCTIONS": p.otherDeductions,
         NET: p.netSalary,
-        // Employer
         "CO CONTRI PF": p.pfEmployer,
         "CO CONTRI ESIC": p.esiEmployer,
         CTC: Math.round(p.ctc),
-        DESIGNATION: p.employee.designation ?? "",
-        BRANCH: p.employee.branch?.name ?? "",
+        DESIGNATION: csvSafe(p.employee.designation ?? ""),
+        BRANCH: csvSafe(p.employee.branch?.name ?? ""),
     }))
 
     return NextResponse.json(rows)

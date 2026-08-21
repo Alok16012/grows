@@ -147,8 +147,12 @@ export default function ReportsDownloadsPage() {
             if (fmt === "pdf") {
                 // Generate printable PDF via print window
                 const cols = Object.keys(data[0] || {})
+                const escHtml = (s: unknown) =>
+                    String(s ?? "").replace(/[&<>"']/g, c =>
+                        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] || c)
+                    )
                 const tableRows = data.map((row: Record<string, unknown>) =>
-                    `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join("")}</tr>`
+                    `<tr>${cols.map(c => `<td>${escHtml(row[c] ?? "")}</td>`).join("")}</tr>`
                 ).join("")
                 const html = `<!DOCTYPE html><html><head><title>Wage Sheet - ${MONTHS[m - 1]} ${y}</title>
 <style>
@@ -162,8 +166,8 @@ export default function ReportsDownloadsPage() {
   @media print { @page { size: A3 landscape; margin: 8mm; } }
 </style></head><body>
 <h2>GROWUS — WAGE SHEET</h2>
-<p class="sub">${MONTHS[m - 1]} ${y} &nbsp;|&nbsp; ${again ? again.site : siteName}</p>
-<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table>
+<p class="sub">${MONTHS[m - 1]} ${y} &nbsp;|&nbsp; ${escHtml(again ? again.site : siteName)}</p>
+<table><thead><tr>${cols.map(c => `<th>${escHtml(c)}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table>
 </body></html>`
                 const w = window.open("", "_blank")
                 if (w) {

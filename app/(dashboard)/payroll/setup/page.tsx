@@ -342,6 +342,10 @@ export default function PayrollPage() {
     }
 
     const processPayroll = async () => {
+        if (!can(session, "payroll.manage")) {
+            toast.error("You don't have permission to process payroll")
+            return
+        }
         setProcessing(true)
         try {
             const attendance = Object.entries(attInputs).map(([employeeId, att]) => ({ employeeId, ...att }))
@@ -359,6 +363,10 @@ export default function PayrollPage() {
     }
 
     const exportExcel = async () => {
+        if (!can(session, "payroll.manage")) {
+            toast.error("You don't have permission to export payroll data")
+            return
+        }
         try {
             const XLSX = await loadXLSX()
             const res = await fetch(`/api/payroll/export?month=${month}&year=${year}`)

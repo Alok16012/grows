@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { csvSafe } from "@/lib/csv-safe"
 
 export async function GET(req: Request) {
     try {
@@ -21,8 +22,8 @@ export async function GET(req: Request) {
             return new NextResponse("Month and Year required", { status: 400 })
         }
 
-        // Include DRAFT, PROCESSED, and PAID payrolls for bank transfer
-        const where: any = { month, year, status: { in: ["DRAFT", "PROCESSED", "PAID"] } }
+        // Only PROCESSED and PAID payrolls are eligible for bank transfer
+        const where: any = { month, year, status: { in: ["PROCESSED", "PAID"] } }
         // Payroll rows carry the site they were processed under — filtering by
         // employee.branchId compared a Site id against Branch ids and matched nothing.
         if (siteId) where.siteId = siteId
@@ -48,10 +49,10 @@ export async function GET(req: Request) {
         }
 
         const data = payrolls.map(p => ({
-            "Beneficiary Name": `${p.employee.firstName} ${p.employee.lastName}`,
-            "Bank Name": p.employee.bankName || "N/A",
-            "Account Number": p.employee.bankAccountNumber || "N/A",
-            "IFSC Code": p.employee.bankIFSC || "N/A",
+            "Beneficiary Name": csvSafe(`${p.employee.firstName} ${p.employee.lastName}`),
+            "Bank Name": csvSafe(p.employee.bankName || "N/A"),
+            "Account Number": csvSafe(p.employee.bankAccountNumber || "N/A"),
+            "IFSC Code": csvSafe(p.employee.bankIFSC || "N/A"),
             "Amount": p.netSalary,
             "Narration": `Salary ${month}/${year}`
         }))
