@@ -134,9 +134,11 @@ export async function GET(req: Request) {
         const dayMap: Record<string, any> = {}
         const inspectorMap: Record<string, any> = {}
         const locationMap: Record<string, any> = {}
+        const shiftMap: Record<string, any> = {}
         const siteMap: Record<string, any> = {}
         const defectMap: Record<string, number> = {}
         const partModels = new Set<string>()
+        const partNumberMap = new Map<string, string>()
         let resolvedSiteName: string | null = null
 
         for (const inspection of inspections) {
@@ -151,11 +153,13 @@ export async function GET(req: Request) {
 
             // Extract field values by label matching
             let partName = "General"
+            let partNumber = ""
             let inspected = 0
             let accepted = 0
             let rework = 0
             let rejected = 0
             let location = "Main"
+            let shift = ""
 
             for (const r of responses) {
                 const label = r.field.fieldLabel
@@ -230,11 +234,16 @@ export async function GET(req: Request) {
                 map[key].totalRejected += rejected
             }
 
+            // Track partNumber alongside partName for the part-wise output.
+            // Key = partName so identical names still group together; number is
+            // carried through as a display field.
+            if (partNumber) partNumberMap.set(partName, partNumber)
             accumulate(partMap, partName, "partName", partName)
             accumulate(dayMap, date, "date", date)
             accumulate(inspectorMap, inspectorName, "inspectorName", inspectorName)
             accumulate(locationMap, location, "location", location)
             accumulate(siteMap, rowSiteId, "siteName", siteName)
+            accumulate(shiftMap, shift, "shiftName", shift)
         }
 
         // Compute summary rates
@@ -259,6 +268,7 @@ export async function GET(req: Request) {
 
         const partWise = mapToArray(partMap, (a, b) => b.totalInspected - a.totalInspected).map(p => ({
             ...p,
+            partNumber: partNumberMap.get(p.partName) || "",
             reworkPercent: p.totalInspected > 0 ? parseFloat(((p.totalRework / p.totalInspected) * 100).toFixed(2)) : 0,
             rejectionPercent: p.totalInspected > 0 ? parseFloat(((p.totalRejected / p.totalInspected) * 100).toFixed(2)) : 0,
         }))
@@ -278,12 +288,15 @@ export async function GET(req: Request) {
                 percentage: totalDefects > 0 ? parseFloat(((count / totalDefects) * 100).toFixed(2)) : 0,
             }))
 
+        const shiftWise = mapToArray(shiftMap, (a, b) => b.totalInspected - a.totalInspected)
+
         return NextResponse.json({
             summary,
             partWise,
             dayWise,
             inspectorWise,
             locationWise,
+            shiftWise,
             siteWise,
             topDefects,
             records: inspections.map(i => {

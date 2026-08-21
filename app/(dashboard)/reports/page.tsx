@@ -96,11 +96,15 @@ function useCountUp(target: number, duration = 1000) {
     return value
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label, payload: _payload }: any) {
     if (!active || !payload?.length) return null
+    // For part-wise charts, payload[0].payload carries the full row (partName + partNumber)
+    const row: any = _payload?.[0]?.payload || {}
+    const partNumber = row.partNumber ? ` (${row.partNumber})` : ""
+    const displayLabel = label ? `${label}${partNumber}` : label
     return (
         <div className="bg-[#1a1a18] rounded-[8px] p-[12px] shadow-lg border border-[#333] z-50">
-            {label && <p className="text-[11px] font-[600] text-[#9e9b95] uppercase mb-[8px]">{label}</p>}
+            {displayLabel && <p className="text-[11px] font-[600] text-[#9e9b95] uppercase mb-[8px]">{displayLabel}</p>}
             <div className="space-y-[6px]">
                 {payload.map((p: any, i: number) => (
                     <div key={i} className="flex items-center justify-between gap-[16px]">
@@ -205,6 +209,8 @@ export default function ReportsPage() {
     const trendRef = useRef<HTMLDivElement>(null)
     const partWiseBarRef = useRef<HTMLDivElement>(null)
     const locationBarRef = useRef<HTMLDivElement>(null)
+    const inspectorBarRef = useRef<HTMLDivElement>(null)
+    const shiftBarRef = useRef<HTMLDivElement>(null)
     const paretoRef = useRef<HTMLDivElement>(null)
 
     // Table features — sorting
@@ -400,7 +406,8 @@ export default function ReportsPage() {
         } else if (activeTab === "Part Wise") {
             if (!data?.partWise || data.partWise.length === 0) return
             formattedData = data.partWise.map((p: any) => ({
-                "Component": p.partName,
+                "Part Name": p.partName,
+                "Part Number": p.partNumber || "—",
                 "Inspected": p.totalInspected,
                 "Accepted": p.totalAccepted,
                 "Rework": p.totalRework,
@@ -471,11 +478,13 @@ export default function ReportsPage() {
             await new Promise(r => setTimeout(r, 400))
 
             // Capture all chart images from hidden capture zone
-            const [pieImg, trendImg, partWiseImg, locationImg, paretoImg] = await Promise.all([
+            const [pieImg, trendImg, partWiseImg, locationImg, inspectorImg, shiftImg, paretoImg] = await Promise.all([
                 captureChartToImage(pieRef.current),
                 captureChartToImage(trendRef.current),
                 captureChartToImage(partWiseBarRef.current),
                 captureChartToImage(locationBarRef.current),
+                captureChartToImage(inspectorBarRef.current),
+                captureChartToImage(shiftBarRef.current),
                 captureChartToImage(paretoRef.current),
             ])
 
@@ -497,7 +506,7 @@ export default function ReportsPage() {
                     project={project}
                     inspector={inspector}
                     logoUrl={logoUrl}
-                    chartImages={{ pie: pieImg, trend: trendImg, partWise: partWiseImg, location: locationImg, pareto: paretoImg }}
+                    chartImages={{ pie: pieImg, trend: trendImg, partWise: partWiseImg, location: locationImg, inspector: inspectorImg, shift: shiftImg, pareto: paretoImg }}
                 />
             ).toBlob()
 
@@ -922,7 +931,13 @@ export default function ReportsPage() {
                                                 <BarChart data={data.partWise} layout="vertical" margin={{ left: 20 }}>
                                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
                                                     <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                                                    <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} width={100} />
+                                                    <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} width={120}
+                                                        tickFormatter={(val: string) => {
+                                                            const row = data.partWise.find((p: any) => p.partName === val)
+                                                            const pn = row?.partNumber ? ` [${row.partNumber}]` : ""
+                                                            return val.length > 18 ? val.slice(0, 18) + "…" + pn : val + pn
+                                                        }}
+                                                    />
                                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
                                                     <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} radius={0} />
                                                     <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
@@ -932,9 +947,11 @@ export default function ReportsPage() {
                                         </div>
                                     ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[#9e9b95]">No parts data</div>}
                                 </div>
+                                {/* Location comparison — only shown when multiple locations exist */}
+                                {(data.locationWise?.length ?? 0) > 1 && (
                                 <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
                                     <h3 className="text-[14px] font-[600] text-[#1a1a18] mb-[20px]">Comparison by Location</h3>
-                                    {data.locationWise.length > 0 ? (
+                                    {(data.locationWise?.length ?? 0) > 0 ? (
                                         <div className="h-[400px] w-full">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={data.locationWise}>
@@ -948,6 +965,7 @@ export default function ReportsPage() {
                                         </div>
                                     ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[#9e9b95]">No locations data</div>}
                                 </div>
+                                )}
                                 {/* Inspector-wise comparison. The API has always aggregated this
                                     (inspectorWise); nothing rendered it, so the one dimension a
                                     quality lead actually reviews people on was missing from the
@@ -973,6 +991,29 @@ export default function ReportsPage() {
                                             </ResponsiveContainer>
                                         </div>
                                     ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No inspector data</div>}
+                                </div>
+                                {/* Shift-wise comparison */}
+                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card md:col-span-2">
+                                    <div className="flex items-center justify-between mb-[20px]">
+                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Shift-Wise Comparison</h3>
+                                        <span className="text-[11px] font-[500] text-[#9e9b95]">{(data as any).shiftWise?.length ?? 0} shifts</span>
+                                    </div>
+                                    {(data as any).shiftWise?.length > 0 ? (
+                                        <div style={{ height: Math.max(240, ((data as any).shiftWise.length * 80) + 60) }} className="w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={(data as any).shiftWise} margin={{ left: 20, right: 16 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                    <XAxis dataKey="shiftName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
+                                                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                                                    <Bar dataKey="totalAccepted" name="Accepted" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={40} />
+                                                    <Bar dataKey="totalRework" name="Rework" fill={THEME.warning} barSize={40} />
+                                                    <Bar dataKey="totalRejected" name="Rejected" fill={THEME.danger} radius={[0, 4, 4, 0]} barSize={40} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No shift data — ensure inspections have Shift field set</div>}
                                 </div>
                             </div>
                         )}
@@ -1325,6 +1366,28 @@ export default function ReportsPage() {
                             <XAxis dataKey="location" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} dy={8} />
                             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
                             <Bar dataKey="totalInspected" name="Inspected" fill={THEME.info} radius={[4, 4, 0, 0]} barSize={40} />
+                        </BarChart>
+                    </div>
+                    {/* Inspector-wise Bar Chart (PDF capture) */}
+                    <div ref={inspectorBarRef} style={{ width: 700, height: Math.max(260, ((data.inspectorWise?.length ?? 0) * 34) + 60) }} className="bg-white">
+                        <BarChart width={700} height={Math.max(260, ((data.inspectorWise?.length ?? 0) * 34) + 60)} data={data.inspectorWise} layout="vertical" margin={{ left: 10, right: 10 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                            <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b6860" }} width={140} />
+                            <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
+                            <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
+                            <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 3, 3, 0]} />
+                        </BarChart>
+                    </div>
+                    {/* Shift-wise Bar Chart (PDF capture) */}
+                    <div ref={shiftBarRef} style={{ width: 700, height: 300 }} className="bg-white">
+                        <BarChart width={700} height={300} data={(data as any).shiftWise} margin={{ left: 0, right: 10 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <XAxis dataKey="shiftName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                            <Bar dataKey="totalAccepted" name="Accepted" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={40} />
+                            <Bar dataKey="totalRework" name="Rework" fill={THEME.warning} barSize={40} />
+                            <Bar dataKey="totalRejected" name="Rejected" fill={THEME.danger} radius={[0, 4, 4, 0]} barSize={40} />
                         </BarChart>
                     </div>
                     {/* Pareto Chart */}

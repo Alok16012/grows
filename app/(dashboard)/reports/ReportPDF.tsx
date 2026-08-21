@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
 
 export function ReportDocument({ data, companyName, period, project, inspector, logoUrl, chartImages }: {
     data: any, companyName: string, period: string, project: string, inspector: string, logoUrl?: string,
-    chartImages?: { pie?: string | null, trend?: string | null, partWise?: string | null, location?: string | null, pareto?: string | null }
+    chartImages?: { pie?: string | null, trend?: string | null, partWise?: string | null, location?: string | null, inspector?: string | null, shift?: string | null, pareto?: string | null }
 }) {
     const s = data?.summary
     const topDefects: any[] = (data?.topDefects || []).slice(0, 5)
@@ -175,6 +175,26 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                             )}
                         </View>
                     </>
+                )}
+
+                {/* Section 4a: Inspector-wise chart (table below covers the same data) */}
+                {chartImages?.inspector && (
+                    <View style={{ marginBottom: 8 }}>
+                        <Text style={styles.sectionTitle}>Inspector-Wise Comparison</Text>
+                        <View style={{ borderWidth: 1, borderColor: "#e8e6e1", borderRadius: 6, padding: 6 }}>
+                            <Image src={chartImages.inspector} style={{ width: "100%", height: Math.min(280, (inspectorWise.length * 30) + 40) }} />
+                        </View>
+                    </View>
+                )}
+
+                {/* Section 4b: Shift-wise comparison */}
+                {(chartImages as any)?.shift && (
+                    <View style={{ marginBottom: 8 }}>
+                        <Text style={styles.sectionTitle}>Shift-Wise Comparison</Text>
+                        <View style={{ borderWidth: 1, borderColor: "#e8e6e1", borderRadius: 6, padding: 6 }}>
+                            <Image src={(chartImages as any).shift} style={{ width: "100%", height: 200 }} />
+                        </View>
+                    </View>
                 )}
 
                 {/* Section 5: Top Defects */}
