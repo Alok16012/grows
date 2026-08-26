@@ -126,11 +126,20 @@ export default function PayrollPage() {
         try {
             const res = await fetch(`/api/payroll/runs?year=${yearFilter}`)
             // A non-OK response used to be ignored entirely, leaving the previous
-            // year's runs on screen with no indication anything failed.
-            if (!res.ok) { setRuns([]); toast.error("Failed to load payroll runs"); return }
+            // year's runs on screen with no indication anything failed. Say WHY
+            // it failed too — "Failed to load payroll runs" alone made a session
+            // timeout, a missing permission and a server error look identical.
+            if (!res.ok) {
+                setRuns([])
+                const detail = await res.text().catch(() => "")
+                if (res.status === 401) toast.error("Session expired — please sign in again")
+                else if (res.status === 403) toast.error("You don't have permission to view payroll")
+                else toast.error(detail.trim() || "Failed to load payroll runs")
+                return
+            }
             const data = await res.json()
             setRuns(Array.isArray(data) ? data : [])
-        } catch { toast.error("Failed to load payroll runs") }
+        } catch { toast.error("Failed to load payroll runs — check your connection") }
         finally { setLoading(false) }
     }, [yearFilter])
 
