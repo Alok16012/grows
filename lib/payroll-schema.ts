@@ -1,22 +1,26 @@
 import prisma from "@/lib/prisma"
 
-// The payroll models (Payroll / PayrollRun) were added to schema.prisma after
-// prod was provisioned and never got a migration — `grep PayrollRun
-// prisma/migrations` returns nothing. Vercel can't run `migrate deploy` on this
-// project either (DIRECT_URL isn't configured), so the generated client happily
-// SELECTs tables and columns that don't exist and every payroll read 500s
-// ("Failed to load payroll runs" on /payroll).
+// The payroll models (Payroll / PayrollRun) were added to schema.prisma but
+// never got a migration — `grep PayrollRun prisma/migrations` returns nothing —
+// and Vercel can't run `migrate deploy` here because DIRECT_URL isn't
+// configured. Prod's copies were built by hand from an older revision of the
+// schema, so the generated client keeps hitting things that don't match. Three
+// distinct failure modes have surfaced so far, each as a different 500:
 //
-// Prod turned out to have BOTH tables already, built from an older revision of
-// the schema and short several columns (PayrollRun.processedBy was the first to
-// surface). So the column lists below are exhaustive on purpose: guessing which
-// columns are "the new ones" is what let processedBy slip through. Every column
-// Prisma models is listed, every one carries a default so it can be added to a
-// table that already has rows, and ADD COLUMN IF NOT EXISTS makes the ones that
-// are already there free.
+//   1. missing column   -> `The column PayrollRun.processedBy does not exist`
+//   2. case-folded twin -> `Null constraint violation on the fields:
+//                           (processedby)` — a column hand-patched in with
+//                           unquoted DDL, which Postgres folds to lower case
+//                           where Prisma can never see it
+//   3. wrong type       -> `operator does not exist: text <> "PayrollStatus"`
+//                          — status is TEXT in prod, an enum in the schema
 //
-// Same shape as lib/hr-doc-schema.ts and lib/payroll-rules-server.ts: create
-// everything idempotently, cached per warm instance. Awaiting this before a
+// Fixing them one at a time is whack-a-mole, so this reconciles all three
+// against one declared spec: SCHEMA below is the single source of truth and is
+// meant to be diffable against schema.prisma by eye. Nothing here drops a
+// column or deletes a row.
+//
+// Cached per warm instance, like lib/hr-doc-schema.ts. Awaiting it before a
 // payroll query is a no-op after the first call.
 let ensured = false
 let inFlight: Promise<void> | null = null
@@ -30,208 +34,302 @@ export async function ensurePayrollSchema(): Promise<void> {
 
 const exec = (sql: string) => (prisma as any).$executeRawUnsafe(sql)
 
-// `id` is deliberately absent from both lists — a table missing its primary key
-// is beyond repairing column-by-column, and CREATE TABLE covers the fresh case.
-const PAYROLL_RUN_COLUMNS = [
-    // month/year are NOT NULL with no default in the model. They can't
-    // realistically be missing, but if they were, a 0 default is the only way to
-    // add them to a table with rows — and it beats leaving the module dead.
-    `"month"            INTEGER NOT NULL DEFAULT 0`,
-    `"year"             INTEGER NOT NULL DEFAULT 0`,
-    `"status"           "PayrollStatus" NOT NULL DEFAULT 'DRAFT'`,
-    `"lockedAt"         TIMESTAMP(3)`,
-    `"processedBy"      TEXT NOT NULL DEFAULT ''`,
-    `"totalGross"       DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"totalNet"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"totalPfEmployer"  DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"totalEsiEmployer" DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"totalLwf"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"totalTds"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-    `"updatedAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-]
+// ─── The spec ────────────────────────────────────────────────────────────────
+type Col = {
+    name: string
+    /** SQL type as written in DDL, e.g. `DOUBLE PRECISION` or `"PayrollStatus"`. */
+    type: string
+    notNull?: boolean
+    /** SQL default expression, e.g. `0` or `'DRAFT'`. */
+    def?: string
+}
 
-const PAYROLL_COLUMNS = [
-    `"employeeId"          TEXT NOT NULL DEFAULT ''`,
-    `"payrollRunId"        TEXT`,
-    `"month"               INTEGER NOT NULL DEFAULT 0`,
-    `"year"                INTEGER NOT NULL DEFAULT 0`,
-    // full-month earnings
-    `"basicFull"           DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"daFull"              DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"hraFull"             DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"washingFull"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"conveyanceFull"      DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"lwwFull"             DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"bonusFull"           DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"otherFull"           DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"grossFullMonth"      DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    // earned / prorated earnings
-    `"basicSalary"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"da"                  DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"hra"                 DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"washing"             DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"conveyance"          DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"lwwEarned"           DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"bonus"               DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"allowances"          DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"otDays"              DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"overtimePay"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"productionIncentive" DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"grossSalary"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    // deductions
-    `"pfEmployee"          DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"pfEmployer"          DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"esiEmployee"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"esiEmployer"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"pt"                  DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"lwf"                 DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"tds"                 DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"canteenDays"         INTEGER NOT NULL DEFAULT 0`,
-    `"canteen"             DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"penalty"             DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"advance"             DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"otherDeductions"     DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"totalDeductions"     DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    // net & CTC
-    `"netSalary"           DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"ctc"                 DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    // attendance
-    `"workingDays"         INTEGER NOT NULL DEFAULT 26`,
-    `"presentDays"         INTEGER NOT NULL DEFAULT 26`,
-    `"leaveDays"           DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"lwpDays"             DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"overtimeHrs"         DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"overtimeRate"        DOUBLE PRECISION NOT NULL DEFAULT 0`,
-    `"siteId"              TEXT`,
-    `"status"              "PayrollStatus" NOT NULL DEFAULT 'DRAFT'`,
-    `"processedAt"         TIMESTAMP(3)`,
-    `"processedBy"         TEXT`,
-    `"paidAt"              TIMESTAMP(3)`,
-    `"paidBy"              TEXT`,
-    `"remarks"             TEXT`,
-    `"createdAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-    `"updatedAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-]
+const num  = (name: string): Col => ({ name, type: "DOUBLE PRECISION", notNull: true, def: "0" })
+const int  = (name: string, def = "0"): Col => ({ name, type: "INTEGER", notNull: true, def })
+const text = (name: string): Col => ({ name, type: "TEXT" })
+const time = (name: string): Col => ({ name, type: "TIMESTAMP(3)" })
+const stamp = (name: string): Col =>
+    ({ name, type: "TIMESTAMP(3)", notNull: true, def: "CURRENT_TIMESTAMP" })
+const status: Col = { name: "status", type: `"PayrollStatus"`, notNull: true, def: `'DRAFT'` }
 
-const columnName = (clause: string) => clause.match(/^"([^"]+)"/)![1]
+const PAYROLL_STATUS_VALUES = ["DRAFT", "PROCESSED", "PAID"]
 
-// Parts of prod were hand-patched with UNQUOTED DDL — `ALTER TABLE "PayrollRun"
-// ADD COLUMN processedBy TEXT NOT NULL` — and Postgres folds unquoted
-// identifiers to lower case, so the column landed as `processedby`. Prisma only
-// ever reads and writes the quoted `"processedBy"`, so the two never met: the
-// heal below saw no `"processedBy"`, added its own, and every insert then died
-// on the legacy `processedby` — NOT NULL, no default, and invisible to Prisma.
+// `id` is deliberately absent from both specs — a table missing its primary key
+// is beyond repairing column by column, and CREATE TABLE covers the fresh case.
 //
-// So before adding anything, reconcile the case-folded twins:
-//   • legacy only  → RENAME it to the camelCase name, data and all. This is the
-//     good outcome, and it's why this has to run BEFORE addColumns.
-//   • both present → the legacy one is now dead weight Prisma will never fill,
-//     so DROP NOT NULL to unblock writes. Nothing is dropped or overwritten;
-//     whatever it holds stays put for inspection.
-async function reconcileLegacyCase(table: string, columns: string[]): Promise<void> {
-    const names = columns.map(columnName).filter(n => n !== n.toLowerCase())
-    if (!names.length) return
-    const literal = names.map(n => `'${n}'`).join(", ")
-    try {
-        await exec(`
-            DO $$
+// month/year are NOT NULL with no default in the model. They can't realistically
+// be missing, but if they were, a 0 default is the only way to add them to a
+// table that already has rows, and that beats leaving the module dead.
+const PAYROLL_RUN: Col[] = [
+    int("month"), int("year"), status, time("lockedAt"),
+    { name: "processedBy", type: "TEXT", notNull: true, def: `''` },
+    num("totalGross"), num("totalNet"), num("totalPfEmployer"),
+    num("totalEsiEmployer"), num("totalLwf"), num("totalTds"),
+    stamp("createdAt"), stamp("updatedAt"),
+]
+
+const PAYROLL: Col[] = [
+    { name: "employeeId", type: "TEXT", notNull: true, def: `''` },
+    text("payrollRunId"), int("month"), int("year"),
+    // full-month earnings
+    num("basicFull"), num("daFull"), num("hraFull"), num("washingFull"),
+    num("conveyanceFull"), num("lwwFull"), num("bonusFull"), num("otherFull"),
+    num("grossFullMonth"),
+    // earned / prorated earnings
+    num("basicSalary"), num("da"), num("hra"), num("washing"), num("conveyance"),
+    num("lwwEarned"), num("bonus"), num("allowances"), num("otDays"),
+    num("overtimePay"), num("productionIncentive"), num("grossSalary"),
+    // deductions
+    num("pfEmployee"), num("pfEmployer"), num("esiEmployee"), num("esiEmployer"),
+    num("pt"), num("lwf"), num("tds"), int("canteenDays"), num("canteen"),
+    num("penalty"), num("advance"), num("otherDeductions"), num("totalDeductions"),
+    // net & CTC
+    num("netSalary"), num("ctc"),
+    // attendance
+    int("workingDays", "26"), int("presentDays", "26"), num("leaveDays"),
+    num("lwpDays"), num("overtimeHrs"), num("overtimeRate"),
+    text("siteId"), status, time("processedAt"), text("processedBy"),
+    time("paidAt"), text("paidBy"), text("remarks"),
+    stamp("createdAt"), stamp("updatedAt"),
+]
+
+// ─── SQL helpers ─────────────────────────────────────────────────────────────
+const lit = (s: string) => `'${s.replace(/'/g, "''")}'`
+const isEnum = (col: Col) => col.type.startsWith(`"`)
+
+/** What information_schema.columns.udt_name reports for a given DDL type. */
+function udtOf(type: string): string {
+    if (type.startsWith(`"`)) return type.slice(1, -1)
+    if (type === "INTEGER") return "int4"
+    if (type === "DOUBLE PRECISION") return "float8"
+    if (type === "TEXT") return "text"
+    if (type.startsWith("TIMESTAMP")) return "timestamp"
+    return type.toLowerCase()
+}
+
+/** Expression that converts whatever is in the column today to the wanted type. */
+function usingOf(col: Col): string {
+    const q = `"${col.name}"`
+    if (isEnum(col)) return `${q}::text::${col.type}`
+    if (col.type === "INTEGER") return `ROUND(NULLIF(${q}::text, '')::numeric)::integer`
+    if (col.type === "DOUBLE PRECISION") return `NULLIF(${q}::text, '')::double precision`
+    if (col.type === "TEXT") return `${q}::text`
+    if (col.type.startsWith("TIMESTAMP")) return `NULLIF(${q}::text, '')::timestamp(3)`
+    return q
+}
+
+const ddl = (col: Col) =>
+    `"${col.name}" ${col.type}${col.notNull ? " NOT NULL" : ""}${col.def ? ` DEFAULT ${col.def}` : ""}`
+
+// ─── 1. Case-folded twins ────────────────────────────────────────────────────
+// `ALTER TABLE "PayrollRun" ADD COLUMN processedBy TEXT NOT NULL` folds to
+// `processedby`, which Prisma never reads or writes. Reconcile before adding
+// anything, so the rename branch can win:
+//   • legacy only  -> RENAME to the camelCase name, data and all.
+//   • both present -> the legacy one is dead weight Prisma will never fill, so
+//     DROP NOT NULL to unblock writes. Its contents are left alone.
+function legacyCaseStatement(table: string, cols: Col[]): string | null {
+    const names = cols.map(c => c.name).filter(n => n !== n.toLowerCase())
+    if (!names.length) return null
+    return `
+            DO $do$
             DECLARE
-                expected TEXT[] := ARRAY[${literal}];
+                expected TEXT[] := ARRAY[${names.map(lit).join(", ")}];
                 col    TEXT;
                 legacy TEXT;
             BEGIN
                 IF NOT EXISTS (
                     SELECT 1 FROM information_schema.tables
-                    WHERE table_schema = 'public' AND table_name = '${table}'
-                ) THEN
-                    RETURN;
-                END IF;
+                    WHERE table_schema = 'public' AND table_name = ${lit(table)}
+                ) THEN RETURN; END IF;
                 FOREACH col IN ARRAY expected LOOP
                     legacy := lower(col);
                     IF EXISTS (
                         SELECT 1 FROM information_schema.columns
-                        WHERE table_schema = 'public' AND table_name = '${table}' AND column_name = legacy
+                        WHERE table_schema = 'public' AND table_name = ${lit(table)} AND column_name = legacy
                     ) THEN
                         IF EXISTS (
                             SELECT 1 FROM information_schema.columns
-                            WHERE table_schema = 'public' AND table_name = '${table}' AND column_name = col
+                            WHERE table_schema = 'public' AND table_name = ${lit(table)} AND column_name = col
                         ) THEN
-                            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', '${table}', legacy);
+                            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', ${lit(table)}, legacy);
                         ELSE
-                            EXECUTE format('ALTER TABLE %I RENAME COLUMN %I TO %I', '${table}', legacy, col);
+                            EXECUTE format('ALTER TABLE %I RENAME COLUMN %I TO %I', ${lit(table)}, legacy, col);
                         END IF;
                     END IF;
                 END LOOP;
-            END $$
-        `)
-    } catch (e) {
-        console.error(`[PAYROLL_SCHEMA_ENSURE] case reconcile ${table}`, e)
-    }
+            END $do$`
 }
 
-// One ALTER for all the columns, because that's a single round trip. Postgres
-// aborts the whole statement if any one clause errors, though, so fall back to
-// adding them individually — a column we can't add must not stop the rest.
-async function addColumns(table: string, columns: string[]): Promise<void> {
+async function reconcileLegacyCase(table: string, cols: Col[]): Promise<void> {
+    const statement = legacyCaseStatement(table, cols)
+    if (!statement) return
+    try { await exec(statement) }
+    catch (e) { console.error(`[PAYROLL_SCHEMA_ENSURE] case reconcile ${table}`, e) }
+}
+
+// ─── 2. Missing columns ──────────────────────────────────────────────────────
+// One ALTER for all of them, because that's a single round trip. Postgres aborts
+// the whole statement if any one clause errors, though, so fall back to adding
+// them individually — a column we can't add must not stop the rest.
+const addColumnsStatement = (table: string, cols: Col[]) =>
+    `ALTER TABLE "${table}"\n    ${cols.map(c => `ADD COLUMN IF NOT EXISTS ${ddl(c)}`).join(",\n    ")}`
+
+async function addColumns(table: string, cols: Col[]): Promise<void> {
     try {
-        await exec(`ALTER TABLE "${table}" ${columns.map(c => `ADD COLUMN IF NOT EXISTS ${c}`).join(", ")}`)
+        await exec(addColumnsStatement(table, cols))
     } catch {
-        for (const column of columns) {
-            try { await exec(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS ${column}`) }
-            catch (e) { console.error(`[PAYROLL_SCHEMA_ENSURE] ${table}.${column.trim().split(" ")[0]}`, e) }
+        for (const col of cols) {
+            try { await exec(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS ${ddl(col)}`) }
+            catch (e) { console.error(`[PAYROLL_SCHEMA_ENSURE] ${table}.${col.name}`, e) }
         }
     }
 }
 
+// ─── 3. Wrong types ──────────────────────────────────────────────────────────
+// ADD COLUMN IF NOT EXISTS silently no-ops on a column that already exists with
+// the WRONG type, which is how prod kept a TEXT `status` while the client
+// generated `status <> 'DRAFT'::"PayrollStatus"` and Postgres refused to compare
+// them. Compare each column's real udt_name against the spec and convert the
+// ones that differ, leaving matching columns untouched.
+function typeReconcileStatement(table: string, cols: Col[]): string {
+    const rows = cols.map(col => [
+        lit(col.name),
+        lit(udtOf(col.type)),
+        lit(col.type),
+        lit(usingOf(col)),
+        col.notNull ? "true" : "false",
+        lit(col.def ?? ""),
+    ].join(", ")).map(r => `(${r})`).join(",\n                ")
+
+    return `
+            DO $do$
+            DECLARE
+                spec   RECORD;
+                actual TEXT;
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = ${lit(table)}
+                ) THEN RETURN; END IF;
+
+                FOR spec IN SELECT * FROM (VALUES
+                ${rows}
+                ) AS t(col, want_udt, type_sql, using_sql, not_null, def_sql)
+                LOOP
+                    SELECT c.udt_name INTO actual
+                    FROM information_schema.columns c
+                    WHERE c.table_schema = 'public' AND c.table_name = ${lit(table)}
+                      AND c.column_name = spec.col;
+
+                    -- Absent (addColumns handles that) or already right: leave it.
+                    CONTINUE WHEN actual IS NULL OR actual = spec.want_udt;
+
+                    -- The old default is expressed in the old type, so it has to
+                    -- go before the column can change type.
+                    EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT', ${lit(table)}, spec.col);
+
+                    -- A value outside the enum would abort the cast. Park those
+                    -- on the default rather than failing the whole repair.
+                    IF spec.want_udt = ${lit(udtOf(status.type))} THEN
+                        EXECUTE format(
+                            'UPDATE %I SET %I = %L WHERE %I IS NULL OR %I::text <> ALL (%L::text[])',
+                            ${lit(table)}, spec.col, 'DRAFT', spec.col, spec.col,
+                            ${lit(`{${PAYROLL_STATUS_VALUES.join(",")}}`)});
+                    END IF;
+
+                    EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE %s USING %s',
+                                   ${lit(table)}, spec.col, spec.type_sql, spec.using_sql);
+
+                    IF spec.def_sql <> '' THEN
+                        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT %s',
+                                       ${lit(table)}, spec.col, spec.def_sql);
+                    END IF;
+
+                    IF spec.not_null THEN
+                        -- The cast can leave NULLs behind (empty strings become
+                        -- NULL), so fill them before re-asserting NOT NULL.
+                        IF spec.def_sql <> '' THEN
+                            EXECUTE format('UPDATE %I SET %I = %s WHERE %I IS NULL',
+                                           ${lit(table)}, spec.col, spec.def_sql, spec.col);
+                        END IF;
+                        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET NOT NULL', ${lit(table)}, spec.col);
+                    END IF;
+                END LOOP;
+            END $do$`
+}
+
+async function reconcileTypes(table: string, cols: Col[]): Promise<void> {
+    try { await exec(typeReconcileStatement(table, cols)) }
+    catch (e) { console.error(`[PAYROLL_SCHEMA_ENSURE] type reconcile ${table}`, e) }
+}
+
+const TABLES: [string, Col[]][] = [["PayrollRun", PAYROLL_RUN], ["Payroll", PAYROLL]]
+
+const enumStatement = () => `
+DO $do$ BEGIN
+    CREATE TYPE "PayrollStatus" AS ENUM (${PAYROLL_STATUS_VALUES.map(lit).join(", ")});
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $do$`
+
+// Only the PK is created here; everything else goes through the three reconcile
+// passes, so a fresh table and a stale one end up identical.
+const createTableStatement = (table: string) => `
+CREATE TABLE IF NOT EXISTS "${table}" (
+    "id" TEXT NOT NULL,
+    CONSTRAINT "${table}_pkey" PRIMARY KEY ("id")
+)`
+
+const INDEX_STATEMENTS = [
+    `CREATE UNIQUE INDEX IF NOT EXISTS "PayrollRun_month_year_key" ON "PayrollRun"("month", "year")`,
+    `CREATE INDEX IF NOT EXISTS "PayrollRun_status_idx" ON "PayrollRun"("status")`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "Payroll_employeeId_month_year_key" ON "Payroll"("employeeId", "month", "year")`,
+    `CREATE INDEX IF NOT EXISTS "Payroll_month_year_idx"   ON "Payroll"("month", "year")`,
+    `CREATE INDEX IF NOT EXISTS "Payroll_status_idx"       ON "Payroll"("status")`,
+    `CREATE INDEX IF NOT EXISTS "Payroll_employeeId_idx"   ON "Payroll"("employeeId")`,
+    `CREATE INDEX IF NOT EXISTS "Payroll_payrollRunId_idx" ON "Payroll"("payrollRunId")`,
+]
+
+// Constraints have no IF NOT EXISTS. At runtime the duplicate is caught in JS;
+// the generated .sql wraps each one in its own exception-handling DO block,
+// because the Supabase editor runs the file as a single transaction where one
+// unhandled error would roll everything back.
+const FOREIGN_KEY_STATEMENTS = [
+    `ALTER TABLE "Payroll" ADD CONSTRAINT "Payroll_employeeId_fkey"
+     FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE RESTRICT ON UPDATE CASCADE`,
+    `ALTER TABLE "Payroll" ADD CONSTRAINT "Payroll_payrollRunId_fkey"
+     FOREIGN KEY ("payrollRunId") REFERENCES "PayrollRun"("id") ON DELETE SET NULL ON UPDATE CASCADE`,
+]
+
+// Exported so scripts/gen-payroll-schema-sql.ts can emit the manual Supabase
+// equivalent from this exact spec. Hand-maintaining a parallel .sql is what let
+// the two drift before; now there is one source and the file is generated.
+export function payrollSchemaSql(): { ddl: string[]; foreignKeys: string[] } {
+    const ddl = [enumStatement()]
+    for (const [table, cols] of TABLES) {
+        ddl.push(createTableStatement(table))
+        const legacy = legacyCaseStatement(table, cols)
+        if (legacy) ddl.push(legacy)
+        ddl.push(addColumnsStatement(table, cols))
+        ddl.push(typeReconcileStatement(table, cols))
+    }
+    ddl.push(...INDEX_STATEMENTS)
+    return { ddl, foreignKeys: FOREIGN_KEY_STATEMENTS }
+}
+
 async function run(): Promise<void> {
     try {
-        // CREATE TYPE has no IF NOT EXISTS — swallow the duplicate.
-        await exec(`
-            DO $$ BEGIN
-                CREATE TYPE "PayrollStatus" AS ENUM ('DRAFT', 'PROCESSED', 'PAID');
-            EXCEPTION WHEN duplicate_object THEN NULL;
-            END $$
-        `)
+        await exec(enumStatement())
 
-        // ── PayrollRun ──────────────────────────────────────────────────────
-        await exec(`
-            CREATE TABLE IF NOT EXISTS "PayrollRun" (
-                "id" TEXT NOT NULL,
-                CONSTRAINT "PayrollRun_pkey" PRIMARY KEY ("id")
-            )
-        `)
-        // Everything except the PK is added here, so a fresh table and a stale
-        // one built from an older schema take the exact same path.
-        await reconcileLegacyCase("PayrollRun", PAYROLL_RUN_COLUMNS)
-        await addColumns("PayrollRun", PAYROLL_RUN_COLUMNS)
-        await exec(`CREATE UNIQUE INDEX IF NOT EXISTS "PayrollRun_month_year_key" ON "PayrollRun"("month", "year")`)
-        await exec(`CREATE INDEX IF NOT EXISTS "PayrollRun_status_idx" ON "PayrollRun"("status")`)
+        for (const [table, cols] of TABLES) {
+            await exec(createTableStatement(table))
+            await reconcileLegacyCase(table, cols)
+            await addColumns(table, cols)
+            await reconcileTypes(table, cols)
+        }
 
-        // ── Payroll ─────────────────────────────────────────────────────────
-        // The runs list joins this table (`_count: { payrolls: true }`), so a
-        // Payroll that's missing columns breaks the runs query too.
-        await exec(`
-            CREATE TABLE IF NOT EXISTS "Payroll" (
-                "id" TEXT NOT NULL,
-                CONSTRAINT "Payroll_pkey" PRIMARY KEY ("id")
-            )
-        `)
-        await reconcileLegacyCase("Payroll", PAYROLL_COLUMNS)
-        await addColumns("Payroll", PAYROLL_COLUMNS)
-        await exec(`CREATE UNIQUE INDEX IF NOT EXISTS "Payroll_employeeId_month_year_key" ON "Payroll"("employeeId", "month", "year")`)
-        await exec(`CREATE INDEX IF NOT EXISTS "Payroll_month_year_idx"   ON "Payroll"("month", "year")`)
-        await exec(`CREATE INDEX IF NOT EXISTS "Payroll_status_idx"       ON "Payroll"("status")`)
-        await exec(`CREATE INDEX IF NOT EXISTS "Payroll_employeeId_idx"   ON "Payroll"("employeeId")`)
-        await exec(`CREATE INDEX IF NOT EXISTS "Payroll_payrollRunId_idx" ON "Payroll"("payrollRunId")`)
-
-        // Constraints have no IF NOT EXISTS — swallow the duplicate on re-run.
-        for (const fk of [
-            `ALTER TABLE "Payroll" ADD CONSTRAINT "Payroll_employeeId_fkey"
-                 FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE RESTRICT ON UPDATE CASCADE`,
-            `ALTER TABLE "Payroll" ADD CONSTRAINT "Payroll_payrollRunId_fkey"
-                 FOREIGN KEY ("payrollRunId") REFERENCES "PayrollRun"("id") ON DELETE SET NULL ON UPDATE CASCADE`,
-        ]) {
+        for (const statement of INDEX_STATEMENTS) await exec(statement)
+        for (const fk of FOREIGN_KEY_STATEMENTS) {
             try { await exec(fk) } catch { /* already present */ }
         }
 
