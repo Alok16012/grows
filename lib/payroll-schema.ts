@@ -114,6 +114,62 @@ const PAYROLL_COLUMNS = [
     `"updatedAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
 ]
 
+const columnName = (clause: string) => clause.match(/^"([^"]+)"/)![1]
+
+// Parts of prod were hand-patched with UNQUOTED DDL — `ALTER TABLE "PayrollRun"
+// ADD COLUMN processedBy TEXT NOT NULL` — and Postgres folds unquoted
+// identifiers to lower case, so the column landed as `processedby`. Prisma only
+// ever reads and writes the quoted `"processedBy"`, so the two never met: the
+// heal below saw no `"processedBy"`, added its own, and every insert then died
+// on the legacy `processedby` — NOT NULL, no default, and invisible to Prisma.
+//
+// So before adding anything, reconcile the case-folded twins:
+//   • legacy only  → RENAME it to the camelCase name, data and all. This is the
+//     good outcome, and it's why this has to run BEFORE addColumns.
+//   • both present → the legacy one is now dead weight Prisma will never fill,
+//     so DROP NOT NULL to unblock writes. Nothing is dropped or overwritten;
+//     whatever it holds stays put for inspection.
+async function reconcileLegacyCase(table: string, columns: string[]): Promise<void> {
+    const names = columns.map(columnName).filter(n => n !== n.toLowerCase())
+    if (!names.length) return
+    const literal = names.map(n => `'${n}'`).join(", ")
+    try {
+        await exec(`
+            DO $$
+            DECLARE
+                expected TEXT[] := ARRAY[${literal}];
+                col    TEXT;
+                legacy TEXT;
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = '${table}'
+                ) THEN
+                    RETURN;
+                END IF;
+                FOREACH col IN ARRAY expected LOOP
+                    legacy := lower(col);
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = '${table}' AND column_name = legacy
+                    ) THEN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public' AND table_name = '${table}' AND column_name = col
+                        ) THEN
+                            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', '${table}', legacy);
+                        ELSE
+                            EXECUTE format('ALTER TABLE %I RENAME COLUMN %I TO %I', '${table}', legacy, col);
+                        END IF;
+                    END IF;
+                END LOOP;
+            END $$
+        `)
+    } catch (e) {
+        console.error(`[PAYROLL_SCHEMA_ENSURE] case reconcile ${table}`, e)
+    }
+}
+
 // One ALTER for all the columns, because that's a single round trip. Postgres
 // aborts the whole statement if any one clause errors, though, so fall back to
 // adding them individually — a column we can't add must not stop the rest.
@@ -147,6 +203,7 @@ async function run(): Promise<void> {
         `)
         // Everything except the PK is added here, so a fresh table and a stale
         // one built from an older schema take the exact same path.
+        await reconcileLegacyCase("PayrollRun", PAYROLL_RUN_COLUMNS)
         await addColumns("PayrollRun", PAYROLL_RUN_COLUMNS)
         await exec(`CREATE UNIQUE INDEX IF NOT EXISTS "PayrollRun_month_year_key" ON "PayrollRun"("month", "year")`)
         await exec(`CREATE INDEX IF NOT EXISTS "PayrollRun_status_idx" ON "PayrollRun"("status")`)
@@ -160,6 +217,7 @@ async function run(): Promise<void> {
                 CONSTRAINT "Payroll_pkey" PRIMARY KEY ("id")
             )
         `)
+        await reconcileLegacyCase("Payroll", PAYROLL_COLUMNS)
         await addColumns("Payroll", PAYROLL_COLUMNS)
         await exec(`CREATE UNIQUE INDEX IF NOT EXISTS "Payroll_employeeId_month_year_key" ON "Payroll"("employeeId", "month", "year")`)
         await exec(`CREATE INDEX IF NOT EXISTS "Payroll_month_year_idx"   ON "Payroll"("month", "year")`)

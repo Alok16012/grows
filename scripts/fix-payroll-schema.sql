@@ -6,8 +6,10 @@
 -- got a migration (`grep PayrollRun prisma/migrations` returns nothing), and
 -- prod migrations are applied by hand here because DIRECT_URL isn't configured
 -- on Vercel. Prod ended up with both tables built from an older revision of the
--- schema, short several columns — PayrollRun.processedBy was the first one to
--- surface — so every payroll read 500s.
+-- schema and short several columns, and with at least one column hand-patched
+-- in via unquoted DDL so Postgres folded it to lower case (`processedby`) where
+-- Prisma can't see it. Reads 500 on the missing columns; writes 500 on the
+-- lower-cased one. Section 2 handles the case folding, sections 3-4 the rest.
 --
 -- HOW TO RUN: paste the whole file into the Supabase SQL editor and run once.
 -- Safe to re-run — every statement is idempotent, and the constraint blocks
@@ -34,7 +36,70 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 
--- ── 2. PayrollRun ───────────────────────────────────────────────────────────
+-- ── 2. Reconcile case-folded legacy columns ─────────────────────────────────
+-- Parts of prod were hand-patched with UNQUOTED DDL — `ALTER TABLE "PayrollRun"
+-- ADD COLUMN processedBy TEXT NOT NULL` — and Postgres folds unquoted
+-- identifiers to lower case, so the column landed as `processedby`. Prisma only
+-- ever touches the quoted `"processedBy"`, so the two never met: section 3 adds
+-- its own `"processedBy"` and every INSERT then dies on the legacy `processedby`
+-- (NOT NULL, no default, invisible to Prisma) with
+--   Null constraint violation on the fields: (`processedby`)
+--
+-- Per column:
+--   • legacy only  -> RENAME to the camelCase name, data and all. The good
+--     outcome, and why this must run BEFORE section 3 adds anything.
+--   • both present -> the legacy one is dead weight Prisma will never fill, so
+--     DROP NOT NULL to unblock writes.
+-- Nothing is ever dropped or overwritten; whatever the legacy column holds
+-- stays put. Tables that don't exist yet are skipped.
+DO $$
+DECLARE
+    spec   RECORD;
+    col    TEXT;
+    legacy TEXT;
+BEGIN
+    FOR spec IN
+        SELECT * FROM (VALUES
+            ('PayrollRun', ARRAY[
+                'lockedAt','processedBy','totalGross','totalNet','totalPfEmployer',
+                'totalEsiEmployer','totalLwf','totalTds','createdAt','updatedAt'
+            ]),
+            ('Payroll', ARRAY[
+                'employeeId','payrollRunId','basicFull','daFull','hraFull','washingFull',
+                'conveyanceFull','lwwFull','bonusFull','otherFull','grossFullMonth',
+                'basicSalary','lwwEarned','otDays','overtimePay','productionIncentive',
+                'grossSalary','pfEmployee','pfEmployer','esiEmployee','esiEmployer',
+                'canteenDays','otherDeductions','totalDeductions','netSalary','workingDays',
+                'presentDays','leaveDays','lwpDays','overtimeHrs','overtimeRate','siteId',
+                'processedAt','processedBy','paidAt','paidBy','createdAt','updatedAt'
+            ])
+        ) AS t(tbl, cols)
+    LOOP
+        CONTINUE WHEN NOT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = spec.tbl
+        );
+        FOREACH col IN ARRAY spec.cols LOOP
+            legacy := lower(col);
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = spec.tbl AND column_name = legacy
+            ) THEN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = spec.tbl AND column_name = col
+                ) THEN
+                    EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', spec.tbl, legacy);
+                ELSE
+                    EXECUTE format('ALTER TABLE %I RENAME COLUMN %I TO %I', spec.tbl, legacy, col);
+                END IF;
+            END IF;
+        END LOOP;
+    END LOOP;
+END $$;
+
+
+-- ── 3. PayrollRun ───────────────────────────────────────────────────────────
 -- Only the primary key is created here; every other column is added below, so a
 -- brand new table and a stale one take the exact same path.
 CREATE TABLE IF NOT EXISTS "PayrollRun" (
@@ -64,7 +129,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "PayrollRun_month_year_key" ON "PayrollRun"("m
 CREATE INDEX        IF NOT EXISTS "PayrollRun_status_idx"     ON "PayrollRun"("status");
 
 
--- ── 3. Payroll ──────────────────────────────────────────────────────────────
+-- ── 4. Payroll ──────────────────────────────────────────────────────────────
 -- The runs list joins this table (`_count: { payrolls: true }`), so a Payroll
 -- that's missing columns breaks the runs query too — not just the payroll list.
 CREATE TABLE IF NOT EXISTS "Payroll" (
@@ -141,7 +206,7 @@ CREATE INDEX        IF NOT EXISTS "Payroll_employeeId_idx"            ON "Payrol
 CREATE INDEX        IF NOT EXISTS "Payroll_payrollRunId_idx"          ON "Payroll"("payrollRunId");
 
 
--- ── 4. Foreign keys ─────────────────────────────────────────────────────────
+-- ── 5. Foreign keys ─────────────────────────────────────────────────────────
 -- ADD CONSTRAINT has no IF NOT EXISTS. Each gets its own DO block so a
 -- duplicate can't abort the transaction the SQL editor wraps this file in.
 DO $$ BEGIN
@@ -157,7 +222,7 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 
--- ── 5. Verify ───────────────────────────────────────────────────────────────
+-- ── 6. Verify ───────────────────────────────────────────────────────────────
 -- Expect: PayrollRun = 14 columns, Payroll = 56 columns, 2 foreign keys.
 SELECT table_name, count(*) AS columns
 FROM information_schema.columns
