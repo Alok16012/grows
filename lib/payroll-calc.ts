@@ -18,9 +18,9 @@
 // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
 //   Default hoursPerDay = 4 (e.g. ₹170/hr × 4 = ₹680/day)
 //
-// PF Employee:  pfBase = min(Basic + DA, wageCeiling ₹15,000)
-//               Default: pfBase × 12% with NO proration (full PF regardless of
-//               worked days). Optional rule: prorate below the threshold days.
+// PF Employee:  pfBase = min(Basic + DA, wage ceiling ₹15,000)
+//               ≤ ₹15,000 → 12% of actual. > ₹15,000 → ₹1,800 fixed.
+//               Default: full PF regardless of worked days; optional proration rule.
 // PF Employer (all on pfBase):
 //   EPS 8.33% + EPF diff 3.67% + EDLI 0.50% + admin 0.50%  (≈ 13%)
 //
@@ -101,7 +101,8 @@ export function calcGrowusPayroll(sal: {
     const pctOf  = (x: number, pct: number) => Math.round(x * pct / 100)
     const pctCeil = (x: number, pct: number) => Math.ceil(x * pct / 100)
 
-    // PF base = min(Basic + DA, wage ceiling) — capped at statutory ceiling.
+    // PF base = min(Basic + DA, wage ceiling ₹15,000) — capped at statutory ceiling.
+    // ≤ ₹15,000 → 12% of actual. > ₹15,000 → ₹1,800 fixed.
     // Default: full PF regardless of worked days; optional proration rule.
     const pfApplies  = rules.pf.enabled && !isCALL
     const pfBase     = Math.min(basic + da, rules.pf.wageCeiling)
@@ -133,7 +134,7 @@ export function calcGrowusPayroll(sal: {
     const netSalary = grossEarned - totalDeductions
 
     // ─── Employer Contributions ───────────────────────────────────────────────
-    // Employer PF — 4 components on pfBase = min(Basic+DA, ceiling)
+    // Employer PF — 4 components on pfBase = Basic + DA (no ceiling)
     const eps         = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.epsPct)
     const epfEmployer = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.epfPct)
     const edli        = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.edliPct)

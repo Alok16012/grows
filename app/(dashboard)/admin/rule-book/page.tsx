@@ -48,7 +48,7 @@ const CALC_ROWS = [
 ]
 
 const DEDUCTION_ROWS = [
-    { col: "PF Employee", formula: "WorkedDays ≥ 26 → ₹1,800   |   else ROUND(15000/26 × WorkedDays × 12%)", eligibility: "OR compliance only", call: "₹0" },
+    { col: "PF Employee", formula: "ROUND((Basic + DA) × employeePct%)", eligibility: "OR compliance only", call: "₹0" },
     { col: "ESIC Employee", formula: "CEIL(ESIC_Wages × 0.75%)   where ESIC_Wages = Earned Gross − Washing − Bonus", eligibility: "Structure Gross ≤ ₹21,000 (₹25,000 Handicap)", call: "₹0" },
     { col: "PT (Prof. Tax)", formula: "≤₹7,500 → ₹0 | ₹7,501–₹10,000 → ₹175 | >₹10,000 → ₹200 | Feb >₹10,000 → ₹300", eligibility: "All OR employees (Maharashtra slab)", call: "₹0" },
     { col: "LWF Employee", formula: "Maharashtra: ₹6 / month", eligibility: "All employees", call: "varies" },
@@ -59,7 +59,7 @@ const DEDUCTION_ROWS = [
 ]
 
 const EMPLOYER_ROWS = [
-    { col: "PF Employer", formula: "ROUND(15000 × 13%) = ₹1,950", breakdown: "12% EPF + 0.5% EDLI + 0.5% admin on ₹15,000 ceiling", call: "₹0" },
+    { col: "PF Employer", formula: "ROUND((Basic + DA) × 13%)", breakdown: "8.33% EPS + 3.67% EPF + 0.5% EDLI + 0.5% admin on (Basic + DA), no ceiling", call: "₹0" },
     { col: "ESIC Employer", formula: "CEIL(ESIC_Wages × 3.25%)", breakdown: "Same ESIC_Wages base as employee contribution", call: "₹0" },
 ]
 

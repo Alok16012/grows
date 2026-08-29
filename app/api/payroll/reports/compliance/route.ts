@@ -60,8 +60,9 @@ type PayrollRow = {
 }
 
 function pfWages(p: PayrollRow, rules: PayrollRules) {
-    return Math.min(p.basicSalary + p.da, rules.pf.wageCeiling)
+    return p.basicSalary + p.da
 }
+
 function epsContrib(p: PayrollRow, rules: PayrollRules) {
     return Math.round(pfWages(p, rules) * rules.pf.employer.epsPct / 100)
 }
@@ -357,7 +358,7 @@ export async function GET(req: Request) {
                         "Month": month,
                         "Year": year,
                         "Basic + DA": p.basicSalary + p.da,
-                        [`PF Wages (Capped ${rules.pf.wageCeiling})`]: pfWages(p, rules),
+                        "PF Wages": pfWages(p, rules),
                         "Employee PF": p.pfEmployee,
                         "Employer PF": p.pfEmployer,
                         "Total PF Contribution": p.pfEmployee + p.pfEmployer,

@@ -677,7 +677,7 @@ function SalaryMasterInner() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of min(Basic+DA, ₹15k) · Emp.ESI = (Gross−Wash)×0.75% · Co.PF = ₹1,950 · Co.ESIC = (Gross−Wash)×3.25% · ESIC limit ₹21k (₹25k for Handicap)
+                Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of (Basic + DA) · Emp.ESI = (Gross−Wash)×0.75% · Co.PF = 13% of (Basic+DA) · Co.ESIC = (Gross−Wash)×3.25% · ESIC limit ₹21k (₹25k for Handicap)
             </p>
 
             {/* ── Manual Edit Drawer ─────────────────────────────────────── */}

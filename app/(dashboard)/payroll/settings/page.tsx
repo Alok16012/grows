@@ -246,8 +246,8 @@ export default function PayrollSettingsPage() {
                     <div>
                         <h2 style={cardTitle}>Provident Fund (PF)</h2>
                         <p style={cardHint}>
-                            <b>Formula:</b> PF = 12% of (Basic + DA), capped at wage ceiling.
-                            If Basic + DA &gt; ₹15,000 → PF = ₹1,800 (fixed). If Basic + DA &le; ₹15,000 → PF = 12% of actual (Basic + DA).
+                            <b>Formula:</b> PF = employeePct% of (Basic + DA), capped at wage ceiling.
+                            If Basic + DA &gt; ₹{Math.round(rules.pf.wageCeiling).toLocaleString("en-IN")} → PF = ₹{Math.round(rules.pf.wageCeiling * rules.pf.employeePct / 100).toLocaleString("en-IN")} (fixed). If Basic + DA &le; ₹{Math.round(rules.pf.wageCeiling).toLocaleString("en-IN")} → PF = {rules.pf.employeePct}% of actual (Basic + DA).
                         </p>
                     </div>
                     <Toggle label="PF enabled" checked={rules.pf.enabled} onChange={b => up("pf", { enabled: b })}

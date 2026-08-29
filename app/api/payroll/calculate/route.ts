@@ -143,8 +143,8 @@ export async function POST(req: Request) {
 
         const allRows: PayrollRow[] = employees.map(emp => {
             const sal      = emp.employeeSalary
-            const salBasic = (sal?.status === "APPROVED" ? sal.basic : null) ?? emp.basicSalary ?? 0
-            const salData  = sal?.status === "APPROVED" ? sal : null
+            const salBasic = sal?.basic ?? emp.basicSalary ?? 0
+            const salData  = sal  // use salary structure if it exists (PROPOSED or APPROVED)
 
             const attInput = (attendance as any[])?.find((a: any) => a.employeeId === emp.id) ?? {}
             const att = {

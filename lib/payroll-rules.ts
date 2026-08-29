@@ -22,7 +22,8 @@ export type PtSlab = {
 export type PayrollRules = {
     pf: {
         enabled: boolean
-        // Statutory wage ceiling: PF base = min(Basic + DA, wageCeiling)
+        // PF base = Basic + DA (no ceiling). wageCeiling kept in type for
+        // backward compat with stored settings but not used in calculation.
         wageCeiling: number
         employeePct: number
         // When true, employees who worked fewer than prorationThresholdDays
