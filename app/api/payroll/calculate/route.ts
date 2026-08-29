@@ -162,6 +162,7 @@ export async function POST(req: Request) {
                 lwf:                 Number(attInput.lwf)                 || 0,
             }
 
+            console.log(`[PAYROLL_DEBUG] ${emp.employeeId} ${emp.firstName} ${emp.lastName}: basic=${salBasic} da=${salData?.da} pfBase=min(${salBasic}+${salData?.da},15000)=${Math.min(salBasic + (salData?.da || 0), 15000)}`)
             const calc = calcGrowusPayroll({
                 basic:             salBasic,
                 da:                salData?.da               ?? 0,
