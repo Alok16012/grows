@@ -55,11 +55,15 @@ const HEADER = `-- =============================================================
 
 const { ddl, foreignKeys } = payrollSchemaSql()
 
-// ADD CONSTRAINT has no IF NOT EXISTS, and an unhandled duplicate would roll
-// back the editor's transaction, so each FK gets its own exception handler.
+// ADD CONSTRAINT has no IF NOT EXISTS, and ANY unhandled error rolls back the
+// editor's single transaction — a missing primary key on PayrollRun once made
+// the second FK fail with 42830 and took every column fix with it. So each FK
+// gets a handler that swallows everything and reports; these constraints are the
+// least important thing in the file and must never cost us the rest of it.
 const fkBlocks = foreignKeys.map(fk => `DO $do$ BEGIN
     ${fk.trim().replace(/\n\s+/g, "\n    ")};
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'skipped foreign key: %', SQLERRM;
 END $do$;`)
 
 const VERIFY = `-- ── Verify ──────────────────────────────────────────────────────────────────

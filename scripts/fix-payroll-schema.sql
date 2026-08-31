@@ -163,6 +163,40 @@ BEGIN
 END $do$;
 
 
+DO $do$
+DECLARE
+    rel   REGCLASS := to_regclass('public."PayrollRun"');
+    dupes BIGINT;
+BEGIN
+    IF rel IS NULL THEN RETURN; END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'PayrollRun' AND column_name = 'id'
+    ) THEN RETURN; END IF;
+
+    -- Already keyed (primary or unique) on exactly "id"?
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = rel AND contype IN ('p', 'u')
+          AND conkey = ARRAY[(
+              SELECT attnum FROM pg_attribute
+              WHERE attrelid = rel AND attname = 'id'
+          )]::smallint[]
+    ) THEN RETURN; END IF;
+
+    EXECUTE format('UPDATE %I SET "id" = gen_random_uuid()::text WHERE "id" IS NULL OR "id" = ''''', 'PayrollRun');
+
+    EXECUTE format('SELECT count(*) FROM (SELECT 1 FROM %I GROUP BY "id" HAVING count(*) > 1) d', 'PayrollRun')
+        INTO dupes;
+    IF dupes > 0 THEN
+        RAISE NOTICE '%: % duplicate id(s), leaving the table unkeyed', 'PayrollRun', dupes;
+        RETURN;
+    END IF;
+
+    EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I PRIMARY KEY ("id")', 'PayrollRun', 'PayrollRun_pkey');
+END $do$;
+
+
 CREATE TABLE IF NOT EXISTS "Payroll" (
     "id" TEXT NOT NULL,
     CONSTRAINT "Payroll_pkey" PRIMARY KEY ("id")
@@ -366,6 +400,40 @@ BEGIN
 END $do$;
 
 
+DO $do$
+DECLARE
+    rel   REGCLASS := to_regclass('public."Payroll"');
+    dupes BIGINT;
+BEGIN
+    IF rel IS NULL THEN RETURN; END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'Payroll' AND column_name = 'id'
+    ) THEN RETURN; END IF;
+
+    -- Already keyed (primary or unique) on exactly "id"?
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = rel AND contype IN ('p', 'u')
+          AND conkey = ARRAY[(
+              SELECT attnum FROM pg_attribute
+              WHERE attrelid = rel AND attname = 'id'
+          )]::smallint[]
+    ) THEN RETURN; END IF;
+
+    EXECUTE format('UPDATE %I SET "id" = gen_random_uuid()::text WHERE "id" IS NULL OR "id" = ''''', 'Payroll');
+
+    EXECUTE format('SELECT count(*) FROM (SELECT 1 FROM %I GROUP BY "id" HAVING count(*) > 1) d', 'Payroll')
+        INTO dupes;
+    IF dupes > 0 THEN
+        RAISE NOTICE '%: % duplicate id(s), leaving the table unkeyed', 'Payroll', dupes;
+        RETURN;
+    END IF;
+
+    EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I PRIMARY KEY ("id")', 'Payroll', 'Payroll_pkey');
+END $do$;
+
+
 CREATE UNIQUE INDEX IF NOT EXISTS "PayrollRun_month_year_key" ON "PayrollRun"("month", "year");
 
 
@@ -390,14 +458,16 @@ CREATE INDEX IF NOT EXISTS "Payroll_payrollRunId_idx" ON "Payroll"("payrollRunId
 DO $do$ BEGIN
     ALTER TABLE "Payroll" ADD CONSTRAINT "Payroll_employeeId_fkey"
     FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'skipped foreign key: %', SQLERRM;
 END $do$;
 
 
 DO $do$ BEGIN
     ALTER TABLE "Payroll" ADD CONSTRAINT "Payroll_payrollRunId_fkey"
     FOREIGN KEY ("payrollRunId") REFERENCES "PayrollRun"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'skipped foreign key: %', SQLERRM;
 END $do$;
 
 

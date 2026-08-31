@@ -116,6 +116,7 @@ export function calcGrowusPayroll(sal: {
     const esicLimit    = isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
     const esicWages    = grossEarned
         - (rules.esic.excludeWashing ? washingEarned : 0)
+        - (rules.esic.excludeConveyance ? convEarned : 0)
         - (rules.esic.excludeBonus ? bonusEarned : 0)
     const esicEligible = rules.esic.enabled && !isCALL && grossFullMonth <= esicLimit
     const esiEmployee  = esicEligible ? pctCeil(esicWages, rules.esic.employeePct) : 0

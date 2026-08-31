@@ -123,12 +123,13 @@ export async function PUT(
                 newAllowances + newOvertimePay + existing.productionIncentive
 
             // ESIC follows the engine: eligibility on FULL-MONTH structure
-            // gross, wages exclude washing/bonus per rules, CALL exempt.
+            // gross, wages exclude washing/conveyance/bonus per rules, CALL exempt.
             const esicLimit = employee?.isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
             const esicEligible = rules.esic.enabled && !isCALL && existing.grossFullMonth <= esicLimit
             const esicWages = Math.max(0,
                 grossSalary
                 - (rules.esic.excludeWashing ? existing.washing : 0)
+                - (rules.esic.excludeConveyance ? existing.conveyance : 0)
                 - (rules.esic.excludeBonus ? existing.bonus : 0))
             const esiEmployee = esicEligible ? Math.ceil(esicWages * rules.esic.employeePct / 100) : 0
             const esiEmployer = esicEligible ? Math.ceil(esicWages * rules.esic.employerPct / 100) : 0

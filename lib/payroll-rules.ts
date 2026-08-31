@@ -48,6 +48,7 @@ export type PayrollRules = {
         // ESIC wage base = earned gross minus the excluded components below
         // (OT stays included per ESIC rules).
         excludeWashing: boolean
+        excludeConveyance: boolean
         excludeBonus: boolean
     }
     pt: {
@@ -109,6 +110,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         employeePct: 0.75,
         employerPct: 3.25,
         excludeWashing: true,
+        excludeConveyance: true,
         excludeBonus: true,
     },
     pt: {
@@ -224,6 +226,7 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
             employeePct: num(esic.employeePct, d.esic.employeePct, { max: 100 }),
             employerPct: num(esic.employerPct, d.esic.employerPct, { max: 100 }),
             excludeWashing: bool(esic.excludeWashing, d.esic.excludeWashing),
+            excludeConveyance: bool(esic.excludeConveyance, d.esic.excludeConveyance),
             excludeBonus: bool(esic.excludeBonus, d.esic.excludeBonus),
         },
         pt: {

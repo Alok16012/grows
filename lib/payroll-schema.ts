@@ -264,6 +264,54 @@ async function reconcileTypes(table: string, cols: Col[]): Promise<void> {
     catch (e) { console.error(`[PAYROLL_SCHEMA_ENSURE] type reconcile ${table}`, e) }
 }
 
+// ─── 4. Missing primary key ──────────────────────────────────────────────────
+// CREATE TABLE IF NOT EXISTS no-ops on an existing table, so its inline PRIMARY
+// KEY never reaches a table that was created without one. Prod's PayrollRun had
+// no key on "id" at all, which Prisma tolerates but a foreign key does not:
+//   there is no unique constraint matching given keys for referenced table
+//   "PayrollRun"
+// Duplicate ids are left alone rather than deleted — losing a payroll row to
+// tidy up a constraint is not a trade worth making. The FK is simply skipped in
+// that case, which is how things already stand.
+const primaryKeyStatement = (table: string) => `
+            DO $do$
+            DECLARE
+                rel   REGCLASS := to_regclass(${lit(`public."${table}"`)});
+                dupes BIGINT;
+            BEGIN
+                IF rel IS NULL THEN RETURN; END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = ${lit(table)} AND column_name = 'id'
+                ) THEN RETURN; END IF;
+
+                -- Already keyed (primary or unique) on exactly "id"?
+                IF EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conrelid = rel AND contype IN ('p', 'u')
+                      AND conkey = ARRAY[(
+                          SELECT attnum FROM pg_attribute
+                          WHERE attrelid = rel AND attname = 'id'
+                      )]::smallint[]
+                ) THEN RETURN; END IF;
+
+                EXECUTE format('UPDATE %I SET "id" = gen_random_uuid()::text WHERE "id" IS NULL OR "id" = ''''', ${lit(table)});
+
+                EXECUTE format('SELECT count(*) FROM (SELECT 1 FROM %I GROUP BY "id" HAVING count(*) > 1) d', ${lit(table)})
+                    INTO dupes;
+                IF dupes > 0 THEN
+                    RAISE NOTICE '%: % duplicate id(s), leaving the table unkeyed', ${lit(table)}, dupes;
+                    RETURN;
+                END IF;
+
+                EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I PRIMARY KEY ("id")', ${lit(table)}, ${lit(`${table}_pkey`)});
+            END $do$`
+
+async function ensurePrimaryKey(table: string): Promise<void> {
+    try { await exec(primaryKeyStatement(table)) }
+    catch (e) { console.error(`[PAYROLL_SCHEMA_ENSURE] primary key ${table}`, e) }
+}
+
 const TABLES: [string, Col[]][] = [["PayrollRun", PAYROLL_RUN], ["Payroll", PAYROLL]]
 
 const enumStatement = () => `
@@ -290,10 +338,13 @@ const INDEX_STATEMENTS = [
     `CREATE INDEX IF NOT EXISTS "Payroll_payrollRunId_idx" ON "Payroll"("payrollRunId")`,
 ]
 
-// Constraints have no IF NOT EXISTS. At runtime the duplicate is caught in JS;
-// the generated .sql wraps each one in its own exception-handling DO block,
-// because the Supabase editor runs the file as a single transaction where one
-// unhandled error would roll everything back.
+// Constraints have no IF NOT EXISTS. At runtime any failure is caught in JS; the
+// generated .sql wraps each one in its own DO block that swallows EVERYTHING,
+// because the Supabase editor runs the file as a single transaction and one
+// unhandled error rolls back the whole repair — which is exactly what happened
+// when a missing primary key on PayrollRun made the second FK fail with 42830
+// and took every column fix down with it. These constraints are the least
+// important thing in this file; nothing may be sacrificed to add them.
 const FOREIGN_KEY_STATEMENTS = [
     `ALTER TABLE "Payroll" ADD CONSTRAINT "Payroll_employeeId_fkey"
      FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE RESTRICT ON UPDATE CASCADE`,
@@ -312,6 +363,7 @@ export function payrollSchemaSql(): { ddl: string[]; foreignKeys: string[] } {
         if (legacy) ddl.push(legacy)
         ddl.push(addColumnsStatement(table, cols))
         ddl.push(typeReconcileStatement(table, cols))
+        ddl.push(primaryKeyStatement(table))
     }
     ddl.push(...INDEX_STATEMENTS)
     return { ddl, foreignKeys: FOREIGN_KEY_STATEMENTS }
@@ -326,6 +378,7 @@ async function run(): Promise<void> {
             await reconcileLegacyCase(table, cols)
             await addColumns(table, cols)
             await reconcileTypes(table, cols)
+            await ensurePrimaryKey(table)
         }
 
         for (const statement of INDEX_STATEMENTS) await exec(statement)
