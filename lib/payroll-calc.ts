@@ -101,11 +101,11 @@ export function calcGrowusPayroll(sal: {
     const pctOf  = (x: number, pct: number) => Math.round(x * pct / 100)
     const pctCeil = (x: number, pct: number) => Math.ceil(x * pct / 100)
 
-    // PF base = min(Basic + DA, wage ceiling ₹15,000) — capped at statutory ceiling.
+    // PF base = min(EARNED Basic + DA, wage ceiling ₹15,000).
     // ≤ ₹15,000 → 12% of actual. > ₹15,000 → ₹1,800 fixed.
     // Default: full PF regardless of worked days; optional proration rule.
     const pfApplies  = rules.pf.enabled && !isCALL
-    const pfBase     = Math.min(basic + da, rules.pf.wageCeiling)
+    const pfBase     = Math.min(basicEarned + daEarned, rules.pf.wageCeiling)
     const pfProrated = rules.pf.prorateEmployee && workedDays < rules.pf.prorationThresholdDays
     const pfEmployee = !pfApplies ? 0 : pfProrated
         ? Math.round(pfBase / rules.pf.prorationThresholdDays * workedDays * rules.pf.employeePct / 100)
