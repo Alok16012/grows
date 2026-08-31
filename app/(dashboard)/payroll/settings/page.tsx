@@ -292,6 +292,7 @@ export default function PayrollSettingsPage() {
                         <NumField label="Employer rate" suffix="%" value={rules.esic.employerPct} onChange={n => up("esic", { employerPct: n })} />
                     </div>
                     <Toggle label="Exclude Washing from ESIC wages" checked={rules.esic.excludeWashing} onChange={b => up("esic", { excludeWashing: b })} />
+                    <Toggle label="Exclude Conveyance from ESIC wages" checked={rules.esic.excludeConveyance} onChange={b => up("esic", { excludeConveyance: b })} />
                     <Toggle label="Exclude Bonus from ESIC wages" checked={rules.esic.excludeBonus} onChange={b => up("esic", { excludeBonus: b })} />
                 </div>
 

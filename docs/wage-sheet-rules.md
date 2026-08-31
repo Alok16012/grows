@@ -18,9 +18,9 @@
 | **DA** (Dearness Allowance) | Manually entered per employee | **₹0** | — |
 | **HRA** (House Rent Allowance) | **Manually entered — NO auto-calculation** | **₹0** | Previously was (Basic+DA)×5% — now fully manual |
 | **Washing Allowance** | Manually entered per employee | **₹0** | Excluded from ESIC base |
-| **Conveyance** | Manually entered per employee | **₹0** | — |
+| **Conveyance** | Manually entered per employee | **₹0** | Excluded from ESIC base |
 | **LWW** (Leave With Wages) | Manually entered per employee | **₹0** | — |
-| **Bonus** | **Manually entered — NO auto-calculation** | **₹0** | Per Payment of Bonus Act. Previously was (Basic+DA)×8.33% — now fully manual. Excluded from ESIC base |
+| **Bonus** | **Manually entered — NO auto-calculation** | **₹0** | Per Payment of Bonus Act. Previously was (Basic+DA)×8.33% — now fully manual. **Included** in ESIC base |
 | **Other Allowance** | Manually entered per employee | **₹0** | — |
 
 ---
@@ -85,9 +85,10 @@
 
 ### ESIC Wage Base
 ```
-ESIC Wages = Earned Gross − Washing (prorated) − Bonus (prorated)
+ESIC Wages = Earned Gross − Washing (prorated) − Conveyance (prorated)
 ```
-> OT Pay IS included. Washing and Bonus are excluded per ESIC rules.
+> OT Pay and Bonus ARE included. Only Washing and Conveyance are excluded.
+> Each exclusion is a toggle in Payroll → Calculation Settings.
 
 ---
 

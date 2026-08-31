@@ -45,8 +45,9 @@ export type PayrollRules = {
         handicapLimit: number
         employeePct: number
         employerPct: number
-        // ESIC wage base = earned gross minus the excluded components below
-        // (OT stays included per ESIC rules).
+        // ESIC wage base = earned gross minus the excluded components below.
+        // OT and Bonus stay included per ESIC rules; only reimbursement-style
+        // components (Washing, Conveyance) come out by default.
         excludeWashing: boolean
         excludeConveyance: boolean
         excludeBonus: boolean
@@ -111,7 +112,9 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         employerPct: 3.25,
         excludeWashing: true,
         excludeConveyance: true,
-        excludeBonus: true,
+        // Bonus STAYS in the ESIC base. Only Washing and Conveyance come out:
+        //   ESIC wages = EarnedGross − Washing − Conveyance
+        excludeBonus: false,
     },
     pt: {
         enabled: true,

@@ -67,11 +67,14 @@ function epsContrib(p: PayrollRow, rules: PayrollRules) {
     return Math.round(pfWages(p, rules) * rules.pf.employer.epsPct / 100)
 }
 function esiWages(p: PayrollRow, rules: PayrollRules) {
-    // Clamp at 0 — bonus/washing > gross (e.g., zero-day month) was producing
-    // negative ESI wages, which EPFO/ESIC challan validators reject.
+    // Must mirror lib/payroll-calc.ts exactly, conveyance included — a challan
+    // that disagrees with the wage sheet is the whole point of this report.
+    // Clamp at 0 — excluded components > gross (e.g., zero-day month) was
+    // producing negative ESI wages, which EPFO/ESIC validators reject.
     return Math.max(0,
         p.grossSalary
         - (rules.esic.excludeWashing ? (p.washing ?? 0) : 0)
+        - (rules.esic.excludeConveyance ? (p.conveyance ?? 0) : 0)
         - (rules.esic.excludeBonus ? (p.bonus ?? 0) : 0))
 }
 function ncpDays(p: PayrollRow) {

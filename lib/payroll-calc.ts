@@ -25,7 +25,7 @@
 //   EPS 8.33% + EPF diff 3.67% + EDLI 0.50% + admin 0.50%  (≈ 13%)
 //
 // ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
-//   ESIC wages = EarnedGross − Washing − Bonus  (OT included)
+//   ESIC wages = EarnedGross − Washing − Conveyance  (OT and Bonus included)
 //   Employee CEIL(0.75%), Employer CEIL(3.25%)
 //
 // PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
