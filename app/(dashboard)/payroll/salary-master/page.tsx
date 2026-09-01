@@ -53,6 +53,34 @@ function calc(s: SalaryRow, isHandicap = false, gender?: string | null, rules: P
     }
 }
 
+// The footer legend is derived from the SAME rules object that drives the
+// table, never hand-written — a stale legend (it used to claim
+// "(Gross−Wash)" long after Conveyance became an exclusion) is how people end
+// up trusting the wrong ESIC figure.
+const pct = (n: number) => `${parseFloat(n.toFixed(2))}%`
+const thousands = (n: number) => `₹${Math.round(n / 1000)}k`
+
+function esicBaseLabel(r: PayrollRules) {
+    const minus = [
+        r.esic.excludeWashing && "Wash",
+        r.esic.excludeConveyance && "Conv",
+        r.esic.excludeBonus && "Bonus",
+    ].filter(Boolean) as string[]
+    return `(Gross${minus.map(m => `−${m}`).join("")})`
+}
+
+function formulaLegend(r: PayrollRules) {
+    const base = esicBaseLabel(r)
+    const coPf = r.pf.employer.epsPct + r.pf.employer.epfPct + r.pf.employer.edliPct + r.pf.employer.adminPct
+    return [
+        `Emp.PF = ${pct(r.pf.employeePct)} of (Basic + DA)`,
+        `Emp.ESI = ${base}×${pct(r.esic.employeePct)}`,
+        `Co.PF = ${pct(coPf)} of (Basic + DA)`,
+        `Co.ESIC = ${base}×${pct(r.esic.employerPct)}`,
+        `ESIC limit ${thousands(r.esic.eligibilityLimit)} (${thousands(r.esic.handicapLimit)} for Handicap)`,
+    ].join(" · ")
+}
+
 type SalaryRow = {
     basic: number; da: number; hra: number; washing: number; conveyance: number
     leaveWithWages: number; otherAllowance: number; bonus: number
@@ -677,7 +705,7 @@ function SalaryMasterInner() {
             </div>
 
             <p style={{ fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-                Bonus = per-employee min-wage based (₹625/₹650) · Emp.PF = 12% of (Basic + DA) · Emp.ESI = (Gross−Wash)×0.75% · Co.PF = 13% of (Basic+DA) · Co.ESIC = (Gross−Wash)×3.25% · ESIC limit ₹21k (₹25k for Handicap)
+                Bonus = per-employee min-wage based · {formulaLegend(rules)}
             </p>
 
             {/* ── Manual Edit Drawer ─────────────────────────────────────── */}
