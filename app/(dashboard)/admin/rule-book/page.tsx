@@ -16,9 +16,9 @@ const EARNINGS_ROWS = [
     { col: "DA", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Dearness Allowance — applied only for OR compliance" },
     { col: "HRA", rule: "Manually entered — NO auto-calculation", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "House Rent Allowance — was (Basic+DA)×5% earlier, now fully manual" },
     { col: "Washing", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Excluded from ESIC wage base" },
-    { col: "Conveyance", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Transport allowance" },
+    { col: "Conveyance", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Transport allowance. Excluded from ESIC wage base" },
     { col: "LWW", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Leave With Wages" },
-    { col: "Bonus", rule: "Manually entered — NO auto-calculation", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Per Payment of Bonus Act. Was (Basic+DA)×8.33% earlier, now fully manual. Excluded from ESIC base." },
+    { col: "Bonus", rule: "Manually entered — NO auto-calculation", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Per Payment of Bonus Act. Was (Basic+DA)×8.33% earlier, now fully manual. Included in the ESIC wage base." },
     { col: "Other Allowance", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Any additional allowance" },
 ]
 
@@ -49,7 +49,7 @@ const CALC_ROWS = [
 
 const DEDUCTION_ROWS = [
     { col: "PF Employee", formula: "ROUND((Basic + DA) × employeePct%)", eligibility: "OR compliance only", call: "₹0" },
-    { col: "ESIC Employee", formula: "CEIL(ESIC_Wages × 0.75%)   where ESIC_Wages = Earned Gross − Washing − Bonus", eligibility: "Structure Gross ≤ ₹21,000 (₹25,000 Handicap)", call: "₹0" },
+    { col: "ESIC Employee", formula: "CEIL(ESIC_Wages × 0.75%)   where ESIC_Wages = Earned Gross − Washing − Conveyance", eligibility: "Structure Gross ≤ ₹21,000 (₹25,000 Handicap)", call: "₹0" },
     { col: "PT (Prof. Tax)", formula: "≤₹7,500 → ₹0 | ₹7,501–₹10,000 → ₹175 | >₹10,000 → ₹200 | Feb >₹10,000 → ₹300", eligibility: "All OR employees (Maharashtra slab)", call: "₹0" },
     { col: "LWF Employee", formula: "Maharashtra: ₹6 / month", eligibility: "All employees", call: "varies" },
     { col: "Canteen", formula: "Canteen_Days × Canteen_Rate_Per_Day", eligibility: "All employees", call: "same" },
@@ -233,8 +233,8 @@ export default function RuleBookPage() {
                             <div style={{ background: "#fef9c3", border: "1px solid #fde047", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-start" }}>
                                 <AlertCircle size={14} style={{ color: "#92400e", marginTop: 1, flexShrink: 0 }} />
                                 <div style={{ fontSize: 12, color: "#78350f" }}>
-                                    <strong>ESIC Wage Base:</strong> <code style={{ background: "#fef08a", padding: "1px 6px", borderRadius: 4 }}>Earned Gross − Washing − Bonus</code>
-                                    &nbsp;(OT included; Washing and Bonus excluded per ESIC rules)
+                                    <strong>ESIC Wage Base:</strong> <code style={{ background: "#fef08a", padding: "1px 6px", borderRadius: 4 }}>Earned Gross − Washing − Conveyance</code>
+                                    &nbsp;(OT and Bonus included; only Washing and Conveyance excluded per ESIC rules)
                                 </div>
                             </div>
                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
