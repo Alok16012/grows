@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client"
+import { schemaSelfHealEnabled } from "@/lib/schema-selfheal"
 
 // Prisma reads DATABASE_URL automatically from prisma/schema.prisma's env()
 // declaration. Don't pass `datasources` explicitly here — doing so forces
@@ -64,6 +65,11 @@ let projectSchemaEnsured = false
 let projectSchemaInFlight: Promise<void> | null = null
 
 export async function ensureProjectSchema(): Promise<void> {
+    // Off in production. This is the widest of the four heals — it fires from
+    // module scope below, so EVERY route on a cold start pays for its ALTER
+    // TABLEs and its full-table backfill over Assignment before doing any work
+    // of its own. See lib/schema-selfheal.ts.
+    if (!schemaSelfHealEnabled()) return
     if (projectSchemaEnsured) return
     if (projectSchemaInFlight) return projectSchemaInFlight
     projectSchemaInFlight = runProjectSchemaHeal().finally(() => {

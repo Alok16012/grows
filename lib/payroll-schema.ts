@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { schemaSelfHealEnabled } from "@/lib/schema-selfheal"
 
 // The payroll models (Payroll / PayrollRun) were added to schema.prisma but
 // never got a migration — `grep PayrollRun prisma/migrations` returns nothing —
@@ -26,6 +27,11 @@ let ensured = false
 let inFlight: Promise<void> | null = null
 
 export async function ensurePayrollSchema(): Promise<void> {
+    // Off in production: ~20 DDL statements in front of every cold-start
+    // request, and they only stop repeating once they succeed. See
+    // lib/schema-selfheal.ts — prod schema comes from
+    // scripts/fix-payroll-schema.sql instead.
+    if (!schemaSelfHealEnabled()) return
     if (ensured) return
     if (inFlight) return inFlight
     inFlight = run().finally(() => { inFlight = null })

@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { schemaSelfHealEnabled } from "@/lib/schema-selfheal"
 
 // The recall feature added an enum value + audit columns to HrDocument after
 // prod was provisioned. Migrations don't run on deploy (DIRECT_URL unset), so
@@ -9,6 +10,8 @@ import prisma from "@/lib/prisma"
 let ensured = false
 
 export async function ensureHrDocRecallSchema() {
+    // Off in production — see lib/schema-selfheal.ts.
+    if (!schemaSelfHealEnabled()) return
     if (ensured) return
     try {
         // ADD VALUE must be its own auto-committed statement (executeRawUnsafe

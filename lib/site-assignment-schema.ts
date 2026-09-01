@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { schemaSelfHealEnabled } from "@/lib/schema-selfheal"
 
 // The SiteAssignment table (the "Whole Site" grant behind the Assignments
 // wizard) was never created in prod, where migrations are applied manually —
@@ -9,6 +10,8 @@ import prisma from "@/lib/prisma"
 let ensured = false
 
 export async function ensureSiteAssignmentSchema() {
+    // Off in production — see lib/schema-selfheal.ts.
+    if (!schemaSelfHealEnabled()) return
     if (ensured) return
     try {
         await (prisma as any).$executeRawUnsafe(`
