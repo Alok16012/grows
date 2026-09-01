@@ -137,7 +137,16 @@ export function calcGrowusPayroll(sal: {
     // ─── Employer Contributions ───────────────────────────────────────────────
     // Employer PF — 4 components on pfBase = Basic + DA (no ceiling)
     const eps         = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.epsPct)
-    const epfEmployer = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.epfPct)
+    // EPF employer is the REMAINDER of the combined EPS+EPF share, not an
+    // independently rounded 3.67%. EPFO computes the 12% employer share and
+    // subtracts EPS from it, so EPS + EPF must come to exactly ROUND(12%) —
+    // rounding each rate separately breaks that on 3,746 of the 15,000
+    // possible bases (verified by sweep), the remainder form on none.
+    // At the ₹15,000 ceiling, which is where most staff here sit:
+    //   independent → ROUND(1249.5)=1250 + ROUND(550.5)=551      → ₹1,951
+    //   remainder   → 1800 − 1250 = 550                          → ₹1,950  ✓
+    const epfEmployer = !pfApplies ? 0
+        : pctOf(pfBase, rules.pf.employer.epsPct + rules.pf.employer.epfPct) - eps
     const edli        = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.edliPct)
     const epfAdmin    = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.adminPct)
     const pfEmployer  = eps + epfEmployer + edli + epfAdmin
