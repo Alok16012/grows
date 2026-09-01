@@ -549,8 +549,18 @@ WHERE table_schema = 'public' AND table_name IN ('Payroll', 'PayrollRun')
   AND column_name = 'status'
 ORDER BY table_name;
 
--- Any row here is a leftover lower-cased twin: harmless, but dead weight that
--- Prisma never reads or writes. Expect none.
+-- Leftover lower-cased twins: dead weight that Prisma, which always quotes
+-- identifiers, never reads or writes.
+--
+-- Rows here are NOT a failure. When only the twin existed the repair renamed
+-- it and this comes back empty; when BOTH spellings existed it cannot rename
+-- over the real column, so it only drops the twin's NOT NULL (which is what
+-- would otherwise break every INSERT) and leaves the column in place --
+-- nothing in this file drops a column or deletes a row.
+--
+-- To clear them, first check the twin holds no data you still want:
+--   SELECT count(*) FROM "Payroll" WHERE "basicsalary" IS NOT NULL;
+-- and only then drop it by hand.
 SELECT table_name, column_name
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name IN ('Payroll', 'PayrollRun')
