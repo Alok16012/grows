@@ -272,11 +272,18 @@ export function computePt(
         isCall?: boolean
         /**
          * What the female exemption limit is measured against. Defaults to
-         * grossEarned, but callers pass earned gross MINUS overtime: a woman
-         * whose salary sits under the limit shouldn't lose the exemption in
-         * the months she happens to work overtime. Without this, EMP-7631 —
-         * 23,302 earned, 9,138 OT — tipped over 25,000 on OT alone and was
-         * charged PT, while the slab itself still applies to the full gross.
+         * grossEarned; callers pass the FULL-MONTH structure gross (the
+         * "Gross(R)" column on Form II).
+         *
+         * The two sides of PT deliberately read different figures, per the
+         * company's stated criteria: the male slab is on what was EARNED,
+         * while the female limit is on the GROSS SALARY. So the exemption
+         * depends on what someone is paid, not on how many days or how much
+         * overtime they worked — EMP-7631's 20,195 salary keeps the exemption
+         * in a month her earnings reached 32,440 on overtime.
+         *
+         * Above the limit she falls through to the same slab as everyone
+         * else, still measured on earned gross.
          */
         femaleExemptBasis?: number
     } = {}

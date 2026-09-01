@@ -64,7 +64,7 @@
 |--------|---------|-------------|------|
 | **PF Employee** | `ROUND(min(Basic + DA, ₹15,000) × 12%)` — **no proration** by default (full PF regardless of worked days; proration below 26 days is an optional setting) | OR compliance only | **₹0** |
 | **ESIC Employee** | `CEIL(ESIC_Wages × 0.75%)` | Structure Gross ≤ ₹21,000 (₹25,000 for Handicap) | **₹0** |
-| **PT** (Professional Tax) | Maharashtra slab on Earned Gross (see PT slab below). Female employees exempt up to ₹25,000 | All employees (system default charges CALL too — configurable) | default charged |
+| **PT** (Professional Tax) | Maharashtra slab on Earned Gross (see PT slab below). Female employees exempt up to ₹25,000 **gross salary** | All employees (system default charges CALL too — configurable) | default charged |
 | **LWF Employee** | Maharashtra: **₹6/month** | All employees | varies |
 | **Canteen** | `Canteen_Days × Canteen_Rate_Per_Day` | All employees | same |
 | **Penalty** | As entered | — | — |
@@ -75,7 +75,7 @@
 
 | Earned Gross | PT Amount |
 |-------------|-----------|
-| Female, ≤ ₹25,000 **excluding OT** | **₹0** (Maharashtra exemption) |
+| Female, **gross salary** ≤ ₹25,000 | **₹0** (Maharashtra exemption) |
 | ≤ ₹7,500 | **₹0** |
 | ₹7,501 – ₹10,000 | **₹175** |
 | > ₹10,000 (standard month) | **₹200** |
@@ -83,11 +83,12 @@
 
 > Slabs, the February amount and the female-exemption limit are editable in Payroll → Calculation Settings.
 >
-> **The female limit is measured on earned gross MINUS overtime**, while the
-> slab itself still uses the full earned gross. A woman whose salary sits under
-> the limit keeps the exemption in the months she works overtime — otherwise OT
-> alone could push her over ₹25,000 and her PT would flip between ₹0 and ₹200
-> month to month.
+> **The two sides of PT read different figures, on purpose.** The slab is on
+> what was EARNED; the female limit is on the full-month GROSS SALARY (Form
+> II's `Gross(R)`). So the exemption follows what someone is paid, not how many
+> days or how much overtime they worked — otherwise OT alone could push a woman
+> over ₹25,000 and flip her PT between ₹0 and ₹200 month to month. Above the
+> limit she falls through to the same slab as everyone else.
 
 ### ESIC Wage Base
 ```
@@ -124,7 +125,7 @@ ESIC Wages = Earned Gross − Washing (prorated) − Conveyance (prorated)
 
 | Term | Meaning | Used For |
 |------|---------|---------|
-| **Structure Gross** (Full Month) | Sum of all salary components at 100% (Basic+DA+HRA+Washing+Conv+LWW+Bonus+Other) | ESIC eligibility check, CTC calculation |
+| **Structure Gross** (Full Month) | Sum of all salary components at 100% (Basic+DA+HRA+Washing+Conv+LWW+Bonus+Other) | ESIC eligibility check, CTC calculation, PT female exemption |
 | **Earned Gross** | Prorated Structure Gross + OT Pay + Production Incentive | Actual payment, deduction calculations, PT slab |
 
 ---
