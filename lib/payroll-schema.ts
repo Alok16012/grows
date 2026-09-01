@@ -143,20 +143,28 @@ function legacyCaseStatement(table: string, cols: Col[]): string | null {
                     WHERE table_schema = 'public' AND table_name = ${lit(table)}
                 ) THEN RETURN; END IF;
                 FOREACH col IN ARRAY expected LOOP
-                    legacy := lower(col);
-                    IF EXISTS (
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_schema = 'public' AND table_name = ${lit(table)} AND column_name = legacy
-                    ) THEN
+                    -- Per-column handler: the Supabase editor runs this file as
+                    -- ONE transaction, so an unhandled error on any single
+                    -- column rolls back every other fix in the file. Skip the
+                    -- column, keep the repair.
+                    BEGIN
+                        legacy := lower(col);
                         IF EXISTS (
                             SELECT 1 FROM information_schema.columns
-                            WHERE table_schema = 'public' AND table_name = ${lit(table)} AND column_name = col
+                            WHERE table_schema = 'public' AND table_name = ${lit(table)} AND column_name = legacy
                         ) THEN
-                            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', ${lit(table)}, legacy);
-                        ELSE
-                            EXECUTE format('ALTER TABLE %I RENAME COLUMN %I TO %I', ${lit(table)}, legacy, col);
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_schema = 'public' AND table_name = ${lit(table)} AND column_name = col
+                            ) THEN
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', ${lit(table)}, legacy);
+                            ELSE
+                                EXECUTE format('ALTER TABLE %I RENAME COLUMN %I TO %I', ${lit(table)}, legacy, col);
+                            END IF;
                         END IF;
-                    END IF;
+                    EXCEPTION WHEN OTHERS THEN
+                        RAISE NOTICE 'skipped legacy-case fix on %.%: %', ${lit(table)}, col, SQLERRM;
+                    END;
                 END LOOP;
             END $do$`
 }
@@ -217,44 +225,55 @@ function typeReconcileStatement(table: string, cols: Col[]): string {
                 ${rows}
                 ) AS t(col, want_udt, type_sql, using_sql, not_null, def_sql)
                 LOOP
-                    SELECT c.udt_name INTO actual
-                    FROM information_schema.columns c
-                    WHERE c.table_schema = 'public' AND c.table_name = ${lit(table)}
-                      AND c.column_name = spec.col;
+                    -- Per-column handler: the Supabase editor runs this file as
+                    -- ONE transaction, so an unhandled error on any single
+                    -- column rolls back every other fix in the file. A column
+                    -- whose type can't be reconciled is skipped with a NOTICE
+                    -- instead of taking the whole repair down. Written as an IF
+                    -- rather than CONTINUE because a jump out of a block that
+                    -- has an EXCEPTION clause is best avoided.
+                    BEGIN
+                        SELECT c.udt_name INTO actual
+                        FROM information_schema.columns c
+                        WHERE c.table_schema = 'public' AND c.table_name = ${lit(table)}
+                          AND c.column_name = spec.col;
 
-                    -- Absent (addColumns handles that) or already right: leave it.
-                    CONTINUE WHEN actual IS NULL OR actual = spec.want_udt;
+                        -- Absent (addColumns handles that) or already right: leave it.
+                        IF actual IS NOT NULL AND actual <> spec.want_udt THEN
+                            -- The old default is expressed in the old type, so it
+                            -- has to go before the column can change type.
+                            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT', ${lit(table)}, spec.col);
 
-                    -- The old default is expressed in the old type, so it has to
-                    -- go before the column can change type.
-                    EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT', ${lit(table)}, spec.col);
+                            -- A value outside the enum would abort the cast. Park
+                            -- those on the default rather than failing the repair.
+                            IF spec.want_udt = ${lit(udtOf(status.type))} THEN
+                                EXECUTE format(
+                                    'UPDATE %I SET %I = %L WHERE %I IS NULL OR %I::text <> ALL (%L::text[])',
+                                    ${lit(table)}, spec.col, 'DRAFT', spec.col, spec.col,
+                                    ${lit(`{${PAYROLL_STATUS_VALUES.join(",")}}`)});
+                            END IF;
 
-                    -- A value outside the enum would abort the cast. Park those
-                    -- on the default rather than failing the whole repair.
-                    IF spec.want_udt = ${lit(udtOf(status.type))} THEN
-                        EXECUTE format(
-                            'UPDATE %I SET %I = %L WHERE %I IS NULL OR %I::text <> ALL (%L::text[])',
-                            ${lit(table)}, spec.col, 'DRAFT', spec.col, spec.col,
-                            ${lit(`{${PAYROLL_STATUS_VALUES.join(",")}}`)});
-                    END IF;
+                            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE %s USING %s',
+                                           ${lit(table)}, spec.col, spec.type_sql, spec.using_sql);
 
-                    EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE %s USING %s',
-                                   ${lit(table)}, spec.col, spec.type_sql, spec.using_sql);
+                            IF spec.def_sql <> '' THEN
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT %s',
+                                               ${lit(table)}, spec.col, spec.def_sql);
+                            END IF;
 
-                    IF spec.def_sql <> '' THEN
-                        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT %s',
-                                       ${lit(table)}, spec.col, spec.def_sql);
-                    END IF;
-
-                    IF spec.not_null THEN
-                        -- The cast can leave NULLs behind (empty strings become
-                        -- NULL), so fill them before re-asserting NOT NULL.
-                        IF spec.def_sql <> '' THEN
-                            EXECUTE format('UPDATE %I SET %I = %s WHERE %I IS NULL',
-                                           ${lit(table)}, spec.col, spec.def_sql, spec.col);
+                            IF spec.not_null THEN
+                                -- The cast can leave NULLs behind (empty strings
+                                -- become NULL), so fill them before re-asserting.
+                                IF spec.def_sql <> '' THEN
+                                    EXECUTE format('UPDATE %I SET %I = %s WHERE %I IS NULL',
+                                                   ${lit(table)}, spec.col, spec.def_sql, spec.col);
+                                END IF;
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET NOT NULL', ${lit(table)}, spec.col);
+                            END IF;
                         END IF;
-                        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET NOT NULL', ${lit(table)}, spec.col);
-                    END IF;
+                    EXCEPTION WHEN OTHERS THEN
+                        RAISE NOTICE 'skipped type fix on %.%: %', ${lit(table)}, spec.col, SQLERRM;
+                    END;
                 END LOOP;
             END $do$`
 }
@@ -292,8 +311,16 @@ const primaryKeyStatement = (table: string) => `
                       AND conkey = ARRAY[(
                           SELECT attnum FROM pg_attribute
                           WHERE attrelid = rel AND attname = 'id'
+                            AND attnum > 0 AND NOT attisdropped
                       )]::smallint[]
                 ) THEN RETURN; END IF;
+
+                -- The constraint NAME is a relation name too, so a leftover
+                -- index called "<table>_pkey" — one hand-created without a
+                -- matching pg_constraint row, which the check above cannot
+                -- see — makes ADD CONSTRAINT fail with 42P07 and, in the
+                -- Supabase editor, rolls back the entire repair file.
+                IF to_regclass(${lit(`public."${table}_pkey"`)}) IS NOT NULL THEN RETURN; END IF;
 
                 EXECUTE format('UPDATE %I SET "id" = gen_random_uuid()::text WHERE "id" IS NULL OR "id" = ''''', ${lit(table)});
 
@@ -305,6 +332,11 @@ const primaryKeyStatement = (table: string) => `
                 END IF;
 
                 EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I PRIMARY KEY ("id")', ${lit(table)}, ${lit(`${table}_pkey`)});
+            EXCEPTION WHEN OTHERS THEN
+                -- Same rule as the foreign keys below: the primary key is the
+                -- least important thing in this file, and nothing may be
+                -- sacrificed to add it. Never let it abort the transaction.
+                RAISE NOTICE 'skipped primary key on %: %', ${lit(table)}, SQLERRM;
             END $do$`
 
 async function ensurePrimaryKey(table: string): Promise<void> {
