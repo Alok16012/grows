@@ -139,6 +139,8 @@ export async function PUT(
                 isFebruary: existing.month === 2,
                 isFemale,
                 isCall: isCALL,
+                // Female limit excludes overtime, same as the engine.
+                femaleExemptBasis: grossSalary - newOvertimePay,
             })
 
             const totalDeductions =

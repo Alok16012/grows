@@ -121,8 +121,14 @@ export function calcGrowusPayroll(sal: {
     const esicEligible = rules.esic.enabled && !isCALL && grossFullMonth <= esicLimit
     const esiEmployee  = esicEligible ? pctCeil(esicWages, rules.esic.employeePct) : 0
 
-    // PT: slab on earned gross (February top-slab override, female exemption)
-    const pt = computePt(grossEarned, rules.pt, { isFebruary: isFeb, isFemale, isCall: isCALL })
+    // PT: slab on earned gross (February top-slab override, female exemption).
+    // The female limit is measured WITHOUT overtime — see computePt.
+    const pt = computePt(grossEarned, rules.pt, {
+        isFebruary: isFeb,
+        isFemale,
+        isCall: isCALL,
+        femaleExemptBasis: grossEarned - otPay,
+    })
 
     // Canteen & other deductions
     const canteen = canteenDays * canteenRatePerDay

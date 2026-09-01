@@ -75,13 +75,19 @@
 
 | Earned Gross | PT Amount |
 |-------------|-----------|
-| Female, ≤ ₹25,000 | **₹0** (Maharashtra exemption) |
+| Female, ≤ ₹25,000 **excluding OT** | **₹0** (Maharashtra exemption) |
 | ≤ ₹7,500 | **₹0** |
 | ₹7,501 – ₹10,000 | **₹175** |
 | > ₹10,000 (standard month) | **₹200** |
 | > ₹10,000 (February only) | **₹300** ← annual ₹100 adjustment |
 
 > Slabs, the February amount and the female-exemption limit are editable in Payroll → Calculation Settings.
+>
+> **The female limit is measured on earned gross MINUS overtime**, while the
+> slab itself still uses the full earned gross. A woman whose salary sits under
+> the limit keeps the exemption in the months she works overtime — otherwise OT
+> alone could push her over ₹25,000 and her PT would flip between ₹0 and ₹200
+> month to month.
 
 ### ESIC Wage Base
 ```

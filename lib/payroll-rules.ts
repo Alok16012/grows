@@ -266,11 +266,25 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
 export function computePt(
     grossEarned: number,
     pt: PayrollRules["pt"],
-    opts: { isFebruary?: boolean; isFemale?: boolean; isCall?: boolean } = {}
+    opts: {
+        isFebruary?: boolean
+        isFemale?: boolean
+        isCall?: boolean
+        /**
+         * What the female exemption limit is measured against. Defaults to
+         * grossEarned, but callers pass earned gross MINUS overtime: a woman
+         * whose salary sits under the limit shouldn't lose the exemption in
+         * the months she happens to work overtime. Without this, EMP-7631 —
+         * 23,302 earned, 9,138 OT — tipped over 25,000 on OT alone and was
+         * charged PT, while the slab itself still applies to the full gross.
+         */
+        femaleExemptBasis?: number
+    } = {}
 ): number {
     if (!pt.enabled) return 0
     if (opts.isCall && !pt.appliesToCall) return 0
-    if (opts.isFemale && pt.femaleExemptUpTo > 0 && grossEarned <= pt.femaleExemptUpTo) return 0
+    const exemptBasis = opts.femaleExemptBasis ?? grossEarned
+    if (opts.isFemale && pt.femaleExemptUpTo > 0 && exemptBasis <= pt.femaleExemptUpTo) return 0
 
     for (let i = 0; i < pt.slabs.length; i++) {
         const slab = pt.slabs[i]
