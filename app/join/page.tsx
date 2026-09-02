@@ -833,7 +833,10 @@ export default function JoinPage() {
                                                 contain letters and slashes, so it gets its own field
                                                 rather than being rejected by the 12-digit UAN rule. */}
                                             <Lbl text="PF Number" />
-                                            <input style={{ ...inp, borderColor: errors.pfNumber ? "var(--red)" : undefined }} placeholder="12-digit PF number" maxLength={12} value={form.pfNumber} onChange={e => { set("pfNumber", e.target.value.replace(/\D/g,"")); clrErr("pfNumber") }} />
+                                            {/* A PF number starts with five letters, so the old
+                                                replace(/\D/g,"") deleted them as they were typed
+                                                and no valid value could ever be entered here. */}
+                                            <input style={{ ...inp, borderColor: errors.pfNumber ? "var(--red)" : undefined }} placeholder="e.g. PUPUN24506540000012118" maxLength={26} value={form.pfNumber} onChange={e => { set("pfNumber", e.target.value.toUpperCase()); clrErr("pfNumber") }} />
                                             <Err msg={errors.pfNumber} />
                                         </div>
                                         <div>

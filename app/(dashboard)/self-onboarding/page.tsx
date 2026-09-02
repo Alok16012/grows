@@ -493,7 +493,7 @@ export default function SelfOnboardingPage() {
                                 <Input value={f("uan")} onChange={set("uan")} placeholder="12-digit UAN" maxLength={12} error={errors.uan} />
                             </Field>
                             <Field label="PF Number">
-                                <Input value={f("pfNumber")} onChange={set("pfNumber")} placeholder="12-digit PF number" maxLength={12} error={errors.pfNumber} />
+                                <Input value={f("pfNumber")} onChange={set("pfNumber")} placeholder="e.g. PUPUN24506540000012118" maxLength={26} error={errors.pfNumber} />
                             </Field>
                             <Field label="ESIC Number">
                                 <Input value={f("esiNumber")} onChange={set("esiNumber")} placeholder="10-digit ESIC number" maxLength={10} error={errors.esiNumber} />

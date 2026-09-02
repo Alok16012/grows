@@ -149,10 +149,30 @@ export function validateESIC(value: string | null | undefined): FieldError {
     return null
 }
 
+/**
+ * EPFO member account number: 5 letters then 17 digits, 22 characters in all —
+ * e.g. PUPUN24506540000012118, which is region PU + office PUN + establishment
+ * 2450654 + extension 000 + member 0012118. The company's own establishment
+ * code in DEFAULT_PAYROLL_RULES (PUPUN2450654000) is the same shape without
+ * the member part.
+ *
+ * This used to run digitsOnly() first and then demand 12 digits, so a real PF
+ * number lost its five letters, came back 17 digits long and was rejected as
+ * "must be 12 digits" — the field could not accept a valid value at all.
+ *
+ * Written with slashes as often as not (PU/PUN/2450654/000/0012118), so
+ * separators are stripped before checking rather than failed on.
+ */
+export function normalizePFNumber(value: string | null | undefined): string {
+    return (value ?? "").toUpperCase().replace(/[\s/\\-]/g, "")
+}
+
 export function validatePFNumber(value: string | null | undefined): FieldError {
-    const d = digitsOnly(value)
-    if (!d) return null
-    if (d.length !== 12) return "PF number must be 12 digits"
+    const v = normalizePFNumber(value)
+    if (!v) return null
+    if (!/^[A-Z]{5}\d{17}$/.test(v)) {
+        return "PF number must be 5 letters then 17 digits (e.g. PUPUN24506540000012118)"
+    }
     return null
 }
 

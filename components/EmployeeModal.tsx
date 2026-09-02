@@ -1121,12 +1121,12 @@ export function EmployeeModal({
                                     {fieldErrors.uan && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.uan}</p>}
                                 </div>
                                 <div>
-                                    {/* Separate from UAN: a PF account number is shorter and may
-                                        contain letters and slashes. It was already loaded and saved
-                                        but had no input, so it could never be entered or corrected. */}
+                                    {/* Separate from UAN: a PF account number is 5 letters + 17
+                                        digits and is often written with slashes. maxLength was 12,
+                                        which truncated every real value before it could be saved. */}
                                     <label className={labelCls}>PF Number</label>
-                                    <input value={form.pfNumber} onChange={set("pfNumber")} maxLength={12}
-                                        className={inputCls + (fieldErrors.pfNumber ? " !border-red-400" : "")} placeholder="12-digit PF number" />
+                                    <input value={form.pfNumber} onChange={set("pfNumber")} maxLength={26}
+                                        className={inputCls + (fieldErrors.pfNumber ? " !border-red-400" : "")} placeholder="e.g. PUPUN24506540000012118" />
                                     {fieldErrors.pfNumber && <p className="text-[11px] text-red-500 mt-0.5">⚠ {fieldErrors.pfNumber}</p>}
                                 </div>
                                 <div>
