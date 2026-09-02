@@ -45,6 +45,8 @@ type AttRow = {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
     otherDeductions: number; productionIncentive: number; lwf: number
+    /** Manual canteen amount. null = derive from days x rate. */
+    canteenAmount: number | null
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -154,6 +156,7 @@ function ProcessPayrollPage() {
                     employeeId: string
                     workingDays: number | null; presentDays: number | null
                     otDays: number | null; canteenDays: number | null
+                    canteenAmount: number | null
                     penalty: number | null; advance: number | null
                     otherDeductions: number | null; productionIncentive: number | null
                     lwf: number | null
@@ -166,6 +169,7 @@ function ProcessPayrollPage() {
                             workedDays:          p.presentDays ?? defaultDays,
                             otDays:              p.otDays ?? 0,
                             canteenDays:         p.canteenDays ?? 0,
+                            canteenAmount:       p.canteenAmount ?? null,
                             penalty:             p.penalty ?? 0,
                             advance:             p.advance ?? 0,
                             otherDeductions:     p.otherDeductions ?? 0,
@@ -196,6 +200,20 @@ function ProcessPayrollPage() {
 
     const setAtt = (empId: string, field: keyof AttRow, value: string) => {
         setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: parseFloat(value) || 0 } }))
+    }
+
+    /** Blank clears the override back to null; "0" is kept as a real zero. */
+    const setAttOptional = (empId: string, field: keyof AttRow, value: string) => {
+        const parsed = value.trim() === "" ? null : (Number.isFinite(parseFloat(value)) ? parseFloat(value) : null)
+        setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: parsed } }))
+    }
+
+    /** Excel cell -> optional amount. Empty cell means "not set", not zero. */
+    const optAmount = (v: unknown): number | null => {
+        if (v === null || v === undefined) return null
+        if (typeof v === "string" && v.trim() === "") return null
+        const n = Number(v)
+        return Number.isFinite(n) ? n : null
     }
 
     const handleAttFileUpload = async (file: File) => {
@@ -285,6 +303,9 @@ function ProcessPayrollPage() {
                     canteenDays: Number(col(obj,
                         "CANTEEN DAYS", "CANTEEN", "MESS DAYS", "FOOD DAYS"
                     ) ?? 0),
+                    canteenAmount: optAmount(col(obj,
+                        "CANTEEN AMOUNT", "CANTEEN AMT", "CANTEEN RS", "MESS AMOUNT"
+                    )),
                     penalty: Number(col(obj, "PENALTY", "FINE") ?? 0),
                     advance: Number(col(obj, "ADVANCE", "ADV", "LOAN") ?? 0),
                     productionIncentive: Number(col(obj,
@@ -329,6 +350,7 @@ function ProcessPayrollPage() {
                     workedDays:          a.workedDays          ?? defaultDays,
                     otDays:              a.otDays              ?? 0,
                     canteenDays:         a.canteenDays         ?? 0,
+                    canteenAmount:       a.canteenAmount       ?? null,
                     penalty:             a.penalty             ?? 0,
                     advance:             a.advance             ?? 0,
                     otherDeductions:     a.otherDeductions     ?? 0,
@@ -731,6 +753,7 @@ function ProcessPayrollPage() {
                                                 <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Days</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Hrs</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Canteen<br/>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Canteen ₹<br/><span style={{ fontWeight: 400, fontSize: 9 }}>blank = days×rate</span></th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Other<br/>Ded</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>LWF</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Penalty</th>
@@ -803,6 +826,11 @@ function ProcessPayrollPage() {
                                                                 onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={attInput} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
+                                                            <input type="number" min={0} placeholder="auto"
+                                                                value={att.canteenAmount ?? ""}
+                                                                onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={attInput} />
+                                                        </td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.otherDeductions ?? 0}
                                                                 onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={attInput} />
                                                         </td>
@@ -864,6 +892,7 @@ function ProcessPayrollPage() {
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + ((attRows[e.id]?.otDays ?? 0)), 0) * 1000) / 1000}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + ((attRows[e.id]?.otDays ?? 0) * 8), 0) * 100) / 100}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenAmount ?? 0), 0) || "—"}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.otherDeductions ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.lwf ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.penalty ?? 0), 0)}</td>

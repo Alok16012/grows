@@ -44,6 +44,8 @@ export function calcGrowusPayroll(sal: {
 }, att: {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
+    /** Manual canteen deduction. null/undefined → canteenDays × rate. */
+    canteenAmount?: number | null
     otherDeductions: number; productionIncentive: number; lwf: number
     gender?: string            // "Male" | "Female" (default "Male")
     month?: number             // 1–12, used for February PT (default: current month)
@@ -58,7 +60,7 @@ export function calcGrowusPayroll(sal: {
     } = sal
 
     const {
-        monthDays, workedDays, otDays, canteenDays,
+        monthDays, workedDays, otDays, canteenDays, canteenAmount,
         penalty, advance, otherDeductions, productionIncentive, lwf,
         month,
         gender,
@@ -131,7 +133,13 @@ export function calcGrowusPayroll(sal: {
     })
 
     // Canteen & other deductions
-    const canteen = canteenDays * canteenRatePerDay
+    // A typed amount wins over days × rate. Checked against null rather than
+    // falsiness so an explicit 0 ("no canteen this month") isn't silently
+    // replaced by a stale day count.
+    const canteenManual = canteenAmount ?? null
+    const canteen = canteenManual !== null && Number.isFinite(canteenManual)
+        ? canteenManual
+        : canteenDays * canteenRatePerDay
 
     const totalDeductions =
         pfEmployee + esiEmployee + pt +
@@ -175,7 +183,7 @@ export function calcGrowusPayroll(sal: {
         grossSalary: grossEarned,
         // Deductions
         pfEmployee, esiEmployee, pfEmployer, esiEmployer,
-        pt, lwf: lwf || 0, canteenDays, canteen,
+        pt, lwf: lwf || 0, canteenDays, canteen, canteenAmount: canteenManual,
         penalty: penalty || 0, advance: advance || 0,
         otherDeductions: otherDeductions || 0,
         totalDeductions, netSalary, ctc,

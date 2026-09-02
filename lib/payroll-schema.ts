@@ -88,6 +88,8 @@ const PAYROLL: Col[] = [
     // deductions
     num("pfEmployee"), num("pfEmployer"), num("esiEmployee"), num("esiEmployer"),
     num("pt"), num("lwf"), num("tds"), int("canteenDays"), num("canteen"),
+    // Nullable — NULL means "derive from days x rate", 0 means "no canteen".
+    { name: "canteenAmount", type: "DOUBLE PRECISION" },
     num("penalty"), num("advance"), num("otherDeductions"), num("totalDeductions"),
     // net & CTC
     num("netSalary"), num("ctc"),

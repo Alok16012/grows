@@ -21,6 +21,8 @@ type ParsedRow = {
     monthDays: number  // total working days in the month (standard = 26)
     days: number; otDays: number; otherDeduction: number; lwf: number
     canteenDays: number; penalty: number; advance: number
+    /** Manual canteen amount. null = derive from days x rate. */
+    canteenAmount: number | null
     productionIncentive: number
 }
 type MatchedRow = ParsedRow & {
@@ -32,14 +34,23 @@ type Employee = {
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
+/** Excel cell -> optional amount. An empty cell means "not set", not zero. */
+function optAmount(v: unknown): number | null {
+    if (v === null || v === undefined) return null
+    if (typeof v === "string" && v.trim() === "") return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+}
+
 const TEMPLATE_COLS = [
     "Employee ID","Employee Name","MONTH DAYS","DAYS","OT DAYS","OTHER DEDUCTION",
-    "LWF","CANTEEN DAYS","PENALTY","ADVANCE","PRODUCTION INCENTIVE"
+    "LWF","CANTEEN DAYS","CANTEEN AMOUNT","PENALTY","ADVANCE","PRODUCTION INCENTIVE"
 ]
 const TEMPLATE_SAMPLE = [
-    ["EMP-0001","Rahul Kumar",   26, 26, 2, 150, 10, 24, 50,  1000, 0],
-    ["EMP-0002","Priya Sharma",  26, 25, 0, 0,   10, 20, 0,   0,    500],
-    ["EMP-0003","Amit Singh",    26, 26, 1, 200, 10, 26, 100, 500,  0],
+    ["EMP-0001","Rahul Kumar",   26, 26, 2, 150, 10, 24, "",   50,  1000, 0],
+    ["EMP-0002","Priya Sharma",  26, 25, 0, 0,   10, 20, "",   0,   0,    500],
+    // Canteen amount filled in: 1500 is charged and the 26 days are ignored.
+    ["EMP-0003","Amit Singh",    26, 26, 1, 200, 10, 26, 1500, 100, 500,  0],
 ]
 
 async function downloadTemplate(siteName: string, employees: Employee[]) {
@@ -48,7 +59,7 @@ async function downloadTemplate(siteName: string, employees: Employee[]) {
     const sheetName = `${siteName.slice(0, 20)} Attendance`
     const header = [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", ""]
     const empRows = employees.length > 0
-        ? employees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 26, 0, 0, 10, 0, 0, 0, 0])
+        ? employees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 26, 0, 0, 10, 0, "", 0, 0, 0])
         : TEMPLATE_SAMPLE
     const wsData = [header, TEMPLATE_COLS, ...empRows]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -191,6 +202,9 @@ export default function AttendanceUploadPage() {
                 otherDeduction:Number(pick(row, "OTHER DEDUCTION", "OTHER DED", "OTH DED") ?? 0) || 0,
                 lwf:           Number(pick(row, "LWF", "LABOUR WELFARE FUND") ?? 0) || 0,
                 canteenDays:   Number(pick(row, "CANTEEN DAYS", "CANTEEN", "MESS DAYS") ?? 0) || 0,
+                // Optional override. An empty cell means "work it out from
+                // days x rate"; a 0 means "no canteen this month".
+                canteenAmount: optAmount(pick(row, "CANTEEN AMOUNT", "CANTEEN AMT", "CANTEEN RS", "MESS AMOUNT")),
                 penalty:       Number(pick(row, "PENALTY", "FINE") ?? 0) || 0,
                 advance:       Number(pick(row, "ADVANCE", "ADV", "LOAN") ?? 0) || 0,
                 productionIncentive: Number(pick(row, "PRODUCTION INCENTIVE", "PROD INCENTIVE", "PROD INC", "INCENTIVE", "PI") ?? 0) || 0,
@@ -247,6 +261,7 @@ export default function AttendanceUploadPage() {
                 otherDeductions:     r.otherDeduction,
                 lwf:                 r.lwf,
                 canteenDays:         r.canteenDays,
+                canteenAmount:       r.canteenAmount,
                 penalty:             r.penalty,
                 advance:             r.advance,
                 productionIncentive: r.productionIncentive,
@@ -450,7 +465,7 @@ export default function AttendanceUploadPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                             <thead>
                                 <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
-                                    {["","Emp ID","Name (File)","Name (DB)","Designation","Days","OT Days","Other Ded.","LWF","Canteen Days","Penalty","Advance","Prod. Inc."].map(h => (
+                                    {["","Emp ID","Name (File)","Name (DB)","Designation","Days","OT Days","Other Ded.","LWF","Canteen Days","Canteen ₹","Penalty","Advance","Prod. Inc."].map(h => (
                                         <th key={h} style={{ padding: "8px 10px", textAlign: h === "" ? "center" : "left", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
                                     ))}
                                 </tr>
@@ -474,6 +489,7 @@ export default function AttendanceUploadPage() {
                                         <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.otherDeduction || "—"}</td>
                                         <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.lwf || "—"}</td>
                                         <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.canteenDays || "—"}</td>
+                                        <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.canteenAmount ?? "—"}</td>
                                         <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.penalty || "—"}</td>
                                         <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.advance || "—"}</td>
                                         <td style={{ padding: "7px 10px", textAlign: "right" }}>{r.productionIncentive || "—"}</td>

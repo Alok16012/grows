@@ -935,6 +935,11 @@ model Payroll {
   tds                 Float         @default(0)
   canteenDays         Int           @default(0)
   canteen             Float         @default(0)
+  /// Manual canteen deduction. NULL = derive it from canteenDays x rate, which
+  /// is the original behaviour; a value here is used as-is and days are ignored.
+  /// Nullable on purpose: 0 is a real amount ("no canteen this month") and has
+  /// to stay distinguishable from "not set".
+  canteenAmount       Float?
   penalty             Float         @default(0)
   advance             Float         @default(0)
   otherDeductions     Float         @default(0)

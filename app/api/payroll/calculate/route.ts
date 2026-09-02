@@ -141,6 +141,15 @@ export async function POST(req: Request) {
             [key: string]: unknown
         }
 
+        // "" / null / undefined / unparseable → null (derive from days).
+        // "0" → 0, a real "no canteen this month".
+        function parseOptionalAmount(v: unknown): number | null {
+            if (v === null || v === undefined) return null
+            if (typeof v === "string" && v.trim() === "") return null
+            const n = Number(v)
+            return Number.isFinite(n) ? n : null
+        }
+
         const allRows: PayrollRow[] = employees.map(emp => {
             const sal      = emp.employeeSalary
             const salBasic = sal?.basic ?? emp.basicSalary ?? 0
@@ -155,6 +164,9 @@ export async function POST(req: Request) {
                 workedDays:          numOrDefault(attInput.workedDays, defaultMonthDays),
                 otDays:              Number(attInput.otDays)              || 0,
                 canteenDays:         Math.round(Number(attInput.canteenDays) || 0),
+                // Manual canteen amount. Blank / absent stays null so the
+                // engine falls back to days × rate; a typed 0 is kept as 0.
+                canteenAmount:       parseOptionalAmount(attInput.canteenAmount),
                 penalty:             Number(attInput.penalty)             || 0,
                 advance:             Number(attInput.advance)             || 0,
                 otherDeductions:     Number(attInput.otherDeductions)     || 0,

@@ -29,6 +29,8 @@ type Employee = {
 type AttRow = {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
+    /** Manual canteen amount. null = derive from days x rate. */
+    canteenAmount: number | null
     otherDeductions: number; productionIncentive: number; lwf: number
 }
 
@@ -110,7 +112,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                     for (const p of payrolls) {
                         filled[p.employeeId] = {
                             monthDays: p.workingDays ?? defaultDays, workedDays: p.presentDays ?? defaultDays,
-                            otDays: p.otDays ?? 0, canteenDays: p.canteenDays ?? 0,
+                            otDays: p.otDays ?? 0, canteenDays: p.canteenDays ?? 0, canteenAmount: p.canteenAmount ?? null,
                             penalty: p.penalty ?? 0, advance: p.advance ?? 0,
                             otherDeductions: p.otherDeductions ?? 0, productionIncentive: p.productionIncentive ?? 0,
                             // Restore what was entered for this saved run — the
@@ -136,6 +138,19 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
 
     const setAtt = (empId: string, field: keyof AttRow, value: string) =>
         setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: value === "" ? 0 : parseFloat(value) } }))
+
+    /** Blank clears the override back to null; "0" stays a real zero. */
+    const setAttOptional = (empId: string, field: keyof AttRow, value: string) =>
+        setAttRows(prev => ({ ...prev, [empId]: { ...prev[empId],
+            [field]: value.trim() === "" || !Number.isFinite(parseFloat(value)) ? null : parseFloat(value) } }))
+
+    /** Excel cell -> optional amount. An empty cell means "not set", not zero. */
+    const optAmount = (v: unknown): number | null => {
+        if (v === null || v === undefined) return null
+        if (typeof v === "string" && v.trim() === "") return null
+        const n = Number(v)
+        return Number.isFinite(n) ? n : null
+    }
 
     const handleAttFileUpload = async (file: File) => {
         if (!employees.length) { toast.error("Load employees first"); return }
@@ -174,6 +189,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                     // the standalone Process page does.
                     lwf: Number(col(obj,"LWF","LABOUR WELFARE FUND") ?? 0),
                     canteenDays: Number(col(obj,"CANTEEN DAYS","CANTEEN","MESS DAYS","FOOD DAYS") ?? 0),
+                    canteenAmount: optAmount(col(obj,"CANTEEN AMOUNT","CANTEEN AMT","CANTEEN RS","MESS AMOUNT")),
                     penalty: Number(col(obj,"PENALTY","FINE") ?? 0),
                     advance: Number(col(obj,"ADVANCE","ADV","LOAN") ?? 0),
                     productionIncentive: Number(col(obj,"PRODUCTION INCENTIVE","PROD INCENTIVE","PROD INC","INCENTIVE","PI") ?? 0),
@@ -193,7 +209,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
         try {
             const attendance = employees.map(emp => {
                 const a = attRows[emp.id] ?? {}
-                return { employeeId: emp.id, monthDays: a.monthDays ?? defaultDays, workedDays: a.workedDays ?? defaultDays, otDays: a.otDays ?? 0, canteenDays: a.canteenDays ?? 0, penalty: a.penalty ?? 0, advance: a.advance ?? 0, otherDeductions: a.otherDeductions ?? 0, productionIncentive: a.productionIncentive ?? 0, lwf: a.lwf ?? 0 }
+                return { employeeId: emp.id, monthDays: a.monthDays ?? defaultDays, workedDays: a.workedDays ?? defaultDays, otDays: a.otDays ?? 0, canteenDays: a.canteenDays ?? 0, canteenAmount: a.canteenAmount ?? null, penalty: a.penalty ?? 0, advance: a.advance ?? 0, otherDeductions: a.otherDeductions ?? 0, productionIncentive: a.productionIncentive ?? 0, lwf: a.lwf ?? 0 }
             })
             const res = await fetch("/api/payroll/calculate", {
                 method: "POST",
@@ -459,6 +475,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                                 <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Days</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Hrs</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Canteen<br/>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>Canteen ₹<br/><span style={{ fontWeight: 400, fontSize: 9 }}>blank = days×rate</span></th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Other<br/>Ded</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>LWF</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Penalty</th>
@@ -510,6 +527,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} step="0.01" value={att.otDays ?? 0} onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={attInput} /></td>
                                                         <td style={{ ...td, background: "#eff6ff", color: "var(--text3)", fontSize: 10 }}>{otHrs}</td>
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.canteenDays ?? 0} onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={attInput} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} placeholder="auto" value={att.canteenAmount ?? ""} onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={attInput} /></td>
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.otherDeductions ?? 0} onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={attInput} /></td>
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.lwf ?? 0} onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={attInput} /></td>
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.penalty ?? 0} onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={attInput} /></td>
@@ -544,6 +562,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0), 0) * 1000) / 1000}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0) * 8, 0) * 100) / 100}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenAmount ?? 0), 0) || "—"}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.otherDeductions ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.lwf ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.penalty ?? 0), 0)}</td>

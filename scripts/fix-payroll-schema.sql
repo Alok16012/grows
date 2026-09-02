@@ -237,7 +237,7 @@ CREATE TABLE IF NOT EXISTS "Payroll" (
 
 DO $do$
 DECLARE
-    expected TEXT[] := ARRAY['employeeId', 'payrollRunId', 'basicFull', 'daFull', 'hraFull', 'washingFull', 'conveyanceFull', 'lwwFull', 'bonusFull', 'otherFull', 'grossFullMonth', 'basicSalary', 'lwwEarned', 'otDays', 'overtimePay', 'productionIncentive', 'grossSalary', 'pfEmployee', 'pfEmployer', 'esiEmployee', 'esiEmployer', 'canteenDays', 'otherDeductions', 'totalDeductions', 'netSalary', 'workingDays', 'presentDays', 'leaveDays', 'lwpDays', 'overtimeHrs', 'overtimeRate', 'siteId', 'processedAt', 'processedBy', 'paidAt', 'paidBy', 'createdAt', 'updatedAt'];
+    expected TEXT[] := ARRAY['employeeId', 'payrollRunId', 'basicFull', 'daFull', 'hraFull', 'washingFull', 'conveyanceFull', 'lwwFull', 'bonusFull', 'otherFull', 'grossFullMonth', 'basicSalary', 'lwwEarned', 'otDays', 'overtimePay', 'productionIncentive', 'grossSalary', 'pfEmployee', 'pfEmployer', 'esiEmployee', 'esiEmployer', 'canteenDays', 'canteenAmount', 'otherDeductions', 'totalDeductions', 'netSalary', 'workingDays', 'presentDays', 'leaveDays', 'lwpDays', 'overtimeHrs', 'overtimeRate', 'siteId', 'processedAt', 'processedBy', 'paidAt', 'paidBy', 'createdAt', 'updatedAt'];
     col    TEXT;
     legacy TEXT;
 BEGIN
@@ -307,6 +307,7 @@ ALTER TABLE "Payroll"
     ADD COLUMN IF NOT EXISTS "tds" DOUBLE PRECISION NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS "canteenDays" INTEGER NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS "canteen" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS "canteenAmount" DOUBLE PRECISION,
     ADD COLUMN IF NOT EXISTS "penalty" DOUBLE PRECISION NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS "advance" DOUBLE PRECISION NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS "otherDeductions" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -375,6 +376,7 @@ BEGIN
     ('tds', 'float8', 'DOUBLE PRECISION', 'NULLIF("tds"::text, '''')::double precision', true, '0'),
     ('canteenDays', 'int4', 'INTEGER', 'ROUND(NULLIF("canteenDays"::text, '''')::numeric)::integer', true, '0'),
     ('canteen', 'float8', 'DOUBLE PRECISION', 'NULLIF("canteen"::text, '''')::double precision', true, '0'),
+    ('canteenAmount', 'float8', 'DOUBLE PRECISION', 'NULLIF("canteenAmount"::text, '''')::double precision', false, ''),
     ('penalty', 'float8', 'DOUBLE PRECISION', 'NULLIF("penalty"::text, '''')::double precision', true, '0'),
     ('advance', 'float8', 'DOUBLE PRECISION', 'NULLIF("advance"::text, '''')::double precision', true, '0'),
     ('otherDeductions', 'float8', 'DOUBLE PRECISION', 'NULLIF("otherDeductions"::text, '''')::double precision', true, '0'),
