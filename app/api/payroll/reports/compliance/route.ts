@@ -59,12 +59,34 @@ type PayrollRow = {
     }
 }
 
+/**
+ * EPF / EPS / EDLI wages, all three the same figure: earned Basic + DA capped
+ * at the statutory ceiling. This used to return Basic + DA uncapped, so anyone
+ * earning above ₹15,000 was filed with their real wage — 16,861 and 19,179 in
+ * August — against contributions that had been computed on 15,000. The wage and
+ * the contribution on the same ECR row disagreed.
+ */
 function pfWages(p: PayrollRow, rules: PayrollRules) {
-    return p.basicSalary + p.da
+    return Math.min(p.basicSalary + p.da, rules.pf.wageCeiling)
 }
 
 function epsContrib(p: PayrollRow, rules: PayrollRules) {
     return Math.round(pfWages(p, rules) * rules.pf.employer.epsPct / 100)
+}
+
+/**
+ * The employer's EPF share for the ECR: the 12% employer contribution minus
+ * EPS, so the two always add back to exactly the 12%.
+ *
+ * NOT p.pfEmployer, which is the full cost to the company and includes EDLI
+ * and admin charges — those are challan lines of their own, not part of a
+ * member's EPF contribution. Filing 1,950 here instead of 550 overstated every
+ * capped member by 1,400.
+ */
+function epfEmployerContrib(p: PayrollRow, rules: PayrollRules) {
+    const w = pfWages(p, rules)
+    const share = Math.round(w * (rules.pf.employer.epsPct + rules.pf.employer.epfPct) / 100)
+    return Math.max(0, share - epsContrib(p, rules))
 }
 function esiWages(p: PayrollRow, rules: PayrollRules) {
     // Must mirror lib/payroll-calc.ts exactly, conveyance included — a challan
@@ -330,8 +352,9 @@ export async function GET(req: Request) {
                         "EPF Wages": pfWages(p, rules),
                         "EPS Wages": pfWages(p, rules),
                         "EPF Contribution (EE)": p.pfEmployee,
+                        "EDLI Wages": pfWages(p, rules),
                         "EPS Contribution (ER)": epsContrib(p, rules),
-                        "EPF Contribution (ER)": Math.max(0, p.pfEmployer - epsContrib(p, rules)),
+                        "EPF Contribution (ER)": epfEmployerContrib(p, rules),
                         "NCP Days": ncpDays(p),
                         "Refund of Advances": 0,
                     }))
@@ -344,9 +367,10 @@ export async function GET(req: Request) {
                         "Gross Wages": p.grossSalary,
                         "EPF Wages": pfWages(p, rules),
                         "EPS Wages": pfWages(p, rules),
+                        "EDLI Wages": pfWages(p, rules),
                         "EPF Contribution (EE)": p.pfEmployee,
-                        "EPF Contribution (ER)": p.pfEmployer,
                         "EPS Contribution": epsContrib(p, rules),
+                        "EPF Contribution (ER)": epfEmployerContrib(p, rules),
                         "NCP Days": ncpDays(p),
                         "Refund of Advances": 0,
                     }))
