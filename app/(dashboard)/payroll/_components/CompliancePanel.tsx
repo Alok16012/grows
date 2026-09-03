@@ -36,8 +36,8 @@ type SectionMap = [string, number][]
 const REPORT_SECTIONS: Record<string, SectionMap> = {
     "pf-summary":    [["Site Info",3],["EPF / EPS / EDLI Wages",3],["Contribution Rates",6],["Total",1],["Exempted",2]],
     "pf-deduction":  [["Employee Info",4],["Wages",2],["Contributions",3],["Period",2]],
-    "pf-ecr":        [["Employee Info",2],["Wages",3],["Contributions",3],["Other",2]],
-    "pf-challan":    [["Employee Info",4],["Wages",2],["Contributions",3],["Other",3]],
+    "pf-ecr":        [["Employee Info",2],["Wages",4],["Contributions",3],["Other",2]],
+    "pf-challan":    [["Employee Info",4],["Wages", 4],["Contributions", 3],["Other", 2]],
     "pf-register":   [["Employee Info",6],["Wages",2],["Contributions",3],["Attendance",2]],
     "esic-summary":  [["Site Info",3],["Wages",1],["Contributions",3],["Exempted",2]],
     "esic-deduction":[["Employee Info",4],["Wages",2],["Contributions",2]],
