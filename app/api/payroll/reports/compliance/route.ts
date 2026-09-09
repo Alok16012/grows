@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { PayrollRules } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
+import { buildEcrText, EcrMember } from "@/lib/ecr-format"
 
 type PayrollRow = {
     id: string
@@ -105,6 +106,21 @@ function ncpDays(p: PayrollRow) {
     return Math.max(0, (p.workingDays ?? 26) - (p.presentDays ?? p.workingDays ?? 26))
 }
 
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"]
+
+/** Maps a payroll row onto the figures the ECR file is built from. */
+const ecrMember = (p: PayrollRow, rules: PayrollRules): EcrMember => ({
+    uan: p.employee.uan ?? "",
+    name: `${p.employee.firstName} ${p.employee.lastName}`,
+    grossWages: p.grossSalary,
+    pfWages: pfWages(p, rules),
+    epfEmployee: p.pfEmployee,
+    epsContribution: epsContrib(p, rules),
+    epfEmployer: epfEmployerContrib(p, rules),
+    ncpDays: ncpDays(p),
+})
+
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -163,6 +179,19 @@ export async function GET(req: Request) {
         const filtered = stateFilter
             ? payrolls.filter(p => p.employee.state?.toLowerCase() === stateFilter.toLowerCase())
             : payrolls
+
+        // The ECR upload file is plain text, not a table, so it returns here
+        // rather than going through the JSON-to-spreadsheet path below.
+        if (type === "pf-ecr" && searchParams.get("format") === "txt") {
+            if (!filtered.length) return new NextResponse("No data for this period", { status: 404 })
+            return new NextResponse(buildEcrText(filtered.map(p => ecrMember(p, rules))), {
+                headers: {
+                    "Content-Type": "text/plain; charset=utf-8",
+                    "Content-Disposition":
+                        `attachment; filename="PF_ECR_${MONTH_NAMES[month - 1]}_${year}.txt"`,
+                },
+            })
+        }
 
         // ── Helper: group by siteId and fetch site names ──────────────────────────
         async function groupBySite(rows: PayrollRow[]) {

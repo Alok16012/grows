@@ -6,6 +6,7 @@ import type { Range as XLSXRange } from "xlsx"
 const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
 import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
+import { downloadEcrTxt } from "@/lib/ecr-download"
 import { Loader2, Download, ShieldCheck, FileSpreadsheet, TableProperties, RefreshCw, X } from "lucide-react"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -132,6 +133,14 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
         const key=`${item.id}-${month}-${year}`
         setDlLoading(key)
         try {
+            // EPFO ingests a text file, not a spreadsheet.
+            if (item.type === "pf-ecr") {
+                const result = await downloadEcrTxt(month, year)
+                if (result.ok) toast.success(`Downloaded: ${item.label}`)
+                else toast.error(result.message)
+                return
+            }
+
             const XLSX = await loadXLSX()
             const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}`)
             if (!r.ok) { toast.error("No data found for this period"); return }
