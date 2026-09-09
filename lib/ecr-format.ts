@@ -45,9 +45,10 @@ export function ecrLine(m: EcrMember): string {
         Math.round(m.epfEmployee),
         Math.round(m.epsContribution),
         Math.round(m.epfEmployer),
-        // Zero NCP days is written as an empty field, not a literal 0 — this
-        // matches the file EPFO accepted for August.
-        m.ncpDays > 0 ? Math.round(m.ncpDays) : "",
+        // Always a number, including zero. The August reference file left this
+        // field empty when nobody had lost days, but the portal rejects the
+        // blank — `#~##~#0` errors, `#~#0#~#0` is accepted.
+        Math.round(m.ncpDays),
         0, // Refund of advances — not tracked, always nil
     ].join(ECR_DELIMITER)
 }
