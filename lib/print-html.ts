@@ -35,6 +35,24 @@ export function printHTML(html: string) {
     }
     window.addEventListener("afterprint", cleanup)
 
+    // Wait for images (the payslip letterhead logo) to finish loading, or the
+    // print dialog opens on an empty box the first time — 80ms isn't enough to
+    // fetch and decode one on a cold cache. Races a timeout so a slow or broken
+    // image can never stop someone printing.
+    const pending = Array.from(container.querySelectorAll("img"))
+        .filter(img => !img.complete)
+        .map(img => new Promise<void>(resolve => {
+            img.addEventListener("load", () => resolve(), { once: true })
+            img.addEventListener("error", () => resolve(), { once: true })
+        }))
+
+    const loaded = pending.length
+        ? Promise.race([
+            Promise.all(pending),
+            new Promise(resolve => setTimeout(resolve, 2000)),
+        ])
+        : Promise.resolve()
+
     // Small delay so the DOM settles before print dialog opens
-    setTimeout(() => window.print(), 80)
+    loaded.then(() => setTimeout(() => window.print(), 80))
 }

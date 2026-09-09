@@ -160,6 +160,7 @@ function SalarySlipsInner() {
         return `
 <div class="slip">
   <div class="co-header">
+    <img class="co-logo" src="/logo.png" alt=""/>
     <h1>GROWUS AUTO INDIA PRIVATE LIMITED</h1>
     <p>BR1, 3<sup>rd</sup> FLOOR, B WING, JAI GANESH VISION, 336, Near, Akurdi Chowk, AKURDI, PUNE, 411035.</p>
   </div>
@@ -227,7 +228,7 @@ function SalarySlipsInner() {
   body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;}
   .slip{width:720px;margin:20px auto;padding:0 0 24px 0;page-break-after:always;}
   .slip:last-child{page-break-after:avoid;}
-  .co-header{text-align:center;padding:10px 4px 6px;border-bottom:1px solid #333;}
+  .co-header{text-align:center;padding:10px 4px 6px;border-bottom:1px solid #333;position:relative;min-height:58px;}.co-logo{position:absolute;left:6px;top:4px;height:50px;width:auto;}
   .co-header h1{font-size:15px;font-style:italic;font-weight:900;letter-spacing:.3px;}
   .co-header p{font-size:10px;font-style:italic;margin-top:3px;}
   .site-row{padding:6px 4px;font-size:11px;}

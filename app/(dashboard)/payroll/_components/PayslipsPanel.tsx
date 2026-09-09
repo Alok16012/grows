@@ -136,7 +136,7 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
             {label:"Loan Deduction", amt:0},
         ]
         return `<div class="slip">
-  <div class="co-header"><h1>GROWUS AUTO INDIA PRIVATE LIMITED</h1>
+  <div class="co-header"><img class="co-logo" src="/logo.png" alt=""/><h1>GROWUS AUTO INDIA PRIVATE LIMITED</h1>
   <p>BR1, 3<sup>rd</sup> FLOOR, B WING, JAI GANESH VISION, 336, Near, Akurdi Chowk, AKURDI, PUNE, 411035.</p></div>
   <div class="site-row"><b>SITE: ${site.toUpperCase()}</b><br/><b>ADDRESS:</b></div>
   <table class="main">
@@ -165,7 +165,7 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
     const slipPageHTML = (recs: PayrollRecord[]) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Salary Slips</title>
 <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;}
 .slip{width:720px;margin:20px auto;padding:0 0 24px 0;page-break-after:always;}.slip:last-child{page-break-after:avoid;}
-.co-header{text-align:center;padding:10px 4px 6px;border-bottom:1px solid #333;}.co-header h1{font-size:15px;font-style:italic;font-weight:900;letter-spacing:.3px;}
+.co-header{text-align:center;padding:10px 4px 6px;border-bottom:1px solid #333;position:relative;min-height:58px;}.co-logo{position:absolute;left:6px;top:4px;height:50px;width:auto;}.co-header h1{font-size:15px;font-style:italic;font-weight:900;letter-spacing:.3px;}
 .co-header p{font-size:10px;font-style:italic;margin-top:3px;}.site-row{padding:6px 4px;font-size:11px;}
 .main{width:100%;border-collapse:collapse;border:1px solid #555;}.main td,.main th{border:1px solid #aaa;padding:3px 6px;font-size:10.5px;}
 .month-hdr{text-align:center;font-size:12px;font-weight:900;background:#f0f0f0;padding:5px;}
