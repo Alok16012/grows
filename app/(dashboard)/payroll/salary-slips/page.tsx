@@ -41,6 +41,8 @@ type PayrollRecord = {
     employee: {
         id: string; employeeId: string; firstName: string; lastName: string
         designation: string | null
+        uan?: string | null; pfNumber?: string | null; esiNumber?: string | null
+        dateOfBirth?: string | null; dateOfJoining?: string | null
         deployments?: { site: { name: string } }[]
     }
 }
@@ -119,6 +121,12 @@ function SalarySlipsInner() {
         // Full-month rate = back-calculate from earned amounts
         const rate = (amt: number) => pDays > 0 ? Math.round(amt * wDays / pDays) : amt
         const r = (n: number) => Math.round(n).toLocaleString("en-IN")
+        // Employee master dates arrive as ISO strings; a missing or unparseable
+        // one prints blank rather than "Invalid Date".
+        const dt = (v: string | null | undefined) => {
+            const t = v ? new Date(v) : null
+            return t && !isNaN(t.getTime()) ? t.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""
+        }
         const earnings = [
             { label: "Basic",                  fullRate: rate(p.basicSalary), amt: p.basicSalary },
             { label: "DA",                      fullRate: rate(p.da),          amt: p.da },
@@ -134,6 +142,9 @@ function SalarySlipsInner() {
             { label: "Performance Allow.",      fullRate: 0,                   amt: p.productionIncentive || 0 },
             { label: "COVID All + Incentives",  fullRate: 0,                   amt: 0 },
         ]
+        // Full-month total of the Salary Rate column, to sit beside the earned
+        // gross. The rate column had a total-row cell but nothing in it.
+        const grossRate = earnings.reduce((s, e) => s + e.fullRate, 0)
         const deductions = [
             { label: "PF",               amt: p.pfEmployee },
             { label: "VPF",              amt: 0 },
@@ -160,11 +171,11 @@ function SalarySlipsInner() {
         <td colspan="3" class="info-cell">
           <table class="info"><tbody>
             <tr><td class="il">Employee Name</td><td class="iv"><b>${p.employee.firstName} ${p.employee.lastName}</b></td><td class="il">Designation</td><td class="iv">${p.employee.designation ?? "."}</td></tr>
-            <tr><td class="il">Employee Number</td><td class="iv">${p.employee.employeeId}</td><td class="il">Date Of Joining</td><td class="iv"></td></tr>
-            <tr><td class="il">Date of Birth</td><td class="iv"></td><td class="il">Days Paid</td><td class="iv"><b>${pDays}</b></td></tr>
-            <tr><td class="il">UAN No.</td><td class="iv"></td><td class="il">OT Hrs</td><td class="iv">${p.overtimeHrs ?? 0}</td></tr>
-            <tr><td class="il">PF No.</td><td class="iv"></td><td class="il">Location</td><td class="iv">PUNE</td></tr>
-            <tr><td class="il">ESIC No.</td><td class="iv"></td><td class="il"></td><td class="iv"></td></tr>
+            <tr><td class="il">Employee Number</td><td class="iv">${p.employee.employeeId}</td><td class="il">Date Of Joining</td><td class="iv">${dt(p.employee.dateOfJoining)}</td></tr>
+            <tr><td class="il">Date of Birth</td><td class="iv">${dt(p.employee.dateOfBirth)}</td><td class="il">Days Paid</td><td class="iv"><b>${pDays}</b></td></tr>
+            <tr><td class="il">UAN No.</td><td class="iv">${p.employee.uan ?? ""}</td><td class="il">OT Hrs</td><td class="iv">${p.overtimeHrs ?? 0}</td></tr>
+            <tr><td class="il">PF No.</td><td class="iv">${p.employee.pfNumber ?? ""}</td><td class="il">Location</td><td class="iv">PUNE</td></tr>
+            <tr><td class="il">ESIC No.</td><td class="iv">${p.employee.esiNumber ?? ""}</td><td class="il"></td><td class="iv"></td></tr>
           </tbody></table>
         </td>
       </tr>

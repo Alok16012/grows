@@ -36,7 +36,12 @@ type PayrollRecord = {
     totalDeductions: number; netSalary: number
     workingDays: number|null; presentDays: number|null; overtimeHrs?: number
     pfEmployer: number; esiEmployer: number; ctc?: number
-    employee: { id: string; employeeId: string; firstName: string; lastName: string; designation: string|null; deployments?: {site:{name:string}}[] }
+    employee: {
+        id: string; employeeId: string; firstName: string; lastName: string; designation: string|null
+        uan?: string|null; pfNumber?: string|null; esiNumber?: string|null
+        dateOfBirth?: string|null; dateOfJoining?: string|null
+        deployments?: {site:{name:string}}[]
+    }
 }
 
 const lbl: React.CSSProperties = { fontSize:11, fontWeight:700, color:"var(--text3)", whiteSpace:"nowrap" }
@@ -97,6 +102,9 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
         const wDays=p.workingDays??26; const pDays=p.presentDays??wDays
         const rate=(amt: number)=>pDays>0?Math.round(amt*wDays/pDays):amt
         const r=(n: number)=>Math.round(n).toLocaleString("en-IN")
+        // Employee master dates arrive as ISO strings; a missing or unparseable
+        // one prints blank rather than "Invalid Date".
+        const dt=(v: string|null|undefined)=>{const t=v?new Date(v):null;return t&&!isNaN(t.getTime())?t.toLocaleDateString("en-IN",{day:"2-digit",month:"2-digit",year:"numeric"}):""}
         const earnings=[
             {label:"Basic",                 fullRate:rate(p.basicSalary), amt:p.basicSalary},
             {label:"DA",                     fullRate:rate(p.da),          amt:p.da},
@@ -112,6 +120,9 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
             {label:"Performance Allow.",     fullRate:0,                   amt:p.productionIncentive||0},
             {label:"COVID All + Incentives", fullRate:0,                   amt:0},
         ]
+        // Full-month total of the Salary Rate column, to sit beside the earned
+        // gross. The rate column had a total-row cell but nothing in it.
+        const grossRate=earnings.reduce((s,e)=>s+e.fullRate,0)
         const deductions=[
             {label:"PF",             amt:p.pfEmployee},
             {label:"VPF",            amt:0},
@@ -133,16 +144,16 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
     <tbody>
       <tr class="info-row"><td colspan="3" class="info-cell"><table class="info"><tbody>
         <tr><td class="il">Employee Name</td><td class="iv"><b>${p.employee.firstName} ${p.employee.lastName}</b></td><td class="il">Designation</td><td class="iv">${p.employee.designation??"."}</td></tr>
-        <tr><td class="il">Employee Number</td><td class="iv">${p.employee.employeeId}</td><td class="il">Date Of Joining</td><td class="iv"></td></tr>
-        <tr><td class="il">Date of Birth</td><td class="iv"></td><td class="il">Days Paid</td><td class="iv"><b>${pDays}</b></td></tr>
-        <tr><td class="il">UAN No.</td><td class="iv"></td><td class="il">OT Hrs</td><td class="iv">${p.overtimeHrs??0}</td></tr>
-        <tr><td class="il">PF No.</td><td class="iv"></td><td class="il">Location</td><td class="iv">PUNE</td></tr>
-        <tr><td class="il">ESIC No.</td><td class="iv"></td><td class="il"></td><td class="iv"></td></tr>
+        <tr><td class="il">Employee Number</td><td class="iv">${p.employee.employeeId}</td><td class="il">Date Of Joining</td><td class="iv">${dt(p.employee.dateOfJoining)}</td></tr>
+        <tr><td class="il">Date of Birth</td><td class="iv">${dt(p.employee.dateOfBirth)}</td><td class="il">Days Paid</td><td class="iv"><b>${pDays}</b></td></tr>
+        <tr><td class="il">UAN No.</td><td class="iv">${p.employee.uan??""}</td><td class="il">OT Hrs</td><td class="iv">${p.overtimeHrs??0}</td></tr>
+        <tr><td class="il">PF No.</td><td class="iv">${p.employee.pfNumber??""}</td><td class="il">Location</td><td class="iv">PUNE</td></tr>
+        <tr><td class="il">ESIC No.</td><td class="iv">${p.employee.esiNumber??""}</td><td class="il"></td><td class="iv"></td></tr>
       </tbody></table></td></tr>
       <tr class="col-hdr"><th class="e-col">Earnings</th><th colspan="2" class="e-col" style="border-right:2px solid #888"></th><th colspan="2" class="d-col">Deductions</th></tr>
       <tr class="sub-hdr"><th>Particulars</th><th class="num">Salary Rate</th><th class="num" style="border-right:2px solid #888">Salary Amt (Rs.)</th><th></th><th class="num">Amount (Rs.)</th></tr>
       ${earnings.map((e,i)=>{const d=deductions[i];return`<tr><td>${e.label}</td><td class="num it">${e.fullRate>0?r(e.fullRate):""}</td><td class="num it" style="border-right:2px solid #888">${e.amt>0?r(e.amt):"0"}</td><td class="dlabel">${d?.label??""}</td><td class="num">${d&&d.amt>0?r(d.amt):"0"}</td></tr>`}).join("")}
-      <tr class="total-row"><td><b>Gross Earnings (A)</b></td><td></td><td class="num" style="border-right:2px solid #888"><b>${r(p.grossSalary)}</b></td><td><b>Total Deduction</b></td><td class="num"><b>${r(p.totalDeductions)}</b></td></tr>
+      <tr class="total-row"><td><b>Gross Earnings (A)</b></td><td class="num"><b>${r(grossRate)}</b></td><td class="num" style="border-right:2px solid #888"><b>${r(p.grossSalary)}</b></td><td><b>Total Deduction</b></td><td class="num"><b>${r(p.totalDeductions)}</b></td></tr>
       <tr class="net-row"><td colspan="2"><b>Net Pay (A) - (B)</b></td><td class="num" style="border-right:2px solid #888"><b>${r(p.netSalary)}</b></td><td><b>(B)</b></td><td></td></tr>
       <tr><td colspan="5" class="words">Amount in words: <b><i>${numToWords(Math.round(p.netSalary))}</i></b></td></tr>
     </tbody></table>

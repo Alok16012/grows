@@ -54,6 +54,9 @@ export async function GET(req: Request) {
                         uan: true,
                         pfNumber: true,
                         esiNumber: true,
+                        // Printed on the payslip header, alongside UAN/PF/ESIC.
+                        dateOfBirth: true,
+                        dateOfJoining: true,
                         deployments: {
                             where: { isActive: true },
                             include: { site: { select: { name: true } } },
