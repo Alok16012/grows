@@ -11,6 +11,7 @@ import {
     validatePhone, validateEmail, validateAadhaar, validatePAN,
     validateIFSC, validateBankAccount, validatePincode, validateUAN,
     validateESIC, validatePFNumber, validateDateOfBirth, validateAmount,
+    validateJoiningAge,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import crypto from "crypto"
@@ -261,6 +262,9 @@ export async function POST(req: Request) {
             phone: validatePhone(phone),
             alternatePhone: validatePhone(alternatePhone),
             dateOfBirth: validateDateOfBirth(dateOfBirth),
+            // Under-18 employment is not allowed: the joining date has to be at
+            // least 18 years after the date of birth.
+            dateOfJoining: validateJoiningAge(dateOfBirth, dateOfJoining),
             pincode: validatePincode(pincode),
             permanentPincode: validatePincode(permanentPincode),
             aadharNumber: validateAadhaar(aadharNumber),

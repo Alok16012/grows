@@ -7,6 +7,7 @@ import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateEmail, validatePincode, validateUAN,
+    validateDateOfBirth, validateJoiningAge,
 } from "@/lib/validation"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
@@ -172,6 +173,10 @@ export async function POST(req: Request) {
                     ?? validateEmail(row.email as string)
                     ?? validatePincode(row.pincode as string)
                     ?? validateUAN(row.uan as string)
+                    // Both dates go through dt() first: the sheet may carry
+                    // Excel serials, which new Date() reads as year numbers.
+                    ?? validateDateOfBirth(dt(row.dateOfBirth))
+                    ?? validateJoiningAge(dt(row.dateOfBirth), dt(row.dateOfJoining))
                 if (formatError) {
                     return { skip: true, rowNum, reason: formatError }
                 }

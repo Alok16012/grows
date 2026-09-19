@@ -5,7 +5,7 @@ import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
     validateIFSC, validateBankAccount, validatePincode, validateUAN,
-    validateESIC, validateDateOfBirth, validatePFNumber,
+    validateESIC, validateDateOfBirth, validateJoiningAge, validatePFNumber,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import crypto from "crypto"
@@ -104,6 +104,8 @@ export async function POST(req: Request) {
             alternatePhone: validatePhone(alternatePhone),
             email: validateEmail(email),
             dateOfBirth: validateDateOfBirth(dateOfBirth),
+            // Under-18 employment is not allowed.
+            dateOfJoining: validateJoiningAge(dateOfBirth, dateOfJoining),
             pincode: validatePincode(pincode),
             permanentPincode: validatePincode(permanentPincode),
             emergencyContact1Phone: validatePhone(emergencyContact1Phone),

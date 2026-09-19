@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { validateDateOfBirth, validateJoiningAge } from "@/lib/validation"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,17 @@ export async function POST(req: Request) {
         if (!branch) branch = allBranches[0] ?? null
         if (!branch) {
             errors.push({ row: rowNum, reason: "No branch available in the system" })
+            skipped++
+            continue
+        }
+
+        // Under-18 employment is not allowed. ContractFrom doubles as the
+        // joining date below, so it is the date checked against BirthDate.
+        const ageError =
+            validateDateOfBirth(parseDate(row["BirthDate"]))
+            ?? validateJoiningAge(parseDate(row["BirthDate"]), parseDate(row["ContractFrom"]))
+        if (ageError) {
+            errors.push({ row: rowNum, reason: ageError })
             skipped++
             continue
         }

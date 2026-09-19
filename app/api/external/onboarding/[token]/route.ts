@@ -6,7 +6,7 @@ import {
     collectErrors, validationResponse,
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validatePincode, validateUAN, validateESIC,
-    validatePFNumber, validateDateOfBirth,
+    validatePFNumber, validateDateOfBirth, validateJoiningAge,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 
@@ -92,6 +92,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
         // that lands in the employee record is re-checked here.
         const errors = collectErrors({
             dateOfBirth: validateDateOfBirth(dateOfBirth),
+            // Under-18 employment is not allowed. Either date may be left out
+            // of the submission, in which case the stored one still applies —
+            // the same fallback the write below uses.
+            dateOfJoining: validateJoiningAge(
+                dateOfBirth ?? existing.dateOfBirth,
+                dateOfJoining ?? existing.dateOfJoining,
+            ),
             alternatePhone: validatePhone(alternatePhone),
             pincode: validatePincode(pincode),
             permanentPincode: validatePincode(permanentPincode),

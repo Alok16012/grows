@@ -11,7 +11,7 @@ import { can } from "@/lib/can"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
-    validatePincode, validateDateOfBirth, validatePFNumber,
+    validatePincode, validateDateOfBirth, validateJoiningAge, validatePFNumber,
 } from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -406,6 +406,9 @@ export function EmployeeModal({
         alternatePhone:   validatePhone(form.alternatePhone) || "",
         email:            validateEmail(form.email) || "",
         dateOfBirth:      validateDateOfBirth(form.dateOfBirth) || "",
+        // Under-18 employment is not allowed — flagged on the joining date,
+        // which is the field the user is usually correcting.
+        dateOfJoining:    validateJoiningAge(form.dateOfBirth, form.dateOfJoining) || "",
         aadharNumber:     validateAadhaar(form.aadharNumber) || "",
         panNumber:        validatePAN(form.panNumber) || "",
         pincode:          validatePincode(form.pincode) || "",
@@ -852,7 +855,9 @@ export function EmployeeModal({
                                 </div>
                                 <div>
                                     <label className={labelCls}>Date of Joining</label>
-                                    <input type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")} className={inputCls} />
+                                    <input type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")}
+                                        className={inputCls + (fieldErrors.dateOfJoining ? " !border-red-400" : "")} />
+                                    {fieldErrors.dateOfJoining && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {fieldErrors.dateOfJoining}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Employment Type</label>

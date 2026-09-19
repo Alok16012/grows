@@ -8,7 +8,7 @@ import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
     validateIFSC, validateBankAccount, validatePincode, validateUAN,
-    validateESIC, validatePFNumber, validateDateOfBirth, validateAmount,
+    validateESIC, validatePFNumber, validateDateOfBirth, validateJoiningAge, validateAmount,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import { Role } from "@prisma/client"
@@ -72,6 +72,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             email: validateEmail(formEmail),
             alternatePhone: validatePhone(alternatePhone),
             dateOfBirth: validateDateOfBirth(dateOfBirth),
+            // Under-18 employment is not allowed.
+            dateOfJoining: validateJoiningAge(dateOfBirth, dateOfJoining),
             aadharNumber: validateAadhaar(aadharNumber),
             panNumber: validatePAN(panNumber),
             bankAccountNumber: validateBankAccount(bankAccountNumber),

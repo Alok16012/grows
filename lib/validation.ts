@@ -223,6 +223,41 @@ export function validateDateOfBirth(value: string | Date | null | undefined): Fi
     return null
 }
 
+/** Minimum age, in whole years, an employee must have reached on their joining date. */
+export const MIN_JOINING_AGE_YEARS = 18
+
+/**
+ * Age on the joining date. Employing anyone under 18 is not allowed, so a
+ * joining date fewer than 18 years after the date of birth is rejected rather
+ * than quietly imported.
+ *
+ * Both dates optional: a record missing either one can't be checked, and this
+ * never makes a field required on its own.
+ */
+export function validateJoiningAge(
+    dateOfBirth: string | Date | null | undefined,
+    dateOfJoining: string | Date | null | undefined,
+): FieldError {
+    if (!dateOfBirth || !dateOfJoining) return null
+    const dob = dateOfBirth instanceof Date ? dateOfBirth : new Date(dateOfBirth)
+    const doj = dateOfJoining instanceof Date ? dateOfJoining : new Date(dateOfJoining)
+    if (Number.isNaN(dob.getTime()) || Number.isNaN(doj.getTime())) return null
+    if (doj < dob) return "Date of joining cannot be before the date of birth"
+
+    // Calendar years, not 365.25-day averages: someone joining on their 18th
+    // birthday is 18, and a leap year must not push them back under.
+    let age = doj.getFullYear() - dob.getFullYear()
+    const beforeBirthday =
+        doj.getMonth() < dob.getMonth() ||
+        (doj.getMonth() === dob.getMonth() && doj.getDate() < dob.getDate())
+    if (beforeBirthday) age--
+
+    if (age < MIN_JOINING_AGE_YEARS) {
+        return `Employee must be at least ${MIN_JOINING_AGE_YEARS} years old on the date of joining (this record is ${age})`
+    }
+    return null
+}
+
 // ─── Batch runner ────────────────────────────────────────────────────────────
 
 export type ValidationMap = Record<string, FieldError>

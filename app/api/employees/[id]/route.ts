@@ -11,6 +11,7 @@ import {
     validatePhone, validateEmail, validateAadhaar, validatePAN,
     validateIFSC, validateBankAccount, validatePincode, validateUAN,
     validateESIC, validatePFNumber, validateDateOfBirth, validateAmount,
+    validateJoiningAge,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 
@@ -119,6 +120,21 @@ export async function PUT(
         })
         // Callers (EmployeeModal, employee list) read this body with res.text().
         if (errors) return new NextResponse(validationResponse(errors).message, { status: 400 })
+
+        // Under-18 employment is not allowed. This is a partial update, so
+        // whichever of the two dates the request leaves out is read back from
+        // the stored record — editing only the joining date must still be
+        // checked against the date of birth already on file.
+        if (dateOfBirth !== undefined || dateOfJoining !== undefined) {
+            const stored = await prisma.employee.findUnique({
+                where: { id: params.id },
+                select: { dateOfBirth: true, dateOfJoining: true },
+            })
+            const dob = dateOfBirth !== undefined ? dateOfBirth : stored?.dateOfBirth
+            const doj = dateOfJoining !== undefined ? dateOfJoining : stored?.dateOfJoining
+            const ageError = validateJoiningAge(dob, doj)
+            if (ageError) return new NextResponse(ageError, { status: 400 })
+        }
 
         // Block edits that would collide with ANOTHER employee's Aadhaar / PAN /
         // mobile / email / bank account (self is excluded). Only check fields present.
