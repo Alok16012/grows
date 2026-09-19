@@ -391,7 +391,7 @@ function ComplianceMasterInner() {
             "Name": `${filtered.length} employees`,
             "Designation": "",
             "UAN": "", "PF Number": "", "ESI Number": "",
-            "Days Paid": filtered.reduce((s, r) => s + r.presentDays, 0),
+            "Days Paid": Math.round(filtered.reduce((s, r) => s + r.presentDays, 0) * 1000) / 1000,
             "Basic": totals.basic, "DA": totals.da, "HRA": totals.hra,
             "Conveyance": totals.conv, "Washing": totals.wash,
             "Leave With Wages": totals.lww, "Bonus": totals.bonus,

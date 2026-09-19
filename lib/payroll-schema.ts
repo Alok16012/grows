@@ -51,6 +51,9 @@ type Col = {
 }
 
 const num  = (name: string): Col => ({ name, type: "DOUBLE PRECISION", notNull: true, def: "0" })
+/** Like `num`, but with a non-zero default. */
+const numDef = (name: string, def: string): Col =>
+    ({ name, type: "DOUBLE PRECISION", notNull: true, def })
 const int  = (name: string, def = "0"): Col => ({ name, type: "INTEGER", notNull: true, def })
 const text = (name: string): Col => ({ name, type: "TEXT" })
 const time = (name: string): Col => ({ name, type: "TIMESTAMP(3)" })
@@ -94,7 +97,9 @@ const PAYROLL: Col[] = [
     // net & CTC
     num("netSalary"), num("ctc"),
     // attendance
-    int("workingDays", "26"), int("presentDays", "26"), num("leaveDays"),
+    // presentDays is DOUBLE PRECISION, not INTEGER: attendance sheets carry
+    // half days (10.5), and an int column rounded them away.
+    int("workingDays", "26"), numDef("presentDays", "26"), num("leaveDays"),
     num("lwpDays"), num("overtimeHrs"), num("overtimeRate"),
     text("siteId"), status, time("processedAt"), text("processedBy"),
     time("paidAt"), text("paidBy"), text("remarks"),

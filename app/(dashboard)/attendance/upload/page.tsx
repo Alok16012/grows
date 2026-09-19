@@ -502,7 +502,8 @@ export default function AttendanceUploadPage() {
                                         <td colSpan={5} style={{ padding: "8px 10px", fontSize: 11, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
                                             Total ({matchedCount} employees)
                                         </td>
-                                        <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--text)" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.days,0)}</td>
+                                        {/* Days can be fractional (half days), so round the sum. */}
+                                        <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--text)" }}>{Math.round(matched.filter(r=>r.matched).reduce((s,r)=>s+r.days,0)*1000)/1000}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--text)" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.otDays,0)}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.otherDeduction,0) || "—"}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.lwf,0) || "—"}</td>

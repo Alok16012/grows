@@ -949,7 +949,9 @@ model Payroll {
   ctc                 Float         @default(0) // CTC = fullGross + empPF + empESIC
   // --- Attendance ---
   workingDays         Int           @default(26)
-  presentDays         Int           @default(26)
+  /// Half days are real: attendance sheets carry values like 10.5, so this
+  /// cannot be an Int — rounding it silently changed what an employee was paid.
+  presentDays         Float         @default(26)
   leaveDays           Float         @default(0)
   lwpDays             Float         @default(0)
   overtimeHrs         Float         @default(0)

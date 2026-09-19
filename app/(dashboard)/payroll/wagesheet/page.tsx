@@ -1004,8 +1004,9 @@ function WageSheetInner() {
                                                     <td colSpan={5} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({selectedCount > 0 ? `${selectedCount} selected` : data.length})</td>
                                                     {/* Attendance totals */}
                                                     <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+(p.workingDays ?? 26),0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+((p.workingDays??26) - (p.presentDays??(p.workingDays??26))),0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+(p.presentDays??p.workingDays??26),0)}</td>
+                                                    {/* Days are decimal (half days), so round the sum like the OT column does. */}
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(data.reduce((s,p)=>s+((p.workingDays??26) - (p.presentDays??(p.workingDays??26))),0)*1000)/1000}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(data.reduce((s,p)=>s+(p.presentDays??p.workingDays??26),0)*1000)/1000}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(data.reduce((s,p)=>s+(p.otDays??0),0)*1000)/1000}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{data.reduce((s,p)=>s+(p.overtimeHrs??0),0)}</td>
                                                     {/* Structure totals */}
