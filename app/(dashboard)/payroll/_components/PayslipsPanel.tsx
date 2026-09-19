@@ -3,8 +3,9 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
-import { Loader2, Search, Printer, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X } from "lucide-react"
+import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
+import PayslipViewerModal from "./PayslipViewerModal"
 
 const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
@@ -59,6 +60,9 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
     const [records,  setRecords]  = useState<PayrollRecord[]>([])
     const [search,   setSearch]   = useState("")
     const [selected, setSelected] = useState<PayrollRecord|null>(null)
+    // The slip open in the full preview. Separate from `selected`, which
+    // drives the summary card beside the list.
+    const [viewing,  setViewing]  = useState<PayrollRecord|null>(null)
     const [ldSites,  setLdSites]  = useState(true)
     const [loading,  setLoading]  = useState(false)
     const [actLoad,  setActLoad]  = useState<string|null>(null)
@@ -72,7 +76,7 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
     useEffect(()=>{ fetchStatus() },[fetchStatus])
 
     const fetchSlips = useCallback(async (siteId: string)=>{
-        setLoading(true); setRecords([]); setSelected(null)
+        setLoading(true); setRecords([]); setSelected(null); setViewing(null)
         try {
             const url=siteId?`/api/payroll?siteId=${siteId}&month=${month}&year=${year}`:`/api/payroll?month=${month}&year=${year}`
             const r=await fetch(url)
@@ -162,7 +166,9 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
 </div>`
     }
 
-    const slipPageHTML = (recs: PayrollRecord[]) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Salary Slips</title>
+    // `autoPrint` off builds the same document for on-screen preview: the
+    // script below is what makes a printed copy open the dialog by itself.
+    const slipPageHTML = (recs: PayrollRecord[], autoPrint = true) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Salary Slips</title>
 <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;}
 .slip{width:720px;margin:20px auto;padding:0 0 24px 0;page-break-after:always;}.slip:last-child{page-break-after:avoid;}
 .co-header{text-align:center;padding:10px 4px 6px;border-bottom:1px solid #333;position:relative;min-height:58px;}.co-logo{position:absolute;left:6px;top:4px;height:50px;width:auto;}.co-header h1{font-size:15px;font-style:italic;font-weight:900;letter-spacing:.3px;}
@@ -178,7 +184,7 @@ export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
 .comp-gen{text-align:center;padding:8px;font-size:10px;color:#555;}
 @media print{body{margin:0;}.slip{width:100%;margin:0;padding:0 12px 20px;}@page{margin:10mm;size:A4;}}</style></head><body>
 ${recs.map(p=>buildSlipHTML(p)).join("")}
-<script>window.onload=()=>window.print()</script></body></html>`
+${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html>`
 
     const printSlip = (p: PayrollRecord) => printHTML(slipPageHTML([p]))
     const printAllSlips = () => { if(filtered.length) printHTML(slipPageHTML(filtered)) }
@@ -277,8 +283,8 @@ ${recs.map(p=>buildSlipHTML(p)).join("")}
                         </div>
                         {/* Narrower fixed columns on phones so the employee
                             name still gets usable width. */}
-                        <div className="grid grid-cols-[1fr_72px_76px_44px] sm:grid-cols-[1fr_90px_100px_60px]" style={{ padding:"8px 16px", background:"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
-                            {["Employee","Net Salary","Status","Print"].map(h=>(
+                        <div className="grid grid-cols-[1fr_72px_76px_76px] sm:grid-cols-[1fr_90px_100px_96px]" style={{ padding:"8px 16px", background:"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
+                            {["Employee","Net Salary","Status","Actions"].map(h=>(
                                 <span key={h} style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px" }}>{h}</span>
                             ))}
                         </div>
@@ -298,7 +304,7 @@ ${recs.map(p=>buildSlipHTML(p)).join("")}
                                 const statusBg=r.status==="PAID"?"#dcfce7":r.status==="PROCESSED"?"#dbeafe":"#f3f4f6"
                                 return (
                                     <div key={r.id} onClick={()=>setSelected(r)}
-                                        className="grid grid-cols-[1fr_72px_76px_44px] sm:grid-cols-[1fr_90px_100px_60px]"
+                                        className="grid grid-cols-[1fr_72px_76px_76px] sm:grid-cols-[1fr_90px_100px_96px]"
                                         style={{ alignItems:"center", padding:"10px 16px", cursor:"pointer",
                                             background:selected?.id===r.id?"#f0fdf4":idx%2===0?"var(--surface)":"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
                                         <div>
@@ -307,8 +313,12 @@ ${recs.map(p=>buildSlipHTML(p)).join("")}
                                         </div>
                                         <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>₹{Math.round(r.netSalary).toLocaleString("en-IN")}</span>
                                         <span style={{ padding:"2px 7px", borderRadius:20, fontSize:9, fontWeight:700, width:"fit-content", color:statusColor, background:statusBg }}>{r.status}</span>
-                                        <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                                            <button onClick={e=>{e.stopPropagation();printSlip(r)}}
+                                        <div style={{ display:"flex", justifyContent:"flex-end", gap:6 }}>
+                                            <button onClick={e=>{e.stopPropagation();setSelected(r);setViewing(r)}} title="View payslip"
+                                                style={{ width:28, height:28, borderRadius:6, border:"1px solid var(--border)", background:"var(--surface2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--text3)" }}>
+                                                <Eye size={12} />
+                                            </button>
+                                            <button onClick={e=>{e.stopPropagation();printSlip(r)}} title="Print payslip"
                                                 style={{ width:28, height:28, borderRadius:6, border:"1px solid var(--border)", background:"var(--surface2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--text3)" }}>
                                                 <Printer size={12} />
                                             </button>
@@ -373,6 +383,10 @@ ${recs.map(p=>buildSlipHTML(p)).join("")}
                                 </div>
                             </div>
                             <div style={{ padding:"0 16px 14px", display:"flex", gap:8 }}>
+                                <button onClick={()=>setViewing(selected)}
+                                    style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px", border:"1px solid var(--border)", borderRadius:8, fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", background:"none" }}>
+                                    <Eye size={13} /> View
+                                </button>
                                 <button onClick={()=>printSlip(selected)}
                                     style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px", border:"1px solid var(--border)", borderRadius:8, fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", background:"none" }}>
                                     <Printer size={13} /> Print
@@ -389,6 +403,15 @@ ${recs.map(p=>buildSlipHTML(p)).join("")}
                     )}
                 </div>
             </div>
+
+            {viewing && (
+                <PayslipViewerModal
+                    title={`${viewing.employee.firstName} ${viewing.employee.lastName} — ${MONTHS_LONG[viewing.month-1]} ${viewing.year}`}
+                    html={slipPageHTML([viewing], false)}
+                    onPrint={()=>printSlip(viewing)}
+                    onClose={()=>setViewing(null)}
+                />
+            )}
         </div>
     )
 }
