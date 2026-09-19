@@ -122,7 +122,6 @@ export async function POST(req: Request) {
         // Company-configurable calculation rules (Payroll → Calculation Settings)
         const { rules } = await getPayrollRules()
         const defaultMonthDays = rules.defaults.monthDays
-        let totalGross = 0, totalNet = 0, totalPfE = 0, totalEsiE = 0
 
         // ── STEP 1: Calculate ALL payroll values in memory (pure JS, zero DB calls) ──
         type PayrollRow = {
@@ -194,11 +193,6 @@ export async function POST(req: Request) {
                 month,
             }, rules)
 
-            totalGross += calc.grossSalary
-            totalNet   += calc.netSalary
-            totalPfE   += calc.pfEmployer
-            totalEsiE  += calc.esiEmployer
-
             return {
                 employeeId:  emp.id,
                 payrollRunId: runId,
@@ -237,9 +231,31 @@ export async function POST(req: Request) {
         const processedCount = allRows.length
 
         // ── STEP 5: Update payroll run totals (1 DB call) ─────────────────────────
+        // Summed over EVERY row in the run, not just the ones this request
+        // wrote. Processing is done site by site against one month-wide run, so
+        // storing this batch's own totals meant the last site processed
+        // overwrote the month — Payroll History showed all 657 employees next
+        // to a single site's gross. The employee count on that screen comes
+        // from the same payrollRunId relation, so keying the sum on it keeps
+        // the two columns describing the same set of rows.
+        const runTotals = await prisma.payroll.aggregate({
+            where: { payrollRunId: runId },
+            _sum: {
+                grossSalary: true, netSalary: true,
+                pfEmployer: true, esiEmployer: true,
+                lwf: true, tds: true,
+            },
+        })
         await prisma.payrollRun.update({
             where: { id: runId },
-            data: { totalGross, totalNet, totalPfEmployer: totalPfE, totalEsiEmployer: totalEsiE }
+            data: {
+                totalGross:       runTotals._sum.grossSalary ?? 0,
+                totalNet:         runTotals._sum.netSalary   ?? 0,
+                totalPfEmployer:  runTotals._sum.pfEmployer  ?? 0,
+                totalEsiEmployer: runTotals._sum.esiEmployer ?? 0,
+                totalLwf:         runTotals._sum.lwf         ?? 0,
+                totalTds:         runTotals._sum.tds         ?? 0,
+            }
         })
 
         return NextResponse.json({

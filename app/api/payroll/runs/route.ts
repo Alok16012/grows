@@ -40,7 +40,40 @@ export async function GET(req: Request) {
             },
         })
 
-        return NextResponse.json(runs)
+        // Totals come from the rows, not from the columns on PayrollRun.
+        // Processing runs site by site against one month-wide run, and the
+        // stored totals used to be overwritten with whichever site went last —
+        // so a run could report 657 employees beside a single site's gross.
+        // The write side now sums the whole run, but runs processed before that
+        // still carry the stale figure, and deleting rows never refreshed it
+        // either. Deriving it here keeps the money column describing the same
+        // rows as the employee count, which comes off the same relation.
+        const sums = await prisma.payroll.groupBy({
+            by: ["payrollRunId"],
+            where: { payrollRunId: { in: runs.map(r => r.id) } },
+            _sum: {
+                grossSalary: true, netSalary: true,
+                pfEmployer: true, esiEmployer: true,
+                lwf: true, tds: true,
+            },
+        })
+        const sumByRun = new Map(sums.map(s => [s.payrollRunId, s._sum]))
+
+        return NextResponse.json(runs.map(run => {
+            const s = sumByRun.get(run.id)
+            // No rows yet (a run created but never processed): keep what's
+            // stored rather than zeroing the row out.
+            if (!s) return run
+            return {
+                ...run,
+                totalGross:       s.grossSalary ?? 0,
+                totalNet:         s.netSalary   ?? 0,
+                totalPfEmployer:  s.pfEmployer  ?? 0,
+                totalEsiEmployer: s.esiEmployer ?? 0,
+                totalLwf:         s.lwf         ?? 0,
+                totalTds:         s.tds         ?? 0,
+            }
+        }))
     } catch (error) {
         console.error("[PAYROLL_RUNS_GET]", error)
         // Send the reason back: the payroll page only ever showed a generic
