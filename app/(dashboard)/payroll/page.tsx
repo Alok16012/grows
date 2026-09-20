@@ -168,6 +168,24 @@ export default function PayrollPage() {
     const currentMonth = new Date().getMonth() + 1
     const currentYear  = new Date().getFullYear()
     const thisMonthRun = runs.find(r => r.month === currentMonth && r.year === currentYear)
+
+    // The Employees / Gross Pay / Net Pay cards read "this month" and went
+    // blank whenever the calendar month had no run yet — which is every month
+    // until payroll is processed, and the whole of it for anyone who runs
+    // payroll in arrears. August's figures sat right there in the history
+    // table below while the three cards above them showed a dash.
+    //
+    // They now fall back to the most recent run and say WHICH month that is,
+    // so the number is never unlabelled. The workflow stepper above still
+    // keys off thisMonthRun: the current month genuinely isn't processed, and
+    // that part should keep saying so.
+    const latestRun = runs.reduce<PayrollRun | undefined>((best, r) =>
+        !best || r.year > best.year || (r.year === best.year && r.month > best.month) ? r : best,
+        undefined)
+    const statRun = thisMonthRun ?? latestRun
+    const statSub = !statRun ? "this month"
+        : statRun === thisMonthRun ? "this month"
+        : `${MONTHS_SHORT[statRun.month - 1]} ${statRun.year}`
     const totalGrossYTD = runs.reduce((s, r) => s + r.totalGross, 0)
     const totalNetYTD   = runs.reduce((s, r) => s + r.totalNet, 0)
 
@@ -595,9 +613,9 @@ export default function PayrollPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                 {[
                     { label: "Runs This Year", value: String(runs.length),                              color: "#3b82f6", bg: "#eff6ff", sub: "payroll runs", icon: CalendarRange },
-                    { label: "Employees",      value: String(thisMonthRun?._count.payrolls ?? "—"),     color: "#8b5cf6", bg: "#f5f3ff", sub: "this month",   icon: Users },
-                    { label: "Gross Pay",      value: thisMonthRun ? fmt(thisMonthRun.totalGross) : "—", color: "#0369a1", bg: "#e0f2fe", sub: "this month",  icon: IndianRupee },
-                    { label: "Net Pay",        value: thisMonthRun ? fmt(thisMonthRun.totalNet) : "—",   color: "#16a34a", bg: "#dcfce7", sub: "this month",  icon: Wallet },
+                    { label: "Employees",      value: String(statRun?._count.payrolls ?? "—"),     color: "#8b5cf6", bg: "#f5f3ff", sub: statSub,       icon: Users },
+                    { label: "Gross Pay",      value: statRun ? fmt(statRun.totalGross) : "—",      color: "#0369a1", bg: "#e0f2fe", sub: statSub,       icon: IndianRupee },
+                    { label: "Net Pay",        value: statRun ? fmt(statRun.totalNet) : "—",        color: "#16a34a", bg: "#dcfce7", sub: statSub,       icon: Wallet },
                     { label: "Gross YTD",      value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",      color: "#0369a1", bg: "#e0f2fe", sub: "year to date", icon: TrendingUp },
                     { label: "Net YTD",        value: totalNetYTD > 0 ? fmt(totalNetYTD) : "—",          color: "#15803d", bg: "#dcfce7", sub: "year to date", icon: TrendingUp },
                 ].map(s => (
