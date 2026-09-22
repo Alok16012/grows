@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
 import * as XLSX from "xlsx"
+import { buildEmployeeWhere, employeeFiltersFromParams, type EmployeeFilters } from "@/lib/employee-filter"
 
 // Ordered column list for the employee export. "Basic Salary" is only included
 // for users allowed to see salary. The Employees page column picker mirrors this.
@@ -63,8 +64,21 @@ function buildRow(e: EmpWithRels): Record<string, string | number> {
     }
 }
 
-async function buildWorkbook(opts: { ids?: string[]; cols?: string[]; canViewSalary: boolean }) {
-    const where = opts.ids && opts.ids.length ? { id: { in: opts.ids } } : {}
+async function buildWorkbook(opts: {
+    ids?: string[]
+    cols?: string[]
+    filters?: EmployeeFilters
+    canViewSalary: boolean
+}) {
+    // Ticked rows win: an explicit selection is the most specific thing the
+    // user can say. Otherwise export exactly what the current filters select —
+    // the status tab (All / Active / Resigned / …), department, site and
+    // search. This used to be `{}`, so choosing the Active tab and hitting
+    // Export still returned every employee in the table, RESIGNED rows and
+    // PENDING-xxxx onboarding records included.
+    const where = opts.ids && opts.ids.length
+        ? { id: { in: opts.ids } }
+        : buildEmployeeWhere(opts.filters ?? {})
     const employees = await loadEmployees(where)
 
     // Resolve which columns to include, honouring the order + salary permission.
@@ -97,14 +111,17 @@ function fileResponse(buf: Buffer) {
     })
 }
 
-// GET — export everyone, all columns (back-compat).
-export async function GET() {
+// GET — all columns, filtered by the same query params the list accepts
+// (?status=ACTIVE&siteId=…). No params means everyone bar onboarding, which is
+// what the All tab shows.
+export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
     if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     const canViewSalary = checkAccess(session, [], "employees.viewSalary")
-    const buf = await buildWorkbook({ canViewSalary })
+    const { searchParams } = new URL(req.url)
+    const buf = await buildWorkbook({ filters: employeeFiltersFromParams(searchParams), canViewSalary })
     return fileResponse(buf)
 }
 
@@ -118,6 +135,16 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}))
     const ids = Array.isArray(body?.ids) ? body.ids.filter((x: unknown) => typeof x === "string") : undefined
     const cols = Array.isArray(body?.cols) ? body.cols.filter((x: unknown) => typeof x === "string") : undefined
-    const buf = await buildWorkbook({ ids, cols, canViewSalary })
+    // Sent by the Employees page so the file matches the tab and dropdowns on
+    // screen. Ignored when `ids` names an explicit selection.
+    const filters: EmployeeFilters = {
+        branchId:       typeof body?.branchId       === "string" ? body.branchId       : null,
+        departmentId:   typeof body?.departmentId   === "string" ? body.departmentId   : null,
+        siteId:         typeof body?.siteId         === "string" ? body.siteId         : null,
+        status:         typeof body?.status         === "string" ? body.status         : null,
+        search:         typeof body?.search         === "string" ? body.search         : null,
+        employmentType: typeof body?.employmentType === "string" ? body.employmentType : null,
+    }
+    const buf = await buildWorkbook({ ids, cols, filters, canViewSalary })
     return fileResponse(buf)
 }

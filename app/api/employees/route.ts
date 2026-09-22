@@ -14,6 +14,7 @@ import {
     validateJoiningAge,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
+import { buildEmployeeWhere, employeeFiltersFromParams } from "@/lib/employee-filter"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
@@ -28,12 +29,6 @@ export async function GET(req: Request) {
         }
 
         const { searchParams } = new URL(req.url)
-        const branchId = searchParams.get("branchId")
-        const departmentId = searchParams.get("departmentId")
-        const siteId = searchParams.get("siteId")
-        const status = searchParams.get("status")
-        const search = searchParams.get("search")
-        const employmentType = searchParams.get("employmentType")
         const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
         const pageSize = Math.min(1000, parseInt(searchParams.get("pageSize") ?? "50"))
         // `lite=1` strips the base64 `photo` blob from each row. Profile photos
@@ -42,40 +37,9 @@ export async function GET(req: Request) {
         // a `hasPhoto` boolean is kept so presence is still known.
         const lite = searchParams.get("lite") === "1"
 
-        const where: Record<string, any> = {}
-        if (branchId) where.branchId = branchId
-        if (departmentId) where.departmentId = departmentId
-        if (status) {
-            where.status = status
-        } else {
-            // Exclude ONBOARDING employees from the default list — they only appear in Onboarding module
-            where.status = { not: "ONBOARDING" }
-        }
-
-        // Hide anyone still pending onboarding (placeholder EMP code / not yet
-        // approved) regardless of employee.status — covers legacy records whose
-        // status may be ACTIVE but whose onboarding was never completed. They only
-        // live in the Onboarding module until approved.
-        where.NOT = { onboardingRecord: { is: { status: { not: "COMPLETED" } } } }
-        if (employmentType) where.employmentType = employmentType
-        if (siteId) {
-            where.deployments = {
-                some: {
-                    siteId,
-                    isActive: true
-                }
-            }
-        }
-
-        if (search) {
-            where.OR = [
-                { firstName: { contains: search, mode: "insensitive" } },
-                { lastName: { contains: search, mode: "insensitive" } },
-                { employeeId: { contains: search, mode: "insensitive" } },
-                { phone: { contains: search, mode: "insensitive" } },
-                { designation: { contains: search, mode: "insensitive" } },
-            ]
-        }
+        // Shared with the Excel export, so the two can't disagree about what
+        // the current view contains. See lib/employee-filter.ts.
+        const where = buildEmployeeWhere(employeeFiltersFromParams(searchParams))
 
         const [employees, total] = await Promise.all([
             prisma.employee.findMany({

@@ -1191,12 +1191,24 @@ function EmployeesPage() {
         const cols = EXPORT_COLUMNS.filter(c => exportCols.has(c) && (c !== "Basic Salary" || canViewSalary))
         if (cols.length === 0) { toast.error("Pick at least one column"); return }
         const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined
+        // With nothing ticked, export what is on screen rather than the whole
+        // table: the status tab, the department / site dropdowns and the search
+        // box. These went unsent, so picking the Active tab and exporting still
+        // produced every employee — resigned ones and pending-onboarding rows
+        // among them. Ignored by the server when `ids` is present.
+        const filters = {
+            status: statusFilter || undefined,
+            departmentId: deptFilter || undefined,
+            employmentType: empTypeFilter || undefined,
+            siteId: siteFilter || undefined,
+            search: search || undefined,
+        }
         setExporting(true)
         try {
             const res = await fetch("/api/employees/export", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids, cols }),
+                body: JSON.stringify({ ids, cols, ...filters }),
             })
             if (!res.ok) { toast.error("Export failed"); return }
             const blob = await res.blob()
@@ -1208,7 +1220,12 @@ function EmployeesPage() {
             a.click()
             a.remove()
             URL.revokeObjectURL(url)
-            toast.success(`Exported ${ids ? `${ids.length} selected` : "all"} employees`)
+            const hasFilters = Object.values(filters).some(Boolean)
+            toast.success(
+                ids                 ? `Exported ${ids.length} selected employees`
+                : hasFilters        ? "Exported the filtered employees"
+                :                     "Exported all employees"
+            )
             setExportOpen(false)
         } catch {
             toast.error("Export failed")
