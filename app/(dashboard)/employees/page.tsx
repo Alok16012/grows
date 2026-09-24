@@ -17,6 +17,7 @@ import { format } from "date-fns"
 // and import. Eager import would bloat the post-login landing bundle.
 const loadXLSX = () => import("xlsx")
 import { EmployeeModal, Employee, STATUS_CONFIG } from "@/components/EmployeeModal"
+import { BulkUpdateEmployees } from "@/components/BulkUpdateEmployees"
 
 // Columns offered in the Export picker — mirrors the server export
 // (app/api/employees/export). "Basic Salary" is hidden without salary access.
@@ -1097,6 +1098,7 @@ function EmployeesPage() {
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
     const [drawerEmployee, setDrawerEmployee] = useState<Employee | null>(null)
     const [showImportModal, setShowImportModal] = useState(false)
+    const [showBulkUpdate, setShowBulkUpdate] = useState(false)
     const [importRows, setImportRows] = useState<Record<string, unknown>[]>([])
     const [importLoading, setImportLoading] = useState(false)
     const [importProgress, setImportProgress] = useState({ done: 0, total: 0 })
@@ -1604,6 +1606,16 @@ function EmployeesPage() {
                         <Upload size={15} />
                         Import
                     </button>
+                    {isAdmin && (
+                        <button
+                            onClick={() => setShowBulkUpdate(true)}
+                            title="Update existing employees (UAN / PF / ESIC, bank …) from Excel"
+                            style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                        >
+                            <RefreshCw size={15} />
+                            Bulk Update
+                        </button>
+                    )}
                     <button
                         onClick={() => { setEditEmployee(null); setShowModal(true) }}
                         className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
@@ -1989,6 +2001,20 @@ function EmployeesPage() {
                 isAdmin={isAdmin}
                 canViewSalary={canViewSalary}
             />
+
+            {showBulkUpdate && (
+                <BulkUpdateEmployees
+                    filters={{
+                        status: statusFilter || null,
+                        departmentId: deptFilter || null,
+                        employmentType: empTypeFilter || null,
+                        siteId: siteFilter || null,
+                        search: search || null,
+                    }}
+                    onClose={() => setShowBulkUpdate(false)}
+                    onDone={() => fetchEmployees()}
+                />
+            )}
 
             {/* Import Modal */}
             {showImportModal && (
