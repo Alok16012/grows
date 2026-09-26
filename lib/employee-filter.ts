@@ -70,6 +70,7 @@ export function buildEmployeeWhere(f: EmployeeFilters): Record<string, any> {
     if (f.search) {
         where.OR = [
             { firstName:   { contains: f.search, mode: "insensitive" } },
+            { middleName:  { contains: f.search, mode: "insensitive" } },
             { lastName:    { contains: f.search, mode: "insensitive" } },
             { employeeId:  { contains: f.search, mode: "insensitive" } },
             { phone:       { contains: f.search, mode: "insensitive" } },

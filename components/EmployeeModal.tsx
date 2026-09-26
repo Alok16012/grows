@@ -98,6 +98,10 @@ type Department = { id: string; name: string }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+/** First, middle and last name as one string — matches the Employee Master's Full Name column. */
+export const employeeFullName = (e: { firstName?: string | null; middleName?: string | null; lastName?: string | null }) =>
+    [e.firstName, e.middleName, e.lastName].map(v => (v ?? "").trim()).filter(Boolean).join(" ")
+
 export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     ACTIVE: { label: "Active", color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
     INACTIVE: { label: "Inactive", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
@@ -596,7 +600,7 @@ export function EmployeeModal({
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
                     <div>
                         <h2 id="employee-modal-title" className="text-[16px] font-semibold text-[var(--text)]">
-                            {employee ? `${employee.firstName} ${employee.lastName}` : "Add New Employee"}
+                            {employee ? employeeFullName(employee) : "Add New Employee"}
                         </h2>
                         {employee && (
                             <p className="text-[12px] text-[var(--text3)] mt-0.5">{employee.employeeId} · {employee.designation || "No Designation"}</p>

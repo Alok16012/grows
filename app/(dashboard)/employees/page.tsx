@@ -16,7 +16,7 @@ import { format } from "date-fns"
 // xlsx is lazy-loaded — it's a ~430KB dep used only on template download
 // and import. Eager import would bloat the post-login landing bundle.
 const loadXLSX = () => import("xlsx")
-import { EmployeeModal, Employee, STATUS_CONFIG } from "@/components/EmployeeModal"
+import { EmployeeModal, Employee, STATUS_CONFIG, employeeFullName } from "@/components/EmployeeModal"
 import { BulkUpdateEmployees } from "@/components/BulkUpdateEmployees"
 
 // Columns offered in the Export picker — mirrors the server export
@@ -461,7 +461,7 @@ function EmployeeDrawer({
                             <Avatar firstName={employee.firstName} lastName={employee.lastName} photo={employee.photo} size={52} />
                             <div>
                                 <h3 className="text-[16px] font-semibold text-[var(--text)]">
-                                    {employee.firstName} {employee.lastName}
+                                    {employeeFullName(employee)}
                                 </h3>
                                 <p className="text-[12px] font-mono text-[var(--accent-text)] mt-0.5">{employee.employeeId}</p>
                                 {employee.designation && (
@@ -1830,7 +1830,7 @@ function EmployeesPage() {
                                                     <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={36} />
                                                     <div>
                                                         <p className="text-[13px] font-semibold text-[var(--text)]">
-                                                            {emp.firstName} {emp.lastName}
+                                                            {employeeFullName(emp)}
                                                         </p>
                                                         <p className="text-[11px] font-mono text-[var(--accent-text)]">{emp.employeeId}</p>
                                                         {emp.designation && (
