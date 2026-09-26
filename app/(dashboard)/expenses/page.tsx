@@ -1810,6 +1810,62 @@ function ExpenseDetailModal({ title, subtitle, items, onClose }: {
     )
 }
 
+// "2026-09" → first and last calendar day as YYYY-MM-DD. Built from the parts,
+// not via toISOString(): in IST local midnight on the 1st is still the previous
+// day in UTC, which pulled the last day of the previous month into the range.
+function monthRange(month: string): { from: string; to: string } {
+    const [y, m] = month.split("-").map(Number)
+    const last = new Date(y, m, 0).getDate()
+    return { from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}` }
+}
+
+// One employee's expenses as an Excel file: every category line, plus a
+// second sheet with each travel journey. `items` are per-category parts (see
+// expenseParts), so a multi-category expense contributes one row per line.
+async function downloadExpenseStatement(fileName: string, heading: string, items: any[]) {
+    const XLSX = await loadXLSX()
+    const sorted = [...items].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    const total = sorted.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+    const lines = [
+        [heading],
+        [],
+        ["Date", "Month", "Expense No", "Title", "Category", "Description", "Status", "Amount (₹)"],
+        ...sorted.map(i => [
+            format(new Date(i.date), "dd-MM-yyyy"),
+            format(new Date(i.date), "MMM yyyy"),
+            i.expenseNo ?? "",
+            i.title ?? "",
+            categoryLabel(i.category),
+            i.description ?? "",
+            statusStyle(i.status)?.label ?? i.status,
+            Number(i.amount) || 0,
+        ]),
+        [],
+        ["", "", "", "", "", "", "Total", total],
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(lines)
+    ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 30 }, { wch: 20 }, { wch: 36 }, { wch: 12 }, { wch: 12 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Expenses")
+
+    const journeys = sorted.flatMap(i => (Array.isArray(i.travelEntries) ? i.travelEntries : []).map((j: any) => [
+        j.date ? format(new Date(j.date), "dd-MM-yyyy") : "",
+        i.expenseNo ?? "",
+        j.vehicleType === "2W" ? "2-Wheeler" : j.vehicleType === "4W" ? "4-Wheeler" : "",
+        j.from ?? "", j.to ?? "",
+        Number(j.kms) || 0,
+        Number(j.amount) || 0,
+    ]))
+    if (journeys.length > 0) {
+        const wj = XLSX.utils.aoa_to_sheet([["Date", "Expense No", "Vehicle", "From", "To", "KMs", "Amount (₹)"], ...journeys])
+        wj["!cols"] = [{ wch: 12 }, { wch: 14 }, { wch: 11 }, { wch: 26 }, { wch: 26 }, { wch: 8 }, { wch: 12 }]
+        XLSX.utils.book_append_sheet(wb, wj, "Travel Journeys")
+    }
+    XLSX.writeFile(wb, fileName)
+}
+
+const fileSafe = (s: string) => s.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")
+
 // ─── Employee Summary Tab (team-wide table + per-employee drill-down) ─────────
 function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     const now = new Date()
@@ -1825,6 +1881,10 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
 
     // Detail item modal
     const [modal, setModal] = useState<{ title: string; subtitle: string; items: any[] } | null>(null)
+
+    // Search + downloads
+    const [empSearch, setEmpSearch] = useState("")
+    const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
     // Travel rate setting — separate per-km rate for 2-wheeler & 4-wheeler
     const [travelRate2W, setTravelRate2W] = useState(0)
@@ -1908,6 +1968,68 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
         finally { setSavingRate(false) }
     }
 
+    const q = empSearch.trim().toLowerCase()
+    const allRows: any[] = teamData?.rows ?? []
+    const visibleRows = q
+        ? allRows.filter(r => [r.name, r.employeeId, r.designation, r.department]
+            .some(v => String(v ?? "").toLowerCase().includes(q)))
+        : allRows
+    // Footer follows the search: with a filter on, "Grand Total" is the total of
+    // the rows you can see, not of everyone.
+    const visibleTotals: Record<string, number> = q
+        ? Object.fromEntries([...TEAM_COLS.map(c => c.key), "total"].map(k => [k, visibleRows.reduce((s, r) => s + (r[k] || 0), 0)]))
+        : (teamData?.totals ?? {})
+
+    // Selected month, one employee: every expense line with journeys.
+    const downloadEmployeeMonth = async (row: any) => {
+        setDownloadingId(row.id)
+        try {
+            const { from, to } = monthRange(month)
+            const res = await fetch(`/api/expenses?submittedBy=${row.userId || row.id}&dateFrom=${from}&dateTo=${to}`)
+            const list: any[] = res.ok ? await res.json() : []
+            // Same statuses the summary counts — drafts and rejected claims aren't in the row total.
+            const parts = (Array.isArray(list) ? list : [])
+                .filter(e => e.status !== "DRAFT" && e.status !== "REJECTED")
+                .flatMap(e => expenseParts(e).map(p => p.item))
+            if (parts.length === 0) { toast.error("No expenses found for this month"); return }
+            await downloadExpenseStatement(
+                `Expenses_${fileSafe(row.name)}_${row.employeeId ?? ""}_${month}.xlsx`,
+                `${row.name} (${row.employeeId ?? "—"}) — ${teamData?.monthLabel ?? month}`,
+                parts,
+            )
+        } catch {
+            toast.error("Download failed")
+        } finally {
+            setDownloadingId(null)
+        }
+    }
+
+    // The table as it stands (search applied), one row per employee.
+    const downloadTeamMonth = async () => {
+        const XLSX = await loadXLSX()
+        const header = ["Employee", "Employee ID", "Designation", "Dept", ...TEAM_COLS.map(c => c.label), "Total (₹)"]
+        const body = visibleRows.map(r => [r.name, r.employeeId ?? "", r.designation ?? "", r.department ?? "", ...TEAM_COLS.map(c => r[c.key] || 0), r.total || 0])
+        const foot = ["Grand Total", "", "", "", ...TEAM_COLS.map(c => visibleTotals[c.key] || 0), visibleTotals.total || 0]
+        const ws = XLSX.utils.aoa_to_sheet([header, ...body, foot])
+        ws["!cols"] = header.map((_, i) => ({ wch: i === 0 ? 26 : 13 }))
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, "Employee Summary")
+        XLSX.writeFile(wb, `Expense_Summary_${month}${q ? `_${fileSafe(empSearch)}` : ""}.xlsx`)
+    }
+
+    // Drill-down: the whole year for one employee.
+    const downloadDrillYear = async () => {
+        if (!drillData) return
+        const parts = (drillData.rows as any[]).flatMap(r => Object.values(r.items ?? {}).flat() as any[])
+        if (parts.length === 0) { toast.error(`No expenses in ${drillYear}`); return }
+        const name = drillData.employee?.name ?? drillEmployee?.name ?? "Employee"
+        await downloadExpenseStatement(
+            `Expenses_${fileSafe(name)}_${drillYear}.xlsx`,
+            `${name}${drillEmployee?.employeeId ? ` (${drillEmployee.employeeId})` : ""} — ${drillYear}`,
+            parts,
+        )
+    }
+
     const monthOptions = Array.from({ length: 12 }, (_, i) => {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
@@ -1925,6 +2047,30 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                     style={{ height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none" }}>
                     {monthOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                 </select>
+
+                {!drillEmpId && (
+                    <>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, height: 34, border: "1px solid var(--border)", borderRadius: 8, background: "white", padding: "0 10px", minWidth: 240 }}>
+                            <Search size={13} className="text-[var(--text3)] shrink-0" />
+                            <input
+                                value={empSearch}
+                                onChange={e => setEmpSearch(e.target.value)}
+                                placeholder="Search employee name, ID, dept…"
+                                style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "var(--text)" }}
+                            />
+                            {empSearch && (
+                                <button onClick={() => setEmpSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", display: "flex" }}>
+                                    <X size={13} />
+                                </button>
+                            )}
+                        </div>
+                        <button onClick={downloadTeamMonth} disabled={visibleRows.length === 0}
+                            title={q ? "Download the matching employees for this month" : "Download all employees for this month"}
+                            style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--text2)", fontSize: 12, fontWeight: 600, cursor: visibleRows.length ? "pointer" : "not-allowed", opacity: visibleRows.length ? 1 : 0.5, display: "flex", alignItems: "center", gap: 5 }}>
+                            <Download size={13} /> Download{q ? ` (${visibleRows.length})` : ""}
+                        </button>
+                    </>
+                )}
 
                 {isPrivileged && (
                     <>
@@ -1969,6 +2115,11 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                             <CreditCard size={28} style={{ margin: "0 auto 10px", opacity: 0.4 }} />
                             <p style={{ fontSize: 13 }}>No expenses submitted for {teamData?.monthLabel ?? "this month"}.</p>
                         </div>
+                    ) : visibleRows.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "48px 16px", color: "var(--text3)" }}>
+                            <Search size={24} style={{ margin: "0 auto 10px", opacity: 0.4 }} />
+                            <p style={{ fontSize: 13 }}>No employee matching “{empSearch}” has expenses in {teamData.monthLabel}.</p>
+                        </div>
                     ) : (
                         <div style={{ overflowX: "auto" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
@@ -1980,10 +2131,11 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                             <th key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
                                         ))}
                                         <th style={{ textAlign: "right", padding: "9px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
+                                        <th style={{ width: 44 }} />
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {teamData.rows.map((row: any) => (
+                                    {visibleRows.map((row: any) => (
                                         <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }}
                                             className="hover:bg-[var(--surface2)] transition-colors">
                                             <td style={{ padding: "10px 16px", whiteSpace: "nowrap" }}>
@@ -2002,16 +2154,14 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                                             <button
                                                                 onClick={() => {
                                                                     // Fetch individual expenses for this employee + category + month
-                                                                    const [y, m2] = month.split("-").map(Number)
-                                                                    const mStart = new Date(y, m2 - 1, 1).toISOString()
-                                                                    const mEnd   = new Date(y, m2, 0, 23, 59, 59).toISOString()
+                                                                    const { from: mFrom, to: mTo } = monthRange(month)
                                                                     // row.userId is the linked user account ID (used by submittedBy filter)
                                                                     const uid = row.userId || row.id
                                                                     // Fetch ALL of the employee's expenses for the month (no category
                                                                     // filter) and split them per-category client-side, so multi-category
                                                                     // expenses contribute their matching line item (with that line's
                                                                     // amount) rather than the whole expense under its legacy category.
-                                                                    fetch(`/api/expenses?submittedBy=${uid}&dateFrom=${mStart.slice(0,10)}&dateTo=${mEnd.slice(0,10)}`)
+                                                                    fetch(`/api/expenses?submittedBy=${uid}&dateFrom=${mFrom}&dateTo=${mTo}`)
                                                                         .then(r => r.ok ? r.json() : [])
                                                                         .then((items: any[]) => {
                                                                             const matching = (Array.isArray(items) ? items : [])
@@ -2034,20 +2184,30 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                             <td style={{ textAlign: "right", padding: "10px 16px", fontWeight: 800, color: "var(--text)", fontSize: 13, whiteSpace: "nowrap" }}>
                                                 {formatINR(row.total)}
                                             </td>
+                                            <td style={{ padding: "10px 12px 10px 0", textAlign: "center" }}>
+                                                <button onClick={() => downloadEmployeeMonth(row)} disabled={downloadingId === row.id}
+                                                    title={`Download ${row.name}'s ${teamData.monthLabel} expenses`}
+                                                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text2)" }}>
+                                                    {downloadingId === row.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
                                     <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
-                                        <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }} colSpan={2}>Grand Total</td>
+                                        <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }} colSpan={2}>
+                                            {q ? `Total (${visibleRows.length} of ${allRows.length})` : "Grand Total"}
+                                        </td>
                                         {TEAM_COLS.map(c => (
-                                            <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: teamData.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
-                                                {teamData.totals[c.key] > 0 ? formatINR(teamData.totals[c.key]) : "—"}
+                                            <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: visibleTotals[c.key] > 0 ? c.color : "var(--text3)" }}>
+                                                {visibleTotals[c.key] > 0 ? formatINR(visibleTotals[c.key]) : "—"}
                                             </td>
                                         ))}
                                         <td style={{ textAlign: "right", padding: "9px 16px", fontWeight: 800, color: "var(--text)", fontSize: 14 }}>
-                                            {formatINR(teamData.totals.total)}
+                                            {formatINR(visibleTotals.total || 0)}
                                         </td>
+                                        <td />
                                     </tr>
                                 </tfoot>
                             </table>
@@ -2067,6 +2227,10 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                             style={{ height: 30, borderRadius: 7, border: "1px solid var(--border)", background: "white", padding: "0 8px", fontSize: 12, outline: "none" }}>
                             {drillYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
+                        <button onClick={downloadDrillYear} disabled={drillLoading || !drillData}
+                            style={{ height: 30, padding: "0 10px", borderRadius: 7, border: "1px solid var(--border)", background: "white", color: "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                            <Download size={13} /> Download {drillYear}
+                        </button>
                     </div>
                     {drillLoading ? (
                         <div style={{ display: "flex", justifyContent: "center", padding: 36 }}>
