@@ -10,10 +10,13 @@ import { can } from "@/lib/can"
 const loadXLSX = () => import("xlsx")
 import {
     Loader2, Search, ChevronRight, Download, Upload,
-    Edit2, Check, X, RefreshCw, IndianRupee
+    Edit2, Check, X, RefreshCw, IndianRupee, CalendarRange
 } from "lucide-react"
 
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
+
+const MONTHS_LONG  = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
 
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
@@ -127,6 +130,14 @@ function SalaryMasterInner() {
     const [drawerForm, setDrawerForm] = useState<EditForm>(EMPTY_SALARY)
     const [drawerSaving, setDrawerSaving] = useState(false)
     const [uploading,  setUploading]  = useState(false)
+    // Month an uploaded increment takes effect from. Defaults to NEXT month:
+    // an increment is nearly always announced for the month ahead, and the
+    // month in progress usually has attendance against the old structure.
+    const [effMonth, setEffMonth] = useState(() => (new Date().getMonth() + 1) % 12 + 1)
+    const [effYear,  setEffYear]  = useState(() => {
+        const d = new Date()
+        return d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear()
+    })
     const [filterNone, setFilterNone] = useState(false)
     const [filterSite, setFilterSite] = useState("")
     // Quick-change compliance type without entering full edit mode
@@ -361,13 +372,34 @@ function SalaryMasterInner() {
                 const res = await fetch("/api/payroll/salary-structure", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rows }),
+                    // The increment is dated, so payroll for an earlier month
+                    // keeps paying the structure that was in force then.
+                    body: JSON.stringify({ rows, effectiveMonth: effMonth, effectiveYear: effYear }),
                 })
+                if (!res.ok) { toast.error(await res.text()); return }
                 const d = await res.json()
+                const effLabel = `${MONTHS_LONG[effMonth - 1]} ${effYear}`
                 const parts = [`${d.updated} updated`]
                 if (skipped.length)   parts.push(`${skipped.length} not found`)
                 if (wrongSite.length) parts.push(`${wrongSite.length} skipped (other site)`)
-                toast.success(`${filterSite ? `[${filterSite}] ` : ""}${parts.join(" · ")}`)
+                toast.success(
+                    `${filterSite ? `[${filterSite}] ` : ""}${parts.join(" · ")}`,
+                    { description: d.appliedNow
+                        ? `Effective ${effLabel} — in force now.`
+                        : `Effective ${effLabel} — scheduled. This month keeps the current structure.` },
+                )
+                // Months already processed that would now compute differently.
+                // Nothing stored was rewritten and a locked row is never touched
+                // by a re-run, but arrears are a judgement call, so say so.
+                if (Array.isArray(d.affectedProcessed) && d.affectedProcessed.length) {
+                    const months = d.affectedProcessed
+                        .map((m: { month: number; year: number }) => `${MONTHS_SHORT[m.month - 1]} ${m.year}`)
+                        .join(", ")
+                    toast.warning("Already-processed months affected", {
+                        description: `${months} — these were processed on the old structure. Nothing was changed; settle any arrears yourself.`,
+                        duration: 12000,
+                    })
+                }
                 if (skipped.length)   console.warn("Skipped EMP Codes (not found):", skipped)
                 if (wrongSite.length) console.warn(`Skipped EMP Codes (not at "${filterSite}"):`, wrongSite)
                 await load()
@@ -423,8 +455,25 @@ function SalaryMasterInner() {
                     <button onClick={handleDownloadTemplate} style={btnGhost} title={filterSite ? `Download template for ${filterSite}` : "Download all-employees template"}>
                         <Download size={13} /> {filterSite ? `Download (${filterSite})` : "Download Template"}
                     </button>
+                    {/* Sits immediately before Upload so the two read as one
+                        control: the month is what the uploaded structure takes
+                        effect from, not a filter on the table below. */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>
+                        <CalendarRange size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>Effective</span>
+                        <select value={effMonth} onChange={e => setEffMonth(Number(e.target.value))} aria-label="Effective month"
+                            style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer" }}>
+                            {MONTHS_LONG.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                        </select>
+                        <select value={effYear} onChange={e => setEffYear(Number(e.target.value))} aria-label="Effective year"
+                            style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer" }}>
+                            {(() => { const y = new Date().getFullYear(); return [y - 1, y, y + 1] })().map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
                     <label style={{ ...btnPrimary, background: uploading ? "#a78bfa" : "#7c3aed", cursor: uploading ? "not-allowed" : "pointer" }}
-                        title={filterSite ? `Upload affects only ${filterSite} employees` : "Upload affects all matched employees"}>
+                        title={filterSite
+                            ? `Upload affects only ${filterSite} employees, effective ${MONTHS_LONG[effMonth - 1]} ${effYear}`
+                            : `Upload affects all matched employees, effective ${MONTHS_LONG[effMonth - 1]} ${effYear}`}>
                         {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                         {uploading ? "Uploading…" : (filterSite ? `Upload (${filterSite})` : "Bulk Upload Excel")}
                         <input type="file" accept=".xlsx,.csv" onChange={handleUpload} style={{ display: "none" }} disabled={uploading || !canManage} />

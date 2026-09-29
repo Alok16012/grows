@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
+import { isValidEffectiveMonth, monthKey } from "@/lib/salary-revision"
 
 // GET /api/payroll/salary-structure
 // Returns all employees (active) with their salary structure (null if not set)
@@ -41,8 +42,15 @@ export async function GET() {
 }
 
 // POST /api/payroll/salary-structure
-// Bulk upsert salary structures
-// Body: { rows: Array<{ employeeId, basic, da, washing, conveyance, leaveWithWages, otherAllowance, otRatePerHour, canteenRatePerDay, complianceType }> }
+// Bulk upsert salary structures.
+// Body: { rows: Array<{ employeeId, basic, da, washing, ... }>,
+//         effectiveMonth?: number, effectiveYear?: number }
+//
+// With an effective month, each row is also written as a SalaryRevision dated
+// to it, and the wage run uses that revision for any month from then on. The
+// live EmployeeSalary row is only overwritten when the increment is effective
+// NOW or earlier — a future-dated one must not change what this month pays.
+// Without an effective month the behaviour is unchanged: overwrite in place.
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
@@ -51,6 +59,17 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
+
+    // Effective month is optional, and invalid values are refused rather than
+    // quietly ignored — silently applying an increment to the wrong month is
+    // far worse than a rejected upload.
+    const hasEffective = body.effectiveMonth != null && body.effectiveYear != null
+    if (hasEffective && !isValidEffectiveMonth(body.effectiveMonth, body.effectiveYear)) {
+        return new NextResponse("Invalid effective month", { status: 400 })
+    }
+    const effMonth = hasEffective ? Number(body.effectiveMonth) : null
+    const effYear  = hasEffective ? Number(body.effectiveYear)  : null
+
     const rows: {
         employeeId: string   // the UUID from Employee.id
         basic: number; da: number; hra?: number; washing: number; conveyance: number
@@ -72,6 +91,14 @@ export async function POST(req: Request) {
         }),
     ])
     const empById = new Map(empDetails.map(e => [e.id, e]))
+
+    // A future-dated increment must not change what the current month pays, so
+    // the live EmployeeSalary row is only touched when the revision is already
+    // in force. Payroll reads revisions anyway; EmployeeSalary is the snapshot
+    // the rest of the app shows.
+    const now = new Date()
+    const isInForce = !hasEffective
+        || monthKey(effYear!, effMonth!) <= monthKey(now.getFullYear(), now.getMonth() + 1)
 
     let updated = 0
     const errors: { employeeId: string; reason: string }[] = []
@@ -99,6 +126,42 @@ export async function POST(req: Request) {
                 complianceType: cType,
                 isHandicap: emp?.isHandicap ?? false,
             }, { gender: emp?.gender ?? "Male" }, rules).ctc
+
+            if (hasEffective) {
+                const fields = {
+                    basic, da, washing, conveyance,
+                    leaveWithWages:    lww,
+                    otherAllowance:    other,
+                    bonus,
+                    otRatePerHour:     otRate,
+                    canteenRatePerDay: canteen,
+                    hra,
+                    ctcMonthly:        ctcM,
+                    ctcAnnual:         ctcM * 12,
+                    complianceType:    cType,
+                }
+                // Re-uploading a month corrects that month rather than stacking
+                // a second revision the lookup would have to break ties on.
+                await prisma.salaryRevision.upsert({
+                    where: {
+                        employeeId_effectiveYear_effectiveMonth: {
+                            employeeId:     row.employeeId,
+                            effectiveYear:  effYear!,
+                            effectiveMonth: effMonth!,
+                        },
+                    },
+                    create: {
+                        employeeId:     row.employeeId,
+                        effectiveYear:  effYear!,
+                        effectiveMonth: effMonth!,
+                        createdBy:      session.user.id,
+                        ...fields,
+                    },
+                    update: fields,
+                })
+            }
+
+            if (!isInForce) { updated++; continue }
 
             await prisma.employeeSalary.upsert({
                 where: { employeeId: row.employeeId },
@@ -134,5 +197,37 @@ export async function POST(req: Request) {
         }
     }
 
-    return NextResponse.json({ updated, errors })
+    // Already-processed months that this increment would now compute
+    // differently. Nothing stored is rewritten and a locked row is never
+    // touched by a re-run — but whoever uploaded the increment should know
+    // which months are affected, so they can settle arrears themselves.
+    let affectedProcessed: { month: number; year: number; count: number }[] = []
+    if (hasEffective) {
+        const processed = await prisma.payroll.groupBy({
+            by: ["year", "month"],
+            where: {
+                employeeId: { in: rows.map(r => r.employeeId) },
+                status: { not: "DRAFT" },
+                OR: [
+                    { year: { gt: effYear! } },
+                    { year: effYear!, month: { gte: effMonth! } },
+                ],
+            },
+            _count: { _all: true },
+        })
+        affectedProcessed = processed
+            .map(p => ({ month: p.month, year: p.year, count: p._count._all }))
+            .sort((a, b) => monthKey(a.year, a.month) - monthKey(b.year, b.month))
+    }
+
+    return NextResponse.json({
+        updated,
+        errors,
+        effectiveMonth: effMonth,
+        effectiveYear:  effYear,
+        // false when the increment is future-dated: the live structure was left
+        // alone and only the revision was written.
+        appliedNow: isInForce,
+        affectedProcessed,
+    })
 }

@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { checkAccess } from "@/lib/permissions"
+import { revisionsForMonth } from "@/lib/salary-revision"
 
 // Zero is a legitimate value here (an employee who worked no days), so `||`
 // cannot be used to apply the default — it would silently pay a full month.
@@ -121,6 +122,13 @@ export async function POST(req: Request) {
 
         // Company-configurable calculation rules (Payroll → Calculation Settings)
         const { rules } = await getPayrollRules()
+
+        // The structure in force for THIS month, not whatever EmployeeSalary
+        // happens to hold today. An increment effective from October must not
+        // change what a re-run of September pays. One query for the batch;
+        // employees without a revision fall back to EmployeeSalary below,
+        // which is what every employee did before revisions existed.
+        const revisions = await revisionsForMonth(employees.map(e => e.id), { month, year })
         const defaultMonthDays = rules.defaults.monthDays
 
         // ── STEP 1: Calculate ALL payroll values in memory (pure JS, zero DB calls) ──
@@ -150,9 +158,11 @@ export async function POST(req: Request) {
         }
 
         const allRows: PayrollRow[] = employees.map(emp => {
+            const revision = revisions.get(emp.id)
             const sal      = emp.employeeSalary
-            const salBasic = sal?.basic ?? emp.basicSalary ?? 0
-            const salData  = sal  // use salary structure if it exists (PROPOSED or APPROVED)
+            // A revision wins over the live row for the month being processed.
+            const salData  = revision ?? sal
+            const salBasic = salData?.basic ?? emp.basicSalary ?? 0
 
             const attInput = (attendance as any[])?.find((a: any) => a.employeeId === emp.id) ?? {}
             const att = {

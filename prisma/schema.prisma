@@ -10,39 +10,39 @@ datasource db {
 }
 
 model User {
-  id                     String              @id @default(uuid())
-  name                   String
-  email                  String              @unique
-  password               String
-  plainPassword          String?
-  role                   Role                @default(CLIENT)
-  phone                  String?
-  image                  String?
-  isActive               Boolean             @default(true)
-  createdAt              DateTime            @default(now())
-  companyId              String?
-  customRoleId           String?
-  assignmentsAsAssigner  Assignment[]        @relation("AssignmentAssigner")
-  assignmentsAsInspector Assignment[]        @relation("AssignmentInspector")
-  inspections            Inspection[]
-  company                Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  customRole             CustomRole?         @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
-  managedProjects        ProjectManager[]    @relation("ProjectManagers")
-  assignedProjects       ProjectManager[]    @relation("ProjectManagerAssigner")
-  inspectedProjects      ProjectInspector[]  @relation("ProjectInspectors")
-  inspectorAssignments   ProjectInspector[]  @relation("ProjectInspectorAssigner")
-  notifications          Notification[]
-  leadsAssigned          Lead[]              @relation("LeadAssignee")
-  leadsCreated           Lead[]              @relation("LeadCreator")
-  leadActivities         LeadActivity[]      @relation("LeadActivityUser")
-  leadDocsUploaded       LeadDocument[]      @relation("LeadDocUploader")
-  leadFollowUpsCreated   LeadFollowUp[]      @relation("LeadFollowUpCreator")
-  leadFormsCreated       LeadForm[]          @relation("LeadFormCreator")
-  hrApprovedReviews      PerformanceReview[] @relation("HRApprover")
-  employeeProfile        Employee?           @relation("EmployeeUser")
-  jobPostingsCreated     JobPosting[]        @relation("JobCreator")
-  siteMemberships            SiteAssignment[] @relation("SiteAssignmentUser")
-  siteAssignmentsAsAssigner  SiteAssignment[] @relation("SiteAssignmentAssigner")
+  id                        String              @id @default(uuid())
+  name                      String
+  email                     String              @unique
+  password                  String
+  plainPassword             String?
+  role                      Role                @default(CLIENT)
+  phone                     String?
+  image                     String?
+  isActive                  Boolean             @default(true)
+  createdAt                 DateTime            @default(now())
+  companyId                 String?
+  customRoleId              String?
+  assignmentsAsAssigner     Assignment[]        @relation("AssignmentAssigner")
+  assignmentsAsInspector    Assignment[]        @relation("AssignmentInspector")
+  inspections               Inspection[]
+  company                   Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  customRole                CustomRole?         @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  managedProjects           ProjectManager[]    @relation("ProjectManagers")
+  assignedProjects          ProjectManager[]    @relation("ProjectManagerAssigner")
+  inspectedProjects         ProjectInspector[]  @relation("ProjectInspectors")
+  inspectorAssignments      ProjectInspector[]  @relation("ProjectInspectorAssigner")
+  notifications             Notification[]
+  leadsAssigned             Lead[]              @relation("LeadAssignee")
+  leadsCreated              Lead[]              @relation("LeadCreator")
+  leadActivities            LeadActivity[]      @relation("LeadActivityUser")
+  leadDocsUploaded          LeadDocument[]      @relation("LeadDocUploader")
+  leadFollowUpsCreated      LeadFollowUp[]      @relation("LeadFollowUpCreator")
+  leadFormsCreated          LeadForm[]          @relation("LeadFormCreator")
+  hrApprovedReviews         PerformanceReview[] @relation("HRApprover")
+  employeeProfile           Employee?           @relation("EmployeeUser")
+  jobPostingsCreated        JobPosting[]        @relation("JobCreator")
+  siteMemberships           SiteAssignment[]    @relation("SiteAssignmentUser")
+  siteAssignmentsAsAssigner SiteAssignment[]    @relation("SiteAssignmentAssigner")
 }
 
 model CustomRole {
@@ -58,17 +58,17 @@ model CustomRole {
 }
 
 model Company {
-  id              String           @id @default(uuid())
-  name            String
-  address         String?
-  contactPerson   String?
-  contactPhone    String?
-  logoUrl         String?
-  createdBy       String
-  createdAt       DateTime         @default(now())
-  projects        Project[]
-  clients         User[]
-  branches        Branch[]
+  id            String    @id @default(uuid())
+  name          String
+  address       String?
+  contactPerson String?
+  contactPhone  String?
+  logoUrl       String?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  projects      Project[]
+  clients       User[]
+  branches      Branch[]
 }
 
 // A "Whole Site" grant: an inspector is assigned to a real HR Site as a whole.
@@ -82,19 +82,19 @@ model Company {
 // it is read off their custom-role permissions, so somebody who holds both
 // appears in both pickers and nothing has to be kept in sync.
 model SiteAssignment {
-  id              String   @id @default(uuid())
-  siteId          String
+  id             String   @id @default(uuid())
+  siteId         String
   // The DB column is still named `inspectionBoyId` — it predates managers being
   // stored here. Mapped rather than renamed so no production SQL is required;
   // the index names below are pinned for the same reason.
-  userId          String   @map("inspectionBoyId")
-  assignedBy      String
-  recurrenceType  String   @default("none")
-  status          String   @default("active")
-  createdAt       DateTime @default(now())
-  site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  user            User     @relation("SiteAssignmentUser", fields: [userId], references: [id])
-  assigner        User     @relation("SiteAssignmentAssigner", fields: [assignedBy], references: [id])
+  userId         String   @map("inspectionBoyId")
+  assignedBy     String
+  recurrenceType String   @default("none")
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+  site           Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user           User     @relation("SiteAssignmentUser", fields: [userId], references: [id])
+  assigner       User     @relation("SiteAssignmentAssigner", fields: [assignedBy], references: [id])
 
   @@unique([siteId, userId], map: "SiteAssignment_siteId_inspectionBoyId_key")
   @@index([siteId])
@@ -102,33 +102,33 @@ model SiteAssignment {
 }
 
 model Project {
-  id              String           @id @default(uuid())
+  id                String             @id @default(uuid())
   // Legacy column — projects now hang off a Site directly. Kept nullable so
   // old rows keep their value; nothing reads or writes it anymore.
-  companyId       String?
-  siteId          String?
-  name            String
-  description     String?
+  companyId         String?
+  siteId            String?
+  name              String
+  description       String?
   // Project workflow fields (added later — created in prod at runtime via
   // ensureProjectSchema in lib/prisma.ts, since prod migrations are manual).
-  code            String?          // e.g. PRJ-2026-00027
-  status          String           @default("ACTIVE") // PLANNING | ACTIVE | ON_HOLD | COMPLETED | ARCHIVED
-  projectType     String?
-  priority        String?          // Low | Medium | High
-  startDate       DateTime?
-  endDate         DateTime?
-  createdBy       String
-  createdAt       DateTime         @default(now())
-  assignments     Assignment[]
+  code              String? // e.g. PRJ-2026-00027
+  status            String             @default("ACTIVE") // PLANNING | ACTIVE | ON_HOLD | COMPLETED | ARCHIVED
+  projectType       String?
+  priority          String? // Low | Medium | High
+  startDate         DateTime?
+  endDate           DateTime?
+  createdBy         String
+  createdAt         DateTime           @default(now())
+  assignments       Assignment[]
   projectInspectors ProjectInspector[]
-  formTemplates   FormTemplate[]
-  expenses        Expense[]
-  company         Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  site            Site?            @relation(fields: [siteId], references: [id])
-  projectManagers ProjectManager[]
-  defectColumns   Json?
-  reportConfig    Json?
-  alertConfig     AlertConfig?
+  formTemplates     FormTemplate[]
+  expenses          Expense[]
+  company           Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site              Site?              @relation(fields: [siteId], references: [id])
+  projectManagers   ProjectManager[]
+  defectColumns     Json?
+  reportConfig      Json?
+  alertConfig       AlertConfig?
 }
 
 model Assignment {
@@ -141,7 +141,7 @@ model Assignment {
   recurrenceActive Boolean      @default(false)
   // Scheduling fields (created in prod at runtime via ensureProjectSchema —
   // prod migrations are manual).
-  code             String?      // e.g. ASG-2026-00012
+  code             String? // e.g. ASG-2026-00012
   startDate        DateTime?
   notes            String?
   // A multi-part assignment is inspected over several visits: the inspector can
@@ -569,9 +569,9 @@ model Department {
 }
 
 model Site {
-  id               String       @id @default(uuid())
+  id               String           @id @default(uuid())
   name             String
-  code             String?      @unique
+  code             String?          @unique
   address          String
   city             String?
   state            String?
@@ -582,21 +582,21 @@ model Site {
   branchId         String?
   latitude         Float?
   longitude        Float?
-  radius           Float        @default(100)
-  manpowerRequired Int          @default(1)
+  radius           Float            @default(100)
+  manpowerRequired Int              @default(1)
   contactPerson    String?
   contactPhone     String?
   siteType         String?
   shift            String?
-  isActive         Boolean      @default(true)
+  isActive         Boolean          @default(true)
   createdBy        String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  branch           Branch?      @relation(fields: [branchId], references: [id])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  branch           Branch?          @relation(fields: [branchId], references: [id])
   deployments      Deployment[]
   attendances      Attendance[]
-  leads            Lead[]       @relation("LeadSite")
-  leadForms        LeadForm[]   @relation("LeadFormSite")
+  leads            Lead[]           @relation("LeadSite")
+  leadForms        LeadForm[]       @relation("LeadFormSite")
   projects         Project[]
   siteAssignments  SiteAssignment[]
 
@@ -753,6 +753,7 @@ model Employee {
   iltAttendances        ILTAttendance[]
   courseFeedbacks       CourseFeedback[]
   employeeSalary        EmployeeSalary?
+  salaryRevisions       SalaryRevision[]
   advances              AdvanceAndReimbursement[]
   hrDocuments           HrDocument[]
 
@@ -810,6 +811,47 @@ model EmployeeSalary {
   employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([status])
+}
+
+/// A dated salary structure. EmployeeSalary holds only ONE row per employee and
+/// no history, so an increment uploaded today silently changed what a re-run of
+/// an OLD month would pay. Revisions are what payroll actually reads: for the
+/// month being processed it takes the newest revision effective on or before
+/// that month, falling back to EmployeeSalary when an employee has none.
+///
+/// Effective from the FIRST of (effectiveYear, effectiveMonth). Salary changes
+/// land on a month boundary here — payroll is monthly, and a mid-month revision
+/// has no meaning to the wage run.
+model SalaryRevision {
+  id                String   @id @default(uuid())
+  employeeId        String
+  effectiveMonth    Int
+  effectiveYear     Int
+  // Same components as EmployeeSalary, captured as they were for this period.
+  basic             Float    @default(0)
+  da                Float    @default(0)
+  hra               Float    @default(0)
+  washing           Float    @default(0)
+  conveyance        Float    @default(0)
+  leaveWithWages    Float    @default(0)
+  otherAllowance    Float    @default(0)
+  bonus             Float    @default(0)
+  otRatePerHour     Float    @default(170)
+  canteenRatePerDay Float    @default(55)
+  complianceType    String   @default("OR")
+  ctcMonthly        Float    @default(0)
+  ctcAnnual         Float    @default(0)
+  note              String?
+  createdBy         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // One structure per employee per month: re-uploading a month corrects it
+  // rather than stacking a second revision the lookup would have to break ties on.
+  @@unique([employeeId, effectiveYear, effectiveMonth])
+  @@index([employeeId])
+  @@index([effectiveYear, effectiveMonth])
 }
 
 model Deployment {
