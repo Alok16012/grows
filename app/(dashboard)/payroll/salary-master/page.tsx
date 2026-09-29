@@ -379,15 +379,32 @@ function SalaryMasterInner() {
                 if (!res.ok) { toast.error(await res.text()); return }
                 const d = await res.json()
                 const effLabel = `${MONTHS_LONG[effMonth - 1]} ${effYear}`
-                const parts = [`${d.updated} updated`]
-                if (skipped.length)   parts.push(`${skipped.length} not found`)
-                if (wrongSite.length) parts.push(`${wrongSite.length} skipped (other site)`)
-                toast.success(
-                    `${filterSite ? `[${filterSite}] ` : ""}${parts.join(" · ")}`,
-                    { description: d.appliedNow
-                        ? `Effective ${effLabel} — in force now.`
-                        : `Effective ${effLabel} — scheduled. This month keeps the current structure.` },
-                )
+                const failed: { employeeId: string; reason: string }[] = d.errors ?? []
+
+                // Rows the server could not write are a FAILURE, not a footnote.
+                // An upload where every row threw used to report "0 updated" as a
+                // green success toast with the reason hidden in the response body,
+                // so a completely failed upload looked like it had worked.
+                if (failed.length) {
+                    console.error("Salary upload — rows the server rejected:", failed)
+                    toast.error(
+                        d.updated > 0
+                            ? `${d.updated} updated, ${failed.length} failed`
+                            : `Upload failed — no salary structures were saved`,
+                        { description: `${failed[0].reason}${failed.length > 1 ? ` (and ${failed.length - 1} more — see the browser console)` : ""}`,
+                          duration: 15000 },
+                    )
+                } else {
+                    const parts = [`${d.updated} updated`]
+                    if (skipped.length)   parts.push(`${skipped.length} not found`)
+                    if (wrongSite.length) parts.push(`${wrongSite.length} skipped (other site)`)
+                    toast.success(
+                        `${filterSite ? `[${filterSite}] ` : ""}${parts.join(" · ")}`,
+                        { description: d.appliedNow
+                            ? `Effective ${effLabel} — in force now.`
+                            : `Effective ${effLabel} — scheduled. This month keeps the current structure.` },
+                    )
+                }
                 // Months already processed that would now compute differently.
                 // Nothing stored was rewritten and a locked row is never touched
                 // by a re-run, but arrears are a judgement call, so say so.

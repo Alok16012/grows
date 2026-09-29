@@ -100,6 +100,28 @@ export async function POST(req: Request) {
     const isInForce = !hasEffective
         || monthKey(effYear!, effMonth!) <= monthKey(now.getFullYear(), now.getMonth() + 1)
 
+    // SalaryRevision arrived in a migration, and production migrations here are
+    // applied by hand. Without the table every row throws inside the loop below
+    // and the upload comes back "0 updated" with the real reason buried in a
+    // per-row error list — which is exactly how it failed the first time. Check
+    // once, up front, and say what to do about it.
+    if (hasEffective) {
+        try {
+            await prisma.salaryRevision.findFirst({ select: { id: true } })
+        } catch (e) {
+            const msg = (e as Error).message ?? ""
+            if (/does not exist|P2021|relation .* does not exist/i.test(msg)) {
+                return new NextResponse(
+                    "Salary revisions are not set up on this database yet. Run the pending migration "
+                    + "(prisma/migrations/20260929120000_salary_revision) and upload again. "
+                    + "Nothing was changed.",
+                    { status: 503 },
+                )
+            }
+            throw e
+        }
+    }
+
     let updated = 0
     const errors: { employeeId: string; reason: string }[] = []
 
