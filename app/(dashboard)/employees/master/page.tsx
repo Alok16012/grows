@@ -7,12 +7,17 @@ import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import {
     Search, Loader2, RefreshCw, FileSpreadsheet, Pencil, X, Save, Trash2, CheckSquare,
     Users, UserCheck, UserX, CalendarOff, UserMinus,
-    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CalendarRange,
 } from "lucide-react"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
 import { can } from "@/lib/can"
+
+const JOIN_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+// Ten years back plus next year: joining dates are historical, and the extra
+// forward year covers an offer already dated into it.
+const JOIN_YEARS = (() => { const y = new Date().getFullYear(); return Array.from({ length: 12 }, (_, i) => y + 1 - i) })()
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Employee = {
@@ -623,6 +628,11 @@ export default function EmployeeMasterPage() {
     // and the table both honor this so you download exactly the columns you pick.
     const [hiddenColKeys, setHiddenColKeys] = useState<Set<string>>(new Set())
     const [showColPicker, setShowColPicker] = useState(false)
+    // Joining month. Filters and exports go together here — the sheet is built
+    // from the filtered rows — so this gives a monthly joiners report without a
+    // separate download path. Month "" means the whole year; year "" means all.
+    const [joinMonth, setJoinMonth] = useState("")
+    const [joinYear,  setJoinYear]  = useState("")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -694,8 +704,23 @@ export default function EmployeeMasterPage() {
     // Client-side column filtering
     const filteredEmployees = useMemo(() => {
         const activeColFilters = Object.entries(colFilters).filter(([, v]) => v.trim())
-        if (activeColFilters.length === 0) return employees
-        return employees.filter(emp => {
+
+        // Joining month, applied before the column filters. An employee with no
+        // joining date on file can't satisfy a month, so they drop out rather
+        // than being counted into every month.
+        const byJoining = (joinMonth || joinYear)
+            ? employees.filter(emp => {
+                if (!emp.dateOfJoining) return false
+                const d = new Date(emp.dateOfJoining)
+                if (Number.isNaN(d.getTime())) return false
+                if (joinYear  && d.getFullYear()  !== Number(joinYear))  return false
+                if (joinMonth && d.getMonth() + 1 !== Number(joinMonth)) return false
+                return true
+            })
+            : employees
+
+        if (activeColFilters.length === 0) return byJoining
+        return byJoining.filter(emp => {
             for (const [key, val] of activeColFilters) {
                 const col = ALL_COLS.find(c => c.key === key)
                 if (!col) continue
@@ -703,7 +728,7 @@ export default function EmployeeMasterPage() {
             }
             return true
         })
-    }, [employees, colFilters])
+    }, [employees, colFilters, joinMonth, joinYear])
 
     const activeFilterCount = Object.values(colFilters).filter(v => v.trim()).length
 
@@ -744,6 +769,13 @@ export default function EmployeeMasterPage() {
         })
     }
 
+    // Names the joining period in the file name and the toast: a monthly
+    // joiners sheet is worth nothing if you can't tell which month it is.
+    const joinLabel = joinMonth && joinYear ? `${JOIN_MONTHS[Number(joinMonth) - 1]}_${joinYear}`
+        : joinMonth ? JOIN_MONTHS[Number(joinMonth) - 1]
+        : joinYear  ? String(joinYear)
+        : ""
+
     // ── Bulk download selected ────────────────────────────────────────────────
     const handleDownloadSelected = async () => {
         const selected = filteredEmployees.filter(e => selectedIds.has(e.id))
@@ -762,7 +794,7 @@ export default function EmployeeMasterPage() {
             }))
             const wb = XLSX.utils.book_new()
             XLSX.utils.book_append_sheet(wb, ws, "Selected Employees")
-            XLSX.writeFile(wb, `Selected_Employees_${new Date().toISOString().slice(0,10)}.xlsx`)
+            XLSX.writeFile(wb, `Selected_Employees${joinLabel ? `_Joined_${joinLabel}` : ""}_${new Date().toISOString().slice(0,10)}.xlsx`)
             toast.success(`Downloaded ${selected.length} employees`)
         } catch {
             toast.error("Download failed")
@@ -810,8 +842,11 @@ export default function EmployeeMasterPage() {
             // Removed branch summary
 
             const date = new Date().toISOString().slice(0, 10)
-            XLSX.writeFile(wb, `Employee_Master_${date}.xlsx`)
-            toast.success(`Exported ${filteredEmployees.length} employees`)
+            XLSX.writeFile(wb, `Employee_Master${joinLabel ? `_Joined_${joinLabel}` : ""}_${date}.xlsx`)
+            toast.success(
+                `Exported ${filteredEmployees.length} employees`,
+                joinLabel ? { description: `Joined ${joinLabel.replace("_", " ")}` } : undefined,
+            )
         } catch {
             toast.error("Export failed")
         } finally {
@@ -923,8 +958,26 @@ export default function EmployeeMasterPage() {
                     {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
 
-                {(statusFilter || siteFilter || search) && (
-                    <button onClick={() => { setStatusFilter(""); setSiteFilter(""); setSearch(""); }}
+                {/* Joining month. Labelled "Joined", not just a bare month, so
+                    it can't be mistaken for an attendance or payroll period —
+                    this grid has no month of its own. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, height: 38, padding: "0 10px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)" }}>
+                    <CalendarRange size={14} style={{ color: "var(--text3)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>Joined</span>
+                    <select value={joinMonth} onChange={e => setJoinMonth(e.target.value)} aria-label="Joining month"
+                        style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 13, outline: "none", cursor: "pointer" }}>
+                        <option value="">Any month</option>
+                        {JOIN_MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                    </select>
+                    <select value={joinYear} onChange={e => setJoinYear(e.target.value)} aria-label="Joining year"
+                        style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 13, outline: "none", cursor: "pointer" }}>
+                        <option value="">Any year</option>
+                        {JOIN_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                </div>
+
+                {(statusFilter || siteFilter || search || joinMonth || joinYear) && (
+                    <button onClick={() => { setStatusFilter(""); setSiteFilter(""); setSearch(""); setJoinMonth(""); setJoinYear(""); }}
                         style={{ display: "flex", alignItems: "center", gap: 4, height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         <X size={13} /> Clear
                     </button>
