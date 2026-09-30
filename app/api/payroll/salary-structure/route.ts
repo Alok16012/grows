@@ -87,7 +87,7 @@ export async function POST(req: Request) {
         getPayrollRules(),
         prisma.employee.findMany({
             where: { id: { in: rows.map(r => r.employeeId) } },
-            select: { id: true, gender: true, isHandicap: true },
+            select: { id: true, gender: true, isHandicap: true, dateOfJoining: true },
         }),
     ])
     const empById = new Map(empDetails.map(e => [e.id, e]))
@@ -119,6 +119,76 @@ export async function POST(req: Request) {
                 )
             }
             throw e
+        }
+    }
+
+    // ── Preserve the structure being replaced ────────────────────────────────
+    // A dated increment only protects earlier months if those months have a
+    // revision of their own to read. Without one they fall back to
+    // EmployeeSalary — the very row this upload is about to overwrite — so
+    // re-running an OLD month would quietly pay the NEW figures. That is the
+    // whole thing effective dating exists to prevent.
+    //
+    // So before writing the increment, the outgoing structure is recorded as a
+    // revision covering the period before it: dated to the employee's joining
+    // month, since that is the earliest month they could ever be paid for.
+    // Only for employees who have no earlier revision already — once history
+    // exists, it is the truth and must not be overwritten by today's snapshot.
+    let preserved = 0
+    if (hasEffective) {
+        const ids = rows.map(r => r.employeeId)
+        const [currentSalaries, earlier] = await Promise.all([
+            prisma.employeeSalary.findMany({ where: { employeeId: { in: ids } } }),
+            prisma.salaryRevision.findMany({
+                where: {
+                    employeeId: { in: ids },
+                    OR: [
+                        { effectiveYear: { lt: effYear! } },
+                        { effectiveYear: effYear!, effectiveMonth: { lt: effMonth! } },
+                    ],
+                },
+                select: { employeeId: true },
+            }),
+        ])
+        const alreadyHasHistory = new Set(earlier.map(r => r.employeeId))
+
+        const baselines = currentSalaries.flatMap(sal => {
+            if (alreadyHasHistory.has(sal.employeeId)) return []
+            const doj = empById.get(sal.employeeId)?.dateOfJoining
+            // No joining date on file: fall back to the floor the validator
+            // allows, which simply means "for as long as this employee existed".
+            const bYear  = doj ? doj.getFullYear()  : 2000
+            const bMonth = doj ? doj.getMonth() + 1 : 1
+            // Joined on or after the increment: there is no earlier period to
+            // protect, and a baseline would only sit on top of the new one.
+            if (monthKey(bYear, bMonth) >= monthKey(effYear!, effMonth!)) return []
+            return [{
+                employeeId:        sal.employeeId,
+                effectiveYear:     bYear,
+                effectiveMonth:    bMonth,
+                basic:             sal.basic,
+                da:                sal.da,
+                hra:               sal.hra,
+                washing:           sal.washing,
+                conveyance:        sal.conveyance,
+                leaveWithWages:    sal.leaveWithWages,
+                otherAllowance:    sal.otherAllowance,
+                bonus:             sal.bonus,
+                otRatePerHour:     sal.otRatePerHour,
+                canteenRatePerDay: sal.canteenRatePerDay,
+                complianceType:    sal.complianceType,
+                ctcMonthly:        sal.ctcMonthly,
+                ctcAnnual:         sal.ctcAnnual,
+                note:              "Structure in force before the increment, recorded automatically",
+                createdBy:         session.user.id,
+            }]
+        })
+
+        if (baselines.length) {
+            // skipDuplicates, never overwrite: a revision already sitting on
+            // that month is real history and outranks this snapshot.
+            const res = await prisma.salaryRevision.createMany({ data: baselines, skipDuplicates: true })
+            preserved = res.count
         }
     }
 
@@ -245,6 +315,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
         updated,
         errors,
+        // Employees whose previous structure was captured as history by this
+        // upload, so earlier months keep paying what they used to.
+        preserved,
         effectiveMonth: effMonth,
         effectiveYear:  effYear,
         // false when the increment is future-dated: the live structure was left
