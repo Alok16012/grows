@@ -92,13 +92,38 @@ export async function POST(req: Request) {
     ])
     const empById = new Map(empDetails.map(e => [e.id, e]))
 
-    // A future-dated increment must not change what the current month pays, so
-    // the live EmployeeSalary row is only touched when the revision is already
-    // in force. Payroll reads revisions anyway; EmployeeSalary is the snapshot
-    // the rest of the app shows.
+    // EmployeeSalary is the snapshot the rest of the app shows, so it must hold
+    // whatever is in force TODAY. Payroll itself reads revisions and doesn't
+    // depend on this.
+    //
+    // Two ways an upload must leave it alone. A FUTURE-dated increment, which
+    // must not change what the current month pays. And a BACK-dated one that a
+    // later revision already supersedes — filing what August was paid on must
+    // not drag the live row back to August's figures. The second is per
+    // employee, since only some of them may have a newer revision on file.
     const now = new Date()
-    const isInForce = !hasEffective
-        || monthKey(effYear!, effMonth!) <= monthKey(now.getFullYear(), now.getMonth() + 1)
+    const nowKey = monthKey(now.getFullYear(), now.getMonth() + 1)
+    const notFutureDated = !hasEffective || monthKey(effYear!, effMonth!) <= nowKey
+
+    // Employees already carrying a revision that sits AFTER this one but is
+    // still in force today — for them this upload is history, not the current
+    // structure.
+    const supersededFor = new Set<string>()
+    if (hasEffective && notFutureDated) {
+        const later = await prisma.salaryRevision.findMany({
+            where: {
+                employeeId: { in: rows.map(r => r.employeeId) },
+                OR: [
+                    { effectiveYear: { gt: effYear! } },
+                    { effectiveYear: effYear!, effectiveMonth: { gt: effMonth! } },
+                ],
+            },
+            select: { employeeId: true, effectiveYear: true, effectiveMonth: true },
+        })
+        for (const r of later) {
+            if (monthKey(r.effectiveYear, r.effectiveMonth) <= nowKey) supersededFor.add(r.employeeId)
+        }
+    }
 
     // SalaryRevision arrived in a migration, and production migrations here are
     // applied by hand. Without the table every row throws inside the loop below
@@ -253,7 +278,9 @@ export async function POST(req: Request) {
                 })
             }
 
-            if (!isInForce) { updated++; continue }
+            // Future-dated, or already superseded for this employee: the
+            // revision is filed and the live structure is left as it is.
+            if (!notFutureDated || supersededFor.has(row.employeeId)) { updated++; continue }
 
             await prisma.employeeSalary.upsert({
                 where: { employeeId: row.employeeId },
@@ -320,9 +347,10 @@ export async function POST(req: Request) {
         preserved,
         effectiveMonth: effMonth,
         effectiveYear:  effYear,
-        // false when the increment is future-dated: the live structure was left
-        // alone and only the revision was written.
-        appliedNow: isInForce,
+        // false when nothing became the live structure: the upload was
+        // future-dated, or every row it touched is already superseded by a
+        // newer revision. Either way only revisions were written.
+        appliedNow: notFutureDated && supersededFor.size < rows.length,
         affectedProcessed,
     })
 }
