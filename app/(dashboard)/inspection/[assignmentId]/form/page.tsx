@@ -54,7 +54,11 @@ export default function InspectionFormPage() {
     const [elapsed, setElapsed] = useState(0)
 
     const isAdmin = session?.user?.role === "ADMIN"
-    const canEdit = inspection?.status === "draft" || isAdmin
+    // A rejection sends the work back to be corrected and submitted again, so
+    // it is editable like a draft. It used to be treated as final here while
+    // POST /api/inspections handed the rejected part straight back to the
+    // inspector — who then could not touch it, or start anything else.
+    const canEdit = inspection?.status === "draft" || inspection?.status === "rejected" || isAdmin
 
     // Other assignments of this inspector that still need filling — powers the
     // "which project do you want to fill?" chooser and the pending banner.
@@ -654,7 +658,9 @@ export default function InspectionFormPage() {
         )
     }
 
-    const isSubmitted = inspection?.status !== "draft"
+    // Rejected work is back in the inspector's hands, so the form is live, not
+    // in its submitted shape.
+    const isSubmitted = inspection?.status !== "draft" && inspection?.status !== "rejected"
 
     const getAutoColor = (label: string, value: number) => {
         if (label === "ACCEPTED QTY") return "text-[#1a9e6e]"
@@ -802,15 +808,21 @@ export default function InspectionFormPage() {
                     </div>
                 )}
 
-                {/* A rejected inspection is also "submitted", and used to fall into the
-                    else-branch below — so the inspector was shown a green tick reading
-                    "pending approval" on work that had actually been turned down. */}
-                {isSubmitted && !isAdmin && inspection?.status === "rejected" && (
-                    <div className="bg-[#fef2f2] border border-[rgba(220,38,38,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
-                        <AlertCircle className="h-[20px] w-[20px] text-[#dc2626] shrink-0" />
-                        <span className="text-[13px] font-[500] text-[#991b1b] flex-1">
-                            This inspection was rejected and can no longer be edited. Your manager must assign a new inspection to redo it.
-                        </span>
+                {/* Rejected work comes back to be corrected. This used to read
+                    "can no longer be edited — your manager must assign a new
+                    inspection", which left the inspector with a form they were
+                    handed but forbidden to touch and no way to move on. */}
+                {!isAdmin && inspection?.status === "rejected" && (
+                    <div className="bg-[#fef2f2] border border-[rgba(220,38,38,0.25)] rounded-[12px] p-[14px_18px] flex items-start gap-[12px] mb-[24px]">
+                        <AlertCircle className="h-[20px] w-[20px] text-[#dc2626] shrink-0 mt-[1px]" />
+                        <div className="flex-1">
+                            <span className="text-[13px] font-[500] text-[#991b1b]">
+                                Your manager sent this back. Correct it and submit again.
+                            </span>
+                            {inspection?.reviewerNotes && (
+                                <p className="text-[13px] text-[#991b1b] italic mt-[6px]">&ldquo;{inspection.reviewerNotes}&rdquo;</p>
+                            )}
+                        </div>
                     </div>
                 )}
                 {isSubmitted && !isAdmin && inspection?.status !== "rejected" && (

@@ -77,7 +77,16 @@ export async function PATCH(
         // A reviewer signature is exempt — it is applied precisely once the
         // inspection has left draft.
         const isRevertToDraft = status === "draft" && inspection.status === "pending"
-        if (!isAdmin && !(isSignatureOnly && isReviewer)
+
+        // A rejected inspection goes back to its inspector to be corrected and
+        // sent again. POST /api/inspections already hands the rejected part back
+        // rather than starting a fresh one — but this guard and the form both
+        // treated it as final, so the inspector was handed work they were then
+        // forbidden to touch, with no way forward from either side.
+        const isAssignedInspector = inspection.assignment.inspectionBoyId === session.user.id
+        const isRejectedRework = inspection.status === "rejected" && isAssignedInspector
+
+        if (!isAdmin && !(isSignatureOnly && isReviewer) && !isRejectedRework
             && inspection.status !== "draft" && !isRevertToDraft) {
             return NextResponse.json({ error: "Inspection is already submitted and cannot be edited" }, { status: 400 })
         }
@@ -88,7 +97,6 @@ export async function PATCH(
         // colleague had started, so the report and the audit trail name the person
         // who actually did the work. Restricted to them on purpose: a reviewer
         // counter-signing must not become the recorded author.
-        const isAssignedInspector = inspection.assignment.inspectionBoyId === session.user.id
         if (isAssignedInspector && inspection.submittedBy !== session.user.id) {
             updateData.submittedBy = session.user.id
         }
@@ -96,6 +104,16 @@ export async function PATCH(
             updateData.status = status
             if (status === "pending") {
                 updateData.submittedAt = new Date()
+                // Resubmitted after a rejection: clear the approval stamp so the
+                // reviewer sees a fresh submission rather than the verdict that
+                // sent it back. reviewerNotes stay — the inspector is still
+                // working to them, and they are the record of why.
+                if (isRejectedRework) {
+                    updateData.approvedAt = null
+                    updateData.approvedBy = null
+                    updateData.sentBackAt = new Date()
+                    updateData.sentBackCount = { increment: 1 }
+                }
             }
             if (isRevertToDraft) {
                 updateData.submittedAt = null
