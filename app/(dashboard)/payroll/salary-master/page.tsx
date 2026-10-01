@@ -118,7 +118,7 @@ const structureDefaults = (r: PayrollRules): SalaryRow => ({
 function SalaryMasterInner() {
     const router  = useRouter()
     const { data: session } = useSession()
-    const canManage = can(session, "payroll.manage")
+    const canManagePerm = can(session, "payroll.manage")
     const [data,       setData]       = useState<EmpSalary[]>([])
     const [loading,    setLoading]    = useState(true)
     const [search,     setSearch]     = useState("")
@@ -138,6 +138,17 @@ function SalaryMasterInner() {
         const d = new Date()
         return d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear()
     })
+    // Month whose structure the table shows. Empty = the live structure, which
+    // is what this page always was. Pick an earlier month to see what that month
+    // is actually paid on — the only way to confirm an increment left the months
+    // before it alone.
+    const [viewMonth, setViewMonth] = useState("")
+    const [viewYear,  setViewYear]  = useState("")
+    const isHistoricalView = !!(viewMonth && viewYear)
+    // Editing is off while looking at a past month. The table is showing that
+    // month's figures, but every edit path writes the LIVE structure — so a save
+    // from here would silently push old values onto the current one.
+    const canManage = canManagePerm && !isHistoricalView
     const [filterNone, setFilterNone] = useState(false)
     const [filterSite, setFilterSite] = useState("")
     // Quick-change compliance type without entering full edit mode
@@ -149,11 +160,12 @@ function SalaryMasterInner() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const r = await fetch("/api/payroll/salary-structure")
+            const qs = viewMonth && viewYear ? `?month=${viewMonth}&year=${viewYear}` : ""
+            const r = await fetch(`/api/payroll/salary-structure${qs}`)
             if (r.ok) setData(await r.json())
         } catch { toast.error("Failed to load") }
         finally { setLoading(false) }
-    }, [])
+    }, [viewMonth, viewYear])
 
     useEffect(() => { load() }, [load])
     useEffect(() => {
@@ -498,6 +510,42 @@ function SalaryMasterInner() {
                 </div>
             </div>
 
+            {/* Which month the table is showing. Deliberately separate from the
+                Effective picker up in the toolbar: that one says when an upload
+                takes effect, this one says which month you are LOOKING at. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>
+                    <CalendarRange size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>Viewing</span>
+                    <select value={viewMonth} onChange={e => setViewMonth(e.target.value)} aria-label="Viewing month"
+                        style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer" }}>
+                        <option value="">Current structure</option>
+                        {MONTHS_LONG.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                    </select>
+                    <select value={viewYear} onChange={e => setViewYear(e.target.value)} aria-label="Viewing year"
+                        style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer" }}>
+                        <option value="">—</option>
+                        {(() => { const y = new Date().getFullYear(); return [y - 2, y - 1, y, y + 1] })().map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    {isHistoricalView && (
+                        <button onClick={() => { setViewMonth(""); setViewYear("") }}
+                            style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                            Back to current
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {isHistoricalView && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1e40af" }}>
+                    <span>🔎</span>
+                    <span>
+                        Showing the structure <b>{MONTHS_LONG[Number(viewMonth) - 1]} {viewYear}</b> is paid on — exactly what payroll
+                        reads for that month. Read-only: editing and upload change the structure going forward, not the past.
+                    </span>
+                </div>
+            )}
+
             {/* Site-wise hint banner */}
             {!filterSite && allSites.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047", fontSize: 11, color: "#854d0e" }}>
@@ -698,13 +746,13 @@ function SalaryMasterInner() {
                                             ) : (
                                                 <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
                                                     <button onClick={() => openDrawer(emp)} disabled={!canManage}
-                                                        title={canManage ? "Open detailed edit form" : "Requires payroll manage permission"}
+                                                        title={canManage ? "Open detailed edit form" : isHistoricalView ? "Viewing a past month — switch back to the current structure to edit" : "Requires payroll manage permission"}
                                                         style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                                                         <Edit2 size={11} /> {s ? "Edit" : "Add Salary"}
                                                     </button>
                                                     {s && (
                                                         <button onClick={() => startEdit(emp)} disabled={!canManage}
-                                                            title={canManage ? "Quick inline edit" : "Requires payroll manage permission"}
+                                                            title={canManage ? "Quick inline edit" : isHistoricalView ? "Viewing a past month — switch back to the current structure to edit" : "Requires payroll manage permission"}
                                                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, cursor: "pointer", color: "var(--text3)" }}>
                                                             ⚡
                                                         </button>

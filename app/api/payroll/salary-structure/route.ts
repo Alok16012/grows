@@ -5,16 +5,29 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
-import { isValidEffectiveMonth, monthKey } from "@/lib/salary-revision"
+import { isValidEffectiveMonth, monthKey, revisionsForMonth } from "@/lib/salary-revision"
 
-// GET /api/payroll/salary-structure
-// Returns all employees (active) with their salary structure (null if not set)
-export async function GET() {
+// GET /api/payroll/salary-structure[?month=&year=]
+// Every active employee with their salary structure (null if not set).
+//
+// With month/year, the structure returned is the one IN FORCE for that month —
+// the same lookup the wage run uses — instead of the live row. Without it there
+// was no way to see what an earlier month will actually be paid on, so after an
+// increment the only thing on screen was the new structure and no one could
+// confirm that the old months had been left alone.
+export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
     if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
+
+    const { searchParams } = new URL(req.url)
+    const qMonth = searchParams.get("month")
+    const qYear  = searchParams.get("year")
+    const asOf = qMonth && qYear && isValidEffectiveMonth(qMonth, qYear)
+        ? { month: Number(qMonth), year: Number(qYear) }
+        : null
 
     const employees = await prisma.employee.findMany({
         where: { status: "ACTIVE" },
@@ -38,7 +51,22 @@ export async function GET() {
         },
     })
 
-    return NextResponse.json(employees)
+    if (!asOf) return NextResponse.json(employees)
+
+    // Overlay the revision in force for that month. Employees without one keep
+    // their live row, which is the same fallback payroll applies — so what you
+    // see here is what that month would be calculated on.
+    const revisions = await revisionsForMonth(employees.map(e => e.id), asOf)
+    const asOfEmployees = employees.map(e => {
+        const rev = revisions.get(e.id)
+        if (!rev || !e.employeeSalary) return rev && !e.employeeSalary
+            // A revision but no live row: still show the revision's figures.
+            ? { ...e, employeeSalary: { ...rev, employeeId: e.id } }
+            : e
+        return { ...e, employeeSalary: { ...e.employeeSalary, ...rev } }
+    })
+
+    return NextResponse.json(asOfEmployees)
 }
 
 // POST /api/payroll/salary-structure
