@@ -143,3 +143,28 @@ export function extractInspectionDimensions(answers: FieldAnswer[]): InspectionD
 
     return out
 }
+
+export type FixedColumn = "part" | "location" | "inspected" | "accepted" | "rework" | "rejected"
+
+/**
+ * Which fixed report column a form field already feeds, if any — so the
+ * Inspection Report table doesn't show the same answer twice (once as "Part",
+ * once as "PART NAME").
+ *
+ * Decided by running the field through extractInspectionDimensions itself
+ * rather than restating its rules here: a second copy of the rules is exactly
+ * how the charts and the table drifted apart before. Part number and shift
+ * deliberately map to nothing — they have no fixed column, so they appear as
+ * form columns of their own.
+ */
+export function fixedColumnOf(field: FieldAnswer["field"]): FixedColumn | null {
+    // A numeric probe, so quantity fields register as well as text ones.
+    const d = extractInspectionDimensions([{ value: "1", field }])
+    if (d.partName)  return "part"
+    if (d.location)  return "location"
+    if (d.inspected) return "inspected"
+    if (d.accepted)  return "accepted"
+    if (d.rework)    return "rework"
+    if (d.rejected)  return "rejected"
+    return null
+}

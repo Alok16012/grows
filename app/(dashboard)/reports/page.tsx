@@ -120,6 +120,80 @@ function CustomTooltip({ active, payload, label, payload: _payload }: any) {
     )
 }
 
+type ReportDimension = {
+    key: string
+    label: string
+    answered: number
+    buckets: { value: string; inspections: number; totalInspected: number; totalAccepted: number; totalRework: number; totalRejected: number }[]
+}
+
+/**
+ * Accepted / rework / rejected split by any grouping field the inspection
+ * forms carry — Line, Model, Shift, Location, Customer, whatever the site's
+ * form has. Replaces the fixed Location and Shift charts, which rendered for
+ * every site whether or not its form recorded either.
+ */
+function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
+    const [selected, setSelected] = useState<string>("")
+    // Switching site or month changes which fields exist; fall back to the
+    // most-answered one rather than showing a field that's no longer there.
+    const active = dimensions.find(d => d.key === selected) ?? dimensions[0]
+
+    return (
+        <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
+            <div className="flex items-start justify-between gap-[12px] mb-[12px]">
+                <div>
+                    <h3 className="text-[14px] font-[600] text-[#1a1a18]">Breakdown by Form Field</h3>
+                    <p className="text-[11px] text-[#9e9b95] mt-[2px]">Built from the fields on these inspection forms</p>
+                </div>
+                {active && <span className="text-[11px] font-[500] text-[#9e9b95] whitespace-nowrap">{active.buckets.length} values</span>}
+            </div>
+
+            {dimensions.length === 0 ? (
+                <div className="h-[340px] flex items-center justify-center text-center px-[24px] text-[13px] text-[#9e9b95]">
+                    These forms have no grouping fields with more than one value yet. Dropdown fields such as Line, Model or Shift appear here automatically.
+                </div>
+            ) : (
+                <>
+                    <div className="flex flex-wrap gap-[6px] mb-[14px]">
+                        {dimensions.map(d => {
+                            const on = d.key === active?.key
+                            return (
+                                <button key={d.key} type="button" onClick={() => setSelected(d.key)}
+                                    className={`px-[10px] py-[4px] rounded-full text-[12px] font-[600] border transition-colors ${on
+                                        ? "bg-[#1a9e6e] border-[#1a9e6e] text-white"
+                                        : "bg-[#f9f8f5] border-[#e8e6e1] text-[#6b6860] hover:bg-white"}`}>
+                                    {d.label}
+                                </button>
+                            )
+                        })}
+                    </div>
+                    {active && (
+                        <>
+                            <div style={{ height: Math.max(240, active.buckets.length * 34 + 60) }} className="w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={active.buckets} layout="vertical" margin={{ left: 20, right: 16 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                                        <YAxis dataKey="value" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} width={120}
+                                            tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 18) + "…" : v} />
+                                        <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
+                                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                                        <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
+                                        <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
+                                        <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 4, 4, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <p className="text-[11px] text-[#9e9b95] mt-[6px]">{active.answered} inspections answered “{active.label}”</p>
+                        </>
+                    )}
+                </>
+            )}
+        </div>
+    )
+}
+
 function ProgressBar({ value, color }: { value: number; color: string }) {
     return (
         <div className="flex items-center gap-[8px]">
@@ -258,7 +332,13 @@ export default function ReportsPage() {
     const [showColMenu, setShowColMenu] = useState(false)
     // Per-column filters
     const [showFilterRow, setShowFilterRow] = useState(false)
-    const [colFilters, setColFilters] = useState<Partial<Record<ColKey, string>>>({})
+    // Keys are fixed column keys ("date", "part", ...) or "f:<form label>" for
+    // a column that comes from the inspection form itself.
+    const [colFilters, setColFilters] = useState<Record<string, string>>({})
+    // Show/hide choices for form-field columns. Absent = that column's default
+    // (on for the form's own FIXED fields, off for defect and computed ones),
+    // so a newly added form field shows up without anyone opting in.
+    const [fieldColPrefs, setFieldColPrefs] = useState<Record<string, boolean>>({})
 
     useEffect(() => {
         if (!mounted) return
@@ -351,7 +431,9 @@ export default function ReportsPage() {
                 (r.inspector && r.inspector.toLowerCase().includes(low)) ||
                 (r.partName && r.partName.toLowerCase().includes(low)) ||
                 (r.location && r.location.toLowerCase().includes(low)) ||
-                (r.project && r.project.toLowerCase().includes(low))
+                (r.project && r.project.toLowerCase().includes(low)) ||
+                // Answers to every other form field are searchable too.
+                Object.values((r.fields ?? {}) as Record<string, string>).some(v => String(v).toLowerCase().includes(low))
             )
         }
         // Per-column filters
@@ -361,7 +443,8 @@ export default function ReportsPage() {
             rows = rows.filter((r: any) => {
                 const cell = key === "date" ? (r.date ? new Date(r.date).toLocaleDateString("en-GB") : "")
                     : key === "part" ? (r.partName || "")
-                        : (r[key] ?? "")
+                        : key.startsWith("f:") ? (r.fields?.[key.slice(2)] ?? "")
+                            : (r[key] ?? "")
                 return String(cell).toLowerCase().includes(low)
             })
         })
@@ -371,6 +454,14 @@ export default function ReportsPage() {
             if (sortKey === "date") { av = new Date(a.date || 0).getTime(); bv = new Date(b.date || 0).getTime() }
             else if (sortKey === "part") { av = (a.partName || "").toLowerCase(); bv = (b.partName || "").toLowerCase() }
             else if (["inspected", "accepted", "rework", "rejected"].includes(sortKey)) { av = a[sortKey] ?? 0; bv = b[sortKey] ?? 0 }
+            else if (sortKey.startsWith("f:")) {
+                const label = sortKey.slice(2)
+                const ra = a.fields?.[label] ?? "", rb = b.fields?.[label] ?? ""
+                // Numeric form fields sort as numbers, so 10 comes after 9.
+                const na = Number(ra), nb = Number(rb)
+                if (ra !== "" && rb !== "" && !Number.isNaN(na) && !Number.isNaN(nb)) { av = na; bv = nb }
+                else { av = String(ra).toLowerCase(); bv = String(rb).toLowerCase() }
+            }
             else { av = (a[sortKey] || "").toLowerCase(); bv = (b[sortKey] || "").toLowerCase() }
             if (av < bv) return sortDir === "asc" ? -1 : 1
             if (av > bv) return sortDir === "asc" ? 1 : -1
@@ -484,13 +575,20 @@ export default function ReportsPage() {
             await new Promise(r => setTimeout(r, 400))
 
             // Capture all chart images from hidden capture zone
+            // Location and Shift go into the PDF only when the forms actually
+            // record them — the same rule the screen uses. Otherwise the PDF
+            // printed a one-bar "Main" location chart and a "Not specified"
+            // shift chart for sites that have neither field.
+            const present = (data as any)?.dimensionsPresent ?? {}
+            const wantLocation = present.location !== false && (data?.locationWise?.length ?? 0) > 1
+            const wantShift = present.shift !== false
             const [pieImg, trendImg, partWiseImg, locationImg, inspectorImg, shiftImg, paretoImg] = await Promise.all([
                 captureChartToImage(pieRef.current),
                 captureChartToImage(trendRef.current),
                 captureChartToImage(partWiseBarRef.current),
-                captureChartToImage(locationBarRef.current),
+                wantLocation ? captureChartToImage(locationBarRef.current) : Promise.resolve(null),
                 captureChartToImage(inspectorBarRef.current),
-                captureChartToImage(shiftBarRef.current),
+                wantShift ? captureChartToImage(shiftBarRef.current) : Promise.resolve(null),
                 captureChartToImage(paretoRef.current),
             ])
 
@@ -953,29 +1051,7 @@ export default function ReportsPage() {
                                         </div>
                                     ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[#9e9b95]">No parts data</div>}
                                 </div>
-                                {/* Only when the form actually has a location field that was
-                                    filled. Counting buckets wasn't enough: a site with no
-                                    location field still got a "Main" bucket, and any stray
-                                    value made a second one — so the chart appeared for sites
-                                    that never record locations. */}
-                                {(data as any).dimensionsPresent?.location !== false && (data.locationWise?.length ?? 0) > 1 && (
-                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
-                                    <h3 className="text-[14px] font-[600] text-[#1a1a18] mb-[20px]">Comparison by Location</h3>
-                                    {(data.locationWise?.length ?? 0) > 0 ? (
-                                        <div className="h-[400px] w-full">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={data.locationWise}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                    <XAxis dataKey="location" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} dy={10} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
-                                                    <Bar dataKey="totalInspected" name="Inspected" fill={THEME.info} radius={[4, 4, 0, 0]} barSize={40} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[#9e9b95]">No locations data</div>}
-                                </div>
-                                )}
+                                <BreakdownCard dimensions={(data as any).dimensions ?? []} />
                                 {/* Inspector-wise comparison. The API has always aggregated this
                                     (inspectorWise); nothing rendered it, so the one dimension a
                                     quality lead actually reviews people on was missing from the
@@ -1002,33 +1078,6 @@ export default function ReportsPage() {
                                         </div>
                                     ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No inspector data</div>}
                                 </div>
-                                {/* Shift-wise comparison — only when the form has a shift
-                                    field. It used to render for every site, and since shift
-                                    was never actually read it was always one blank bar. */}
-                                {(data as any).dimensionsPresent?.shift !== false && (
-                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card md:col-span-2">
-                                    <div className="flex items-center justify-between mb-[20px]">
-                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Shift-Wise Comparison</h3>
-                                        <span className="text-[11px] font-[500] text-[#9e9b95]">{(data as any).shiftWise?.length ?? 0} shifts</span>
-                                    </div>
-                                    {(data as any).shiftWise?.length > 0 ? (
-                                        <div style={{ height: Math.max(240, ((data as any).shiftWise.length * 80) + 60) }} className="w-full">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={(data as any).shiftWise} margin={{ left: 20, right: 16 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                    <XAxis dataKey="shiftName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
-                                                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                                                    <Bar dataKey="totalAccepted" name="Accepted" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={40} />
-                                                    <Bar dataKey="totalRework" name="Rework" fill={THEME.warning} barSize={40} />
-                                                    <Bar dataKey="totalRejected" name="Rejected" fill={THEME.danger} radius={[0, 4, 4, 0]} barSize={40} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No shift data — ensure inspections have Shift field set</div>}
-                                </div>
-                                )}
                             </div>
                         )}
 
@@ -1130,7 +1179,8 @@ export default function ReportsPage() {
                         )}
 
                         {activeTab === "Inspection Report" && (() => {
-                            const COL_META: { key: ColKey; label: string; numeric: boolean }[] = [
+                            type ColMeta = { key: string; label: string; numeric: boolean; field?: string; defaultOn?: boolean }
+                            const FIXED_META: ColMeta[] = [
                                 { key: "date", label: "Date", numeric: false },
                                 { key: "inspector", label: "Inspector", numeric: false },
                                 { key: "site", label: "Site", numeric: false },
@@ -1142,7 +1192,39 @@ export default function ReportsPage() {
                                 { key: "rework", label: "Rework", numeric: true },
                                 { key: "rejected", label: "Rejected", numeric: true },
                             ]
-                            const visibleMeta = COL_META.filter(c => visibleCols.has(c.key))
+                            // Every field on these inspections' forms that a fixed column
+                            // doesn't already show. The table used to stop at the fixed
+                            // list, so a form's Line, Shift, Part No. or Model answers were
+                            // in the Excel export but nowhere on screen.
+                            const FORM_META: ColMeta[] = (((data as any)?.formFields ?? []) as { label: string; fieldType: string; category: string; fixedColumn: string | null }[])
+                                .filter(f => !f.fixedColumn)
+                                .map(f => ({
+                                    key: `f:${f.label}`,
+                                    label: f.label,
+                                    numeric: f.fieldType === "number",
+                                    field: f.label,
+                                    // The form's own fields by default; defect counts and
+                                    // computed % / PPM stay one click away in the picker.
+                                    defaultOn: f.category === "FIXED" && f.fieldType !== "file" && f.fieldType !== "signature",
+                                }))
+                            const COL_META: ColMeta[] = [...FIXED_META, ...FORM_META]
+                            // Location is a fixed column, but only meaningful when the form has one.
+                            const noLocation = (data as any)?.dimensionsPresent?.location === false
+                            const isVisible = (c: ColMeta) => c.field
+                                ? (fieldColPrefs[c.key] ?? !!c.defaultOn)
+                                : visibleCols.has(c.key as ColKey) && !(c.key === "location" && noLocation)
+                            const toggleCol = (c: ColMeta) => {
+                                if (c.field) { setFieldColPrefs(prev => ({ ...prev, [c.key]: !isVisible(c) })); return }
+                                setVisibleCols(prev => {
+                                    const next = new Set(prev)
+                                    const k = c.key as ColKey
+                                    if (next.has(k)) { if (next.size > 1) next.delete(k) } else next.add(k)
+                                    return next
+                                })
+                            }
+                            const visibleMeta = COL_META.filter(isVisible)
+                            const visibleFormMeta = visibleMeta.filter(c => c.field)
+                            const shown = (key: ColKey) => visibleMeta.some(c => c.key === key)
 
                             const handleSort = (key: string) => {
                                 if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -1208,30 +1290,25 @@ export default function ReportsPage() {
                                                     <span className="hidden sm:inline">Columns</span>
                                                 </button>
                                                 {showColMenu && (
-                                                    <div className="absolute right-0 top-[38px] z-[50] bg-white border border-[#e8e6e1] rounded-[10px] shadow-lg p-[8px] min-w-[160px]">
+                                                    <div className="absolute right-0 top-[38px] z-[50] bg-white border border-[#e8e6e1] rounded-[10px] shadow-lg p-[8px] min-w-[200px] max-h-[420px] overflow-y-auto">
                                                         <p className="text-[10px] font-[700] text-[#9e9b95] uppercase tracking-[0.6px] px-[8px] pt-[4px] pb-[8px] border-b border-[#f5f4f0] mb-[4px]">Visible Columns</p>
-                                                        {COL_META.map(c => (
+                                                        {COL_META.map((c, i) => (<div key={c.key}>
+                                                            {c.field && !COL_META[i - 1]?.field && (
+                                                                <p className="text-[10px] font-[700] text-[#9e9b95] uppercase tracking-[0.6px] px-[8px] pt-[8px] pb-[6px] border-t border-[#f5f4f0] mt-[4px]">From the form</p>
+                                                            )}
                                                             <button
-                                                                key={c.key}
-                                                                onClick={() => {
-                                                                    setVisibleCols(prev => {
-                                                                        const next = new Set(prev)
-                                                                        if (next.has(c.key)) { if (next.size > 1) next.delete(c.key) }
-                                                                        else next.add(c.key)
-                                                                        return next
-                                                                    })
-                                                                }}
+                                                                onClick={() => toggleCol(c)}
                                                                 className="w-full flex items-center gap-[8px] px-[8px] py-[5px] rounded-[6px] hover:bg-[#f9f8f5] transition-colors text-left"
                                                             >
-                                                                <div className={`w-[14px] h-[14px] rounded-[3px] border flex items-center justify-center flex-shrink-0 ${visibleCols.has(c.key) ? "bg-[#1a9e6e] border-[#1a9e6e]" : "border-[#d4d1ca]"
+                                                                <div className={`w-[14px] h-[14px] rounded-[3px] border flex items-center justify-center flex-shrink-0 ${isVisible(c) ? "bg-[#1a9e6e] border-[#1a9e6e]" : "border-[#d4d1ca]"
                                                                     }`}>
-                                                                    {visibleCols.has(c.key) && <Check className="h-[9px] w-[9px] text-white" />}
+                                                                    {isVisible(c) && <Check className="h-[9px] w-[9px] text-white" />}
                                                                 </div>
                                                                 <span className="text-[12.5px] font-[500] text-[#1a1a18]">{c.label}</span>
                                                             </button>
-                                                        ))}
+                                                        </div>))}
                                                         <button
-                                                            onClick={() => setVisibleCols(new Set(ALL_COLS))}
+                                                            onClick={() => { setVisibleCols(new Set(ALL_COLS)); setFieldColPrefs({}) }}
                                                             className="w-full text-center text-[11px] font-[600] text-[#1a9e6e] mt-[6px] pt-[6px] border-t border-[#f5f4f0] hover:underline"
                                                         >Reset all</button>
                                                     </div>
@@ -1301,16 +1378,21 @@ export default function ReportsPage() {
                                                 <tbody className="divide-y divide-[#e8e6e1]">
                                                     {filteredRecords.map((r: any) => (
                                                         <tr key={r.id} className="hover:bg-[#f9f8f5] transition-colors">
-                                                            {visibleCols.has("date") && <td className="p-[12px_16px] text-[12.5px] font-mono text-[#6b6860] whitespace-nowrap">{r.date ? format(new Date(r.date), "dd/MM/yyyy") : "—"}</td>}
-                                                            {visibleCols.has("inspector") && <td className="p-[12px_16px] text-[13px] font-[500] text-[#1a1a18] whitespace-nowrap">{r.inspector}</td>}
-                                                            {visibleCols.has("site") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.site}</td>}
-                                                            {visibleCols.has("project") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.project}</td>}
-                                                            {visibleCols.has("part") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.partName}</td>}
-                                                            {visibleCols.has("location") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.location}</td>}
-                                                            {visibleCols.has("inspected") && <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-right text-[#1a1a18]">{r.inspected}</td>}
-                                                            {visibleCols.has("accepted") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.accepted > 0 ? "text-[#0d6b4a]" : "text-[#1a1a18]"}`}>{r.accepted}</td>}
-                                                            {visibleCols.has("rework") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rework > 0 ? "text-[#d97706]" : "text-[#1a1a18]"}`}>{r.rework}</td>}
-                                                            {visibleCols.has("rejected") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rejected > 0 ? "text-[#dc2626]" : "text-[#1a1a18]"}`}>{r.rejected}</td>}
+                                                            {shown("date") && <td className="p-[12px_16px] text-[12.5px] font-mono text-[#6b6860] whitespace-nowrap">{r.date ? format(new Date(r.date), "dd/MM/yyyy") : "—"}</td>}
+                                                            {shown("inspector") && <td className="p-[12px_16px] text-[13px] font-[500] text-[#1a1a18] whitespace-nowrap">{r.inspector}</td>}
+                                                            {shown("site") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.site}</td>}
+                                                            {shown("project") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.project}</td>}
+                                                            {shown("part") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.partName}</td>}
+                                                            {shown("location") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.location}</td>}
+                                                            {shown("inspected") && <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-right text-[#1a1a18]">{r.inspected}</td>}
+                                                            {shown("accepted") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.accepted > 0 ? "text-[#0d6b4a]" : "text-[#1a1a18]"}`}>{r.accepted}</td>}
+                                                            {shown("rework") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rework > 0 ? "text-[#d97706]" : "text-[#1a1a18]"}`}>{r.rework}</td>}
+                                                            {shown("rejected") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rejected > 0 ? "text-[#dc2626]" : "text-[#1a1a18]"}`}>{r.rejected}</td>}
+                                                            {visibleFormMeta.map(c => (
+                                                                <td key={c.key} className={`p-[12px_16px] text-[13px] text-[#6b6860] whitespace-nowrap ${c.numeric ? "text-right font-mono" : ""}`}>
+                                                                    {r.fields?.[c.field!] ?? "—"}
+                                                                </td>
+                                                            ))}
                                                             {role === "ADMIN" && (
                                                                 <td className="p-[8px_12px] text-right">
                                                                     <button

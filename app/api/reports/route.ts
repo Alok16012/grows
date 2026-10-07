@@ -3,7 +3,8 @@ import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { isSelfScopedInspector } from "@/lib/permissions"
-import { extractInspectionDimensions, isPartModelLabel, labelHas } from "@/lib/inspection-fields"
+import { extractInspectionDimensions, fixedColumnOf, isPartModelLabel, labelHas } from "@/lib/inspection-fields"
+import { createDimensionAggregator } from "@/lib/report-dimensions"
 
 // Helper to parse a number value safely
 function parseNum(val: string | null | undefined): number {
@@ -133,6 +134,13 @@ export async function GET(req: Request) {
         // Shift chart (one blank bar). Now a chart exists only if some
         // inspection filled that field.
         const present = { location: false, shift: false, partNumber: false }
+        // Breakdowns discovered from the forms themselves (lib/report-dimensions).
+        const dimAgg = createDimensionAggregator()
+        // Every field these inspections' forms carry, in the order first seen, so the
+        // Inspection Report table can offer them as columns. Keyed by label,
+        // case-insensitively, since sites name the same field slightly
+        // differently.
+        const formFields = new Map<string, { label: string; fieldType: string; category: string; fixedColumn: string | null }>()
         const siteMap: Record<string, any> = {}
         const defectMap: Record<string, number> = {}
         const partModels = new Set<string>()
@@ -197,6 +205,21 @@ export async function GET(req: Request) {
             summary.totalAccepted += accepted
             summary.totalRework += rework
             summary.totalRejected += rejected
+
+            dimAgg.add(responses, { inspected, accepted, rework, rejected })
+            for (const r of responses) {
+                const f = r.field as { fieldLabel: string; fieldType?: string | null; category?: string | null; reportRole?: string | null }
+                const k = f.fieldLabel.trim().toLowerCase()
+                if (!formFields.has(k)) {
+                    formFields.set(k, {
+                        label: f.fieldLabel.trim(),
+                        fieldType: (f.fieldType ?? "").toLowerCase(),
+                        category: (f.category ?? "FIXED").toUpperCase(),
+                        // Set when a fixed table column already shows this answer.
+                        fixedColumn: fixedColumnOf(f),
+                    })
+                }
+            }
 
             // Utility to accumulate maps
             const accumulate = (map: any, key: string, nameField: string, nameValue: string) => {
@@ -271,6 +294,10 @@ export async function GET(req: Request) {
             locationWise,
             shiftWise,
             dimensionsPresent: present,
+            // Form-driven breakdowns and the form's own field list. The fixed
+            // charts above stay for the PDF; the screen builds from these.
+            dimensions: dimAgg.result(),
+            formFields: [...formFields.values()],
             siteWise,
             topDefects,
             records: inspections.map(i => {
