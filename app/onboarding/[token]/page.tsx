@@ -737,7 +737,13 @@ export default function OnboardingPortal() {
                         </button>
                     )}
                     {step < STEPS.length ? (
-                        <button onClick={() => setStep(s => s + 1)}
+                        <button onClick={() => {
+                            setStep(s => s + 1)
+                            // Back to the top of the new step — on a phone you tap
+                            // Continue at the bottom and otherwise land at the bottom
+                            // of the next step, which looks like nothing moved.
+                            window.scrollTo({ top: 0, behavior: "smooth" })
+                        }}
                             style={{ flex: 1, padding: "13px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                             Continue <ChevronRight size={16} />
                         </button>

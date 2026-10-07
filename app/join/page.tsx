@@ -8,7 +8,7 @@ import {
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
-    validatePincode, validateDateOfBirth, validatePFNumber, type FieldError,
+    validatePincode, validateDateOfBirth, validateJoiningAge, validatePFNumber, type FieldError,
 } from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ function Lbl({ text, required }: { text: string; required?: boolean }) {
 }
 function Err({ msg }: { msg?: string }) {
     if (!msg) return null
-    return <div style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{msg}</div>
+    return <div data-field-error style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{msg}</div>
 }
 function SecTitle({ children }: { children: React.ReactNode }) {
     return <div style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.6px", paddingBottom: 6, borderBottom: "1px solid var(--border)", marginTop: 4 }}>{children}</div>
@@ -109,6 +109,7 @@ export default function JoinPage() {
     const [tab, setTab] = useState("personal")
     const [form, setForm] = useState<FormData>(INITIAL)
     const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
+    const [stepError, setStepError] = useState("")
     const [docError, setDocError] = useState("")
     const [loading, setLoading] = useState(false)
     const [submitted, setSubmitted] = useState(false)
@@ -228,6 +229,9 @@ export default function JoinPage() {
         if (t === "employment") {
             if (!form.designation.trim())   e.designation   = "Required"
             if (!form.dateOfJoining)        e.dateOfJoining = "Required"
+            // Same rule the server applies on submit. Without it here a
+            // candidate filled every tab and only learned at the very end.
+            else put("dateOfJoining", validateJoiningAge(form.dateOfBirth, form.dateOfJoining))
             if (!form.employmentType)       e.employmentType = "Required"
         }
         if (t === "bank") {
@@ -250,7 +254,23 @@ export default function JoinPage() {
     function validate(t: string): boolean {
         const e = errorsFor(t)
         setErrors(e)
-        return Object.keys(e).length === 0
+        const n = Object.keys(e).length
+        if (n) showStepError(n)
+        else setStepError("")
+        return n === 0
+    }
+
+    // A failed Next used to do nothing visible. The Personal tab runs to ~16
+    // required fields, so on a phone the field in error (Site and HR sit at
+    // the very top) was a screen or two away from the Next button — the form
+    // just looked stuck. Now it says how many fields need attention, beside
+    // the button, and scrolls the first one into view.
+    function showStepError(n: number) {
+        setStepError(`${n} field${n > 1 ? "s need" : " needs"} attention — highlighted in red`)
+        // After React paints the error messages.
+        setTimeout(() => {
+            document.querySelector("[data-field-error]")?.scrollIntoView({ behavior: "smooth", block: "center" })
+        }, 60)
     }
 
     /**
@@ -261,14 +281,21 @@ export default function JoinPage() {
     function validateAll(): boolean {
         for (const t of tabOrder) {
             const e = errorsFor(t)
-            if (Object.keys(e).length) { setErrors(e); setTab(t); return false }
+            if (Object.keys(e).length) { setErrors(e); setTab(t); showStepError(Object.keys(e).length); return false }
         }
         setErrors({})
         return true
     }
 
-    function goNext() { if (!validate(tab)) return; setTab(tabOrder[tabIdx + 1]) }
-    function goBack() { setTab(tabOrder[tabIdx - 1]) }
+    // Scroll back up on a successful step too: on a phone you tap Next at the
+    // bottom of a long tab and would otherwise land at the bottom of the next
+    // one, which reads as nothing having happened.
+    function goNext() {
+        if (!validate(tab)) return
+        setTab(tabOrder[tabIdx + 1])
+        window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+    function goBack() { setStepError(""); setTab(tabOrder[tabIdx - 1]) }
 
     // ── File select & upload ──────────────────────────────────────────────────
 
@@ -952,6 +979,12 @@ export default function JoinPage() {
                         )}
 
                     </div>
+
+                    {stepError && (
+                        <div role="alert" style={{ padding: "10px 28px", background: "#fef2f2", borderTop: "1px solid #fecaca", color: "var(--red)", fontSize: 13, fontWeight: 600 }}>
+                            {stepError}
+                        </div>
+                    )}
 
                     {/* Footer */}
                     <div style={{ padding: "16px 28px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
