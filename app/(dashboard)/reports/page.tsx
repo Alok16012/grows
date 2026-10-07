@@ -166,6 +166,12 @@ async function captureChartToImage(el: HTMLDivElement | null): Promise<string | 
     })
 }
 
+
+/** Alphabetical, case-insensitive, natural ("Plant 2" before "Plant 10"). */
+function sortByName<T extends { name: string }>(items: T[]): T[] {
+    return [...items].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true }))
+}
+
 export default function ReportsPage() {
     const { data: session } = useSession()
     const role = session?.user?.role
@@ -257,7 +263,7 @@ export default function ReportsPage() {
     useEffect(() => {
         if (!mounted) return
         if (can(session, "reports.view")) {
-            fetch("/api/sites?isActive=true").then(r => r.json()).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => { })
+            fetch("/api/sites?isActive=true").then(r => r.json()).then(d => setSites(Array.isArray(d) ? sortByName(d) : [])).catch(() => { })
             fetch("/api/users?role=INSPECTION_BOY").then(r => r.json()).then(d => setInspectors(Array.isArray(d) ? d : [])).catch(() => { })
         } else if (canAny(session, INSPECTION_PERMISSIONS)) {
             // Mirrors /api/reports: full-report holders get every site + inspector,
@@ -271,7 +277,7 @@ export default function ReportsPage() {
                 allProjects.forEach(p => {
                     if (p.site) siteMap.set(p.site.id, { id: p.site.id, name: p.site.name })
                 })
-                setSites(Array.from(siteMap.values()))
+                setSites(sortByName(Array.from(siteMap.values())))
             }).catch(() => { })
         }
     }, [role, mounted])
@@ -947,8 +953,12 @@ export default function ReportsPage() {
                                         </div>
                                     ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[#9e9b95]">No parts data</div>}
                                 </div>
-                                {/* Location comparison — only shown when multiple locations exist */}
-                                {(data.locationWise?.length ?? 0) > 1 && (
+                                {/* Only when the form actually has a location field that was
+                                    filled. Counting buckets wasn't enough: a site with no
+                                    location field still got a "Main" bucket, and any stray
+                                    value made a second one — so the chart appeared for sites
+                                    that never record locations. */}
+                                {(data as any).dimensionsPresent?.location !== false && (data.locationWise?.length ?? 0) > 1 && (
                                 <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
                                     <h3 className="text-[14px] font-[600] text-[#1a1a18] mb-[20px]">Comparison by Location</h3>
                                     {(data.locationWise?.length ?? 0) > 0 ? (
@@ -992,7 +1002,10 @@ export default function ReportsPage() {
                                         </div>
                                     ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No inspector data</div>}
                                 </div>
-                                {/* Shift-wise comparison */}
+                                {/* Shift-wise comparison — only when the form has a shift
+                                    field. It used to render for every site, and since shift
+                                    was never actually read it was always one blank bar. */}
+                                {(data as any).dimensionsPresent?.shift !== false && (
                                 <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card md:col-span-2">
                                     <div className="flex items-center justify-between mb-[20px]">
                                         <h3 className="text-[14px] font-[600] text-[#1a1a18]">Shift-Wise Comparison</h3>
@@ -1015,6 +1028,7 @@ export default function ReportsPage() {
                                         </div>
                                     ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No shift data — ensure inspections have Shift field set</div>}
                                 </div>
+                                )}
                             </div>
                         )}
 

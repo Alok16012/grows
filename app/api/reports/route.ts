@@ -3,6 +3,7 @@ import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { isSelfScopedInspector } from "@/lib/permissions"
+import { extractInspectionDimensions, isPartModelLabel, labelHas } from "@/lib/inspection-fields"
 
 // Helper to parse a number value safely
 function parseNum(val: string | null | undefined): number {
@@ -11,15 +12,6 @@ function parseNum(val: string | null | undefined): number {
     return isNaN(n) ? 0 : n
 }
 
-// Normalize a field label for matching
-function normalizeLabel(label: string): string {
-    return label.toLowerCase().replace(/[^a-z0-9]/g, "")
-}
-
-function matchesLabel(label: string, keywords: string[]): boolean {
-    const norm = normalizeLabel(label)
-    return keywords.some(k => norm.includes(normalizeLabel(k)))
-}
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -135,6 +127,12 @@ export async function GET(req: Request) {
         const inspectorMap: Record<string, any> = {}
         const locationMap: Record<string, any> = {}
         const shiftMap: Record<string, any> = {}
+        // Which dimensions the forms in this report ACTUALLY carry. The charts
+        // used to render Location and Shift unconditionally, so a site whose
+        // form has neither still got a Location chart (one "Main" bar) and a
+        // Shift chart (one blank bar). Now a chart exists only if some
+        // inspection filled that field.
+        const present = { location: false, shift: false, partNumber: false }
         const siteMap: Record<string, any> = {}
         const defectMap: Record<string, number> = {}
         const partModels = new Set<string>()
@@ -151,55 +149,30 @@ export async function GET(req: Request) {
                 ? new Date(inspection.submittedAt).toISOString().slice(0, 10)
                 : new Date(inspection.createdAt).toISOString().slice(0, 10)
 
-            // Extract field values by label matching
-            let partName = "General"
-            let partNumber = ""
-            let inspected = 0
-            let accepted = 0
-            let rework = 0
-            let rejected = 0
-            let location = "Main"
-            let shift = ""
+            // One extractor for both the charts and the Inspection Report table
+            // (lib/inspection-fields.ts). This loop used to have its own rules,
+            // matching keywords as substrings — so "part" caught "Part Number"
+            // and a part number was charted as a part name, and "location"
+            // caught a "Dislocation" defect and charted locations that a site
+            // never had.
+            const dims = extractInspectionDimensions(responses)
+            if (dims.location)   present.location   = true
+            if (dims.shift)      present.shift      = true
+            if (dims.partNumber) present.partNumber = true
+            const partName = dims.partName ?? "General"
+            const partNumber = dims.partNumber ?? ""
+            const location = dims.location ?? "Main"
+            // Was declared "" and never assigned, so every inspection fell into
+            // one blank bucket and Shift-Wise always showed a single bar.
+            const shift = dims.shift ?? "Not specified"
+            let { inspected, accepted } = dims
+            const { rework, rejected } = dims
 
             for (const r of responses) {
                 const label = r.field.fieldLabel
-                // Explicit mapping set in the Form Builder wins outright — a
-                // renamed field keeps feeding its chart. Only unmapped fields
-                // fall through to the label-keyword guessing below, and a
-                // mapped field never leaks into another dimension via its name.
-                const role = (r.field as { reportRole?: string | null }).reportRole ?? null
-                if (role) {
-                    const val = r.value || ""
-                    if (role === "PART_NAME"   && val) partName = val
-                    if (role === "LOCATION"    && val) location = val
-                    if (role === "INSPECTED") inspected = parseNum(val)
-                    if (role === "ACCEPTED")  accepted  = parseNum(val)
-                    if (role === "REWORK")    rework    = parseNum(val)
-                    if (role === "REJECTED")  rejected  = parseNum(val)
-                    continue
-                }
                 const val = r.value || ""
-
-                if (matchesLabel(label, ["part name", "partname", "part"])) {
-                    if (val) partName = val
-                }
-                if (matchesLabel(label, ["part model", "model", "component model"])) {
+                if (!(r.field as { reportRole?: string | null }).reportRole && isPartModelLabel(label) && r.field.category !== "DEFECT") {
                     if (val) partModels.add(val)
-                }
-                if (matchesLabel(label, ["total inspected", "inspected", "qty inspected", "quantity inspected"])) {
-                    inspected = parseNum(val)
-                }
-                if (matchesLabel(label, ["total accepted", "accepted", "ok qty", "ok"])) {
-                    accepted = parseNum(val)
-                }
-                if (matchesLabel(label, ["rework qty", "total rework"])) {
-                    rework = parseNum(val)
-                }
-                if (matchesLabel(label, ["rejected qty", "rejection qty", "total rejected"])) {
-                    rejected = parseNum(val)
-                }
-                if (matchesLabel(label, ["location", "shift location", "plant location"])) {
-                    if (val) location = val
                 }
                 // Track DEFECT category fields by their label (field name = defect type)
                 if (r.field.category === "DEFECT") {
@@ -209,7 +182,7 @@ export async function GET(req: Request) {
                         const cleanName = label.replace(/\s*(qty|count|no\.?|quantity)\s*$/i, "").trim() || label
                         defectMap[cleanName] = (defectMap[cleanName] || 0) + qty
                     }
-                } else if (matchesLabel(label, ["defect type", "defect name", "defect reason"])) {
+                } else if (labelHas(label, ["defect type", "defect name", "defect reason"])) {
                     // Fallback: text fields where user types the defect name
                     if (val && val.trim()) {
                         defectMap[val.trim()] = (defectMap[val.trim()] || 0) + 1
@@ -297,6 +270,7 @@ export async function GET(req: Request) {
             inspectorWise,
             locationWise,
             shiftWise,
+            dimensionsPresent: present,
             siteWise,
             topDefects,
             records: inspections.map(i => {
@@ -321,33 +295,20 @@ export async function GET(req: Request) {
                     // nowhere to go and vanished from the export entirely.
                     fields: {} as Record<string, string>,
                 }
+                // Same extractor as the charts, so a row in this table and the
+                // bar it feeds can't name a different part or location.
+                const dims = extractInspectionDimensions(i.responses)
+                if (dims.partName)   r.partName   = dims.partName
+                if (dims.partNumber) r.partNumber = dims.partNumber
+                if (dims.location)   r.location   = dims.location
+                if (dims.shift)      r.shift      = dims.shift
+                r.inspected = dims.inspected
+                r.accepted  = dims.accepted
+                r.rework    = dims.rework
+                r.rejected  = dims.rejected
                 for (const resp of i.responses) {
-                    const rawLabel = resp.field.fieldLabel
-                    const label = rawLabel.toLowerCase()
                     const val = resp.value || ""
-                    const role = (resp.field as { reportRole?: string | null }).reportRole ?? null
-                    if (role) {
-                        if (role === "PART_NAME"   && val) r.partName   = val
-                        if (role === "PART_NUMBER" && val) r.partNumber = val
-                        if (role === "SHIFT"       && val) r.shift      = val
-                        if (role === "LOCATION"    && val) r.location   = val
-                        if (role === "INSPECTED") r.inspected = parseNum(val)
-                        if (role === "ACCEPTED")  r.accepted  = parseNum(val)
-                        if (role === "REWORK")    r.rework    = parseNum(val)
-                        if (role === "REJECTED")  r.rejected  = parseNum(val)
-                        if (val !== "") r.fields[rawLabel] = val
-                        continue
-                    }
-                    if (label.includes("part name") || label.includes("partname")) r.partName = val
-                    if (label.includes("part number") || label.includes("part no") || label.includes("partnumber")) r.partNumber = val
-                    // "Shift Location" is a location field, not a shift field.
-                    if (label.includes("shift") && !label.includes("location")) r.shift = val
-                    if (label.includes("inspected")) r.inspected = parseNum(val)
-                    if (label.includes("accepted")) r.accepted = parseNum(val)
-                    if (label.includes("rework qty") || label.includes("total rework")) r.rework = parseNum(val)
-                    if (label.includes("rejected qty") || label.includes("rejection qty") || label.includes("total rejected")) r.rejected = parseNum(val)
-                    if (label.includes("location")) r.location = val
-                    if (val !== "") r.fields[rawLabel] = val
+                    if (val !== "") r.fields[resp.field.fieldLabel] = val
                 }
                 if (r.inspected === 0) r.inspected = r.accepted + r.rework + r.rejected
                 return r
