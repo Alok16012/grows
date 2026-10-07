@@ -137,6 +137,9 @@ export async function POST(req: Request) {
     // still in force today — for them this upload is history, not the current
     // structure.
     const supersededFor = new Set<string>()
+    // The latest of those later revisions, so the response can say which month
+    // is actually in force instead of leaving the user to guess.
+    let supersedingKey = 0
     if (hasEffective && notFutureDated) {
         const later = await prisma.salaryRevision.findMany({
             where: {
@@ -149,7 +152,11 @@ export async function POST(req: Request) {
             select: { employeeId: true, effectiveYear: true, effectiveMonth: true },
         })
         for (const r of later) {
-            if (monthKey(r.effectiveYear, r.effectiveMonth) <= nowKey) supersededFor.add(r.employeeId)
+            const k = monthKey(r.effectiveYear, r.effectiveMonth)
+            if (k <= nowKey) {
+                supersededFor.add(r.employeeId)
+                if (k > supersedingKey) supersedingKey = k
+            }
         }
     }
 
@@ -379,6 +386,12 @@ export async function POST(req: Request) {
         // future-dated, or every row it touched is already superseded by a
         // newer revision. Either way only revisions were written.
         appliedNow: notFutureDated && supersededFor.size < rows.length,
+        // Employees for whom a LATER revision is already in force, and that
+        // month. Their upload was filed as history only; the current structure
+        // is still the later one. (monthKey = year * 12 + month.)
+        supersededCount: supersededFor.size,
+        supersededByMonth: supersedingKey ? ((supersedingKey - 1) % 12) + 1 : null,
+        supersededByYear:  supersedingKey ? Math.floor((supersedingKey - 1) / 12) : null,
         affectedProcessed,
     })
 }

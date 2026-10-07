@@ -130,14 +130,14 @@ function SalaryMasterInner() {
     const [drawerForm, setDrawerForm] = useState<EditForm>(EMPTY_SALARY)
     const [drawerSaving, setDrawerSaving] = useState(false)
     const [uploading,  setUploading]  = useState(false)
-    // Month an uploaded increment takes effect from. Defaults to NEXT month:
-    // an increment is nearly always announced for the month ahead, and the
-    // month in progress usually has attendance against the old structure.
-    const [effMonth, setEffMonth] = useState(() => (new Date().getMonth() + 1) % 12 + 1)
-    const [effYear,  setEffYear]  = useState(() => {
-        const d = new Date()
-        return d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear()
-    })
+    // Month an uploaded structure takes effect from. Defaults to the CURRENT
+    // month. It used to default to next month, which let an upload land in a
+    // month nobody was looking at — the result was invisible on the table, and
+    // that future revision later overrode a correction filed for this month.
+    // A wrong current-month upload shows up on the table immediately; a wrong
+    // next-month one hides until it bites.
+    const [effMonth, setEffMonth] = useState(() => new Date().getMonth() + 1)
+    const [effYear,  setEffYear]  = useState(() => new Date().getFullYear())
     // Month whose structure the table shows. Empty = the live structure, which
     // is what this page always was. Pick an earlier month to see what that month
     // is actually paid on — the only way to confirm an increment left the months
@@ -410,12 +410,20 @@ function SalaryMasterInner() {
                     const parts = [`${d.updated} updated`]
                     if (skipped.length)   parts.push(`${skipped.length} not found`)
                     if (wrongSite.length) parts.push(`${wrongSite.length} skipped (other site)`)
-                    toast.success(
-                        `${filterSite ? `[${filterSite}] ` : ""}${parts.join(" · ")}`,
-                        { description: d.appliedNow
-                            ? `Effective ${effLabel} — in force now.`
-                            : `Effective ${effLabel} — scheduled. This month keeps the current structure.` },
-                    )
+                    // Three different outcomes, and the old message collapsed two
+                    // of them: a back-dated upload that a LATER revision already
+                    // overrides was reported as "scheduled", so the table kept
+                    // showing the later figures with no explanation.
+                    const later = d.supersededByMonth
+                        ? `${MONTHS_LONG[d.supersededByMonth - 1]} ${d.supersededByYear}` : ""
+                    const isFuture = (effYear * 12 + effMonth) > (new Date().getFullYear() * 12 + new Date().getMonth() + 1)
+                    const description = isFuture
+                        ? `Effective ${effLabel} — scheduled. The current month keeps its structure until then.`
+                        : d.supersededCount > 0
+                            ? `Saved for ${effLabel}. But ${d.supersededCount} employee${d.supersededCount > 1 ? "s have" : " has"} a later structure from ${later} already in force, so the current structure stays as ${later}'s. Upload with Effective ${later} to change it.`
+                            : `Effective ${effLabel} — in force now.`
+                    const show = d.supersededCount > 0 ? toast.warning : toast.success
+                    show(`${filterSite ? `[${filterSite}] ` : ""}${parts.join(" · ")}`, { description, duration: d.supersededCount > 0 ? 15000 : undefined })
                 }
                 // Months already processed that would now compute differently.
                 // Nothing stored was rewritten and a locked row is never touched
