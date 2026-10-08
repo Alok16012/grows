@@ -710,7 +710,7 @@ function ProcessPayrollPage() {
                                     {[
                                         { label: "Total Staff",       value: String(employees.length),                              color: "#3b82f6" },
                                         { label: "Salary Approved",   value: `${approvedCount}/${employees.length}`,                 color: approvedCount < employees.length ? "#f59e0b" : "#16a34a" },
-                                        { label: "Est. Gross (Full)", value: fmt(totalGrossEst),                                     color: "#0369a1" },
+                                        { label: "Est. Gross (Full)", value: fmt(totalGrossEst),                                     color: "#0b5cff" },
                                         { label: "Default Days",      value: String(defaultDays),                                    color: "#7c3aed" },
                                     ].map(s => (
                                         <div key={s.label} style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>

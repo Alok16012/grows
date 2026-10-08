@@ -295,7 +295,7 @@ function FinalPayrollInner() {
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                                     {[
                                         { label: "Employees",    value: String(data.length),  color: "#3b82f6" },
-                                        { label: "Total Gross",  value: fmt(totGross),         color: "#0369a1" },
+                                        { label: "Total Gross",  value: fmt(totGross),         color: "#0b5cff" },
                                         { label: "Total Net",    value: fmt(totNet),           color: "#16a34a" },
                                         { label: "DRAFT / Ready",value: `${siteData.draft} / ${siteData.processed}`, color: siteData.draft > 0 ? "#f59e0b" : "#16a34a" },
                                     ].map(s => (
@@ -327,7 +327,7 @@ function FinalPayrollInner() {
                                                 <th style={{ ...th, textAlign: "left" }}>Name</th>
                                                 <th style={th}>Designation</th>
                                                 <th style={th}>Present Days</th>
-                                                <th style={{ ...th, color: "#0369a1" }}>Gross (₹)</th>
+                                                <th style={{ ...th, color: "#0b5cff" }}>Gross (₹)</th>
                                                 <th style={{ ...th, color: "#dc2626" }}>Deductions (₹)</th>
                                                 <th style={{ ...th, color: "#16a34a" }}>Net Pay (₹)</th>
                                                 <th style={th}>Status</th>
@@ -349,7 +349,7 @@ function FinalPayrollInner() {
                                                     <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{p.employee.firstName} {p.employee.lastName}</td>
                                                     <td style={{ ...td, fontSize: 10, color: "var(--text3)" }}>{p.employee.designation || "—"}</td>
                                                     <td style={td}>{p.presentDays ?? "—"}</td>
-                                                    <td style={{ ...td, fontWeight: 700, color: "#0369a1" }}>₹{Math.round(p.grossSalary).toLocaleString("en-IN")}</td>
+                                                    <td style={{ ...td, fontWeight: 700, color: "#0b5cff" }}>₹{Math.round(p.grossSalary).toLocaleString("en-IN")}</td>
                                                     <td style={{ ...td, color: "#dc2626" }}>₹{Math.round(p.totalDeductions).toLocaleString("en-IN")}</td>
                                                     <td style={{ ...td, fontWeight: 700, color: "#16a34a" }}>₹{Math.round(p.netSalary).toLocaleString("en-IN")}</td>
                                                     <td style={td}>
@@ -366,7 +366,7 @@ function FinalPayrollInner() {
                                             <tfoot>
                                                 <tr style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
                                                     <td colSpan={5} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({data.length})</td>
-                                                    <td style={{ ...td, color: "#0369a1" }}>{fmt(totGross)}</td>
+                                                    <td style={{ ...td, color: "#0b5cff" }}>{fmt(totGross)}</td>
                                                     <td style={{ ...td, color: "#dc2626" }}>{fmt(data.reduce((s,p)=>s+p.totalDeductions,0))}</td>
                                                     <td style={{ ...td, color: "#16a34a" }}>{fmt(totNet)}</td>
                                                     <td />

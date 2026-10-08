@@ -52,10 +52,10 @@ const STEPS = [
         desc: "Upload site-wise attendance Excel file",
         doneDesc: "Attendance data uploaded",
         ctaLabel: "Upload Now",
-        color: "#0369a1",
-        bg: "#eff6ff",
-        border: "#bfdbfe",
-        gradient: "linear-gradient(135deg, #0369a1 0%, #0284c7 100%)",
+        color: "#0b5cff",
+        bg: "#e8effe",
+        border: "#c7dbff",
+        gradient: "linear-gradient(135deg, #0b5cff 0%, #0847c7 100%)",
     },
     {
         step: 2,
@@ -492,7 +492,12 @@ export default function PayrollPage() {
                             border: `1px solid ${activeStep.border}`,
                             display: "flex",
                             alignItems: "center",
-                            gap: 16,
+                            // Wraps on a phone: icon, text and button in one row
+                            // left the text ~100px, so "Step 1: Upload Attendance"
+                            // broke a word per line. Now the button drops to its
+                            // own full-width row instead (see its className).
+                            flexWrap: "wrap",
+                            gap: 14,
                         }}>
                             <div style={{
                                 width: 44,
@@ -507,7 +512,7 @@ export default function PayrollPage() {
                             }}>
                                 <Icon size={20} style={{ color: "#fff" }} />
                             </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ flex: "1 1 180px", minWidth: 0 }}>
                                 <p style={{ fontSize: 13, fontWeight: 700, color: activeStep.color, margin: 0 }}>
                                     Step {activeStep.step}: {activeStep.label}
                                 </p>
@@ -516,6 +521,7 @@ export default function PayrollPage() {
                                 </p>
                             </div>
                             <button
+                                className="w-full sm:w-auto justify-center"
                                 onClick={() => {
                                     if (activeStep.step === 1) setActivePanel("attendance")
                                     else if (activeStep.step === 2) setActivePanel("process")
@@ -614,9 +620,9 @@ export default function PayrollPage() {
                 {[
                     { label: "Runs This Year", value: String(runs.length),                              color: "#3b82f6", bg: "#eff6ff", sub: "payroll runs", icon: CalendarRange },
                     { label: "Employees",      value: String(statRun?._count.payrolls ?? "—"),     color: "#8b5cf6", bg: "#f5f3ff", sub: statSub,       icon: Users },
-                    { label: "Gross Pay",      value: statRun ? fmt(statRun.totalGross) : "—",      color: "#0369a1", bg: "#e0f2fe", sub: statSub,       icon: IndianRupee },
+                    { label: "Gross Pay",      value: statRun ? fmt(statRun.totalGross) : "—",      color: "#0b5cff", bg: "#e8effe", sub: statSub,       icon: IndianRupee },
                     { label: "Net Pay",        value: statRun ? fmt(statRun.totalNet) : "—",        color: "#16a34a", bg: "#dcfce7", sub: statSub,       icon: Wallet },
-                    { label: "Gross YTD",      value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",      color: "#0369a1", bg: "#e0f2fe", sub: "year to date", icon: TrendingUp },
+                    { label: "Gross YTD",      value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",      color: "#0b5cff", bg: "#e8effe", sub: "year to date", icon: TrendingUp },
                     { label: "Net YTD",        value: totalNetYTD > 0 ? fmt(totalNetYTD) : "—",          color: "#15803d", bg: "#dcfce7", sub: "year to date", icon: TrendingUp },
                 ].map(s => (
                     <div key={s.label} style={{ padding: "16px 18px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 12 }}>
@@ -691,7 +697,7 @@ export default function PayrollPage() {
                                                 {MONTHS_SHORT[run.month - 1]} {run.year}
                                             </td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)", fontWeight: 600 }}>{run._count.payrolls}</td>
-                                            <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#0369a1" }}>{fmt(run.totalGross)}</td>
+                                            <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#0b5cff" }}>{fmt(run.totalGross)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#16a34a" }}>{fmt(run.totalNet)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)" }}>{fmt(run.totalPfEmployer)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)" }}>{fmt(run.totalEsiEmployer)}</td>

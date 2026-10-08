@@ -495,7 +495,7 @@ function ComplianceMasterInner() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
                     {[
                         { label: "Employees",   value: String(filtered.length),  color: "#3b82f6" },
-                        { label: "Gross Salary", value: fmtC(totals.gross),       color: "#0369a1" },
+                        { label: "Gross Salary", value: fmtC(totals.gross),       color: "#0b5cff" },
                         { label: "Total PF",     value: fmtC(totals.pfEE + totals.pfER), color: "#7c3aed" },
                         { label: "Total ESI",    value: fmtC(totals.esiEE + totals.esiER), color: "#0891b2" },
                         { label: "Total PT",     value: fmtC(totals.pt),           color: "#d97706" },

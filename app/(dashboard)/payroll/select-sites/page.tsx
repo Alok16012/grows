@@ -187,7 +187,7 @@ function SelectSitesInner() {
                                         </div>
                                         <div>
                                             <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 2px 0" }}>Gross</p>
-                                            <p style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", margin: 0 }}>{fmt(site.totalGross)}</p>
+                                            <p style={{ fontSize: 12, fontWeight: 700, color: "#0b5cff", margin: 0 }}>{fmt(site.totalGross)}</p>
                                         </div>
                                         <div>
                                             <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 2px 0" }}>Net</p>
@@ -215,7 +215,7 @@ function SelectSitesInner() {
                         </div>
                         <div>
                             <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Gross</p>
-                            <p style={{ fontSize: 16, fontWeight: 800, color: "#0369a1", margin: 0 }}>{fmt(totalGross)}</p>
+                            <p style={{ fontSize: 16, fontWeight: 800, color: "#0b5cff", margin: 0 }}>{fmt(totalGross)}</p>
                         </div>
                         <div>
                             <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Net</p>

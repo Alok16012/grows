@@ -712,7 +712,7 @@ function WageSheetInner() {
                                     )}
                                     {activeView === "neft" && (
                                         <button onClick={handleNEFT} disabled={!data.length}
-                                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#0369a1", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
+                                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#0b5cff", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !data.length ? 0.5 : 1 }}>
                                             <FileDown size={13} />
                                             {selectedCount > 0 ? `Download NEFT (${selectedCount})` : "Download NEFT"}
                                         </button>
@@ -781,7 +781,7 @@ function WageSheetInner() {
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                                     {[
                                         { label: "Employees",    value: String(data.length),  color: "#3b82f6" },
-                                        { label: "Total Gross",  value: fmt(totals.gross),    color: "#0369a1" },
+                                        { label: "Total Gross",  value: fmt(totals.gross),    color: "#0b5cff" },
                                         { label: "Deductions",   value: fmt(totals.ded),      color: "#dc2626" },
                                         { label: "Net Payable",  value: fmt(totals.net),      color: "#16a34a" },
                                     ].map(s => (
