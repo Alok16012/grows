@@ -214,3 +214,17 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* ── Zavtoo app touches (mobile home, buttons) ─────────────────────────── */
+/* Subtle press feedback for tappable cards/buttons — a native-app feel. */
+.press { transition: transform 0.12s ease, opacity 0.12s ease; }
+.press:active { transform: scale(0.97); opacity: 0.9; }
+
+/* Horizontal rails (hero slides, the Today strip) scroll without a bar. */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up 0.35s ease both; }

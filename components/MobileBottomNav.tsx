@@ -33,7 +33,8 @@ const STAFF: Item[] = [
 
 // Field inspectors.
 const INSPECTOR: Item[] = [
-    { label: "Assignments", href: "/inspection", icon: HardHat, perms: ["inspection.view", "inspection.submit", "inspection.history"] },
+    // "Assignments" is cut to "Assignmen…" in a five-item bar on a 375px phone.
+    { label: "My Work",     href: "/inspection", icon: HardHat, perms: ["inspection.view", "inspection.submit", "inspection.history"] },
     { label: "Attendance",  href: "/attendance", icon: Clock,   perms: ["self.view"] },
     { label: "Profile",     href: "/profile",    icon: User,    perms: ["self.view"] },
 ]

@@ -5,6 +5,7 @@
 // their permissions allow — styled to match the admin dashboard.
 
 import { useSession } from "next-auth/react"
+import { ResponsiveHome } from "@/components/ResponsiveHome"
 import { useCachedFetch } from "@/lib/useCachedFetch"
 import {
     Users, CalendarCheck, ClipboardCheck, ClipboardList, ChevronRight,
@@ -154,7 +155,12 @@ const ALL_ACTIONS: { perm: string[]; href: string; icon: React.ElementType; labe
     { perm: ["lms.view", "lms.manage"],              href: "/lms/learn",            icon: GraduationCap,  label: "Training",          sub: "Courses & learning",  color: "#8b5cf6", bg: "#f5f3ff" },
 ]
 
+// Phones get the Zavtoo-style MobileHome; md and up keep this dashboard.
 export default function UniversalDashboard() {
+    return <ResponsiveHome desktop={<DesktopDashboard />} />
+}
+
+function DesktopDashboard() {
     const { data: session } = useSession()
     // Cached fetch: revisits paint the last snapshot instantly and refresh in
     // the background — critical because the server is far from most users.
@@ -321,33 +327,8 @@ export default function UniversalDashboard() {
 
     const hasAnyWidget = kpiRow.length > 0 || pipelines.length > 0 || attSlices.length > 0 || projSlices.length > 0
 
-    // Mobile banner mini stats — first 4 available numbers
-    const miniStats: { label: string; value: string }[] = []
-    if (employees) miniStats.push({ label: "Employees", value: String(employees.active ?? 0) })
-    if (att) miniStats.push({ label: "Attendance", value: `${att.pct}%` })
-    if (approvals) miniStats.push({ label: "Approvals", value: String(approvals.total) })
-    if (recruitment) miniStats.push({ label: "Candidates", value: String(recruitment.activeLeads) })
-    if (logins) miniStats.push({ label: "Logins", value: `${logins.withLogin}/${logins.totalEmployees}` })
-    if (stats.openTickets !== undefined) miniStats.push({ label: "Tickets", value: String(stats.openTickets) })
-
     return (
         <div className="p-4 lg:p-0 space-y-4">
-            {/* Mobile Welcome Banner */}
-            <div className="md:hidden bg-gradient-to-br from-[var(--accent)] to-[var(--accent-text)] rounded-[16px] p-4 text-white shadow-sm">
-                <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>
-                <p className="text-[20px] font-bold tracking-tight">{roleName || "My Dashboard"}</p>
-                {miniStats.length > 0 && (
-                    <div className="flex items-center gap-2 mt-3">
-                        {miniStats.slice(0, 4).map(s => (
-                            <div key={s.label} className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
-                                <p className="text-[18px] font-bold tabular-nums">{s.value}</p>
-                                <p className="text-[10px] opacity-70 mt-0.5">{s.label}</p>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
             {/* Page Header — Desktop */}
             <div className="hidden md:flex items-end justify-between">
                 <div>

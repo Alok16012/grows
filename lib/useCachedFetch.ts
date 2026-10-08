@@ -2,6 +2,22 @@
 
 import { useEffect, useRef, useState } from "react"
 
+// Requests in flight, by URL. Components that mount together and ask for the
+// same URL — e.g. the phone home and the desktop dashboard, both mounted with
+// one hidden by CSS — share a single round trip instead of paying for two.
+const inflight = new Map<string, Promise<unknown>>()
+
+function sharedFetch(url: string): Promise<unknown> {
+    let p = inflight.get(url)
+    if (!p) {
+        p = fetch(url)
+            .then(r => (r.ok ? r.json() : null))
+            .finally(() => inflight.delete(url))
+        inflight.set(url, p)
+    }
+    return p
+}
+
 // Stale-while-revalidate fetch backed by sessionStorage.
 //
 // The server sits far from many users (~400ms+ per round trip), so pages that
@@ -26,12 +42,11 @@ export function useCachedFetch<T>(url: string, maxAgeMs = 5 * 60_000) {
 
     useEffect(() => {
         aborted.current = false
-        fetch(url)
-            .then(r => (r.ok ? r.json() : null))
+        sharedFetch(url)
             .then(v => {
                 if (aborted.current) return
                 if (v !== null) {
-                    setData(v)
+                    setData(v as T)
                     try { sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), v })) } catch { /* quota */ }
                 }
                 setLoading(false)

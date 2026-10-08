@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { ResponsiveHome } from "@/components/ResponsiveHome"
 import { useSession } from "next-auth/react"
 import {
     Building2,
@@ -312,7 +313,12 @@ function DonutLegend({ slices }: { slices: DonutSlice[] }) {
     )
 }
 
-export default function AdminDashboard() {
+// Phones get the Zavtoo-style MobileHome; md and up keep this dashboard.
+export default function AdminHome() {
+    return <ResponsiveHome desktop={<AdminDashboard />} />
+}
+
+function AdminDashboard() {
     const { data: session } = useSession()
     // Cached fetch: revisits paint the last snapshot instantly and refresh in
     // the background — critical because the server is far from most users.
@@ -410,30 +416,6 @@ export default function AdminDashboard() {
         // The dashboard layout already provides lg:p-8 around pages — adding our
         // own desktop padding doubled the top gap into a blank band.
         <div className="p-4 lg:p-0 space-y-4">
-            {/* Mobile Welcome Banner */}
-            <div className="md:hidden bg-gradient-to-br from-[var(--accent)] to-[var(--accent-text)] rounded-[16px] p-4 text-white shadow-sm">
-                <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>
-                <p className="text-[20px] font-bold tracking-tight">Admin Dashboard</p>
-                <div className="flex items-center gap-2 mt-3">
-                    <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
-                        <p className="text-[20px] font-bold tabular-nums">{stats.activeEmployees ?? 0}</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Employees</p>
-                    </div>
-                    <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
-                        <p className="text-[20px] font-bold tabular-nums">{att.pct}%</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Attendance</p>
-                    </div>
-                    <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
-                        <p className="text-[20px] font-bold tabular-nums">{approvals.total}</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Approvals</p>
-                    </div>
-                    <div className="flex-1 bg-white/10 rounded-[10px] p-2.5 text-center">
-                        <p className="text-[20px] font-bold tabular-nums">{inspToday}</p>
-                        <p className="text-[10px] opacity-70 mt-0.5">Inspections</p>
-                    </div>
-                </div>
-            </div>
-
             {/* Page Header — Desktop only */}
             <div className="hidden md:flex items-end justify-between">
                 <div>
