@@ -239,18 +239,18 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     ]
 
     return (
-        <div className="sidebar-dark flex h-full w-[230px] flex-col bg-[var(--surface)] border-r border-[var(--border)] overflow-hidden">
+        <div className="flex h-full w-full flex-col bg-[var(--surface)] overflow-hidden rounded-r-[24px] md:rounded-[22px] shadow-[var(--shadow-card)]">
 
             {/* ── Logo / Header ── */}
-            <div className="flex h-[54px] items-center justify-between px-4 border-b border-[var(--border)] shrink-0">
+            <div className="flex h-[68px] items-center justify-between px-5 shrink-0">
                 <Link href="/" className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 bg-[var(--accent)] rounded-[6px] flex items-center justify-center text-white">
+                    <div className="h-9 w-9 rounded-[11px] flex items-center justify-center text-white shadow-sm" style={{ background: "var(--accent-gradient)" }}>
                         <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M3 3h18v18H3z" />
                             <path d="M18 9h-6v6h6v-3h-3" />
                         </svg>
                     </div>
-                    <span className="font-bold text-[16px] tracking-tight text-[var(--text)]">Growus Auto</span>
+                    <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-none">Growus <span className="text-[var(--accent)]">Auto</span></span>
                 </Link>
                 {onMobileClose && (
                     <button onClick={onMobileClose} aria-label="Close sidebar" className="p-1 md:hidden hover:bg-[var(--surface2)] rounded-md transition-colors text-[var(--text3)] h-9 w-9 flex items-center justify-center">
@@ -287,7 +287,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
                     return (
                         <div key={section.title} className="mb-5">
-                            <h3 className="px-3 mb-1.5 text-[10px] font-semibold text-[var(--text3)] tracking-[0.7px] uppercase">
+                            <h3 className="px-3 mb-2 text-[10.5px] font-semibold text-[var(--text3)] tracking-[0.8px] uppercase">
                                 {section.title}
                             </h3>
                             <nav className="space-y-0.5">
@@ -307,9 +307,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                                 onClick={onMobileClose}
                                                 aria-current={isItemActive && !hasSubLinks ? "page" : undefined}
                                                 className={cn(
-                                                    "flex items-center justify-between rounded-[8px] px-3 py-2 min-h-[40px] text-[13px] transition-all group",
+                                                    "flex items-center justify-between rounded-[14px] px-3.5 py-2 min-h-[42px] text-[13.5px] font-medium transition-all group",
                                                     isItemActive && !hasSubLinks
-                                                        ? "bg-[var(--accent-light)] text-[var(--accent-text)] font-medium"
+                                                        ? "bg-[var(--accent-light)] text-[var(--accent)] font-semibold"
                                                         : (isSubActive || isItemActive)
                                                             ? "bg-[var(--surface2)] text-[var(--text)] font-medium"
                                                             : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
@@ -369,7 +369,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             </div>
 
             {/* ── Footer ── */}
-            <div className="px-5 py-4 border-t border-[var(--border)] mt-auto">
+            <div className="px-5 py-4 mt-auto">
                 <div className="flex flex-col gap-1">
                     <p className="text-[10.5px] text-[var(--text3)]">v1.1.2 · Growus Auto</p>
                     <Link href="/terms" className="text-[10.5px] text-[var(--text3)] hover:text-[var(--text2)]">Terms & Conditions</Link>

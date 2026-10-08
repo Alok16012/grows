@@ -57,22 +57,6 @@
     --radius: 0.75rem;
   }
 
-  /* Dark navy sidebar — scoped token override, so every token-driven child
-     (nav items, section headers, active states) recolors without touching
-     the markup. Zavtoo navy (its splash / hero), with gold marking the
-     active item — gold is the highlight colour, and blue on navy doesn't read. */
-  .sidebar-dark {
-    --surface: #04246b;
-    --surface2: rgba(255, 255, 255, 0.07);
-    --border: rgba(255, 255, 255, 0.08);
-    --text: #ffffff;
-    --text2: #c3cde6;
-    --text3: #8090b8;
-    --accent: #f5a623;
-    --accent-light: rgba(245, 166, 35, 0.16);
-    --accent-text: #ffc04d;
-  }
-
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -228,3 +212,97 @@
   to   { opacity: 1; transform: none; }
 }
 .fade-up { animation: fade-up 0.35s ease both; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Zavtoo pattern layer
+   ──────────────────────────────────────────────────────────────────────────
+   Zavtoo's surfaces are white cards with a soft shadow and NO border, 18px
+   corners, on the lavender canvas; its primary buttons are gradient blue with
+   a coloured shadow. Grows drew the same things as 1px-outlined boxes with
+   12–14px corners and flat 8px buttons — in roughly 650 cards and 90 buttons
+   across 80 files, built from Tailwind classes and inline styles rather than
+   shared components.
+
+   Restyling them one file at a time would take weeks and drift. Instead this
+   layer recognises the patterns by what they are made of and restyles them in
+   one place:
+
+     card    = white background + 1px var(--border) outline + 10px+ corners,
+               on a block element that is not floating (popovers and menus
+               carry their own shadow and stay as they are)
+     primary = an accent-filled button or link
+
+   Scoped to #main-content, so the shell (sidebar, top bar, drawers) is styled
+   by its own markup. Delete this block and every page returns to exactly
+   what it was.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Cards built from Tailwind classes ─────────────────────────────────── */
+#main-content :is(div, section, article, a, li, form):is(.bg-\[var\(--surface\)\], .bg-white).border.border-\[var\(--border\)\]:is(
+    [class*="rounded-[10px]"], [class*="rounded-[11px]"], [class*="rounded-[12px]"], [class*="rounded-[13px]"],
+    [class*="rounded-[14px]"], [class*="rounded-[15px]"], [class*="rounded-[16px]"], [class*="rounded-[18px]"],
+    .rounded-lg, .rounded-xl, .rounded-2xl
+):not(.absolute):not(.fixed):not([class*="shadow-lg"]):not([class*="shadow-xl"]):not([class*="shadow-2xl"]) {
+  border-color: transparent;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Cards built from inline styles ────────────────────────────────────── */
+/* An inline style beats any selector, hence !important — confined to
+   elements whose own style attribute says white + 1px border outline +
+   10px+ corners, and never to anything positioned or already shadowed. */
+#main-content :is(div, section, article, a, form)[style*="1px solid var(--border)"]:is(
+    [style*="background: var(--surface)"], [style*="background:var(--surface)"],
+    [style*="background: white"], [style*="background:white"],
+    [style*="background: rgb(255, 255, 255)"], [style*="background:#fff"]
+):is([style*="border-radius: 1"], [style*="border-radius:1"]):not([style*="position: absolute"]):not([style*="position:absolute"]):not([style*="position: fixed"]):not([style*="position:fixed"]):not([style*="box-shadow"]) {
+  border-color: transparent !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+/* ── Primary buttons ───────────────────────────────────────────────────── */
+#main-content :is(button, a).bg-\[var\(--accent\)\],
+#main-content :is(button, a)[style*="background: var(--accent)"],
+#main-content :is(button, a)[style*="background:var(--accent)"] {
+  background-image: var(--accent-gradient) !important;
+  box-shadow: 0 6px 16px rgba(11, 92, 255, 0.24);
+  font-weight: 600;
+}
+#main-content :is(button, a).bg-\[var\(--accent\)\]:is(
+    [class*="rounded-[6px]"], [class*="rounded-[7px]"], [class*="rounded-[8px]"], [class*="rounded-[9px]"],
+    [class*="rounded-[10px]"], .rounded, .rounded-md, .rounded-lg
+) {
+  border-radius: 12px;
+}
+#main-content :is(button, a).bg-\[var\(--accent\)\]:disabled {
+  box-shadow: none;
+}
+
+/* ── Page titles: Zavtoo's headings are heavy and tight ────────────────── */
+#main-content h1 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* ── Form fields: white with a soft outline, rounder ───────────────────── */
+#main-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), select, textarea):is(.bg-\[var\(--surface2\)\], .bg-\[var\(--surface\)\], .bg-white) {
+  background-color: var(--surface);
+  border-color: var(--border2);
+}
+#main-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), select, textarea):is([class*="rounded-[6px]"], [class*="rounded-[7px]"], [class*="rounded-[8px]"], [class*="rounded-[9px]"], [class*="rounded-[10px]"]) {
+  border-radius: 12px;
+}
+
+/* ── Outlined tiles inside cards (quick actions, option lists) ─────────── */
+/* Zavtoo's tiles within a card are softly tinted, not outlined. Only
+   clickable tiles with no background of their own — a div with this shape
+   is often a table wrapper or a drop zone, which must keep its outline. */
+#main-content :is(a, button):not([class*="bg-"]):not(.border-dashed).border.border-\[var\(--border\)\]:is(
+    [class*="rounded-[10px]"], [class*="rounded-[11px]"], [class*="rounded-[12px]"], [class*="rounded-[14px]"], [class*="rounded-[16px]"], .rounded-lg, .rounded-xl
+) {
+  background-color: var(--surface2);
+  border-color: transparent;
+  border-radius: 16px;
+}

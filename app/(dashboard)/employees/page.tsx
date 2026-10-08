@@ -1649,17 +1649,20 @@ function EmployeesPage() {
                 />
             </div>
 
-            {/* Status tabs — underline style */}
-            <div className="border-b border-[var(--border)] overflow-x-auto">
-                <div className="flex items-center gap-1 min-w-max">
+            {/* Status tabs — Zavtoo's segmented pills: a white track, the
+                active tab a blue pill. Scrolls sideways on a narrow screen. */}
+            <div className="overflow-x-auto no-scrollbar">
+                <div className="inline-flex items-center gap-1 min-w-max bg-[var(--surface)] rounded-full p-1 shadow-[var(--shadow-card)]" role="tablist">
                     {[{ k: "", label: "All" }, ...Object.entries(STATUS_CONFIG).map(([k, v]) => ({ k, label: v.label }))].map(({ k, label }) => (
                         <button
                             key={k}
+                            role="tab"
+                            aria-selected={statusFilter === k}
                             onClick={() => setStatusFilter(k)}
-                            className={`px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                            className={`px-4 py-2 rounded-full text-[13px] transition-colors whitespace-nowrap ${
                                 statusFilter === k
-                                    ? "border-[var(--accent)] text-[var(--accent-text)]"
-                                    : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
+                                    ? "bg-[var(--accent)] text-white font-semibold shadow-sm"
+                                    : "text-[var(--text2)] font-medium hover:text-[var(--text)]"
                             }`}
                         >
                             {label}

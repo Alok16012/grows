@@ -25,8 +25,12 @@ export default function DashboardLayout({
             </a>
 
             {/* Sidebar Desktop */}
-            <div className="sidebar-dark hidden bg-[var(--surface)] md:block w-64 shrink-0 transition-all duration-300 border-r border-[var(--border)]">
-                <Sidebar />
+            {/* Floats on the canvas as a white card, inset from the edges —
+                Zavtoo's surfaces are cards, not chrome. */}
+            <div className="hidden md:block w-[264px] shrink-0 p-3 pr-0">
+                <div className="sticky top-3 h-[calc(100vh-24px)]">
+                    <Sidebar />
+                </div>
             </div>
 
             {/* Sidebar Mobile Overlay */}
@@ -38,7 +42,7 @@ export default function DashboardLayout({
             )}
 
             <div className={cn(
-                "sidebar-dark fixed inset-y-0 left-0 z-50 w-72 bg-[var(--surface)] transform transition-transform duration-300 ease-in-out md:hidden",
+                "fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-in-out md:hidden",
                 isSidebarOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <Sidebar onMobileClose={() => setIsSidebarOpen(false)} />

@@ -150,7 +150,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     }
 
     return (
-        <div className="sticky top-0 z-30 flex h-[60px] md:h-[54px] items-center justify-between md:border-b border-[var(--border)] bg-[var(--bg)] md:bg-[var(--surface)] px-4 md:px-6 shrink-0 gap-2" role="banner">
+        <div className="sticky top-0 z-30 flex h-[60px] md:h-[72px] items-center justify-between bg-[rgba(238,241,251,0.9)] backdrop-blur-md px-4 md:px-8 shrink-0 gap-2" role="banner">
             {/* Left — phones get Zavto's brand mark where the hamburger was;
                 the full menu lives behind "More" in the bottom bar now. */}
             <div className="flex items-center gap-2 shrink-0">
@@ -173,17 +173,17 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
             {/* Center: Search — inline from md up; a full-width row over the
                 header on phones, opened from the search icon or the home page. */}
             <div className={cn(
-                "relative md:flex-1 md:max-w-[300px] md:block",
+                "relative md:flex-1 md:max-w-[420px] md:block",
                 mobileSearch ? "absolute inset-x-3 top-[10px] z-40 flex items-center gap-2" : "hidden",
             )} ref={dropdownRef}>
                 <div className="relative group flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)] group-focus-within:text-[var(--accent)] transition-colors" aria-hidden="true" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)] group-focus-within:text-[var(--accent)] transition-colors" aria-hidden="true" />
                     <input
                         ref={searchInputRef}
                         type="search"
                         placeholder="Search for anything..."
                         aria-label="Search sites, projects, and inspections"
-                        className="w-full h-9 pl-9 pr-4 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] text-[16px] text-[var(--text)] placeholder-[var(--text3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] focus:bg-[var(--surface)] transition-all"
+                        className="w-full h-10 md:h-11 pl-10 pr-4 bg-[var(--surface)] border-0 rounded-full text-[16px] md:text-[14px] text-[var(--text)] placeholder-[var(--text3)] shadow-[var(--shadow-card)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onFocus={() => query.length >= 2 && setIsOpen(true)}
@@ -255,7 +255,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                     <Search size={19} />
                 </button>
                 <div className="flex items-center gap-2">
-                    <button aria-label="Help" className="hidden sm:flex h-10 w-10 rounded-full items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
+                    <button aria-label="Help" className="hidden sm:flex h-10 w-10 rounded-full items-center justify-center bg-[var(--surface)] shadow-[var(--shadow-card)] text-[var(--text)] hover:text-[var(--accent)] transition-colors">
                         <HelpCircle size={18} />
                     </button>
 
@@ -272,7 +272,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 // the actual rows when the panel is opened.
                                 if (opening) fetchNotifs()
                             }}
-                            className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] md:bg-[var(--surface2)] md:border border-[var(--border)] text-[var(--text)] md:text-[var(--text2)] shadow-[var(--shadow-card)] md:shadow-none hover:text-[var(--text)] transition-colors relative"
+                            className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)] hover:text-[var(--accent)] transition-colors relative"
                         >
                             <Bell size={18} />
                             {unreadCount > 0 && (
@@ -324,12 +324,12 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                         )}
                     </div>
 
-                    <button className="hidden sm:flex h-[34px] w-[34px] rounded-full items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
+                    <button className="hidden sm:flex h-10 w-10 rounded-full items-center justify-center bg-[var(--surface)] shadow-[var(--shadow-card)] text-[var(--text)] hover:text-[var(--accent)] transition-colors">
                         <Settings size={18} />
                     </button>
                 </div>
 
-                <div className="h-6 w-px bg-[var(--border)] mx-1 hidden sm:block"></div>
+                
 
                 {/* Profile */}
                 <div className="relative" ref={profileRef}>
