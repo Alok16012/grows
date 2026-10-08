@@ -7,39 +7,70 @@
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
-    --bg: #f5f4f0;
-    --surface: #ffffff;
-    --surface2: #f9f8f5;
-    --border: #e8e6e1;
-    --border2: #d4d1ca;
-    --text: #1a1a18;
-    --text2: #6b6860;
-    --text3: #9e9b95;
-    --accent: #1a9e6e;
-    --accent-light: #e8f7f1;
-    --accent-text: #0d6b4a;
+    /* ── Zavtoo design system ─────────────────────────────────────────────
+       Lavender canvas, white cards, blue as the action colour, gold for
+       highlights. Every screen reads these tokens, so this block IS the
+       look; change it here, not page by page.
+
+       Green is NOT the brand colour any more — it means success only
+       (Accepted, Paid, Approved, Present), via --success. That is the same
+       split Zavtoo uses: blue to act, gold to highlight, green for done. */
+    --bg: #eef1fb;          /* page canvas */
+    --surface: #ffffff;     /* cards */
+    --surface2: #f5f7fd;    /* table heads, hovers, insets */
+    --border: #e6eaf5;      /* hairlines */
+    --border2: #d6ddee;     /* stronger dividers, input borders */
+    --text: #0f1729;        /* headings */
+    --text2: #5b6478;       /* body / secondary */
+    --text3: #98a1b5;       /* captions */
+
+    --accent: #0b5cff;      /* primary action */
+    --accent-hover: #0847c7;
+    --accent-light: #e8effe;
+    --accent-text: #0847c7;
+    --accent-gradient: linear-gradient(135deg, #0b5cff 0%, #0847c7 100%);
+
+    --gold: #f5a623;
+    --gold-dark: #dd8f0d;
+    --gold-light: #fff6e4;
+    --gold-gradient: linear-gradient(135deg, #f5a623 0%, #dd8f0d 100%);
+
+    --success: #15803d;
+    --success-strong: #16a34a;
+    --success-light: #dcfce7;
+    --success-border: #bbf7d0;
+
     --amber: #d97706;
     --amber-light: #fef3c7;
     --red: #dc2626;
     --red-light: #fef2f2;
 
+    --hero: linear-gradient(165deg, #04246b 0%, #020b24 100%);
+
+    --radius-card: 18px;
+    --shadow-card: 0 2px 10px rgba(15, 23, 41, 0.05);
+    --shadow-lg: 0 8px 24px rgba(15, 23, 41, 0.10);
+
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    /* Rounder shadcn primitives (rounded-lg = 12px), closer to Zavtoo. */
+    --radius: 0.75rem;
   }
 
-  /* Dark navy sidebar — scoped token override. Applied to the sidebar
-     root so every token-driven child (nav items, section headers, active
-     states) recolors correctly without touching the markup. */
+  /* Dark navy sidebar — scoped token override, so every token-driven child
+     (nav items, section headers, active states) recolors without touching
+     the markup. Zavtoo navy (its splash / hero), with gold marking the
+     active item — gold is the highlight colour, and blue on navy doesn't read. */
   .sidebar-dark {
-    --surface: #0e1c2b;
-    --surface2: #1b2f43;
-    --border: #22384c;
-    --text: #eaf1f8;
-    --text2: #a4b7c9;
-    --text3: #647d93;
-    --accent-light: rgba(26, 158, 110, 0.18);
-    --accent-text: #34d399;
+    --surface: #04246b;
+    --surface2: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #ffffff;
+    --text2: #c3cde6;
+    --text3: #8090b8;
+    --accent: #f5a623;
+    --accent-light: rgba(245, 166, 35, 0.16);
+    --accent-text: #ffc04d;
   }
 
   .dark {
@@ -61,13 +92,15 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
+    /* --accent and --border deliberately NOT set here: those names are the
+       app's own hex colour tokens (see :root). Overriding them with HSL
+       triples made every var(--accent) button and var(--border) line
+       invalid — transparent — in dark mode. */
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
   }
@@ -81,8 +114,15 @@
   body {
     background-color: var(--bg);
     color: var(--text);
-    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    /* Figures line up in columns — this app is mostly tables of numbers. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Poppins runs wide; pull headings in so they read as one block. */
+  h1, h2, h3, h4 { letter-spacing: -0.02em; }
 }
 
 /* ── Mobile safety net (phone widths / the Growus ERP app WebView) ──────────
@@ -120,11 +160,12 @@
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    /* Not --accent / --border: they are the app's hex colour tokens, and an
+       HSL triple there made primary buttons and borders vanish on any phone
+       or PC set to dark mode. */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
   }

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+// Zavtoo's typeface. Weights limited to the ones the UI uses, to keep the
+// font download small.
+const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
   title: "CIMS - Inspection Management",
@@ -31,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} ${inter.variable} font-sans`}>
+      <body className={`${poppins.className} ${poppins.variable} font-sans`}>
         {/* Cache Bust: 1773724001 */}
         <Providers>
           {children}
