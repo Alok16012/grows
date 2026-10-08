@@ -27,7 +27,25 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isNotifOpen, setIsNotifOpen] = useState(false)
     const [mounted, setMounted] = useState(false)
+    // Phones: the search field is folded behind an icon so the header can be
+    // Zavto's — logo left, bell and profile right — and opens as a full-width
+    // row over the header. The mobile home's big search bar opens it too, by
+    // dispatching "grows:open-search", so there is one search, not two.
+    const [mobileSearch, setMobileSearch] = useState(false)
+    const searchInputRef = useRef<HTMLInputElement>(null)
     const pathname = usePathname()
+    const homeHref = session?.user?.role === "ADMIN" ? "/admin" : "/dashboard"
+    // Same rule as MobileBottomNav's HIDE_ON: these pages have no bottom bar.
+    const noBottomBar = /^\/inspection\/[^/]+\/form/.test(pathname ?? "")
+
+    useEffect(() => {
+        const open = () => {
+            setMobileSearch(true)
+            setTimeout(() => searchInputRef.current?.focus(), 30)
+        }
+        window.addEventListener("grows:open-search", open)
+        return () => window.removeEventListener("grows:open-search", open)
+    }, [])
 
     const [notifications, setNotifications] = useState<any[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
@@ -107,6 +125,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
         setIsProfileOpen(false)
         setIsNotifOpen(false)
         setQuery("")
+        setMobileSearch(false)
     }, [pathname])
 
     const markAllRead = async () => {
@@ -131,19 +150,36 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     }
 
     return (
-        <div className="sticky top-0 z-30 flex h-[54px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-3 md:px-6 shrink-0 gap-2" role="banner">
-            {/* Left */}
+        <div className="sticky top-0 z-30 flex h-[60px] md:h-[54px] items-center justify-between md:border-b border-[var(--border)] bg-[var(--bg)] md:bg-[var(--surface)] px-4 md:px-6 shrink-0 gap-2" role="banner">
+            {/* Left — phones get Zavto's brand mark where the hamburger was;
+                the full menu lives behind "More" in the bottom bar now. */}
             <div className="flex items-center gap-2 shrink-0">
-                <button onClick={onMenuClick} aria-label="Open menu" className="inline-flex items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] md:hidden transition-colors">
+                <Link href={homeHref} className="flex md:hidden items-center gap-2.5" aria-label="Growus Auto home">
+                    <span className="h-9 w-9 rounded-[11px] flex items-center justify-center text-white shadow-sm" style={{ background: "var(--accent-gradient)" }}>
+                        <svg viewBox="0 0 24 24" className="w-[19px] h-[19px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M3 3h18v18H3z" />
+                            <path d="M18 9h-6v6h6v-3h-3" />
+                        </svg>
+                    </span>
+                    <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-none">Growus <span className="text-[var(--accent)]">Auto</span></span>
+                </Link>
+                {/* Kept for pages without the bottom bar (e.g. the inspection
+                    form), so the menu is never out of reach on a phone. */}
+                <button onClick={onMenuClick} aria-label="Open menu" className={cn("items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors", noBottomBar ? "inline-flex md:hidden" : "hidden")}>
                     <Menu size={20} />
                 </button>
             </div>
 
-            {/* Center: Search */}
-            <div className="flex-1 max-w-[200px] sm:max-w-[400px] md:max-w-[300px] relative" ref={dropdownRef}>
-                <div className="relative group">
+            {/* Center: Search — inline from md up; a full-width row over the
+                header on phones, opened from the search icon or the home page. */}
+            <div className={cn(
+                "relative md:flex-1 md:max-w-[300px] md:block",
+                mobileSearch ? "absolute inset-x-3 top-[10px] z-40 flex items-center gap-2" : "hidden",
+            )} ref={dropdownRef}>
+                <div className="relative group flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)] group-focus-within:text-[var(--accent)] transition-colors" aria-hidden="true" />
                     <input
+                        ref={searchInputRef}
                         type="search"
                         placeholder="Search for anything..."
                         aria-label="Search sites, projects, and inspections"
@@ -155,6 +191,12 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                     />
                     {loading && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--text3)]" /></div>}
                 </div>
+                {mobileSearch && (
+                    <button type="button" onClick={() => { setMobileSearch(false); setQuery("") }} aria-label="Close search"
+                        className="md:hidden shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] border border-[var(--border)] text-[var(--text2)]">
+                        <X size={18} />
+                    </button>
+                )}
 
                 {isOpen && (results?.sites?.length || results?.projects?.length || results?.inspections?.length) ? (
                     <div className="absolute top-full left-0 mt-2 w-full max-h-[400px] overflow-y-auto rounded-[12px] border border-[var(--border)] bg-[var(--surface)] shadow-xl z-50 p-2 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -208,8 +250,12 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
 
             {/* Right */}
             <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-2">
-                    <button aria-label="Help" className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
+                <button type="button" onClick={() => { setMobileSearch(true); setTimeout(() => searchInputRef.current?.focus(), 30) }}
+                    aria-label="Search" className="md:hidden h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)]">
+                    <Search size={19} />
+                </button>
+                <div className="flex items-center gap-2">
+                    <button aria-label="Help" className="hidden sm:flex h-10 w-10 rounded-full items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
                         <HelpCircle size={18} />
                     </button>
 
@@ -226,7 +272,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 // the actual rows when the panel is opened.
                                 if (opening) fetchNotifs()
                             }}
-                            className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors relative"
+                            className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] md:bg-[var(--surface2)] md:border border-[var(--border)] text-[var(--text)] md:text-[var(--text2)] shadow-[var(--shadow-card)] md:shadow-none hover:text-[var(--text)] transition-colors relative"
                         >
                             <Bell size={18} />
                             {unreadCount > 0 && (
@@ -237,7 +283,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                         </button>
 
                         {isNotifOpen && (
-                            <div id="notifications-panel" role="region" aria-label="Notifications" className="absolute right-0 mt-2 w-80 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div id="notifications-panel" role="region" aria-label="Notifications" className="fixed left-3 right-3 top-[64px] sm:absolute sm:left-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-80 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface2)]/50">
                                     <h3 className="text-[13px] font-semibold text-[var(--text)]">Notifications</h3>
                                     <div className="flex items-center gap-2">
@@ -278,7 +324,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                         )}
                     </div>
 
-                    <button className="h-[34px] w-[34px] rounded-full flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
+                    <button className="hidden sm:flex h-[34px] w-[34px] rounded-full items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
                         <Settings size={18} />
                     </button>
                 </div>
@@ -288,7 +334,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                 {/* Profile */}
                 <div className="relative" ref={profileRef}>
                     <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--surface2)] transition-all">
-                        <div className="h-[42px] w-[42px] rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-[15px] font-bold overflow-hidden shadow-sm">
+                        <div className="h-[38px] w-[38px] md:h-[42px] md:w-[42px] rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-[15px] font-bold overflow-hidden shadow-sm">
                             {mounted && (session?.user as any)?.photo ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={(session?.user as any).photo} alt={session?.user?.name || "Profile"} className="h-full w-full object-cover" />
@@ -298,7 +344,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 <UserCircle size={24} />
                             )}
                         </div>
-                        <ChevronDown size={14} className={cn("text-[var(--text3)] transition-transform duration-200", isProfileOpen && "rotate-180")} />
+                        <ChevronDown size={14} className={cn("hidden md:block text-[var(--text3)] transition-transform duration-200", isProfileOpen && "rotate-180")} />
                     </button>
 
                     {isProfileOpen && (
