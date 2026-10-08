@@ -585,11 +585,7 @@ export function EmployeeModal({
     const setCheck = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
         setForm(f => ({ ...f, [key]: e.target.checked }))
 
-    const tabCls = (t: string) =>
-        `px-3 py-2 text-[13px] font-semibold transition-colors whitespace-nowrap rounded-md ${activeTab === t
-            ? "bg-[var(--accent)] text-white shadow-sm"
-            : "text-[var(--text)] hover:bg-[var(--surface2)]"
-        }`
+    const tabCls = (t: string) => `z-tab ${activeTab === t ? "is-active" : ""}`
     const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
     const labelCls = "block text-[12px] text-[var(--text2)] mb-1"
 
@@ -612,13 +608,13 @@ export function EmployeeModal({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b border-[var(--border)] px-4 py-3 overflow-x-auto bg-[var(--surface2)]/40">
+                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-4 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
                     {(["personal", "employment", ...(canViewSalary ? ["salary"] as const : []), "bank", "compliance", "safety", "documents", ...(employee ? ["history"] as const : [])] as const).map(t => (
-                        <button type="button" key={t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
+                        <button type="button" key={t} role="tab" aria-selected={activeTab === t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
                             {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : t === "history" ? "History" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5">
                     {/* Personal Tab */}

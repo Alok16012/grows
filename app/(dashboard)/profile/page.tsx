@@ -937,14 +937,14 @@ export default function ProfilePage() {
 
             {/* Tabs */}
             {/* Up to 6 tabs — the strip scrolls sideways instead of overflowing narrow screens. */}
-            <div className="flex gap-1 bg-[var(--surface)] rounded-xl p-1 w-fit max-w-full overflow-x-auto">
+            <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
                 {tabs.map(({ key, label, icon: Icon }) => (
-                    <button key={key} onClick={() => setActiveTab(key)}
-                        className={`shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${activeTab === key ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text3)] hover:text-[var(--text)]"}`}>
+                    <button key={key} role="tab" aria-selected={activeTab === key} onClick={() => setActiveTab(key)}
+                        className={`z-tab ${activeTab === key ? "is-active" : ""}`}>
                         <Icon size={14} />{label}
                     </button>
                 ))}
-            </div>
+            </div></div>
 
             {/* ── Profile tab ── */}
             {activeTab === "profile" && (

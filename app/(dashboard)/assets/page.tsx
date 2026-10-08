@@ -778,14 +778,14 @@ export default function AssetsPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 px-6 pb-3 shrink-0">
+            <div className="z-tabs-wrap px-6 pb-3 shrink-0"><div className="z-tabs" role="tablist">
                 {(["assets", "issued"] as const).map(t => (
-                    <button key={t} onClick={() => setTab(t)}
-                        className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${tab === t ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
+                    <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                        className={`z-tab ${tab === t ? "is-active" : ""}`}>
                         {t === "assets" ? "Assets" : "Issued Items"}
                     </button>
                 ))}
-            </div>
+            </div></div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 pb-6">

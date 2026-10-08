@@ -419,23 +419,10 @@ export default function PerformancePage() {
     }
 
     // ─── Tabs ──────────────────────────────────────────────────────────────────
-    const tabStyle = (active: boolean) => ({
-        padding: "10px 20px",
-        border: "none",
-        background: "none",
-        cursor: "pointer",
-        // The strip scrolls horizontally on narrow screens — tabs must not squash.
-        flexShrink: 0,
-        whiteSpace: "nowrap" as const,
-        fontWeight: active ? 700 : 500,
-        fontSize: 14,
-        color: active ? "var(--accent)" : "var(--text)",
-        borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
-        transition: "all 0.15s",
-    })
+    const tabCls = (active: boolean) => `z-tab ${active ? "is-active" : ""}`
 
     return (
-        <div style={{ padding: "24px 28px", minHeight: "100vh", background: "var(--surface)" }}>
+        <div style={{ padding: "24px 28px", minHeight: "100vh" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
                 <div>
@@ -463,28 +450,17 @@ export default function PerformancePage() {
             </div>
 
             {/* Tab Bar */}
-            <div className="overflow-x-auto max-w-full" style={{
-                display: "flex",
-                borderBottom: "1px solid var(--border)",
-                marginBottom: 24,
-                gap: 0,
-            }}>
-                <button style={tabStyle(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <BarChart2 size={14} /> Dashboard
-                    </span>
+            <div className="z-tabs-wrap" style={{ marginBottom: 24 }}><div className="z-tabs" role="tablist">
+                <button role="tab" aria-selected={activeTab === "dashboard"} className={tabCls(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>
+                    <BarChart2 size={14} /> Dashboard
                 </button>
-                <button style={tabStyle(activeTab === "reviews")} onClick={() => setActiveTab("reviews")}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <FileText size={14} /> Reviews
-                    </span>
+                <button role="tab" aria-selected={activeTab === "reviews"} className={tabCls(activeTab === "reviews")} onClick={() => setActiveTab("reviews")}>
+                    <FileText size={14} /> Reviews
                 </button>
-                <button style={tabStyle(activeTab === "templates")} onClick={() => setActiveTab("templates")}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Settings size={14} /> Templates
-                    </span>
+                <button role="tab" aria-selected={activeTab === "templates"} className={tabCls(activeTab === "templates")} onClick={() => setActiveTab("templates")}>
+                    <Settings size={14} /> Templates
                 </button>
-            </div>
+            </div></div>
 
             {/* ─── DASHBOARD TAB ─────────────────────────────────────────────── */}
             {activeTab === "dashboard" && (
@@ -959,26 +935,20 @@ function ReviewDrawer({
             </div>
 
             {/* Sub-tabs */}
-            <div style={{
-                display: "flex", borderBottom: "1px solid var(--border)",
-                overflowX: "auto", flexShrink: 0,
-            }}>
-                {drawerTabs.map(t => (
-                    <button
-                        key={t.id}
-                        onClick={() => setTab(t.id as "overview" | "self" | "kra" | "manager" | "hr" | "pip")}
-                        style={{
-                            padding: "10px 16px", border: "none", background: "none", cursor: "pointer",
-                            fontWeight: tab === t.id ? 700 : 500, fontSize: 13,
-                            color: tab === t.id ? "var(--accent)" : "#6b7280",
-                            borderBottom: tab === t.id ? "2px solid var(--accent)" : "2px solid transparent",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0,
-                        }}
-                    >
-                        {t.label}
-                    </button>
-                ))}
+            <div className="z-tabs-wrap" style={{ flexShrink: 0, padding: "12px 20px", borderBottom: "1px solid var(--border)" }}>
+                <div className="z-tabs z-tabs--inset" role="tablist">
+                    {drawerTabs.map(t => (
+                        <button
+                            key={t.id}
+                            role="tab"
+                            aria-selected={tab === t.id}
+                            onClick={() => setTab(t.id as "overview" | "self" | "kra" | "manager" | "hr" | "pip")}
+                            className={`z-tab ${tab === t.id ? "is-active" : ""}`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Drawer Content */}

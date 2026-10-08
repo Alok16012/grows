@@ -550,23 +550,21 @@ function CourseModal({ open, onClose, onSaved, course }: {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-[var(--border)] px-6 shrink-0">
+                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-6 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
                     {(["basic", "modules", "quiz", "assignment"] as const).map(tab => (
                         <button
                             key={tab}
+                            role="tab"
+                            aria-selected={activeTab === tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-3 text-[13px] font-medium border-b-2 transition-colors capitalize flex items-center gap-1.5 ${
-                                activeTab === tab
-                                    ? "border-[var(--accent)] text-[var(--accent)]"
-                                    : "border-transparent text-[var(--text3)] hover:text-[var(--text2)]"
-                            }`}
+                            className={`z-tab ${activeTab === tab ? "is-active" : ""}`}
                         >
                             {tab === "basic" ? "Basic Info" : tab === "modules" ? `Modules ${modules.length > 0 ? `(${modules.length})` : ""}` : tab === "quiz" ? `Quiz ${questions.length > 0 ? `(${questions.length})` : ""}` : `Assignment ${rules.length > 0 ? `(${rules.length})` : ""}`}
                             {tab === "quiz" && <FileQuestion size={13} />}
                             {tab === "assignment" && <Users2 size={13} />}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-6">
@@ -1738,7 +1736,7 @@ export default function LMSPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-[var(--border)] bg-[var(--surface)] rounded-t-[12px] px-2 overflow-x-auto">
+                <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
                     {([
                         { key: "dashboard", label: "Dashboard", icon: <TrendingUp size={14} /> },
                         { key: "courses", label: "Courses", icon: <BookOpen size={14} /> },
@@ -1750,17 +1748,15 @@ export default function LMSPage() {
                     ]).map(tab => (
                         <button
                             key={tab.key}
+                            role="tab"
+                            aria-selected={activeTab === tab.key}
                             onClick={() => setActiveTab(tab.key as any)}
-                            className={`px-4 py-3 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-                                activeTab === tab.key
-                                    ? "border-[var(--accent)] text-[var(--accent)]"
-                                    : "border-transparent text-[var(--text3)] hover:text-[var(--text2)]"
-                            }`}
+                            className={`z-tab ${activeTab === tab.key ? "is-active" : ""}`}
                         >
                             {tab.icon} {tab.label}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 {/* ── Dashboard Tab ── */}
                 {activeTab === "dashboard" && (

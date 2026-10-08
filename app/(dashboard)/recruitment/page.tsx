@@ -990,7 +990,7 @@ export default function RecruitmentPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 mt-4 border-b border-[var(--border)]">
+                <div className="z-tabs-wrap mt-4"><div className="z-tabs" role="tablist">
                     {([
                         { key: "pipeline", label: "Pipeline", icon: ArrowRight },
                         { key: "analytics", label: "Analytics", icon: BarChart2 },
@@ -1001,19 +1001,17 @@ export default function RecruitmentPage() {
                         return (
                             <button
                                 key={tab.key}
+                                role="tab"
+                                aria-selected={activeTab === tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
-                                    activeTab === tab.key
-                                        ? "border-[var(--accent)] text-[var(--accent)]"
-                                        : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
-                                }`}
+                                className={`z-tab ${activeTab === tab.key ? "is-active" : ""}`}
                             >
                                 <Icon size={14} />
                                 {tab.label}
                             </button>
                         )
                     })}
-                </div>
+                </div></div>
             </div>
 
             {/* ── PIPELINE TAB ── */}
@@ -2392,18 +2390,14 @@ function DetailDrawer({
                 </div>
 
                 {/* Drawer tabs */}
-                <div className="flex gap-0 border-b border-[var(--border)] shrink-0 overflow-x-auto">
+                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-4 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
                     {DRAWER_TABS.map(t => (
-                        <button key={t.key} onClick={() => setDrawerTab(t.key)}
-                            className={`px-3 py-2.5 text-[12px] font-medium whitespace-nowrap border-b-2 transition-colors ${
-                                drawerTab === t.key
-                                    ? "border-[var(--accent)] text-[var(--accent)]"
-                                    : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
-                            }`}>
+                        <button key={t.key} role="tab" aria-selected={drawerTab === t.key} onClick={() => setDrawerTab(t.key)}
+                            className={`z-tab ${drawerTab === t.key ? "is-active" : ""}`}>
                             {t.label}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 {/* Tab content */}
                 <div className="flex-1 overflow-y-auto">
@@ -3001,7 +2995,7 @@ function ConvertModal({ lead, onClose, onConverted }: {
     const iCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
     const errCls = (bad: string | null | boolean) => iCls + (bad ? " !border-red-400" : "")
     const lCls = "block text-[12px] text-[var(--text2)] mb-1"
-    const tabCls = (t: string) => `px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${activeTab === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`
+    const tabCls = (t: string) => `z-tab ${activeTab === t ? "is-active" : ""}`
 
     // Validation
     const cErrors = {
@@ -3071,13 +3065,13 @@ function ConvertModal({ lead, onClose, onConverted }: {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-[var(--border)] px-6 overflow-x-auto shrink-0">
+                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-6 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
                     {(["personal", "employment", "salary", "bank", "compliance", "safety", "docs"] as const).map(t => (
-                        <button key={t} type="button" onClick={() => setActiveTab(t)} className={tabCls(t)}>
+                        <button key={t} type="button" role="tab" aria-selected={activeTab === t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
                             {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
 

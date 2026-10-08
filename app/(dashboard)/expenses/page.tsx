@@ -2571,7 +2571,7 @@ export default function ExpensesPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[var(--surface)] p-4 md:p-6">
+        <div className="min-h-screen p-4 md:p-6">
             {/* Header */}
             <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
                 <div>
@@ -2650,7 +2650,7 @@ export default function ExpensesPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 mb-4 border-b border-[var(--border)]">
+            <div className="z-tabs-wrap mb-4"><div className="z-tabs" role="tablist">
                 {isPrivileged ? (
                     /* ── Admin / Manager tabs ── */
                     <>
@@ -2674,11 +2674,9 @@ export default function ExpensesPage() {
                                         setStatusFilter("ALL")
                                     }
                                 }}
-                                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
-                                    activeTab === id
-                                        ? "border-[var(--accent)] text-[var(--accent)]"
-                                        : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
-                                }`}
+                                role="tab"
+                                aria-selected={activeTab === id}
+                                className={`z-tab ${activeTab === id ? "is-active" : ""}`}
                             >
                                 {label}
                                 {id === "all" && pendingCount > 0 && (
@@ -2691,11 +2689,11 @@ export default function ExpensesPage() {
                     </>
                 ) : (
                     /* ── Regular employee: single tab ── */
-                    <button className="px-4 py-2 text-[13px] font-medium border-b-2 border-[var(--accent)] text-[var(--accent)] -mb-px">
+                    <button role="tab" aria-selected className="z-tab is-active">
                         My Expenses
                     </button>
                 )}
-            </div>
+            </div></div>
 
             {/* Analytics Tab */}
             {activeTab === "analytics" && (

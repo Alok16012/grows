@@ -230,14 +230,7 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
         setShowReject(false)
     }
 
-    const tabCls = (t: string) => ({
-        padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-        border: "none", background: "none",
-        // The strip scrolls horizontally on narrow screens — tabs must not squash.
-        flexShrink: 0, whiteSpace: "nowrap",
-        borderBottom: tab === t ? "2px solid var(--accent)" : "2px solid transparent",
-        color: tab === t ? "var(--accent)" : "var(--text3)",
-    } as React.CSSProperties)
+    const tabCls = (t: string) => `z-tab ${tab === t ? "is-active" : ""}`
 
     return (
         <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -267,13 +260,13 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
                     </div>
 
                     {/* Tabs */}
-                    <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
+                    <div className="z-tabs-wrap" style={{ paddingBottom: 12 }}><div className="z-tabs z-tabs--inset" role="tablist">
                         {(["personal", "employment", "bank", "safety", "docs"] as const).map(t => (
-                            <button key={t} onClick={() => setTab(t)} style={tabCls(t)}>
+                            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={tabCls(t)}>
                                 {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "bank" ? "Bank & Compliance" : t === "safety" ? "Safety" : `Documents${docs.length ? ` (${docs.length})` : ""}`}
                             </button>
                         ))}
-                    </div>
+                    </div></div>
                 </div>
 
                 {/* Body */}
@@ -885,14 +878,14 @@ export default function OnboardingPage() {
 
             {/* Filter tabs + search */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div className="flex gap-1 overflow-x-auto max-w-full">
+                <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
                     {FILTER_TABS.map(t => (
-                        <button key={t.key} onClick={() => setFilter(t.key)} className="shrink-0"
-                            style={{ padding: "8px 16px", borderRadius: 9, border: "none", background: filter === t.key ? "var(--accent)" : "transparent", color: filter === t.key ? "#fff" : "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => setFilter(t.key)}
+                            className={`z-tab ${filter === t.key ? "is-active" : ""}`}>
                             {t.label}
                         </button>
                     ))}
-                </div>
+                </div></div>
                 <div style={{ flex: 1 }} />
                 <div style={{ position: "relative", minWidth: 240, flex: "0 1 360px" }}>
                     <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />

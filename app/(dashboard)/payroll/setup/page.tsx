@@ -522,14 +522,14 @@ export default function PayrollPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-[var(--surface)] rounded-xl p-1 w-fit">
+            <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
                 {[["payroll","Calculate Payroll"],["setup","Salary Setup"]] .map(([t, label]) => (
-                    <button key={t} onClick={() => setTab(t as any)}
-                        className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${tab === t ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text3)] hover:text-[var(--text)]"}`}>
+                    <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t as any)}
+                        className={`z-tab ${tab === t ? "is-active" : ""}`}>
                         {label}
                     </button>
                 ))}
-            </div>
+            </div></div>
 
             {/* ── TAB: PAYROLL CALCULATOR ── */}
             {tab === "payroll" && (

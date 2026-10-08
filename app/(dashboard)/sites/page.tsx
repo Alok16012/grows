@@ -258,18 +258,14 @@ function AddSiteModal({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-[var(--border)] shrink-0 px-5">
+                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-5 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
                     {(["info", "geo"] as const).map(t => (
-                        <button key={t} onClick={() => setTab(t)}
-                            className={`px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
-                                tab === t
-                                    ? "border-[var(--accent)] text-[var(--accent)]"
-                                    : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
-                            }`}>
+                        <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                            className={`z-tab ${tab === t ? "is-active" : ""}`}>
                             {t === "info" ? "Site Info" : "Geofencing"}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 {/* Body */}
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">

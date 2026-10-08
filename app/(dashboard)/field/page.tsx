@@ -794,21 +794,19 @@ export default function FieldPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b border-[var(--border)]">
+                <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
                     {(["tasks", "activity"] as const).map((tab) => (
                         <button
                             key={tab}
+                            role="tab"
+                            aria-selected={activeTab === tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2.5 text-[13px] font-medium capitalize border-b-2 transition-colors ${
-                                activeTab === tab
-                                    ? "border-[var(--accent)] text-[var(--accent)]"
-                                    : "border-transparent text-[var(--text2)] hover:text-[var(--text)]"
-                            }`}
+                            className={`z-tab ${activeTab === tab ? "is-active" : ""}`}
                         >
                             {tab === "tasks" ? "Tasks" : "Field Activity"}
                         </button>
                     ))}
-                </div>
+                </div></div>
             </div>
 
             {/* Content */}

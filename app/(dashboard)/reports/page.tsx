@@ -839,20 +839,19 @@ export default function ReportsPage() {
 
             {/* TABS ROW */}
             <div className="no-print bg-white border-b border-[var(--border)] p-3 md:p-[10px_24px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="bg-white border border-[var(--border)] rounded-[10px] p-[4px] flex gap-[2px] overflow-x-auto">
+                <div className="z-tabs-wrap"><div className="z-tabs z-tabs--inset" role="tablist">
                     {["Dashboard", "Graphical", "Pareto Chart", "Day Wise", "Part Wise", "Inspection Report"].map(tab => (
                         <button
                             key={tab}
+                            role="tab"
+                            aria-selected={activeTab === tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`p-[7px_14px] rounded-[7px] text-[13px] font-[500] transition-colors whitespace-nowrap ${activeTab === tab
-                                ? "bg-[var(--text)] text-white"
-                                : "bg-transparent text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
-                                }`}
+                            className={`z-tab ${activeTab === tab ? "is-active" : ""}`}
                         >
                             {tab}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 <div className="flex flex-wrap items-center gap-[6px]">
                     {!["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab) && (

@@ -444,11 +444,7 @@ function EmployeeDrawer({
     const status = STATUS_CONFIG[employee.status] || STATUS_CONFIG.ACTIVE
     const emp = (detail as Employee | null) || employee
 
-    const tabCls = (t: string) =>
-        `px-3 py-3 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${activeTab === t
-            ? "border-[var(--accent)] text-[var(--accent-text)]"
-            : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"
-        }`
+    const tabCls = (t: string) => `z-tab ${activeTab === t ? "is-active" : ""}`
 
     return (
         <div className="fixed inset-0 z-50 flex">
@@ -518,7 +514,7 @@ function EmployeeDrawer({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-[var(--border)] px-5 overflow-x-auto">
+                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-5 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
                     {(["personal", "employment", ...(canViewSalary ? ["salary"] as const : []), "bank", "documents"] as const).map(t => (
                         <button key={t} onClick={() => {
                             setActiveTab(t)
@@ -529,7 +525,7 @@ function EmployeeDrawer({
                             {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : "Documents"}
                         </button>
                     ))}
-                </div>
+                </div></div>
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-5">

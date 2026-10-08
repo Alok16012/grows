@@ -915,14 +915,14 @@ function AdminView() {
             </div>
 
             {/* Sub-tabs */}
-            <div className="flex items-center gap-1 bg-[var(--surface2)] rounded-[10px] p-1 w-fit">
+            <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
                 {(["daily", "monthly"] as const).map(t => (
-                    <button key={t} onClick={() => setTab(t)}
-                        className={`px-4 py-1.5 rounded-[7px] text-[13px] font-medium transition-all capitalize ${tab === t ? "bg-white shadow-sm text-[var(--text)]" : "text-[var(--text2)] hover:text-[var(--text)]"}`}>
+                    <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                        className={`z-tab ${tab === t ? "is-active" : ""}`}>
                         {t === "daily" ? "Daily View" : "Monthly Summary"}
                     </button>
                 ))}
-            </div>
+            </div></div>
 
             {tab === "daily" ? (
                 <>

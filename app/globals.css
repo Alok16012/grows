@@ -306,3 +306,53 @@
   border-color: transparent;
   border-radius: 16px;
 }
+
+/* ── Segmented pill tabs ───────────────────────────────────────────────── */
+/* Zavtoo's tabs: a white rounded track, the active tab a blue pill. Every
+   tab strip uses these, so the look is set here once:
+
+     <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
+       <button className={`z-tab ${on ? "is-active" : ""}`}>…</button>
+     </div></div>
+
+   The wrap scrolls sideways when the strip is wider than the screen. Inside
+   a white drawer or modal, add .z-tabs--inset: the track takes the tinted
+   surface instead of a shadow, since white-on-white would vanish. */
+.z-tabs-wrap { overflow-x: auto; max-width: 100%; -ms-overflow-style: none; scrollbar-width: none; }
+.z-tabs-wrap::-webkit-scrollbar { display: none; }
+.z-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: max-content;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.z-tabs--inset { background: var(--surface2); box-shadow: none; }
+.z-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text2);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.z-tab:hover { color: var(--text); }
+.z-tab.is-active {
+  background: var(--accent-gradient);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(11, 92, 255, 0.24);
+}
+.z-tab:disabled { opacity: 0.5; cursor: not-allowed; }
