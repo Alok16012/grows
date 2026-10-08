@@ -56,7 +56,7 @@ const ROLE_OPTIONS = [
     "Other",
 ]
 
-const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
 function getAvatarColor(firstName: string, lastName: string) {
     const idx = (firstName.charCodeAt(0) + (lastName.charCodeAt(0) || 0)) % AVATAR_COLORS.length
@@ -1629,7 +1629,7 @@ function EmployeesPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <StatCard
                     label="Total Employees" value={counts?.total ?? total}
-                    icon={<Users size={18} />} color="#0d6b4a" bg="#e8f7f1" sparkColor="#1a9e6e" seed={0}
+                    icon={<Users size={18} />} color="#0847c7" bg="#e8effe" sparkColor="#0b5cff" seed={0}
                     trend={counts && counts.newThisMonth.total > 0 ? { dir: "up", text: `${counts.newThisMonth.total} this month` } : { dir: "flat", text: "No change" }}
                 />
                 <StatCard
@@ -2081,7 +2081,7 @@ function EmployeesPage() {
                         )}
 
                         {importResult && (
-                            <div style={{ padding: "14px 16px", borderRadius: "10px", background: importResult.imported > 0 ? "#e8f7f1" : "#fef2f2", border: `1px solid ${importResult.imported > 0 ? "#6ee7b7" : "#fecaca"}` }}>
+                            <div style={{ padding: "14px 16px", borderRadius: "10px", background: importResult.imported > 0 ? "#dcfce7" : "#fef2f2", border: `1px solid ${importResult.imported > 0 ? "#bbf7d0" : "#fecaca"}` }}>
                                 <p style={{ fontSize: "14px", fontWeight: 600, color: importResult.imported > 0 ? "#047857" : "#dc2626", marginBottom: "4px" }}>
                                     ✓ {importResult.imported} imported, {importResult.skipped} skipped (duplicates / errors)
                                 </p>

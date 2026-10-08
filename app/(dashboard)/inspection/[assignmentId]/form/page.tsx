@@ -491,7 +491,7 @@ export default function InspectionFormPage() {
             const isChecked = value === "true"
             return (
                 <div key={template.id} id={`field-${template.id}`}
-                    className={`bg-white border ${error ? "border-[#dc2626]" : isChecked ? "border-[#1a9e6e]" : "border-[#e8e6e1]"} rounded-[10px] mb-[8px] transition-all duration-150 ${isChecked ? "bg-[#f0fdf4]" : ""}`}>
+                    className={`bg-white border ${error ? "border-[#dc2626]" : isChecked ? "border-[var(--accent)]" : "border-[var(--border)]"} rounded-[10px] mb-[8px] transition-all duration-150 ${isChecked ? "bg-[#f0fdf4]" : ""}`}>
                     <button
                         type="button"
                         disabled={readOnly}
@@ -500,7 +500,7 @@ export default function InspectionFormPage() {
                     >
                         <div className="flex items-center gap-3 text-left">
                             {/* Big tick circle */}
-                            <div className={`w-[28px] h-[28px] rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all duration-200 ${isChecked ? "bg-[#1a9e6e] border-[#1a9e6e]" : "bg-white border-[#d4d1ca]"}`}>
+                            <div className={`w-[28px] h-[28px] rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all duration-200 ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "bg-white border-[var(--border2)]"}`}>
                                 {isChecked && (
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="20 6 9 17 4 12" />
@@ -508,12 +508,12 @@ export default function InspectionFormPage() {
                                 )}
                             </div>
                             <div>
-                                <p className={`text-[13px] font-[600] transition-colors ${isChecked ? "text-[#0d6b4a]" : "text-[#1a1a18]"}`}>
+                                <p className={`text-[13px] font-[600] transition-colors ${isChecked ? "text-[var(--accent-text)]" : "text-[var(--text)]"}`}>
                                     {template.fieldLabel}
                                     {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
                                 </p>
                                 {template.options && (
-                                    <p className="text-[11px] text-[#9e9b95] mt-[1px]">{template.options}</p>
+                                    <p className="text-[11px] text-[var(--text3)] mt-[1px]">{template.options}</p>
                                 )}
                             </div>
                         </div>
@@ -534,9 +534,9 @@ export default function InspectionFormPage() {
             const ngLabel  = template.fieldType === "pass_fail" ? "FAIL" : "NG"
             return (
                 <div key={template.id} id={`field-${template.id}`}
-                    className={`bg-white border ${error ? "border-[#dc2626]" : isOK ? "border-[#1a9e6e]" : isNG ? "border-[#dc2626]" : "border-[#e8e6e1]"} rounded-[10px] mb-[8px] p-[12px_14px] transition-all duration-150`}>
+                    className={`bg-white border ${error ? "border-[#dc2626]" : isOK ? "border-[var(--success-strong)]" : isNG ? "border-[#dc2626]" : "border-[var(--border)]"} rounded-[10px] mb-[8px] p-[12px_14px] transition-all duration-150`}>
                     <div className="flex items-center justify-between mb-[10px]">
-                        <div className="text-[11px] font-[600] text-[#6b6860] uppercase tracking-[0.4px]">
+                        <div className="text-[11px] font-[600] text-[var(--text2)] uppercase tracking-[0.4px]">
                             {template.fieldLabel}
                             {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
                         </div>
@@ -545,13 +545,13 @@ export default function InspectionFormPage() {
                     <div className="grid grid-cols-2 gap-[8px]">
                         <button type="button" disabled={readOnly}
                             onClick={() => handleFieldChange(template.id, okLabel)}
-                            className={`py-[12px] rounded-[10px] text-[14px] font-[700] border-2 transition-all duration-200 disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2 ${isOK ? "bg-[#1a9e6e] border-[#1a9e6e] text-white shadow-sm" : "bg-white border-[#e8e6e1] text-[#6b6860] hover:border-[#1a9e6e] hover:text-[#1a9e6e]"}`}>
+                            className={`py-[12px] rounded-[10px] text-[14px] font-[700] border-2 transition-all duration-200 disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2 ${isOK ? "bg-[var(--success-strong)] border-[var(--success-strong)] text-white shadow-sm" : "bg-white border-[var(--border)] text-[var(--text2)] hover:border-[var(--success-strong)] hover:text-[var(--success-strong)]"}`}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             {okLabel}
                         </button>
                         <button type="button" disabled={readOnly}
                             onClick={() => handleFieldChange(template.id, ngLabel)}
-                            className={`py-[12px] rounded-[10px] text-[14px] font-[700] border-2 transition-all duration-200 disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2 ${isNG ? "bg-[#dc2626] border-[#dc2626] text-white shadow-sm" : "bg-white border-[#e8e6e1] text-[#6b6860] hover:border-[#dc2626] hover:text-[#dc2626]"}`}>
+                            className={`py-[12px] rounded-[10px] text-[14px] font-[700] border-2 transition-all duration-200 disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2 ${isNG ? "bg-[#dc2626] border-[#dc2626] text-white shadow-sm" : "bg-white border-[var(--border)] text-[var(--text2)] hover:border-[#dc2626] hover:text-[#dc2626]"}`}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             {ngLabel}
                         </button>
@@ -566,9 +566,9 @@ export default function InspectionFormPage() {
             const rating = parseInt(value) || 0
             return (
                 <div key={template.id} id={`field-${template.id}`}
-                    className={`bg-white border ${error ? "border-[#dc2626]" : "border-[#e8e6e1]"} rounded-[10px] mb-[8px] p-[12px_14px] transition-all duration-150`}>
+                    className={`bg-white border ${error ? "border-[#dc2626]" : "border-[var(--border)]"} rounded-[10px] mb-[8px] p-[12px_14px] transition-all duration-150`}>
                     <div className="flex items-center justify-between mb-[10px]">
-                        <div className="text-[11px] font-[600] text-[#6b6860] uppercase tracking-[0.4px]">
+                        <div className="text-[11px] font-[600] text-[var(--text2)] uppercase tracking-[0.4px]">
                             {template.fieldLabel}
                             {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
                         </div>
@@ -595,14 +595,14 @@ export default function InspectionFormPage() {
         if (template.fieldType === "date") pillClass = "bg-[#eff6ff] text-[#3b82f6]"
         else if (template.fieldType === "dropdown") pillClass = "bg-[#f5f3ff] text-[#7c3aed]"
         else if (template.fieldType === "number") pillClass = "bg-[#fef3c7] text-[#d97706]"
-        else pillClass = "bg-[#f9f8f5] text-[#9e9b95] border border-[#e8e6e1]"
+        else pillClass = "bg-[var(--surface2)] text-[var(--text3)] border border-[var(--border)]"
 
         const dropdownBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239e9b95' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 18 15 12 9 6'/%3E%3C/svg%3E")`
 
         return (
-            <div key={template.id} id={`field-${template.id}`} className={`bg-white border ${error ? 'border-[#dc2626]' : 'border-[#e8e6e1]'} rounded-[10px] mb-[8px] focus-within:border-[#1a9e6e] focus-within:shadow-[0_0_0_3px_rgba(26,158,110,0.06)] transition-all duration-150`}>
+            <div key={template.id} id={`field-${template.id}`} className={`bg-white border ${error ? 'border-[#dc2626]' : 'border-[var(--border)]'} rounded-[10px] mb-[8px] focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_rgba(26,158,110,0.06)] transition-all duration-150`}>
                 <div className="flex justify-between items-center p-[10px_14px_0]">
-                    <div className="text-[11px] font-[600] text-[#6b6860] uppercase tracking-[0.4px]">
+                    <div className="text-[11px] font-[600] text-[var(--text2)] uppercase tracking-[0.4px]">
                         {template.fieldLabel}
                         {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
                     </div>
@@ -616,10 +616,10 @@ export default function InspectionFormPage() {
                             value={value}
                             onChange={(e) => handleFieldChange(template.id, e.target.value)}
                             disabled={readOnly}
-                            className="w-full bg-transparent border-none outline-none text-[14px] font-[500] text-[#1a1a18] appearance-none"
+                            className="w-full bg-transparent border-none outline-none text-[14px] font-[500] text-[var(--text)] appearance-none"
                             style={{ backgroundImage: dropdownBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
                         >
-                            <option value="" disabled className="text-[#9e9b95]">Select option...</option>
+                            <option value="" disabled className="text-[var(--text3)]">Select option...</option>
                             {template.options?.split(",").map((opt: string) => (
                                 <option key={opt.trim()} value={opt.trim()}>{opt.trim()}</option>
                             ))}
@@ -631,7 +631,7 @@ export default function InspectionFormPage() {
                             disabled={readOnly}
                             rows={3}
                             placeholder={`Enter ${template.fieldLabel.toLowerCase()}...`}
-                            className="w-full bg-transparent border-none outline-none text-[14px] font-[500] text-[#1a1a18] placeholder:text-[#9e9b95] resize-y"
+                            className="w-full bg-transparent border-none outline-none text-[14px] font-[500] text-[var(--text)] placeholder:text-[var(--text3)] resize-y"
                         />
                     ) : (
                         <input
@@ -640,7 +640,7 @@ export default function InspectionFormPage() {
                             onChange={(e) => handleFieldChange(template.id, e.target.value)}
                             disabled={readOnly}
                             placeholder={template.fieldType === 'number' ? '0' : `Enter ${template.fieldLabel.toLowerCase()}...`}
-                            className="w-full bg-transparent border-none outline-none text-[14px] font-[500] text-[#1a1a18] placeholder:text-[#9e9b95]"
+                            className="w-full bg-transparent border-none outline-none text-[14px] font-[500] text-[var(--text)] placeholder:text-[var(--text3)]"
                             style={{ fontFamily: template.fieldType === "date" ? "Inter" : "inherit" }}
                         />
                     )}
@@ -652,8 +652,8 @@ export default function InspectionFormPage() {
 
     if (loading || authStatus === "loading") {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[100vh] bg-[#f5f4f0] space-y-4">
-                <Loader2 className="h-10 w-10 animate-spin text-[#9e9b95]" />
+            <div className="flex flex-col items-center justify-center min-h-[100vh] bg-[var(--bg)] space-y-4">
+                <Loader2 className="h-10 w-10 animate-spin text-[var(--text3)]" />
             </div>
         )
     }
@@ -663,12 +663,12 @@ export default function InspectionFormPage() {
     const isSubmitted = inspection?.status !== "draft" && inspection?.status !== "rejected"
 
     const getAutoColor = (label: string, value: number) => {
-        if (label === "ACCEPTED QTY") return "text-[#1a9e6e]"
-        if (label === "TOTAL DEFECTS") return "text-[#1a1a18]"
+        if (label === "ACCEPTED QTY") return "text-[var(--success-strong)]"
+        if (label === "TOTAL DEFECTS") return "text-[var(--text)]"
         if (label === "REJECTED QTY" || label === "REJECTED %" || label === "REJECTION PPM") return "text-[#dc2626]"
         if (label === "REWORK %" || label === "REWORK PPM") return "text-[#d97706]"
-        if (label === "DIFFERENCE") return value === 0 ? "text-[#1a9e6e]" : "text-[#dc2626]"
-        return "text-[#1a1a18]"
+        if (label === "DIFFERENCE") return value === 0 ? "text-[var(--accent)]" : "text-[#dc2626]"
+        return "text-[var(--text)]"
     }
 
     const renderAutoSection = () => {
@@ -677,7 +677,7 @@ export default function InspectionFormPage() {
 
         return (
             <>
-                <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px] mt-[24px]">
+                <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px] mt-[24px]">
                     Calculated (Auto)
                 </div>
                 <div className="grid grid-cols-2 gap-[8px]">
@@ -693,19 +693,19 @@ export default function InspectionFormPage() {
                         else if (t.fieldLabel.toUpperCase() === "DIFFERENCE") formulaDesc = "Should be 0"
 
                         return (
-                            <div key={t.id} className="bg-[#f9f8f5] border-[1.5px] border-dashed border-[#d4d1ca] rounded-[9px] p-[11px_13px]">
-                                <div className="text-[10px] font-[500] text-[#9e9b95] uppercase">{t.fieldLabel}</div>
+                            <div key={t.id} className="bg-[var(--surface2)] border-[1.5px] border-dashed border-[var(--border2)] rounded-[9px] p-[11px_13px]">
+                                <div className="text-[10px] font-[500] text-[var(--text3)] uppercase">{t.fieldLabel}</div>
                                 <div className={`text-[20px] font-[700] font-mono tracking-[-0.5px] ${getAutoColor(t.fieldLabel.toUpperCase(), valNum)}`}>
                                     {responses[t.id] || "0"}
                                 </div>
-                                {formulaDesc && <div className="text-[10px] text-[#9e9b95] mt-[2px]">{formulaDesc}</div>}
+                                {formulaDesc && <div className="text-[10px] text-[var(--text3)] mt-[2px]">{formulaDesc}</div>}
                             </div>
                         )
                     })}
                     {inspectorField && (
                         <div className="col-span-2 bg-[#f0fdf4] border border-[rgba(26,158,110,0.2)] rounded-[9px] p-[11px_13px] flex items-center gap-[10px]">
-                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-[#1a9e6e]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                            <span className="text-[13px] font-[600] text-[#0d6b4a]">{responses[inspectorField.id] || session?.user?.name || "Pending Inspector"}</span>
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            <span className="text-[13px] font-[600] text-[var(--accent-text)]">{responses[inspectorField.id] || session?.user?.name || "Pending Inspector"}</span>
                         </div>
                     )}
                 </div>
@@ -714,20 +714,20 @@ export default function InspectionFormPage() {
     }
 
     return (
-        <div className="flex flex-col min-h-[100vh] bg-[#f5f4f0] p-0">
+        <div className="flex flex-col min-h-[100vh] bg-[var(--bg)] p-0">
 
             {/* INNER HEADER */}
-            <div className="bg-white border-b border-[#e8e6e1] p-[12px_16px] sm:p-[12px_24px] flex justify-between items-center gap-2 sticky top-0 z-40">
+            <div className="bg-white border-b border-[var(--border)] p-[12px_16px] sm:p-[12px_24px] flex justify-between items-center gap-2 sticky top-0 z-40">
                 <div className="flex items-center min-w-0">
                     <button
                         onClick={() => router.push(isAdmin ? "/approvals" : "/inspection")}
-                        className="w-[38px] h-[38px] sm:w-[30px] sm:h-[30px] shrink-0 border border-[#e8e6e1] bg-white rounded-[8px] flex items-center justify-center text-[#6b6860] hover:bg-[#f9f8f5] transition-colors"
+                        className="w-[38px] h-[38px] sm:w-[30px] sm:h-[30px] shrink-0 border border-[var(--border)] bg-white rounded-[8px] flex items-center justify-center text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors"
                     >
                         <ChevronLeft size={16} />
                     </button>
-                    <span className="text-[14px] font-[600] text-[#1a1a18] ml-[10px] truncate">{assignment?.project?.name}</span>
-                    <span className="text-[#9e9b95] mx-[8px] shrink-0">•</span>
-                    <span className="text-[13px] text-[#6b6860] truncate">{assignment?.project?.site?.name}</span>
+                    <span className="text-[14px] font-[600] text-[var(--text)] ml-[10px] truncate">{assignment?.project?.name}</span>
+                    <span className="text-[var(--text3)] mx-[8px] shrink-0">•</span>
+                    <span className="text-[13px] text-[var(--text2)] truncate">{assignment?.project?.site?.name}</span>
                 </div>
 
                 {!isSubmitted && (
@@ -743,7 +743,7 @@ export default function InspectionFormPage() {
                             {gpsStatus === "ok" ? "GPS" : gpsStatus === "loading" ? "Locating..." : "No GPS"}
                         </div>
                         {/* Timer */}
-                        <div className="hidden sm:flex items-center gap-1 text-[11px] bg-[#f9f8f5] border border-[#e8e6e1] px-2 py-1 rounded-full text-[#6b6860]">
+                        <div className="hidden sm:flex items-center gap-1 text-[11px] bg-[var(--surface2)] border border-[var(--border)] px-2 py-1 rounded-full text-[var(--text2)]">
                             <Timer className="h-3 w-3" />
                             {Math.floor(elapsed / 3600) > 0 && `${Math.floor(elapsed / 3600)}h `}
                             {Math.floor((elapsed % 3600) / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}
@@ -754,7 +754,7 @@ export default function InspectionFormPage() {
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3b82f6] opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3b82f6]"></span>
                                 </span>
-                                <span className="text-[12.5px] text-[#6b6860] hidden sm:inline">Saving...</span>
+                                <span className="text-[12.5px] text-[var(--text2)] hidden sm:inline">Saving...</span>
                             </>
                         ) : isDirty ? (
                             <>
@@ -763,8 +763,8 @@ export default function InspectionFormPage() {
                             </>
                         ) : (
                             <>
-                                <div className="h-[8px] w-[8px] rounded-full bg-[#1a9e6e]"></div>
-                                <span className="text-[12.5px] text-[#6b6860] hidden sm:inline">
+                                <div className="h-[8px] w-[8px] rounded-full bg-[var(--accent)]"></div>
+                                <span className="text-[12.5px] text-[var(--text2)] hidden sm:inline">
                                     {lastSaved && !isNaN(lastSaved.getTime()) ? `Saved ${lastSaved.toLocaleTimeString([], { hour12: false })}` : 'Saved'}
                                 </span>
                             </>
@@ -827,8 +827,8 @@ export default function InspectionFormPage() {
                 )}
                 {isSubmitted && !isAdmin && inspection?.status !== "rejected" && (
                     <div className="bg-[#f0fdf4] border border-[rgba(26,158,110,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
-                        <CheckCircle2 className="h-[20px] w-[20px] text-[#1a9e6e] shrink-0" />
-                        <span className="text-[13px] font-[500] text-[#0d6b4a] flex-1">
+                        <CheckCircle2 className="h-[20px] w-[20px] text-[var(--success-strong)] shrink-0" />
+                        <span className="text-[13px] font-[500] text-[var(--success)] flex-1">
                             This form has been submitted and is {inspection?.status === "approved" ? "approved" : "pending approval"}.
                         </span>
                     </div>
@@ -843,12 +843,12 @@ export default function InspectionFormPage() {
                 )}
 
                 {/* ── STEPPER RAIL (payroll-style) ── */}
-                <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-[14px_16px] mb-[20px]">
+                <div className="bg-white border border-[var(--border)] rounded-[12px] p-[14px_16px] mb-[20px]">
                     <div className="flex items-center justify-between mb-[10px]">
-                        <span className="text-[12px] font-[600] text-[#1a1a18]">
+                        <span className="text-[12px] font-[600] text-[var(--text)]">
                             Step {stepIndex + 1} of {totalSteps} — {currentStepDef?.label}
                         </span>
-                        <span className="text-[11px] font-[500] text-[#9e9b95]">
+                        <span className="text-[11px] font-[500] text-[var(--text3)]">
                             {Math.round((stepIndex / (totalSteps - 1 || 1)) * 100)}%
                         </span>
                     </div>
@@ -865,21 +865,21 @@ export default function InspectionFormPage() {
                                     >
                                         <span className={cn(
                                             "flex items-center justify-center w-[26px] h-[26px] rounded-full text-[12px] font-[700] border-[1.5px] transition-colors",
-                                            isActive ? "bg-[#1a9e6e] border-[#1a9e6e] text-white" :
-                                            isDone ? "bg-[#e8f7f1] border-[#1a9e6e] text-[#0d6b4a]" :
-                                            "bg-white border-[#e8e6e1] text-[#9e9b95]"
+                                            isActive ? "bg-[var(--accent)] border-[var(--accent)] text-white" :
+                                            isDone ? "bg-[var(--success-light)] border-[var(--success-strong)] text-[var(--success)]" :
+                                            "bg-white border-[var(--border)] text-[var(--text3)]"
                                         )}>
                                             {isDone ? <CheckCircle2 className="h-[15px] w-[15px]" /> : i + 1}
                                         </span>
                                         <span className={cn(
                                             "text-[10.5px] font-[500] whitespace-nowrap",
-                                            isActive ? "text-[#1a1a18]" : "text-[#9e9b95]"
+                                            isActive ? "text-[var(--text)]" : "text-[var(--text3)]"
                                         )}>{s.label}</span>
                                     </button>
                                     {i < steps.length - 1 && (
                                         <span className={cn(
                                             "h-[2px] flex-1 mx-[6px] mb-[18px] rounded-full transition-colors",
-                                            i < stepIndex ? "bg-[#1a9e6e]" : "bg-[#e8e6e1]"
+                                            i < stepIndex ? "bg-[var(--accent)]" : "bg-[var(--border)]"
                                         )} />
                                     )}
                                 </div>
@@ -889,7 +889,7 @@ export default function InspectionFormPage() {
                 </div>
 
                 {currentStepDef?.key === "basic" && (<>
-                <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px]">
+                <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px]">
                     Basic Info
                 </div>
                 {fixedFields.map(t => renderBasicField(t))}
@@ -897,13 +897,13 @@ export default function InspectionFormPage() {
 
                 {currentStepDef?.key === "defect" && defectFields.length > 0 && (
                     <>
-                        <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px] mt-[24px]">
+                        <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px] mt-[24px]">
                             Defect Entry
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-[8px]">
                             {defectFields.map(t => (
-                                <div key={t.id} id={`field-${t.id}`} className="bg-white border border-[#e8e6e1] rounded-[9px] p-[9px_10px] focus-within:border-[#d97706] focus-within:shadow-[0_0_0_3px_rgba(217,119,6,0.06)] transition-all">
-                                    <div className="text-[10px] font-[500] text-[#9e9b95] uppercase leading-[1.3] mb-[5px] truncate" title={t.fieldLabel}>
+                                <div key={t.id} id={`field-${t.id}`} className="bg-white border border-[var(--border)] rounded-[9px] p-[9px_10px] focus-within:border-[#d97706] focus-within:shadow-[0_0_0_3px_rgba(217,119,6,0.06)] transition-all">
+                                    <div className="text-[10px] font-[500] text-[var(--text3)] uppercase leading-[1.3] mb-[5px] truncate" title={t.fieldLabel}>
                                         {t.fieldLabel}
                                     </div>
                                     <input
@@ -913,7 +913,7 @@ export default function InspectionFormPage() {
                                         onChange={(e) => handleFieldChange(t.id, e.target.value)}
                                         disabled={!canEdit}
                                         placeholder="0"
-                                        className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[6px] p-[7px] text-[15px] font-[700] font-mono text-center outline-none focus:border-[#d97706] focus:bg-white transition-colors"
+                                        className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] p-[7px] text-[15px] font-[700] font-mono text-center outline-none focus:border-[#d97706] focus:bg-white transition-colors"
                                     />
                                     {errors[t.id] && <div className="text-[10px] text-[#dc2626] text-center mt-1">Required</div>}
                                 </div>
@@ -925,17 +925,17 @@ export default function InspectionFormPage() {
                 {currentStepDef?.key === "review" && autoFields.length > 0 && renderAutoSection()}
 
                 {currentStepDef?.key === "attach" && (<>
-                <div className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[1px] border-b-[1.5px] border-[#e8e6e1] pb-[8px] mb-[14px] mt-[24px]">
+                <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px] mt-[24px]">
                     Attachments & Paper Form
                 </div>
-                <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-[16px]">
+                <div className="bg-white border border-[var(--border)] rounded-[10px] p-[16px]">
                     {responses["paperFormPhoto"] ? (
                         <div className="flex flex-col sm:flex-row items-center gap-[14px]">
-                            <div className="relative h-[120px] w-full sm:w-[120px] rounded-[8px] border border-[#e8e6e1] overflow-hidden bg-[#f9f8f5]">
+                            <div className="relative h-[120px] w-full sm:w-[120px] rounded-[8px] border border-[var(--border)] overflow-hidden bg-[var(--surface2)]">
                                 <img src={responses["paperFormPhoto"]} alt="Paper form" className="h-[120px] w-full sm:w-[120px] object-cover" />
                             </div>
                             <div className="flex-1 text-center sm:text-left">
-                                <p className="text-[13px] font-[600] text-[#1a1a18] mb-[4px]">Paper form uploaded</p>
+                                <p className="text-[13px] font-[600] text-[var(--text)] mb-[4px]">Paper form uploaded</p>
                                 <div className="flex gap-[8px] justify-center sm:justify-start mt-[10px]">
                                     <button 
                                         type="button"
@@ -943,12 +943,12 @@ export default function InspectionFormPage() {
                                             setPreviewUrl(responses["paperFormPhoto"])
                                             setPreviewName("Paper Form Photo")
                                         }}
-                                        className="inline-flex items-center justify-center bg-[#f9f8f5] border border-[#e8e6e1] text-[#6b6860] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white"
+                                        className="inline-flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white"
                                     >
                                         <ExternalLink size={12} className="mr-[6px]" /> View Image
                                     </button>
                                     {canEdit && (
-                                        <button type="button" onClick={() => handleFieldChange("paperFormPhoto", "")} className="inline-flex items-center justify-center bg-[#fef2f2] border border-[#e8e6e1] text-[#dc2626] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white border-transparent">
+                                        <button type="button" onClick={() => handleFieldChange("paperFormPhoto", "")} className="inline-flex items-center justify-center bg-[#fef2f2] border border-[var(--border)] text-[#dc2626] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white border-transparent">
                                             Remove
                                         </button>
                                     )}
@@ -957,10 +957,10 @@ export default function InspectionFormPage() {
                         </div>
                     ) : canEdit ? (
                         <div className="space-y-[12px]">
-                            <label className="flex flex-col items-center justify-center w-full h-[100px] border-[1.5px] border-dashed border-[#d4d1ca] rounded-[8px] cursor-pointer bg-[#f9f8f5] hover:bg-[#f5f4f0] transition-colors">
+                            <label className="flex flex-col items-center justify-center w-full h-[100px] border-[1.5px] border-dashed border-[var(--border2)] rounded-[8px] cursor-pointer bg-[var(--surface2)] hover:bg-[var(--bg)] transition-colors">
                                 <div className="flex flex-col items-center justify-center">
-                                    <Upload className="w-[20px] h-[20px] mb-[8px] text-[#9e9b95]" />
-                                    <p className="text-[12px] font-[500] text-[#6b6860]">Click or drag to upload photo</p>
+                                    <Upload className="w-[20px] h-[20px] mb-[8px] text-[var(--text3)]" />
+                                    <p className="text-[12px] font-[500] text-[var(--text2)]">Click or drag to upload photo</p>
                                 </div>
                                 <input
                                     type="file"
@@ -974,7 +974,7 @@ export default function InspectionFormPage() {
                             </label>
                             <button
                                 type="button"
-                                className="w-full inline-flex items-center justify-center bg-[#f9f8f5] border border-[#e8e6e1] text-[#6b6860] rounded-[8px] text-[12px] font-medium px-[16px] py-[10px] hover:bg-white"
+                                className="w-full inline-flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] rounded-[8px] text-[12px] font-medium px-[16px] py-[10px] hover:bg-white"
                                 onClick={() => setCameraFieldId("paperFormPhoto")}
                             >
                                 <Camera className="h-[14px] w-[14px] mr-[8px]" />
@@ -982,7 +982,7 @@ export default function InspectionFormPage() {
                             </button>
                         </div>
                     ) : (
-                        <div className="h-[80px] flex items-center justify-center text-[12px] text-[#9e9b95] italic bg-[#f9f8f5] rounded-[8px] border border-dashed border-[#e8e6e1]">
+                        <div className="h-[80px] flex items-center justify-center text-[12px] text-[var(--text3)] italic bg-[var(--surface2)] rounded-[8px] border border-dashed border-[var(--border)]">
                             No paper form attached
                         </div>
                     )}
@@ -992,14 +992,14 @@ export default function InspectionFormPage() {
             </div>
 
             {/* STICKY BOTTOM BAR — wizard navigation + actions */}
-            <div className="fixed bottom-0 md:left-[220px] left-0 right-0 bg-white border-t border-[#e8e6e1] p-[12px_16px] sm:p-[12px_24px] flex justify-between items-center gap-2 z-50">
+            <div className="fixed bottom-0 md:left-[220px] left-0 right-0 bg-white border-t border-[var(--border)] p-[12px_16px] sm:p-[12px_24px] flex justify-between items-center gap-2 z-50">
                 {/* Left: Back + save status */}
                 <div className="flex items-center gap-[10px] flex-shrink-0">
                     <button
                         type="button"
                         onClick={handlePrevStep}
                         disabled={stepIndex === 0}
-                        className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[#f9f8f5] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-[6px]"
+                        className="bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-[6px]"
                     >
                         <ChevronLeft size={15} /> <span className="hidden sm:inline">Back</span>
                     </button>
@@ -1011,7 +1011,7 @@ export default function InspectionFormPage() {
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3b82f6] opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3b82f6]"></span>
                                     </span>
-                                    <span className="text-[12.5px] text-[#6b6860]">Saving...</span>
+                                    <span className="text-[12.5px] text-[var(--text2)]">Saving...</span>
                                 </>
                             ) : isDirty ? (
                                 <>
@@ -1020,8 +1020,8 @@ export default function InspectionFormPage() {
                                 </>
                             ) : (
                                 <>
-                                    <div className="h-[8px] w-[8px] rounded-full bg-[#1a9e6e]"></div>
-                                    <span className="text-[12.5px] text-[#6b6860]">
+                                    <div className="h-[8px] w-[8px] rounded-full bg-[var(--accent)]"></div>
+                                    <span className="text-[12.5px] text-[var(--text2)]">
                                         {lastSaved && !isNaN(lastSaved.getTime()) ? `Saved ${lastSaved.toLocaleTimeString([], { hour12: false })}` : 'Saved'}
                                     </span>
                                 </>
@@ -1036,7 +1036,7 @@ export default function InspectionFormPage() {
                         <button
                             type="button"
                             onClick={handleNextStep}
-                            className="bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#158a5e] flex items-center gap-[6px] transition-colors shadow-sm"
+                            className="bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[var(--accent-hover)] flex items-center gap-[6px] transition-colors shadow-sm"
                         >
                             Next <ChevronLeft size={15} className="rotate-180" />
                         </button>
@@ -1055,7 +1055,7 @@ export default function InspectionFormPage() {
                                 type="button"
                                 onClick={() => saveForm("draft")}
                                 disabled={saving || !isDirty}
-                                className="bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[#f9f8f5] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                className="bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-[500] px-[16px] py-[9px] hover:bg-[var(--surface2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                             >
                                 <span className="hidden sm:inline">Force Save</span>
                                 <span className="sm:hidden inline">Save</span>
@@ -1064,7 +1064,7 @@ export default function InspectionFormPage() {
                                 type="button"
                                 onClick={handleSubmit}
                                 disabled={saving}
-                                className="bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#158a5e] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
+                                className="bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
                             >
                                 <span className="hidden sm:inline">Complete Inspection & Submit</span>
                                 <span className="sm:hidden inline">Complete</span>
@@ -1094,44 +1094,44 @@ export default function InspectionFormPage() {
             {/* Project chooser — inspector has multiple pending inspections */}
             {showChooser && !isAdmin && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-[16px] border border-[#e8e6e1] w-full max-w-md shadow-xl overflow-hidden">
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e8e6e1]">
+                    <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-md shadow-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
                             <div>
-                                <h2 className="text-[15px] font-semibold text-[#1a1a18] flex items-center gap-2">
-                                    <ClipboardList size={15} className="text-[#1a9e6e]" /> Which inspection do you want to fill?
+                                <h2 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2">
+                                    <ClipboardList size={15} className="text-[var(--accent)]" /> Which inspection do you want to fill?
                                 </h2>
-                                <p className="text-[12px] text-[#9e9b95] mt-0.5">You have {otherPending.length + 1} pending inspections.</p>
+                                <p className="text-[12px] text-[var(--text3)] mt-0.5">You have {otherPending.length + 1} pending inspections.</p>
                             </div>
-                            <button onClick={dismissChooser} className="p-2 sm:p-1 shrink-0 text-[#9e9b95] hover:text-[#1a1a18] rounded-md hover:bg-[#f9f8f5] transition-colors">
+                            <button onClick={dismissChooser} className="p-2 sm:p-1 shrink-0 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)] transition-colors">
                                 <X size={17} />
                             </button>
                         </div>
                         <div className="p-4 space-y-2 max-h-[55vh] overflow-y-auto">
                             {/* Current form — continue */}
                             <button onClick={dismissChooser}
-                                className="w-full flex items-center gap-3 p-3 rounded-[12px] border-[1.5px] border-[#1a9e6e] bg-[#f0fdf4] text-left hover:bg-[#e8f7f1] transition-colors">
-                                <span className="w-9 h-9 rounded-[9px] bg-[#1a9e6e] flex items-center justify-center shrink-0">
+                                className="w-full flex items-center gap-3 p-3 rounded-[12px] border-[1.5px] border-[var(--accent)] bg-[#f0fdf4] text-left hover:bg-[var(--accent-light)] transition-colors">
+                                <span className="w-9 h-9 rounded-[9px] bg-[var(--accent)] flex items-center justify-center shrink-0">
                                     <CheckCircle2 size={16} className="text-white" />
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                    <span className="block text-[13px] font-semibold text-[#1a1a18] truncate">{assignment?.project?.name}</span>
-                                    <span className="block text-[11.5px] text-[#6b6860] truncate">
+                                    <span className="block text-[13px] font-semibold text-[var(--text)] truncate">{assignment?.project?.name}</span>
+                                    <span className="block text-[11.5px] text-[var(--text2)] truncate">
                                         {assignment?.project?.site?.name} · This form
                                     </span>
                                 </span>
-                                <span className="text-[11.5px] font-semibold text-[#1a9e6e] shrink-0">Continue →</span>
+                                <span className="text-[11.5px] font-semibold text-[var(--accent)] shrink-0">Continue →</span>
                             </button>
 
                             {/* Other pending forms */}
                             {otherPending.map((a: any) => (
                                 <button key={a.id} onClick={() => switchToAssignment(a.id)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-[12px] border border-[#e8e6e1] bg-white text-left hover:border-[#1a9e6e]/50 hover:bg-[#f9f8f5] transition-colors">
+                                    className="w-full flex items-center gap-3 p-3 rounded-[12px] border border-[var(--border)] bg-white text-left hover:border-[#0b5cff]/50 hover:bg-[var(--surface2)] transition-colors">
                                     <span className="w-9 h-9 rounded-[9px] bg-[#fef3c7] flex items-center justify-center shrink-0">
                                         <ClipboardList size={15} className="text-[#d97706]" />
                                     </span>
                                     <span className="min-w-0 flex-1">
-                                        <span className="block text-[13px] font-semibold text-[#1a1a18] truncate">{a.project?.name}</span>
-                                        <span className="block text-[11.5px] text-[#6b6860] truncate">
+                                        <span className="block text-[13px] font-semibold text-[var(--text)] truncate">{a.project?.name}</span>
+                                        <span className="block text-[11.5px] text-[var(--text2)] truncate">
                                             {a.project?.site?.name}
                                             {a.inspection?.status === "draft" ? " · Draft saved" : " · Not started"}
                                         </span>
@@ -1140,8 +1140,8 @@ export default function InspectionFormPage() {
                                 </button>
                             ))}
                         </div>
-                        <div className="px-5 py-3.5 border-t border-[#e8e6e1] bg-[#f9f8f5]/60">
-                            <p className="text-[11.5px] text-[#9e9b95]">Baaki pending forms upar banner me bhi dikhte rahenge.</p>
+                        <div className="px-5 py-3.5 border-t border-[var(--border)] bg-[#f5f7fd]/60">
+                            <p className="text-[11.5px] text-[var(--text3)]">Baaki pending forms upar banner me bhi dikhte rahenge.</p>
                         </div>
                     </div>
                 </div>

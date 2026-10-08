@@ -98,7 +98,7 @@ export default function InspectionDashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#f5f4f0] p-4 md:p-6 lg:p-7">
+            <div className="min-h-screen bg-[var(--bg)] p-4 md:p-6 lg:p-7">
                 <div className="space-y-5 animate-pulse">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {[1, 2, 3, 4].map((i) => (
@@ -136,7 +136,7 @@ export default function InspectionDashboard() {
     const rejectedCount = recentSubmissions.filter(s => s.status === "rejected").length
 
     return (
-        <div className="min-h-screen bg-[#f5f4f0] p-4 md:p-6 lg:p-7">
+        <div className="min-h-screen bg-[var(--bg)] p-4 md:p-6 lg:p-7">
             {/* Mobile Welcome Banner */}
             <div className="md:hidden bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] rounded-[16px] p-4 text-white shadow-sm mb-4">
                 <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>
@@ -164,13 +164,13 @@ export default function InspectionDashboard() {
 
             {/* Desktop Header */}
             <div className="hidden md:block mb-5">
-                <h1 className="text-[22px] font-semibold text-[#1a1a18] tracking-[-0.4px]">Inspector Workspace</h1>
-                <p className="text-[13px] text-[#6b6860] mt-[3px]">Track assignments and submit inspection reports</p>
+                <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-[-0.4px]">Inspector Workspace</h1>
+                <p className="text-[13px] text-[var(--text2)] mt-[3px]">Track assignments and submit inspection reports</p>
             </div>
 
             {/* SECTION 1: STATUS CARDS — hidden on mobile (shown in welcome banner) */}
             <div className="hidden md:grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+                <div className="bg-white border border-[var(--border)] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
                     <div className="w-[38px] h-[38px] rounded-full bg-[#eff6ff] flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <rect x="3" y="3" width="7" height="7" />
@@ -180,11 +180,11 @@ export default function InspectionDashboard() {
                         </svg>
                     </div>
                     <div>
-                        <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-1">Active</p>
-                        <p className="text-[26px] font-bold text-[#1a1a18] tracking-[-0.5px] tabular-nums">{activeCount}</p>
+                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] mb-1">Active</p>
+                        <p className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px] tabular-nums">{activeCount}</p>
                     </div>
                 </div>
-                <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+                <div className="bg-white border border-[var(--border)] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
                     <div className="w-[38px] h-[38px] rounded-full bg-[#fef3c7] flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M12 20h9" />
@@ -192,11 +192,11 @@ export default function InspectionDashboard() {
                         </svg>
                     </div>
                     <div>
-                        <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-1">Drafts</p>
-                        <p className="text-[26px] font-bold text-[#1a1a18] tracking-[-0.5px] tabular-nums">{draftCount}</p>
+                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] mb-1">Drafts</p>
+                        <p className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px] tabular-nums">{draftCount}</p>
                     </div>
                 </div>
-                <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+                <div className="bg-white border border-[var(--border)] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
                     <div className="w-[38px] h-[38px] rounded-full bg-[#f5f3ff] flex items-center justify-center">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="22" y1="2" x2="11" y2="13" />
@@ -204,20 +204,20 @@ export default function InspectionDashboard() {
                         </svg>
                     </div>
                     <div>
-                        <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-1">Pending</p>
-                        <p className="text-[26px] font-bold text-[#1a1a18] tracking-[-0.5px] tabular-nums">{pendingCount}</p>
+                        <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] mb-1">Pending</p>
+                        <p className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px] tabular-nums">{pendingCount}</p>
                     </div>
                 </div>
-                <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
-                    <div className="w-[38px] h-[38px] rounded-full bg-[#e8f7f1] flex items-center justify-center">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a9e6e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <div className="bg-white border border-[var(--border)] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="w-[38px] h-[38px] rounded-full bg-[var(--accent-light)] flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0b5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                             <polyline points="22 4 12 14.01 9 11.01" />
                         </svg>
                     </div>
                     <div>
-                        <p className="text-[11px] font-semibold text-[#0d6b4a] uppercase tracking-[0.6px] mb-1">Approved</p>
-                        <p className="text-[26px] font-bold text-[#1a9e6e] tracking-[-0.5px] tabular-nums">{approvedCount}</p>
+                        <p className="text-[11px] font-semibold text-[var(--success)] uppercase tracking-[0.6px] mb-1">Approved</p>
+                        <p className="text-[26px] font-bold text-[var(--success-strong)] tracking-[-0.5px] tabular-nums">{approvedCount}</p>
                     </div>
                 </div>
             </div>
@@ -225,12 +225,12 @@ export default function InspectionDashboard() {
             {/* SECTION 2: COMPANY WISE REPORTS */}
             <div className="mb-5">
                 <div className="flex items-center gap-2 mb-4">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b6860" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5b6478" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="18" y1="20" x2="18" y2="10" />
                         <line x1="12" y1="20" x2="12" y2="4" />
                         <line x1="6" y1="20" x2="6" y2="14" />
                     </svg>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a18]">Site Wise Reports (Current Month)</h2>
+                    <h2 className="text-[15px] font-semibold text-[var(--text)]">Site Wise Reports (Current Month)</h2>
                 </div>
 
                 {reportLoading ? (
@@ -240,7 +240,7 @@ export default function InspectionDashboard() {
                 ) : reportData?.summary ? (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4 flex items-center gap-3">
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-[#eff6ff] flex items-center justify-center shrink-0">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
@@ -248,23 +248,23 @@ export default function InspectionDashboard() {
                                     </svg>
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-[3px]">Total Inspected</p>
-                                    <p className="text-[22px] font-bold text-[#1a1a18] tabular-nums">{reportData.summary.totalInspected.toLocaleString()}</p>
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-[3px]">Total Inspected</p>
+                                    <p className="text-[22px] font-bold text-[var(--text)] tabular-nums">{reportData.summary.totalInspected.toLocaleString()}</p>
                                 </div>
                             </div>
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4 flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#e8f7f1] flex items-center justify-center shrink-0">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a9e6e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                                         <polyline points="22 4 12 14.01 9 11.01" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-[3px]">Accepted</p>
-                                    <p className="text-[22px] font-bold text-[#1a1a18] tabular-nums">{reportData.summary.totalAccepted.toLocaleString()}</p>
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-[3px]">Accepted</p>
+                                    <p className="text-[22px] font-bold text-[var(--text)] tabular-nums">{reportData.summary.totalAccepted.toLocaleString()}</p>
                                 </div>
                             </div>
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4 flex items-center gap-3">
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-[#fef3c7] flex items-center justify-center shrink-0">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M12 20h9" />
@@ -272,11 +272,11 @@ export default function InspectionDashboard() {
                                     </svg>
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-[3px]">Rework</p>
-                                    <p className="text-[22px] font-bold text-[#1a1a18] tabular-nums">{reportData.summary.totalRework.toLocaleString()}</p>
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-[3px]">Rework</p>
+                                    <p className="text-[22px] font-bold text-[var(--text)] tabular-nums">{reportData.summary.totalRework.toLocaleString()}</p>
                                 </div>
                             </div>
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4 flex items-center gap-3">
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-[#fef2f2] flex items-center justify-center shrink-0">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <circle cx="12" cy="12" r="10" />
@@ -285,39 +285,39 @@ export default function InspectionDashboard() {
                                     </svg>
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-[3px]">Rejected</p>
-                                    <p className="text-[22px] font-bold text-[#1a1a18] tabular-nums">{reportData.summary.totalRejected.toLocaleString()}</p>
+                                    <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-[3px]">Rejected</p>
+                                    <p className="text-[22px] font-bold text-[var(--text)] tabular-nums">{reportData.summary.totalRejected.toLocaleString()}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4">
-                                <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-1.5">Quality Rate</p>
-                                <p className="text-[22px] font-bold text-[#1a9e6e] tabular-nums">{reportData.summary.acceptanceRate}%</p>
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4">
+                                <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-1.5">Quality Rate</p>
+                                <p className="text-[22px] font-bold text-[var(--success-strong)] tabular-nums">{reportData.summary.acceptanceRate}%</p>
                             </div>
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4">
-                                <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-1.5">Rework Rate</p>
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4">
+                                <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-1.5">Rework Rate</p>
                                 <p className="text-[22px] font-bold text-[#d97706] tabular-nums">{reportData.summary.reworkRate}%</p>
                             </div>
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4">
-                                <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-1.5">Rejection Rate</p>
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4">
+                                <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-1.5">Rejection Rate</p>
                                 <p className="text-[22px] font-bold text-[#dc2626] tabular-nums">{reportData.summary.rejectionRate}%</p>
                             </div>
-                            <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-4">
-                                <p className="text-[11px] font-semibold text-[#9e9b95] uppercase tracking-[0.5px] mb-1.5">Total Inspections</p>
-                                <p className="text-[22px] font-bold text-[#1a1a18] tabular-nums">{reportData.summary.totalInspected || 0}</p>
+                            <div className="bg-white border border-[var(--border)] rounded-[10px] p-4">
+                                <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-1.5">Total Inspections</p>
+                                <p className="text-[22px] font-bold text-[var(--text)] tabular-nums">{reportData.summary.totalInspected || 0}</p>
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div className="bg-white border border-dashed border-[#e8e6e1] rounded-[10px] p-8 text-center">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d4d1ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
+                    <div className="bg-white border border-dashed border-[var(--border)] rounded-[10px] p-8 text-center">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d6ddee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
                             <line x1="18" y1="20" x2="18" y2="10" />
                             <line x1="12" y1="20" x2="12" y2="4" />
                             <line x1="6" y1="20" x2="6" y2="14" />
                         </svg>
-                        <p className="text-[13px] text-[#9e9b95]">No inspection data for this month</p>
+                        <p className="text-[13px] text-[var(--text3)]">No inspection data for this month</p>
                     </div>
                 )}
             </div>
@@ -327,25 +327,25 @@ export default function InspectionDashboard() {
                 {/* LEFT — ACTIVE + COMPLETED ASSIGNMENTS */}
                 <div>
                     <div className="flex items-center gap-2 mb-4">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b6860" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5b6478" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                         </svg>
-                        <h2 className="text-[15px] font-semibold text-[#1a1a18]">Active Assignments</h2>
+                        <h2 className="text-[15px] font-semibold text-[var(--text)]">Active Assignments</h2>
                     </div>
 
                     {activeAssignments.length === 0 ? (
-                        <div className="bg-white border border-dashed border-[#e8e6e1] rounded-[12px] p-8 text-center">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d4d1ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3">
+                        <div className="bg-white border border-dashed border-[var(--border)] rounded-[12px] p-8 text-center">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d6ddee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3">
                                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                             </svg>
-                            <p className="text-[13px] text-[#9e9b95]">No active assignments</p>
+                            <p className="text-[13px] text-[var(--text3)]">No active assignments</p>
                         </div>
                     ) : (
                         activeAssignments.map((a) => (
-                            <div key={a.id} className="bg-white border border-[#e8e6e1] rounded-[12px] p-5 mb-3 hover:shadow-md transition-shadow">
-                                <p className="text-[10.5px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-1 flex items-center gap-1">
+                            <div key={a.id} className="bg-white border border-[var(--border)] rounded-[12px] p-5 mb-3 hover:shadow-md transition-shadow">
+                                <p className="text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] mb-1 flex items-center gap-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
                                         <rect x="9" y="9" width="6" height="6" />
@@ -360,17 +360,17 @@ export default function InspectionDashboard() {
                                     </svg>
                                     {a.project.site?.name || ""}
                                 </p>
-                                <p className="text-[15px] font-semibold text-[#1a1a18] mb-3">{a.project.name}</p>
+                                <p className="text-[15px] font-semibold text-[var(--text)] mb-3">{a.project.name}</p>
                                 <div className="flex flex-col gap-1.5 mb-3">
-                                    <div className="flex items-center gap-2 text-[12.5px] text-[#6b6860]">
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9e9b95" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <div className="flex items-center gap-2 text-[12.5px] text-[var(--text2)]">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98a1b5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                                             <circle cx="12" cy="7" r="4" />
                                         </svg>
                                         Assigned by: {a.assigner.name}
                                     </div>
-                                    <div className="flex items-center gap-2 text-[12.5px] text-[#6b6860]">
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9e9b95" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <div className="flex items-center gap-2 text-[12.5px] text-[var(--text2)]">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98a1b5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                                             <line x1="16" y1="2" x2="16" y2="6" />
                                             <line x1="8" y1="2" x2="8" y2="6" />
@@ -383,7 +383,7 @@ export default function InspectionDashboard() {
                                     href={a.isMultiPart && a.inspection && a.inspection.status !== "draft" && a.inspection.status !== "rejected"
                                         ? `/inspection/${a.id}/form?newPart=1`
                                         : `/inspection/${a.id}/form`}
-                                    className="flex items-center justify-center gap-2 w-full bg-[#1a9e6e] text-white rounded-[9px] py-2.5 text-[13px] font-medium hover:bg-[#158a5e] transition-colors"
+                                    className="flex items-center justify-center gap-2 w-full bg-[var(--accent)] text-white rounded-[9px] py-2.5 text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors"
                                 >
                                     {a.inspection?.status === "draft"
                                         ? "Complete Inspection"
@@ -402,33 +402,33 @@ export default function InspectionDashboard() {
                     {/* COMPLETED ASSIGNMENTS */}
                     <div className="mt-5">
                         <div className="flex items-center gap-2 mb-3">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a9e6e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0b5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                                 <polyline points="22 4 12 14.01 9 11.01" />
                             </svg>
-                            <h3 className="text-[13.5px] font-semibold text-[#1a1a18]">Completed Assignments</h3>
-                            <span className="bg-[#e8f7f1] text-[#0d6b4a] text-[11px] font-[500] px-[8px] py-[2px] rounded-[20px]">{completedAssignments.length}</span>
+                            <h3 className="text-[13.5px] font-semibold text-[var(--text)]">Completed Assignments</h3>
+                            <span className="bg-[var(--success-light)] text-[var(--success)] text-[11px] font-[500] px-[8px] py-[2px] rounded-[20px]">{completedAssignments.length}</span>
                         </div>
                         {completedAssignments.length === 0 ? (
-                            <div className="bg-white border border-dashed border-[#e8e6e1] rounded-[10px] p-6 text-center">
-                                <p className="text-[13px] text-[#9e9b95]">No completed assignments yet</p>
+                            <div className="bg-white border border-dashed border-[var(--border)] rounded-[10px] p-6 text-center">
+                                <p className="text-[13px] text-[var(--text3)]">No completed assignments yet</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
                                 {completedAssignments.slice(0, 10).map((a) => {
                                     const badge = a.status === "completed"
-                                        ? { label: "Approved", cls: "bg-[#e8f7f1] text-[#0d6b4a]" }
+                                        ? { label: "Approved", cls: "bg-[var(--success-light)] text-[var(--success)]" }
                                         : a.inspection?.status === "approved"
-                                            ? { label: "Approved", cls: "bg-[#e8f7f1] text-[#0d6b4a]" }
+                                            ? { label: "Approved", cls: "bg-[var(--success-light)] text-[var(--success)]" }
                                             : a.inspection?.status === "rejected"
                                                 ? { label: "Rejected", cls: "bg-[#fef2f2] text-[#dc2626]" }
                                                 : { label: "Pending Review", cls: "bg-[#fef3c7] text-[#d97706]" }
                                     return (
-                                        <div key={a.id} className="bg-white border border-[#e8e6e1] rounded-[10px] p-[12px_14px] flex flex-wrap items-center justify-between gap-2">
+                                        <div key={a.id} className="bg-white border border-[var(--border)] rounded-[10px] p-[12px_14px] flex flex-wrap items-center justify-between gap-2">
                                             <div className="min-w-0">
-                                                <p className="text-[10.5px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] mb-[2px]">{a.project?.site?.name}</p>
-                                                <p className="text-[13.5px] font-semibold text-[#1a1a18]">{a.project?.name}</p>
-                                                <p className="text-[11.5px] text-[#9e9b95] mt-[2px]">{safeFormat(a.createdAt, "MMM d, yyyy")}</p>
+                                                <p className="text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] mb-[2px]">{a.project?.site?.name}</p>
+                                                <p className="text-[13.5px] font-semibold text-[var(--text)]">{a.project?.name}</p>
+                                                <p className="text-[11.5px] text-[var(--text3)] mt-[2px]">{safeFormat(a.createdAt, "MMM d, yyyy")}</p>
                                             </div>
                                             <div className="flex flex-wrap items-center gap-[8px]">
                                                 {a.recurrenceType && a.recurrenceType !== "none" && (
@@ -445,7 +445,7 @@ export default function InspectionDashboard() {
                                                 <span className={`text-[11px] font-[500] px-[10px] py-[3px] rounded-[20px] ${badge.cls}`}>{badge.label}</span>
                                                 <Link
                                                     href={`/inspection/${a.id}/form`}
-                                                    className="text-[12px] font-[500] text-[#6b6860] hover:text-[#1a9e6e] hover:underline"
+                                                    className="text-[12px] font-[500] text-[var(--text2)] hover:text-[var(--accent)] hover:underline"
                                                 >
                                                     View →
                                                 </Link>
@@ -461,18 +461,18 @@ export default function InspectionDashboard() {
                 {/* RIGHT — ACTIVITY FEED */}
                 <div>
                     <div className="flex items-center gap-2 mb-4">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b6860" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5b6478" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                         </svg>
-                        <h2 className="text-[15px] font-semibold text-[#1a1a18]">Activity Feed</h2>
+                        <h2 className="text-[15px] font-semibold text-[var(--text)]">Activity Feed</h2>
                     </div>
 
-                    <div className="bg-white border border-[#e8e6e1] rounded-[12px] overflow-hidden">
+                    <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
                         {recentSubmissions.slice(0, 10).map((s) => (
-                            <div key={s.id} className="p-4 border-b border-[#e8e6e1] last:border-b-0 flex flex-wrap items-center justify-between gap-2 hover:bg-[#f9f8f5] transition-colors">
+                            <div key={s.id} className="p-4 border-b border-[var(--border)] last:border-b-0 flex flex-wrap items-center justify-between gap-2 hover:bg-[var(--surface2)] transition-colors">
                                 <div className="min-w-0">
-                                    <p className="text-[13px] font-medium text-[#1a1a18] mb-1">{s.assignment.project.name}</p>
-                                    <div className="flex items-center gap-1.5 text-[12px] text-[#9e9b95]">
+                                    <p className="text-[13px] font-medium text-[var(--text)] mb-1">{s.assignment.project.name}</p>
+                                    <div className="flex items-center gap-1.5 text-[12px] text-[var(--text3)]">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <circle cx="12" cy="12" r="10" />
                                             <polyline points="12 6 12 12 16 14" />
@@ -485,7 +485,7 @@ export default function InspectionDashboard() {
                                         <span className="bg-[#fef3c7] text-[#d97706] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Draft</span>
                                     )}
                                     {s.status === "pending" && (
-                                        <span className="bg-[#e8f7f1] text-[#0d6b4a] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Submitted</span>
+                                        <span className="bg-[var(--accent-light)] text-[var(--accent-text)] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Submitted</span>
                                     )}
                                     {s.status === "approved" && (
                                         <span className="bg-[#eff6ff] text-[#3b82f6] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Approved</span>
@@ -497,7 +497,7 @@ export default function InspectionDashboard() {
                                         read-only once submitted, so "Resume" on a pending,
                                         approved or rejected row promised an edit that the
                                         server would refuse. */}
-                                    <Link href={`/inspection/${s.assignmentId}/form`} className="text-[12.5px] font-medium text-[#1a9e6e] hover:underline">
+                                    <Link href={`/inspection/${s.assignmentId}/form`} className="text-[12.5px] font-medium text-[var(--accent)] hover:underline">
                                         {s.status === "draft" ? "Complete Inspection" : "View"} →
                                     </Link>
                                 </div>
@@ -505,7 +505,7 @@ export default function InspectionDashboard() {
                         ))}
                         {recentSubmissions.length === 0 && (
                             <div className="p-8 text-center">
-                                <p className="text-[13px] text-[#9e9b95]">No recent submissions</p>
+                                <p className="text-[13px] text-[var(--text3)]">No recent submissions</p>
                             </div>
                         )}
                     </div>

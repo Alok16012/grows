@@ -68,14 +68,14 @@ type EmployeeOption = { id: string; firstName: string; lastName: string; employe
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#16a34a", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
 const STATUS_CONFIG: Record<ExitStatus, { label: string; color: string; bg: string }> = {
   INITIATED:          { label: "Initiated",       color: "#f59e0b", bg: "#fffbeb" },
   NOTICE_PERIOD:      { label: "Notice Period",    color: "#3b82f6", bg: "#eff6ff" },
   CLEARANCE_PENDING:  { label: "Clearance",        color: "#f97316", bg: "#fff7ed" },
   FULL_FINAL_PENDING: { label: "F&F Pending",      color: "#ef4444", bg: "#fef2f2" },
-  COMPLETED:          { label: "Completed",        color: "#1a9e6e", bg: "#e8f7f1" },
+  COMPLETED:          { label: "Completed",        color: "#16a34a", bg: "#dcfce7" },
   CANCELLED:          { label: "Cancelled",        color: "#6b7280", bg: "#f3f4f6" },
 }
 
@@ -88,7 +88,7 @@ const EXIT_TYPE_CONFIG: Record<ExitType, { label: string; color: string; bg: str
 }
 
 const DEPT_COLORS: Record<string, string> = {
-  HR: "#1a9e6e",
+  HR: "#0b5cff",
   IT: "#3b82f6",
   Finance: "#8b5cf6",
   Operations: "#f97316",
@@ -304,7 +304,7 @@ export default function ExitPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 24 }}>
         <StatCard label="Active Exits" value={activeCount} color="#d97706" bg="#fef3c7" icon={LogOut} />
         <StatCard label="Pending F&F" value={fnfPendingCount} color="#dc2626" bg="#fef2f2" icon={IndianRupee} />
-        <StatCard label="Completed This Month" value={completedThisMonth} color="#1a9e6e" bg="#e8f7f1" icon={CheckCircle2} />
+        <StatCard label="Completed This Month" value={completedThisMonth} color="#16a34a" bg="#dcfce7" icon={CheckCircle2} />
         <StatCard label="Notice Ending This Week" value={noticePeriodEndingThisWeek} color="#3b82f6" bg="#eff6ff" icon={Clock} />
       </div>
 
@@ -1098,7 +1098,7 @@ function TimelineTab({
 
       {exit.status === "COMPLETED" && exit.completedAt && (
         <div style={{
-          padding: 14, background: "#e8f7f1", borderRadius: 10, border: "1px solid #a7f3d0",
+          padding: 14, background: "#dcfce7", borderRadius: 10, border: "1px solid #bbf7d0",
           display: "flex", alignItems: "center", gap: 10,
         }}>
           <CheckCircle2 size={20} color="var(--accent)" />
@@ -1208,7 +1208,7 @@ function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () =>
                     style={{
                       padding: "12px 14px", borderRadius: 10,
                       background: isWaived ? "var(--surface2)" : "var(--surface)",
-                      border: `1px solid ${isCompleted ? "#a7f3d0" : isWaived ? "var(--border)" : "var(--border)"}`,
+                      border: `1px solid ${isCompleted ? "#bbf7d0" : isWaived ? "var(--border)" : "var(--border)"}`,
                       opacity: isWaived ? 0.7 : 1,
                     }}
                   >
@@ -1351,8 +1351,8 @@ function FnFTab({
       {/* If paid */}
       {exit.fnfPaidAt && (
         <div style={{
-          padding: 14, background: "#e8f7f1", borderRadius: 10,
-          border: "1px solid #a7f3d0", marginBottom: 20,
+          padding: 14, background: "#dcfce7", borderRadius: 10,
+          border: "1px solid #bbf7d0", marginBottom: 20,
           display: "flex", gap: 12, alignItems: "flex-start",
         }}>
           <CheckCircle2 size={20} color="var(--accent)" style={{ marginTop: 2 }} />

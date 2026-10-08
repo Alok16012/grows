@@ -84,7 +84,7 @@ function statusBadge(status: TicketStatus) {
     const map: Record<TicketStatus, { bg: string; color: string; label: string }> = {
         OPEN: { bg: "#eff6ff", color: "#3b82f6", label: "Open" },
         IN_PROGRESS: { bg: "#fffbeb", color: "#f59e0b", label: "In Progress" },
-        RESOLVED: { bg: "#e8f7f1", color: "#1a9e6e", label: "Resolved" },
+        RESOLVED: { bg: "#dcfce7", color: "#16a34a", label: "Resolved" },
         CLOSED: { bg: "#f9fafb", color: "#6b7280", label: "Closed" },
     }
     return map[status]
@@ -104,7 +104,7 @@ function categoryColor(cat: string): { bg: string; color: string } {
 }
 
 function avatarColors(name: string) {
-    const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
+    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
     const idx = name ? name.charCodeAt(0) % colors.length : 0
     return colors[idx]
 }
@@ -707,7 +707,7 @@ export default function HelpdeskPage() {
                 {[
                     { label: "Open Tickets", value: openCount, color: "#3b82f6", bg: "#eff6ff", icon: <AlertCircle size={20} /> },
                     { label: "In Progress", value: inProgressCount, color: "#d97706", bg: "#fef3c7", icon: <Timer size={20} /> },
-                    { label: "Resolved Today", value: resolvedToday, color: "#1a9e6e", bg: "#e8f7f1", icon: <CheckCircle2 size={20} /> },
+                    { label: "Resolved Today", value: resolvedToday, color: "#16a34a", bg: "#dcfce7", icon: <CheckCircle2 size={20} /> },
                     { label: "Avg Resolution (hrs)", value: avgResolution, color: "#8b5cf6", bg: "#f5f3ff", icon: <Clock size={20} /> },
                 ].map(s => (
                     <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">

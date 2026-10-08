@@ -95,8 +95,8 @@ export default function JobsPage() {
         const draft = jobs.filter(j => j.status === "DRAFT").length
         const closed = jobs.filter(j => j.status === "CLOSED").length
         return [
-            { label: "Total Jobs", value: total,     icon: Briefcase, color: "#1a9e6e", bg: "#e8f7f1", ...monthStats(jobs, () => true) },
-            { label: "Published",  value: published, icon: Send,      color: "#1a9e6e", bg: "#e8f7f1", ...monthStats(jobs, j => j.status === "PUBLISHED") },
+            { label: "Total Jobs", value: total,     icon: Briefcase, color: "#0b5cff", bg: "#e8effe", ...monthStats(jobs, () => true) },
+            { label: "Published",  value: published, icon: Send,      color: "#0b5cff", bg: "#e8effe", ...monthStats(jobs, j => j.status === "PUBLISHED") },
             { label: "Draft",      value: draft,     icon: FileText,  color: "#d97706", bg: "#fef3c7", ...monthStats(jobs, j => j.status === "DRAFT") },
             { label: "Closed",     value: closed,    icon: Lock,      color: "#7c3aed", bg: "#f3e8ff", ...monthStats(jobs, j => j.status === "CLOSED") },
         ]
@@ -229,11 +229,11 @@ export default function JobsPage() {
                 </button>
                 <div className="flex items-center gap-1 border border-[var(--border)] rounded-[9px] p-0.5 bg-[var(--surface)]">
                     <button onClick={() => setView("grid")} title="Grid"
-                        className="w-8 h-8 rounded-[7px] flex items-center justify-center" style={{ background: view === "grid" ? "var(--accent-light,#e8f7f1)" : "transparent", color: view === "grid" ? "var(--accent)" : "var(--text3)" }}>
+                        className="w-8 h-8 rounded-[7px] flex items-center justify-center" style={{ background: view === "grid" ? "var(--accent-light,#e8effe)" : "transparent", color: view === "grid" ? "var(--accent)" : "var(--text3)" }}>
                         <LayoutGrid size={16} />
                     </button>
                     <button onClick={() => setView("list")} title="List"
-                        className="w-8 h-8 rounded-[7px] flex items-center justify-center" style={{ background: view === "list" ? "var(--accent-light,#e8f7f1)" : "transparent", color: view === "list" ? "var(--accent)" : "var(--text3)" }}>
+                        className="w-8 h-8 rounded-[7px] flex items-center justify-center" style={{ background: view === "list" ? "var(--accent-light,#e8effe)" : "transparent", color: view === "list" ? "var(--accent)" : "var(--text3)" }}>
                         <List size={16} />
                     </button>
                 </div>

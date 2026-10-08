@@ -45,7 +45,7 @@ type Employee = { id: string; firstName: string; lastName: string; employeeId: s
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     PENDING:   { label: "Pending",   color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
-    APPROVED:  { label: "Approved",  color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
+    APPROVED:  { label: "Approved",  color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
     REJECTED:  { label: "Rejected",  color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
     CANCELLED: { label: "Cancelled", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
 }
@@ -53,7 +53,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const LEAVE_TYPE_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
     CL:      { color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
     SL:      { color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
-    PL:      { color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
+    PL:      { color: "#0d9488", bg: "#e6fffa", border: "#99f6e4" },
     LWP:     { color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
     CompOff: { color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
 }
@@ -67,7 +67,7 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
 }) {
     const [imgErr, setImgErr] = useState(false)
     const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
-    const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"]
+    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"]
     const bg = colors[(firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length]
     if (photo && !imgErr) return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" onError={() => setImgErr(true)} />
     return (
@@ -362,8 +362,8 @@ function LeaveDrawer({ leave, onClose, onUpdated, isAdminOrManager }: {
 
                             {/* Approved/Rejected info */}
                             {leave.status === "APPROVED" && leave.approvedAt && (
-                                <div className="p-3 bg-[#e8f7f1] border border-[#6ee7b7] rounded-[10px]">
-                                    <p className="text-[12px] font-medium text-[#1a9e6e]">Approved on {format(new Date(leave.approvedAt), "dd MMM yyyy")}</p>
+                                <div className="p-3 bg-[var(--success-light)] border border-[var(--success-border)] rounded-[10px]">
+                                    <p className="text-[12px] font-medium text-[var(--success-strong)]">Approved on {format(new Date(leave.approvedAt), "dd MMM yyyy")}</p>
                                 </div>
                             )}
                             {leave.status === "REJECTED" && leave.rejectedAt && (
@@ -507,7 +507,7 @@ export default function LeavesPage() {
     const pctOf = (n: number) => totalReq > 0 ? `${((n / totalReq) * 100).toFixed(1)}% of total` : "—"
     const statsCards = [
         { label: "Pending Requests",        value: pending,           sub: pctOf(pending),        color: "#d97706", bg: "#fef3c7", icon: Clock },
-        { label: "Approved This Month",     value: approvedThisMonth, sub: "current month",       color: "#1a9e6e", bg: "#e8f7f1", icon: CheckCircle },
+        { label: "Approved This Month",     value: approvedThisMonth, sub: "current month",       color: "#16a34a", bg: "#dcfce7", icon: CheckCircle },
         { label: "Leave Days (Month)",      value: totalLeaveDays,    sub: "approved days",       color: "#3b82f6", bg: "#eff6ff", icon: Calendar },
         { label: "Rejected",                value: rejected,          sub: pctOf(rejected),       color: "#dc2626", bg: "#fef2f2", icon: XCircle },
     ]
@@ -672,7 +672,7 @@ export default function LeavesPage() {
                                                             fetchLeaves()
                                                         } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Failed") }
                                                     }}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-2 rounded-[7px] border border-[#6ee7b7] bg-[#e8f7f1] text-[#1a9e6e] text-[12px] font-medium hover:bg-[#d1f5e6] transition-colors">
+                                                        className="inline-flex items-center gap-1 px-2.5 py-2 rounded-[7px] border border-[#c7dbff] bg-[var(--accent-light)] text-[var(--accent)] text-[12px] font-medium hover:bg-[#d1f5e6] transition-colors">
                                                         <CheckCircle size={11} /> Approve
                                                     </button>
                                                 </div>

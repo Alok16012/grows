@@ -420,7 +420,7 @@ ${autoPrint ? "<script>window.onload=()=>window.print()</script>" : ""}
                     {/* Slip Preview Panel */}
                     {selected && (
                         <div className="w-full lg:w-[310px] lg:shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", alignSelf: "flex-start", position: "sticky", top: 16 }}>
-                            <div style={{ background: "#1a9e6e", color: "#fff", padding: "14px 16px" }}>
+                            <div style={{ background: "#0b5cff", color: "#fff", padding: "14px 16px" }}>
                                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                                     <div>
                                         <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{selected.employee.firstName} {selected.employee.lastName}</p>
@@ -444,7 +444,7 @@ ${autoPrint ? "<script>window.onload=()=>window.print()</script>" : ""}
                                         </div>
                                     ))}
                                     <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 6, fontWeight: 700 }}>
-                                        <span>Gross</span><span style={{ color: "#1a9e6e" }}>₹{Math.round(selected.grossSalary).toLocaleString("en-IN")}</span>
+                                        <span>Gross</span><span style={{ color: "#0b5cff" }}>₹{Math.round(selected.grossSalary).toLocaleString("en-IN")}</span>
                                     </div>
                                 </div>
                                 <div>
@@ -481,7 +481,7 @@ ${autoPrint ? "<script>window.onload=()=>window.print()</script>" : ""}
                                 </button>
                                 {selected.status !== "PAID" && (
                                     <button onClick={() => handleMarkPaid(selected.id)} disabled={!!actLoad || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
-                                        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", background: "#1a9e6e", opacity: actLoad ? 0.6 : 1 }}>
+                                        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", background: "#16a34a", opacity: actLoad ? 0.6 : 1 }}>
                                         {actLoad === selected.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                                         Mark Credited
                                     </button>

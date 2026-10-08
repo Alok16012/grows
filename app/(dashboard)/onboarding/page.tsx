@@ -115,7 +115,7 @@ const FILTER_TABS = [
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function Avatar({ name, photo, size = 40 }: { name: string; photo?: string | null; size?: number }) {
-    const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
+    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
     const color = colors[name.charCodeAt(0) % colors.length]
     if (photo) return <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }} />
     return (
@@ -656,7 +656,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                         <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 4, whiteSpace: "nowrap" }}>{doneTasks} of {totalTasks} Completed</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <div style={{ flex: 1, height: 6, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}>
-                                <div style={{ width: `${progress}%`, height: "100%", borderRadius: 4, background: progress === 100 ? "#15803d" : "var(--accent, #1a9e6e)" }} />
+                                <div style={{ width: `${progress}%`, height: "100%", borderRadius: 4, background: progress === 100 ? "#15803d" : "var(--accent, #0b5cff)" }} />
                             </div>
                             <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>{progress}%</span>
                         </div>
@@ -672,7 +672,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                 <td style={{ ...cell, borderRight: expanded ? "2px solid var(--accent)" : "none", borderTopRightRadius: expanded ? 12 : 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <button onClick={onOpen}
-                            style={{ padding: "7px 16px", borderRadius: 8, border: isPending ? "none" : "1px solid var(--border)", background: isPending ? "var(--accent, #1a9e6e)" : "var(--surface)", color: isPending ? "#fff" : "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                            style={{ padding: "7px 16px", borderRadius: 8, border: isPending ? "none" : "1px solid var(--border)", background: isPending ? "var(--accent, #0b5cff)" : "var(--surface)", color: isPending ? "#fff" : "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                             {isPending ? "Review" : "View"}
                         </button>
                         <button onClick={onToggle} title="Quick actions"
@@ -1024,7 +1024,7 @@ export default function OnboardingPage() {
                         style={{ background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
                         <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8f7f1", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8effe", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                     <Link2 size={18} style={{ color: "var(--accent)" }} />
                                 </div>
                                 <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", margin: 0 }}>Share Join Link</h2>

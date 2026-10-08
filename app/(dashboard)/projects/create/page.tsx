@@ -24,7 +24,7 @@ const PRIORITIES = [
 ]
 const STATUS_OPTIONS = [
     { value: "PLANNING", label: "Planning", dot: "#3b82f6" },
-    { value: "ACTIVE", label: "Active", dot: "#1a9e6e" },
+    { value: "ACTIVE", label: "Active", dot: "#16a34a" },
     { value: "ON_HOLD", label: "On Hold", dot: "#ef4444" },
 ]
 
@@ -49,7 +49,7 @@ function PersonCard({ person, checked, onToggle, showContact }: {
                 checked ? "border-[var(--accent)] bg-[#f0fdf4]" : "border-[var(--border)] bg-white hover:border-[var(--accent)]/40"
             }`}>
             <span className={`flex items-center justify-center w-[17px] h-[17px] rounded-[4px] border-[1.5px] shrink-0 transition-colors ${
-                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[#d4d1ca] bg-white"
+                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border2)] bg-white"
             }`}>
                 {checked && <CheckCircle2 size={11} className="text-white" strokeWidth={3} />}
             </span>

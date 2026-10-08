@@ -68,7 +68,7 @@ function AdminExpenseTable() {
                 <div className="flex items-center gap-2 flex-1">
                     <CreditCard className="h-4 w-4 text-[var(--accent)]" />
                     <span className="text-[13.5px] font-semibold text-[var(--text)]">Employee Expense Summary</span>
-                    {data && <span className="text-[11px] bg-[#e8f7f1] text-[#0d6b4a] px-2 py-0.5 rounded-full font-medium">{data.monthLabel}</span>}
+                    {data && <span className="text-[11px] bg-[var(--accent-light)] text-[var(--accent-text)] px-2 py-0.5 rounded-full font-medium">{data.monthLabel}</span>}
                 </div>
                 <div className="flex items-center gap-2">
                     <select value={month} onChange={e => setMonth(e.target.value)}
@@ -374,13 +374,13 @@ export default function AdminDashboard() {
 
     // Donut data — palettes validated for CVD safety (dataviz checks).
     const attSlices: { label: string; value: number; color: string }[] = [
-        { label: "Present", value: att.present, color: "#1a9e6e" },
+        { label: "Present", value: att.present, color: "#16a34a" },
         { label: "Absent", value: att.absent, color: "#dc2626" },
         { label: "On Leave", value: att.onLeave, color: "#f59e0b" },
     ]
     const pbs = stats.projectsByStatus || {}
     const projSlices: { label: string; value: number; color: string }[] = [
-        { label: "Active", value: pbs.ACTIVE ?? 0, color: "#1a9e6e" },
+        { label: "Active", value: pbs.ACTIVE ?? 0, color: "#16a34a" },
         { label: "Planning", value: pbs.PLANNING ?? 0, color: "#3b82f6" },
         { label: "On Hold", value: pbs.ON_HOLD ?? 0, color: "#ef4444" },
         { label: "Completed", value: pbs.COMPLETED ?? 0, color: "#7c3aed" },
@@ -397,7 +397,7 @@ export default function AdminDashboard() {
 
     const QUICK_ACTIONS = [
         { href: "/approvals", icon: ClipboardCheck, label: "Approve Requests", sub: "Pending approvals", color: "#d97706", bg: "#fef3c7" },
-        { href: "/attendance", icon: Clock, label: "Mark Attendance", sub: "Take attendance", color: "#1a9e6e", bg: "#e8f7f1" },
+        { href: "/attendance", icon: Clock, label: "Mark Attendance", sub: "Take attendance", color: "#0b5cff", bg: "#e8effe" },
         { href: "/employees", icon: UserPlus, label: "Add Employee", sub: "Onboard new hire", color: "#3b82f6", bg: "#eff6ff" },
         { href: "/projects/create", icon: Folder, label: "Create Project", sub: "Start new project", color: "#7c3aed", bg: "#f5f3ff" },
         { href: "/assignments", icon: ClipboardList, label: "Manage Assignments", sub: "Assign inspections", color: "#0891b2", bg: "#ecfeff" },
@@ -411,7 +411,7 @@ export default function AdminDashboard() {
         // own desktop padding doubled the top gap into a blank band.
         <div className="p-4 lg:p-0 space-y-4">
             {/* Mobile Welcome Banner */}
-            <div className="md:hidden bg-gradient-to-br from-[#1a9e6e] to-[#0d6b4a] rounded-[16px] p-4 text-white shadow-sm">
+            <div className="md:hidden bg-gradient-to-br from-[var(--accent)] to-[var(--accent-text)] rounded-[16px] p-4 text-white shadow-sm">
                 <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>
                 <p className="text-[20px] font-bold tracking-tight">Admin Dashboard</p>
                 <div className="flex items-center gap-2 mt-3">
@@ -450,7 +450,7 @@ export default function AdminDashboard() {
                 <Link href="/employees" className={kpiCard}>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2.5">
-                            <div className="h-9 w-9 rounded-[10px] bg-[#e8f7f1] flex items-center justify-center"><Users size={17} className="text-[#0d6b4a]" /></div>
+                            <div className="h-9 w-9 rounded-[10px] bg-[var(--accent-light)] flex items-center justify-center"><Users size={17} className="text-[var(--accent-text)]" /></div>
                             <span className="text-[12.5px] font-medium text-[var(--text2)]">Active Employees</span>
                         </div>
                         <ChevronRight size={15} className="text-[var(--text3)] group-hover:text-[var(--text)] transition-colors" />
@@ -469,7 +469,7 @@ export default function AdminDashboard() {
                 <Link href="/attendance" className={kpiCard}>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2.5">
-                            <div className="h-9 w-9 rounded-[10px] bg-[#e8f7f1] flex items-center justify-center"><CalendarCheck size={17} className="text-[#0d6b4a]" /></div>
+                            <div className="h-9 w-9 rounded-[10px] bg-[var(--success-light)] flex items-center justify-center"><CalendarCheck size={17} className="text-[var(--success)]" /></div>
                             <span className="text-[12.5px] font-medium text-[var(--text2)]">Today&apos;s Attendance</span>
                         </div>
                         <ChevronRight size={15} className="text-[var(--text3)] group-hover:text-[var(--text)] transition-colors" />
@@ -501,7 +501,7 @@ export default function AdminDashboard() {
                 <Link href="/sites" className={kpiCard}>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2.5">
-                            <div className="h-9 w-9 rounded-[10px] bg-[#e8f7f1] flex items-center justify-center"><FileCheck size={17} className="text-[#0d6b4a]" /></div>
+                            <div className="h-9 w-9 rounded-[10px] bg-[var(--success-light)] flex items-center justify-center"><FileCheck size={17} className="text-[var(--success)]" /></div>
                             <span className="text-[12.5px] font-medium text-[var(--text2)]">Inspections Today</span>
                         </div>
                         <ChevronRight size={15} className="text-[var(--text3)] group-hover:text-[var(--text)] transition-colors" />
@@ -677,7 +677,7 @@ export default function AdminDashboard() {
                 <div className="xl:col-span-3 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 xl:auto-rows-fr gap-[14px]">
                     {/* Onboarding */}
                     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[16px] flex flex-col">
-                        <div className="h-8 w-8 rounded-[9px] bg-[#e8f7f1] flex items-center justify-center mb-3"><UserPlus size={15} className="text-[#0d6b4a]" /></div>
+                        <div className="h-8 w-8 rounded-[9px] bg-[var(--accent-light)] flex items-center justify-center mb-3"><UserPlus size={15} className="text-[var(--accent-text)]" /></div>
                         <p className="text-[12px] font-semibold text-[var(--text)] leading-tight mb-2">Onboarding Pipeline</p>
                         <div className="text-[24px] font-semibold text-[var(--text)] leading-none tabular-nums">{onboarding.inProgress}</div>
                         <p className="text-[10.5px] text-[var(--text3)] mt-0.5 mb-3">In progress</p>

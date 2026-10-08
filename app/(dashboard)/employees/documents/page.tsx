@@ -51,7 +51,7 @@ const DOC_COLS = [
 const PROFILE_PHOTO_ID = "__profile_photo__"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const AVATAR_COLORS = ["#1a9e6e","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#06b6d4","#f97316"]
+const AVATAR_COLORS = ["#0b5cff","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#06b6d4","#f97316"]
 function avatarColor(name: string) {
     return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
 }
@@ -348,7 +348,7 @@ export default function MasterDocumentsPage() {
                     </button>
                     {isAdmin && (
                         <button onClick={() => toast.info("Use the per-document Upload buttons in each employee's row.")}
-                            className="flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent,#1a9e6e)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                            className="flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent,#0b5cff)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
                             style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                             <Upload size={16} /> Upload Documents
                         </button>
@@ -360,7 +360,7 @@ export default function MasterDocumentsPage() {
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {[
                     { label: "Total Employees",      value: totalEmployees,       sub: "100%",              color: "#3b82f6", bg: "#eff6ff", icon: Users },
-                    { label: "Total Documents",      value: totalDocs,            sub: "100%",              color: "#1a9e6e", bg: "#e8f7f1", icon: FileText },
+                    { label: "Total Documents",      value: totalDocs,            sub: "100%",              color: "#0b5cff", bg: "#e8effe", icon: FileText },
                     { label: "All Docs Present",     value: allPresent,           sub: pctOf(allPresent),   color: "#15803d", bg: "#dcfce7", icon: CheckCircle2 },
                     { label: "Missing Docs",         value: missingAny,           sub: pctOf(missingAny),   color: "#dc2626", bg: "#fef2f2", icon: AlertCircle },
                     { label: "Verification Pending", value: verificationPending,  sub: pctOf(verificationPending), color: "#d97706", bg: "#fef3c7", icon: Clock },

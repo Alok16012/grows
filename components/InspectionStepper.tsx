@@ -44,12 +44,12 @@ export function InspectionStepper() {
 
     return (
         <div className="px-4 pt-4 lg:px-0 lg:pt-0">
-            <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[14px_18px]">
+            <div className="bg-white border border-[var(--border)] rounded-[14px] p-[14px_18px]">
                 <div className="flex items-center justify-between mb-[12px]">
-                    <span className="text-[12px] font-[600] text-[#1a1a18]">
+                    <span className="text-[12px] font-[600] text-[var(--text)]">
                         Inspection Setup — Step {currentIndex + 1} of {STEPS.length}: {STEPS[currentIndex].label}
                     </span>
-                    <span className="text-[11px] font-[500] text-[#9e9b95]">
+                    <span className="text-[11px] font-[500] text-[var(--text3)]">
                         {Math.round((currentIndex / (STEPS.length - 1)) * 100)}%
                     </span>
                 </div>
@@ -66,37 +66,37 @@ export function InspectionStepper() {
                                     className="flex flex-col items-center gap-[5px] shrink-0 focus:outline-none group"
                                 >
                                     <span className={`flex items-center justify-center w-[26px] h-[26px] rounded-full text-[12px] font-[700] border-[1.5px] transition-colors ${isActive
-                                        ? "bg-[#1a9e6e] border-[#1a9e6e] text-white"
+                                        ? "bg-[var(--accent)] border-[var(--accent)] text-white"
                                         : isDone
-                                            ? "bg-[#e8f7f1] border-[#1a9e6e] text-[#0d6b4a]"
-                                            : "bg-white border-[#e8e6e1] text-[#9e9b95] group-hover:border-[#1a9e6e]"
+                                            ? "bg-[var(--success-light)] border-[var(--success-strong)] text-[var(--success)]"
+                                            : "bg-white border-[var(--border)] text-[var(--text3)] group-hover:border-[var(--accent)]"
                                         }`}>
                                         {isDone ? <Check className="h-[14px] w-[14px]" strokeWidth={3} /> : i + 1}
                                     </span>
-                                    <span className={`text-[10.5px] font-[500] whitespace-nowrap ${isActive ? "text-[#1a1a18]" : "text-[#9e9b95]"}`}>
+                                    <span className={`text-[10.5px] font-[500] whitespace-nowrap ${isActive ? "text-[var(--text)]" : "text-[var(--text3)]"}`}>
                                         {s.label}
                                     </span>
                                 </button>
                                 {i < STEPS.length - 1 && (
-                                    <span className={`h-[2px] flex-1 min-w-[20px] mx-[6px] mb-[18px] rounded-full transition-colors ${i < currentIndex ? "bg-[#1a9e6e]" : "bg-[#e8e6e1]"}`} />
+                                    <span className={`h-[2px] flex-1 min-w-[20px] mx-[6px] mb-[18px] rounded-full transition-colors ${i < currentIndex ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`} />
                                 )}
                             </div>
                         )
                     })}
                 </div>
 
-                <div className="flex items-center justify-between gap-[10px] mt-[12px] pt-[12px] border-t border-[#e8e6e1]">
+                <div className="flex items-center justify-between gap-[10px] mt-[12px] pt-[12px] border-t border-[var(--border)]">
                     <button
                         onClick={() => go(currentIndex - 1)}
                         disabled={currentIndex === 0}
-                        className="inline-flex items-center gap-[4px] bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[12.5px] font-[500] px-[14px] py-[7px] hover:bg-[#f9f8f5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-[4px] bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[12.5px] font-[500] px-[14px] py-[7px] hover:bg-[var(--surface2)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <ChevronLeft className="h-[14px] w-[14px]" /> Back
                     </button>
                     <button
                         onClick={() => go(currentIndex + 1)}
                         disabled={currentIndex === STEPS.length - 1}
-                        className="inline-flex items-center gap-[4px] bg-[#1a9e6e] text-white rounded-[9px] text-[12.5px] font-[500] px-[16px] py-[7px] hover:bg-[#158a5e] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                        className="inline-flex items-center gap-[4px] bg-[var(--accent)] text-white rounded-[9px] text-[12.5px] font-[500] px-[16px] py-[7px] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
                     >
                         Next <ChevronLeft className="h-[14px] w-[14px] rotate-180" />
                     </button>

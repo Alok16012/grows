@@ -218,7 +218,7 @@ function statusStyle(status: ExpenseStatus): { bg: string; color: string; label:
     const map: Record<ExpenseStatus, { bg: string; color: string; label: string }> = {
         DRAFT: { bg: "#f9fafb", color: "#6b7280", label: "Draft" },
         SUBMITTED: { bg: "#eff6ff", color: "#3b82f6", label: "Submitted" },
-        APPROVED: { bg: "#e8f7f1", color: "#1a9e6e", label: "Approved" },
+        APPROVED: { bg: "#dcfce7", color: "#16a34a", label: "Approved" },
         REJECTED: { bg: "#fef2f2", color: "#ef4444", label: "Rejected" },
         PAID: { bg: "#fdf4ff", color: "#a855f7", label: "Paid" },
     }
@@ -276,7 +276,7 @@ function verifyItemsOf(exp: any): VerifyItem[] {
 const isImageUrl = (u: string) => /\.(jpe?g|png|gif|webp|avif)$/i.test(u)
 
 function avatarColor(name: string): string {
-    const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
+    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
     return name ? colors[name.charCodeAt(0) % colors.length] : colors[0]
 }
 
@@ -1191,12 +1191,12 @@ function ExpenseDrawer({
                                         <div
                                             className="w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 mt-0.5 border-2"
                                             style={{
-                                                background: step.failed ? "#fef2f2" : step.done ? "#e8f7f1" : "var(--surface2)",
+                                                background: step.failed ? "#fef2f2" : step.done ? "#dcfce7" : "var(--surface2)",
                                                 borderColor: step.failed ? "#ef4444" : step.done ? "var(--accent)" : "var(--border)",
                                             }}
                                         >
                                             {step.done && !step.failed && (
-                                                <CheckCircle2 size={10} color="#1a9e6e" />
+                                                <CheckCircle2 size={10} color="#16a34a" />
                                             )}
                                             {step.failed && <XCircle size={10} color="#ef4444" />}
                                         </div>
@@ -1261,7 +1261,7 @@ function ExpenseDrawer({
                                         <div className="rounded-[10px] border border-[var(--border)] overflow-hidden">
                                             <div className="flex items-center justify-between px-3 py-2 bg-[var(--surface2)]">
                                                 <span className="text-[12px] font-semibold text-[var(--text2)]">Verify items</span>
-                                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${allVerified ? "bg-[#e8f7f1] text-[#1a9e6e]" : "bg-[#fff7ed] text-[#c2410c]"}`}>
+                                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${allVerified ? "bg-[var(--success-light)] text-[var(--success-strong)]" : "bg-[#fff7ed] text-[#c2410c]"}`}>
                                                     {verifiedCount}/{verifyItems.length} verified
                                                 </span>
                                             </div>
@@ -1272,8 +1272,8 @@ function ExpenseDrawer({
                                                     return (
                                                         <div key={i} className={`flex items-center gap-2.5 px-3 py-2 ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
                                                             <span className="w-6 h-6 shrink-0 rounded-full flex items-center justify-center"
-                                                                style={{ background: ok ? "#e8f7f1" : "var(--surface2)" }}>
-                                                                {ok ? <CheckCircle2 size={14} className="text-[#1a9e6e]" /> : <span className="text-[11px] font-bold text-[var(--text3)]">{i + 1}</span>}
+                                                                style={{ background: ok ? "#dcfce7" : "var(--surface2)" }}>
+                                                                {ok ? <CheckCircle2 size={14} className="text-[var(--success-strong)]" /> : <span className="text-[11px] font-bold text-[var(--text3)]">{i + 1}</span>}
                                                             </span>
                                                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
                                                                 style={{ background: cs.bg, color: cs.color }}>
@@ -1435,7 +1435,7 @@ function ExpenseDrawer({
                                         {categoryLabel(r.category)}
                                     </span>
                                     <span className="text-[13px] font-bold">{formatINR(r.amount)}</span>
-                                    {ok && <span className="inline-flex items-center gap-1 text-[11px] text-[#6ee7b7]"><CheckCircle2 size={12} /> Verified</span>}
+                                    {ok && <span className="inline-flex items-center gap-1 text-[11px] text-[var(--success-border)]"><CheckCircle2 size={12} /> Verified</span>}
                                 </div>
                             </div>
                             <button onClick={() => setVerifierIdx(null)} className="p-1.5 rounded-md hover:bg-white/10 text-white/80">
@@ -2600,7 +2600,7 @@ export default function ExpensesPage() {
                                 onClick={approveAll}
                                 disabled={approveAllLoading || pendingCount === 0}
                                 title={pendingCount === 0 ? "No pending expenses" : "Approve all pending expenses at once"}
-                                className="h-[42px] px-4 bg-[#1a9e6e] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-[42px] px-4 bg-[var(--accent)] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {approveAllLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                                 Approve all{pendingCount > 0 ? ` (${pendingCount})` : ""}
@@ -2630,7 +2630,7 @@ export default function ExpensesPage() {
                     label="Approved This Month"
                     value={formatINR(stats.approvedThisMonth)}
                     sub="Approved + Paid"
-                    color="#1a9e6e"
+                    color="#16a34a"
                     icon={CheckCircle2}
                 />
                 <StatCard

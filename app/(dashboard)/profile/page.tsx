@@ -875,11 +875,11 @@ export default function ProfilePage() {
     if (loading) return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--accent)]" /></div>
 
     const roleBadge: Record<string, { bg: string; color: string }> = {
-        ADMIN:          { bg: "#e8f7f1", color: "#0d6b4a" },
+        ADMIN:          { bg: "#e8effe", color: "#0847c7" },
         MANAGER:        { bg: "#eff6ff", color: "#1d4ed8" },
         INSPECTION_BOY: { bg: "#fef3c7", color: "#92400e" },
     }
-    const badge = roleBadge[formData.role] ?? { bg: "#f9f8f5", color: "#6b6860" }
+    const badge = roleBadge[formData.role] ?? { bg: "#f5f7fd", color: "#5b6478" }
 
     const tabs = [
         { key: "profile",    label: "Profile",       icon: User },
@@ -897,7 +897,7 @@ export default function ProfilePage() {
             {/* Header card */}
             <div className="bg-white border border-[var(--border)] rounded-2xl p-6 flex items-center gap-4">
                 <div className="relative shrink-0">
-                    <div className="w-20 h-20 rounded-full overflow-hidden bg-[#1a1a18] text-white flex items-center justify-center text-[26px] font-bold border-2 border-[var(--border)]">
+                    <div className="w-20 h-20 rounded-full overflow-hidden bg-[var(--text)] text-white flex items-center justify-center text-[26px] font-bold border-2 border-[var(--border)]">
                         {formData.image ? (
                             <img src={formData.image} alt={formData.name} className="w-full h-full object-cover" />
                         ) : (

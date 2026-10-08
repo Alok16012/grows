@@ -28,7 +28,7 @@ type Project = {
 }
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
-    ACTIVE: { label: "Active", bg: "#e8f7f1", fg: "#0d6b4a", dot: "#1a9e6e" },
+    ACTIVE: { label: "Active", bg: "#dcfce7", fg: "#15803d", dot: "#16a34a" },
     PLANNING: { label: "Planning", bg: "#eff6ff", fg: "#1d4ed8", dot: "#3b82f6" },
     ON_HOLD: { label: "On Hold", bg: "#fef2f2", fg: "#b91c1c", dot: "#ef4444" },
     COMPLETED: { label: "Completed", bg: "#f3f4f6", fg: "#374151", dot: "#6b7280" },
@@ -45,7 +45,7 @@ function StatusBadge({ status }: { status?: string | null }) {
     )
 }
 
-const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
+const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
 
 function TeamAvatars({ team }: { team?: TeamMember[] }) {
     const members = (team ?? []).filter(m => m.name)

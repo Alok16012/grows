@@ -129,24 +129,24 @@ type KPITemplate = {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#16a34a", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
 const STATUS_CONFIG: Record<ReviewStatus, { label: string; color: string; bg: string }> = {
     DRAFT:        { label: "Draft",        color: "#6b7280", bg: "#f3f4f6" },
     SUBMITTED:    { label: "Submitted",    color: "#d97706", bg: "#fef3c7" },
     ACKNOWLEDGED: { label: "Acknowledged", color: "#2563eb", bg: "#eff6ff" },
-    COMPLETED:    { label: "Completed",    color: "#1a9e6e", bg: "#e8f7f1" },
+    COMPLETED:    { label: "Completed",    color: "#16a34a", bg: "#dcfce7" },
 }
 
 const CYCLE_CONFIG: Record<ReviewCycle, { label: string; color: string; bg: string }> = {
     MONTHLY:     { label: "Monthly",    color: "#7c3aed", bg: "#f5f3ff" },
     QUARTERLY:   { label: "Quarterly",  color: "#2563eb", bg: "#eff6ff" },
     HALF_YEARLY: { label: "Half-Yearly", color: "#0891b2", bg: "#ecfeff" },
-    ANNUAL:      { label: "Annual",     color: "#1a9e6e", bg: "#e8f7f1" },
+    ANNUAL:      { label: "Annual",     color: "#0b5cff", bg: "#e8effe" },
 }
 
 const RANK_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    TOP_PERFORMER:  { label: "Top Performer",  color: "#1a9e6e", bg: "#e8f7f1" },
+    TOP_PERFORMER:  { label: "Top Performer",  color: "#0b5cff", bg: "#e8effe" },
     HIGH_PERFORMER: { label: "High Performer", color: "#2563eb", bg: "#eff6ff" },
     AVERAGE:        { label: "Average",        color: "#d97706", bg: "#fef3c7" },
     LOW_PERFORMER:  { label: "Low Performer",  color: "#ef4444", bg: "#fee2e2" },
@@ -561,12 +561,12 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
     const summaryCards = [
         { label: "Total Reviews", value: summary.total, icon: FileText, color: "#3b82f6", bg: "#eff6ff" },
         { label: "Pending Reviews", value: summary.pending, icon: Clock, color: "#d97706", bg: "#fef3c7" },
-        { label: "Completed", value: summary.completed, icon: CheckCircle2, color: "#1a9e6e", bg: "#e8f7f1" },
+        { label: "Completed", value: summary.completed, icon: CheckCircle2, color: "#16a34a", bg: "#dcfce7" },
         { label: "Avg Score", value: summary.avgScore.toFixed(2), icon: TrendingUp, color: "#8b5cf6", bg: "#f5f3ff" },
     ]
 
     const rankCards = [
-        { key: "TOP_PERFORMER", label: "Top Performers", color: "#1a9e6e", bg: "#e8f7f1" },
+        { key: "TOP_PERFORMER", label: "Top Performers", color: "#0b5cff", bg: "#e8effe" },
         { key: "HIGH_PERFORMER", label: "High Performers", color: "#2563eb", bg: "#eff6ff" },
         { key: "AVERAGE", label: "Average", color: "#d97706", bg: "#fef3c7" },
         { key: "LOW_PERFORMER", label: "Low Performers", color: "#ef4444", bg: "#fee2e2" },
@@ -603,8 +603,8 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
 
             {/* Ranking & Actions Ribbons */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #e8f7f1 100%)", borderRadius: 12, padding: 18, border: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ width: 40, height: 40, background: "#1a9e6e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><Award color="#fff" size={20} /></div>
+                <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #e8effe 100%)", borderRadius: 12, padding: 18, border: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 40, height: 40, background: "#0b5cff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><Award color="#fff" size={20} /></div>
                     <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>Performance Rewards Active</div>
                         <div style={{ fontSize: 11, color: "#15803d" }}>Top 10% eligible for quarterly performance bonus</div>
@@ -675,7 +675,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                                     <div style={{ fontSize: 11, color: "#6b7280" }}>{p.employee.designation || "—"}</div>
                                 </div>
                                 <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a9e6e" }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0b5cff" }}>
                                         {p.overallRating?.toFixed(1) ?? "—"}
                                     </div>
                                     {p.performanceRank && (
@@ -1259,7 +1259,7 @@ function DrawerKRAKPI({
                     background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
                     padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12,
                 }}>
-                    <TrendingUp size={18} color="#1a9e6e" />
+                    <TrendingUp size={18} color="#16a34a" />
                     <div>
                         <div style={{ fontSize: 13, color: "#166534" }}>
                             <strong>Calculated Overall Score:</strong> {calcScore.toFixed(2)} / 5
@@ -1302,7 +1302,7 @@ function DrawerKRAKPI({
                         disabled={isSyncing}
                         style={{
                             display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
-                            background: "#fff", color: "#1a9e6e", border: "1px solid #1a9e6e",
+                            background: "#fff", color: "#0b5cff", border: "1px solid #0b5cff",
                             borderRadius: 7, fontSize: 13, cursor: isSyncing ? "not-allowed" : "pointer", fontWeight: 600,
                             marginLeft: "auto"
                         }}
@@ -1470,7 +1470,7 @@ function KRABlock({
                     <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{kra.title}</span>
                     <span style={{ fontSize: 12, color: "#6b7280", marginLeft: 8 }}>Weight: {kra.weightage}%</span>
                     {kraScore !== null && (
-                        <span style={{ fontSize: 12, color: "#1a9e6e", marginLeft: 8, fontWeight: 600 }}>
+                        <span style={{ fontSize: 12, color: "#0b5cff", marginLeft: 8, fontWeight: 600 }}>
                             Score: {kraScore.toFixed(2)}
                         </span>
                     )}
@@ -1617,7 +1617,7 @@ function KPIRow({
             >
                 {saving
                     ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
-                    : <Check size={12} color="#1a9e6e" />
+                    : <Check size={12} color="#16a34a" />
                 }
             </button>
         </div>
@@ -1897,7 +1897,7 @@ function DrawerHRApproval({
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{
-                background: review.hrApprovedAt ? "#e8f7f1" : "#fef3c7",
+                background: review.hrApprovedAt ? "#dcfce7" : "#fef3c7",
                 border: `1px solid ${review.hrApprovedAt ? "#86efac" : "#fde68a"}`,
                 borderRadius: 8, padding: "10px 14px", fontSize: 13,
             }}>
@@ -1938,7 +1938,7 @@ function DrawerHRApproval({
                     disabled={approving}
                     style={{
                         display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
-                        background: "#1a9e6e", color: "#fff", border: "none",
+                        background: "#0b5cff", color: "#fff", border: "none",
                         borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: approving ? "not-allowed" : "pointer",
                         alignSelf: "flex-start",
                     }}
@@ -2036,7 +2036,7 @@ function DrawerPIP({
 
             {pip && (
                 <div style={{
-                    background: pip.status === "ACTIVE" ? "#fff7ed" : pip.status === "COMPLETED" ? "#e8f7f1" : "#f3f4f6",
+                    background: pip.status === "ACTIVE" ? "#fff7ed" : pip.status === "COMPLETED" ? "#dcfce7" : "#f3f4f6",
                     border: "1px solid var(--border)", borderRadius: 8,
                     padding: "10px 14px", fontSize: 13,
                 }}>

@@ -9,7 +9,7 @@ import {
     PieChart, Pie, Cell, Legend
 } from "recharts"
 
-const PIE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#06b6d4", "#1a9e6e", "#dc2626", "#65a30d", "#ea580c", "#6b7280"]
+const PIE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#06b6d4", "#0b5cff", "#dc2626", "#65a30d", "#ea580c", "#6b7280"]
 
 export interface AnalyticsData {
     summary: {

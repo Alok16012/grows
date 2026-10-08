@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils"
 
 const THEME = {
     primary: "#3b82f6",
-    success: "#1a9e6e",
+    success: "#16a34a",
     warning: "#d97706",
     danger: "#dc2626",
     info: "#06b6d4"
@@ -103,8 +103,8 @@ function CustomTooltip({ active, payload, label, payload: _payload }: any) {
     const partNumber = row.partNumber ? ` (${row.partNumber})` : ""
     const displayLabel = label ? `${label}${partNumber}` : label
     return (
-        <div className="bg-[#1a1a18] rounded-[8px] p-[12px] shadow-lg border border-[#333] z-50">
-            {displayLabel && <p className="text-[11px] font-[600] text-[#9e9b95] uppercase mb-[8px]">{displayLabel}</p>}
+        <div className="bg-[var(--text)] rounded-[8px] p-[12px] shadow-lg border border-[#333] z-50">
+            {displayLabel && <p className="text-[11px] font-[600] text-[var(--text3)] uppercase mb-[8px]">{displayLabel}</p>}
             <div className="space-y-[6px]">
                 {payload.map((p: any, i: number) => (
                     <div key={i} className="flex items-center justify-between gap-[16px]">
@@ -140,17 +140,17 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
     const active = dimensions.find(d => d.key === selected) ?? dimensions[0]
 
     return (
-        <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
+        <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
             <div className="flex items-start justify-between gap-[12px] mb-[12px]">
                 <div>
-                    <h3 className="text-[14px] font-[600] text-[#1a1a18]">Breakdown by Form Field</h3>
-                    <p className="text-[11px] text-[#9e9b95] mt-[2px]">Built from the fields on these inspection forms</p>
+                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Breakdown by Form Field</h3>
+                    <p className="text-[11px] text-[var(--text3)] mt-[2px]">Built from the fields on these inspection forms</p>
                 </div>
-                {active && <span className="text-[11px] font-[500] text-[#9e9b95] whitespace-nowrap">{active.buckets.length} values</span>}
+                {active && <span className="text-[11px] font-[500] text-[var(--text3)] whitespace-nowrap">{active.buckets.length} values</span>}
             </div>
 
             {dimensions.length === 0 ? (
-                <div className="h-[340px] flex items-center justify-center text-center px-[24px] text-[13px] text-[#9e9b95]">
+                <div className="h-[340px] flex items-center justify-center text-center px-[24px] text-[13px] text-[var(--text3)]">
                     These forms have no grouping fields with more than one value yet. Dropdown fields such as Line, Model or Shift appear here automatically.
                 </div>
             ) : (
@@ -161,8 +161,8 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
                             return (
                                 <button key={d.key} type="button" onClick={() => setSelected(d.key)}
                                     className={`px-[10px] py-[4px] rounded-full text-[12px] font-[600] border transition-colors ${on
-                                        ? "bg-[#1a9e6e] border-[#1a9e6e] text-white"
-                                        : "bg-[#f9f8f5] border-[#e8e6e1] text-[#6b6860] hover:bg-white"}`}>
+                                        ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+                                        : "bg-[var(--surface2)] border-[var(--border)] text-[var(--text2)] hover:bg-white"}`}>
                                     {d.label}
                                 </button>
                             )
@@ -174,10 +174,10 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={active.buckets} layout="vertical" margin={{ left: 20, right: 16 }}>
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                                        <YAxis dataKey="value" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} width={120}
+                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                                        <YAxis dataKey="value" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} width={120}
                                             tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 18) + "…" : v} />
-                                        <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
+                                        <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
                                         <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                                         <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
                                         <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
@@ -185,7 +185,7 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-                            <p className="text-[11px] text-[#9e9b95] mt-[6px]">{active.answered} inspections answered “{active.label}”</p>
+                            <p className="text-[11px] text-[var(--text3)] mt-[6px]">{active.answered} inspections answered “{active.label}”</p>
                         </>
                     )}
                 </>
@@ -197,7 +197,7 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
 function ProgressBar({ value, color }: { value: number; color: string }) {
     return (
         <div className="flex items-center gap-[8px]">
-            <div className="flex-1 h-[6px] rounded-full bg-[#f5f4f0] overflow-hidden">
+            <div className="flex-1 h-[6px] rounded-full bg-[var(--bg)] overflow-hidden">
                 <div
                     className="h-full rounded-full transition-all duration-1000 ease-out"
                     style={{ width: `${Math.min(value, 100)}%`, backgroundColor: color }}
@@ -670,11 +670,11 @@ export default function ReportsPage() {
     const StatCard = ({ label, value, bg, iconBg, iconColor, icon: Icon }: any) => {
         const animatedValue = useCountUp(value)
         return (
-            <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[12px_14px] md:p-[16px_18px] print-card">
+            <div className="bg-white border border-[var(--border)] rounded-[14px] p-[12px_14px] md:p-[16px_18px] print-card">
                 <div className={`w-[38px] h-[38px] rounded-[11px] flex items-center justify-center mb-[10px] ${iconBg}`}>
                     <Icon className="h-[18px] w-[18px]" style={{ color: iconColor }} />
                 </div>
-                <div className="text-[11px] font-[500] text-[#9e9b95] mb-[5px]">{label}</div>
+                <div className="text-[11px] font-[500] text-[var(--text3)] mb-[5px]">{label}</div>
                 <div className="text-[27px] font-[700] tracking-[-0.5px] leading-none" style={{ color: iconColor }}>
                     {animatedValue.toLocaleString()}
                 </div>
@@ -683,18 +683,18 @@ export default function ReportsPage() {
     }
 
     return (
-        <div className="flex flex-col min-h-[100vh] bg-[#f5f4f0] pb-[40px]" id="reports-print-area">
+        <div className="flex flex-col min-h-[100vh] bg-[var(--bg)] pb-[40px]" id="reports-print-area">
             <style jsx global>{`
                 @media print {
                     .no-print { display: none !important; }
                     body { background: white !important; -webkit-print-color-adjust: exact; }
-                    .print-card { border: 1px solid #e8e6e1 !important; box-shadow: none !important; break-inside: avoid; }
+                    .print-card { border: 1px solid #e6eaf5 !important; box-shadow: none !important; break-inside: avoid; }
                     #reports-print-area { background: white !important; }
                 }
             `}</style>
 
             {/* FILTER ROW */}
-            <div className="no-print bg-white border-b border-[#e8e6e1] p-3 md:p-[12px_24px] sticky top-0 z-20">
+            <div className="no-print bg-white border-b border-[var(--border)] p-3 md:p-[12px_24px] sticky top-0 z-20">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-[10px] md:gap-[12px]">
                     {/* Site */}
                     {[
@@ -703,20 +703,20 @@ export default function ReportsPage() {
                         { label: "Inspector", value: selectedInspectorId, options: scopedInspectors, setter: setSelectedInspectorId, allLabel: "All Inspectors" },
                     ].map((filter, idx) => (
                         <div key={idx} className="flex flex-col">
-                            <label className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[0.6px] mb-[5px]">{filter.label}</label>
+                            <label className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[0.6px] mb-[5px]">{filter.label}</label>
                             <div className="relative">
                                 <select
                                     value={filter.value}
                                     onChange={e => filter.setter(e.target.value)}
                                     disabled={filter.disabled}
-                                    className={`w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[9px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none appearance-none transition-all focus:border-[#1a9e6e] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] ${filter.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                    className={`w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] p-[9px_14px] text-[13px] text-[var(--text)] font-[500] outline-none appearance-none transition-all focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] ${filter.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                 >
                                     {filter.allLabel && <option value="all">{filter.allLabel}</option>}
                                     {filter.options.map((opt: any) => (
                                         <option key={opt.id} value={opt.id}>{opt.name}</option>
                                     ))}
                                 </select>
-                                <ChevronRight className="absolute right-[12px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none rotate-90" />
+                                <ChevronRight className="absolute right-[12px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)] pointer-events-none rotate-90" />
                             </div>
                         </div>
                     ))}
@@ -725,15 +725,15 @@ export default function ReportsPage() {
                     <div className="col-span-2 sm:col-span-3 md:col-span-2 flex flex-col gap-[6px]">
                         {/* Mode toggle */}
                         <div className="flex items-center justify-between">
-                            <label className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[0.6px]">Date Filter</label>
-                            <div className="flex bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] p-[2px] gap-[2px]">
+                            <label className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[0.6px]">Date Filter</label>
+                            <div className="flex bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] p-[2px] gap-[2px]">
                                 {(["month", "week", "single", "range"] as const).map(mode => (
                                     <button
                                         key={mode}
                                         onClick={() => setDateFilterMode(mode)}
                                         className={`px-[10px] py-[4px] rounded-[6px] text-[11px] font-[600] transition-colors whitespace-nowrap ${dateFilterMode === mode
-                                            ? "bg-[#1a1a18] text-white"
-                                            : "text-[#6b6860] hover:text-[#1a1a18]"
+                                            ? "bg-[var(--text)] text-white"
+                                            : "text-[var(--text2)] hover:text-[var(--text)]"
                                             }`}
                                     >
                                         {mode === "month" ? "Month" : mode === "week" ? "Week" : mode === "single" ? "Single Day" : "Date Range"}
@@ -749,21 +749,21 @@ export default function ReportsPage() {
                                     <select
                                         value={selectedMonth}
                                         onChange={e => setSelectedMonth(Number(e.target.value))}
-                                        className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[9px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none appearance-none transition-all focus:border-[#1a9e6e] focus:bg-white cursor-pointer"
+                                        className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] p-[9px_14px] text-[13px] text-[var(--text)] font-[500] outline-none appearance-none transition-all focus:border-[var(--accent)] focus:bg-white cursor-pointer"
                                     >
                                         {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                                     </select>
-                                    <ChevronRight className="absolute right-[12px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none rotate-90" />
+                                    <ChevronRight className="absolute right-[12px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)] pointer-events-none rotate-90" />
                                 </div>
                                 <div className="relative">
                                     <select
                                         value={selectedYear}
                                         onChange={e => setSelectedYear(Number(e.target.value))}
-                                        className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[9px_14px] text-[13px] text-[#1a1a18] font-[500] outline-none appearance-none transition-all focus:border-[#1a9e6e] focus:bg-white cursor-pointer"
+                                        className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] p-[9px_14px] text-[13px] text-[var(--text)] font-[500] outline-none appearance-none transition-all focus:border-[var(--accent)] focus:bg-white cursor-pointer"
                                     >
                                         {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                                     </select>
-                                    <ChevronRight className="absolute right-[12px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95] pointer-events-none rotate-90" />
+                                    <ChevronRight className="absolute right-[12px] top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)] pointer-events-none rotate-90" />
                                 </div>
                             </div>
                         )}
@@ -775,7 +775,7 @@ export default function ReportsPage() {
                                     type="button"
                                     aria-label="Previous week"
                                     onClick={() => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() - 7); setWeekAnchor(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`) }}
-                                    className="px-[8px] py-[7px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[#6b6860] hover:text-[#1a1a18] transition-colors"
+                                    className="px-[8px] py-[7px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
                                 >‹</button>
                                 <div className="flex-1">
                                     <input
@@ -783,9 +783,9 @@ export default function ReportsPage() {
                                         value={weekAnchor}
                                         max={todayStr}
                                         onChange={e => e.target.value && setWeekAnchor(e.target.value)}
-                                        className="w-full bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[8px_12px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all focus:border-[#1a9e6e] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
+                                        className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] p-[8px_12px] text-[13px] text-[var(--text)] font-[500] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
                                     />
-                                    <p className="text-[10.5px] text-[#9e9b95] mt-[3px] font-[600]">
+                                    <p className="text-[10.5px] text-[var(--text3)] mt-[3px] font-[600]">
                                         {(() => { const w = weekBoundsOf(weekAnchor); return `${format(new Date(w.start + "T00:00:00"), "EEE d MMM")} – ${format(new Date(w.end + "T00:00:00"), "EEE d MMM yyyy")}` })()}
                                     </p>
                                 </div>
@@ -793,7 +793,7 @@ export default function ReportsPage() {
                                     type="button"
                                     aria-label="Next week"
                                     onClick={() => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() + 7); const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; if (iso <= todayStr) setWeekAnchor(iso) }}
-                                    className="px-[8px] py-[7px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[#6b6860] hover:text-[#1a1a18] transition-colors"
+                                    className="px-[8px] py-[7px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
                                 >›</button>
                             </div>
                         )}
@@ -801,13 +801,13 @@ export default function ReportsPage() {
                         {/* Single day mode */}
                         {dateFilterMode === "single" && (
                             <div className="flex items-center gap-[8px]">
-                                <Calendar className="h-[14px] w-[14px] text-[#9e9b95] flex-shrink-0" />
+                                <Calendar className="h-[14px] w-[14px] text-[var(--text3)] flex-shrink-0" />
                                 <input
                                     type="date"
                                     value={dateFrom}
                                     max={todayStr}
                                     onChange={e => setDateFrom(e.target.value)}
-                                    className="flex-1 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[8px_12px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all focus:border-[#1a9e6e] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
+                                    className="flex-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] p-[8px_12px] text-[13px] text-[var(--text)] font-[500] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
                                 />
                             </div>
                         )}
@@ -820,16 +820,16 @@ export default function ReportsPage() {
                                     value={dateFrom}
                                     max={dateTo}
                                     onChange={e => setDateFrom(e.target.value)}
-                                    className="flex-1 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[8px_12px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all focus:border-[#1a9e6e] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
+                                    className="flex-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] p-[8px_12px] text-[13px] text-[var(--text)] font-[500] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
                                 />
-                                <span className="text-[11px] font-[600] text-[#9e9b95] flex-shrink-0">to</span>
+                                <span className="text-[11px] font-[600] text-[var(--text3)] flex-shrink-0">to</span>
                                 <input
                                     type="date"
                                     value={dateTo}
                                     min={dateFrom}
                                     max={todayStr}
                                     onChange={e => setDateTo(e.target.value)}
-                                    className="flex-1 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] p-[8px_12px] text-[13px] text-[#1a1a18] font-[500] outline-none transition-all focus:border-[#1a9e6e] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
+                                    className="flex-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] p-[8px_12px] text-[13px] text-[var(--text)] font-[500] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(26,158,110,0.08)] cursor-pointer"
                                 />
                             </div>
                         )}
@@ -838,15 +838,15 @@ export default function ReportsPage() {
             </div>
 
             {/* TABS ROW */}
-            <div className="no-print bg-white border-b border-[#e8e6e1] p-3 md:p-[10px_24px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="bg-white border border-[#e8e6e1] rounded-[10px] p-[4px] flex gap-[2px] overflow-x-auto">
+            <div className="no-print bg-white border-b border-[var(--border)] p-3 md:p-[10px_24px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="bg-white border border-[var(--border)] rounded-[10px] p-[4px] flex gap-[2px] overflow-x-auto">
                     {["Dashboard", "Graphical", "Pareto Chart", "Day Wise", "Part Wise", "Inspection Report"].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`p-[7px_14px] rounded-[7px] text-[13px] font-[500] transition-colors whitespace-nowrap ${activeTab === tab
-                                ? "bg-[#1a1a18] text-white"
-                                : "bg-transparent text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
+                                ? "bg-[var(--text)] text-white"
+                                : "bg-transparent text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                                 }`}
                         >
                             {tab}
@@ -870,7 +870,7 @@ export default function ReportsPage() {
                         <button
                             onClick={handleExportExcel}
                             disabled={loading || (activeTab === "Day Wise" ? !data?.dayWise?.length : activeTab === "Part Wise" ? !data?.partWise?.length : !filteredRecords?.length)}
-                            className="flex items-center gap-[6px] bg-[#1a9e6e] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[#158a5e] focus:bg-[#158a5e] transition-colors disabled:opacity-50"
+                            className="flex items-center gap-[6px] bg-[var(--accent)] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] focus:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
                         >
                             <FileSpreadsheet className="h-[14px] w-[14px]" />
                             Excel
@@ -879,7 +879,7 @@ export default function ReportsPage() {
                     <button
                         onClick={fetchReport}
                         disabled={loading}
-                        className="flex items-center gap-[6px] bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[#158a5e] transition-colors disabled:opacity-50 shadow-sm"
+                        className="flex items-center gap-[6px] bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 shadow-sm"
                     >
                         {loading ? <div className="h-[14px] w-[14px] rounded-full border-2 border-white border-t-transparent animate-spin" /> : <ExternalLink className="h-[14px] w-[14px]" />}
                         <span className="hidden sm:inline">Update Dashboard</span>
@@ -892,9 +892,9 @@ export default function ReportsPage() {
             <div className="p-3 md:p-[20px_24px]">
 
                 {/* Print Header Visible Only in PDF */}
-                <div className="hidden print:block mb-[24px] border-b border-[#1a1a18] pb-[16px]">
-                    <h1 className="text-[24px] font-[700] text-[#1a1a18]">{sites.find(c => c.id === selectedSiteId)?.name || "Global View"} - {activeTab}</h1>
-                    <p className="text-[12px] font-[500] text-[#6b6860] mt-[4px]">
+                <div className="hidden print:block mb-[24px] border-b border-[var(--text)] pb-[16px]">
+                    <h1 className="text-[24px] font-[700] text-[var(--text)]">{sites.find(c => c.id === selectedSiteId)?.name || "Global View"} - {activeTab}</h1>
+                    <p className="text-[12px] font-[500] text-[var(--text2)] mt-[4px]">
                         Period: {periodLabel} •
                         Project: {projects.find(p => p.id === selectedProjectId)?.name || "All"} •
                         Inspector: {inspectors.find(i => i.id === selectedInspectorId)?.name || "All"}
@@ -903,13 +903,13 @@ export default function ReportsPage() {
 
                 {loading ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-[14px]">
-                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-[110px] rounded-[12px] w-full bg-white border border-[#e8e6e1]" />)}
+                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-[110px] rounded-[12px] w-full bg-white border border-[var(--border)]" />)}
                     </div>
                 ) : !data ? (
-                    <div className="flex flex-col items-center justify-center p-[60px] bg-white border border-[#e8e6e1] rounded-[14px]">
-                        <AlertCircle className="h-[32px] w-[32px] text-[#d4d1ca] mb-[12px]" />
-                        <h2 className="text-[14px] font-[600] text-[#1a1a18]">No data loaded</h2>
-                        <p className="text-[12px] text-[#9e9b95] mt-[4px]">Click Update Dashboard to refresh.</p>
+                    <div className="flex flex-col items-center justify-center p-[60px] bg-white border border-[var(--border)] rounded-[14px]">
+                        <AlertCircle className="h-[32px] w-[32px] text-[var(--border2)] mb-[12px]" />
+                        <h2 className="text-[14px] font-[600] text-[var(--text)]">No data loaded</h2>
+                        <p className="text-[12px] text-[var(--text3)] mt-[4px]">Click Update Dashboard to refresh.</p>
                     </div>
                 ) : (
                     <div className="space-y-[16px]">
@@ -918,7 +918,7 @@ export default function ReportsPage() {
                         {activeTab === "Dashboard" && (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-[14px]">
                                 <StatCard label="TOTAL INSPECTED" value={s?.totalInspected || 0} iconBg="bg-[#eff6ff]" iconColor="#3b82f6" icon={Terminal} />
-                                <StatCard label="TOTAL ACCEPTED" value={s?.totalAccepted || 0} iconBg="bg-[#e8f7f1]" iconColor="#1a9e6e" icon={CheckCircle2} />
+                                <StatCard label="TOTAL ACCEPTED" value={s?.totalAccepted || 0} iconBg="bg-[var(--success-light)]" iconColor="#16a34a" icon={CheckCircle2} />
                                 <StatCard label="TOTAL REWORK" value={s?.totalRework || 0} iconBg="bg-[#fef3c7]" iconColor="#d97706" icon={TrendingDown} />
                                 <StatCard label="TOTAL REJECTED" value={s?.totalRejected || 0} iconBg="bg-[#fef2f2]" iconColor="#dc2626" icon={AlertCircle} />
                                 <StatCard label="REWORK PPM" value={s?.reworkPPM || 0} iconBg="bg-[#fef3c7]" iconColor="#d97706" icon={Target} />
@@ -928,10 +928,10 @@ export default function ReportsPage() {
 
                         {activeTab === "Dashboard" && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
-                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
+                                <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
                                     <div className="mb-[16px]">
-                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Overall Status</h3>
-                                        <p className="text-[11px] font-[500] text-[#9e9b95] mt-[2px]">Acceptance vs Rejection</p>
+                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Overall Status</h3>
+                                        <p className="text-[11px] font-[500] text-[var(--text3)] mt-[2px]">Acceptance vs Rejection</p>
                                     </div>
                                     {(s?.totalInspected || 0) > 0 ? (
                                         <div className="flex flex-col items-center">
@@ -945,26 +945,26 @@ export default function ReportsPage() {
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                                    <span className="text-[40px] font-[700] text-[#1a1a18] font-mono tracking-[-1px] leading-none">{s?.acceptanceRate.toFixed(1)}%</span>
-                                                    <span className="text-[10px] font-[600] text-[#9e9b95] uppercase tracking-[1px] mt-[6px]">Quality Rate</span>
+                                                    <span className="text-[40px] font-[700] text-[var(--text)] font-mono tracking-[-1px] leading-none">{s?.acceptanceRate.toFixed(1)}%</span>
+                                                    <span className="text-[10px] font-[600] text-[var(--text3)] uppercase tracking-[1px] mt-[6px]">Quality Rate</span>
                                                 </div>
                                             </div>
                                             <div className="flex flex-wrap justify-center gap-[16px] mt-[16px]">
                                                 {pieData.map(e => (
                                                     <div key={e.name} className="flex items-center gap-[6px]">
                                                         <div className="w-[10px] h-[10px] rounded-[3px]" style={{ backgroundColor: e.color }} />
-                                                        <span className="text-[12px] font-[500] text-[#6b6860]">{e.name}</span>
+                                                        <span className="text-[12px] font-[500] text-[var(--text2)]">{e.name}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
-                                    ) : <div className="h-[280px] flex items-center justify-center text-[13px] text-[#9e9b95]">No inspection data</div>}
+                                    ) : <div className="h-[280px] flex items-center justify-center text-[13px] text-[var(--text3)]">No inspection data</div>}
                                 </div>
 
-                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
+                                <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
                                     <div className="mb-[16px]">
-                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Performance Trend</h3>
-                                        <p className="text-[11px] font-[500] text-[#9e9b95] mt-[2px]">Daily inspection volume over selected month</p>
+                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Performance Trend</h3>
+                                        <p className="text-[11px] font-[500] text-[var(--text3)] mt-[2px]">Daily inspection volume over selected month</p>
                                     </div>
                                     {areaData.length > 0 ? (
                                         <div className="h-[320px] w-full">
@@ -975,8 +975,8 @@ export default function ReportsPage() {
                                                         <linearGradient id="colorInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.primary} stopOpacity={0.1} /><stop offset="95%" stopColor={THEME.primary} stopOpacity={0} /></linearGradient>
                                                     </defs>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#9e9b95" }} dy={10} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#9e9b95" }} />
+                                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#98a1b5" }} dy={10} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#98a1b5" }} />
                                                     <Tooltip content={<CustomTooltip />} />
                                                     <Area type="monotone" dataKey="totalInspected" name="Inspected" stroke={THEME.primary} strokeWidth={2} fillOpacity={1} fill="url(#colorInspected)" />
                                                     <Area type="monotone" dataKey="totalAccepted" name="Accepted" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#colorAccepted)" />
@@ -984,17 +984,17 @@ export default function ReportsPage() {
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         </div>
-                                    ) : <div className="h-[320px] flex items-center justify-center text-[13px] text-[#9e9b95]">No trend data available</div>}
+                                    ) : <div className="h-[320px] flex items-center justify-center text-[13px] text-[var(--text3)]">No trend data available</div>}
                                 </div>
                             </div>
                         )}
 
                         {activeTab === "Dashboard" && (
-                            <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
+                            <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
                                 <div className="flex items-center justify-between mb-[18px]">
                                     <div>
-                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Top 5 Defects</h3>
-                                        <p className="text-[11px] font-[500] text-[#9e9b95] mt-[2px]">Most frequent defects this period</p>
+                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Top 5 Defects</h3>
+                                        <p className="text-[11px] font-[500] text-[var(--text3)] mt-[2px]">Most frequent defects this period</p>
                                     </div>
                                     <Badge variant="outline" className="bg-[#fef2f2] text-[#dc2626] border-transparent font-[600] px-[10px] py-[2px] text-[11px]">
                                         {(data?.topDefects || []).length > 0 ? `${Math.min(5, data.topDefects.length)} Defects` : "No Data"}
@@ -1009,10 +1009,10 @@ export default function ReportsPage() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between mb-[4px]">
-                                                        <span className="text-[13px] font-[600] text-[#1a1a18] truncate">{d.defectName}</span>
-                                                        <span className="text-[12px] font-[700] text-[#dc2626] ml-[8px] flex-shrink-0">{d.count} <span className="text-[10px] font-[500] text-[#9e9b95]">({d.percentage.toFixed(1)}%)</span></span>
+                                                        <span className="text-[13px] font-[600] text-[var(--text)] truncate">{d.defectName}</span>
+                                                        <span className="text-[12px] font-[700] text-[#dc2626] ml-[8px] flex-shrink-0">{d.count} <span className="text-[10px] font-[500] text-[var(--text3)]">({d.percentage.toFixed(1)}%)</span></span>
                                                     </div>
-                                                    <div className="h-[5px] rounded-full bg-[#f5f4f0] overflow-hidden">
+                                                    <div className="h-[5px] rounded-full bg-[var(--bg)] overflow-hidden">
                                                         <div className="h-full rounded-full bg-[#dc2626] transition-all duration-700" style={{ width: `${d.percentage}%` }} />
                                                     </div>
                                                 </div>
@@ -1020,55 +1020,55 @@ export default function ReportsPage() {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="h-[120px] flex items-center justify-center text-[13px] text-[#9e9b95]">No defect data for this period</div>
+                                    <div className="h-[120px] flex items-center justify-center text-[13px] text-[var(--text3)]">No defect data for this period</div>
                                 )}
                             </div>
                         )}
 
                         {activeTab === "Graphical" && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
-                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
-                                    <h3 className="text-[14px] font-[600] text-[#1a1a18] mb-[20px]">Part-Wise Quality Split</h3>
+                                <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
+                                    <h3 className="text-[14px] font-[600] text-[var(--text)] mb-[20px]">Part-Wise Quality Split</h3>
                                     {data.partWise.length > 0 ? (
                                         <div className="h-[400px] w-full">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={data.partWise} layout="vertical" margin={{ left: 20 }}>
                                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                                                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                                                    <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} width={120}
+                                                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                                                    <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} width={120}
                                                         tickFormatter={(val: string) => {
                                                             const row = data.partWise.find((p: any) => p.partName === val)
                                                             const pn = row?.partNumber ? ` [${row.partNumber}]` : ""
                                                             return val.length > 18 ? val.slice(0, 18) + "…" + pn : val + pn
                                                         }}
                                                     />
-                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
+                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
                                                     <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} radius={0} />
                                                     <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
                                                     <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 4, 4, 0]} />
                                                 </BarChart>
                                             </ResponsiveContainer>
                                         </div>
-                                    ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[#9e9b95]">No parts data</div>}
+                                    ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[var(--text3)]">No parts data</div>}
                                 </div>
                                 <BreakdownCard dimensions={(data as any).dimensions ?? []} />
                                 {/* Inspector-wise comparison. The API has always aggregated this
                                     (inspectorWise); nothing rendered it, so the one dimension a
                                     quality lead actually reviews people on was missing from the
                                     charts. Spans both columns so long names stay readable. */}
-                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card md:col-span-2">
+                                <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card md:col-span-2">
                                     <div className="flex items-center justify-between mb-[20px]">
-                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Inspector-Wise Comparison</h3>
-                                        <span className="text-[11px] font-[500] text-[#9e9b95]">{data.inspectorWise?.length ?? 0} inspectors</span>
+                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Inspector-Wise Comparison</h3>
+                                        <span className="text-[11px] font-[500] text-[var(--text3)]">{data.inspectorWise?.length ?? 0} inspectors</span>
                                     </div>
                                     {(data.inspectorWise?.length ?? 0) > 0 ? (
                                         <div style={{ height: Math.max(240, (data.inspectorWise.length * 34) + 60) }} className="w-full">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={data.inspectorWise} layout="vertical" margin={{ left: 20, right: 16 }}>
                                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                                                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                                                    <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} width={140} />
-                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f8f5" }} />
+                                                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                                                    <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} width={140} />
+                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
                                                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                                                     <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
                                                     <Bar dataKey="totalRework"   name="Rework"   stackId="a" fill={THEME.warning} />
@@ -1076,17 +1076,17 @@ export default function ReportsPage() {
                                                 </BarChart>
                                             </ResponsiveContainer>
                                         </div>
-                                    ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[#9e9b95]">No inspector data</div>}
+                                    ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[var(--text3)]">No inspector data</div>}
                                 </div>
                             </div>
                         )}
 
                         {activeTab === "Pareto Chart" && (
-                            <div className="bg-white border border-[#e8e6e1] rounded-[14px] p-[20px] print-card">
+                            <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
                                 <div className="flex items-center justify-between mb-[24px]">
                                     <div>
-                                        <h3 className="text-[14px] font-[600] text-[#1a1a18]">Top Defect Analysis</h3>
-                                        <p className="text-[11px] font-[500] text-[#9e9b95] mt-[2px]">Defect frequency vs cumulative impact</p>
+                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Top Defect Analysis</h3>
+                                        <p className="text-[11px] font-[500] text-[var(--text3)] mt-[2px]">Defect frequency vs cumulative impact</p>
                                     </div>
                                     <Badge variant="outline" className="bg-[#fef3c7] text-[#d97706] border-transparent font-[600] px-[10px] py-[2px] text-[11px]">
                                         Major Defects Only
@@ -1097,46 +1097,46 @@ export default function ReportsPage() {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart data={paretoData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} angle={-45} textAnchor="end" height={80} dy={20} />
-                                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                                                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} unit="%" />
+                                                <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} angle={-45} textAnchor="end" height={80} dy={20} />
+                                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                                                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} unit="%" />
                                                 <Tooltip content={<CustomTooltip />} />
                                                 <Bar yAxisId="left" dataKey="count" name="Frequency" fill={THEME.danger} radius={[4, 4, 0, 0]} barSize={50} />
                                                 <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.warning} strokeWidth={3} dot={{ r: 4, fill: THEME.warning, strokeWidth: 2, stroke: "white" }} />
                                             </ComposedChart>
                                         </ResponsiveContainer>
                                     </div>
-                                ) : <div className="h-[450px] flex items-center justify-center text-[13px] text-[#9e9b95]">No defect data to plot</div>}
+                                ) : <div className="h-[450px] flex items-center justify-center text-[13px] text-[var(--text3)]">No defect data to plot</div>}
                             </div>
                         )}
 
                         {activeTab === "Day Wise" && (
-                            <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden print-card">
-                                <div className="p-[16px_20px] border-b border-[#e8e6e1]">
-                                    <h3 className="text-[14px] font-[600] text-[#1a1a18]">Daily Inspection Log</h3>
+                            <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden print-card">
+                                <div className="p-[16px_20px] border-b border-[var(--border)]">
+                                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Daily Inspection Log</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
-                                            <tr className="bg-[#f9f8f5] border-b border-[#e8e6e1]">
+                                            <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
                                                 {["Date", "Inspected", "Accepted", "Rework", "Rejected", "Quality Status"].map(h => (
-                                                    <th key={h} className="p-[10px_16px] text-left text-[11px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px]">{h}</th>
+                                                    <th key={h} className="p-[10px_16px] text-left text-[11px] font-[600] text-[var(--text3)] uppercase tracking-[0.5px]">{h}</th>
                                                 ))}
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-[#e8e6e1]">
+                                        <tbody className="divide-y divide-[var(--border)]">
                                             {data.dayWise.map((d: any) => (
-                                                <tr key={d.date} className="hover:bg-[#f9f8f5] transition-colors">
-                                                    <td className="p-[12px_16px] text-[13px] text-[#1a1a18] font-[500]">{(() => { try { return format(parseISO(d.date), "dd MMM yyyy, EEE") } catch { return d.date || "—" } })()}</td>
+                                                <tr key={d.date} className="hover:bg-[var(--surface2)] transition-colors">
+                                                    <td className="p-[12px_16px] text-[13px] text-[var(--text)] font-[500]">{(() => { try { return format(parseISO(d.date), "dd MMM yyyy, EEE") } catch { return d.date || "—" } })()}</td>
                                                     <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-left">{d.totalInspected.toLocaleString()}</td>
-                                                    <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[#1a9e6e] text-left">{d.totalAccepted.toLocaleString()}</td>
+                                                    <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[var(--success-strong)] text-left">{d.totalAccepted.toLocaleString()}</td>
                                                     <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[#d97706] text-left">{d.totalRework.toLocaleString()}</td>
                                                     <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[#dc2626] text-left">{d.totalRejected.toLocaleString()}</td>
                                                     <td className="p-[12px_16px] w-[200px]"><ProgressBar value={d.qualityRate} color={d.qualityRate >= 99 ? THEME.success : d.qualityRate >= 95 ? THEME.warning : THEME.danger} /></td>
                                                 </tr>
                                             ))}
                                             {data.dayWise.length === 0 && (
-                                                <tr><td colSpan={6} className="p-[30px] text-center text-[13px] text-[#9e9b95]">No daily data available.</td></tr>
+                                                <tr><td colSpan={6} className="p-[30px] text-center text-[13px] text-[var(--text3)]">No daily data available.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
@@ -1145,32 +1145,32 @@ export default function ReportsPage() {
                         )}
 
                         {activeTab === "Part Wise" && (
-                            <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden print-card">
-                                <div className="p-[16px_20px] border-b border-[#e8e6e1]">
-                                    <h3 className="text-[14px] font-[600] text-[#1a1a18]">Performance by Component</h3>
+                            <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden print-card">
+                                <div className="p-[16px_20px] border-b border-[var(--border)]">
+                                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Performance by Component</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
-                                            <tr className="bg-[#f9f8f5] border-b border-[#e8e6e1]">
+                                            <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
                                                 {["Component", "Inspected", "Accepted", "Rework", "Rejected", "Quality Rate"].map(h => (
-                                                    <th key={h} className="p-[10px_16px] text-left text-[11px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px]">{h}</th>
+                                                    <th key={h} className="p-[10px_16px] text-left text-[11px] font-[600] text-[var(--text3)] uppercase tracking-[0.5px]">{h}</th>
                                                 ))}
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-[#e8e6e1]">
+                                        <tbody className="divide-y divide-[var(--border)]">
                                             {data.partWise.map((p: any) => (
-                                                <tr key={p.partName} className="hover:bg-[#f9f8f5] transition-colors">
-                                                    <td className="p-[12px_16px] text-[13px] text-[#1a1a18] font-[500]">{p.partName}</td>
+                                                <tr key={p.partName} className="hover:bg-[var(--surface2)] transition-colors">
+                                                    <td className="p-[12px_16px] text-[13px] text-[var(--text)] font-[500]">{p.partName}</td>
                                                     <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-left">{p.totalInspected.toLocaleString()}</td>
-                                                    <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[#1a9e6e] text-left">{p.totalAccepted.toLocaleString()}</td>
+                                                    <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[var(--success-strong)] text-left">{p.totalAccepted.toLocaleString()}</td>
                                                     <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[#d97706] text-left">{p.totalRework.toLocaleString()}</td>
                                                     <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-[#dc2626] text-left">{p.totalRejected.toLocaleString()}</td>
                                                     <td className="p-[12px_16px] w-[200px]"><ProgressBar value={p.qualityRate} color={p.qualityRate >= 99 ? THEME.success : p.qualityRate >= 95 ? THEME.warning : THEME.danger} /></td>
                                                 </tr>
                                             ))}
                                             {data.partWise.length === 0 && (
-                                                <tr><td colSpan={6} className="p-[30px] text-center text-[13px] text-[#9e9b95]">No component data available.</td></tr>
+                                                <tr><td colSpan={6} className="p-[30px] text-center text-[13px] text-[var(--text3)]">No component data available.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
@@ -1234,26 +1234,26 @@ export default function ReportsPage() {
                             const SortIcon = ({ col }: { col: string }) => {
                                 if (sortKey !== col) return <ArrowUpDown className="h-[11px] w-[11px] text-[#c5c3bd] ml-[4px] inline" />
                                 return sortDir === "asc"
-                                    ? <ArrowUp className="h-[11px] w-[11px] text-[#1a9e6e] ml-[4px] inline" />
-                                    : <ArrowDown className="h-[11px] w-[11px] text-[#1a9e6e] ml-[4px] inline" />
+                                    ? <ArrowUp className="h-[11px] w-[11px] text-[var(--accent)] ml-[4px] inline" />
+                                    : <ArrowDown className="h-[11px] w-[11px] text-[var(--accent)] ml-[4px] inline" />
                             }
 
                             return (
-                                <div className="bg-white border border-[#e8e6e1] rounded-[14px] mt-[16px] overflow-hidden no-print">
+                                <div className="bg-white border border-[var(--border)] rounded-[14px] mt-[16px] overflow-hidden no-print">
                                     {/* Header bar */}
-                                    <div className="p-[14px_18px] border-b border-[#e8e6e1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div className="p-[14px_18px] border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                         <div>
-                                            <h3 className="text-[13.5px] font-[600] text-[#1a1a18]">Inspection Record Explorer</h3>
-                                            <p className="text-[10.5px] font-[600] text-[#9e9b95] uppercase tracking-[0.6px] mt-[2px]">
+                                            <h3 className="text-[13.5px] font-[600] text-[var(--text)]">Inspection Record Explorer</h3>
+                                            <p className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[0.6px] mt-[2px]">
                                                 {filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""} &nbsp;·&nbsp; LIVE DATA FEED
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-[8px] flex-wrap">
                                             {/* Global search */}
                                             <div className="relative">
-                                                <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[#9e9b95]" />
+                                                <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[var(--text3)]" />
                                                 <Input
-                                                    className="w-[200px] pl-[30px] h-[34px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] text-[12.5px] font-[500] focus-visible:ring-0 focus:border-[#1a9e6e] focus:bg-white transition-all shadow-none"
+                                                    className="w-[200px] pl-[30px] h-[34px] bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] text-[12.5px] font-[500] focus-visible:ring-0 focus:border-[var(--accent)] focus:bg-white transition-all shadow-none"
                                                     placeholder="Search all..."
                                                     value={searchTerm}
                                                     onChange={e => setSearchTerm(e.target.value)}
@@ -1263,15 +1263,15 @@ export default function ReportsPage() {
                                             <button
                                                 onClick={() => setShowFilterRow(v => !v)}
                                                 className={`flex items-center gap-[5px] h-[34px] px-[10px] rounded-[8px] border text-[12px] font-[600] transition-colors ${showFilterRow || Object.values(colFilters).some(Boolean)
-                                                        ? "bg-[#1a9e6e] text-white border-[#1a9e6e]"
-                                                        : "bg-[#f9f8f5] text-[#6b6860] border-[#e8e6e1] hover:border-[#1a9e6e] hover:text-[#1a9e6e]"
+                                                        ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                                                        : "bg-[var(--surface2)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                                                     }`}
                                                 title="Column filters"
                                             >
                                                 <SlidersHorizontal className="h-[13px] w-[13px]" />
                                                 <span className="hidden sm:inline">Filter</span>
                                                 {Object.values(colFilters).some(Boolean) && (
-                                                    <span className="bg-white text-[#1a9e6e] rounded-full w-[16px] h-[16px] text-[10px] font-[700] flex items-center justify-center">
+                                                    <span className="bg-white text-[var(--accent)] rounded-full w-[16px] h-[16px] text-[10px] font-[700] flex items-center justify-center">
                                                         {Object.values(colFilters).filter(Boolean).length}
                                                     </span>
                                                 )}
@@ -1281,8 +1281,8 @@ export default function ReportsPage() {
                                                 <button
                                                     onClick={() => setShowColMenu(v => !v)}
                                                     className={`flex items-center gap-[5px] h-[34px] px-[10px] rounded-[8px] border text-[12px] font-[600] transition-colors ${showColMenu
-                                                            ? "bg-[#1a1a18] text-white border-[#1a1a18]"
-                                                            : "bg-[#f9f8f5] text-[#6b6860] border-[#e8e6e1] hover:border-[#1a1a18] hover:text-[#1a1a18]"
+                                                            ? "bg-[var(--text)] text-white border-[var(--text)]"
+                                                            : "bg-[var(--surface2)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--text)] hover:text-[var(--text)]"
                                                         }`}
                                                     title="Show/hide columns"
                                                 >
@@ -1290,26 +1290,26 @@ export default function ReportsPage() {
                                                     <span className="hidden sm:inline">Columns</span>
                                                 </button>
                                                 {showColMenu && (
-                                                    <div className="absolute right-0 top-[38px] z-[50] bg-white border border-[#e8e6e1] rounded-[10px] shadow-lg p-[8px] min-w-[200px] max-h-[420px] overflow-y-auto">
-                                                        <p className="text-[10px] font-[700] text-[#9e9b95] uppercase tracking-[0.6px] px-[8px] pt-[4px] pb-[8px] border-b border-[#f5f4f0] mb-[4px]">Visible Columns</p>
+                                                    <div className="absolute right-0 top-[38px] z-[50] bg-white border border-[var(--border)] rounded-[10px] shadow-lg p-[8px] min-w-[200px] max-h-[420px] overflow-y-auto">
+                                                        <p className="text-[10px] font-[700] text-[var(--text3)] uppercase tracking-[0.6px] px-[8px] pt-[4px] pb-[8px] border-b border-[var(--bg)] mb-[4px]">Visible Columns</p>
                                                         {COL_META.map((c, i) => (<div key={c.key}>
                                                             {c.field && !COL_META[i - 1]?.field && (
-                                                                <p className="text-[10px] font-[700] text-[#9e9b95] uppercase tracking-[0.6px] px-[8px] pt-[8px] pb-[6px] border-t border-[#f5f4f0] mt-[4px]">From the form</p>
+                                                                <p className="text-[10px] font-[700] text-[var(--text3)] uppercase tracking-[0.6px] px-[8px] pt-[8px] pb-[6px] border-t border-[var(--bg)] mt-[4px]">From the form</p>
                                                             )}
                                                             <button
                                                                 onClick={() => toggleCol(c)}
-                                                                className="w-full flex items-center gap-[8px] px-[8px] py-[5px] rounded-[6px] hover:bg-[#f9f8f5] transition-colors text-left"
+                                                                className="w-full flex items-center gap-[8px] px-[8px] py-[5px] rounded-[6px] hover:bg-[var(--surface2)] transition-colors text-left"
                                                             >
-                                                                <div className={`w-[14px] h-[14px] rounded-[3px] border flex items-center justify-center flex-shrink-0 ${isVisible(c) ? "bg-[#1a9e6e] border-[#1a9e6e]" : "border-[#d4d1ca]"
+                                                                <div className={`w-[14px] h-[14px] rounded-[3px] border flex items-center justify-center flex-shrink-0 ${isVisible(c) ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border2)]"
                                                                     }`}>
                                                                     {isVisible(c) && <Check className="h-[9px] w-[9px] text-white" />}
                                                                 </div>
-                                                                <span className="text-[12.5px] font-[500] text-[#1a1a18]">{c.label}</span>
+                                                                <span className="text-[12.5px] font-[500] text-[var(--text)]">{c.label}</span>
                                                             </button>
                                                         </div>))}
                                                         <button
                                                             onClick={() => { setVisibleCols(new Set(ALL_COLS)); setFieldColPrefs({}) }}
-                                                            className="w-full text-center text-[11px] font-[600] text-[#1a9e6e] mt-[6px] pt-[6px] border-t border-[#f5f4f0] hover:underline"
+                                                            className="w-full text-center text-[11px] font-[600] text-[var(--accent)] mt-[6px] pt-[6px] border-t border-[var(--bg)] hover:underline"
                                                         >Reset all</button>
                                                     </div>
                                                 )}
@@ -1332,19 +1332,19 @@ export default function ReportsPage() {
                                     <div className="overflow-x-auto">
                                         {filteredRecords.length === 0 ? (
                                             <div className="flex flex-col items-center justify-center p-[60px]">
-                                                <Search className="h-[32px] w-[32px] text-[#d4d1ca] mb-[10px]" />
-                                                <p className="text-[13px] text-[#9e9b95]">No records matching your filters</p>
+                                                <Search className="h-[32px] w-[32px] text-[var(--border2)] mb-[10px]" />
+                                                <p className="text-[13px] text-[var(--text3)]">No records matching your filters</p>
                                             </div>
                                         ) : (
                                             <table className="w-full">
                                                 <thead>
                                                     {/* Column headers with sort */}
-                                                    <tr className="bg-[#f9f8f5] border-b border-[#e8e6e1]">
+                                                    <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
                                                         {visibleMeta.map(c => (
                                                             <th
                                                                 key={c.key}
                                                                 onClick={() => handleSort(c.key)}
-                                                                className={`p-[10px_16px] text-[11px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px] cursor-pointer select-none hover:text-[#1a1a18] hover:bg-[#f0efeb] transition-colors group ${c.numeric ? "text-right" : "text-left"
+                                                                className={`p-[10px_16px] text-[11px] font-[600] text-[var(--text3)] uppercase tracking-[0.5px] cursor-pointer select-none hover:text-[var(--text)] hover:bg-[#f0efeb] transition-colors group ${c.numeric ? "text-right" : "text-left"
                                                                     }`}
                                                             >
                                                                 <span className="inline-flex items-center gap-[2px]">
@@ -1353,11 +1353,11 @@ export default function ReportsPage() {
                                                                 </span>
                                                             </th>
                                                         ))}
-                                                        {role === "ADMIN" && <th className="p-[10px_16px] text-[11px] font-[600] text-[#9e9b95] uppercase tracking-[0.5px] text-right w-[60px]">Actions</th>}
+                                                        {role === "ADMIN" && <th className="p-[10px_16px] text-[11px] font-[600] text-[var(--text3)] uppercase tracking-[0.5px] text-right w-[60px]">Actions</th>}
                                                     </tr>
                                                     {/* Filter row */}
                                                     {showFilterRow && (
-                                                        <tr className="bg-[#fafaf8] border-b border-[#e8e6e1]">
+                                                        <tr className="bg-[#fafaf8] border-b border-[var(--border)]">
                                                             {visibleMeta.map(c => (
                                                                 <td key={c.key} className="p-[4px_8px]">
                                                                     <input
@@ -1365,8 +1365,8 @@ export default function ReportsPage() {
                                                                         placeholder={`Filter ${c.label}…`}
                                                                         value={colFilters[c.key] || ""}
                                                                         onChange={e => setColFilters(prev => ({ ...prev, [c.key]: e.target.value }))}
-                                                                        className={`w-full bg-white border border-[#e8e6e1] rounded-[6px] px-[8px] py-[5px] text-[11.5px] text-[#1a1a18] placeholder-[#c5c3bd] outline-none focus:border-[#1a9e6e] focus:shadow-[0_0_0_2px_rgba(26,158,110,0.1)] transition-all ${c.numeric ? "text-right" : "text-left"
-                                                                            } ${colFilters[c.key] ? "border-[#1a9e6e] bg-[#f0faf6]" : ""
+                                                                        className={`w-full bg-white border border-[var(--border)] rounded-[6px] px-[8px] py-[5px] text-[11.5px] text-[var(--text)] placeholder-[#c5c3bd] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_rgba(26,158,110,0.1)] transition-all ${c.numeric ? "text-right" : "text-left"
+                                                                            } ${colFilters[c.key] ? "border-[var(--accent)] bg-[#f0faf6]" : ""
                                                                             }`}
                                                                     />
                                                                 </td>
@@ -1375,21 +1375,21 @@ export default function ReportsPage() {
                                                         </tr>
                                                     )}
                                                 </thead>
-                                                <tbody className="divide-y divide-[#e8e6e1]">
+                                                <tbody className="divide-y divide-[var(--border)]">
                                                     {filteredRecords.map((r: any) => (
-                                                        <tr key={r.id} className="hover:bg-[#f9f8f5] transition-colors">
-                                                            {shown("date") && <td className="p-[12px_16px] text-[12.5px] font-mono text-[#6b6860] whitespace-nowrap">{r.date ? format(new Date(r.date), "dd/MM/yyyy") : "—"}</td>}
-                                                            {shown("inspector") && <td className="p-[12px_16px] text-[13px] font-[500] text-[#1a1a18] whitespace-nowrap">{r.inspector}</td>}
-                                                            {shown("site") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.site}</td>}
-                                                            {shown("project") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.project}</td>}
-                                                            {shown("part") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.partName}</td>}
-                                                            {shown("location") && <td className="p-[12px_16px] text-[13px] text-[#6b6860]">{r.location}</td>}
-                                                            {shown("inspected") && <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-right text-[#1a1a18]">{r.inspected}</td>}
-                                                            {shown("accepted") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.accepted > 0 ? "text-[#0d6b4a]" : "text-[#1a1a18]"}`}>{r.accepted}</td>}
-                                                            {shown("rework") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rework > 0 ? "text-[#d97706]" : "text-[#1a1a18]"}`}>{r.rework}</td>}
-                                                            {shown("rejected") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rejected > 0 ? "text-[#dc2626]" : "text-[#1a1a18]"}`}>{r.rejected}</td>}
+                                                        <tr key={r.id} className="hover:bg-[var(--surface2)] transition-colors">
+                                                            {shown("date") && <td className="p-[12px_16px] text-[12.5px] font-mono text-[var(--text2)] whitespace-nowrap">{r.date ? format(new Date(r.date), "dd/MM/yyyy") : "—"}</td>}
+                                                            {shown("inspector") && <td className="p-[12px_16px] text-[13px] font-[500] text-[var(--text)] whitespace-nowrap">{r.inspector}</td>}
+                                                            {shown("site") && <td className="p-[12px_16px] text-[13px] text-[var(--text2)]">{r.site}</td>}
+                                                            {shown("project") && <td className="p-[12px_16px] text-[13px] text-[var(--text2)]">{r.project}</td>}
+                                                            {shown("part") && <td className="p-[12px_16px] text-[13px] text-[var(--text2)]">{r.partName}</td>}
+                                                            {shown("location") && <td className="p-[12px_16px] text-[13px] text-[var(--text2)]">{r.location}</td>}
+                                                            {shown("inspected") && <td className="p-[12px_16px] text-[13px] font-[600] font-mono text-right text-[var(--text)]">{r.inspected}</td>}
+                                                            {shown("accepted") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.accepted > 0 ? "text-[var(--success)]" : "text-[var(--text)]"}`}>{r.accepted}</td>}
+                                                            {shown("rework") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rework > 0 ? "text-[#d97706]" : "text-[var(--text)]"}`}>{r.rework}</td>}
+                                                            {shown("rejected") && <td className={`p-[12px_16px] text-[13px] font-[600] font-mono text-right ${r.rejected > 0 ? "text-[#dc2626]" : "text-[var(--text)]"}`}>{r.rejected}</td>}
                                                             {visibleFormMeta.map(c => (
-                                                                <td key={c.key} className={`p-[12px_16px] text-[13px] text-[#6b6860] whitespace-nowrap ${c.numeric ? "text-right font-mono" : ""}`}>
+                                                                <td key={c.key} className={`p-[12px_16px] text-[13px] text-[var(--text2)] whitespace-nowrap ${c.numeric ? "text-right font-mono" : ""}`}>
                                                                     {r.fields?.[c.field!] ?? "—"}
                                                                 </td>
                                                             ))}
@@ -1437,8 +1437,8 @@ export default function ReportsPage() {
                                 <linearGradient id="capInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.primary} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.primary} stopOpacity={0} /></linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} dy={6} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} dy={6} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
                             <Area type="monotone" dataKey="totalInspected" name="Inspected" stroke={THEME.primary} strokeWidth={2} fillOpacity={1} fill="url(#capInspected)" />
                             <Area type="monotone" dataKey="totalAccepted" name="Accepted" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#capAccepted)" />
                             <Line type="monotone" dataKey="totalRejected" name="Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, stroke: 'white', strokeWidth: 2 }} />
@@ -1448,8 +1448,8 @@ export default function ReportsPage() {
                     <div ref={partWiseBarRef} style={{ width: 700, height: 320, backgroundColor: 'white' }}>
                         <BarChart width={700} height={320} data={data.partWise} layout="vertical" margin={{ left: 10, right: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                            <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b6860" }} width={100} />
+                            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                            <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#5b6478" }} width={100} />
                             <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
                             <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
                             <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 3, 3, 0]} />
@@ -1459,8 +1459,8 @@ export default function ReportsPage() {
                     <div ref={locationBarRef} style={{ width: 700, height: 260, backgroundColor: 'white' }}>
                         <BarChart width={700} height={260} data={data.locationWise} margin={{ left: 0, right: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="location" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} dy={8} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                            <XAxis dataKey="location" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} dy={8} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
                             <Bar dataKey="totalInspected" name="Inspected" fill={THEME.info} radius={[4, 4, 0, 0]} barSize={40} />
                         </BarChart>
                     </div>
@@ -1468,8 +1468,8 @@ export default function ReportsPage() {
                     <div ref={inspectorBarRef} style={{ width: 700, height: Math.max(260, ((data.inspectorWise?.length ?? 0) * 34) + 60) }} className="bg-white">
                         <BarChart width={700} height={Math.max(260, ((data.inspectorWise?.length ?? 0) * 34) + 60)} data={data.inspectorWise} layout="vertical" margin={{ left: 10, right: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                            <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b6860" }} width={140} />
+                            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                            <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#5b6478" }} width={140} />
                             <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
                             <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
                             <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 3, 3, 0]} />
@@ -1479,8 +1479,8 @@ export default function ReportsPage() {
                     <div ref={shiftBarRef} style={{ width: 700, height: 300 }} className="bg-white">
                         <BarChart width={700} height={300} data={(data as any).shiftWise} margin={{ left: 0, right: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="shiftName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6b6860" }} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
+                            <XAxis dataKey="shiftName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
                             <Bar dataKey="totalAccepted" name="Accepted" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={40} />
                             <Bar dataKey="totalRework" name="Rework" fill={THEME.warning} barSize={40} />
                             <Bar dataKey="totalRejected" name="Rejected" fill={THEME.danger} radius={[0, 4, 4, 0]} barSize={40} />
@@ -1490,9 +1490,9 @@ export default function ReportsPage() {
                     <div ref={paretoRef} style={{ width: 700, height: 340, backgroundColor: 'white' }}>
                         <ComposedChart width={700} height={340} data={paretoData} margin={{ top: 10, right: 40, left: 0, bottom: 60 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b6860" }} angle={-35} textAnchor="end" height={80} dy={16} />
-                            <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} />
-                            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9e9b95" }} unit="%" />
+                            <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#5b6478" }} angle={-35} textAnchor="end" height={80} dy={16} />
+                            <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} unit="%" />
                             <Bar yAxisId="left" dataKey="count" name="Frequency" fill={THEME.danger} radius={[4, 4, 0, 0]} barSize={40} />
                             <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.warning} strokeWidth={3} dot={{ r: 4, fill: THEME.warning, stroke: 'white', strokeWidth: 2 }} />
                         </ComposedChart>
@@ -1507,12 +1507,12 @@ export default function ReportsPage() {
                         <div className="w-[44px] h-[44px] bg-[#fef2f2] rounded-full flex items-center justify-center mb-4">
                             <Trash2 className="h-5 w-5 text-[#dc2626]" />
                         </div>
-                        <h3 className="text-[16px] font-semibold text-[#1a1a18] mb-1">Delete Inspection Record?</h3>
-                        <p className="text-[13px] text-[#6b6860] mb-5 leading-relaxed">This action is permanent and cannot be undone. All responses associated with this record will be deleted.</p>
+                        <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1">Delete Inspection Record?</h3>
+                        <p className="text-[13px] text-[var(--text2)] mb-5 leading-relaxed">This action is permanent and cannot be undone. All responses associated with this record will be deleted.</p>
                         <div className="flex gap-2.5">
                             <button
                                 onClick={() => setDeleteConfirmId(null)}
-                                className="flex-1 py-2.5 bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-medium hover:bg-[#f9f8f5] transition-colors"
+                                className="flex-1 py-2.5 bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors"
                             >
                                 Cancel
                             </button>

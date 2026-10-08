@@ -65,7 +65,7 @@ function PersonCard({ person, checked, onToggle, showContact }: {
                 checked ? "border-[var(--accent)] bg-[#f0fdf4]" : "border-[var(--border)] bg-white hover:border-[var(--accent)]/40"
             }`}>
             <span className={`flex items-center justify-center w-[17px] h-[17px] rounded-[4px] border-[1.5px] shrink-0 transition-colors ${
-                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[#d4d1ca] bg-white"
+                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border2)] bg-white"
             }`}>
                 {checked && <Check size={11} className="text-white" strokeWidth={3.5} />}
             </span>
@@ -517,7 +517,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                             </div>
                         ))}
                     </div>
-                    <div className="mt-4 rounded-[10px] bg-[var(--accent-light)] border border-[#6ee7b7]/40 p-3 flex gap-2">
+                    <div className="mt-4 rounded-[10px] bg-[var(--accent-light)] border border-[#93bdfb]/40 p-3 flex gap-2">
                         <CheckCircle2 size={13} className="text-[var(--accent)] shrink-0 mt-0.5" />
                         <p className="text-[11.5px] text-[var(--text2)] leading-snug">Changes you make will be updated across the project and visible to all related team members.</p>
                     </div>

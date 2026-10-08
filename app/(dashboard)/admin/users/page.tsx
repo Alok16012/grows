@@ -286,8 +286,8 @@ export default function UserManagementPage() {
         return (
             <div className="p-6 lg:p-7 flex h-[70vh] items-center justify-center">
                 <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-10 w-10 animate-spin text-[#1a9e6e]" />
-                    <p className="text-[13px] font-medium text-[#6b6860]">Loading users...</p>
+                    <Loader2 className="h-10 w-10 animate-spin text-[var(--accent)]" />
+                    <p className="text-[13px] font-medium text-[var(--text2)]">Loading users...</p>
                 </div>
             </div>
         )
@@ -297,8 +297,8 @@ export default function UserManagementPage() {
         <div className="p-6 lg:p-7">
             <div className="flex items-center justify-between mb-5">
                 <div>
-                    <h1 className="text-[22px] font-semibold tracking-tight text-[#1a1a18]">System Users</h1>
-                    <p className="text-[13px] text-[#6b6860] mt-[3px]">Manage access, roles, and account security</p>
+                    <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">System Users</h1>
+                    <p className="text-[13px] text-[var(--text2)] mt-[3px]">Manage access, roles, and account security</p>
                     {users.length > 0 && (() => {
                         // Why total users > employee logins: admins, client-portal
                         // accounts and legacy logins (kept for work history) also
@@ -309,9 +309,9 @@ export default function UserManagementPage() {
                         const clients = rest.filter(u => u.role === "CLIENT").length
                         const legacy = rest.length - admins - clients
                         return (
-                            <p className="text-[12px] text-[#9e9b95] mt-[6px]">
-                                <span className="font-semibold text-[#1a1a18]">{users.length}</span> total
-                                {" · "}<span className="text-[#0d6b4a] font-medium">{emp} employee logins</span>
+                            <p className="text-[12px] text-[var(--text3)] mt-[6px]">
+                                <span className="font-semibold text-[var(--text)]">{users.length}</span> total
+                                {" · "}<span className="text-[var(--accent-text)] font-medium">{emp} employee logins</span>
                                 {clients > 0 && <>{" · "}{clients} client portal</>}
                                 {admins > 0 && <>{" · "}{admins} admin</>}
                                 {legacy > 0 && <>{" · "}{legacy} legacy (kept — have work history)</>}
@@ -323,7 +323,7 @@ export default function UserManagementPage() {
                     <button
                         onClick={handleCleanupOrphans}
                         disabled={cleaning}
-                        className="px-3.5 h-9 bg-white border border-[#e8e6e1] text-[#b91c1c] rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#fef2f2] hover:border-[#fca5a5] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        className="px-3.5 h-9 bg-white border border-[var(--border)] text-[#b91c1c] rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#fef2f2] hover:border-[#fca5a5] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                         title="Delete logins that have no linked employee record"
                     >
                         {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />}
@@ -332,7 +332,7 @@ export default function UserManagementPage() {
                     <BulkImportInspectors onImportComplete={fetchData} />
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="px-3.5 h-9 bg-[#1a9e6e] text-white rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#158a5e] transition-colors"
+                        className="px-3.5 h-9 bg-[var(--accent)] text-white rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-colors"
                     >
                         <UserPlus className="h-4 w-4" />
                         Create User
@@ -343,10 +343,10 @@ export default function UserManagementPage() {
             {/* Filters Bar */}
             <div className="flex items-center gap-3 mb-4">
                 <div className="relative flex-1 max-w-[400px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95]" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <input
                         placeholder="Search name or email..."
-                        className="w-full pl-9 pr-4 py-[9px] bg-white border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:outline-none focus:border-[#1a9e6e] focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] transition-shadow"
+                        className="w-full pl-9 pr-4 py-[9px] bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] transition-shadow"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -354,7 +354,7 @@ export default function UserManagementPage() {
                 <select
                     value={roleFilter}
                     onChange={e => setRoleFilter(e.target.value)}
-                    className="w-[160px] px-3.5 py-[9px] bg-white border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#6b6860] focus:outline-none focus:border-[#1a9e6e] appearance-none cursor-pointer"
+                    className="w-[160px] px-3.5 py-[9px] bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text2)] focus:outline-none focus:border-[var(--accent)] appearance-none cursor-pointer"
                 >
                     <option value="ALL">All Roles</option>
                     <option value="ADMIN">Admin</option>
@@ -364,26 +364,26 @@ export default function UserManagementPage() {
                 </select>
             </div>
 
-            <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden">
+            <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
                 {filteredUsers.map((user, idx) => (
                     <div
                         key={user.id}
-                        className={`flex items-center gap-3.5 p-5 hover:bg-[#f9f8f5] transition-colors ${
-                            idx !== filteredUsers.length - 1 ? "border-b border-[#e8e6e1]" : ""
+                        className={`flex items-center gap-3.5 p-5 hover:bg-[var(--surface2)] transition-colors ${
+                            idx !== filteredUsers.length - 1 ? "border-b border-[var(--border)]" : ""
                         } ${!user.isActive ? "opacity-60" : ""}`}
                     >
                         <div className={`h-9 w-9 rounded-full flex items-center justify-center text-[14px] font-semibold shrink-0 ${
-                            user.role === "ADMIN" ? "bg-[#e8f7f1] text-[#0d6b4a]" :
+                            user.role === "ADMIN" ? "bg-[var(--accent-light)] text-[var(--accent-text)]" :
                             user.role === "MANAGER" ? "bg-[#eff6ff] text-[#1d4ed8]" :
                             user.role === "INSPECTION_BOY" ? "bg-[#fef3c7] text-[#92400e]" :
-                            "bg-[#f9f8f5] text-[#6b6860]"
+                            "bg-[var(--surface2)] text-[var(--text2)]"
                         }`}
                         style={user.customRole?.color ? { background: `${user.customRole.color}20`, color: user.customRole.color } : {}}>
                             {user.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                                <span className="text-[13.5px] font-medium text-[#1a1a18]">{user.name}</span>
+                                <span className="text-[13.5px] font-medium text-[var(--text)]">{user.name}</span>
                                 {user.customRole?.name ? (
                                     <span className="px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium"
                                         style={{ background: `${user.customRole.color || "#6366f1"}20`, color: user.customRole.color || "#6366f1" }}>
@@ -393,16 +393,16 @@ export default function UserManagementPage() {
                                     <span className={`px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium ${
                                         user.role === "INSPECTION_BOY" ? "bg-[#fef3c7] text-[#92400e]" :
                                         user.role === "MANAGER" ? "bg-[#eff6ff] text-[#1d4ed8]" :
-                                        user.role === "ADMIN" ? "bg-[#e8f7f1] text-[#0d6b4a]" :
-                                        "bg-[#f9f8f5] text-[#6b6860]"
+                                        user.role === "ADMIN" ? "bg-[var(--accent-light)] text-[var(--accent-text)]" :
+                                        "bg-[var(--surface2)] text-[var(--text2)]"
                                     }`}>
                                         {roleLabel(user.role, { designation: user.employeeProfile?.designation })}
                                     </span>
                                 )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                                <Mail className="h-3 w-3 text-[#9e9b95]" />
-                                <span className="text-[12.5px] text-[#6b6860]">{user.email}</span>
+                                <Mail className="h-3 w-3 text-[var(--text3)]" />
+                                <span className="text-[12.5px] text-[var(--text2)]">{user.email}</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5 ml-auto">
@@ -411,10 +411,10 @@ export default function UserManagementPage() {
                                     setSelectedUserId(user.id)
                                     setIsResetModalOpen(true)
                                 }}
-                                className="h-[30px] w-[30px] rounded-[7px] bg-[#f9f8f5] border border-[#e8e6e1] flex items-center justify-center hover:bg-[#fef3c7] hover:text-[#d97706] hover:border-[#fcd34d] transition-colors"
+                                className="h-[30px] w-[30px] rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center justify-center hover:bg-[#fef3c7] hover:text-[#d97706] hover:border-[#fcd34d] transition-colors"
                                 title="Reset Password"
                             >
-                                <KeyRound className="h-[14px] w-[14px] text-[#6b6860]" />
+                                <KeyRound className="h-[14px] w-[14px] text-[var(--text2)]" />
                             </button>
                             <button
                                 onClick={() => {
@@ -422,20 +422,20 @@ export default function UserManagementPage() {
                                     setEditData({ name: user.name, email: user.email, role: user.role, customRoleId: user.customRole?.id || "" })
                                     setIsEditModalOpen(true)
                                 }}
-                                className="h-[30px] w-[30px] rounded-[7px] bg-[#f9f8f5] border border-[#e8e6e1] flex items-center justify-center hover:bg-[#eff6ff] hover:text-[#1d4ed8] hover:border-[#93c5fd] transition-colors"
+                                className="h-[30px] w-[30px] rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center justify-center hover:bg-[#eff6ff] hover:text-[#1d4ed8] hover:border-[#93c5fd] transition-colors"
                                 title="Edit User"
                             >
-                                <Pencil className="h-[14px] w-[14px] text-[#6b6860]" />
+                                <Pencil className="h-[14px] w-[14px] text-[var(--text2)]" />
                             </button>
                             <button
                                 onClick={() => {
                                     setSelectedUserId(user.id)
                                     setIsDeleteConfirmOpen(true)
                                 }}
-                                className="h-[30px] w-[30px] rounded-[7px] bg-[#f9f8f5] border border-[#e8e6e1] flex items-center justify-center hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors"
+                                className="h-[30px] w-[30px] rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center justify-center hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors"
                                 title="Delete User"
                             >
-                                <Trash2 className="h-[14px] w-[14px] text-[#6b6860]" />
+                                <Trash2 className="h-[14px] w-[14px] text-[var(--text2)]" />
                             </button>
                         </div>
                     </div>
@@ -447,55 +447,55 @@ export default function UserManagementPage() {
                 <DialogContent className="bg-white rounded-2xl w-[480px] max-w-[95vw] p-7 shadow-[0_20px_60px_rgba(0,0,0,0.12)] border-none [&>button]:hidden">
                     <div className="flex items-start justify-between mb-5">
                         <div>
-                            <h2 className="text-[17px] font-semibold text-[#1a1a18]">Create New User</h2>
-                            <p className="text-[13px] text-[#6b6860] mt-1 leading-relaxed">Provision a new account with specific role-based permissions.</p>
+                            <h2 className="text-[17px] font-semibold text-[var(--text)]">Create New User</h2>
+                            <p className="text-[13px] text-[var(--text2)] mt-1 leading-relaxed">Provision a new account with specific role-based permissions.</p>
                         </div>
                         <button
                             onClick={() => setIsCreateModalOpen(false)}
-                            className="h-[30px] w-[30px] rounded-[8px] bg-[#f9f8f5] border border-[#e8e6e1] text-[#6b6860] text-[16px] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
+                            className="h-[30px] w-[30px] rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] text-[16px] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
                         >
                             ✕
                         </button>
                     </div>
 
-                    <div className="border-t border-[#e8e6e1] mb-5" />
+                    <div className="border-t border-[var(--border)] mb-5" />
 
                     <form onSubmit={handleCreateUser} className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Full Name</label>
+                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Full Name</label>
                             <input
                                 type="text"
                                 required
                                 value={formData.name}
                                 onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 placeholder="John Doe"
-                                className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
+                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Email Address</label>
+                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Email Address</label>
                             <input
                                 type="email"
                                 required
                                 value={formData.email}
                                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                                 placeholder="john@example.com"
-                                className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
+                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Initial Password</label>
+                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Initial Password</label>
                             <input
                                 type="password"
                                 required
                                 value={formData.password}
                                 onChange={e => setFormData({ ...formData, password: e.target.value })}
                                 placeholder="••••••••"
-                                className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
+                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Role</label>
+                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Role</label>
                             <select
                                 value={formData.role === "ADMIN" ? "ADMIN" : formData.customRoleId}
                                 onChange={e => {
@@ -503,7 +503,7 @@ export default function UserManagementPage() {
                                     if (v === "ADMIN") setFormData({ ...formData, role: "ADMIN", customRoleId: "" })
                                     else setFormData({ ...formData, role: "MANAGER", customRoleId: v })
                                 }}
-                                className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
+                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
                             >
                                 <option value="ADMIN">Administrator</option>
                                 {customRoles.map(r => (
@@ -512,11 +512,11 @@ export default function UserManagementPage() {
                             </select>
                         </div>
 
-                        <div className="border-t border-[#e8e6e1] mt-1 pt-4">
+                        <div className="border-t border-[var(--border)] mt-1 pt-4">
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className="w-full py-3 bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13.5px] font-medium hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="w-full py-3 bg-[var(--accent)] text-white border-none rounded-[9px] text-[13.5px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {submitting ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -537,41 +537,41 @@ export default function UserManagementPage() {
                 <DialogContent className="bg-white rounded-2xl w-[400px] max-w-[95vw] p-7 shadow-[0_20px_60px_rgba(0,0,0,0.12)] border-none [&>button]:hidden">
                     <div className="flex items-start justify-between mb-5">
                         <div>
-                            <h2 className="text-[17px] font-semibold text-[#1a1a18]">Reset Account Password</h2>
-                            <p className="text-[13px] text-[#6b6860] mt-1">Create a new secure password for this user.</p>
+                            <h2 className="text-[17px] font-semibold text-[var(--text)]">Reset Account Password</h2>
+                            <p className="text-[13px] text-[var(--text2)] mt-1">Create a new secure password for this user.</p>
                         </div>
                         <button
                             onClick={() => setIsResetModalOpen(false)}
-                            className="h-[30px] w-[30px] rounded-[8px] bg-[#f9f8f5] border border-[#e8e6e1] text-[#6b6860] text-[16px] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
+                            className="h-[30px] w-[30px] rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] text-[16px] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
                         >
                             ✕
                         </button>
                     </div>
 
-                    <div className="border-t border-[#e8e6e1] mb-5" />
+                    <div className="border-t border-[var(--border)] mb-5" />
 
                     <div className="space-y-1.5 mb-4">
-                        <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">New Password</label>
+                        <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">New Password</label>
                         <input
                             type="password"
                             value={newPassword}
                             onChange={e => setNewPassword(e.target.value)}
                             placeholder="Enter strong password"
-                            className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
+                            className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
                         />
                     </div>
 
                     <div className="flex gap-2.5">
                         <button
                             onClick={() => setIsResetModalOpen(false)}
-                            className="flex-1 py-2.5 bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-medium hover:bg-[#f9f8f5] transition-colors"
+                            className="flex-1 py-2.5 bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handlePasswordReset}
                             disabled={submitting || !newPassword}
-                            className="flex-1 py-2.5 bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13px] font-medium hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="flex-1 py-2.5 bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {submitting ? (
                                 <span className="flex items-center justify-center gap-2">
@@ -591,36 +591,36 @@ export default function UserManagementPage() {
                 <DialogContent className="bg-white rounded-2xl w-[440px] max-w-[95vw] p-7 shadow-[0_20px_60px_rgba(0,0,0,0.12)] border-none [&>button]:hidden">
                     <div className="flex items-start justify-between mb-5">
                         <div>
-                            <h2 className="text-[17px] font-semibold text-[#1a1a18]">Edit User</h2>
-                            <p className="text-[13px] text-[#6b6860] mt-1">Update user details and role.</p>
+                            <h2 className="text-[17px] font-semibold text-[var(--text)]">Edit User</h2>
+                            <p className="text-[13px] text-[var(--text2)] mt-1">Update user details and role.</p>
                         </div>
                         <button
                             onClick={() => setIsEditModalOpen(false)}
-                            className="h-[30px] w-[30px] rounded-[8px] bg-[#f9f8f5] border border-[#e8e6e1] text-[#6b6860] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
+                            className="h-[30px] w-[30px] rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
                         >✕</button>
                     </div>
-                    <div className="border-t border-[#e8e6e1] mb-5" />
+                    <div className="border-t border-[var(--border)] mb-5" />
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Full Name</label>
+                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Full Name</label>
                             <input
                                 type="text"
                                 value={editData.name}
                                 onChange={e => setEditData({ ...editData, name: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
+                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Email Address</label>
+                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Email Address</label>
                             <input
                                 type="email"
                                 value={editData.email}
                                 onChange={e => setEditData({ ...editData, email: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
+                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[#6b6860] uppercase tracking-wide">Role</label>
+                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Role</label>
                             <select
                                 value={editData.role === "ADMIN" ? "ADMIN" : editData.customRoleId}
                                 onChange={e => {
@@ -628,7 +628,7 @@ export default function UserManagementPage() {
                                     if (v === "ADMIN") setEditData({ ...editData, role: "ADMIN", customRoleId: "" })
                                     else setEditData({ ...editData, role: "MANAGER", customRoleId: v })
                                 }}
-                                className="w-full px-3.5 py-2.5 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] focus:outline-none focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
+                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
                             >
                                 <option value="" disabled>— Select role —</option>
                                 <option value="ADMIN">Administrator</option>
@@ -637,11 +637,11 @@ export default function UserManagementPage() {
                                 ))}
                             </select>
                         </div>
-                        <div className="border-t border-[#e8e6e1] pt-4">
+                        <div className="border-t border-[var(--border)] pt-4">
                             <button
                                 onClick={handleEditUser}
                                 disabled={submitting}
-                                className="w-full py-3 bg-[#1a9e6e] text-white border-none rounded-[9px] text-[13.5px] font-medium hover:bg-[#158a5e] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full py-3 bg-[var(--accent)] text-white border-none rounded-[9px] text-[13.5px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
                             </button>
@@ -657,14 +657,14 @@ export default function UserManagementPage() {
                         <div className="w-[44px] h-[44px] bg-[#fef2f2] rounded-full flex items-center justify-center mb-4">
                             <Trash2 className="h-5 w-5 text-[#dc2626]" />
                         </div>
-                        <h3 className="text-[16px] font-semibold text-[#1a1a18] mb-1">Delete User?</h3>
-                        <p className="text-[13px] text-[#6b6860] mb-5 leading-relaxed">
+                        <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1">Delete User?</h3>
+                        <p className="text-[13px] text-[var(--text2)] mb-5 leading-relaxed">
                             This will permanently remove the user account. This action cannot be undone.
                         </p>
                         <div className="flex gap-2.5">
                             <button
                                 onClick={() => { setIsDeleteConfirmOpen(false); setSelectedUserId(null) }}
-                                className="flex-1 py-2.5 bg-white border border-[#e8e6e1] text-[#6b6860] rounded-[9px] text-[13px] font-medium hover:bg-[#f9f8f5] transition-colors"
+                                className="flex-1 py-2.5 bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors"
                             >Cancel</button>
                             <button
                                 onClick={handleDeleteUser}
@@ -680,12 +680,12 @@ export default function UserManagementPage() {
             )}
 
             {filteredUsers.length === 0 && (
-                <div className="bg-white border border-[#e8e6e1] rounded-[14px] py-[60px] text-center">
-                    <div className="w-[56px] h-[56px] bg-[#e8f7f1] rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Users className="h-6 w-6 text-[#1a9e6e]" />
+                <div className="bg-white border border-[var(--border)] rounded-[14px] py-[60px] text-center">
+                    <div className="w-[56px] h-[56px] bg-[var(--accent-light)] rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Users className="h-6 w-6 text-[var(--accent)]" />
                     </div>
-                    <h3 className="text-[16px] font-semibold text-[#1a1a18] mb-1.5">No users found</h3>
-                    <p className="text-[13px] text-[#6b6860] max-w-[250px] mx-auto leading-relaxed">
+                    <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1.5">No users found</h3>
+                    <p className="text-[13px] text-[var(--text2)] max-w-[250px] mx-auto leading-relaxed">
                         No system users found matching your criteria.
                     </p>
                 </div>

@@ -71,7 +71,7 @@ function displayStatus(a: Assignment): { label: string; bg: string; fg: string }
     if (a.status === "manager_only") return { label: "Manager Only", bg: "#f5f3ff", fg: "#7c3aed" }
     if (a.status === "inactive") return { label: "Inactive", bg: "#f3f4f6", fg: "#6b7280" }
     if (a.startDate && new Date(a.startDate) > new Date()) return { label: "Scheduled", bg: "#eff6ff", fg: "#1d4ed8" }
-    return { label: "Active", bg: "#e8f7f1", fg: "#0d6b4a" }
+    return { label: "Active", bg: "#dcfce7", fg: "#15803d" }
 }
 
 function fmtDate(s?: string | null) {
@@ -87,7 +87,7 @@ function PersonRow({ person, checked, onToggle }: { person: Person; checked: boo
                 checked ? "bg-[#f0fdf4]" : "hover:bg-[var(--surface2)]"
             }`}>
             <span className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] shrink-0 transition-colors ${
-                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[#d4d1ca] bg-white"
+                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border2)] bg-white"
             }`}>
                 {checked && <Check size={10} className="text-white" strokeWidth={3.5} />}
             </span>
@@ -523,7 +523,7 @@ export default function AssignmentsPage() {
                                             className={`w-full flex items-center gap-2.5 p-[11px_14px] rounded-[10px] border-[1.5px] text-left transition-all ${
                                                 wholeSite ? "border-[var(--accent)] bg-[#f0fdf4]" : "border-[var(--border)] bg-white hover:border-[var(--accent)]/40"
                                             }`}>
-                                            <span className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] shrink-0 ${wholeSite ? "border-[var(--accent)]" : "border-[#d4d1ca]"}`}>
+                                            <span className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] shrink-0 ${wholeSite ? "border-[var(--accent)]" : "border-[var(--border2)]"}`}>
                                                 {wholeSite && <span className="w-[7px] h-[7px] rounded-full bg-[var(--accent)]" />}
                                             </span>
                                             <span>
@@ -537,7 +537,7 @@ export default function AssignmentsPage() {
                                             className={`w-full flex items-center gap-2.5 p-[11px_14px] rounded-[10px] border-[1.5px] text-left transition-all ${
                                                 !wholeSite ? "border-[var(--accent)] bg-[#f0fdf4]" : "border-[var(--border)] bg-white hover:border-[var(--accent)]/40"
                                             }`}>
-                                            <span className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] shrink-0 ${!wholeSite ? "border-[var(--accent)]" : "border-[#d4d1ca]"}`}>
+                                            <span className={`flex items-center justify-center w-[15px] h-[15px] rounded-full border-[1.5px] shrink-0 ${!wholeSite ? "border-[var(--accent)]" : "border-[var(--border2)]"}`}>
                                                 {!wholeSite && <span className="w-[7px] h-[7px] rounded-full bg-[var(--accent)]" />}
                                             </span>
                                             <span>
@@ -568,7 +568,7 @@ export default function AssignmentsPage() {
                                                                 checked ? "bg-[#f0fdf4]" : "hover:bg-[var(--surface2)]"
                                                             }`}>
                                                             <span className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] shrink-0 ${
-                                                                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[#d4d1ca] bg-white"
+                                                                checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border2)] bg-white"
                                                             }`}>
                                                                 {checked && <Check size={10} className="text-white" strokeWidth={3.5} />}
                                                             </span>

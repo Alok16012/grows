@@ -75,25 +75,25 @@ export default function AdminToolsPage() {
 
     return (
         <div className="p-8 max-w-3xl mx-auto">
-            <h1 className="text-2xl font-bold text-[#1a1a18] mb-2">Admin Tools</h1>
-            <p className="text-sm text-[#9e9b95] mb-8">Employee login diagnostic & fix tools</p>
+            <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Admin Tools</h1>
+            <p className="text-sm text-[var(--text3)] mb-8">Employee login diagnostic & fix tools</p>
 
             {/* Debug Single Employee */}
-            <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-6 mb-6">
-                <h2 className="text-[15px] font-semibold text-[#1a1a18] mb-1">🔍 Check Employee Login</h2>
-                <p className="text-[12px] text-[#9e9b95] mb-4">Enter a phone number, Employee ID or email</p>
+            <div className="bg-white border border-[var(--border)] rounded-[12px] p-6 mb-6">
+                <h2 className="text-[15px] font-semibold text-[var(--text)] mb-1">🔍 Check Employee Login</h2>
+                <p className="text-[12px] text-[var(--text3)] mb-4">Enter a phone number, Employee ID or email</p>
                 <div className="flex gap-2 mb-4">
                     <input
                         type="text"
                         value={debugInput}
                         onChange={e => setDebugInput(e.target.value)}
                         placeholder="9322059808 or EMP001"
-                        className="flex-1 border border-[#e8e6e1] rounded-[8px] px-3 py-2 text-[13px] focus:outline-none focus:border-[#1a9e6e]"
+                        className="flex-1 border border-[var(--border)] rounded-[8px] px-3 py-2 text-[13px] focus:outline-none focus:border-[var(--accent)]"
                     />
                     <button
                         onClick={handleDebug}
                         disabled={loading || !debugInput}
-                        className="px-4 py-2 bg-[#1a9e6e] text-white rounded-[8px] text-[13px] font-medium disabled:opacity-50"
+                        className="px-4 py-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium disabled:opacity-50"
                     >
                         {loading ? "Checking..." : "Check"}
                     </button>
@@ -107,8 +107,8 @@ export default function AdminToolsPage() {
                 </div>
 
                 {debugResult && (
-                    <div className="bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] p-4">
-                        <p className="text-[12px] font-bold text-[#1a1a18] mb-2">Results for: {debugResult.input}</p>
+                    <div className="bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] p-4">
+                        <p className="text-[12px] font-bold text-[var(--text)] mb-2">Results for: {debugResult.input}</p>
                         {debugResult.checks?.map((c: any, i: number) => (
                             <div key={i} className={`mb-2 p-2 rounded-[6px] text-[12px] ${c.found || c.hasUser ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
                                 <p className="font-semibold">{c.step}</p>
@@ -140,8 +140,8 @@ export default function AdminToolsPage() {
 
             {/* Fix Custom Role Users (MIS Executive, HR Recruiter, etc.) */}
             <div className="bg-white border border-purple-200 rounded-[12px] p-6 mb-6">
-                <h2 className="text-[15px] font-semibold text-[#1a1a18] mb-1">🛡️ Fix Custom Role Dashboard Access</h2>
-                <p className="text-[12px] text-[#9e9b95] mb-1">
+                <h2 className="text-[15px] font-semibold text-[var(--text)] mb-1">🛡️ Fix Custom Role Dashboard Access</h2>
+                <p className="text-[12px] text-[var(--text3)] mb-1">
                     Upgrades users who hold a custom role — MIS Executive, HR Recruiter and the like — but are still on
                     <strong> INSPECTION_BOY</strong>, moving them to <strong>MANAGER</strong> level.
                 </p>
@@ -180,9 +180,9 @@ export default function AdminToolsPage() {
             </div>
 
             {/* Bulk Fix */}
-            <div className="bg-white border border-[#e8e6e1] rounded-[12px] p-6">
-                <h2 className="text-[15px] font-semibold text-[#1a1a18] mb-1">⚡ Bulk Fix All Employee Logins</h2>
-                <p className="text-[12px] text-[#9e9b95] mb-4">
+            <div className="bg-white border border-[var(--border)] rounded-[12px] p-6">
+                <h2 className="text-[15px] font-semibold text-[var(--text)] mb-1">⚡ Bulk Fix All Employee Logins</h2>
+                <p className="text-[12px] text-[var(--text3)] mb-4">
                     Sabhi active employees ke login fix karega. Password = unka phone number hoga.
                 </p>
                 <button
@@ -194,7 +194,7 @@ export default function AdminToolsPage() {
                 </button>
 
                 {bulkResult && (
-                    <div className="mt-4 bg-[#f9f8f5] border border-[#e8e6e1] rounded-[8px] p-4 text-[12px]">
+                    <div className="mt-4 bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] p-4 text-[12px]">
                         {bulkResult.error ? (
                             <p className="text-red-500">❌ {bulkResult.error}</p>
                         ) : (

@@ -73,7 +73,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
     NOTICE: { label: "Notice", color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe", icon: Bell },
     EVENT:  { label: "Event",  color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe", icon: PartyPopper },
-    POLICY: { label: "Policy", color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7", icon: FileText },
+    POLICY: { label: "Policy", color: "#0b5cff", bg: "#e8effe", border: "#c7dbff", icon: FileText },
     URGENT: { label: "Urgent", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: AlertCircle },
 }
 
@@ -209,7 +209,7 @@ export default function AnnouncementsPage() {
                 <StatCard icon={<Megaphone size={18} />} tint="#3b82f6" value={announcements.length} label="Total Announcements" sub="All notices" />
                 <StatCard icon={<AlertCircle size={18} />} tint="#dc2626" value={criticalAnns.length} label="Critical / Pinned" sub="Need attention" />
                 <StatCard icon={<Cake size={18} />} tint="#d97706" value={todaysBirthdays.length} label="Birthdays Today" sub="Wish your colleagues" />
-                <StatCard icon={<CalendarDays size={18} />} tint="#1a9e6e" value={upcomingHolidays.length} label="Upcoming Holidays" sub={`${new Date().getFullYear()}`} />
+                <StatCard icon={<CalendarDays size={18} />} tint="#0b5cff" value={upcomingHolidays.length} label="Upcoming Holidays" sub={`${new Date().getFullYear()}`} />
             </div>
 
             {/* ── Critical banner ── */}

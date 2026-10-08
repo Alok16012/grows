@@ -130,7 +130,7 @@ export default function ReviewInspectionPage() {
         const rect = canvas.getBoundingClientRect()
         const x = "touches" in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left
         const y = "touches" in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top
-        ctx.lineTo(x, y); ctx.strokeStyle = "#1a9e6e"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke()
+        ctx.lineTo(x, y); ctx.strokeStyle = "#0b5cff"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke()
         setHasSig(true)
     }
     const stopDraw = () => { isDrawingRef.current = false }
@@ -154,10 +154,10 @@ export default function ReviewInspectionPage() {
 
     if (loading || authStatus === "loading") {
         return (
-            <div className="min-h-screen bg-[#f5f4f0] flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
-                    <div className="w-9 h-9 border-2 border-[#1a9e6e] border-t-transparent rounded-full animate-spin" />
-                    <p className="text-[13px] text-[#9e9b95]">Loading inspection...</p>
+                    <div className="w-9 h-9 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-[13px] text-[var(--text3)]">Loading inspection...</p>
                 </div>
             </div>
         )
@@ -181,11 +181,11 @@ export default function ReviewInspectionPage() {
     try { if (inspection.gpsLocation) gps = JSON.parse(inspection.gpsLocation) } catch {}
 
     const renderFieldValue = (field: any, value: string) => {
-        if (!value) return <p className="text-[13px] text-[#d4d1ca] italic">Not filled</p>
+        if (!value) return <p className="text-[13px] text-[var(--border2)] italic">Not filled</p>
 
         if (field.fieldType === "checkbox") {
             return (
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium ${value === "true" ? "bg-[#dcfce7] text-[#166534]" : "bg-[#f5f4f0] text-[#6b6860]"}`}>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium ${value === "true" ? "bg-[#dcfce7] text-[#166534]" : "bg-[var(--bg)] text-[var(--text2)]"}`}>
                     {value === "true" ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                     {value === "true" ? "Yes" : "No"}
                 </span>
@@ -194,7 +194,7 @@ export default function ReviewInspectionPage() {
 
         if (field.fieldType === "dropdown" || field.fieldType === "select") {
             return (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-[#e8f7f1] text-[#0d6b4a] border border-[#b6e8d5]">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-[var(--accent-light)] text-[var(--accent-text)] border border-[#b6e8d5]">
                     {value}
                 </span>
             )
@@ -204,10 +204,10 @@ export default function ReviewInspectionPage() {
             return (
                 <div className="space-y-2">
                     {value.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                        <img src={value} alt="evidence" className="w-full h-36 object-cover rounded-[8px] border border-[#e8e6e1]" />
+                        <img src={value} alt="evidence" className="w-full h-36 object-cover rounded-[8px] border border-[var(--border)]" />
                     ) : (
-                        <div className="h-20 flex items-center justify-center rounded-[8px] bg-[#f5f4f0] border border-[#e8e6e1]">
-                            <FileText className="h-6 w-6 text-[#d4d1ca]" />
+                        <div className="h-20 flex items-center justify-center rounded-[8px] bg-[var(--bg)] border border-[var(--border)]">
+                            <FileText className="h-6 w-6 text-[var(--border2)]" />
                         </div>
                     )}
                     <button
@@ -216,7 +216,7 @@ export default function ReviewInspectionPage() {
                             setPreviewUrl(value)
                             setPreviewName(field.fieldLabel)
                         }}
-                        className="inline-flex items-center gap-1 text-[12px] text-[#1a9e6e] hover:underline"
+                        className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
                     >
                         <ExternalLink className="h-3 w-3" /> View File
                     </button>
@@ -225,22 +225,22 @@ export default function ReviewInspectionPage() {
         }
 
         if (field.fieldType === "number") {
-            return <p className="text-[18px] font-bold text-[#1a1a18] tabular-nums">{value}</p>
+            return <p className="text-[18px] font-bold text-[var(--text)] tabular-nums">{value}</p>
         }
 
         if (field.fieldType === "date") {
             try {
-                return <p className="text-[13px] text-[#1a1a18] font-medium">{new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>
+                return <p className="text-[13px] text-[var(--text)] font-medium">{new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>
             } catch {
-                return <p className="text-[13px] text-[#1a1a18]">{value}</p>
+                return <p className="text-[13px] text-[var(--text)]">{value}</p>
             }
         }
 
-        return <p className="text-[13px] text-[#1a1a18] leading-relaxed whitespace-pre-wrap">{value}</p>
+        return <p className="text-[13px] text-[var(--text)] leading-relaxed whitespace-pre-wrap">{value}</p>
     }
 
     return (
-        <div className="min-h-screen bg-[#f5f4f0] p-5 lg:p-7">
+        <div className="min-h-screen bg-[var(--bg)] p-5 lg:p-7">
 
             {/* Signature Modal */}
             {showSignature && (
@@ -248,16 +248,16 @@ export default function ReviewInspectionPage() {
                     <div className="bg-white rounded-[18px] shadow-2xl p-6 max-w-md w-full">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h3 className="text-[15px] font-semibold text-[#1a1a18]">Digital Signature</h3>
-                                <p className="text-[11px] text-[#9e9b95]">Reviewer authorization signature</p>
+                                <h3 className="text-[15px] font-semibold text-[var(--text)]">Digital Signature</h3>
+                                <p className="text-[11px] text-[var(--text3)]">Reviewer authorization signature</p>
                             </div>
-                            <button onClick={() => setShowSignature(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f5f4f0] transition-colors">
-                                <X className="h-4 w-4 text-[#6b6860]" />
+                            <button onClick={() => setShowSignature(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg)] transition-colors">
+                                <X className="h-4 w-4 text-[var(--text2)]" />
                             </button>
                         </div>
                         {inspection.signature ? (
                             <div className="space-y-3">
-                                <img src={inspection.signature} alt="signature" className="border border-[#e8e6e1] rounded-[10px] w-full bg-[#f9f8f5]" />
+                                <img src={inspection.signature} alt="signature" className="border border-[var(--border)] rounded-[10px] w-full bg-[var(--surface2)]" />
                                 <button onClick={async () => {
                                     const res = await fetch(`/api/inspections/${inspectionId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: null }) })
                                     if (!res.ok) {
@@ -273,17 +273,17 @@ export default function ReviewInspectionPage() {
                         ) : (
                             <div className="space-y-3">
                                 <canvas ref={canvasRef} width={400} height={160}
-                                    className="border-2 border-dashed border-[#e8e6e1] rounded-[10px] w-full touch-none bg-[#f9f8f5] cursor-crosshair"
+                                    className="border-2 border-dashed border-[var(--border)] rounded-[10px] w-full touch-none bg-[var(--surface2)] cursor-crosshair"
                                     onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
                                     onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
                                 />
-                                <p className="text-[11px] text-[#9e9b95] text-center">Draw your signature above</p>
+                                <p className="text-[11px] text-[var(--text3)] text-center">Draw your signature above</p>
                                 <div className="flex gap-2">
-                                    <button onClick={clearSig} className="flex items-center gap-1.5 px-3 py-2 border border-[#e8e6e1] rounded-[8px] text-[12px] text-[#6b6860] hover:bg-[#f5f4f0]">
+                                    <button onClick={clearSig} className="flex items-center gap-1.5 px-3 py-2 border border-[var(--border)] rounded-[8px] text-[12px] text-[var(--text2)] hover:bg-[var(--bg)]">
                                         <Trash2 className="h-3.5 w-3.5" /> Clear
                                     </button>
                                     <button onClick={submitSignature} disabled={!hasSig}
-                                        className="flex-1 flex items-center justify-center gap-1.5 bg-[#1a9e6e] text-white rounded-[8px] py-2 text-[13px] font-medium hover:bg-[#158a5e] disabled:opacity-40 transition-colors">
+                                        className="flex-1 flex items-center justify-center gap-1.5 bg-[var(--accent)] text-white rounded-[8px] py-2 text-[13px] font-medium hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors">
                                         Save Signature
                                     </button>
                                 </div>
@@ -295,20 +295,20 @@ export default function ReviewInspectionPage() {
 
             {/* Header */}
             <div className="mb-6">
-                <Link href="/approvals" className="inline-flex items-center gap-1 text-[12px] text-[#9e9b95] hover:text-[#1a1a18] transition-colors mb-4">
+                <Link href="/approvals" className="inline-flex items-center gap-1 text-[12px] text-[var(--text3)] hover:text-[var(--text)] transition-colors mb-4">
                     <ChevronLeft className="h-3.5 w-3.5" /> Back to Approvals
                 </Link>
 
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <p className="text-[12px] text-[#9e9b95] mb-1">
+                        <p className="text-[12px] text-[var(--text3)] mb-1">
                             {inspection.assignment?.project?.site?.name}
                             <span className="mx-1.5 opacity-40">/</span>
                             {inspection.assignment?.project?.name}
                         </p>
-                        <h1 className="text-[22px] font-semibold text-[#1a1a18] tracking-[-0.4px]">Review Inspection</h1>
+                        <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-[-0.4px]">Review Inspection</h1>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[11px] font-mono text-[#9e9b95] bg-[#f0ede8] px-2 py-0.5 rounded">
+                            <span className="text-[11px] font-mono text-[var(--text3)] bg-[#f0ede8] px-2 py-0.5 rounded">
                                 INS-{inspection.id.substring(0, 8).toUpperCase()}
                             </span>
                             {inspection.sentBackCount > 0 && (
@@ -323,12 +323,12 @@ export default function ReviewInspectionPage() {
                         {inspection.status === "approved" && (
                             <>
                                 <button onClick={handleShare} disabled={sharing}
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#e8e6e1] rounded-[9px] text-[12.5px] text-[#1a9e6e] font-medium hover:bg-[#f0faf6] hover:border-[#1a9e6e]/30 transition-colors shadow-sm">
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[var(--border)] rounded-[9px] text-[12.5px] text-[var(--accent)] font-medium hover:bg-[#f0faf6] hover:border-[#0b5cff]/30 transition-colors shadow-sm">
                                     {sharing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
                                     {shareToken ? "Copy Link" : "Share Report"}
                                 </button>
                                 <button onClick={() => setShowSignature(true)}
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#e8e6e1] rounded-[9px] text-[12.5px] text-[#6b6860] font-medium hover:bg-[#f5f4f0] transition-colors shadow-sm">
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[var(--border)] rounded-[9px] text-[12.5px] text-[var(--text2)] font-medium hover:bg-[var(--bg)] transition-colors shadow-sm">
                                     <PenTool className="h-3.5 w-3.5" />
                                     {inspection.signature ? "View Signature" : "Add Signature"}
                                 </button>
@@ -351,13 +351,13 @@ export default function ReviewInspectionPage() {
 
                     {/* GPS */}
                     {gps && (
-                        <div className="bg-white border border-[#e8e6e1] rounded-[12px] px-4 py-3 flex items-center gap-3">
+                        <div className="bg-white border border-[var(--border)] rounded-[12px] px-4 py-3 flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                                 <MapPin className="h-4 w-4 text-blue-500" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] mb-0.5">GPS Location Captured</p>
-                                <p className="text-[13px] text-[#1a1a18] font-medium tabular-nums">{gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}</p>
+                                <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-0.5">GPS Location Captured</p>
+                                <p className="text-[13px] text-[var(--text)] font-medium tabular-nums">{gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}</p>
                             </div>
                             <a href={`https://maps.google.com?q=${gps.lat},${gps.lng}`} target="_blank" rel="noopener noreferrer"
                                 className="shrink-0 inline-flex items-center gap-1 text-[12px] text-blue-600 hover:text-blue-700 font-medium">
@@ -368,30 +368,30 @@ export default function ReviewInspectionPage() {
 
                     {/* Responses header */}
                     <div className="flex items-center justify-between px-0.5">
-                        <h2 className="text-[14px] font-semibold text-[#1a1a18]">Inspection Responses</h2>
-                        <span className="text-[12px] text-[#9e9b95] bg-[#f0ede8] px-2.5 py-1 rounded-full">
+                        <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspection Responses</h2>
+                        <span className="text-[12px] text-[var(--text3)] bg-[#f0ede8] px-2.5 py-1 rounded-full">
                             {inspection.responses.length} fields
                         </span>
                     </div>
 
                     {inspection.responses.length === 0 ? (
-                        <div className="bg-white border border-[#e8e6e1] rounded-[14px] py-20 flex flex-col items-center gap-3 text-center">
-                            <div className="w-12 h-12 rounded-full bg-[#f5f4f0] flex items-center justify-center">
-                                <Inbox className="h-5 w-5 text-[#d4d1ca]" />
+                        <div className="bg-white border border-[var(--border)] rounded-[14px] py-20 flex flex-col items-center gap-3 text-center">
+                            <div className="w-12 h-12 rounded-full bg-[var(--bg)] flex items-center justify-center">
+                                <Inbox className="h-5 w-5 text-[var(--border2)]" />
                             </div>
-                            <p className="text-[13px] text-[#9e9b95]">No responses recorded</p>
+                            <p className="text-[13px] text-[var(--text3)]">No responses recorded</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {inspection.responses
                                 .sort((a: any, b: any) => a.field.displayOrder - b.field.displayOrder)
                                 .map((resp: any) => (
-                                    <div key={resp.id} className="bg-white border border-[#e8e6e1] rounded-[12px] p-4 hover:border-[#d4d1ca] transition-colors">
+                                    <div key={resp.id} className="bg-white border border-[var(--border)] rounded-[12px] p-4 hover:border-[var(--border2)] transition-colors">
                                         <div className="flex items-center justify-between gap-2 mb-3">
-                                            <p className="text-[10px] font-semibold text-[#9e9b95] uppercase tracking-[0.6px] leading-tight">
+                                            <p className="text-[10px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] leading-tight">
                                                 {resp.field.fieldLabel}
                                             </p>
-                                            <span className="text-[9.5px] text-[#c4c1bb] bg-[#f5f4f0] px-1.5 py-0.5 rounded shrink-0 uppercase tracking-[0.3px]">
+                                            <span className="text-[9.5px] text-[#c4c1bb] bg-[var(--bg)] px-1.5 py-0.5 rounded shrink-0 uppercase tracking-[0.3px]">
                                                 {resp.field.fieldType}
                                             </span>
                                         </div>
@@ -408,46 +408,46 @@ export default function ReviewInspectionPage() {
                 <div className="space-y-4 lg:sticky lg:top-5 lg:self-start">
 
                     {/* Inspection Details */}
-                    <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden">
+                    <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
                         <div className="px-5 py-4 border-b border-[#f0ede8]">
-                            <h3 className="text-[13px] font-semibold text-[#1a1a18]">Inspection Details</h3>
+                            <h3 className="text-[13px] font-semibold text-[var(--text)]">Inspection Details</h3>
                         </div>
                         <div className="p-5 space-y-4">
                             <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#f5f4f0] flex items-center justify-center shrink-0">
-                                    <UserIcon className="h-3.5 w-3.5 text-[#9e9b95]" />
+                                <div className="w-8 h-8 rounded-full bg-[var(--bg)] flex items-center justify-center shrink-0">
+                                    <UserIcon className="h-3.5 w-3.5 text-[var(--text3)]" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] mb-0.5">Inspector</p>
-                                    <p className="text-[13px] font-semibold text-[#1a1a18]">{inspection.submitter?.name}</p>
-                                    <p className="text-[11px] text-[#9e9b95]">{inspection.submitter?.email}</p>
+                                    <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-0.5">Inspector</p>
+                                    <p className="text-[13px] font-semibold text-[var(--text)]">{inspection.submitter?.name}</p>
+                                    <p className="text-[11px] text-[var(--text3)]">{inspection.submitter?.email}</p>
                                 </div>
                             </div>
-                            <div className="h-px bg-[#f5f4f0]" />
+                            <div className="h-px bg-[var(--bg)]" />
                             <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#f5f4f0] flex items-center justify-center shrink-0">
-                                    <Building2 className="h-3.5 w-3.5 text-[#9e9b95]" />
+                                <div className="w-8 h-8 rounded-full bg-[var(--bg)] flex items-center justify-center shrink-0">
+                                    <Building2 className="h-3.5 w-3.5 text-[var(--text3)]" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] mb-0.5">Client / Project</p>
-                                    <p className="text-[13px] font-semibold text-[#1a1a18]">{inspection.assignment?.project?.site?.name}</p>
-                                    <p className="text-[11px] text-[#9e9b95]">{inspection.assignment?.project?.name}</p>
+                                    <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-0.5">Client / Project</p>
+                                    <p className="text-[13px] font-semibold text-[var(--text)]">{inspection.assignment?.project?.site?.name}</p>
+                                    <p className="text-[11px] text-[var(--text3)]">{inspection.assignment?.project?.name}</p>
                                 </div>
                             </div>
-                            <div className="h-px bg-[#f5f4f0]" />
+                            <div className="h-px bg-[var(--bg)]" />
                             <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#f5f4f0] flex items-center justify-center shrink-0">
-                                    <Calendar className="h-3.5 w-3.5 text-[#9e9b95]" />
+                                <div className="w-8 h-8 rounded-full bg-[var(--bg)] flex items-center justify-center shrink-0">
+                                    <Calendar className="h-3.5 w-3.5 text-[var(--text3)]" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] mb-0.5">Submitted</p>
-                                    <p className="text-[13px] font-semibold text-[#1a1a18]">
+                                    <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-0.5">Submitted</p>
+                                    <p className="text-[13px] font-semibold text-[var(--text)]">
                                         {inspection.submittedAt
                                             ? new Date(inspection.submittedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
                                             : "N/A"}
                                     </p>
                                     {inspection.submittedAt && (
-                                        <p className="text-[11px] text-[#9e9b95]">
+                                        <p className="text-[11px] text-[var(--text3)]">
                                             {new Date(inspection.submittedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                                         </p>
                                     )}
@@ -455,14 +455,14 @@ export default function ReviewInspectionPage() {
                             </div>
                             {fillDuration !== null && (
                                 <>
-                                    <div className="h-px bg-[#f5f4f0]" />
+                                    <div className="h-px bg-[var(--bg)]" />
                                     <div className="flex items-start gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-[#f5f4f0] flex items-center justify-center shrink-0">
-                                            <Clock className="h-3.5 w-3.5 text-[#9e9b95]" />
+                                        <div className="w-8 h-8 rounded-full bg-[var(--bg)] flex items-center justify-center shrink-0">
+                                            <Clock className="h-3.5 w-3.5 text-[var(--text3)]" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] mb-0.5">Fill Duration</p>
-                                            <p className="text-[13px] font-semibold text-[#1a1a18]">{fillDuration} min</p>
+                                            <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-0.5">Fill Duration</p>
+                                            <p className="text-[13px] font-semibold text-[var(--text)]">{fillDuration} min</p>
                                         </div>
                                     </div>
                                 </>
@@ -474,28 +474,28 @@ export default function ReviewInspectionPage() {
                     {shareToken && (
                         <div className="bg-[#f0faf6] border border-[#b6e8d5] rounded-[14px] p-4">
                             <div className="flex items-center gap-2 mb-2">
-                                <Share2 className="h-3.5 w-3.5 text-[#1a9e6e]" />
-                                <p className="text-[12px] font-semibold text-[#0d6b4a]">Share Link Active</p>
+                                <Share2 className="h-3.5 w-3.5 text-[var(--accent)]" />
+                                <p className="text-[12px] font-semibold text-[var(--success)]">Share Link Active</p>
                             </div>
-                            <p className="text-[11px] text-[#6b6860] break-all leading-relaxed mb-2.5">
+                            <p className="text-[11px] text-[var(--text2)] break-all leading-relaxed mb-2.5">
                                 {typeof window !== "undefined" ? `${window.location.origin}/share/${shareToken}` : ""}
                             </p>
                             <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/share/${shareToken}`).then(() => toast.success("Copied!"))}
-                                className="inline-flex items-center gap-1.5 text-[12px] text-[#1a9e6e] hover:text-[#158a5e] font-medium transition-colors">
+                                className="inline-flex items-center gap-1.5 text-[12px] text-[var(--accent)] hover:text-[var(--accent-hover)] font-medium transition-colors">
                                 <Copy className="h-3 w-3" /> Copy link
                             </button>
                         </div>
                     )}
 
                     {/* Decision Panel */}
-                    <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden">
+                    <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
                         <div className={`px-5 py-4 border-b ${
                             inspection.status === "approved" ? "border-green-100 bg-[#f0fdf4]" :
                             inspection.status === "rejected" ? "border-red-100 bg-[#fef2f2]" :
                             inspection.status === "draft"    ? "border-orange-100 bg-[#fff7ed]" :
                             "border-[#f0ede8] bg-white"
                         }`}>
-                            <h3 className="text-[13px] font-semibold text-[#1a1a18]">
+                            <h3 className="text-[13px] font-semibold text-[var(--text)]">
                                 {inspection.status === "pending" ? "Review Decision" : "Final Decision"}
                             </h3>
                         </div>
@@ -504,12 +504,12 @@ export default function ReviewInspectionPage() {
                             {inspection.status === "pending" ? (
                                 <div className="space-y-3">
                                     <div>
-                                        <label className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] block mb-1.5">
+                                        <label className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] block mb-1.5">
                                             Reviewer Notes
                                         </label>
                                         <Textarea
                                             placeholder="Add feedback, corrections, or approval notes..."
-                                            className="bg-[#f9f8f5] border-[#e8e6e1] text-[13px] min-h-[90px] resize-none focus-visible:ring-0 focus-visible:border-[#1a9e6e] rounded-[10px]"
+                                            className="bg-[var(--surface2)] border-[var(--border)] text-[13px] min-h-[90px] resize-none focus-visible:ring-0 focus-visible:border-[var(--accent)] rounded-[10px]"
                                             value={reviewerNotes}
                                             onChange={(e) => setReviewerNotes(e.target.value)}
                                         />
@@ -518,7 +518,7 @@ export default function ReviewInspectionPage() {
 
                                     <div className="space-y-2 pt-1">
                                         <button onClick={() => handleAction("approve")} disabled={actionLoading}
-                                            className="w-full flex items-center justify-center gap-2 bg-[#1a9e6e] hover:bg-[#158a5e] text-white rounded-[10px] py-[11px] text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-sm">
+                                            className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-[10px] py-[11px] text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-sm">
                                             {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                                             Approve Inspection
                                         </button>
@@ -565,16 +565,16 @@ export default function ReviewInspectionPage() {
                                             }`}>
                                                 Inspection {inspection.status === "draft" ? "Sent Back" : inspection.status.charAt(0).toUpperCase() + inspection.status.slice(1)}
                                             </p>
-                                            <p className="text-[11px] text-[#9e9b95]">
+                                            <p className="text-[11px] text-[var(--text3)]">
                                                 {new Date(inspection.approvedAt || inspection.sentBackAt || inspection.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                                             </p>
                                         </div>
                                     </div>
 
                                     {inspection.reviewerNotes && (
-                                        <div className="bg-[#f9f8f5] border border-[#f0ede8] rounded-[10px] p-3.5">
-                                            <p className="text-[10px] text-[#9e9b95] uppercase tracking-[0.5px] mb-1.5">Reviewer Notes</p>
-                                            <p className="text-[13px] text-[#1a1a18] leading-relaxed">"{inspection.reviewerNotes}"</p>
+                                        <div className="bg-[var(--surface2)] border border-[#f0ede8] rounded-[10px] p-3.5">
+                                            <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-1.5">Reviewer Notes</p>
+                                            <p className="text-[13px] text-[var(--text)] leading-relaxed">"{inspection.reviewerNotes}"</p>
                                         </div>
                                     )}
 

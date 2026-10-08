@@ -360,7 +360,7 @@ export default function SendDocumentsPage() {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-6">
                 <div className="flex items-center justify-between gap-3 mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-[11px] bg-[#e8f7f1] flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-[11px] bg-[var(--accent-light)] flex items-center justify-center">
                             <FileText size={20} className="text-[var(--accent)]" />
                         </div>
                         <h2 className="text-[17px] font-bold text-[var(--text)]">Compose Document</h2>
@@ -510,7 +510,7 @@ export default function SendDocumentsPage() {
 
                     {/* Target recipients bar */}
                     <div className="rounded-[14px] bg-[var(--surface2)] border border-[var(--border)] p-4 flex items-center gap-4 flex-wrap">
-                        <div className="w-11 h-11 rounded-[12px] bg-[#e8f7f1] flex items-center justify-center shrink-0">
+                        <div className="w-11 h-11 rounded-[12px] bg-[var(--accent-light)] flex items-center justify-center shrink-0">
                             <Users size={20} className="text-[var(--accent)]" />
                         </div>
                         <div className="min-w-0">
@@ -593,7 +593,7 @@ export default function SendDocumentsPage() {
                                             <tr key={d.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface2)]">
                                                 <td className="px-3 py-3">
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light,#e8f7f1)] text-[var(--accent)] flex items-center justify-center text-[11px] font-bold shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light,#e8effe)] text-[var(--accent)] flex items-center justify-center text-[11px] font-bold shrink-0">
                                                             {d.employee.firstName[0]}{(d.employee.lastName || "")[0]}
                                                         </div>
                                                         <div>
@@ -713,12 +713,12 @@ export default function SendDocumentsPage() {
                             ) : (
                                 <div className="bg-white border border-[var(--border)] rounded-[10px] p-6">
                                     <div className="border-b-2 border-[#e23b3b] pb-3 mb-4">
-                                        <p className="text-[18px] font-bold text-[#1a1a18]">Growus Auto India Pvt. Ltd.</p>
+                                        <p className="text-[18px] font-bold text-[var(--text)]">Growus Auto India Pvt. Ltd.</p>
                                         <p className="text-[11px] italic text-[#e23b3b]">Pioneer in outsourcing</p>
                                     </div>
-                                    <pre className="whitespace-pre-wrap font-sans text-[13px] text-[#1a1a18] leading-relaxed">{previewContent || "(empty)"}</pre>
+                                    <pre className="whitespace-pre-wrap font-sans text-[13px] text-[var(--text)] leading-relaxed">{previewContent || "(empty)"}</pre>
                                     <div className="mt-8">
-                                        <p className="text-[12px] font-semibold text-[#1a1a18]">For Growus Auto India Pvt. Ltd.</p>
+                                        <p className="text-[12px] font-semibold text-[var(--text)]">For Growus Auto India Pvt. Ltd.</p>
                                         {signature ? (
                                             <>
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}

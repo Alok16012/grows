@@ -889,7 +889,7 @@ export default function EmployeeMasterPage() {
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--accent-light, #e8f7f1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--accent-light, #e8effe)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
                         <Users size={19} style={{ color: "var(--accent)" }} />
                     </div>
                     <div>
@@ -912,7 +912,7 @@ export default function EmployeeMasterPage() {
                     </button>
                     <button onClick={selectedIds.size > 0 ? handleDownloadSelected : handleExport} disabled={exporting || filteredEmployees.length === 0}
                         title={selectedIds.size > 0 ? "Downloads only the selected rows, with the columns you've picked" : "Downloads all rows, with the columns you've picked"}
-                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 17px", borderRadius: 9, border: "none", background: "var(--accent, #1a9e6e)", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 17px", borderRadius: 9, border: "none", background: "var(--accent, #0b5cff)", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                         {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
                         {exporting ? "Exporting…" : selectedIds.size > 0 ? `Download Excel (${selectedIds.size})` : "Download Excel"}
                     </button>
@@ -923,7 +923,7 @@ export default function EmployeeMasterPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 12 }}>
                 {[
                     { label: "Total Employees", value: filteredEmployees.length,                                         color: "#3b82f6", bg: "#eff6ff", icon: Users },
-                    { label: "Active",          value: filteredEmployees.filter(e => e.status === "ACTIVE").length,     color: "#16a34a", bg: "#e8f7f1", icon: UserCheck },
+                    { label: "Active",          value: filteredEmployees.filter(e => e.status === "ACTIVE").length,     color: "#16a34a", bg: "#dcfce7", icon: UserCheck },
                     { label: "Inactive",        value: filteredEmployees.filter(e => e.status === "INACTIVE").length,   color: "#6b7280", bg: "#f3f4f6", icon: UserX },
                     { label: "On Leave",        value: filteredEmployees.filter(e => e.status === "ON_LEAVE").length,   color: "#d97706", bg: "#fef3c7", icon: CalendarOff },
                     { label: "Terminated",      value: filteredEmployees.filter(e => e.status === "TERMINATED").length, color: "#dc2626", bg: "#fef2f2", icon: UserMinus },

@@ -253,7 +253,7 @@ const PIPELINE_STAGES = [
     { key: "SCREENING", label: "Screening", color: "#8b5cf6" },
     { key: "INTERVIEW_SCHEDULED", label: "Interview", color: "#f59e0b" },
     { key: "INTERVIEW_DONE", label: "Done", color: "#3b82f6" },
-    { key: "SELECTED", label: "Selected", color: "#1a9e6e" },
+    { key: "SELECTED", label: "Selected", color: "#16a34a" },
     { key: "ONBOARDED", label: "Onboarded", color: "#059669" },
 ]
 
@@ -329,7 +329,7 @@ export default function AnalyticsPage() {
     const monthlyTrend = data?.monthlyTrend || []
 
     return (
-        <div className="min-h-screen bg-[#f5f4f0] p-4 lg:p-7 space-y-8">
+        <div className="min-h-screen bg-[var(--bg)] p-4 lg:p-7 space-y-8">
 
             {/* ── Header ─────────────────────────────────────── */}
             <div className="flex items-center justify-between">
@@ -469,9 +469,9 @@ export default function AnalyticsPage() {
                                         <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={2} />
                                         <YAxis tick={{ fontSize: 9 }} />
                                         <Tooltip
-                                            contentStyle={{ borderRadius: 8, border: "1px solid #e8e6e1", fontSize: 11 }}
+                                            contentStyle={{ borderRadius: 8, border: "1px solid #e6eaf5", fontSize: 11 }}
                                         />
-                                        <Bar dataKey="present" stackId="a" fill="#1a9e6e" name="Present" radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="present" stackId="a" fill="#16a34a" name="Present" radius={[0, 0, 0, 0]} />
                                         <Bar dataKey="absent" stackId="a" fill="#dc2626" name="Absent" radius={[3, 3, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
@@ -502,9 +502,9 @@ export default function AnalyticsPage() {
                                         <XAxis type="number" tick={{ fontSize: 10 }} />
                                         <YAxis type="category" dataKey="type" tick={{ fontSize: 11 }} width={36} />
                                         <Tooltip
-                                            contentStyle={{ borderRadius: 8, border: "1px solid #e8e6e1", fontSize: 11 }}
+                                            contentStyle={{ borderRadius: 8, border: "1px solid #e6eaf5", fontSize: 11 }}
                                         />
-                                        <Bar dataKey="count" fill="#1a9e6e" name="Leaves" radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="count" fill="#0b5cff" name="Leaves" radius={[0, 4, 4, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (
@@ -648,12 +648,12 @@ export default function AnalyticsPage() {
                                         <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                                         <YAxis tick={{ fontSize: 11 }} />
                                         <Tooltip
-                                            contentStyle={{ borderRadius: 8, border: "1px solid #e8e6e1", fontSize: 12 }}
+                                            contentStyle={{ borderRadius: 8, border: "1px solid #e6eaf5", fontSize: 12 }}
                                             formatter={(val: number | string | undefined, name: string | undefined) => [val, name === "rate" ? "Approval Rate %" : (name ?? "")]}
                                         />
                                         <Legend wrapperStyle={{ fontSize: 12 }} />
                                         <Line type="monotone" dataKey="submitted" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Submitted" />
-                                        <Line type="monotone" dataKey="approved" stroke="#1a9e6e" strokeWidth={2} dot={{ r: 3 }} name="Approved" />
+                                        <Line type="monotone" dataKey="approved" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} name="Approved" />
                                         <Line type="monotone" dataKey="rate" stroke="#d97706" strokeWidth={2} dot={{ r: 3 }} name="Rate %" strokeDasharray="4 2" />
                                     </LineChart>
                                 </ResponsiveContainer>
@@ -676,7 +676,7 @@ export default function AnalyticsPage() {
                                 <div className="divide-y divide-[#f0f0f0]">
                                     {inspectors.map((inspector, idx) => (
                                         <div key={inspector.id} className={cn(
-                                            "p-4 hover:bg-[#f9f8f5] transition-colors",
+                                            "p-4 hover:bg-[var(--surface2)] transition-colors",
                                             idx === 0 && "bg-yellow-50/40"
                                         )}>
                                             <div className="flex items-start gap-4">
@@ -712,7 +712,7 @@ export default function AnalyticsPage() {
                                                         />
                                                     </div>
                                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                        <div className="bg-[#f9f8f5] rounded-[8px] p-2.5">
+                                                        <div className="bg-[var(--surface2)] rounded-[8px] p-2.5">
                                                             <p className="text-[10px] text-[var(--text3)] uppercase tracking-wide mb-0.5">Total</p>
                                                             <p className="text-[16px] font-bold text-[var(--text)]">{inspector.total}</p>
                                                         </div>
@@ -783,9 +783,9 @@ export default function AnalyticsPage() {
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                                         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                                         <YAxis tick={{ fontSize: 11 }} />
-                                        <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e8e6e1", fontSize: 12 }} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e6eaf5", fontSize: 12 }} />
                                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                                        <Bar dataKey="approved" stackId="a" fill="#1a9e6e" name="Approved" radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="approved" stackId="a" fill="#16a34a" name="Approved" radius={[0, 0, 0, 0]} />
                                         <Bar dataKey="rejected" stackId="a" fill="#dc2626" name="Rejected" />
                                         <Bar dataKey="pending" stackId="a" fill="#d97706" name="Pending" radius={[4, 4, 0, 0]} />
                                     </BarChart>

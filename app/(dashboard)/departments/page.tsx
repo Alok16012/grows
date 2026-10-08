@@ -298,7 +298,7 @@ export default function DepartmentsPage() {
                                     )}
                                 </div>
                                 {dept.isActive ? (
-                                    <span className="px-2 py-0.5 bg-[#e8f7f1] text-[#1a9e6e] border border-[#6ee7b7] rounded-full text-[10.5px] font-semibold whitespace-nowrap">Active</span>
+                                    <span className="px-2 py-0.5 bg-[var(--success-light)] text-[var(--success-strong)] border border-[var(--success-border)] rounded-full text-[10.5px] font-semibold whitespace-nowrap">Active</span>
                                 ) : (
                                     <span className="px-2 py-0.5 bg-[#f9fafb] text-[#6b7280] border border-[#e5e7eb] rounded-full text-[10.5px] font-semibold whitespace-nowrap">Inactive</span>
                                 )}

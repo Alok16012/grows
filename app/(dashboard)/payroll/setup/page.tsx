@@ -147,7 +147,7 @@ function SalaryModal({ emp, rules, onClose, onSaved }: {
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             {([
-                                { value: "OR", label: "OR — With Compliance", desc: "PF + ESIC + PT", color: "#1a9e6e", bg: "#e8f7f1", border: "#86efac" },
+                                { value: "OR", label: "OR — With Compliance", desc: "PF + ESIC + PT", color: "#0b5cff", bg: "#e8effe", border: "#86efac" },
                                 { value: "CALL", label: "CALL — Without Compliance", desc: "PT only (No PF / ESIC)", color: "#d97706", bg: "#fffbeb", border: "#fcd34d" },
                             ] as const).map(opt => (
                                 <button key={opt.value} type="button"

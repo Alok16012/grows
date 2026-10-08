@@ -229,7 +229,7 @@ export function BulkUpdateEmployees({ filters, onClose, onDone }: {
                 )}
 
                 {result && (
-                    <div style={{ padding: "14px 16px", borderRadius: 10, background: result.updated > 0 ? "#e8f7f1" : "#fef2f2", border: `1px solid ${result.updated > 0 ? "#6ee7b7" : "#fecaca"}` }}>
+                    <div style={{ padding: "14px 16px", borderRadius: 10, background: result.updated > 0 ? "#dcfce7" : "#fef2f2", border: `1px solid ${result.updated > 0 ? "#bbf7d0" : "#fecaca"}` }}>
                         <p style={{ fontSize: 14, fontWeight: 600, color: result.updated > 0 ? "#047857" : "#dc2626", marginBottom: 4 }}>
                             ✓ {result.updated} updated · {result.unchanged} unchanged · {result.failed} failed
                         </p>

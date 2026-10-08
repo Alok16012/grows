@@ -103,7 +103,7 @@ export const employeeFullName = (e: { firstName?: string | null; middleName?: st
     [e.firstName, e.middleName, e.lastName].map(v => (v ?? "").trim()).filter(Boolean).join(" ")
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    ACTIVE: { label: "Active", color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
+    ACTIVE: { label: "Active", color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
     INACTIVE: { label: "Inactive", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
     ON_LEAVE: { label: "On Leave", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     TERMINATED: { label: "Terminated", color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },

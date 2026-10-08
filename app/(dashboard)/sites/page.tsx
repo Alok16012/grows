@@ -79,7 +79,7 @@ type Employee = {
 const SITE_TYPES = ["Security", "Housekeeping", "Facility", "Mixed"]
 const SHIFTS = ["Day", "Night", "24x7", "Rotating"]
 const DEPLOY_SHIFTS = ["Morning", "Evening", "Night", "Rotating"]
-const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
 function getAvatarColor(name: string) {
     const idx = (name.charCodeAt(0) || 0) % AVATAR_COLORS.length
@@ -335,7 +335,7 @@ function AddSiteModal({
                             </>
                         ) : (
                             <>
-                                <div className="bg-[var(--accent-light)] border border-[#6ee7b7]/40 rounded-[10px] p-3">
+                                <div className="bg-[var(--accent-light)] border border-[#93bdfb]/40 rounded-[10px] p-3">
                                     <p className="text-[12.5px] text-[var(--accent)] font-medium flex items-center gap-1.5">
                                         <Navigation size={13} />
                                         Enter coordinates for GPS attendance geofencing
@@ -525,7 +525,7 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
                     <div className="flex items-center gap-1.5 shrink-0">
                         <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${
                             site.isActive
-                                ? "bg-[#e8f7f1] text-[#1a9e6e] border-[#6ee7b7]"
+                                ? "bg-[var(--success-light)] text-[var(--success-strong)] border-[var(--success-border)]"
                                 : "bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]"
                         }`}>
                             {site.isActive ? "Active" : "Inactive"}
@@ -547,7 +547,7 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
                     <TypeBadge type={site.siteType} />
                     <ShiftBadge shift={site.shift} />
                     {hasGeo ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold border bg-[#e8f7f1] text-[#1a9e6e] border-[#6ee7b7]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold border bg-[var(--accent-light)] text-[var(--accent)] border-[#93bdfb]">
                             <Navigation size={10} /> Geofenced
                         </span>
                     ) : (
@@ -995,7 +995,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                                 <span className="font-mono text-[11px] text-[var(--accent)] font-bold bg-[var(--accent-light)] px-2 py-0.5 rounded">{s.code}</span>
                             )}
                             <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${
-                                s.isActive ? "bg-[#e8f7f1] text-[#1a9e6e] border-[#6ee7b7]" : "bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]"
+                                s.isActive ? "bg-[var(--success-light)] text-[var(--success-strong)] border-[var(--success-border)]" : "bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]"
                             }`}>
                                 {s.isActive ? "Active" : "Inactive"}
                             </span>
@@ -1049,7 +1049,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
                                 understaffed
                                     ? "bg-red-50 text-[var(--red)] border-red-200"
-                                    : "bg-[#e8f7f1] text-[#1a9e6e] border-[#6ee7b7]"
+                                    : "bg-[var(--accent-light)] text-[var(--accent)] border-[#93bdfb]"
                             }`}>
                                 {deployed.length}/{required}
                             </span>
@@ -1149,7 +1149,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                             <h3 className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] mb-3">
                                 Geofence Configuration
                             </h3>
-                            <div className="bg-[var(--accent-light)] border border-[#6ee7b7]/40 rounded-[12px] p-4">
+                            <div className="bg-[var(--accent-light)] border border-[#93bdfb]/40 rounded-[12px] p-4">
                                 <div className="flex items-center gap-2 mb-3">
                                     <Navigation size={14} className="text-[var(--accent)]" />
                                     <span className="text-[13px] font-semibold text-[var(--accent)]">GPS Geofencing Active</span>
@@ -1168,7 +1168,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-3 border border-[#6ee7b7]/40 rounded-[9px] p-3 bg-white/50 text-center">
+                                <div className="mt-3 border border-[#93bdfb]/40 rounded-[9px] p-3 bg-white/50 text-center">
                                     <p className="text-[11.5px] text-[var(--text2)]">
                                         <MapPin size={11} className="inline mr-1 text-[var(--accent)]" />
                                         <strong>{s.name}</strong> — Lat: {s.latitude?.toFixed(4)}, Lng: {s.longitude?.toFixed(4)}, Radius: {s.radius}m
@@ -1310,9 +1310,9 @@ export default function SitesPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <StatCard label="Total Sites" value={totalSites} color="#3b82f6" bg="#eff6ff"
                     icon={<Building2 size={18} />} sub="Across all clients" />
-                <StatCard label="Active Sites" value={activeSites} color="#1a9e6e" bg="#e8f7f1"
+                <StatCard label="Active Sites" value={activeSites} color="#16a34a" bg="#dcfce7"
                     icon={<CheckCircle size={18} />} sub="Currently operational" />
-                <StatCard label="Total Deployed" value={totalDeployed} color="#1a9e6e" bg="#e8f7f1"
+                <StatCard label="Total Deployed" value={totalDeployed} color="#0b5cff" bg="#e8effe"
                     icon={<Users size={18} />} sub="Active deployments" />
                 <StatCard label="Understaffed" value={understaffedSites} color="#dc2626" bg="#fef2f2"
                     icon={<AlertTriangle size={18} />} sub="Below required strength" danger />

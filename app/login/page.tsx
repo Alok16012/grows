@@ -67,11 +67,11 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f5f4f0] flex items-center justify-center p-4">
-            <div className="bg-white border border-[#e8e6e1] rounded-[16px] w-full max-w-[400px] p-9 mx-4" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+        <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
+            <div className="bg-white border border-[var(--border)] rounded-[16px] w-full max-w-[400px] p-9 mx-4" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
                 <div className="text-center mb-7">
                     <div className="flex items-center justify-center gap-2.5 mb-4">
-                        <div className="w-9 h-9 bg-[#1a9e6e] rounded-[10px] flex items-center justify-center">
+                        <div className="w-9 h-9 bg-[var(--accent)] rounded-[10px] flex items-center justify-center">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="7" height="7" />
                                 <rect x="14" y="3" width="7" height="7" />
@@ -79,14 +79,14 @@ export default function LoginPage() {
                                 <rect x="3" y="14" width="7" height="7" />
                             </svg>
                         </div>
-                        <span className="text-[20px] font-bold text-[#1a1a18] tracking-[-0.4px]">Growus Auto</span>
+                        <span className="text-[20px] font-bold text-[var(--text)] tracking-[-0.4px]">Growus Auto</span>
                     </div>
-                    <p className="text-[13px] text-[#9e9b95] leading-relaxed">
+                    <p className="text-[13px] text-[var(--text3)] leading-relaxed">
                         Sign in to access your dashboard
                     </p>
                 </div>
 
-                <div className="border-t border-[#e8e6e1] mb-6" role="separator"></div>
+                <div className="border-t border-[var(--border)] mb-6" role="separator"></div>
 
                 <form onSubmit={handleSubmit}>
                     {error && (
@@ -102,27 +102,27 @@ export default function LoginPage() {
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-[13px] font-medium text-[#1a1a18]">Email / Employee ID / Phone</Label>
+                            <Label htmlFor="email" className="text-[13px] font-medium text-[var(--text)]">Email / Employee ID / Phone</Label>
                             <Input
                                 id="email"
                                 type="text"
                                 placeholder="you@example.com or EMP001 or 9876543210"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full py-[10px] px-[14px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all"
+                                className="w-full py-[10px] px-[14px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all"
                                 required
                                 autoComplete="username"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="password" className="text-[13px] font-medium text-[#1a1a18]">Password</Label>
+                            <Label htmlFor="password" className="text-[13px] font-medium text-[var(--text)]">Password</Label>
                             <Input
                                 id="password"
                                 type="password"
                                 placeholder="Enter your password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full py-[10px] px-[14px] bg-[#f9f8f5] border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:border-[#1a9e6e] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all"
+                                className="w-full py-[10px] px-[14px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all"
                                 required
                                 autoComplete="current-password"
                             />
@@ -132,15 +132,15 @@ export default function LoginPage() {
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full mt-5 py-[11px] bg-[#1a9e6e] hover:bg-[#158a5e] text-white border-none rounded-[9px] text-[14px] font-semibold disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        className="w-full mt-5 py-[11px] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border-none rounded-[9px] text-[14px] font-semibold disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                     >
                         {loading ? "Signing in..." : "Sign In"}
                     </Button>
                 </form>
             </div>
 
-            <div className="absolute bottom-6 text-center text-[13px] text-[#9e9b95]">
-                Developed by <a href="https://blinks-ai.com" target="_blank" rel="noopener noreferrer" className="text-[#1a9e6e] hover:underline font-medium">Blinks AI</a>
+            <div className="absolute bottom-6 text-center text-[13px] text-[var(--text3)]">
+                Developed by <a href="https://blinks-ai.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline font-medium">Blinks AI</a>
             </div>
         </div>
     )

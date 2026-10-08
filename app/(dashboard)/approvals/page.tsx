@@ -122,13 +122,13 @@ export default function ApprovalsPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div className="flex items-center bg-white border border-[#e8e6e1] rounded-[10px] p-1 overflow-x-auto">
+                <div className="flex items-center bg-white border border-[var(--border)] rounded-[10px] p-1 overflow-x-auto">
                     <button
                         onClick={() => setActiveTab("pending")}
                         className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "pending"
                                 ? "bg-[#fef3c7] text-[#d97706]"
-                                : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
+                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                         }`}
                     >
                         Pending {counts.pending > 0 && <span className="ml-1 text-[10px]">({counts.pending})</span>}
@@ -137,8 +137,8 @@ export default function ApprovalsPage() {
                         onClick={() => setActiveTab("approved")}
                         className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "approved"
-                                ? "bg-[#e8f7f1] text-[#0d6b4a]"
-                                : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
+                                ? "bg-[var(--success-light)] text-[var(--success)]"
+                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                         }`}
                     >
                         Approved
@@ -148,7 +148,7 @@ export default function ApprovalsPage() {
                         className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "rejected"
                                 ? "bg-[#fef2f2] text-[#dc2626]"
-                                : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
+                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                         }`}
                     >
                         Rejected
@@ -157,8 +157,8 @@ export default function ApprovalsPage() {
                         onClick={() => setActiveTab("all")}
                         className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                             activeTab === "all"
-                                ? "bg-[#1a1a18] text-white"
-                                : "text-[#6b6860] hover:bg-[#f9f8f5] hover:text-[#1a1a18]"
+                                ? "bg-[var(--text)] text-white"
+                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                         }`}
                     >
                         All
@@ -166,10 +166,10 @@ export default function ApprovalsPage() {
                 </div>
 
                 <div className="relative w-full sm:w-[280px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[#9e9b95]" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <Input
                         placeholder="Search..."
-                        className="pl-9 pr-4 py-2 bg-white border border-[#e8e6e1] rounded-[9px] text-[13px] text-[#1a1a18] placeholder:text-[#9e9b95] focus:border-[#1a9e6e] focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-shadow"
+                        className="pl-9 pr-4 py-2 bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-shadow"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -183,46 +183,46 @@ export default function ApprovalsPage() {
                         <p className="text-sm font-medium text-muted-foreground">Loading inspections...</p>
                     </div>
                 ) : filteredInspections.length === 0 ? (
-                    <div className="bg-white border border-[#e8e6e1] rounded-[14px] py-[60px] px-10 text-center">
-                        <div className="w-[56px] h-[56px] bg-[#e8f7f1] rounded-full flex items-center justify-center mx-auto mb-4">
-                            <ClipboardCheck className="h-6 w-6 text-[#1a9e6e]" />
+                    <div className="bg-white border border-[var(--border)] rounded-[14px] py-[60px] px-10 text-center">
+                        <div className="w-[56px] h-[56px] bg-[var(--accent-light)] rounded-full flex items-center justify-center mx-auto mb-4">
+                            <ClipboardCheck className="h-6 w-6 text-[var(--accent)]" />
                         </div>
-                        <h3 className="text-[16px] font-semibold text-[#1a1a18] mb-1.5">All caught up!</h3>
-                        <p className="text-[13px] text-[#6b6860] max-w-[250px] mx-auto leading-relaxed">
+                        <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1.5">All caught up!</h3>
+                        <p className="text-[13px] text-[var(--text2)] max-w-[250px] mx-auto leading-relaxed">
                             No {activeTab !== "all" ? activeTab : ""} inspections found matching your criteria.
                         </p>
                     </div>
                 ) : (
-                    <div className="bg-white border border-[#e8e6e1] rounded-[14px] overflow-hidden">
+                    <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
                         {/* Mobile Card View */}
-                        <div className="sm:hidden divide-y divide-[#e8e6e1]">
+                        <div className="sm:hidden divide-y divide-[var(--border)]">
                             {filteredInspections.map((inspection) => (
-                                <div key={inspection.id} className="p-4 hover:bg-[#f9f8f5] transition-colors">
+                                <div key={inspection.id} className="p-4 hover:bg-[var(--surface2)] transition-colors">
                                     <div className="flex items-start justify-between gap-2 mb-3">
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-[13.5px] font-semibold text-[#1a1a18] truncate">{inspection.submitter?.name}</p>
-                                            <p className="text-[11.5px] text-[#9e9b95] truncate">{inspection.submitter?.email}</p>
-                                            <p className="text-[12px] text-[#6b6860] font-[500] truncate mt-1">{inspection.assignment?.project?.name}</p>
-                                            <p className="text-[11px] text-[#9e9b95] truncate">{inspection.assignment?.project?.site?.name}</p>
+                                            <p className="text-[13.5px] font-semibold text-[var(--text)] truncate">{inspection.submitter?.name}</p>
+                                            <p className="text-[11.5px] text-[var(--text3)] truncate">{inspection.submitter?.email}</p>
+                                            <p className="text-[12px] text-[var(--text2)] font-[500] truncate mt-1">{inspection.assignment?.project?.name}</p>
+                                            <p className="text-[11px] text-[var(--text3)] truncate">{inspection.assignment?.project?.site?.name}</p>
                                         </div>
                                         <span className={`shrink-0 inline-block px-[10px] py-[4px] rounded-[20px] text-[11px] font-medium ${
                                             inspection.status === "pending" ? "bg-[#fef3c7] text-[#d97706]" :
-                                            inspection.status === "approved" ? "bg-[#e8f7f1] text-[#0d6b4a]" :
+                                            inspection.status === "approved" ? "bg-[var(--success-light)] text-[var(--success)]" :
                                             inspection.status === "rejected" ? "bg-[#fef2f2] text-[#dc2626]" :
-                                            "bg-[#f9f8f5] text-[#6b6860]"
+                                            "bg-[var(--surface2)] text-[var(--text2)]"
                                         }`}>
                                             {inspection.status === "pending" ? "Pending" : inspection.status === "approved" ? "Approved" : inspection.status === "rejected" ? "Rejected" : inspection.status}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <p className="text-[12px] text-[#9e9b95]">
+                                        <p className="text-[12px] text-[var(--text3)]">
                                             {inspection.submittedAt ? new Date(inspection.submittedAt).toLocaleDateString('en-GB') : "—"}
                                         </p>
                                         <div className="flex items-center gap-2">
                                             {inspection.status === "pending" && (
                                                 <button
                                                     onClick={() => quickAction(inspection.id, "approve")}
-                                                    className="h-8 w-8 rounded-[7px] bg-[#e8f7f1] text-[#0d6b4a] flex items-center justify-center hover:bg-[#1a9e6e] hover:text-white transition-colors"
+                                                    className="h-8 w-8 rounded-[7px] bg-[var(--accent-light)] text-[var(--accent-text)] flex items-center justify-center hover:bg-[var(--accent)] hover:text-white transition-colors"
                                                     title="Approve"
                                                 >
                                                     <CheckCircle2 className="h-4 w-4" />
@@ -239,7 +239,7 @@ export default function ApprovalsPage() {
                                             )}
                                             <Link
                                                 href={`/approvals/${inspection.id}`}
-                                                className="h-8 px-3 rounded-[7px] bg-[#f9f8f5] text-[#6b6860] flex items-center justify-center hover:bg-[#1a1a18] hover:text-white transition-colors text-[12px] font-[500]"
+                                                className="h-8 px-3 rounded-[7px] bg-[var(--surface2)] text-[var(--text2)] flex items-center justify-center hover:bg-[var(--text)] hover:text-white transition-colors text-[12px] font-[500]"
                                                 title="View"
                                             >
                                                 View →
@@ -253,37 +253,37 @@ export default function ApprovalsPage() {
                         <div className="hidden sm:block overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-[#f9f8f5] border-b border-[#e8e6e1]">
-                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[#9e9b95] uppercase tracking-wide">Inspector</th>
-                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[#9e9b95] uppercase tracking-wide">Project</th>
-                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[#9e9b95] uppercase tracking-wide">Company</th>
-                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[#9e9b95] uppercase tracking-wide">Submitted</th>
-                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[#9e9b95] uppercase tracking-wide">Status</th>
-                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[#9e9b95] uppercase tracking-wide">Actions</th>
+                                    <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Inspector</th>
+                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Project</th>
+                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Company</th>
+                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Submitted</th>
+                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Status</th>
+                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-[#e8e6e1]">
+                                <tbody className="divide-y divide-[var(--border)]">
                                     {filteredInspections.map((inspection) => (
-                                        <tr key={inspection.id} className="hover:bg-[#f9f8f5] transition-colors">
+                                        <tr key={inspection.id} className="hover:bg-[var(--surface2)] transition-colors">
                                             <td className="px-[18px] py-3.5">
-                                                <p className="text-[13px] font-medium text-[#1a1a18]">{inspection.submitter?.name}</p>
-                                                <p className="text-[11.5px] text-[#9e9b95] mt-0.5">{inspection.submitter?.email}</p>
+                                                <p className="text-[13px] font-medium text-[var(--text)]">{inspection.submitter?.name}</p>
+                                                <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{inspection.submitter?.email}</p>
                                             </td>
-                                            <td className="px-[18px] py-3.5 text-[13px] text-[#1a1a18]">
+                                            <td className="px-[18px] py-3.5 text-[13px] text-[var(--text)]">
                                                 {inspection.assignment?.project?.name}
                                             </td>
-                                            <td className="px-[18px] py-3.5 text-[13px] text-[#1a1a18]">
+                                            <td className="px-[18px] py-3.5 text-[13px] text-[var(--text)]">
                                                 {inspection.assignment?.project?.site?.name}
                                             </td>
-                                            <td className="px-[18px] py-3.5 text-[13px] text-[#6b6860]">
+                                            <td className="px-[18px] py-3.5 text-[13px] text-[var(--text2)]">
                                                 {inspection.submittedAt ? new Date(inspection.submittedAt).toLocaleDateString('en-GB') : "—"}
                                             </td>
                                             <td className="px-[18px] py-3.5">
                                                 <span className={`inline-block px-3 py-1 rounded-[20px] text-[11.5px] font-medium ${
                                                     inspection.status === "pending" ? "bg-[#fef3c7] text-[#d97706]" :
-                                                    inspection.status === "approved" ? "bg-[#e8f7f1] text-[#0d6b4a]" :
+                                                    inspection.status === "approved" ? "bg-[var(--success-light)] text-[var(--success)]" :
                                                     inspection.status === "rejected" ? "bg-[#fef2f2] text-[#dc2626]" :
-                                                    "bg-[#f9f8f5] text-[#6b6860]"
+                                                    "bg-[var(--surface2)] text-[var(--text2)]"
                                                 }`}>
                                                     {inspection.status === "pending" ? "Pending" : inspection.status === "approved" ? "Approved" : inspection.status === "rejected" ? "Rejected" : inspection.status}
                                                 </span>
@@ -293,7 +293,7 @@ export default function ApprovalsPage() {
                                                     {inspection.status === "pending" && (
                                                         <button
                                                             onClick={() => quickAction(inspection.id, "approve")}
-                                                            className="h-7 w-7 rounded-[7px] bg-[#e8f7f1] text-[#0d6b4a] flex items-center justify-center hover:bg-[#1a9e6e] hover:text-white transition-colors"
+                                                            className="h-7 w-7 rounded-[7px] bg-[var(--accent-light)] text-[var(--accent-text)] flex items-center justify-center hover:bg-[var(--accent)] hover:text-white transition-colors"
                                                             title="Approve"
                                                         >
                                                             <CheckCircle2 className="h-4 w-4" />
@@ -310,7 +310,7 @@ export default function ApprovalsPage() {
                                                     )}
                                                     <Link
                                                         href={`/approvals/${inspection.id}`}
-                                                        className="h-7 w-7 rounded-[7px] bg-[#f9f8f5] text-[#6b6860] flex items-center justify-center hover:bg-[#1a1a18] hover:text-white transition-colors"
+                                                        className="h-7 w-7 rounded-[7px] bg-[var(--surface2)] text-[var(--text2)] flex items-center justify-center hover:bg-[var(--text)] hover:text-white transition-colors"
                                                         title="View"
                                                     >
                                                         <ChevronRight className="h-4 w-4" />

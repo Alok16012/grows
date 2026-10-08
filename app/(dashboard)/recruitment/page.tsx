@@ -56,9 +56,9 @@ const STATUSES = [
     { key: "INTERESTED",          label: "Interested",          color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
     { key: "INTERVIEW_SCHEDULED", label: "Interview Scheduled", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     { key: "INTERVIEW_DONE",      label: "Interview Done",      color: "#06b6d4", bg: "#ecfeff", border: "#a5f3fc" },
-    { key: "SELECTED",            label: "Selected",            color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
+    { key: "SELECTED",            label: "Selected",            color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
     { key: "OFFERED",             label: "Offered",             color: "#65a30d", bg: "#f7fee7", border: "#bef264" },
-    { key: "JOINED",              label: "Joined ✓",            color: "#047857", bg: "#ecfdf5", border: "#6ee7b7" },
+    { key: "JOINED",              label: "Joined ✓",            color: "#047857", bg: "#ecfdf5", border: "#bbf7d0" },
     { key: "ON_SITE_JOINED",      label: "On-site Joined ✓✓",   color: "#0d9488", bg: "#f0fdfa", border: "#5eead4" },
     { key: "REJECTED",            label: "Rejected",            color: "#9ca3af", bg: "#f9fafb", border: "#e5e7eb" },
     { key: "DROPPED",             label: "Dropped",             color: "#9ca3af", bg: "#f3f4f6", border: "#d1d5db" },
@@ -67,7 +67,7 @@ const STATUSES = [
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
     HIGH:   { label: "High",   color: "#dc2626", dot: "bg-[#dc2626]" },
     MEDIUM: { label: "Medium", color: "#f59e0b", dot: "bg-[#f59e0b]" },
-    LOW:    { label: "Low",    color: "#1a9e6e", dot: "bg-[#1a9e6e]" },
+    LOW:    { label: "Low",    color: "#0b5cff", dot: "bg-[var(--accent)]" },
 }
 
 const SCORE_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -124,7 +124,7 @@ const QUALIFICATIONS = ["8th Pass", "10th Pass", "12th Pass", "ITI", "Diploma", 
 const INTERVIEW_MODES = ["In-person", "Phone", "Video Call", "WhatsApp Video"]
 const DOC_TYPES = ["RESUME", "AADHAAR", "PAN", "CERTIFICATE", "OTHER"]
 const FOLLOWUP_TYPES = ["CALL", "INTERVIEW", "DOCUMENT", "OTHER"]
-const PIE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#06b6d4", "#1a9e6e", "#dc2626", "#65a30d", "#ea580c", "#6b7280"]
+const PIE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#06b6d4", "#0b5cff", "#dc2626", "#65a30d", "#ea580c", "#6b7280"]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -962,7 +962,7 @@ export default function RecruitmentPage() {
                     {[
                         { label: "TOTAL CANDIDATES",   value: stats.total,     month: stats.totalMonth,      icon: Users,     color: "#3b82f6", bg: "#eff6ff" },
                         { label: "INTERVIEWS",         value: stats.interviews,month: stats.interviewsMonth, icon: Calendar,  color: "#f59e0b", bg: "#fef3c7" },
-                        { label: "SELECTED / OFFERED", value: stats.selected,  month: stats.selectedMonth,   icon: UserCheck, color: "#1a9e6e", bg: "#e8f7f1" },
+                        { label: "SELECTED / OFFERED", value: stats.selected,  month: stats.selectedMonth,   icon: UserCheck, color: "#16a34a", bg: "#dcfce7" },
                         { label: "JOINED",             value: stats.joined,    month: stats.joinedMonth,     icon: Award,     color: "#047857", bg: "#ecfdf5" },
                     ].map(s => (
                         <div key={s.label} className="bg-white border border-[var(--border)] rounded-[14px] p-[18px]">
@@ -977,7 +977,7 @@ export default function RecruitmentPage() {
                                     <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
                                         <span className="text-[28px] font-bold leading-none tabular-nums" style={{ color: s.color }}>{s.value}</span>
                                         {s.month > 0 && (
-                                            <span className="inline-flex items-center gap-0.5 text-[11.5px] font-semibold text-[#1a9e6e] whitespace-nowrap">
+                                            <span className="inline-flex items-center gap-0.5 text-[11.5px] font-semibold text-[var(--accent)] whitespace-nowrap">
                                                 <ArrowUpRight size={13} className="stroke-[2.5]" />
                                                 {s.month} this month
                                             </span>
@@ -1666,7 +1666,7 @@ export default function RecruitmentPage() {
                         style={{ background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
                         <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8f7f1", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8effe", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                     <Link2 size={18} style={{ color: "var(--accent)" }} />
                                 </div>
                                 <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", margin: 0 }}>Onboarding Link</h2>
@@ -1788,7 +1788,7 @@ export default function RecruitmentPage() {
                         )}
 
                         {importResult && (
-                            <div style={{ padding: "14px 16px", borderRadius: "10px", background: importResult.imported > 0 ? "#e8f7f1" : "#fef2f2", border: `1px solid ${importResult.imported > 0 ? "#6ee7b7" : "#fecaca"}` }}>
+                            <div style={{ padding: "14px 16px", borderRadius: "10px", background: importResult.imported > 0 ? "#dcfce7" : "#fef2f2", border: `1px solid ${importResult.imported > 0 ? "#bbf7d0" : "#fecaca"}` }}>
                                 <p style={{ fontSize: "14px", fontWeight: 600, color: importResult.imported > 0 ? "#047857" : "#dc2626", marginBottom: "4px" }}>
                                     ✓ {importResult.imported} imported, {importResult.skipped} skipped (duplicates / errors)
                                 </p>
@@ -1944,9 +1944,9 @@ function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCar
         <div onClick={() => onCard(lead)}
             className="bg-white border rounded-[11px] cursor-pointer hover:shadow-md transition-all overflow-hidden shrink-0"
             style={{
-                borderColor: isOnSiteJoin ? "#6ee7b7" : "var(--border)",
+                borderColor: isOnSiteJoin ? "#93bdfb" : "var(--border)",
                 borderLeft: `4px solid ${color.fg}`,
-                boxShadow: isOnSiteJoin ? "0 0 0 1px #6ee7b7" : undefined,
+                boxShadow: isOnSiteJoin ? "0 0 0 1px #93bdfb" : undefined,
             }}>
             {/* On-site join top banner */}
             {isOnSiteJoin && (
@@ -2129,7 +2129,7 @@ function DocumentsTabView({ leads, onLeadClick, onView }: { leads: Lead[]; onLea
 
     const verifiedColor: Record<string, string> = {
         PENDING: "#f59e0b",
-        APPROVED: "#1a9e6e",
+        APPROVED: "#16a34a",
         REJECTED: "#dc2626",
     }
 
@@ -2328,7 +2328,7 @@ function DetailDrawer({
     ]
 
     const verifiedBadge = (v: string) => {
-        const colors: Record<string, string> = { PENDING: "#f59e0b", APPROVED: "#1a9e6e", REJECTED: "#dc2626" }
+        const colors: Record<string, string> = { PENDING: "#f59e0b", APPROVED: "#16a34a", REJECTED: "#dc2626" }
         return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border"
             style={{ color: colors[v] ?? "#6b7280", borderColor: colors[v] ?? "#6b7280", background: (colors[v] ?? "#6b7280") + "15" }}>
             {v}
@@ -2835,7 +2835,7 @@ function DetailDrawer({
                                     <p className="text-[12px] text-[var(--text3)] text-center py-8">No follow-ups scheduled</p>
                                 )}
                                 {(lead.followUps ?? []).map(fu => {
-                                    const statusColors: Record<string, string> = { PENDING: "#f59e0b", DONE: "#1a9e6e", SNOOZED: "#6b7280" }
+                                    const statusColors: Record<string, string> = { PENDING: "#f59e0b", DONE: "#16a34a", SNOOZED: "#6b7280" }
                                     return (
                                         <div key={fu.id} className="border border-[var(--border)] rounded-[10px] p-3 bg-white">
                                             <div className="flex items-center justify-between mb-1">

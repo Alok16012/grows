@@ -136,7 +136,7 @@ function PipelineCard({ href, icon: Icon, iconBg, iconColor, title, big, bigSub,
 
 const ALL_ACTIONS: { perm: string[]; href: string; icon: React.ElementType; label: string; sub: string; color: string; bg: string }[] = [
     { perm: ["approvals.view"],                      href: "/approvals",            icon: ClipboardCheck, label: "Approve Requests",  sub: "Pending approvals",   color: "#d97706", bg: "#fef3c7" },
-    { perm: ["attendance.view"],                     href: "/attendance",           icon: Clock,          label: "Attendance",        sub: "View & mark",         color: "#1a9e6e", bg: "#e8f7f1" },
+    { perm: ["attendance.view"],                     href: "/attendance",           icon: Clock,          label: "Attendance",        sub: "View & mark",         color: "#0b5cff", bg: "#e8effe" },
     { perm: ["employees.view"],                      href: "/employees",            icon: UserCheck,      label: "Employees",         sub: "Employee directory",  color: "#3b82f6", bg: "#eff6ff" },
     { perm: ["employees.create"],                    href: "/employees",            icon: UserPlus,       label: "Add Employee",      sub: "Onboard new hire",    color: "#0891b2", bg: "#ecfeff" },
     { perm: ["recruitment.view"],                    href: "/recruitment",          icon: Target,         label: "Recruitment",       sub: "Candidate pipeline",  color: "#8b5cf6", bg: "#f5f3ff" },
@@ -215,7 +215,7 @@ export default function UniversalDashboard() {
     // ── KPI cards, in priority order — first 4 the user qualifies for ────────
     const kpis: React.ReactNode[] = []
     if (employees) kpis.push(
-        <KpiCard key="emp" href="/employees" icon={Users} iconBg="#e8f7f1" iconColor="#0d6b4a"
+        <KpiCard key="emp" href="/employees" icon={Users} iconBg="#e8effe" iconColor="#0847c7"
             label="Active Employees" value={(employees.active ?? 0).toLocaleString("en-IN")}
             sub={employees.new30d > 0
                 ? <span className="inline-flex items-center gap-0.5 h-6 px-2 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold"><ArrowUpRight size={12} className="stroke-[3px]" />+{employees.new30d} last 30 days</span>
@@ -223,7 +223,7 @@ export default function UniversalDashboard() {
         />
     )
     if (att) kpis.push(
-        <KpiCard key="att" href="/attendance" icon={CalendarCheck} iconBg="#e8f7f1" iconColor="#0d6b4a"
+        <KpiCard key="att" href="/attendance" icon={CalendarCheck} iconBg="#dcfce7" iconColor="#15803d"
             label="Today's Attendance" value={`${att.pct}%`}
             sub={<div className="flex items-center gap-4 text-[11px]">
                 <span className="text-[var(--text3)]">Present <span className="font-semibold text-[var(--accent-text)] tabular-nums">{att.present.toLocaleString("en-IN")}</span></span>
@@ -274,13 +274,13 @@ export default function UniversalDashboard() {
 
     // ── Donut data ───────────────────────────────────────────────────────────
     const attSlices: DonutSlice[] = att ? [
-        { label: "Present", value: att.present, color: "#1a9e6e" },
+        { label: "Present", value: att.present, color: "#16a34a" },
         { label: "Absent", value: att.absent, color: "#dc2626" },
         { label: "On Leave", value: att.onLeave, color: "#f59e0b" },
     ] : []
     const pbs = stats.projectsByStatus || null
     const projSlices: DonutSlice[] = pbs ? [
-        { label: "Active", value: pbs.ACTIVE ?? 0, color: "#1a9e6e" },
+        { label: "Active", value: pbs.ACTIVE ?? 0, color: "#16a34a" },
         { label: "Planning", value: pbs.PLANNING ?? 0, color: "#3b82f6" },
         { label: "On Hold", value: pbs.ON_HOLD ?? 0, color: "#ef4444" },
         { label: "Completed", value: pbs.COMPLETED ?? 0, color: "#7c3aed" },
@@ -289,7 +289,7 @@ export default function UniversalDashboard() {
     // ── Pipeline cards ───────────────────────────────────────────────────────
     const pipelines: React.ReactNode[] = []
     if (onboarding) pipelines.push(
-        <PipelineCard key="onb" href="/onboarding" icon={UserPlus} iconBg="#e8f7f1" iconColor="#0d6b4a"
+        <PipelineCard key="onb" href="/onboarding" icon={UserPlus} iconBg="#e8effe" iconColor="#0847c7"
             title="Onboarding Pipeline" big={String(onboarding.inProgress)} bigSub="In progress"
             rows={[
                 { label: "Yet to start", value: String(onboarding.notStarted) },
@@ -333,7 +333,7 @@ export default function UniversalDashboard() {
     return (
         <div className="p-4 lg:p-0 space-y-4">
             {/* Mobile Welcome Banner */}
-            <div className="md:hidden bg-gradient-to-br from-[#1a9e6e] to-[#0d6b4a] rounded-[16px] p-4 text-white shadow-sm">
+            <div className="md:hidden bg-gradient-to-br from-[var(--accent)] to-[var(--accent-text)] rounded-[16px] p-4 text-white shadow-sm">
                 <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>
                 <p className="text-[20px] font-bold tracking-tight">{roleName || "My Dashboard"}</p>
                 {miniStats.length > 0 && (

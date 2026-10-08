@@ -92,7 +92,7 @@ type AssetWithAssignments = Asset & {
 const CATEGORIES = ["All", "Uniform", "ID Card", "Tool", "Safety Equipment", "Electronics", "Vehicle", "Furniture", "Other"]
 
 const CONDITION_CONFIG: Record<AssetCondition, { label: string; color: string; bg: string }> = {
-    NEW: { label: "New", color: "#1a9e6e", bg: "#e8f7f1" },
+    NEW: { label: "New", color: "#0b5cff", bg: "#e8effe" },
     GOOD: { label: "Good", color: "#0891b2", bg: "#e0f2fe" },
     FAIR: { label: "Fair", color: "#d97706", bg: "#fffbeb" },
     DAMAGED: { label: "Damaged", color: "#dc2626", bg: "#fef2f2" },
@@ -135,7 +135,7 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
 }) {
     const [imgErr, setImgErr] = useState(false)
     const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
-    const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0891b2", "#f97316"]
+    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0891b2", "#f97316"]
     const bg = colors[(firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length]
     if (photo && !imgErr) return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" onError={() => setImgErr(true)} />
     return (
@@ -760,7 +760,7 @@ export default function AssetsPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 px-6 py-4 shrink-0">
                 {[
                     { label: "Total Assets", value: totalAssets, sub: `${totalItems} items`, icon: Package, color: "#3b82f6", bg: "#eff6ff" },
-                    { label: "Total Items", value: totalItems, sub: "across all assets", icon: BarChart3, color: "#1a9e6e", bg: "#e8f7f1" },
+                    { label: "Total Items", value: totalItems, sub: "across all assets", icon: BarChart3, color: "#0b5cff", bg: "#e8effe" },
                     { label: "Currently Issued", value: currentlyIssued, sub: "in use", icon: Users, color: "#d97706", bg: "#fef3c7" },
                     { label: "Damaged / Lost", value: damagedLost, sub: "need attention", icon: AlertTriangle, color: "#dc2626", bg: "#fef2f2" },
                 ].map(stat => (
@@ -991,7 +991,7 @@ export default function AssetsPage() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {a.isActive ? (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#e8f7f1] text-[#1a9e6e]">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--success-light)] text-[var(--success-strong)]">
                                                             <CheckCircle size={10} />
                                                             With Employee
                                                         </span>

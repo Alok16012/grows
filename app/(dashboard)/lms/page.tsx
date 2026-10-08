@@ -156,7 +156,7 @@ const CATEGORY_STRIP: Record<string, string> = {
 const ENROLLMENT_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     ENROLLED:    { label: "Enrolled",     color: "#1d4ed8", bg: "#dbeafe", border: "#bfdbfe" },
     IN_PROGRESS: { label: "In Progress",  color: "#b45309", bg: "#fef3c7", border: "#fde68a" },
-    COMPLETED:   { label: "Completed",    color: "#065f46", bg: "#d1fae5", border: "#a7f3d0" },
+    COMPLETED:   { label: "Completed",    color: "#065f46", bg: "#d1fae5", border: "#bbf7d0" },
     FAILED:      { label: "Failed",       color: "#dc2626", bg: "#fee2e2", border: "#fecaca" },
     DROPPED:     { label: "Dropped",      color: "#6b7280", bg: "#f3f4f6", border: "#e5e7eb" },
 }
@@ -167,7 +167,7 @@ const COURSE_STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
     ARCHIVED:  { label: "Archived",  color: "#b45309", bg: "#fef3c7" },
 }
 
-const AVATAR_COLORS = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
 function getAvatarColor(name: string) {
     return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
@@ -1732,7 +1732,7 @@ export default function LMSPage() {
                 {/* Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard label="Total Courses" value={totalCourses} icon={<BookOpen size={22} />} color="#3b82f6" />
-                    <StatCard label="Published" value={publishedCourses} icon={<CheckCircle size={22} />} color="#1a9e6e" />
+                    <StatCard label="Published" value={publishedCourses} icon={<CheckCircle size={22} />} color="#16a34a" />
                     <StatCard label="Mandatory" value={mandatoryCourses} icon={<AlertTriangle size={22} />} color="#f59e0b" />
                     <StatCard label="Total Enrollments" value={totalEnrollments} icon={<Users size={22} />} color="#8b5cf6" />
                 </div>
@@ -2521,7 +2521,7 @@ type ILTAttendeeRecord = {
 const ILT_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
     SCHEDULED:   { label: "Scheduled",  bg: "#dbeafe", text: "#1d4ed8", border: "#bfdbfe" },
     IN_PROGRESS: { label: "In Progress",bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
-    COMPLETED:   { label: "Completed",  bg: "#d1fae5", text: "#065f46", border: "#a7f3d0" },
+    COMPLETED:   { label: "Completed",  bg: "#d1fae5", text: "#065f46", border: "#bbf7d0" },
     CANCELLED:   { label: "Cancelled",  bg: "#f3f4f6", text: "#6b7280", border: "#e5e7eb" },
 }
 

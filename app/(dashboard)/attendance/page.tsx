@@ -70,7 +70,7 @@ type Site = { id: string; name: string }
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    PRESENT:  { label: "Present",   color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
+    PRESENT:  { label: "Present",   color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
     ABSENT:   { label: "Absent",    color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
     HALF_DAY: { label: "Half Day",  color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     LATE:     { label: "Late",      color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
@@ -89,7 +89,7 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
 }) {
     const [imgErr, setImgErr] = useState(false)
     const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
-    const colors = ["#1a9e6e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
+    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
     const bg = colors[(firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length]
     if (photo && !imgErr) return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" onError={() => setImgErr(true)} />
     return (
@@ -401,9 +401,9 @@ type MonthlySummary = {
 }
 
 function AttendancePct({ pct }: { pct: number }) {
-    const color = pct >= 90 ? "#1a9e6e" : pct >= 75 ? "#f59e0b" : "#dc2626"
-    const bg = pct >= 90 ? "#e8f7f1" : pct >= 75 ? "#fffbeb" : "#fef2f2"
-    const border = pct >= 90 ? "#6ee7b7" : pct >= 75 ? "#fde68a" : "#fecaca"
+    const color = pct >= 90 ? "#16a34a" : pct >= 75 ? "#f59e0b" : "#dc2626"
+    const bg = pct >= 90 ? "#dcfce7" : pct >= 75 ? "#fffbeb" : "#fef2f2"
+    const border = pct >= 90 ? "#bbf7d0" : pct >= 75 ? "#fde68a" : "#fecaca"
     return (
         <span style={{ color, background: bg, borderColor: border }}
             className="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap">
@@ -447,7 +447,7 @@ function SelfCheckCard({
                 <div className="flex flex-col items-end gap-2">
                     {complete ? (
                         <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[13px] font-semibold"
-                            style={{ background: "#e8f7f1", color: "#1a9e6e", border: "1px solid #6ee7b7" }}>
+                            style={{ background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0" }}>
                             <CheckCircle size={16} />
                             Complete ✓
                         </div>
@@ -465,7 +465,7 @@ function SelfCheckCard({
                             onClick={() => onAction("checkin")}
                             disabled={actionLoading}
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
-                            style={{ background: "#1a9e6e" }}>
+                            style={{ background: "#0b5cff" }}>
                             {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />}
                             Check In
                         </button>
@@ -480,17 +480,17 @@ function SelfCheckCard({
             {(checkedIn || checkedOut) && (
                 <div className="mt-5 pt-5 border-t border-[var(--border)] grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {checkedIn && (
-                        <div className="flex items-start gap-3 p-3 rounded-[10px]" style={{ background: "#e8f7f1" }}>
-                            <div className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "#1a9e6e" }}>
+                        <div className="flex items-start gap-3 p-3 rounded-[10px]" style={{ background: "#e8effe" }}>
+                            <div className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "#0b5cff" }}>
                                 <LogIn size={15} className="text-white" />
                             </div>
                             <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.4px]" style={{ color: "#1a9e6e" }}>Checked In</p>
-                                <p className="text-[15px] font-bold" style={{ color: "#1a9e6e" }}>{formatTime(todayRecord!.checkIn!)}</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.4px]" style={{ color: "#16a34a" }}>Checked In</p>
+                                <p className="text-[15px] font-bold" style={{ color: "#16a34a" }}>{formatTime(todayRecord!.checkIn!)}</p>
                                 {formatCoords(todayRecord?.checkInLat, todayRecord?.checkInLng) && (
                                     <div className="flex items-center gap-1 mt-0.5">
-                                        <MapPin size={10} style={{ color: "#1a9e6e" }} />
-                                        <span className="text-[10px]" style={{ color: "#1a9e6e", opacity: 0.8 }}>
+                                        <MapPin size={10} style={{ color: "#0b5cff" }} />
+                                        <span className="text-[10px]" style={{ color: "#0b5cff", opacity: 0.8 }}>
                                             {formatCoords(todayRecord?.checkInLat, todayRecord?.checkInLng)}
                                         </span>
                                     </div>
@@ -563,7 +563,7 @@ function SelfMonthTable({ monthRecords, selectedMonth }: {
             {/* Summary chips */}
             <div className="flex flex-wrap gap-2">
                 {[
-                    { label: "Present", value: present, color: "#1a9e6e", bg: "#e8f7f1", border: "#6ee7b7" },
+                    { label: "Present", value: present, color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
                     { label: "Absent", value: absent, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
                     { label: "Late", value: late, color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
                     { label: "Leave", value: leave, color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
@@ -888,7 +888,7 @@ function AdminView() {
     })
 
     const statsCards = [
-        { label: "Present",         value: presentCount,   color: "#1a9e6e", bg: "#e8f7f1", icon: <CheckCircle size={18} /> },
+        { label: "Present",         value: presentCount,   color: "#16a34a", bg: "#dcfce7", icon: <CheckCircle size={18} /> },
         { label: "Absent",          value: absentCount,    color: "#dc2626", bg: "#fef2f2", icon: <XCircle size={18} /> },
         { label: "Late / Half Day", value: lateHalfCount,  color: "#f59e0b", bg: "#fffbeb", icon: <Clock size={18} /> },
         { label: "On Leave",        value: onLeaveCount,   color: "#8b5cf6", bg: "#f5f3ff", icon: <Users size={18} /> },
@@ -1086,7 +1086,7 @@ function AdminView() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className="text-[13px] font-semibold" style={{ color: "#1a9e6e" }}>{row.present}</span>
+                                                    <span className="text-[13px] font-semibold" style={{ color: "#16a34a" }}>{row.present}</span>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className="text-[13px] font-semibold" style={{ color: "#dc2626" }}>{row.absent}</span>
