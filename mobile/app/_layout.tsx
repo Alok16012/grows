@@ -4,7 +4,6 @@ import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
-import { colors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -33,7 +32,7 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: colors.navyDark },
+            contentStyle: { backgroundColor: "#FFFFFF" },
           }}
         />
       </SafeAreaProvider>

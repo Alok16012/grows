@@ -7,13 +7,21 @@ import {
   Pressable,
   BackHandler,
   Platform,
+  Image,
 } from "react-native";
 import { WebView, type WebViewNavigation } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { API_BASE_URL } from "@/config";
-import { colors, font, spacing, shadow } from "@/theme";
+import { colors, font, spacing } from "@/theme";
+
+// The logo artwork sits on a white square, so the native splash and the
+// first-load screen are white too — on any other colour it would read as a
+// box. Once the site has painted, the strip behind the status bar takes the
+// site's lavender canvas (--bg in app/globals.css) so it blends into the page.
+const SPLASH_BG = "#FFFFFF";
+const SITE_CANVAS = "#EEF1FB";
 
 // The whole app is the Growus ERP website rendered in a WebView. Everything —
 // login, employee self-service, admin panel — comes from the live site, so any
@@ -73,9 +81,14 @@ export default function AppShell() {
 
   return (
     <View style={styles.root}>
-      <StatusBar style="light" />
-      {/* Branded strip behind the status bar so the site starts below it. */}
-      <View style={{ height: insets.top, backgroundColor: colors.navyDark }} />
+      <StatusBar style="dark" />
+      {/* Strip behind the status bar so the site starts below it. */}
+      <View
+        style={{
+          height: insets.top,
+          backgroundColor: firstLoadDone && !error ? SITE_CANVAS : SPLASH_BG,
+        }}
+      />
 
       <View style={styles.webWrap}>
         {!error ? (
@@ -112,13 +125,8 @@ export default function AppShell() {
             in-app navigation never flashes an overlay. */}
         {!firstLoadDone && !error ? (
           <View style={styles.center} pointerEvents="none">
-            <View style={styles.logoMark}>
-              <Text style={styles.logoG}>G</Text>
-            </View>
-            <Text style={styles.logoWord}>
-              GROWUS <Text style={{ color: colors.brand }}>ERP</Text>
-            </Text>
-            <ActivityIndicator color={colors.onNavyMuted} style={{ marginTop: spacing.xl }} />
+            <Image source={require("../assets/icon.png")} style={styles.logo} resizeMode="contain" />
+            <ActivityIndicator color={colors.textMuted} style={{ marginTop: spacing.lg }} />
           </View>
         ) : null}
 
@@ -140,53 +148,37 @@ export default function AppShell() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.navyDark },
-  webWrap: { flex: 1, backgroundColor: colors.bg },
-  web: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: SPLASH_BG },
+  webWrap: { flex: 1, backgroundColor: SITE_CANVAS },
+  web: { flex: 1, backgroundColor: SITE_CANVAS },
   center: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.navyDark,
+    backgroundColor: SPLASH_BG,
     paddingHorizontal: spacing.xl,
   },
-  logoMark: {
-    width: 78,
-    height: 78,
-    borderRadius: 22,
-    backgroundColor: colors.brand,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 18,
-    ...shadow.raised,
-  },
-  logoG: { color: colors.white, fontSize: 44, fontWeight: font.weight.heavy },
-  logoWord: {
-    color: colors.white,
-    fontSize: font.size.xxl,
-    fontWeight: font.weight.heavy,
-    letterSpacing: 1,
-  },
+  logo: { width: 200, height: 200 },
   errIcon: {
     width: 64,
     height: 64,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: colors.dangerTint,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.lg,
   },
-  errTitle: { fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.white },
+  errTitle: { fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text },
   errText: {
     fontSize: font.size.sm,
-    color: colors.onNavyMuted,
+    color: colors.textSecondary,
     textAlign: "center",
     marginTop: spacing.sm,
     lineHeight: 20,
   },
   retryBtn: {
     marginTop: spacing.xl,
-    backgroundColor: colors.brand,
+    backgroundColor: "#0B5CFF",
     paddingHorizontal: spacing.xxl,
     paddingVertical: spacing.md,
     borderRadius: 999,
