@@ -24,11 +24,9 @@ export default function DashboardLayout({
                 Skip to content
             </a>
 
-            {/* Sidebar Desktop */}
-            {/* Floats on the canvas as a white card, inset from the edges —
-                Zavtoo's surfaces are cards, not chrome. */}
-            <div className="hidden md:block w-[264px] shrink-0 p-3 pr-0">
-                <div className="sticky top-3 h-[calc(100vh-24px)]">
+            {/* Sidebar Desktop — a full-height deep-blue rail flush to the edge. */}
+            <div className="hidden md:block w-[264px] shrink-0">
+                <div className="sticky top-0 h-screen">
                     <Sidebar />
                 </div>
             </div>

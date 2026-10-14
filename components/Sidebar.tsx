@@ -239,28 +239,30 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     ]
 
     return (
-        <div className="flex h-full w-full flex-col bg-[var(--surface)] overflow-hidden rounded-r-[24px] md:rounded-[22px] shadow-[var(--shadow-card)]">
+        // Deep-blue rail with white type — the dashboard's "Operations overview"
+        // look. Colours are local to the sidebar; page tokens are untouched.
+        <div className="flex h-full w-full flex-col overflow-hidden rounded-r-[24px] md:rounded-none text-white bg-[linear-gradient(180deg,#0b2a8f_0%,#0a1f6e_55%,#081a5c_100%)]">
 
             {/* ── Logo / Header ── */}
-            <div className="flex h-[68px] items-center justify-between px-5 shrink-0">
+            <div className="flex h-[80px] items-center justify-between px-5 shrink-0">
                 <Link href="/" className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-[11px] flex items-center justify-center text-white shadow-sm" style={{ background: "var(--accent-gradient)" }}>
+                    <div className="h-10 w-10 rounded-[12px] flex items-center justify-center text-white bg-[#1f6bff] ring-1 ring-white/25 shadow-[0_6px_16px_rgba(11,92,255,0.45)]">
                         <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M3 3h18v18H3z" />
                             <path d="M18 9h-6v6h6v-3h-3" />
                         </svg>
                     </div>
-                    <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-none">Growus <span className="text-[var(--accent)]">Auto</span></span>
+                    <span className="text-[19px] font-bold tracking-[-0.02em] text-white leading-none">Growus <span className="text-[#5b9dff]">Auto</span></span>
                 </Link>
                 {onMobileClose && (
-                    <button onClick={onMobileClose} aria-label="Close sidebar" className="p-1 md:hidden hover:bg-[var(--surface2)] rounded-md transition-colors text-[var(--text3)] h-9 w-9 flex items-center justify-center">
+                    <button onClick={onMobileClose} aria-label="Close sidebar" className="p-1 md:hidden hover:bg-white/10 rounded-md transition-colors text-white/70 h-9 w-9 flex items-center justify-center">
                         <X size={20} />
                     </button>
                 )}
             </div>
 
             {/* ── Navigation ── */}
-            <div className="flex-1 overflow-y-auto pt-4 px-2 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto pt-2 px-3 scrollbar-thin [scrollbar-color:rgba(255,255,255,0.2)_transparent]">
                 {navigation.map((section) => {
                     const currentRole = String(role || "")
 
@@ -287,7 +289,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
 
                     return (
                         <div key={section.title} className="mb-5">
-                            <h3 className="px-3 mb-2 text-[10.5px] font-semibold text-[var(--text3)] tracking-[0.8px] uppercase">
+                            <h3 className="px-3 mb-2 text-[11px] font-semibold text-white/60 tracking-[1.2px] uppercase">
                                 {section.title}
                             </h3>
                             <nav className="space-y-0.5">
@@ -307,12 +309,12 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                                 onClick={onMobileClose}
                                                 aria-current={isItemActive && !hasSubLinks ? "page" : undefined}
                                                 className={cn(
-                                                    "flex items-center justify-between rounded-[14px] px-3.5 py-2 min-h-[42px] text-[13.5px] font-medium transition-all group",
+                                                    "flex items-center justify-between rounded-[12px] px-3.5 py-2 min-h-[46px] text-[14px] font-medium transition-all group",
                                                     isItemActive && !hasSubLinks
-                                                        ? "bg-[var(--accent-light)] text-[var(--accent)] font-semibold"
+                                                        ? "bg-[#1f6bff] text-white font-semibold shadow-[0_8px_20px_rgba(11,92,255,0.45)]"
                                                         : (isSubActive || isItemActive)
-                                                            ? "bg-[var(--surface2)] text-[var(--text)] font-medium"
-                                                            : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
+                                                            ? "bg-white/10 text-white"
+                                                            : "text-white/85 hover:bg-white/10 hover:text-white"
                                                 )}
                                             >
                                                 <div className="flex items-center gap-3">
@@ -320,15 +322,15 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                                         size={18}
                                                         className={cn(
                                                             isItemActive || isSubActive
-                                                                ? "text-[var(--accent-text)]"
-                                                                : "text-[var(--text3)] group-hover:text-[var(--text2)]"
+                                                                ? "text-white"
+                                                                : "text-white/75 group-hover:text-white"
                                                         )}
                                                         aria-hidden="true"
                                                     />
                                                     {link.name}
                                                 </div>
                                                 {hasSubLinks && (
-                                                    <ChevronRight size={13} className={cn("transition-transform text-[var(--text3)]", showSub && "rotate-90")} />
+                                                    <ChevronRight size={13} className={cn("transition-transform text-white/60", showSub && "rotate-90")} />
                                                 )}
                                                 {link.badge && pendingCount > 0 && (
                                                     <div className="h-[17px] min-w-[17px] rounded-full bg-[var(--red)] text-white text-[10px] font-bold flex items-center justify-center px-1">
@@ -338,7 +340,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                             </Link>
 
                                             {hasSubLinks && showSub && (
-                                                <div className="flex flex-col gap-0.5 ml-4 border-l border-[var(--border)] pl-3 my-0.5">
+                                                <div className="flex flex-col gap-0.5 ml-4 border-l border-white/15 pl-3 my-0.5">
                                                     {link.subLinks!.map(sub => {
                                                         const isSubLinkActive = pathname === sub.href
                                                         return (
@@ -349,8 +351,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                                                 className={cn(
                                                                     "rounded-[6px] px-[10px] py-[6px] text-[12px] transition-all",
                                                                     isSubLinkActive
-                                                                        ? "bg-[var(--accent-light)] text-[var(--accent-text)] font-medium"
-                                                                        : "text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)]"
+                                                                        ? "bg-white/15 text-white font-medium"
+                                                                        : "text-white/65 hover:text-white hover:bg-white/10"
                                                                 )}
                                                             >
                                                                 {sub.name}
@@ -371,8 +373,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             {/* ── Footer ── */}
             <div className="px-5 py-4 mt-auto">
                 <div className="flex flex-col gap-1">
-                    <p className="text-[10.5px] text-[var(--text3)]">v1.1.2 · Growus Auto</p>
-                    <Link href="/terms" className="text-[10.5px] text-[var(--text3)] hover:text-[var(--text2)]">Terms & Conditions</Link>
+                    <p className="text-[11px] text-white/60">v1.1.2 · Growus Auto</p>
+                    <Link href="/terms" className="text-[11px] text-white/60 hover:text-white">Terms & Conditions</Link>
                 </div>
             </div>
         </div>

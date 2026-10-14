@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Search, Menu, X, Building2, Folder, ClipboardCheck, Loader2, UserCircle, LogOut, ChevronDown, Bell, Settings, HelpCircle, CheckCheck, ExternalLink } from "lucide-react"
+import { Search, Menu, X, Building2, Folder, ClipboardCheck, Loader2, UserCircle, LogOut, ChevronDown, Bell, Settings, CheckCheck, ExternalLink } from "lucide-react"
 import { useSession, signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -150,7 +150,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     }
 
     return (
-        <div className="sticky top-0 z-30 flex h-[60px] md:h-[72px] items-center justify-between bg-[rgba(238,241,251,0.9)] backdrop-blur-md px-4 md:px-8 shrink-0 gap-2" role="banner">
+        <div className="sticky top-0 z-30 flex h-[60px] md:h-[78px] items-center justify-between bg-[rgba(238,241,251,0.9)] backdrop-blur-md px-4 md:px-8 shrink-0 gap-2" role="banner">
             {/* Left — phones get Zavto's brand mark where the hamburger was;
                 the full menu lives behind "More" in the bottom bar now. */}
             <div className="flex items-center gap-2 shrink-0">
@@ -173,17 +173,17 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
             {/* Center: Search — inline from md up; a full-width row over the
                 header on phones, opened from the search icon or the home page. */}
             <div className={cn(
-                "relative md:flex-1 md:max-w-[420px] md:block",
+                "relative md:flex-1 md:max-w-[820px] md:block",
                 mobileSearch ? "absolute inset-x-3 top-[10px] z-40 flex items-center gap-2" : "hidden",
             )} ref={dropdownRef}>
                 <div className="relative group flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)] group-focus-within:text-[var(--accent)] transition-colors" aria-hidden="true" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-[var(--text2)] group-focus-within:text-[var(--accent)] transition-colors" aria-hidden="true" />
                     <input
                         ref={searchInputRef}
                         type="search"
                         placeholder="Search for anything..."
                         aria-label="Search sites, projects, and inspections"
-                        className="w-full h-10 md:h-11 pl-10 pr-4 bg-[var(--surface)] border-0 rounded-full text-[16px] md:text-[14px] text-[var(--text)] placeholder-[var(--text3)] shadow-[var(--shadow-card)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all"
+                        className="w-full h-10 md:h-12 pl-11 pr-4 bg-[var(--surface)] border border-[var(--border)] rounded-full md:rounded-[12px] text-[16px] md:text-[14.5px] text-[var(--text)] placeholder-[var(--text3)] shadow-[0_1px_3px_rgba(15,23,41,0.04)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onFocus={() => query.length >= 2 && setIsOpen(true)}
@@ -255,10 +255,6 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                     <Search size={19} />
                 </button>
                 <div className="flex items-center gap-2">
-                    <button aria-label="Help" className="hidden sm:flex h-10 w-10 rounded-full items-center justify-center bg-[var(--surface)] shadow-[var(--shadow-card)] text-[var(--text)] hover:text-[var(--accent)] transition-colors">
-                        <HelpCircle size={18} />
-                    </button>
-
                     {/* Notification Bell */}
                     <div className="relative" ref={notifRef}>
                         <button
@@ -272,11 +268,11 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 // the actual rows when the panel is opened.
                                 if (opening) fetchNotifs()
                             }}
-                            className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)] hover:text-[var(--accent)] transition-colors relative"
+                            className="h-10 w-10 md:h-11 md:w-11 rounded-full flex items-center justify-center bg-[var(--surface)] md:bg-transparent shadow-[var(--shadow-card)] md:shadow-none text-[var(--text)] hover:bg-[var(--surface)] hover:text-[var(--accent)] transition-colors relative"
                         >
-                            <Bell size={18} />
+                            <Bell size={21} />
                             {unreadCount > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-[var(--red)] text-white text-[9px] font-bold flex items-center justify-center">
+                                <span className="absolute top-0 right-0 h-[18px] min-w-[18px] px-1 rounded-full bg-[var(--red)] text-white text-[9.5px] font-bold flex items-center justify-center ring-2 ring-[var(--bg)]">
                                     {unreadCount > 9 ? "9+" : unreadCount}
                                 </span>
                             )}
@@ -324,17 +320,17 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                         )}
                     </div>
 
-                    <button className="hidden sm:flex h-10 w-10 rounded-full items-center justify-center bg-[var(--surface)] shadow-[var(--shadow-card)] text-[var(--text)] hover:text-[var(--accent)] transition-colors">
-                        <Settings size={18} />
-                    </button>
+                    <Link href="/profile" aria-label="Settings" className="hidden sm:flex h-11 w-11 rounded-full items-center justify-center text-[var(--text)] hover:bg-[var(--surface)] hover:text-[var(--accent)] transition-colors">
+                        <Settings size={21} />
+                    </Link>
                 </div>
 
                 
 
                 {/* Profile */}
                 <div className="relative" ref={profileRef}>
-                    <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--surface2)] transition-all">
-                        <div className="h-[38px] w-[38px] md:h-[42px] md:w-[42px] rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-[15px] font-bold overflow-hidden shadow-sm">
+                    <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2.5 p-1 md:pr-2 md:ml-2 rounded-full hover:bg-[var(--surface)] transition-all">
+                        <div className="h-[38px] w-[38px] md:h-[40px] md:w-[40px] rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-[15px] font-bold overflow-hidden shadow-sm">
                             {mounted && (session?.user as any)?.photo ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={(session?.user as any).photo} alt={session?.user?.name || "Profile"} className="h-full w-full object-cover" />
@@ -344,7 +340,10 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 <UserCircle size={24} />
                             )}
                         </div>
-                        <ChevronDown size={14} className={cn("hidden md:block text-[var(--text3)] transition-transform duration-200", isProfileOpen && "rotate-180")} />
+                        <span className="hidden md:block text-[14.5px] font-medium text-[var(--text)] max-w-[140px] truncate">
+                            {mounted ? (session?.user?.name || "").split(" ")[0] : ""}
+                        </span>
+                        <ChevronDown size={16} className={cn("hidden md:block text-[var(--text2)] transition-transform duration-200", isProfileOpen && "rotate-180")} />
                     </button>
 
                     {isProfileOpen && (
