@@ -10,7 +10,7 @@ import {
     CheckCircle, Clock, Building2, Briefcase, Phone, Mail,
     FileText, IndianRupee, MoreVertical, ShieldOff, Trash2,
     User, CreditCard, MapPin, LogOut, Download, Upload,
-    Copy, Link2, RefreshCw, SlidersHorizontal
+    Copy, Link2, RefreshCw, SlidersHorizontal, ChevronLeft, ChevronRight
 } from "lucide-react"
 import { format } from "date-fns"
 // xlsx is lazy-loaded — it's a ~430KB dep used only on template download
@@ -85,8 +85,8 @@ function Avatar({ firstName, lastName, photo, size = 40 }: {
     }
     return (
         <div
-            style={{ width: size, height: size, background: bg, fontSize: size * 0.33 }}
-            className="rounded-full flex items-center justify-center text-white font-semibold shrink-0 select-none"
+            style={{ width: size, height: size, background: `${bg}1f`, color: bg, fontSize: size * 0.32 }}
+            className="rounded-full flex items-center justify-center font-semibold shrink-0 select-none"
         >
             {initials}
         </div>
@@ -121,37 +121,51 @@ function Sparkline({ color, seed = 0 }: { color: string; seed?: number }) {
     const base = [6, 10, 7, 13, 9, 15, 11, 17]
     const pts = base.map((v, i) => `${(i / (base.length - 1)) * 72},${22 - ((v + (seed % 3)) % 18)}`).join(" ")
     return (
-        <svg viewBox="0 0 72 24" preserveAspectRatio="none" className="w-[64px] h-[26px] shrink-0">
-            <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <svg viewBox="0 0 72 24" preserveAspectRatio="none" className="w-[84px] h-[30px] shrink-0">
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     )
 }
 
-function StatCard({ label, value, icon, color, bg, trend, sparkColor, seed }: {
-    label: string; value: number; icon: React.ReactNode; color: string; bg: string
-    trend?: { dir: "up" | "down" | "flat"; text: string }; sparkColor: string; seed: number
+// Gradient KPI tile, matching the admin dashboard's "Operations overview".
+const STAT_GRADIENTS = {
+    blue:   "linear-gradient(135deg,#2f6bff 0%,#1240d8 100%)",
+    teal:   "linear-gradient(135deg,#14b8a6 0%,#0f766e 100%)",
+    amber:  "linear-gradient(135deg,#ffd84d 0%,#f7a823 100%)",
+    violet: "linear-gradient(135deg,#9b4dff 0%,#6d28d9 100%)",
+} as const
+
+function StatCard({ label, value, icon, tone, trend, seed, onClick }: {
+    label: string; value: number; icon: React.ReactNode; tone: keyof typeof STAT_GRADIENTS
+    trend?: { dir: "up" | "down" | "flat"; text: string }; seed: number; onClick?: () => void
 }) {
+    const dark = tone === "amber"
+    const Tag = onClick ? "button" : "div"
+    const ink = dark ? "#3a2a00" : "#ffffff"
     return (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-3.5 sm:p-[18px] hover:shadow-sm transition-all">
-            <div className="flex items-start justify-between mb-2.5 sm:mb-3 gap-2">
-                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                    <div style={{ background: bg, color }} className="w-9 h-9 sm:w-10 sm:h-10 rounded-[10px] sm:rounded-[11px] flex items-center justify-center shrink-0">
+        <Tag
+            {...(onClick ? { type: "button" as const, onClick } : {})}
+            style={{ background: STAT_GRADIENTS[tone] }}
+            className={`relative overflow-hidden text-left rounded-[16px] p-4 sm:p-5 min-h-[128px] sm:min-h-[148px] flex flex-col transition-transform hover:-translate-y-0.5 shadow-[0_10px_24px_-12px_rgba(15,23,41,0.45)] ${dark ? "text-[#1d1a0f]" : "text-white"}`}
+        >
+            <span aria-hidden className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10" />
+            <div className="relative flex items-start justify-between mb-3 gap-2">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-[12px] flex items-center justify-center shrink-0 ${dark ? "bg-white/45" : "bg-white/20"}`}>
                         {icon}
                     </div>
-                    <span className="text-[12px] sm:text-[12.5px] font-medium text-[var(--text2)] leading-tight">{label}</span>
+                    <span className="min-w-0 text-[12.5px] sm:text-[15px] font-medium leading-tight">{label}</span>
                 </div>
-                <div className="hidden sm:block"><Sparkline color={sparkColor} seed={seed} /></div>
+                <div className="hidden sm:block opacity-90"><Sparkline color={dark ? "#b45309" : ink} seed={seed} /></div>
             </div>
-            <p className="text-[24px] sm:text-[28px] font-bold text-[var(--text)] leading-none tabular-nums">{value.toLocaleString("en-IN")}</p>
+            <p className="relative text-[28px] sm:text-[34px] font-bold leading-none tabular-nums tracking-[-0.02em]">{value.toLocaleString("en-IN")}</p>
             {trend && (
-                <p className={`text-[11.5px] font-medium mt-2 flex items-center gap-1 ${
-                    trend.dir === "up" ? "text-[var(--accent-text)]" : trend.dir === "down" ? "text-[var(--red)]" : "text-[var(--text3)]"
-                }`}>
-                    {trend.dir === "up" ? <TrendingUp size={12} /> : trend.dir === "down" ? <TrendingDown size={12} /> : <Minus size={12} />}
+                <p className="relative mt-auto pt-2.5 text-[12.5px] sm:text-[13.5px] font-medium flex items-center gap-1.5">
+                    {trend.dir === "up" ? <TrendingUp size={15} /> : trend.dir === "down" ? <TrendingDown size={15} /> : <Minus size={15} />}
                     {trend.text}
                 </p>
             )}
-        </div>
+        </Tag>
     )
 }
 
@@ -1089,7 +1103,7 @@ function EmployeesPage() {
         total: number; active: number; onLeave: number; inactive: number; terminated: number; resigned: number
         newThisMonth: { total: number; active: number; terminated: number }
     } | null>(null)
-    const PAGE_SIZE = 50
+    const [PAGE_SIZE, setPageSize] = useState(50)
     const [showModal, setShowModal] = useState(false)
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
     const [drawerEmployee, setDrawerEmployee] = useState<Employee | null>(null)
@@ -1146,14 +1160,14 @@ function EmployeesPage() {
         } finally {
             setLoading(false)
         }
-    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search, page])
+    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search, page, PAGE_SIZE])
 
     // Debounce: reset to page 1 and refetch when filters change
     useEffect(() => {
         if (status === "unauthenticated") return
         const t = setTimeout(() => { setPage(1); fetchEmployees(1) }, 300)
         return () => clearTimeout(t)
-    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search, status])
+    }, [statusFilter, deptFilter, empTypeFilter, siteFilter, search, status, PAGE_SIZE])
 
     // Re-fetch when page changes (not debounced)
     useEffect(() => {
@@ -1531,28 +1545,41 @@ function EmployeesPage() {
         e => e.status === "TERMINATED" || e.status === "RESIGNED"
     ).length
 
+    // Per-status counts for the tab badges — only once the server sent them.
+    const tabCounts: Record<string, number | undefined> = counts ? {
+        "": counts.total, ACTIVE: counts.active, INACTIVE: counts.inactive,
+        ON_LEAVE: counts.onLeave, TERMINATED: counts.terminated, RESIGNED: counts.resigned,
+    } : {}
+
+    // Page buttons: first, last, and two either side of the current page.
+    const pageList: (number | "…")[] = []
+    for (let p = 1; p <= totalPages; p++) {
+        if (p === 1 || p === totalPages || Math.abs(p - page) <= 1 || (page <= 3 && p <= 3)) pageList.push(p)
+        else if (pageList[pageList.length - 1] !== "…") pageList.push("…")
+    }
+
 
     return (
         <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-[12px] bg-[var(--accent-light)] flex items-center justify-center shrink-0">
-                        <Users size={20} className="text-[var(--accent-text)]" />
+                    <div className="w-12 h-12 rounded-[14px] bg-[var(--surface)] shadow-[var(--shadow-card)] flex items-center justify-center shrink-0">
+                        <Users size={23} className="text-[var(--accent)]" />
                     </div>
                     <div>
-                        <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Employees</h1>
-                        <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage your workforce and track employee information</p>
+                        <h1 className="text-[26px] sm:text-[30px] font-bold tracking-[-0.03em] text-[var(--text)] leading-tight">Employees</h1>
+                        <p className="text-[13px] sm:text-[15px] text-[var(--text2)] mt-0.5">Manage your workforce and track employee information</p>
                     </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div className="flex items-center gap-2.5 flex-wrap">
                     <div style={{ position: "relative" }}>
                         <button
                             onClick={() => setExportOpen(o => !o)}
                             title="Export to Excel — pick rows & columns"
-                            style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                            className="inline-flex items-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
                         >
-                            <Download size={15} />
+                            <Download size={17} />
                             Export{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
                         </button>
                         {exportOpen && (
@@ -1597,50 +1624,50 @@ function EmployeesPage() {
                     <button
                         onClick={() => { setShowImportModal(true); setImportRows([]); setImportResult(null); if (importFileRef.current) importFileRef.current.value = "" }}
                         title="Import from Excel"
-                        style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                        className="inline-flex items-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
                     >
-                        <Upload size={15} />
+                        <Upload size={17} />
                         Import
                     </button>
                     {isAdmin && (
                         <button
                             onClick={() => setShowBulkUpdate(true)}
                             title="Update existing employees (UAN / PF / ESIC, bank …) from Excel"
-                            style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                            className="inline-flex items-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
                         >
-                            <RefreshCw size={15} />
+                            <RefreshCw size={17} />
                             Bulk Update
                         </button>
                     )}
                     <button
                         onClick={() => { setEditEmployee(null); setShowModal(true) }}
-                        className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center gap-2 h-11 px-5 rounded-[10px] text-white text-[14px] font-semibold bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] shadow-[0_8px_20px_-6px_rgba(31,95,255,0.6)] hover:brightness-110 transition"
                     >
-                        <Plus size={16} /> Add Employee
+                        <Plus size={18} /> Add Employee
                     </button>
                 </div>
             </div>
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Stats Row — clicking a tile filters the table to it */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
                 <StatCard
-                    label="Total Employees" value={counts?.total ?? total}
-                    icon={<Users size={18} />} color="#0847c7" bg="#e8effe" sparkColor="#0b5cff" seed={0}
+                    label="Total Employees" value={counts?.total ?? total} tone="blue" seed={0}
+                    icon={<Users size={20} />} onClick={() => setStatusFilter("")}
                     trend={counts && counts.newThisMonth.total > 0 ? { dir: "up", text: `${counts.newThisMonth.total} this month` } : { dir: "flat", text: "No change" }}
                 />
                 <StatCard
-                    label="Active Employees" value={counts?.active ?? active}
-                    icon={<CheckCircle size={18} />} color="#16a34a" bg="#dcfce7" sparkColor="#16a34a" seed={1}
+                    label="Active Employees" value={counts?.active ?? active} tone="teal" seed={1}
+                    icon={<CheckCircle size={20} />} onClick={() => setStatusFilter("ACTIVE")}
                     trend={counts && counts.newThisMonth.active > 0 ? { dir: "up", text: `${counts.newThisMonth.active} this month` } : { dir: "flat", text: "No change" }}
                 />
                 <StatCard
-                    label="On Leave" value={counts?.onLeave ?? onLeave}
-                    icon={<Clock size={18} />} color="#d97706" bg="#fffbeb" sparkColor="#f59e0b" seed={2}
+                    label="On Leave" value={counts?.onLeave ?? onLeave} tone="amber" seed={2}
+                    icon={<Clock size={20} />} onClick={() => setStatusFilter("ON_LEAVE")}
                     trend={{ dir: "flat", text: "No change" }}
                 />
                 <StatCard
-                    label="Terminated / Resigned" value={counts ? counts.terminated + counts.resigned : terminatedResigned}
-                    icon={<TrendingDown size={18} />} color="#dc2626" bg="#fef2f2" sparkColor="#ef4444" seed={1}
+                    label="Terminated / Resigned" value={counts ? counts.terminated + counts.resigned : terminatedResigned} tone="violet" seed={1}
+                    icon={<TrendingDown size={20} />}
                     trend={counts && counts.newThisMonth.terminated > 0 ? { dir: "down", text: `${counts.newThisMonth.terminated} this month` } : { dir: "flat", text: "No change" }}
                 />
             </div>
@@ -1648,77 +1675,86 @@ function EmployeesPage() {
             {/* Status tabs — Zavtoo's segmented pills: a white track, the
                 active tab a blue pill. Scrolls sideways on a narrow screen. */}
             <div className="overflow-x-auto no-scrollbar">
-                <div className="inline-flex items-center gap-1 min-w-max bg-[var(--surface)] rounded-full p-1 shadow-[var(--shadow-card)]" role="tablist">
-                    {[{ k: "", label: "All" }, ...Object.entries(STATUS_CONFIG).map(([k, v]) => ({ k, label: v.label }))].map(({ k, label }) => (
-                        <button
-                            key={k}
-                            role="tab"
-                            aria-selected={statusFilter === k}
-                            onClick={() => setStatusFilter(k)}
-                            className={`px-4 py-2 rounded-full text-[13px] transition-colors whitespace-nowrap ${
-                                statusFilter === k
-                                    ? "bg-[var(--accent)] text-white font-semibold shadow-sm"
-                                    : "text-[var(--text2)] font-medium hover:text-[var(--text)]"
-                            }`}
-                        >
-                            {label}
-                        </button>
-                    ))}
+                <div className="inline-flex items-center gap-1 min-w-max bg-[var(--surface)] rounded-full p-1.5 shadow-[var(--shadow-card)]" role="tablist">
+                    {[{ k: "", label: "All" }, ...Object.entries(STATUS_CONFIG).map(([k, v]) => ({ k, label: v.label }))].map(({ k, label }) => {
+                        const on = statusFilter === k
+                        const n = tabCounts[k]
+                        return (
+                            <button
+                                key={k}
+                                role="tab"
+                                aria-selected={on}
+                                onClick={() => setStatusFilter(k)}
+                                className={`inline-flex items-center gap-2 h-10 px-5 rounded-full text-[14px] transition-colors whitespace-nowrap ${
+                                    on
+                                        ? "bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] text-white font-semibold shadow-[0_4px_12px_rgba(31,95,255,0.3)]"
+                                        : "text-[var(--text2)] font-medium hover:text-[var(--text)]"
+                                }`}
+                            >
+                                {label}
+                                {n !== undefined && (
+                                    <span className={`min-w-[26px] h-6 px-1.5 rounded-[7px] text-[12.5px] font-semibold tabular-nums inline-flex items-center justify-center ${
+                                        on ? "bg-white/20 text-white" : "bg-[var(--accent-light)] text-[var(--accent-text)]"
+                                    }`}>{n.toLocaleString("en-IN")}</span>
+                                )}
+                            </button>
+                        )
+                    })}
                 </div>
             </div>
 
             {/* Search + dropdowns */}
-            <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative flex-1 min-w-[220px]">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[240px]">
+                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text2)]" />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && fetchEmployees()}
-                        placeholder="Search by name, ID, phone, email..."
-                        className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        placeholder="Search employees by name, ID, phone, etc..."
+                        className="w-full h-12 rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-3 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                     />
                 </div>
                 <div className="relative">
-                    <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                    <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text2)] pointer-events-none" />
                     <select
                         value={deptFilter}
                         onChange={e => setDeptFilter(e.target.value)}
-                        className="h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text2)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
+                        className="h-12 min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Departments</option>
                         {allDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
-                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                    <ChevronDown size={17} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text2)] pointer-events-none" />
                 </div>
                 <div className="relative">
-                    <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                    <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text2)] pointer-events-none" />
                     <select
                         value={siteFilter}
                         onChange={e => setSiteFilter(e.target.value)}
-                        className="h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text2)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
+                        className="h-12 min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Sites</option>
                         {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
-                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                    <ChevronDown size={17} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text2)] pointer-events-none" />
                 </div>
                 <div className="relative">
-                    <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                    <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text2)] pointer-events-none" />
                     <select
                         value={empTypeFilter}
                         onChange={e => setEmpTypeFilter(e.target.value)}
-                        className="h-10 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text2)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
+                        className="h-12 min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Employment Types</option>
                         {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
-                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                    <ChevronDown size={17} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text2)] pointer-events-none" />
                 </div>
                 {(deptFilter || siteFilter || empTypeFilter || search) && (
                     <button
                         onClick={() => { setDeptFilter(""); setSiteFilter(""); setEmpTypeFilter(""); setSearch("") }}
-                        className="h-10 px-3.5 inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors"
+                        className="h-12 px-4 inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors"
                     >
                         <X size={14} /> Clear
                     </button>
@@ -1766,18 +1802,18 @@ function EmployeesPage() {
                         </button>
                     </div>
                 )}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] overflow-hidden">
                     <div className="overflow-x-auto">
                         {/* Nine columns cannot share 375px — without a floor the table
                             squeezed every cell instead of scrolling inside its wrapper. */}
                         <table className="w-full min-w-[900px]">
                             <thead>
-                                <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
+                                <tr className="border-b border-[var(--border)]">
                                     {canDelete && (
-                                        <th className="px-4 py-3 w-10">
+                                        <th className="pl-5 pr-2 py-4 w-10">
                                             <input
                                                 type="checkbox"
-                                                className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+                                                className="w-[18px] h-[18px] accent-[var(--accent)] cursor-pointer"
                                                 checked={employees.length > 0 && employees.every(e => selectedIds.has(e.id))}
                                                 onChange={e => {
                                                     if (e.target.checked) setSelectedIds(new Set(employees.map(emp => emp.id)))
@@ -1786,17 +1822,17 @@ function EmployeesPage() {
                                             />
                                         </th>
                                     )}
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Employee</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Department</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Site</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Type</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Phone</th>
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Joined</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-5 py-4">Employee</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Department</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Site</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Type</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Phone</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Joined</th>
                                     {canViewSalary && (
-                                        <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Salary</th>
+                                        <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Salary</th>
                                     )}
-                                    <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Status</th>
-                                    <th className="text-right text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Actions</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Status</th>
+                                    <th className="text-right text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-5 py-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1805,13 +1841,13 @@ function EmployeesPage() {
                                     return (
                                         <tr
                                             key={emp.id}
-                                            className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/30 transition-colors ${selectedIds.has(emp.id) ? "bg-[var(--accent)]/5" : ""} ${i === employees.length - 1 ? "border-b-0" : ""}`}
+                                            className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/60 transition-colors ${selectedIds.has(emp.id) ? "bg-[var(--accent)]/5" : ""} ${i === employees.length - 1 ? "border-b-0" : ""}`}
                                         >
                                             {canDelete && (
-                                                <td className="px-4 py-3 w-10">
+                                                <td className="pl-5 pr-2 py-4 w-10">
                                                     <input
                                                         type="checkbox"
-                                                        className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+                                                        className="w-[18px] h-[18px] accent-[var(--accent)] cursor-pointer"
                                                         checked={selectedIds.has(emp.id)}
                                                         onChange={e => {
                                                             setSelectedIds(prev => {
@@ -1824,14 +1860,14 @@ function EmployeesPage() {
                                                     />
                                                 </td>
                                             )}
-                                            <td className="px-5 py-3">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={36} />
-                                                    <div>
-                                                        <p className="text-[13px] font-semibold text-[var(--text)]">
+                                            <td className="px-5 py-3.5">
+                                                <div className="flex items-center gap-3.5">
+                                                    <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={44} />
+                                                    <div className="min-w-0 max-w-[240px]">
+                                                        <p className="text-[14px] font-semibold text-[var(--text)] leading-snug">
                                                             {employeeFullName(emp)}
                                                         </p>
-                                                        <p className="text-[11px] font-mono text-[var(--accent-text)]">{emp.employeeId}</p>
+                                                        <p className="text-[12.5px] font-semibold text-[var(--accent)] mt-0.5">{emp.employeeId}</p>
                                                         {emp.designation && (
                                                             <p className="text-[11px] text-[var(--text3)]">{emp.designation}</p>
                                                         )}
@@ -1855,7 +1891,7 @@ function EmployeesPage() {
                                                     department name wrapped and split the pill's border and
                                                     background into separate fragments per line. */}
                                                 {emp.department ? (
-                                                    <span className="inline-block whitespace-nowrap px-2 py-0.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] text-[12px] text-[var(--text2)] font-medium">
+                                                    <span className="inline-block whitespace-nowrap px-2.5 py-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] text-[12.5px] text-[var(--text2)] font-medium">
                                                         {emp.department.name}
                                                     </span>
                                                 ) : (
@@ -1864,27 +1900,27 @@ function EmployeesPage() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 {emp.deployments?.[0]?.site ? (
-                                                    <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded-[6px] text-[12px] text-blue-700 font-medium whitespace-nowrap">
+                                                    <span className="inline-block px-2.5 py-1 bg-[#eef4ff] border border-[#c9dafe] rounded-[8px] text-[12.5px] text-[#1447e6] font-semibold whitespace-nowrap">
                                                         {emp.deployments[0].site.name}
                                                     </span>
                                                 ) : (
                                                     <span className="text-[13px] text-[var(--text3)]">—</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-[13px] text-[var(--text2)]">{emp.employmentType}</td>
-                                            <td className="px-4 py-3 text-[13px] text-[var(--text2)]">{emp.phone}</td>
-                                            <td className="px-4 py-3 text-[13px] text-[var(--text2)] whitespace-nowrap">
+                                            <td className="px-4 py-3.5 text-[14px] text-[var(--text2)]">{emp.employmentType || "—"}</td>
+                                            <td className="px-4 py-3.5 text-[14px] text-[var(--text2)]">{emp.phone || "—"}</td>
+                                            <td className="px-4 py-3.5 text-[14px] text-[var(--text2)] whitespace-nowrap">
                                                 {emp.dateOfJoining ? format(new Date(emp.dateOfJoining), "dd MMM yyyy") : "—"}
                                             </td>
                                             {canViewSalary && (
-                                                <td className="px-4 py-3 text-[13px] text-[var(--text2)] whitespace-nowrap">
+                                                <td className="px-4 py-3.5 text-[14px] text-[var(--text2)] whitespace-nowrap">
                                                     {fmtRupee(emp.basicSalary)}
                                                 </td>
                                             )}
                                             <td className="px-4 py-3">
                                                 <span
                                                     style={{ color: s.color, background: s.bg, borderColor: s.border }}
-                                                    className="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap"
+                                                    className="inline-block px-3 py-1 rounded-[8px] text-[12.5px] font-semibold border whitespace-nowrap"
                                                 >
                                                     {s.label}
                                                 </span>
@@ -1907,6 +1943,54 @@ function EmployeesPage() {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Footer — count, rows per page, pager */}
+                    <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-3.5 border-t border-[var(--border)]">
+                        <span className="text-[13.5px] text-[var(--text2)]">
+                            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount || employees.length)} of {(totalCount || employees.length).toLocaleString("en-IN")} employees
+                        </span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <label className="flex items-center gap-2 text-[13.5px] text-[var(--text2)] mr-3">
+                                Rows per page:
+                                <span className="relative">
+                                    <select
+                                        value={PAGE_SIZE}
+                                        onChange={e => { setPage(1); setPageSize(Number(e.target.value)) }}
+                                        className="appearance-none h-10 pl-3.5 pr-9 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] text-[var(--text)] outline-none focus:border-[var(--accent)] cursor-pointer"
+                                    >
+                                        {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                                    </select>
+                                    <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text2)] pointer-events-none" />
+                                </span>
+                            </label>
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                                className="h-10 px-3.5 inline-flex items-center gap-1 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] text-[var(--text)] disabled:text-[var(--text3)] disabled:cursor-not-allowed hover:border-[var(--accent)] transition-colors"
+                            >
+                                <ChevronLeft size={16} /> Previous
+                            </button>
+                            {pageList.map((p, i) => p === "…" ? (
+                                <span key={`gap-${i}`} className="w-7 text-center text-[var(--text2)]">…</span>
+                            ) : (
+                                <button
+                                    key={p} onClick={() => setPage(p)} aria-current={p === page ? "page" : undefined}
+                                    className={`h-10 min-w-[40px] px-2 rounded-[10px] text-[13.5px] tabular-nums transition-colors ${
+                                        p === page
+                                            ? "bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] text-white font-semibold shadow-[0_4px_12px_rgba(31,95,255,0.3)]"
+                                            : "border border-[var(--border2)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--accent)]"
+                                    }`}
+                                >
+                                    {p}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                                className="h-10 px-3.5 inline-flex items-center gap-1 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] font-medium text-[var(--text)] disabled:text-[var(--text3)] disabled:cursor-not-allowed hover:border-[var(--accent)] transition-colors"
+                            >
+                                Next <ChevronRight size={16} />
+                            </button>
+                        </div>
                     </div>
                 </div>
                 </>
@@ -1942,44 +2026,6 @@ function EmployeesPage() {
                                 {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 4px", flexWrap: "wrap", gap: 8 }}>
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                        Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount} employees
-                    </span>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <button onClick={() => setPage(1)} disabled={page === 1}
-                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, color: "var(--text2)" }}>
-                            «
-                        </button>
-                        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, color: "var(--text2)" }}>
-                            ‹ Prev
-                        </button>
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                            const p = Math.max(1, Math.min(totalPages - 4, page - 2)) + i
-                            return (
-                                <button key={p} onClick={() => setPage(p)}
-                                    style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 12, cursor: "pointer",
-                                        background: p === page ? "var(--accent)" : "var(--surface)",
-                                        color: p === page ? "#fff" : "var(--text2)", fontWeight: p === page ? 700 : 400 }}>
-                                    {p}
-                                </button>
-                            )
-                        })}
-                        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1, color: "var(--text2)" }}>
-                            Next ›
-                        </button>
-                        <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
-                            style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1, color: "var(--text2)" }}>
-                            »
-                        </button>
                     </div>
                 </div>
             )}
