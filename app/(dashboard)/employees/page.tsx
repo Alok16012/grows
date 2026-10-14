@@ -107,6 +107,13 @@ function maskBank(v?: string) {
     if (!v) return "—"
     return `XXXXXX${v.slice(-4)}`
 }
+// "FULL_TIME" → "Full time"; free-text values pass through unchanged.
+function fmtEmploymentType(v?: string | null) {
+    if (!v) return "—"
+    if (!/^[A-Z_]+$/.test(v)) return v
+    const t = v.replace(/_/g, " ").toLowerCase()
+    return t.charAt(0).toUpperCase() + t.slice(1)
+}
 function fmtRupee(n?: number) {
     if (n === undefined || n === null) return "—"
     return `₹${n.toLocaleString("en-IN")}`
@@ -156,9 +163,11 @@ function StatCard({ label, value, icon, tone, trend, seed, onClick }: {
                     </div>
                     <span className="min-w-0 text-[12.5px] sm:text-[15px] font-medium leading-tight">{label}</span>
                 </div>
-                <div className="hidden sm:block opacity-90"><Sparkline color={dark ? "#b45309" : ink} seed={seed} /></div>
             </div>
-            <p className="relative text-[28px] sm:text-[34px] font-bold leading-none tabular-nums tracking-[-0.02em]">{value.toLocaleString("en-IN")}</p>
+            <div className="relative flex items-end justify-between gap-2">
+                <p className="text-[28px] sm:text-[34px] font-bold leading-none tabular-nums tracking-[-0.02em]">{value.toLocaleString("en-IN")}</p>
+                <div className="hidden sm:block opacity-90 mb-0.5"><Sparkline color={dark ? "#b45309" : ink} seed={seed} /></div>
+            </div>
             {trend && (
                 <p className="relative mt-auto pt-2.5 text-[12.5px] sm:text-[13.5px] font-medium flex items-center gap-1.5">
                     {trend.dir === "up" ? <TrendingUp size={15} /> : trend.dir === "down" ? <TrendingDown size={15} /> : <Minus size={15} />}
@@ -1804,13 +1813,16 @@ function EmployeesPage() {
                 )}
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] overflow-hidden">
                     <div className="overflow-x-auto">
-                        {/* Nine columns cannot share 375px — without a floor the table
-                            squeezed every cell instead of scrolling inside its wrapper. */}
-                        <table className="w-full min-w-[900px]">
+                        {/* Fixed layout with percentage widths: the columns share the
+                            card's width, so the table fits the window instead of
+                            spilling sideways. Short columns get fixed widths so phone
+                            numbers and dates never clip; below ~940px it scrolls inside its
+                            wrapper rather than crushing every cell. */}
+                        <table className="w-full min-w-[940px] table-fixed">
                             <thead>
                                 <tr className="border-b border-[var(--border)]">
                                     {canDelete && (
-                                        <th className="pl-5 pr-2 py-4 w-10">
+                                        <th className="pl-4 pr-1 py-4 w-[44px]">
                                             <input
                                                 type="checkbox"
                                                 className="w-[18px] h-[18px] accent-[var(--accent)] cursor-pointer"
@@ -1822,17 +1834,17 @@ function EmployeesPage() {
                                             />
                                         </th>
                                     )}
-                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-5 py-4">Employee</th>
-                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Department</th>
-                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Site</th>
-                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Type</th>
-                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Phone</th>
-                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Joined</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[52%] pl-2.5 pr-2.5 py-4">Employee</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[20%] px-2.5 py-4">Department</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[28%] px-2.5 py-4">Site</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[88px] px-2.5 py-4">Type</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[104px] px-2.5 py-4">Phone</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[104px] px-2.5 py-4">Joined</th>
                                     {canViewSalary && (
-                                        <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Salary</th>
+                                        <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[90px] px-2.5 py-4">Salary</th>
                                     )}
-                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-4 py-4">Status</th>
-                                    <th className="text-right text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] px-5 py-4">Actions</th>
+                                    <th className="text-left text-[12px] font-medium text-[var(--text2)] uppercase tracking-[0.6px] truncate w-[116px] px-2.5 py-4">Status</th>
+                                    <th className="w-[44px] py-4"><span className="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1844,7 +1856,7 @@ function EmployeesPage() {
                                             className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/60 transition-colors ${selectedIds.has(emp.id) ? "bg-[var(--accent)]/5" : ""} ${i === employees.length - 1 ? "border-b-0" : ""}`}
                                         >
                                             {canDelete && (
-                                                <td className="pl-5 pr-2 py-4 w-10">
+                                                <td className="pl-4 pr-1 py-4">
                                                     <input
                                                         type="checkbox"
                                                         className="w-[18px] h-[18px] accent-[var(--accent)] cursor-pointer"
@@ -1860,16 +1872,16 @@ function EmployeesPage() {
                                                     />
                                                 </td>
                                             )}
-                                            <td className="px-5 py-3.5">
-                                                <div className="flex items-center gap-3.5">
-                                                    <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={44} />
-                                                    <div className="min-w-0 max-w-[240px]">
-                                                        <p className="text-[14px] font-semibold text-[var(--text)] leading-snug">
+                                            <td className="pl-2.5 pr-2.5 py-3.5">
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar firstName={emp.firstName} lastName={emp.lastName} photo={emp.photo} size={42} />
+                                                    <div className="min-w-0">
+                                                        <p className="text-[14px] font-semibold text-[var(--text)] leading-snug break-words">
                                                             {employeeFullName(emp)}
                                                         </p>
                                                         <p className="text-[12.5px] font-semibold text-[var(--accent)] mt-0.5">{emp.employeeId}</p>
                                                         {emp.designation && (
-                                                            <p className="text-[11px] text-[var(--text3)]">{emp.designation}</p>
+                                                            <p className="text-[11.5px] text-[var(--text3)] truncate" title={emp.designation}>{emp.designation}</p>
                                                         )}
                                                         {(emp as any).user?.customRole?.name && (
                                                             <span
@@ -1886,46 +1898,46 @@ function EmployeesPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-2.5 py-3">
                                                 {/* inline-block + nowrap: as a plain inline span, a long
                                                     department name wrapped and split the pill's border and
                                                     background into separate fragments per line. */}
                                                 {emp.department ? (
-                                                    <span className="inline-block whitespace-nowrap px-2.5 py-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] text-[12.5px] text-[var(--text2)] font-medium">
+                                                    <span title={emp.department.name} className="inline-block max-w-full truncate align-middle whitespace-nowrap px-2.5 py-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] text-[12.5px] text-[var(--text2)] font-medium">
                                                         {emp.department.name}
                                                     </span>
                                                 ) : (
                                                     <span className="text-[13px] text-[var(--text3)]">—</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-2.5 py-3">
                                                 {emp.deployments?.[0]?.site ? (
-                                                    <span className="inline-block px-2.5 py-1 bg-[#eef4ff] border border-[#c9dafe] rounded-[8px] text-[12.5px] text-[#1447e6] font-semibold whitespace-nowrap">
+                                                    <span title={emp.deployments[0].site.name} className="inline-block max-w-full truncate align-middle px-2.5 py-1 bg-[#eef4ff] border border-[#c9dafe] rounded-[8px] text-[12.5px] text-[#1447e6] font-semibold whitespace-nowrap">
                                                         {emp.deployments[0].site.name}
                                                     </span>
                                                 ) : (
                                                     <span className="text-[13px] text-[var(--text3)]">—</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3.5 text-[14px] text-[var(--text2)]">{emp.employmentType || "—"}</td>
-                                            <td className="px-4 py-3.5 text-[14px] text-[var(--text2)]">{emp.phone || "—"}</td>
-                                            <td className="px-4 py-3.5 text-[14px] text-[var(--text2)] whitespace-nowrap">
+                                            <td className="px-2.5 py-3.5 text-[13.5px] text-[var(--text2)] truncate" title={emp.employmentType || undefined}>{fmtEmploymentType(emp.employmentType)}</td>
+                                            <td className="px-2.5 py-3.5 text-[13.5px] text-[var(--text2)] tabular-nums truncate">{emp.phone || "—"}</td>
+                                            <td className="px-2.5 py-3.5 text-[13.5px] text-[var(--text2)] whitespace-nowrap truncate">
                                                 {emp.dateOfJoining ? format(new Date(emp.dateOfJoining), "dd MMM yyyy") : "—"}
                                             </td>
                                             {canViewSalary && (
-                                                <td className="px-4 py-3.5 text-[14px] text-[var(--text2)] whitespace-nowrap">
+                                                <td className="px-2.5 py-3.5 text-[13.5px] text-[var(--text2)] whitespace-nowrap truncate">
                                                     {fmtRupee(emp.basicSalary)}
                                                 </td>
                                             )}
-                                            <td className="px-4 py-3">
+                                            <td className="px-2.5 py-3">
                                                 <span
                                                     style={{ color: s.color, background: s.bg, borderColor: s.border }}
-                                                    className="inline-block px-3 py-1 rounded-[8px] text-[12.5px] font-semibold border whitespace-nowrap"
+                                                    className="inline-block max-w-full truncate align-middle px-2 py-1 rounded-[8px] text-[12px] font-semibold border whitespace-nowrap"
                                                 >
                                                     {s.label}
                                                 </span>
                                             </td>
-                                            <td className="px-5 py-3">
+                                            <td className="pr-2 py-3">
                                                 <div className="flex items-center justify-end">
                                                     <RowActions
                                                         emp={emp}
