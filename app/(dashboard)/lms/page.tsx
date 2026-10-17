@@ -1691,16 +1691,16 @@ export default function LMSPage() {
                         <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Training (LMS)</h1>
                         <p className="text-[13.5px] text-[var(--text3)] mt-1">Training courses &amp; employee development.</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+                    <div className="page-actions">
                         <button
                             onClick={() => { setEnrollCourseId(undefined); setShowEnrollModal(true) }}
-                            className="h-[42px] px-4 text-[13px] font-semibold border border-[var(--border)] bg-[var(--surface)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center gap-2"
+                            className="h-[42px] px-4 text-[13px] font-semibold border border-[var(--border)] bg-[var(--surface)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2"
                         >
                             <Users size={16} /> Enroll Employees
                         </button>
                         <button
                             onClick={() => { setEditCourse(null); setShowCourseModal(true) }}
-                            className="h-[42px] px-5 text-[13px] bg-[var(--accent)] text-white rounded-[10px] font-semibold flex items-center gap-2 hover:opacity-90"
+                            className="h-[42px] px-5 text-[13px] bg-[var(--accent)] text-white rounded-[10px] font-semibold inline-flex items-center justify-center gap-2 hover:opacity-90"
                             style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
                         >
                             <Plus size={16} /> Create Course
@@ -1752,12 +1752,12 @@ export default function LMSPage() {
                         {/* Filters */}
                         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 space-y-3">
                             <div className="flex flex-wrap gap-2">
-                                <div className="flex flex-wrap gap-1.5">
+                                <div className="flex gap-1.5 overflow-x-auto no-scrollbar max-w-full">
                                     {CATEGORIES.map(cat => (
                                         <button
                                             key={cat}
                                             onClick={() => setCatFilter(cat)}
-                                            className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
+                                            className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
                                                 catFilter === cat
                                                     ? "bg-[var(--accent)] text-white"
                                                     : "bg-[var(--surface2)] text-[var(--text2)] border border-[var(--border)] hover:border-[var(--accent)]"
@@ -1768,13 +1768,13 @@ export default function LMSPage() {
                                     ))}
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-2 items-center">
-                                <div className="flex gap-1.5">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                                <div className="flex gap-1.5 overflow-x-auto no-scrollbar max-w-full">
                                     {COURSE_STATUSES.map(s => (
                                         <button
                                             key={s}
                                             onClick={() => setStatusFilter(s)}
-                                            className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
+                                            className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
                                                 statusFilter === s
                                                     ? "bg-[var(--accent)] text-white"
                                                     : "bg-[var(--surface2)] text-[var(--text2)] border border-[var(--border)] hover:border-[var(--accent)]"
@@ -1784,7 +1784,8 @@ export default function LMSPage() {
                                         </button>
                                     ))}
                                 </div>
-                                <div className="relative flex-1 min-w-[180px]">
+                                <div className="filter-bar sm:flex-1">
+                                <div className="filter-search relative flex-1 sm:min-w-[180px]">
                                     <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                     <input
                                         value={search}
@@ -1802,6 +1803,7 @@ export default function LMSPage() {
                                     />
                                     <span className="text-[12px] text-[var(--text2)]">Mandatory only</span>
                                 </label>
+                                </div>
                             </div>
                         </div>
 
@@ -1963,12 +1965,12 @@ export default function LMSPage() {
                         {/* Filters */}
                         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 space-y-3">
                             <div className="flex flex-wrap gap-2 items-center">
-                                <div className="flex flex-wrap gap-1.5">
+                                <div className="flex gap-1.5 overflow-x-auto no-scrollbar max-w-full">
                                     {ENROLLMENT_STATUSES.map(s => (
                                         <button
                                             key={s}
                                             onClick={() => setEnrollStatusFilter(s)}
-                                            className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
+                                            className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
                                                 enrollStatusFilter === s
                                                     ? "bg-[var(--accent)] text-white"
                                                     : "bg-[var(--surface2)] text-[var(--text2)] border border-[var(--border)] hover:border-[var(--accent)]"
@@ -1979,18 +1981,18 @@ export default function LMSPage() {
                                     ))}
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-3">
+                            <div className="filter-bar">
                                 <select
                                     value={enrollCourseFilter}
                                     onChange={e => setEnrollCourseFilter(e.target.value)}
-                                    className="h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[12px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] min-w-[200px]"
+                                    className="w-full sm:w-auto h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] text-[12px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] sm:min-w-[200px]"
                                 >
                                     <option value="">All Courses</option>
                                     {courses.map(c => (
                                         <option key={c.id} value={c.id}>{c.courseCode} — {c.title}</option>
                                     ))}
                                 </select>
-                                <div className="relative flex-1">
+                                <div className="filter-search relative flex-1">
                                     <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                     <input
                                         value={enrollSearch}

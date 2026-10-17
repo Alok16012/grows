@@ -122,7 +122,7 @@ export default function ApprovalsPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div className="flex items-center bg-white border border-[var(--border)] rounded-[10px] p-1 overflow-x-auto">
+                <div className="flex items-center bg-white border border-[var(--border)] rounded-[10px] p-1 overflow-x-auto no-scrollbar">
                     <button
                         onClick={() => setActiveTab("pending")}
                         className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${

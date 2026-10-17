@@ -749,10 +749,10 @@ export default function AssetsPage() {
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Assets</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage and track physical assets issued to employees.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button
                         onClick={() => setAddModal(true)}
-                        className="flex items-center gap-2 h-[42px] px-5 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center justify-center gap-2 h-[42px] px-5 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold hover:opacity-90 transition-opacity"
                         style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                         <Plus size={16} /> Add Asset
                     </button>
@@ -782,12 +782,12 @@ export default function AssetsPage() {
                 {tab === "assets" && (
                     <>
                         {/* Filters */}
-                        <div className="flex items-center gap-3 mb-4 flex-wrap">
+                        <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:flex-wrap sm:items-center">
                             {/* Category Pills */}
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
                                 {CATEGORIES.map(cat => (
                                     <button key={cat} onClick={() => setCategoryFilter(cat)}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all border ${categoryFilter === cat
+                                        className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all border ${categoryFilter === cat
                                             ? "bg-[var(--accent)] text-white border-[var(--accent)]"
                                             : "bg-[var(--surface)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)]"}`}>
                                         {cat !== "All" && getCategoryIcon(cat, 12)}
@@ -796,14 +796,15 @@ export default function AssetsPage() {
                                 ))}
                             </div>
 
+                            <div className="filter-bar sm:ml-auto">
                             {/* Search */}
-                            <div className="relative ml-auto">
+                            <div className="filter-search relative">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                 <input
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                     placeholder="Search by name or code..."
-                                    className="pl-8 pr-4 py-2 text-[12.5px] border border-[var(--border)] rounded-xl bg-[var(--surface2)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] w-60"
+                                    className="pl-8 pr-4 py-2 text-[12.5px] border border-[var(--border)] rounded-xl bg-[var(--surface2)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] w-full sm:w-60"
                                 />
                                 {search && (
                                     <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] hover:text-[var(--text)]">
@@ -817,6 +818,7 @@ export default function AssetsPage() {
                                 className={`px-3 py-1.5 rounded-xl text-[12px] font-medium border transition-all ${showInactive ? "bg-[var(--surface2)] text-[var(--text2)] border-[var(--border)]" : "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30"}`}>
                                 {showInactive ? "All" : "Active Only"}
                             </button>
+                            </div>
                         </div>
 
                         {/* Assets Table */}
@@ -912,8 +914,8 @@ export default function AssetsPage() {
                 {tab === "issued" && (
                     <>
                         {/* Filters */}
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="relative flex-1 max-w-xs">
+                        <div className="filter-bar mb-4">
+                            <div className="filter-search relative flex-1 sm:max-w-xs">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                 <input
                                     value={assignSearch}

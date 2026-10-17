@@ -694,10 +694,10 @@ export default function HelpdeskPage() {
                     <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Helpdesk</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage and track support tickets.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button
                         onClick={() => setShowNew(true)}
-                        className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold h-[42px] px-5 hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center justify-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold h-[42px] px-5 hover:opacity-90 transition-opacity"
                         style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
                     >
                         <Plus size={16} /> New Ticket
@@ -716,7 +716,7 @@ export default function HelpdeskPage() {
             {/* Filters */}
             <div className="bg-white border border-[var(--border)] rounded-[12px] p-4 space-y-3">
                 {/* Status pills */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
                     {[
                         { label: "All", value: "ALL" },
                         { label: "Open", value: "OPEN" },
@@ -727,7 +727,7 @@ export default function HelpdeskPage() {
                         <button
                             key={s.value}
                             onClick={() => setStatusFilter(s.value)}
-                            className={`px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors ${statusFilter === s.value
+                            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors ${statusFilter === s.value
                                 ? "bg-[var(--accent)] text-white"
                                 : "border border-[var(--border)] text-[var(--text2)] hover:bg-[var(--surface2)]"
                                 }`}
@@ -738,11 +738,11 @@ export default function HelpdeskPage() {
                 </div>
 
                 {/* Dropdowns + Search */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="filter-bar">
                     <select
                         value={priorityFilter}
                         onChange={e => setPriorityFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        className="w-full sm:w-auto h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                     >
                         <option value="ALL">All Priorities</option>
                         {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>)}
@@ -750,12 +750,12 @@ export default function HelpdeskPage() {
                     <select
                         value={categoryFilter}
                         onChange={e => setCategoryFilter(e.target.value)}
-                        className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        className="w-full sm:w-auto h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                     >
                         <option value="ALL">All Categories</option>
                         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    <div className="relative flex-1 min-w-[200px]">
+                    <div className="filter-search relative flex-1 sm:min-w-[200px]">
                         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                         <input
                             value={search}

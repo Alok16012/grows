@@ -903,7 +903,7 @@ function AdminView() {
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Attendance</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Track and manage employee attendance</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button onClick={() => setBulkModal(true)}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-[8px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
                         <Users size={15} /> Bulk Mark
@@ -928,22 +928,22 @@ function AdminView() {
             {tab === "daily" ? (
                 <>
                     {/* Filters */}
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] px-3 py-2">
+                    <div className="filter-bar">
+                        <div className="filter-full flex items-center gap-2 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] px-3 py-2">
                             <button onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n })}
                                 className="p-2 text-[var(--text3)] hover:text-[var(--text)] transition-colors"><ChevronLeft size={16} /></button>
                             <input type="date" value={format(selectedDate, "yyyy-MM-dd")}
                                 onChange={e => { const d = new Date(e.target.value); if (!isNaN(d.getTime())) setSelectedDate(d) }}
-                                className="text-[13px] font-medium text-[var(--text)] outline-none bg-transparent cursor-pointer" />
+                                className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text)] outline-none bg-transparent cursor-pointer" />
                             <button onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n })}
                                 className="p-2 text-[var(--text3)] hover:text-[var(--text)] transition-colors"><ChevronRight size={16} /></button>
                         </div>
                         <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
-                            className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
+                            className="w-full sm:w-auto h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
                             <option value="">All Sites</option>
                             {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
-                        <div className="relative flex-1 min-w-[200px]">
+                        <div className="filter-search relative flex-1 sm:min-w-[200px]">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search employees..."
                                 className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
@@ -1034,11 +1034,11 @@ function AdminView() {
             ) : (
                 // ── Monthly Summary Tab ──
                 <>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="filter-bar">
                         <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
-                            className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
+                            className="w-full sm:w-auto h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
                         <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
-                            className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
+                            className="w-full sm:w-auto h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
                             <option value="">All Sites</option>
                             {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>

@@ -2013,21 +2013,22 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     return (
         <div>
             {/* ── Toolbar ─────────────────────────────── */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <div className="filter-bar" style={{ marginBottom: 14 }}>
                 <select value={month} onChange={e => { setMonth(e.target.value); setDrillEmpId(null) }}
+                    className="w-full sm:w-auto"
                     style={{ height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "white", padding: "0 10px", fontSize: 13, color: "var(--text)", outline: "none" }}>
                     {monthOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                 </select>
 
                 {!drillEmpId && (
                     <>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, height: 34, border: "1px solid var(--border)", borderRadius: 8, background: "white", padding: "0 10px", minWidth: 240 }}>
+                        <div className="filter-search sm:min-w-[240px]" style={{ display: "flex", alignItems: "center", gap: 6, height: 34, border: "1px solid var(--border)", borderRadius: 8, background: "white", padding: "0 10px" }}>
                             <Search size={13} className="text-[var(--text3)] shrink-0" />
                             <input
                                 value={empSearch}
                                 onChange={e => setEmpSearch(e.target.value)}
                                 placeholder="Search employee name, ID, dept…"
-                                style={{ flex: 1, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "var(--text)" }}
+                                style={{ flex: 1, minWidth: 0, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "var(--text)" }}
                             />
                             {empSearch && (
                                 <button onClick={() => setEmpSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", display: "flex" }}>
@@ -2037,7 +2038,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                         </div>
                         <button onClick={downloadTeamMonth} disabled={visibleRows.length === 0}
                             title={q ? "Download the matching employees for this month" : "Download all employees for this month"}
-                            style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--text2)", fontSize: 12, fontWeight: 600, cursor: visibleRows.length ? "pointer" : "not-allowed", opacity: visibleRows.length ? 1 : 0.5, display: "flex", alignItems: "center", gap: 5 }}>
+                            style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--text2)", fontSize: 12, fontWeight: 600, cursor: visibleRows.length ? "pointer" : "not-allowed", opacity: visibleRows.length ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
                             <Download size={13} /> Download{q ? ` (${visibleRows.length})` : ""}
                         </button>
                     </>
@@ -2046,11 +2047,11 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                 {isPrivileged && (
                     <>
                         <button onClick={() => setShowRateSetting(s => !s)}
-                            style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                            style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap" }}>
                             <Settings size={14} /> Travel: <Bike size={14} /> ₹{travelRate2W} · <Car size={14} /> ₹{travelRate4W} /km
                         </button>
                         {showRateSetting && (
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "4px 10px", flexWrap: "wrap" }}>
+                            <div className="filter-full" style={{ display: "flex", alignItems: "center", gap: 8, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "4px 10px", flexWrap: "wrap" }}>
                                 <span style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 3 }}><Bike size={14} /> 2-Wheeler ₹/km</span>
                                 <input type="number" min="0" step="0.5" value={rate2WInput} onChange={e => setRate2WInput(e.target.value)}
                                     style={{ width: 64, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
@@ -2068,7 +2069,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
 
                 {drillEmpId && (
                     <button onClick={() => { setDrillEmpId(null); setDrillData(null) }}
-                        style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "#fef2f2", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                        style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "#fef2f2", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
                         <X size={13} /> Close drill-down
                     </button>
                 )}
@@ -2549,10 +2550,10 @@ export default function ExpensesPage() {
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Expenses</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Track and manage employee expense claims.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+                <div className="page-actions">
                     <button
                         onClick={() => exportExpenses("xlsx")}
-                        className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] flex items-center gap-2 transition-colors"
+                        className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors"
                     >
                         <Download size={16} /> Export
                     </button>
@@ -2562,7 +2563,7 @@ export default function ExpensesPage() {
                                 onClick={startReview}
                                 disabled={reviewLoading || pendingCount === 0}
                                 title={pendingCount === 0 ? "No pending expenses" : "Review pending expenses one by one"}
-                                className="h-[42px] px-4 bg-[#8b5cf6] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-[42px] px-4 bg-[#8b5cf6] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 inline-flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {reviewLoading ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
                                 Review{pendingCount > 0 ? ` (${pendingCount})` : ""}
@@ -2571,7 +2572,7 @@ export default function ExpensesPage() {
                                 onClick={approveAll}
                                 disabled={approveAllLoading || pendingCount === 0}
                                 title={pendingCount === 0 ? "No pending expenses" : "Approve all pending expenses at once"}
-                                className="h-[42px] px-4 bg-[var(--accent)] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-[42px] px-4 bg-[var(--accent)] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 inline-flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {approveAllLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                                 Approve all{pendingCount > 0 ? ` (${pendingCount})` : ""}
@@ -2580,7 +2581,7 @@ export default function ExpensesPage() {
                     )}
                     <button
                         onClick={() => setAddOpen(true)}
-                        className="h-[42px] px-5 bg-[var(--accent)] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 flex items-center gap-2 transition-opacity"
+                        className="h-[42px] px-5 bg-[var(--accent)] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 inline-flex items-center justify-center gap-2 transition-opacity"
                         style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
                     >
                         <Plus size={16} /> Add Expense
@@ -2684,12 +2685,12 @@ export default function ExpensesPage() {
             {/* Filters — hidden on analytics and employee tabs */}
             {activeTab !== "analytics" && activeTab !== "employee" && <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 mb-4 space-y-3">
                 {/* Status pills */}
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
                     {(activeTab === "accounts" ? ["ALL", "APPROVED", "PAID"] as StatusFilter[] : STATUS_FILTERS).map(s => (
                         <button
                             key={s}
                             onClick={() => setStatusFilter(s)}
-                            className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${statusFilter === s
+                            className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${statusFilter === s
                                 ? "bg-[var(--accent)] text-white"
                                 : "bg-[var(--surface2)] text-[var(--text2)] hover:bg-[var(--border)]"
                                 }`}
@@ -2699,11 +2700,11 @@ export default function ExpensesPage() {
                     ))}
                 </div>
                 {/* Second row: Category + Project + Month + Date range + Search */}
-                <div className="flex flex-wrap gap-2">
+                <div className="filter-bar">
                     <select
                         value={categoryFilter}
                         onChange={e => setCategoryFilter(e.target.value)}
-                        className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        className="w-full sm:w-auto h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                     >
                         <option value="ALL">All Categories</option>
                         {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
@@ -2711,7 +2712,7 @@ export default function ExpensesPage() {
                     <select
                         value={projectFilter}
                         onChange={e => setProjectFilter(e.target.value)}
-                        className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors max-w-[180px]"
+                        className="w-full sm:w-auto h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors sm:max-w-[180px]"
                     >
                         <option value="ALL">All Sites</option>
                         {projectsList.map(p => (
@@ -2723,16 +2724,16 @@ export default function ExpensesPage() {
                         value={monthFilter}
                         onChange={e => setMonthFilter(e.target.value)}
                         title="Filter by month"
-                        className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                        className="w-full sm:w-auto h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                     />
-                    <div className={`flex items-center gap-1 ${monthFilter ? "opacity-50 pointer-events-none" : ""}`}>
+                    <div className={`filter-full flex items-center gap-1 ${monthFilter ? "opacity-50 pointer-events-none" : ""}`}>
                         <Calendar size={13} className="text-[var(--text3)] shrink-0" />
                         <input
                             type="date"
                             value={dateFrom}
                             onChange={e => setDateFrom(e.target.value)}
                             disabled={!!monthFilter}
-                            className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                            className="flex-1 sm:flex-none min-w-0 h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                             placeholder="From"
                         />
                         <span className="text-[var(--text3)] text-[12px]">–</span>
@@ -2741,18 +2742,18 @@ export default function ExpensesPage() {
                             value={dateTo}
                             onChange={e => setDateTo(e.target.value)}
                             disabled={!!monthFilter}
-                            className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+                            className="flex-1 sm:flex-none min-w-0 h-8 rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
                             placeholder="To"
                         />
                     </div>
-                    <div className="flex items-center gap-1.5 flex-1 min-w-[180px] h-8 rounded-[8px] border border-[var(--border)] bg-white px-2">
+                    <div className="filter-search flex items-center gap-1.5 flex-1 sm:min-w-[180px] h-8 rounded-[8px] border border-[var(--border)] bg-white px-2">
                         <Search size={13} className="text-[var(--text3)] shrink-0" />
                         <input
                             type="text"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Search title or EXP number..."
-                            className="flex-1 text-[12px] text-[var(--text)] bg-transparent outline-none placeholder:text-[var(--text3)]"
+                            className="flex-1 min-w-0 text-[12px] text-[var(--text)] bg-transparent outline-none placeholder:text-[var(--text3)]"
                         />
                         {search && (
                             <button onClick={() => setSearch("")} className="text-[var(--text3)] hover:text-[var(--text)]">

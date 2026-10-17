@@ -435,11 +435,11 @@ export default function PerformancePage() {
                     </p>
                 </div>
                 {isAdminOrManager && activeTab === "reviews" && (
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <div className="page-actions">
                         <button
                             onClick={() => setShowCreateModal(true)}
                             style={{
-                                display: "flex", alignItems: "center", gap: 7,
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
                                 height: 42, padding: "0 18px",
                                 background: "var(--accent)", color: "#fff", border: "none",
                                 borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer",
@@ -720,8 +720,8 @@ function ReviewsTab({
     return (
         <div>
             {/* Toolbar */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-                <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
+            <div className="filter-bar" style={{ marginBottom: 20 }}>
+                <div className="filter-search sm:min-w-[180px]" style={{ position: "relative", flex: 1 }}>
                     <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
                     <input
                         value={search}
@@ -737,6 +737,7 @@ function ReviewsTab({
                 <select
                     value={filterCycle}
                     onChange={e => setFilterCycle(e.target.value)}
+                    className="w-full sm:w-auto"
                     style={{
                         height: 36, padding: "0 10px", border: "1px solid var(--border)",
                         borderRadius: 8, fontSize: 13, background: "#fff", color: "var(--text)",
@@ -750,6 +751,7 @@ function ReviewsTab({
                 <select
                     value={filterStatus}
                     onChange={e => setFilterStatus(e.target.value)}
+                    className="w-full sm:w-auto"
                     style={{
                         height: 36, padding: "0 10px", border: "1px solid var(--border)",
                         borderRadius: 8, fontSize: 13, background: "#fff", color: "var(--text)",

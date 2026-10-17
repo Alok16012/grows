@@ -191,13 +191,13 @@ export default function AnnouncementsPage() {
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Company notices &amp; holiday calendar.</p>
                 </div>
                 {canManage && (
-                    <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+                    <div className="page-actions">
                         <button onClick={() => setShowHolForm(true)}
-                            className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
+                            className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
                             <Plus size={16} /> Add Holiday
                         </button>
                         <button onClick={() => setShowAnnForm(true)}
-                            className="inline-flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                            className="inline-flex items-center justify-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
                             style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                             <Plus size={16} /> New Notice
                         </button>

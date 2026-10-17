@@ -540,7 +540,7 @@ export default function LeavesPage() {
                     <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Leaves</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage employee leave requests and approvals.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+                <div className="page-actions">
                     <button onClick={exportCsv}
                         className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <Download size={16} /> Export
@@ -561,34 +561,36 @@ export default function LeavesPage() {
             </div>
 
             {/* Filter tabs + search */}
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
                 {/* Scrolls sideways on a phone — five tabs don't fit, and the global
                     overflow-x:hidden was clipping "Cancelled" out of reach entirely. */}
-                <div className="flex items-center gap-1 overflow-x-auto max-w-full">
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
                     {(["", "PENDING", "APPROVED", "REJECTED", "CANCELLED"] as const).map(s => (
                         <button key={s} onClick={() => setStatusFilter(s)}
-                            className={`shrink-0 px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${statusFilter === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
+                            className={`shrink-0 whitespace-nowrap px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${statusFilter === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
                             {s === "" ? "All" : STATUS_CONFIG[s]?.label}
                         </button>
                     ))}
                 </div>
+                <div className="filter-bar sm:flex-1">
                 <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-                    className="h-9 px-3 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                    className="w-full sm:w-auto h-9 px-3 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
                     <option value="">All Types</option>
                     {LEAVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
-                    className="h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer" />
+                    className="w-full sm:w-auto h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer" />
                 {(monthFilter || typeFilter || statusFilter) && (
                     <button onClick={() => { setMonthFilter(""); setTypeFilter(""); setStatusFilter("") }}
-                        className="inline-flex items-center gap-1 h-9 px-3 rounded-[9px] text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]">
+                        className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-[9px] text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <X size={13} /> Clear
                     </button>
                 )}
-                <div className="relative flex-1 min-w-[200px] max-w-[320px] ml-auto">
+                <div className="filter-search relative sm:flex-1 sm:min-w-[200px] sm:max-w-[320px] sm:ml-auto">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by employee name or ID..."
                         className="w-full h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
+                </div>
                 </div>
             </div>
 
