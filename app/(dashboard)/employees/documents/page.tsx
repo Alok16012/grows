@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { can } from "@/lib/can"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Doc = {
@@ -337,12 +338,12 @@ export default function MasterDocumentsPage() {
     return (
         <div className="p-4 lg:p-6 max-w-full mx-auto flex flex-col gap-5">
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[24px] font-bold text-[var(--text)] tracking-[-0.4px]">Document Management</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-1">Manage, upload and verify all employee documents in one place.</p>
                 </div>
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
                     <button className="flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
                         <Download size={16} /> Export
                     </button>
@@ -357,25 +358,12 @@ export default function MasterDocumentsPage() {
             </div>
 
             {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                {[
-                    { label: "Total Employees",      value: totalEmployees,       sub: "100%",              color: "#3b82f6", bg: "#eff6ff", icon: Users },
-                    { label: "Total Documents",      value: totalDocs,            sub: "100%",              color: "#0b5cff", bg: "#e8effe", icon: FileText },
-                    { label: "All Docs Present",     value: allPresent,           sub: pctOf(allPresent),   color: "#15803d", bg: "#dcfce7", icon: CheckCircle2 },
-                    { label: "Missing Docs",         value: missingAny,           sub: pctOf(missingAny),   color: "#dc2626", bg: "#fef2f2", icon: AlertCircle },
-                    { label: "Verification Pending", value: verificationPending,  sub: pctOf(verificationPending), color: "#d97706", bg: "#fef3c7", icon: Clock },
-                ].map(s => (
-                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 flex items-center gap-3">
-                        <div className="h-11 w-11 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: s.bg }}>
-                            <s.icon size={20} style={{ color: s.color }} />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-[12px] text-[var(--text3)]">{s.label}</p>
-                            <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: s.color }}>{s.value}</p>
-                            <p className="text-[11px] text-[var(--text3)]">{s.sub}</p>
-                        </div>
-                    </div>
-                ))}
+            <div className={statGridClass(5)}>
+                <StatCard label="Total Employees" value={totalEmployees} sub="100%" tone="blue" icon={<Users size={20} />} seed={0} />
+                <StatCard label="Total Documents" value={totalDocs} sub="100%" tone="violet" icon={<FileText size={20} />} seed={1} />
+                <StatCard label="All Docs Present" value={allPresent} sub={pctOf(allPresent)} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
+                <StatCard label="Missing Docs" value={missingAny} sub={pctOf(missingAny)} tone="rose" icon={<AlertCircle size={20} />} seed={3} />
+                <StatCard label="Verification Pending" value={verificationPending} sub={pctOf(verificationPending)} tone="amber" icon={<Clock size={20} />} seed={4} />
             </div>
 
             {/* Filters */}

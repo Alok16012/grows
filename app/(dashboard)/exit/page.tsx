@@ -5,11 +5,12 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
+import { StatCard, statGridClass } from "@/components/StatCard"
 import {
   Plus, Loader2, X, Search, MoreVertical,
   LogOut, CheckCircle2, Clock, AlertCircle,
   ChevronRight, ChevronDown, Check, Eye,
-  Trash2, Calendar, IndianRupee, type LucideIcon,
+  Trash2, Calendar, IndianRupee,
 } from "lucide-react"
 import { format, isWithinInterval, addDays } from "date-fns"
 
@@ -137,28 +138,6 @@ function Avatar({ first, last, photo, size = 38 }: { first: string; last: string
       }}
     >
       {getInitials(first, last)}
-    </div>
-  )
-}
-
-// ─── Stats Card ───────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, color, bg, icon: Icon }: { label: string; value: number; color: string; bg?: string; icon?: LucideIcon }) {
-  return (
-    <div style={{
-      background: "var(--surface)", border: "1px solid var(--border)",
-      borderRadius: 14, padding: "18px 20px",
-      display: "flex", alignItems: "center", gap: 14,
-    }}>
-      {Icon && (
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: bg || (color + "1f"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Icon size={20} style={{ color }} />
-        </div>
-      )}
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, color: "var(--text3)", whiteSpace: "nowrap" }}>{label}</div>
-        <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1.15, fontVariantNumeric: "tabular-nums" }}>{value}</div>
-      </div>
     </div>
   )
 }
@@ -301,11 +280,11 @@ export default function ExitPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 24 }}>
-        <StatCard label="Active Exits" value={activeCount} color="#d97706" bg="#fef3c7" icon={LogOut} />
-        <StatCard label="Pending F&F" value={fnfPendingCount} color="#dc2626" bg="#fef2f2" icon={IndianRupee} />
-        <StatCard label="Completed This Month" value={completedThisMonth} color="#16a34a" bg="#dcfce7" icon={CheckCircle2} />
-        <StatCard label="Notice Ending This Week" value={noticePeriodEndingThisWeek} color="#3b82f6" bg="#eff6ff" icon={Clock} />
+      <div className={statGridClass(4)} style={{ marginBottom: 24 }}>
+        <StatCard label="Active Exits" value={activeCount} tone="amber" icon={<LogOut size={20} />} seed={0} />
+        <StatCard label="Pending F&F" value={fnfPendingCount} tone="rose" icon={<IndianRupee size={20} />} seed={1} />
+        <StatCard label="Completed This Month" value={completedThisMonth} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
+        <StatCard label="Notice Ending This Week" value={noticePeriodEndingThisWeek} tone="blue" icon={<Clock size={20} />} seed={3} />
       </div>
 
       {/* Filters */}

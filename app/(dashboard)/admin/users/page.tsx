@@ -294,9 +294,9 @@ export default function UserManagementPage() {
     }
 
     return (
-        <div className="p-6 lg:p-7">
-            <div className="flex items-center justify-between mb-5">
-                <div>
+        <div className="p-4 sm:p-6 lg:p-7">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
+                <div className="min-w-0">
                     <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">System Users</h1>
                     <p className="text-[13px] text-[var(--text2)] mt-[3px]">Manage access, roles, and account security</p>
                     {users.length > 0 && (() => {
@@ -319,7 +319,7 @@ export default function UserManagementPage() {
                         )
                     })()}
                 </div>
-                <div className="flex items-center gap-[10px]">
+                <div className="flex flex-wrap items-center gap-[10px] sm:justify-end">
                     <button
                         onClick={handleCleanupOrphans}
                         disabled={cleaning}
@@ -341,8 +341,8 @@ export default function UserManagementPage() {
             </div>
 
             {/* Filters Bar */}
-            <div className="flex items-center gap-3 mb-4">
-                <div className="relative flex-1 max-w-[400px]">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="relative flex-1 min-w-[180px] max-w-[400px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <input
                         placeholder="Search name or email..."

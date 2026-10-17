@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -826,10 +827,10 @@ export default function OnboardingPage() {
     const pct = (n: number) => total > 0 ? `${((n / total) * 100).toFixed(1)}% of total` : "0% of total"
 
     const kpis = [
-        { label: "Pending Review", count: (counts["IN_PROGRESS"] || 0) + (counts["NOT_STARTED"] || 0), color: "#d97706", bg: "#fef3c7", icon: Clock },
-        { label: "Approved",       count: counts["COMPLETED"] || 0, color: "#15803d", bg: "#dcfce7", icon: CheckCircle2 },
-        { label: "Rejected",       count: counts["ON_HOLD"]   || 0, color: "#dc2626", bg: "#fee2e2", icon: XCircle },
-        { label: "Total",          count: total,                    color: "#3b82f6", bg: "#eff6ff", icon: Users, isTotal: true },
+        { label: "Pending Review", count: (counts["IN_PROGRESS"] || 0) + (counts["NOT_STARTED"] || 0), tone: "amber" as const, icon: Clock },
+        { label: "Approved",       count: counts["COMPLETED"] || 0, tone: "teal" as const,  icon: CheckCircle2 },
+        { label: "Rejected",       count: counts["ON_HOLD"]   || 0, tone: "rose" as const,  icon: XCircle },
+        { label: "Total",          count: total,                    tone: "blue" as const,  icon: Users, isTotal: true },
     ]
 
     // Client-side pagination over the fetched (already status/search filtered) list.
@@ -841,14 +842,14 @@ export default function OnboardingPage() {
         <div className="px-4 lg:px-0" style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 32 }}>
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.4px" }}>Onboarding</h1>
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: "4px 0 0 0" }}>
                         Review, approve or reject newly joined employees
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: 10 }}>
+                <div className="flex flex-wrap items-center sm:justify-end" style={{ gap: 10 }}>
                     <button onClick={() => setShareOpen(true)}
                         style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         <Link2 size={15} /> Share Join Link
@@ -861,18 +862,10 @@ export default function OnboardingPage() {
             </div>
 
             {/* KPI cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-                {kpis.map(s => (
-                    <div key={s.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "18px 20px", display: "flex", alignItems: "center", gap: 14 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <s.icon size={21} style={{ color: s.color }} />
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                            <p style={{ fontSize: 12.5, color: "var(--text3)", margin: 0, fontWeight: 500 }}>{s.label}</p>
-                            <p style={{ fontSize: 27, fontWeight: 800, color: s.color, margin: "1px 0 2px", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{s.count}</p>
-                            <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>{s.isTotal ? "100% of total" : pct(s.count)}</p>
-                        </div>
-                    </div>
+            <div className={statGridClass(kpis.length)}>
+                {kpis.map((s, i) => (
+                    <StatCard key={s.label} label={s.label} value={s.count} tone={s.tone} icon={<s.icon size={20} />}
+                        sub={s.isTotal ? "100% of total" : pct(s.count)} seed={i} />
                 ))}
             </div>
 

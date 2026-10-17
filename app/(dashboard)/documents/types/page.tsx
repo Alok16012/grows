@@ -8,6 +8,7 @@ import {
     CheckCircle2, AlertCircle, ToggleLeft, ToggleRight, ChevronRight
 } from "lucide-react"
 import { can } from "@/lib/can"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 type DocType = {
     id: string
@@ -284,10 +285,10 @@ export default function DocumentTypesPage() {
     }
 
     return (
-        <div className="space-y-5 max-w-screen-xl mx-auto pb-12">
+        <div className="w-full min-w-0 space-y-5 pb-12 px-4 pt-4 lg:p-0">
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <div className="flex items-center gap-2 text-[13px] text-[var(--text3)] mb-1">
                         <span className="text-[var(--text)]">Document Types</span>
                     </div>
@@ -298,49 +299,21 @@ export default function DocumentTypesPage() {
                         Manage document templates and settings
                     </p>
                 </div>
-                <button
-                    onClick={() => { setEditingType(null); setShowModal(true) }}
-                    className="flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
-                >
-                    <Plus size={16} /> Add Document Type
-                </button>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <button
+                        onClick={() => { setEditingType(null); setShowModal(true) }}
+                        className="flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
+                    >
+                        <Plus size={16} /> Add Document Type
+                    </button>
+                </div>
             </div>
 
             {/* Summary bar */}
-            <div className="bg-white border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-[8px] bg-[var(--accent)]/10 flex items-center justify-center">
-                        <FolderOpen size={16} className="text-[var(--accent)]" />
-                    </div>
-                    <div>
-                        <p className="text-[11px] text-[var(--text3)]">Total Types</p>
-                        <p className="text-[18px] font-bold text-[var(--text)]">{types.length}</p>
-                    </div>
-                </div>
-                <div className="h-8 w-px bg-[var(--border)]" />
-                <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-[8px] bg-amber-50 flex items-center justify-center">
-                        <AlertCircle size={16} className="text-amber-500" />
-                    </div>
-                    <div>
-                        <p className="text-[11px] text-[var(--text3)]">Requires Approval</p>
-                        <p className="text-[18px] font-bold text-[var(--text)]">
-                            {types.filter(t => t.requiresApproval).length}
-                        </p>
-                    </div>
-                </div>
-                <div className="h-8 w-px bg-[var(--border)]" />
-                <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-[8px] bg-green-50 flex items-center justify-center">
-                        <CheckCircle2 size={16} className="text-green-600" />
-                    </div>
-                    <div>
-                        <p className="text-[11px] text-[var(--text3)]">Direct Issue</p>
-                        <p className="text-[18px] font-bold text-[var(--text)]">
-                            {types.filter(t => !t.requiresApproval).length}
-                        </p>
-                    </div>
-                </div>
+            <div className={statGridClass(3)}>
+                <StatCard label="Total Types" value={types.length} tone="blue" icon={<FolderOpen size={20} />} seed={0} />
+                <StatCard label="Requires Approval" value={types.filter(t => t.requiresApproval).length} tone="amber" icon={<AlertCircle size={20} />} seed={1} />
+                <StatCard label="Direct Issue" value={types.filter(t => !t.requiresApproval).length} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
             </div>
 
             {/* Cards Grid */}

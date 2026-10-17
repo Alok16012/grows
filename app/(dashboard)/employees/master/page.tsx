@@ -13,6 +13,7 @@ import {
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
 import { can } from "@/lib/can"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 const JOIN_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 // Ten years back plus next year: joining dates are historical, and the extra
@@ -920,24 +921,12 @@ export default function EmployeeMasterPage() {
             </div>
 
             {/* KPI cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 12 }}>
-                {[
-                    { label: "Total Employees", value: filteredEmployees.length,                                         color: "#3b82f6", bg: "#eff6ff", icon: Users },
-                    { label: "Active",          value: filteredEmployees.filter(e => e.status === "ACTIVE").length,     color: "#16a34a", bg: "#dcfce7", icon: UserCheck },
-                    { label: "Inactive",        value: filteredEmployees.filter(e => e.status === "INACTIVE").length,   color: "#6b7280", bg: "#f3f4f6", icon: UserX },
-                    { label: "On Leave",        value: filteredEmployees.filter(e => e.status === "ON_LEAVE").length,   color: "#d97706", bg: "#fef3c7", icon: CalendarOff },
-                    { label: "Terminated",      value: filteredEmployees.filter(e => e.status === "TERMINATED").length, color: "#dc2626", bg: "#fef2f2", icon: UserMinus },
-                ].map(s => (
-                    <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 18px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface)" }}>
-                        <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <s.icon size={20} style={{ color: s.color }} />
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                            <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, fontWeight: 500, whiteSpace: "nowrap" }}>{s.label}</p>
-                            <p style={{ fontSize: 24, fontWeight: 700, color: s.color, margin: 0, lineHeight: 1.25, fontVariantNumeric: "tabular-nums" }}>{s.value.toLocaleString("en-IN")}</p>
-                        </div>
-                    </div>
-                ))}
+            <div className={statGridClass(5)}>
+                <StatCard label="Total Employees" value={filteredEmployees.length} tone="blue" icon={<Users size={20} />} seed={0} />
+                <StatCard label="Active" value={filteredEmployees.filter(e => e.status === "ACTIVE").length} tone="teal" icon={<UserCheck size={20} />} seed={1} />
+                <StatCard label="Inactive" value={filteredEmployees.filter(e => e.status === "INACTIVE").length} tone="slate" icon={<UserX size={20} />} seed={2} />
+                <StatCard label="On Leave" value={filteredEmployees.filter(e => e.status === "ON_LEAVE").length} tone="amber" icon={<CalendarOff size={20} />} seed={3} />
+                <StatCard label="Terminated" value={filteredEmployees.filter(e => e.status === "TERMINATED").length} tone="rose" icon={<UserMinus size={20} />} seed={4} />
             </div>
 
             {/* Search + filters */}

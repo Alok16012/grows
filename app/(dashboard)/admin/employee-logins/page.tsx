@@ -205,13 +205,13 @@ export default function EmployeeLoginsPage() {
     }
 
     return (
-        <div className="p-6 lg:p-7">
-            <div className="flex items-center justify-between mb-5">
-                <div>
+        <div className="p-4 sm:p-6 lg:p-7">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
+                <div className="min-w-0">
                     <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">Employee Logins</h1>
                     <p className="text-[13px] text-[var(--text2)] mt-[3px]">Every employee&apos;s login id, password and role — view, copy and update</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <button
                         onClick={resetAllMobile}
                         disabled={resettingMobile || generating}
@@ -233,7 +233,7 @@ export default function EmployeeLoginsPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="relative flex-1 min-w-[220px] max-w-[400px]">
+                <div className="relative flex-1 min-w-[200px] max-w-[400px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <input
                         placeholder="Search name, login id or code..."

@@ -3,7 +3,8 @@ import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, Shield, Users, ChevronRight, X, Check, Loader2, Search } from "lucide-react"
+import { Plus, Pencil, Trash2, Shield, Users, ChevronRight, X, Check, Loader2, Search, KeyRound } from "lucide-react"
+import { StatCard, statGridClass } from "@/components/StatCard"
 import { PERMISSION_GROUPS } from "@/lib/permissions"
 
 const ROLE_COLORS = [
@@ -314,33 +315,28 @@ export default function RolesPage() {
     const allPermCount = PERMISSION_GROUPS.reduce((s, g) => s + g.permissions.length, 0)
 
     return (
-        <div style={{ padding: "28px 32px", minHeight: "100vh", background: "var(--bg)" }}>
+        <div className="p-4 sm:px-8 sm:py-7" style={{ minHeight: "100vh", background: "var(--bg)" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between" style={{ marginBottom: 28 }}>
+                <div className="min-w-0">
                     <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Role Management</h1>
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: "3px 0 0" }}>Create roles and define what each role can access</p>
                 </div>
-                <button
-                    onClick={() => { setEditing(null); setShowModal(true) }}
-                    style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
-                >
-                    <Plus size={15} /> Create Role
-                </button>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <button
+                        onClick={() => { setEditing(null); setShowModal(true) }}
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                    >
+                        <Plus size={15} /> Create Role
+                    </button>
+                </div>
             </div>
 
             {/* Stats row */}
-            <div style={{ display: "flex", gap: 14, marginBottom: 28, flexWrap: "wrap" }}>
-                {[
-                    { label: "Total Roles", value: roles.length, color: "#6366f1" },
-                    { label: "Total Permissions", value: allPermCount, color: "#8b5cf6" },
-                    { label: "Users with Custom Role", value: roles.reduce((s, r) => s + r._count.users, 0), color: "#0ea5e9" },
-                ].map(s => (
-                    <div key={s.label} style={{ flex: "1 1 160px", background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 20px" }}>
-                        <p style={{ fontSize: 24, fontWeight: 800, color: s.color, margin: "0 0 3px" }}>{s.value}</p>
-                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>{s.label}</p>
-                    </div>
-                ))}
+            <div className={statGridClass(3)} style={{ marginBottom: 28 }}>
+                <StatCard label="Total Roles" value={roles.length} tone="blue" icon={<Shield size={20} />} seed={0} />
+                <StatCard label="Total Permissions" value={allPermCount} tone="violet" icon={<KeyRound size={20} />} seed={1} />
+                <StatCard label="Users with Custom Role" value={roles.reduce((s, r) => s + r._count.users, 0)} tone="sky" icon={<Users size={20} />} seed={2} />
             </div>
 
             {/* Content */}
@@ -363,7 +359,7 @@ export default function RolesPage() {
                     </button>
                 </div>
             ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
+                <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16, alignItems: "start" }}>
                     {/* Roles list */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {roles.map(role => (

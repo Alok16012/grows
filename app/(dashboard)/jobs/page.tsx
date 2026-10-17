@@ -9,12 +9,13 @@ import { can } from "@/lib/can"
 import {
     Plus, Search, Loader2, Briefcase, MapPin, IndianRupee, Users, Target,
     Pencil, Copy, Trash2, CalendarClock, Send, FileText, Lock, Eye,
-    MoreHorizontal, LayoutGrid, List, ArrowUpRight, ArrowDownRight,
+    MoreHorizontal, LayoutGrid, List,
     ChevronLeft, ChevronRight, SlidersHorizontal, Download, FileStack,
 } from "lucide-react"
 import {
     JobPosting, STATUS_META, formatExperience, formatSalary, priorityStyle,
 } from "@/components/jobs/constants"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 const STATUS_FILTERS = ["ALL", "PUBLISHED", "DRAFT", "CLOSED"] as const
 
@@ -95,10 +96,10 @@ export default function JobsPage() {
         const draft = jobs.filter(j => j.status === "DRAFT").length
         const closed = jobs.filter(j => j.status === "CLOSED").length
         return [
-            { label: "Total Jobs", value: total,     icon: Briefcase, color: "#0b5cff", bg: "#e8effe", ...monthStats(jobs, () => true) },
-            { label: "Published",  value: published, icon: Send,      color: "#0b5cff", bg: "#e8effe", ...monthStats(jobs, j => j.status === "PUBLISHED") },
-            { label: "Draft",      value: draft,     icon: FileText,  color: "#d97706", bg: "#fef3c7", ...monthStats(jobs, j => j.status === "DRAFT") },
-            { label: "Closed",     value: closed,    icon: Lock,      color: "#7c3aed", bg: "#f3e8ff", ...monthStats(jobs, j => j.status === "CLOSED") },
+            { label: "Total Jobs", value: total,     icon: Briefcase, tone: "blue" as const, ...monthStats(jobs, () => true) },
+            { label: "Published",  value: published, icon: Send,      tone: "teal" as const, ...monthStats(jobs, j => j.status === "PUBLISHED") },
+            { label: "Draft",      value: draft,     icon: FileText,  tone: "amber" as const, ...monthStats(jobs, j => j.status === "DRAFT") },
+            { label: "Closed",     value: closed,    icon: Lock,      tone: "violet" as const, ...monthStats(jobs, j => j.status === "CLOSED") },
         ]
     }, [jobs])
 
@@ -145,12 +146,12 @@ export default function JobsPage() {
     return (
         <div className="p-4 lg:p-0 flex flex-col gap-5">
             {/* Header */}
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Jobs</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage internal job postings across departments and sites.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
                     <button onClick={exportCsv}
                         className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <Download size={16} /> Export
@@ -172,25 +173,10 @@ export default function JobsPage() {
             </div>
 
             {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {kpis.map(s => (
-                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-[13px] flex items-center justify-center shrink-0" style={{ background: s.bg }}>
-                            <s.icon size={22} style={{ color: s.color }} />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-[12.5px] text-[var(--text3)]">{s.label}</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-[26px] font-bold text-[var(--text)] leading-none tabular-nums">{s.value}</span>
-                                {s.pct !== 0 && (
-                                    <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold" style={{ color: s.pct >= 0 ? "#15803d" : "#dc2626" }}>
-                                        {s.pct >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(s.pct)}%
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-[11px] text-[var(--text3)] mt-0.5">{s.delta >= 0 ? "+" : ""}{s.delta} vs last month</p>
-                        </div>
-                    </div>
+            <div className={statGridClass(kpis.length)}>
+                {kpis.map((s, i) => (
+                    <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={<s.icon size={20} />} seed={i}
+                        sub={`${s.delta >= 0 ? "+" : ""}${s.delta} vs last month${s.pct !== 0 ? ` (${s.pct >= 0 ? "+" : "-"}${Math.abs(s.pct)}%)` : ""}`} />
                 ))}
             </div>
 
