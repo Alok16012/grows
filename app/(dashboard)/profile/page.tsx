@@ -779,10 +779,18 @@ function ChangePasswordCard() {
     const labelCls = "text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide block mb-1.5"
 
     return (
+        <>
+        <div className="bg-white border border-[var(--border)] rounded-2xl p-6 mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+                <h3 className="text-[14px] font-semibold text-[var(--text)]">MPIN</h3>
+                <p className="text-[12px] text-[var(--text3)] mt-0.5">The 4-digit code you sign in with. Change it any time.</p>
+            </div>
+            <a href="/setup-mpin" className="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-[var(--border)] text-[13px] font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">Change MPIN</a>
+        </div>
         <form onSubmit={submit} className="bg-white border border-[var(--border)] rounded-2xl p-6 space-y-4 mt-5">
             <div>
                 <h3 className="text-[14px] font-semibold text-[var(--text)]">Change Password</h3>
-                <p className="text-[12px] text-[var(--text3)] mt-0.5">Your default password is your mobile number — change it after first login.</p>
+                <p className="text-[12px] text-[var(--text3)] mt-0.5">Used for signing in with a password. Most people sign in with their MPIN instead.</p>
             </div>
             <div>
                 <label className={labelCls}>Current Password</label>
@@ -802,6 +810,7 @@ function ChangePasswordCard() {
                 Update Password
             </button>
         </form>
+        </>
     )
 }
 

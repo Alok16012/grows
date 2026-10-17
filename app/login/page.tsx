@@ -1,18 +1,71 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState, useEffect, useCallback, Suspense } from "react"
+import { signIn, useSession } from "next-auth/react"
+import { useSearchParams } from "next/navigation"
+import { Eye, EyeOff, AlertCircle, Loader2, Smartphone, KeyRound, MessageSquareText, ArrowRight, Info } from "lucide-react"
+import { AuthShell } from "@/components/auth/AuthShell"
+import { PinInput } from "@/components/auth/PinInput"
 
-export default function LoginPage() {
-    const router = useRouter()
-    const [email, setEmail] = useState("")
-    const [password, setPassword] = useState("")
+type Method = "mpin" | "otp" | "password"
+
+const LAST_ID_KEY = "growus.lastLoginId"
+
+// Only same-site paths may be used as the post-login destination.
+function safeCallback(raw: string | null): string {
+    if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/login")) return "/"
+    return raw
+}
+
+function messageFor(code: string, method: Method): string {
+    if (code.startsWith("ACCOUNT_LOCKED")) {
+        const mins = Number(code.split(":")[1]) || 15
+        return `Too many wrong attempts. Your account is paused — try again in ${mins} minute${mins === 1 ? "" : "s"}.`
+    }
+    switch (code) {
+        case "ACCOUNT_INACTIVE": return "This account is inactive. Please contact HR."
+        case "USE_MPIN": return "Your mobile-number password no longer works. Sign in with your MPIN or OTP."
+        case "NO_MPIN": return "You haven't set an MPIN yet. Sign in with your password first — it's your mobile number."
+        default:
+            return method === "mpin" ? "Wrong MPIN. Please try again."
+                : method === "otp" ? "Wrong or expired OTP. Please try again."
+                : "Wrong login ID or password."
+    }
+}
+
+function LoginForm() {
+    const params = useSearchParams()
+    const callbackUrl = safeCallback(params.get("callbackUrl"))
+    const { status } = useSession()
+
+    const [method, setMethod] = useState<Method>("mpin")
+    const [loginId, setLoginId] = useState("")
+    const [secret, setSecret] = useState("")
+    const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState("")
+    const [notice, setNotice] = useState("")
     const [loading, setLoading] = useState(false)
+    const [otpEnabled, setOtpEnabled] = useState(false)
+    const [mpinLength, setMpinLength] = useState(4)
+    const [otpSentTo, setOtpSentTo] = useState<string | null>(null)
+    const [resendIn, setResendIn] = useState(0)
+
+    // Already signed in (e.g. back button) → straight to the app.
+    useEffect(() => {
+        if (status === "authenticated") window.location.replace(callbackUrl)
+    }, [status, callbackUrl])
+
+    // Remember who signed in last on this device — the id only, never a secret.
+    useEffect(() => {
+        try {
+            const last = localStorage.getItem(LAST_ID_KEY)
+            if (last) setLoginId(last)
+        } catch { /* private mode */ }
+        fetch("/api/login/options").then(r => r.json()).then(o => {
+            setOtpEnabled(!!o.otp)
+            if (o.mpinLength) setMpinLength(o.mpinLength)
+        }).catch(() => {})
+    }, [])
 
     // Auto-recover from stale JS chunks after a deploy
     useEffect(() => {
@@ -25,123 +78,201 @@ export default function LoginPage() {
         return () => window.removeEventListener("error", handleError, true)
     }, [])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    useEffect(() => {
+        if (resendIn <= 0) return
+        const t = setTimeout(() => setResendIn(s => s - 1), 1000)
+        return () => clearTimeout(t)
+    }, [resendIn])
+
+    const switchMethod = (m: Method) => {
+        setMethod(m)
+        setSecret("")
+        setError("")
+        setNotice("")
+    }
+
+    const submit = useCallback(async (value?: string) => {
+        const id = loginId.trim()
+        const code = (value ?? secret).trim()
+        if (!id) { setError("Enter your mobile number, employee ID or email."); return }
+        if (method === "mpin" && code.length !== mpinLength) { setError(`Enter all ${mpinLength} digits of your MPIN.`); return }
+        if (method === "otp" && code.length !== 6) { setError("Enter the 6-digit OTP."); return }
+        if (!code) { setError("Enter your password."); return }
         setLoading(true)
         setError("")
-
+        setNotice("")
         try {
-            // If user typed only digits (phone number), auto-append @cims.local
-            // For Employee IDs (e.g. EMP001) or emails, send as-is
-            const trimmed = email.trim()
-            const loginEmail = /^\d+$/.test(trimmed)
-                ? `${trimmed}@cims.local`
-                : trimmed
-
-            const result = await signIn("credentials", {
-                redirect: false,
-                email: loginEmail,
-                password,
-            })
-
-            if (result?.error) {
-                // authorize() throws a coarse code (lib/auth.ts) — the precise
-                // reason is logged server-side rather than shown here, so the
-                // login form can't be used to discover which accounts exist.
-                // Anything we don't recognise falls back to the generic text,
-                // including NextAuth's own "CredentialsSignin".
-                setError(result.error === "ACCOUNT_INACTIVE"
-                    ? "This account is inactive. Please contact HR."
-                    : "Invalid credentials. Please check your email and password.")
-            } else if (result?.ok) {
-                router.refresh()
-                window.location.href = "/"
-            } else {
-                setError("Login did not complete. Try again.")
+            // A bare 10-digit number is a mobile login.
+            const loginEmail = /^\d+$/.test(id) ? `${id}@cims.local` : id
+            const result = await signIn("credentials", { redirect: false, email: loginEmail, password: code, method })
+            if (result?.ok && !result.error) {
+                try { localStorage.setItem(LAST_ID_KEY, id) } catch { /* ignore */ }
+                window.location.href = callbackUrl
+                return
             }
+            const errCode = result?.error || ""
+            if (errCode === "NO_MPIN") switchMethod("password")
+            setError(messageFor(errCode, method))
+            setSecret("")
         } catch {
-            setError("Something went wrong. Please try again.")
+            setError("Something went wrong. Please check your connection and try again.")
+        } finally {
+            setLoading(false)
+        }
+    }, [loginId, secret, method, callbackUrl, mpinLength])
+
+    const sendOtp = async () => {
+        const id = loginId.trim()
+        if (!id) { setError("Enter your mobile number or employee ID first."); return }
+        setLoading(true)
+        setError("")
+        setNotice("")
+        try {
+            const res = await fetch("/api/login/otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: id }) })
+            const data = await res.json().catch(() => ({}))
+            if (data.resendIn) setResendIn(data.resendIn)
+            if (!res.ok) { setError(data.error || "Couldn't send the OTP."); return }
+            setOtpSentTo(data.to || "your registered mobile")
+            setSecret("")
+        } catch {
+            setError("Couldn't send the OTP. Check your connection.")
         } finally {
             setLoading(false)
         }
     }
 
+    const tabs: { key: Method; label: string; icon: typeof KeyRound }[] = [
+        { key: "mpin", label: "MPIN", icon: KeyRound },
+        ...(otpEnabled ? [{ key: "otp" as const, label: "OTP", icon: MessageSquareText }] : []),
+        { key: "password", label: "Password", icon: Smartphone },
+    ]
+
     return (
-        <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
-            <div className="bg-white border border-[var(--border)] rounded-[16px] w-full max-w-[400px] p-9 mx-4" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
-                <div className="text-center mb-7">
-                    <div className="flex items-center justify-center gap-2.5 mb-4">
-                        <div className="w-9 h-9 bg-[var(--accent)] rounded-[10px] flex items-center justify-center">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="3" y="3" width="7" height="7" />
-                                <rect x="14" y="3" width="7" height="7" />
-                                <rect x="14" y="14" width="7" height="7" />
-                                <rect x="3" y="14" width="7" height="7" />
-                            </svg>
-                        </div>
-                        <span className="text-[20px] font-bold text-[var(--text)] tracking-[-0.4px]">Growus ERP</span>
-                    </div>
-                    <p className="text-[13px] text-[var(--text3)] leading-relaxed">
-                        Sign in to access your dashboard
-                    </p>
+        <AuthShell
+            title="Welcome back"
+            subtitle="Sign in to continue to your workspace"
+            footer={<span>Trouble signing in? Contact your HR or admin.</span>}
+        >
+            <form onSubmit={e => { e.preventDefault(); if (method === "otp" && !otpSentTo) sendOtp(); else submit() }} noValidate>
+                <label htmlFor="loginId" className="block text-[13px] font-semibold text-[var(--text)] mb-1.5">Mobile number / Employee ID</label>
+                <input
+                    id="loginId"
+                    name="username"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="9876543210 or EMP001"
+                    value={loginId}
+                    onChange={e => { setLoginId(e.target.value); setOtpSentTo(null) }}
+                    className="w-full h-12 px-4 rounded-[14px] border-2 border-[var(--border)] bg-[var(--surface2)] text-[15px] text-[var(--text)] placeholder:text-[var(--text3)] outline-none transition-all focus:bg-white focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(11,92,255,0.12)]"
+                />
+
+                {/* Method switcher */}
+                <div className="mt-5 grid gap-1 p-1 rounded-[14px] bg-[var(--surface2)] border border-[var(--border)]" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }} role="tablist" aria-label="Sign-in method">
+                    {tabs.map(t => (
+                        <button
+                            key={t.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={method === t.key}
+                            onClick={() => switchMethod(t.key)}
+                            className={`h-10 rounded-[11px] text-[13.5px] font-semibold flex items-center justify-center gap-1.5 transition-all ${method === t.key ? "bg-white text-[var(--accent)] shadow-[0_2px_8px_rgba(15,23,41,0.08)]" : "text-[var(--text2)] hover:text-[var(--text)]"}`}
+                        >
+                            <t.icon size={15} /> {t.label}
+                        </button>
+                    ))}
                 </div>
 
-                <div className="border-t border-[var(--border)] mb-6" role="separator"></div>
-
-                <form onSubmit={handleSubmit}>
-                    {error && (
-                        <div className="bg-[#fef2f2] border border-[#fca5a5] rounded-[8px] px-[14px] py-[10px] mb-3 flex items-center gap-2 text-[13px] text-[#dc2626]" role="alert" aria-live="polite">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            {error}
+                <div className="mt-6 min-h-[132px]">
+                    {method === "mpin" && (
+                        <div>
+                            <p className="text-[13px] font-semibold text-[var(--text)] mb-3 text-center">Enter your {mpinLength}-digit MPIN</p>
+                            <PinInput length={mpinLength} value={secret} onChange={v => { setSecret(v); setError("") }} onComplete={v => submit(v)} masked disabled={loading} invalid={!!error} label="MPIN" />
+                            <div className="mt-4 text-center text-[13px]">
+                                <button type="button" className="font-semibold text-[var(--accent)] hover:underline" onClick={() => otpEnabled ? switchMethod("otp") : setNotice("Ask your HR or admin to reset your login. You'll then sign in with your mobile number as the password and set a new MPIN.")}>
+                                    Forgot MPIN?
+                                </button>
+                            </div>
                         </div>
                     )}
 
-                    <div className="space-y-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-[13px] font-medium text-[var(--text)]">Email / Employee ID / Phone</Label>
-                            <Input
-                                id="email"
-                                type="text"
-                                placeholder="you@example.com or EMP001 or 9876543210"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full py-[10px] px-[14px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all"
-                                required
-                                autoComplete="username"
-                            />
+                    {method === "otp" && (
+                        otpSentTo ? (
+                            <div>
+                                <p className="text-[13px] text-[var(--text2)] mb-3 text-center">Enter the 6-digit code sent to <span className="font-semibold text-[var(--text)]">{otpSentTo}</span></p>
+                                <PinInput length={6} value={secret} onChange={v => { setSecret(v); setError("") }} onComplete={v => submit(v)} autoFocus disabled={loading} invalid={!!error} label="OTP" autoComplete="one-time-code" />
+                                <div className="mt-4 text-center text-[13px] text-[var(--text3)]">
+                                    {resendIn > 0 ? <>Resend OTP in <span className="font-semibold tabular-nums">{resendIn}s</span></> : (
+                                        <button type="button" className="font-semibold text-[var(--accent)] hover:underline" onClick={sendOtp} disabled={loading}>Resend OTP</button>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-[13.5px] text-[var(--text2)] text-center leading-relaxed px-2">
+                                We&apos;ll text a one-time code to the mobile number registered with your account.
+                            </p>
+                        )
+                    )}
+
+                    {method === "password" && (
+                        <div>
+                            <label htmlFor="password" className="block text-[13px] font-semibold text-[var(--text)] mb-1.5">Password</label>
+                            <div className="relative">
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type={showPassword ? "text" : "password"}
+                                    autoComplete="current-password"
+                                    placeholder="Enter your password"
+                                    value={secret}
+                                    onChange={e => { setSecret(e.target.value); setError("") }}
+                                    className="w-full h-12 pl-4 pr-12 rounded-[14px] border-2 border-[var(--border)] bg-[var(--surface2)] text-[15px] text-[var(--text)] placeholder:text-[var(--text3)] outline-none transition-all focus:bg-white focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(11,92,255,0.12)]"
+                                />
+                                <button type="button" onClick={() => setShowPassword(s => !s)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1.5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[10px] flex items-center justify-center text-[var(--text3)] hover:text-[var(--text)]">
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                            <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] text-[var(--text3)] leading-snug">
+                                <Info size={14} className="mt-[1px] shrink-0" />
+                                First time? Your password is your mobile number. You&apos;ll set an MPIN right after.
+                            </p>
                         </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="password" className="text-[13px] font-medium text-[var(--text)]">Password</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="Enter your password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full py-[10px] px-[14px] bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-all"
-                                required
-                                autoComplete="current-password"
-                            />
-                        </div>
+                    )}
+                </div>
+
+                {error && (
+                    <div className="mt-4 flex items-start gap-2 rounded-[12px] border border-[#fecaca] bg-[var(--red-light)] px-3.5 py-3 text-[13px] text-[var(--red)]" role="alert" aria-live="polite">
+                        <AlertCircle size={16} className="mt-[1px] shrink-0" /> <span>{error}</span>
                     </div>
+                )}
+                {notice && !error && (
+                    <div className="mt-4 flex items-start gap-2 rounded-[12px] border border-[#bfd3ff] bg-[var(--accent-light)] px-3.5 py-3 text-[13px] text-[var(--accent-text)]" role="status">
+                        <Info size={16} className="mt-[1px] shrink-0" /> <span>{notice}</span>
+                    </div>
+                )}
 
-                    <Button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full mt-5 py-[11px] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border-none rounded-[9px] text-[14px] font-semibold disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {loading ? "Signing in..." : "Sign In"}
-                    </Button>
-                </form>
-            </div>
+                {/* MPIN and OTP submit themselves when the last digit is typed; the button is still there for clarity. */}
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="mt-6 w-full h-12 rounded-[14px] text-white text-[15px] font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_10px_24px_-10px_rgba(11,92,255,0.6)] hover:brightness-110 active:scale-[0.99]"
+                    style={{ background: "var(--accent-gradient)" }}
+                >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : null}
+                    {loading ? "Please wait…" : method === "otp" && !otpSentTo ? "Send OTP" : "Sign in"}
+                    {!loading && <ArrowRight size={17} />}
+                </button>
+            </form>
+        </AuthShell>
+    )
+}
 
-            <div className="absolute bottom-6 text-center text-[13px] text-[var(--text3)]">
-                Developed by <a href="https://blinks-ai.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline font-medium">Blinks AI</a>
-            </div>
-        </div>
+export default function LoginPage() {
+    return (
+        <Suspense fallback={null}>
+            <LoginForm />
+        </Suspense>
     )
 }

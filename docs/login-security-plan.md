@@ -5,7 +5,25 @@
 
 ---
 
-## 1. How sign-in works today
+## Status — October 2026 (implemented)
+
+- **MPIN + OTP sign-in.** Employees sign in the first time with their mobile number as the password, then must set a
+  4-digit MPIN (after an SMS OTP when SMS is configured). From then on they sign in with mobile/employee ID + MPIN, or
+  with an SMS OTP. Once an MPIN exists, the mobile-number password stops working for that account.
+- **Lockout.** 5 wrong passwords / MPINs / OTPs pause the account for 15 minutes.
+- **OTP limits.** 6-digit code, valid 10 minutes, 3 wrong tries, 60 s between sends, 5 sends per hour; the send endpoint
+  answers the same for unknown numbers.
+- **Every app page now needs a session** (middleware previously only guarded /admin, /manager, /inspection, /client).
+- **Admin resets** (Employee Logins → reset / reset-all-to-mobile, bulk fix) clear the MPIN and lockout.
+- **To switch on in production:** run `scripts/login-otp-mpin.sql` in the Supabase SQL editor (idempotent). Until then
+  login behaves exactly as before. For OTP by SMS set `SMS_PROVIDER` (msg91 / fast2sms) and its keys — see `lib/sms.ts`;
+  without it the OTP option is hidden and MPIN setup needs no OTP.
+- Still open: plain-text passwords on the admin screen (kept on purpose), forced password-only accounts (admins) have no
+  second factor.
+
+---
+
+## 1. How sign-in worked before (August 2026)
 
 | Item | Current behaviour |
 |---|---|

@@ -4,12 +4,10 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { Role } from "@prisma/client"
-// Normalize a phone-like string to last 10 digits
-const phoneDigits = (s: string | null | undefined): string => {
-    if (!s) return ""
-    const d = s.replace(/\D/g, "")
-    return d.length >= 10 ? d.slice(-10) : d
-}
+import {
+    findLoginUser, getCredential, lockMinutesLeft, recordFailedLogin, clearFailedLogins,
+    checkMpin, verifyOtp, phoneDigits,
+} from "@/lib/login-security"
 
 // Resolve effective permissions for a user object from the DB.
 // Permissions come EXCLUSIVELY from an assigned custom role (Admin → Roles).
@@ -46,6 +44,14 @@ const dlog = (...args: unknown[]) => { if (DEV_LOG) console.log(...args) }
 // one was to query the database by hand.
 const AUTH_INACTIVE = "ACCOUNT_INACTIVE"
 const AUTH_INVALID = "INVALID_CREDENTIALS"
+// Too many failures — the client gets "ACCOUNT_LOCKED:<minutes left>".
+const AUTH_LOCKED = "ACCOUNT_LOCKED"
+// The mobile-number default password is retired once the employee has an MPIN.
+const AUTH_USE_MPIN = "USE_MPIN"
+// MPIN login attempted before one was ever set.
+const AUTH_NO_MPIN = "NO_MPIN"
+
+type LoginMethod = "password" | "mpin" | "otp"
 
 // Enough of the identifier to match against a support ticket, not enough for
 // the log stream to become a directory of employee phone numbers.
@@ -77,20 +83,25 @@ export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
             name: "credentials",
+            // `email` is whatever was typed in the login box (login id, mobile
+            // number or employee code). `method` picks the secret: the account
+            // password, the 4-digit MPIN, or a 6-digit SMS OTP — all in `password`.
             credentials: {
                 email: { label: "Email", type: "text" },
                 password: { label: "Password", type: "password" },
+                method: { label: "Method", type: "text" },
             },
             async authorize(credentials) {
+                const method: LoginMethod = credentials?.method === "mpin" || credentials?.method === "otp" ? credentials.method : "password"
                 if (!credentials?.email || !credentials?.password) {
-                    authFail(AUTH_INVALID, "missing email or password", credentials?.email)
+                    authFail(AUTH_INVALID, `missing login id or ${method}`, credentials?.email)
                 }
 
                 const passwordRaw = credentials.password
                 const passwordDigits = passwordRaw.replace(/\D/g, "")
 
                 // Demo Mode — DEV ONLY. Disabled by default in production
-                if (DEMO_ENABLED) {
+                if (DEMO_ENABLED && method === "password") {
                     const demoUsers: Record<string, { name: string, role: string }> = {
                         "admin@cims.com":     { name: "Admin User",      role: "ADMIN" },
                         "manager@cims.com":   { name: "Manager User",    role: "MANAGER" },
@@ -124,51 +135,13 @@ export const authOptions: NextAuthOptions = {
 
                 try {
                     const inputRaw = credentials.email.trim()
-                    const inputClean = inputRaw.replace(/@cims\.local$/i, "").trim()
-                    const inputDigits = phoneDigits(inputClean)
-
-                    let user: any = null
-                    let matchedEmployee: any = null
-
-                    // Step 1: Direct email lookup
-                    user = await prisma.user.findUnique({
-                        where: { email: inputRaw },
-                        include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                    })
-                    if (user) {
-                        matchedEmployee = await prisma.employee.findFirst({
-                            where: { userId: user.id },
-                            select: { id: true, firstName: true, lastName: true, phone: true, employeeId: true }
-                        })
-                    }
-
-                    // Step 2: Phone lookup via Employee
-                    if (!user && inputDigits.length === 10) {
-                        matchedEmployee = await prisma.employee.findFirst({
-                            where: { phone: { endsWith: inputDigits } },
-                            include: {
-                                user: { include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } } }
-                            }
-                        })
-                        if (matchedEmployee?.user) user = matchedEmployee.user
-                    }
-
-                    // Step 3: EmployeeId lookup
-                    if (!user) {
-                        const emp = await prisma.employee.findFirst({
-                            where: { employeeId: { equals: inputClean, mode: "insensitive" } },
-                            include: {
-                                user: { include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } } }
-                            }
-                        })
-                        if (emp) {
-                            matchedEmployee = emp
-                            if (emp.user) user = emp.user
-                        }
-                    }
+                    const found = await findLoginUser(inputRaw)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    let user: any = found.user
+                    const matchedEmployee = found.matchedEmployee
 
                     const empPhoneDigits = matchedEmployee ? phoneDigits(matchedEmployee.phone) : ""
-                    const passwordIsPhone = empPhoneDigits.length === 10 && passwordDigits === empPhoneDigits
+                    const passwordIsPhone = method === "password" && empPhoneDigits.length === 10 && passwordDigits === empPhoneDigits
 
                     // AUTO-HEAL #1 (DEV ONLY): Employee found but no User account → create one if password is phone
                     // This is a major attack vector in production: anyone with an employee's phone number
@@ -208,38 +181,67 @@ export const authOptions: NextAuthOptions = {
                             inputRaw)
                     }
 
-                    // Verify password
-                    let passwordOk = false
-                    if (user.password) {
-                        try {
-                            passwordOk = await bcrypt.compare(passwordRaw, user.password)
-                        } catch { /* invalid hash format */ }
+                    // Lockout: 5 wrong passwords / MPINs / OTPs pause the account
+                    // for 15 minutes, whichever method the guesses came through.
+                    const credential = await getCredential(user.id)
+                    const lockedFor = lockMinutesLeft(credential)
+                    if (lockedFor > 0) {
+                        authFail(`${AUTH_LOCKED}:${lockedFor}`, `account locked for ${lockedFor} more min`, inputRaw)
                     }
 
-                    // AUTO-HEAL #2 (DEV ONLY): Password missing/wrong but matches employee phone → reset.
-                    // CRITICAL: Anyone with knowledge of an employee's phone number could reset
-                    // their password to anything they want. NEVER enable this in production.
-                    if (DEMO_ENABLED && !passwordOk && passwordIsPhone) {
-                        dlog("[AUTH] Auto-heal: resetting password for", user.email)
-                        const hash = await bcrypt.hash(passwordRaw, 10)
-                        user = await prisma.user.update({
-                            where: { id: user.id },
-                            data: { password: hash, isActive: true },
-                            include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                        })
-                        passwordOk = true
-                    }
+                    if (method === "mpin" || method === "otp") {
+                        if (method === "mpin" && !credential.mpinHash) {
+                            authFail(AUTH_NO_MPIN, "MPIN login but no MPIN has been set", inputRaw)
+                        }
+                        const ok = method === "mpin"
+                            ? await checkMpin(credential, passwordRaw.trim())
+                            : await verifyOtp(user.id, passwordRaw.trim(), "LOGIN")
+                        if (!ok) {
+                            await recordFailedLogin(user.id)
+                            authFail(AUTH_INVALID, method === "mpin" ? "MPIN did not match" : "OTP wrong, expired or already used", inputRaw)
+                        }
+                    } else {
+                        // Verify password
+                        let passwordOk = false
+                        if (user.password) {
+                            try {
+                                passwordOk = await bcrypt.compare(passwordRaw, user.password)
+                            } catch { /* invalid hash format */ }
+                        }
 
-                    if (!passwordOk) {
-                        // Distinguish a genuinely wrong password from a stored
-                        // value that is not a bcrypt hash at all (soft-deleted
-                        // accounts have their password replaced with a plain
-                        // marker string, and those can never compare true).
-                        const looksHashed = typeof user.password === "string" && /^\$2[aby]\$/.test(user.password)
-                        authFail(AUTH_INVALID,
-                            looksHashed ? "password did not match the stored hash"
-                                        : "stored password is not a bcrypt hash (account disabled or never set)",
-                            inputRaw)
+                        // AUTO-HEAL #2 (DEV ONLY): Password missing/wrong but matches employee phone → reset.
+                        // CRITICAL: Anyone with knowledge of an employee's phone number could reset
+                        // their password to anything they want. NEVER enable this in production.
+                        if (DEMO_ENABLED && !passwordOk && passwordIsPhone) {
+                            dlog("[AUTH] Auto-heal: resetting password for", user.email)
+                            const hash = await bcrypt.hash(passwordRaw, 10)
+                            user = await prisma.user.update({
+                                where: { id: user.id },
+                                data: { password: hash, isActive: true },
+                                include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
+                            })
+                            passwordOk = true
+                        }
+
+                        if (!passwordOk) {
+                            await recordFailedLogin(user.id)
+                            // Distinguish a genuinely wrong password from a stored
+                            // value that is not a bcrypt hash at all (soft-deleted
+                            // accounts have their password replaced with a plain
+                            // marker string, and those can never compare true).
+                            const looksHashed = typeof user.password === "string" && /^\$2[aby]\$/.test(user.password)
+                            authFail(AUTH_INVALID,
+                                looksHashed ? "password did not match the stored hash"
+                                            : "stored password is not a bcrypt hash (account disabled or never set)",
+                                inputRaw)
+                        }
+
+                        // Once the employee has an MPIN, the mobile-number default
+                        // password no longer opens the account — otherwise anyone who
+                        // knows the number still gets in.
+                        if (credential.mpinHash && passwordIsPhone) {
+                            authFail(AUTH_USE_MPIN, "default mobile-number password used after MPIN was set", inputRaw)
+                        }
                     }
 
                     // Deactivated accounts stay locked out. Users are deactivated
@@ -262,6 +264,13 @@ export const authOptions: NextAuthOptions = {
                         authFail(AUTH_INACTIVE, `linked employee status is ${employee.status}`, inputRaw)
                     }
 
+                    await clearFailedLogins(user.id)
+
+                    // Employees (anyone with a mobile number on an employee
+                    // record) must set an MPIN before using the app. Skipped
+                    // while the credential tables aren't installed.
+                    const needsMpin = credential.installed && !credential.mpinHash && empPhoneDigits.length === 10
+
                     return {
                         id: user.id,
                         name: user.name,
@@ -271,6 +280,8 @@ export const authOptions: NextAuthOptions = {
                         customRoleName: user.customRole?.isActive ? user.customRole.name : null,
                         customRoleColor: user.customRole?.isActive ? user.customRole.color : null,
                         photo: employee?.photo || null,
+                        needsMpin,
+                        loginMethod: method,
                     } as any
                 } catch (error) {
                     // Expected outcomes (wrong password, inactive account) have
@@ -281,7 +292,8 @@ export const authOptions: NextAuthOptions = {
                     // surfaced to the user as an indistinguishable
                     // "invalid credentials".
                     const msg = error instanceof Error ? error.message : String(error)
-                    if (msg !== AUTH_INVALID && msg !== AUTH_INACTIVE) {
+                    const expected = [AUTH_INVALID, AUTH_INACTIVE, AUTH_USE_MPIN, AUTH_NO_MPIN]
+                    if (!expected.includes(msg) && !msg.startsWith(AUTH_LOCKED)) {
                         // Never log raw credentials — only the error itself.
                         console.error("[AUTH] unexpected error during sign-in:", error)
                     }
@@ -291,8 +303,10 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger }) {
             if (user) {
+                ;(token as any).needsMpin = !!(user as any).needsMpin
+                ;(token as any).loginMethod = (user as any).loginMethod || "password"
                 token.id = user.id
                 token.role = user.role
                 token.permissions = (user as any).permissions || []
@@ -305,6 +319,15 @@ export const authOptions: NextAuthOptions = {
             // request (getServerSession runs this callback), which added two DB
             // round-trips of latency across the whole app. 3 min still propagates
             // permission changes quickly enough, at ~1/6th the DB load.
+            // After /setup-mpin the client calls session.update(); re-read the
+            // MPIN state from the DB rather than trusting anything it sends.
+            if (trigger === "update" && token.id && (token as any).needsMpin) {
+                try {
+                    const c = await getCredential(token.id as string)
+                    if (!c.installed || c.mpinHash) (token as any).needsMpin = false
+                } catch { /* keep the flag; the page will retry */ }
+            }
+
             const REFRESH_INTERVAL_MS = 3 * 60 * 1000
             const lastRefresh = (token as { roleRefreshedAt?: number }).roleRefreshedAt ?? 0
             const needsRefresh = token.id && !user && (Date.now() - lastRefresh > REFRESH_INTERVAL_MS)
@@ -363,6 +386,8 @@ export const authOptions: NextAuthOptions = {
                 ;(session.user as any).customRoleName = (token as any).customRoleName || null
                 ;(session.user as any).customRoleColor = (token as any).customRoleColor || null
                 ;(session.user as any).photo = (token as any).photo || null
+                ;(session.user as any).needsMpin = !!(token as any).needsMpin
+                ;(session.user as any).loginMethod = (token as any).loginMethod || "password"
             }
             return session
         },

@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
+import { resetLoginSecurity } from "@/lib/login-security"
 
 export const maxDuration = 60
 export const dynamic = "force-dynamic"
@@ -85,6 +86,10 @@ export async function POST() {
                 failed++
             }
         }
+
+        // Everyone is back on the mobile-number password, so their MPINs and
+        // lockouts go too — each employee sets a fresh MPIN at next login.
+        await resetLoginSecurity(employees.map(e => e.userId).filter((id): id is string => !!id))
 
         return NextResponse.json({ updated, created, skipped, failed, total: employees.length })
     } catch (error) {

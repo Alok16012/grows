@@ -43,6 +43,36 @@ model User {
   jobPostingsCreated        JobPosting[]        @relation("JobCreator")
   siteMemberships           SiteAssignment[]    @relation("SiteAssignmentUser")
   siteAssignmentsAsAssigner SiteAssignment[]    @relation("SiteAssignmentAssigner")
+  credential                UserCredential?
+  loginOtps                 LoginOtp[]
+}
+
+// Login hardening kept OUT of the User table on purpose: production schema is
+// applied by hand (scripts/login-otp-mpin.sql), and a new User column would
+// break every User query until that SQL runs. Code treats a missing table as
+// "feature not installed yet" and falls back to plain password login.
+model UserCredential {
+  userId      String    @id
+  mpinHash    String?
+  mpinSetAt   DateTime?
+  failedCount Int       @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LoginOtp {
+  id         String    @id @default(uuid())
+  userId     String
+  codeHash   String
+  purpose    String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model CustomRole {

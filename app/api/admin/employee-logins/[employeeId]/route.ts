@@ -6,6 +6,7 @@ import { Role } from "@prisma/client"
 import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
 import { checkAccess } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
+import { resetLoginSecurity } from "@/lib/login-security"
 
 // Update (or create) the login for a single employee: email, password, role, status.
 export async function PATCH(
@@ -87,6 +88,8 @@ export async function PATCH(
         }
 
         const user = await prisma.user.update({ where: { id: employee.userId }, data: updateData })
+        // A new password from the admin also clears the MPIN and any lockout.
+        if (updateData.password) await resetLoginSecurity([employee.userId])
         return NextResponse.json({ created: false, email: user.email, password: user.plainPassword })
     } catch (error) {
         console.error("PATCH_EMPLOYEE_LOGIN_ERROR", error)

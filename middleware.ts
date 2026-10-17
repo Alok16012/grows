@@ -30,18 +30,30 @@ export default withAuth(
         // fall back to the system role default.
         const customLanding = customRoleName ? landingForCustomRole(permissions) : null
 
+        const needsMpin = !!(token as any)?.needsMpin
+
         // /login: bounce signed-in users to their own dashboard
         if (path === "/login") {
             if (token) {
-                const target = customLanding || rolePaths[role] || "/"
+                const target = needsMpin ? "/setup-mpin" : (customLanding || rolePaths[role] || "/")
                 return NextResponse.redirect(new URL(target, req.url))
             }
             return NextResponse.next()
         }
 
-        // Anyone unauthenticated → /login
+        // Anyone unauthenticated → /login (keeping where they were headed)
         if (!token) {
-            return NextResponse.redirect(new URL("/login", req.url))
+            const login = new URL("/login", req.url)
+            if (path !== "/") login.searchParams.set("callbackUrl", path + req.nextUrl.search)
+            return NextResponse.redirect(login)
+        }
+
+        // Employees who signed in with the mobile-number password must set an
+        // MPIN before anything else. /setup-mpin itself stays reachable so it
+        // can also be used later to change the MPIN.
+        if (path === "/setup-mpin") return NextResponse.next()
+        if (needsMpin) {
+            return NextResponse.redirect(new URL("/setup-mpin", req.url))
         }
 
         const ownDashboard = customLanding || rolePaths[role] || "/"
@@ -97,6 +109,12 @@ export default withAuth(
     }
 )
 
+// Every app page needs a session. Left out: API routes (each checks its own
+// session and must answer JSON, not a redirect), Next internals, files with an
+// extension (logo, manifest, uploads), and the public pages — login, job
+// applications (/apply), the candidate join form (/join), shared inspection
+// reports (/share) and candidate onboarding links (/onboarding/<token>; the
+// /onboarding list page itself is still protected).
 export const config = {
-    matcher: ["/admin/:path*", "/manager/:path*", "/inspection/:path*", "/client/:path*"],
+    matcher: ["/((?!api|_next|login|apply|join|share|onboarding/|.*\\..*).*)"],
 }

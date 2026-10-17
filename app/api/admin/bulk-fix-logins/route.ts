@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import bcrypt from "bcryptjs"
+import { resetLoginSecurity } from "@/lib/login-security"
 
 // POST /api/admin/bulk-fix-logins
 // Server-side bulk: creates/activates user accounts for ALL employees in one DB round-trip
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
                         where: { id: emp.userId },
                         data: { isActive: true, password: hash, name },
                     })
+                    await resetLoginSecurity([emp.userId])
                     fixed++
                 } else {
                     // Upsert user by email, then link to employee
