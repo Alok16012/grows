@@ -4,17 +4,35 @@
 // registration (company entity + sender ID + approved template) before any
 // provider will deliver, so this stays "not configured" until that is done.
 //
+//   SMS_PROVIDER=http      SMS_HTTP_URL — any bulk-SMS gateway's "send" URL with
+//                          placeholders: {mobile} (10 digits), {mobile91}
+//                          (91 + 10 digits), {message} (full DLT text), {otp}.
+//                          Put the gateway's API key, sender ID (GROWUS) and DLT
+//                          template ID straight into the URL. Example:
+//                          https://gateway.example/send?key=XXX&sender=GROWUS&to={mobile91}&text={message}&dlt_template_id=1107...
 //   SMS_PROVIDER=msg91     MSG91_AUTH_KEY, MSG91_TEMPLATE_ID (OTP template with ##OTP##)
 //   SMS_PROVIDER=fast2sms  FAST2SMS_API_KEY (uses the "otp" route)
 //   SMS_PROVIDER=console   prints the OTP to the server log — development only
 //
+// The message text must match the DLT-approved template character for
+// character or operators drop it. Default is the approved "GROWUS_Login_OTP"
+// template; override with SMS_OTP_TEXT (use {otp} where the code goes).
+//
 // With nothing set, development behaves like "console" and production reports
 // SMS as unavailable, so the login page hides OTP instead of sending into a void.
 
-type Provider = "msg91" | "fast2sms" | "console"
+type Provider = "http" | "msg91" | "fast2sms" | "console"
+
+// DLT template "GROWUS_Login_OTP" (Service Implicit, approved on the STPL portal).
+const DEFAULT_OTP_TEXT = "Your OTP for GROWUS login is {otp}. It is valid for 10 minutes. Do not share it with anyone."
+
+export function otpMessage(code: string): string {
+    return (process.env.SMS_OTP_TEXT || DEFAULT_OTP_TEXT).replace("{otp}", code)
+}
 
 function provider(): Provider | null {
     const p = (process.env.SMS_PROVIDER || "").toLowerCase()
+    if (p === "http" && process.env.SMS_HTTP_URL) return "http"
     if (p === "msg91" && process.env.MSG91_AUTH_KEY && process.env.MSG91_TEMPLATE_ID) return "msg91"
     if (p === "fast2sms" && process.env.FAST2SMS_API_KEY) return "fast2sms"
     if (p === "console" || (!p && process.env.NODE_ENV !== "production")) return "console"
@@ -33,6 +51,22 @@ export async function sendOtpSms(mobile10: string, code: string): Promise<boolea
     try {
         if (p === "console") {
             console.log(`[SMS:console] OTP for ******${mobile10.slice(-4)} is ${code}`)
+            return true
+        }
+        if (p === "http") {
+            const url = process.env.SMS_HTTP_URL!
+                .replaceAll("{mobile91}", `91${mobile10}`)
+                .replaceAll("{mobile}", mobile10)
+                .replaceAll("{otp}", code)
+                .replaceAll("{message}", encodeURIComponent(otpMessage(code)))
+            const res = await fetch(url, { method: "GET" })
+            const text = await res.text().catch(() => "")
+            // Gateways differ wildly in how they report errors; a non-2xx or an
+            // obvious "error"/"fail" in the body is treated as not sent.
+            if (!res.ok || /\b(error|fail(ed|ure)?|invalid)\b/i.test(text)) {
+                console.error("[SMS:http] send failed", res.status, text.slice(0, 300))
+                return false
+            }
             return true
         }
         if (p === "msg91") {
