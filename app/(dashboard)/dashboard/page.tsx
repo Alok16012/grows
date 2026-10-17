@@ -481,7 +481,7 @@ function DesktopDashboard() {
                     <div className="w-12 h-12 rounded-[14px] bg-[var(--accent-light)] flex items-center justify-center mx-auto mb-4">
                         <Sparkles size={22} className="text-[var(--accent-text)]" />
                     </div>
-                    <h3 className="text-[16px] font-bold text-[var(--text)] mb-1.5">Welcome to Growus Auto</h3>
+                    <h3 className="text-[16px] font-bold text-[var(--text)] mb-1.5">Welcome to Growus ERP</h3>
                     <p className="text-[13px] text-[var(--text2)] mb-6 max-w-sm mx-auto">
                         Your account doesn&apos;t have any dashboard modules yet. Use the links below, or contact your admin for access.
                     </p>

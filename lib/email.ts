@@ -60,7 +60,7 @@ export async function sendApprovalEmail({
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="left" style="vertical-align:middle;">
-                    <span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">CIMS</span>
+                    <span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">Growus ERP</span>
                     <span style="font-size:12px;color:rgba(255,255,255,0.7);margin-left:8px;font-weight:500;">Quality Inspection</span>
                   </td>
                   <td align="right">
@@ -170,7 +170,7 @@ export async function sendApprovalEmail({
 </html>`
 
     await transporter.sendMail({
-        from: `"CIMS Quality" <${process.env.GMAIL_USER}>`,
+        from: `"Growus ERP" <${process.env.GMAIL_USER}>`,
         to: toEmails.join(", "),
         subject: `✅ Inspection Report Approved — ${projectName} (${companyName})`,
         html,

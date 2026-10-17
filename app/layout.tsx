@@ -9,7 +9,7 @@ import { Toaster } from "sonner";
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "CIMS - Inspection Management",
+  title: "Growus ERP",
   description: "Quality Inspection Management System by Growus",
   manifest: "/manifest.json",
   icons: {
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "CIMS",
+    title: "Growus ERP",
   },
   formatDetection: {
     telephone: false,

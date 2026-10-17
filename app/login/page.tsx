@@ -79,7 +79,7 @@ export default function LoginPage() {
                                 <rect x="3" y="14" width="7" height="7" />
                             </svg>
                         </div>
-                        <span className="text-[20px] font-bold text-[var(--text)] tracking-[-0.4px]">Growus Auto</span>
+                        <span className="text-[20px] font-bold text-[var(--text)] tracking-[-0.4px]">Growus ERP</span>
                     </div>
                     <p className="text-[13px] text-[var(--text3)] leading-relaxed">
                         Sign in to access your dashboard

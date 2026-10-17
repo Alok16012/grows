@@ -1,6 +1,6 @@
 {
-  "name": "CIMS - Inspection Management",
-  "short_name": "CIMS",
+  "name": "Growus ERP",
+  "short_name": "Growus ERP",
   "description": "Quality Inspection Management System by Growus",
   "start_url": "/",
   "display": "standalone",

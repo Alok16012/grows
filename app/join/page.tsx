@@ -1014,7 +1014,7 @@ export default function JoinPage() {
                 </div>
 
                 <p style={{ textAlign: "center", fontSize: 11, color: "var(--text3)", marginTop: 16 }}>
-                    Growus Auto · HR Management System · Your data is encrypted and secure
+                    Growus ERP · HR Management System · Your data is encrypted and secure
                 </p>
             </div>
         </div>

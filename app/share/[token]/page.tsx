@@ -189,7 +189,7 @@ export default function SharePage() {
 
                 {/* Footer */}
                 <div className="text-center py-4 text-[11px] text-[var(--text3)]">
-                    <p>This report was shared via CIMS — Quality Inspection Management System</p>
+                    <p>This report was shared via Growus ERP</p>
                     <p className="mt-0.5">Shared on {new Date(data.createdAt).toLocaleDateString("en-IN")}</p>
                 </div>
             </div>
