@@ -12,6 +12,7 @@ import {
     CalendarRange, Users, Wallet,
 } from "lucide-react"
 import { can } from "@/lib/can"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // Panels are lazy-loaded — each pulls xlsx (~430KB) so eager imports
 // bloated the initial payroll bundle. Only one is open at a time.
@@ -616,25 +617,16 @@ export default function PayrollPage() {
             )}
 
             {/* ── Stats Row ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <div className={statGridClass(6)}>
                 {[
-                    { label: "Runs This Year", value: String(runs.length),                              color: "#3b82f6", bg: "#eff6ff", sub: "payroll runs", icon: CalendarRange },
-                    { label: "Employees",      value: String(statRun?._count.payrolls ?? "—"),     color: "#8b5cf6", bg: "#f5f3ff", sub: statSub,       icon: Users },
-                    { label: "Gross Pay",      value: statRun ? fmt(statRun.totalGross) : "—",      color: "#0b5cff", bg: "#e8effe", sub: statSub,       icon: IndianRupee },
-                    { label: "Net Pay",        value: statRun ? fmt(statRun.totalNet) : "—",        color: "#16a34a", bg: "#dcfce7", sub: statSub,       icon: Wallet },
-                    { label: "Gross YTD",      value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",      color: "#0b5cff", bg: "#e8effe", sub: "year to date", icon: TrendingUp },
-                    { label: "Net YTD",        value: totalNetYTD > 0 ? fmt(totalNetYTD) : "—",          color: "#15803d", bg: "#dcfce7", sub: "year to date", icon: TrendingUp },
-                ].map(s => (
-                    <div key={s.label} style={{ padding: "16px 18px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <s.icon size={19} style={{ color: s.color }} />
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                            <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, whiteSpace: "nowrap" }}>{s.label}</p>
-                            <p style={{ fontSize: 19, fontWeight: 700, color: s.color, margin: "2px 0 1px", lineHeight: 1.1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.value}</p>
-                            <p style={{ fontSize: 10.5, color: "var(--text3)", margin: 0 }}>{s.sub}</p>
-                        </div>
-                    </div>
+                    { label: "Runs This Year", value: String(runs.length),                              tone: "blue" as const,   sub: "payroll runs", icon: CalendarRange },
+                    { label: "Employees",      value: String(statRun?._count.payrolls ?? "—"),     tone: "violet" as const, sub: statSub,       icon: Users },
+                    { label: "Gross Pay",      value: statRun ? fmt(statRun.totalGross) : "—",      tone: "sky" as const,    sub: statSub,       icon: IndianRupee },
+                    { label: "Net Pay",        value: statRun ? fmt(statRun.totalNet) : "—",        tone: "teal" as const,   sub: statSub,       icon: Wallet },
+                    { label: "Gross YTD",      value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",      tone: "slate" as const,  sub: "year to date", icon: TrendingUp },
+                    { label: "Net YTD",        value: totalNetYTD > 0 ? fmt(totalNetYTD) : "—",          tone: "green" as const,  sub: "year to date", icon: TrendingUp },
+                ].map((s, i) => (
+                    <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={<s.icon size={20} />} sub={s.sub} seed={i} />
                 ))}
             </div>
 

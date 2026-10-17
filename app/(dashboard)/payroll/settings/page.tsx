@@ -202,24 +202,26 @@ export default function PayrollSettingsPage() {
             </div>
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Settings2 size={22} style={{ color: "var(--accent)" }} />
-                    <div>
-                        <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Payroll Calculation Settings</h1>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
+                    <Settings2 size={22} style={{ color: "var(--accent)", flexShrink: 0, marginTop: 3 }} />
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                            <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Payroll Calculation Settings</h1>
+                            <span style={{
+                                padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                                background: customized ? "#fef3c7" : "#dcfce7",
+                                color: customized ? "#92400e" : "#15803d",
+                            }}>
+                                {customized ? "Customized" : "Growus defaults"}
+                            </span>
+                        </div>
                         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "3px 0 0 0" }}>
                             Every rate, ceiling and slab the wage engine uses — editable here, no code changes needed.
                         </p>
                     </div>
-                    <span style={{
-                        padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-                        background: customized ? "#fef3c7" : "#dcfce7",
-                        color: customized ? "#92400e" : "#15803d",
-                    }}>
-                        {customized ? "Customized" : "Growus defaults"}
-                    </span>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <button onClick={handleReset} disabled={resetting || saving} style={btnGhost}>
                         {resetting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Reset to defaults
                     </button>

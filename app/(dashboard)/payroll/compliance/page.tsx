@@ -193,8 +193,8 @@ function ComplianceInner() {
             </div>
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
                     <ShieldCheck size={20} style={{ color: "var(--accent)" }} />
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Compliance Reports</h1>
                     {!loading && (
@@ -203,7 +203,7 @@ function ComplianceInner() {
                         </span>
                     )}
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <button onClick={fetchRuns} disabled={loading}
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh

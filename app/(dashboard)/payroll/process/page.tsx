@@ -439,7 +439,7 @@ function ProcessPayrollPage() {
     const processedSites = siteStatus.filter(s => (s.processedCount ?? 0) > 0).length
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32, minWidth: 0 }}>
 
             {/* Breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
@@ -449,9 +449,9 @@ function ProcessPayrollPage() {
             </div>
 
             {/* Title */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Process Payroll — Site Wise</h1>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0, minWidth: 0 }}>Process Payroll — Site Wise</h1>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     {loadingStatus && <Loader2 size={13} className="animate-spin" style={{ color: "var(--text3)" }} />}
                     <span style={{ fontSize: 11, color: "var(--text3)" }}>{processedSites}/{sites.length} sites done</span>
                 </div>
@@ -463,8 +463,9 @@ function ProcessPayrollPage() {
                 background: "var(--surface)", border: "1px solid var(--border)",
                 borderRadius: 10, padding: "10px 14px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                minWidth: 0, maxWidth: "100%",
             }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto" }}>
+                <div className="overflow-x-auto" style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
                     {WORKFLOW_STEPS.map((s, i) => {
                         const status   = getStepStatus(s.num)
                         const isDone   = status === "done"
@@ -510,7 +511,7 @@ function ProcessPayrollPage() {
             </div>
 
             {/* Month / Year row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
                 <span style={labelSt}>Month</span>
                 <select value={month} onChange={e => { setMonth(e.target.value); selectSite("") }} style={selectSt}>
                     {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}

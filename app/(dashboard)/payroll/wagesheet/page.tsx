@@ -503,7 +503,7 @@ function WageSheetInner() {
     }
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 32, minWidth: 0 }}>
             {/* Breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)" }}>
                 <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/payroll")}>Payroll</span>
@@ -512,15 +512,15 @@ function WageSheetInner() {
             </div>
 
             {/* Title */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Site Wise Wage Sheet</h1>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0, minWidth: 0 }}>Site Wise Wage Sheet</h1>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>{done}/{sites.length} sites processed</span>
             </div>
 
             {/* Stepper */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4, overflowX: "auto", whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
+            <div className="overflow-x-auto" style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", minWidth: 0, maxWidth: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
                 {["Upload Attendance","Process Payroll","Wage Sheet & Lock","Compliance","Payslips"].map((s, i) => (
-                    <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div key={s} style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 7,
                             background: i === 2 ? "var(--accent-light)" : "transparent",
                             color: i === 2 ? "var(--accent)" : "var(--text3)", fontSize: 12, fontWeight: i === 2 ? 700 : 400 }}>
@@ -535,7 +535,7 @@ function WageSheetInner() {
             </div>
 
             {/* Month/Year */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 16px" }}>
                 <span style={lbl}>Month</span>
                 <select value={month} onChange={e => { setMonth(e.target.value); setSelId(""); setData([]) }} style={sel}>
                     {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}

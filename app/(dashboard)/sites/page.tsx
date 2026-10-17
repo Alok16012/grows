@@ -13,6 +13,7 @@ import {
     Shield, Home, Wrench, Layers, Clock, User, CalendarDays,
 } from "lucide-react"
 import { format } from "date-fns"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -401,26 +402,6 @@ function AddSiteModal({
                     </div>
                 </form>
             </div>
-        </div>
-    )
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, sub, color, bg, icon, danger }: {
-    label: string; value: number; sub?: string; color: string; bg: string; icon: React.ReactNode; danger?: boolean
-}) {
-    return (
-        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4 hover:shadow-sm transition-all">
-            <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: bg, color }}>
-                    {icon}
-                </div>
-                <ChevronRight size={15} className="text-[var(--text3)]" />
-            </div>
-            <p className={`text-[26px] font-bold leading-none tabular-nums ${danger ? "text-[var(--red)]" : "text-[var(--text)]"}`}>{value}</p>
-            <p className="text-[12.5px] font-medium text-[var(--text)] mt-1.5">{label}</p>
-            {sub && <p className="text-[11px] text-[var(--text3)] mt-0.5">{sub}</p>}
         </div>
     )
 }
@@ -1290,28 +1271,30 @@ export default function SitesPage() {
     return (
         <div className="p-4 lg:p-0 space-y-5 pb-8">
             {/* Page Header */}
-            <div className="flex items-center justify-between">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Sites</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage client sites and employee deployments across locations.</p>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <button
                     onClick={() => { setEditSite(null); setShowModal(true) }}
                     className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
                     <Plus size={16} /> Add Site
                 </button>
+                </div>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <StatCard label="Total Sites" value={totalSites} color="#3b82f6" bg="#eff6ff"
-                    icon={<Building2 size={18} />} sub="Across all clients" />
-                <StatCard label="Active Sites" value={activeSites} color="#16a34a" bg="#dcfce7"
-                    icon={<CheckCircle size={18} />} sub="Currently operational" />
-                <StatCard label="Total Deployed" value={totalDeployed} color="#0b5cff" bg="#e8effe"
-                    icon={<Users size={18} />} sub="Active deployments" />
-                <StatCard label="Understaffed" value={understaffedSites} color="#dc2626" bg="#fef2f2"
-                    icon={<AlertTriangle size={18} />} sub="Below required strength" danger />
+            <div className={statGridClass(4)}>
+                <StatCard label="Total Sites" value={totalSites} tone="blue"
+                    icon={<Building2 size={20} />} sub="Across all clients" seed={0} />
+                <StatCard label="Active Sites" value={activeSites} tone="teal"
+                    icon={<CheckCircle size={20} />} sub="Currently operational" seed={1} />
+                <StatCard label="Total Deployed" value={totalDeployed} tone="violet"
+                    icon={<Users size={20} />} sub="Active deployments" seed={2} />
+                <StatCard label="Understaffed" value={understaffedSites} tone="rose"
+                    icon={<AlertTriangle size={20} />} sub="Below required strength" seed={3} />
             </div>
 
             {/* Filters */}

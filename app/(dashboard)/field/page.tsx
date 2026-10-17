@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { can } from "@/lib/can"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -762,35 +763,11 @@ export default function FieldPage() {
                 </div>
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Clock size={15} className="text-amber-500" />
-                            <span className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Due Today</span>
-                        </div>
-                        <p className="text-[24px] font-bold text-amber-600">{stats.dueTodayCount}</p>
-                    </div>
-                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <CheckCircle2 size={15} className="text-[var(--accent)]" />
-                            <span className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Completed Today</span>
-                        </div>
-                        <p className="text-[24px] font-bold text-[var(--accent)]">{stats.completedToday}</p>
-                    </div>
-                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle size={15} className="text-red-500" />
-                            <span className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Missed</span>
-                        </div>
-                        <p className="text-[24px] font-bold text-red-600">{stats.overdue}</p>
-                    </div>
-                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Users size={15} className="text-blue-500" />
-                            <span className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Active Today</span>
-                        </div>
-                        <p className="text-[24px] font-bold text-blue-600">{stats.activeField}</p>
-                    </div>
+                <div className={`${statGridClass(4)} mb-5`}>
+                    <StatCard label="Due Today" value={stats.dueTodayCount} tone="amber" icon={<Clock size={20} />} seed={0} />
+                    <StatCard label="Completed Today" value={stats.completedToday} tone="teal" icon={<CheckCircle2 size={20} />} seed={1} />
+                    <StatCard label="Missed" value={stats.overdue} tone="rose" icon={<AlertTriangle size={20} />} seed={2} />
+                    <StatCard label="Active Today" value={stats.activeField} tone="blue" icon={<Users size={20} />} seed={3} />
                 </div>
 
                 {/* Tabs */}

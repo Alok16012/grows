@@ -35,6 +35,7 @@ import {
     Trash2
 } from "lucide-react"
 import { toast } from "sonner"
+import { StatCard, statGridClass } from "@/components/StatCard"
 // xlsx is lazy-loaded — only needed on Excel export click. Eager import
 // was adding ~430KB to the initial /reports bundle.
 const loadXLSX = () => import("xlsx")
@@ -72,28 +73,6 @@ function weekBoundsOf(isoDate: string): { start: string; end: string } {
     const end = new Date(start); end.setDate(start.getDate() + 6)
     const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
     return { start: iso(start), end: iso(end) }
-}
-
-function useCountUp(target: number, duration = 1000) {
-    const [value, setValue] = useState(0)
-
-    useEffect(() => {
-        if (!target) { setValue(0); return }
-        let start = 0
-        const step = Math.ceil(target / (duration / 30))
-        const timer = setInterval(() => {
-            start += step
-            if (start >= target) {
-                setValue(target)
-                clearInterval(timer)
-            } else {
-                setValue(start)
-            }
-        }, 30)
-        return () => clearInterval(timer)
-    }, [target, duration])
-
-    return value
 }
 
 function CustomTooltip({ active, payload, label, payload: _payload }: any) {
@@ -667,21 +646,6 @@ export default function ReportsPage() {
         return { ...d, cumulative: totalD > 0 ? parseFloat(((cumSum / totalD) * 100).toFixed(1)) : 0 }
     }), [data?.topDefects])
 
-    const StatCard = ({ label, value, bg, iconBg, iconColor, icon: Icon }: any) => {
-        const animatedValue = useCountUp(value)
-        return (
-            <div className="bg-white border border-[var(--border)] rounded-[14px] p-[12px_14px] md:p-[16px_18px] print-card">
-                <div className={`w-[38px] h-[38px] rounded-[11px] flex items-center justify-center mb-[10px] ${iconBg}`}>
-                    <Icon className="h-[18px] w-[18px]" style={{ color: iconColor }} />
-                </div>
-                <div className="text-[11px] font-[500] text-[var(--text3)] mb-[5px]">{label}</div>
-                <div className="text-[27px] font-[700] tracking-[-0.5px] leading-none" style={{ color: iconColor }}>
-                    {animatedValue.toLocaleString()}
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div className="flex flex-col min-h-[100vh] bg-[var(--bg)] pb-[40px]" id="reports-print-area">
             <style jsx global>{`
@@ -901,8 +865,8 @@ export default function ReportsPage() {
                 </div>
 
                 {loading ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-[14px]">
-                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-[110px] rounded-[12px] w-full bg-white border border-[var(--border)]" />)}
+                    <div className={statGridClass(6)}>
+                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-[128px] sm:h-[148px] rounded-[16px] w-full bg-white border border-[var(--border)]" />)}
                     </div>
                 ) : !data ? (
                     <div className="flex flex-col items-center justify-center p-[60px] bg-white border border-[var(--border)] rounded-[14px]">
@@ -915,13 +879,13 @@ export default function ReportsPage() {
 
                         {/* DASHBOARD STAT CARDS */}
                         {activeTab === "Dashboard" && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-[14px]">
-                                <StatCard label="TOTAL INSPECTED" value={s?.totalInspected || 0} iconBg="bg-[#eff6ff]" iconColor="#3b82f6" icon={Terminal} />
-                                <StatCard label="TOTAL ACCEPTED" value={s?.totalAccepted || 0} iconBg="bg-[var(--success-light)]" iconColor="#16a34a" icon={CheckCircle2} />
-                                <StatCard label="TOTAL REWORK" value={s?.totalRework || 0} iconBg="bg-[#fef3c7]" iconColor="#d97706" icon={TrendingDown} />
-                                <StatCard label="TOTAL REJECTED" value={s?.totalRejected || 0} iconBg="bg-[#fef2f2]" iconColor="#dc2626" icon={AlertCircle} />
-                                <StatCard label="REWORK PPM" value={s?.reworkPPM || 0} iconBg="bg-[#fef3c7]" iconColor="#d97706" icon={Target} />
-                                <StatCard label="REJECTION PPM" value={s?.rejectionPPM || 0} iconBg="bg-[#fef2f2]" iconColor="#dc2626" icon={AlertCircle} />
+                            <div className={statGridClass(6)}>
+                                <StatCard label="Total Inspected" value={s?.totalInspected || 0} tone="blue" icon={<Terminal size={20} />} seed={0} />
+                                <StatCard label="Total Accepted" value={s?.totalAccepted || 0} tone="teal" icon={<CheckCircle2 size={20} />} seed={1} />
+                                <StatCard label="Total Rework" value={s?.totalRework || 0} tone="amber" icon={<TrendingDown size={20} />} seed={2} />
+                                <StatCard label="Total Rejected" value={s?.totalRejected || 0} tone="rose" icon={<AlertCircle size={20} />} seed={3} />
+                                <StatCard label="Rework PPM" value={s?.reworkPPM || 0} tone="violet" icon={<Target size={20} />} seed={4} />
+                                <StatCard label="Rejection PPM" value={s?.rejectionPPM || 0} tone="sky" icon={<AlertCircle size={20} />} seed={5} />
                             </div>
                         )}
 

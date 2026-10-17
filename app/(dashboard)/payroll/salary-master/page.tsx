@@ -10,8 +10,10 @@ import { can } from "@/lib/can"
 const loadXLSX = () => import("xlsx")
 import {
     Loader2, Search, ChevronRight, Download, Upload,
-    Edit2, Check, X, RefreshCw, IndianRupee, CalendarRange
+    Edit2, Check, X, RefreshCw, IndianRupee, CalendarRange,
+    Users, CheckCircle2, AlertCircle, MapPin, Lightbulb,
 } from "lucide-react"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 
@@ -476,12 +478,12 @@ function SalaryMasterInner() {
 
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
                     <IndianRupee size={20} style={{ color: "var(--accent)" }} />
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Salary Structure Master</h1>
                     {filterSite && (
                         <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "#dbeafe", color: "#1e40af", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            📍 Site Mode: {filterSite} ({filtered.length})
+                            <MapPin size={12} /> Site Mode: {filterSite} ({filtered.length})
                         </span>
                     )}
                 </div>
@@ -546,7 +548,7 @@ function SalaryMasterInner() {
 
             {isHistoricalView && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1e40af" }}>
-                    <span>🔎</span>
+                    <Search size={14} style={{ flexShrink: 0 }} />
                     <span>
                         Showing the structure <b>{MONTHS_LONG[Number(viewMonth) - 1]} {viewYear}</b> is paid on — exactly what payroll
                         reads for that month. Read-only: editing and upload change the structure going forward, not the past.
@@ -557,23 +559,16 @@ function SalaryMasterInner() {
             {/* Site-wise hint banner */}
             {!filterSite && allSites.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047", fontSize: 11, color: "#854d0e" }}>
-                    <span>💡</span>
+                    <Lightbulb size={14} style={{ flexShrink: 0 }} />
                     <span><b>Site-wise upload:</b> Select a site below → click <b>Download (Site)</b> → fill Bonus/Basic/DA etc. → upload back. Only that site&apos;s employees get updated.</span>
                 </div>
             )}
 
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
-                {[
-                    { label: "Total Employees", value: data.length, color: "#3b82f6" },
-                    { label: "Structure Set",   value: withSal,     color: "#16a34a" },
-                    { label: "Not Set",          value: noSal,       color: noSal > 0 ? "#dc2626" : "#6b7280" },
-                ].map(s => (
-                    <div key={s.label} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)" }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: 0 }}>{s.label}</p>
-                        <p style={{ fontSize: 20, fontWeight: 800, color: s.color, margin: "3px 0 0 0" }}>{s.value}</p>
-                    </div>
-                ))}
+            <div className={statGridClass(3)}>
+                <StatCard label="Total Employees" value={data.length} tone="blue" icon={<Users size={20} />} seed={0} />
+                <StatCard label="Structure Set" value={withSal} tone="teal" icon={<CheckCircle2 size={20} />} seed={1} />
+                <StatCard label="Not Set" value={noSal} tone={noSal > 0 ? "rose" : "slate"} icon={<AlertCircle size={20} />} seed={2} />
             </div>
 
             {/* Toolbar */}

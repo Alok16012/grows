@@ -13,6 +13,7 @@ import { format, formatDistanceToNow, isValid } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import BulkImportInspectors from "@/components/BulkImportInspectors"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Expense Team Summary Table ───────────────────────────────────────────────
 
@@ -198,10 +199,10 @@ export default function ManagerDashboard() {
     }
 
     const kpiCards = [
-        { title: "Pending Approvals", value: stats.pendingApprovals, icon: ClipboardCheck, color: "#d97706", bg: "#fef3c7", link: "/approvals" },
-        { title: "Active Assignments", value: stats.activeAssignments, icon: Users, color: "#16a34a", bg: "#dcfce7", link: "/assignments" },
-        { title: "Completed This Month", value: stats.completedThisMonth, icon: CheckCircle2, color: "#3b82f6", bg: "#eff6ff", link: "/approvals" },
-        { title: "Overdue (>7 days)", value: stats.overdueInspections || 0, icon: AlertTriangle, color: "#dc2626", bg: "#fef2f2", link: "/approvals" },
+        { title: "Pending Approvals", value: stats.pendingApprovals, icon: ClipboardCheck, tone: "amber" as const, link: "/approvals" },
+        { title: "Active Assignments", value: stats.activeAssignments, icon: Users, tone: "teal" as const, link: "/assignments" },
+        { title: "Completed This Month", value: stats.completedThisMonth, icon: CheckCircle2, tone: "blue" as const, link: "/approvals" },
+        { title: "Overdue (>7 days)", value: stats.overdueInspections || 0, icon: AlertTriangle, tone: "rose" as const, link: "/approvals" },
     ]
 
     return (
@@ -214,12 +215,12 @@ export default function ManagerDashboard() {
             </div>
 
             {/* Desktop Header */}
-            <div className="hidden md:flex items-center justify-between mb-6">
-                <div>
+            <div className="hidden md:flex md:flex-row md:items-start md:justify-between gap-3 mb-6">
+                <div className="min-w-0">
                     <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-[-0.4px]">Manager Dashboard</h1>
                     <p className="text-[13px] text-[var(--text2)] mt-[3px]">Monitor operations and review pending inspections</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <Link href="/manager/analytics" className="flex items-center gap-2 bg-white border border-[var(--border)] rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                         <BarChart2 className="h-4 w-4 text-[var(--accent)]" /> Analytics
                     </Link>
@@ -228,7 +229,7 @@ export default function ManagerDashboard() {
             </div>
 
             <div className="md:hidden mb-4">
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-wrap gap-2 mb-3">
                     <Link href="/manager/analytics" className="flex items-center gap-2 bg-white border border-[var(--border)] rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--text)]">
                         <BarChart2 className="h-4 w-4 text-[var(--accent)]" /> Analytics
                     </Link>
@@ -237,16 +238,10 @@ export default function ManagerDashboard() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 md:mb-5">
-                {kpiCards.map((card) => (
-                    <Link key={card.title} href={card.link}>
-                        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4 sm:p-5 hover:shadow-md transition-shadow">
-                            <div className="w-9 h-9 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: card.bg }}>
-                                <card.icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: card.color }} />
-                            </div>
-                            <p className="text-[12px] sm:text-[13px] text-[var(--text2)] mb-1">{card.title}</p>
-                            <p className="text-[26px] sm:text-[32px] font-bold text-[var(--text)] tracking-[-1px] tabular-nums">{card.value}</p>
-                        </div>
+            <div className={`${statGridClass(kpiCards.length)} mb-4 md:mb-5`}>
+                {kpiCards.map((card, i) => (
+                    <Link key={card.title} href={card.link} className="block min-w-0 rounded-[16px]">
+                        <StatCard label={card.title} value={card.value} tone={card.tone} icon={<card.icon size={20} />} seed={i} />
                     </Link>
                 ))}
             </div>
@@ -256,7 +251,7 @@ export default function ManagerDashboard() {
                 <div className="bg-white border border-[#fbbf24] rounded-[14px] overflow-hidden mb-4">
                     <div className="p-4 border-b border-[#fef3c7] bg-[#fffbeb] flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4 text-[#d97706]" />
-                        <span className="text-[13.5px] font-semibold text-[#92400e]">⚠️ Risk Alerts — High Defect Projects</span>
+                        <span className="text-[13.5px] font-semibold text-[#92400e]">Risk Alerts — High Defect Projects</span>
                         <span className="ml-auto text-[11px] text-[#d97706]">{stats.riskAlerts.length} project{stats.riskAlerts.length !== 1 ? "s" : ""} at risk</span>
                     </div>
                     <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
