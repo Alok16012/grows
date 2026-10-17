@@ -237,6 +237,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         },
 
     ]
+    // Every link across all sections — a prefix match yields to any more specific
+    // link anywhere in the menu (e.g. Dashboard "/admin" vs Roles "/admin/roles").
+    const allLinks = navigation.flatMap(s => s.links)
 
     return (
         // Deep-blue rail with white type — the dashboard's "Operations overview"
@@ -297,10 +300,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                     const Icon = link.icon
                                     const hasSubLinks = !!link.subLinks && link.subLinks.length > 0
                                     const isSubActive  = hasSubLinks && link.subLinks!.some(sub => pathname === sub.href || (sub.href !== "/" && pathname.startsWith(sub.href)))
-                                    // A prefix match yields to a more specific sibling (e.g.
+                                    // A prefix match yields to a more specific link (e.g.
                                     // "/employees" stays inactive on "/employees/master").
                                     const prefixMatch = link.href !== "/" && pathname.startsWith(link.href + "/")
-                                        && !filteredLinks.some(other => other.href.length > link.href.length
+                                        && !allLinks.some(other => other.href.length > link.href.length
                                             && (pathname === other.href || pathname.startsWith(other.href + "/")))
                                     const isItemActive = pathname === link.href
                                         || prefixMatch
