@@ -252,7 +252,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                             <path d="M18 9h-6v6h6v-3h-3" />
                         </svg>
                     </div>
-                    <span className="text-[19px] font-bold tracking-[-0.02em] text-white leading-none">Growus <span className="text-[#5b9dff]">Auto</span></span>
+                    <span className="text-[19px] font-bold tracking-[-0.02em] text-white leading-none">Growus <span className="text-[#5b9dff]">ERP</span></span>
                 </Link>
                 {onMobileClose && (
                     <button onClick={onMobileClose} aria-label="Close sidebar" className="p-1 md:hidden hover:bg-white/10 rounded-md transition-colors text-white/70 h-9 w-9 flex items-center justify-center">
@@ -378,7 +378,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             {/* ── Footer ── */}
             <div className="px-5 py-4 mt-auto">
                 <div className="flex flex-col gap-1">
-                    <p className="text-[11px] text-white/60">v1.1.2 · Growus Auto</p>
+                    <p className="text-[11px] text-white/60">v1.1.2 · Growus ERP</p>
                     <Link href="/terms" className="text-[11px] text-white/60 hover:text-white">Terms & Conditions</Link>
                 </div>
             </div>
