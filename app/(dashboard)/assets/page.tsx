@@ -760,12 +760,12 @@ export default function AssetsPage() {
             </div>
 
             {/* KPI cards */}
-            <div className={`${statGridClass(4)} px-6 py-4 shrink-0`}>
+            <div className="px-4 sm:px-6 py-4 shrink-0"><div className={statGridClass(4)}>
                 <StatCard label="Total Assets" value={totalAssets} sub={`${totalItems} items`} tone="blue" icon={<Package size={20} />} seed={0} />
                 <StatCard label="Total Items" value={totalItems} sub="across all assets" tone="violet" icon={<BarChart3 size={20} />} seed={1} />
                 <StatCard label="Currently Issued" value={currentlyIssued} sub="in use" tone="amber" icon={<Users size={20} />} seed={2} />
                 <StatCard label="Damaged / Lost" value={damagedLost} sub="need attention" tone="rose" icon={<AlertTriangle size={20} />} seed={3} />
-            </div>
+            </div></div>
 
             {/* Tabs */}
             <div className="z-tabs-wrap px-6 pb-3 shrink-0"><div className="z-tabs" role="tablist">

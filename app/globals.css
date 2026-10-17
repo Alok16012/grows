@@ -221,8 +221,9 @@
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .filter-bar > * { min-width: 0; }
 @media (max-width: 639.98px) {
-  .filter-bar > * { flex: 1 1 calc(50% - 4px); max-width: none !important; width: auto !important; }
-  .filter-bar > .filter-search, .filter-bar > .filter-full { flex-basis: 100%; }
+  /* !important: several pages set flex/width inline on these children. */
+  .filter-bar > * { flex: 1 1 calc(50% - 4px) !important; max-width: none !important; width: auto !important; }
+  .filter-bar > .filter-search, .filter-bar > .filter-full { flex-basis: 100% !important; }
 }
 
 @keyframes fade-up {

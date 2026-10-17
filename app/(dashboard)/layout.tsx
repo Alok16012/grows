@@ -51,7 +51,7 @@ export default function DashboardLayout({
                 <main className="flex-1 overflow-y-auto flex flex-col">
                     {/* Removed 500ms fade-in/slide animation — was adding
                         perceived 500ms latency to every page navigation. */}
-                    <div id="main-content" className="flex-1 mx-auto w-full flex flex-col gap-0 p-0 lg:gap-8 lg:p-8 max-w-7xl">
+                    <div id="main-content" className="flex-1 mx-auto w-full min-w-0 flex flex-col gap-0 p-0 lg:gap-8 lg:p-8 max-w-7xl [&>*]:w-full [&>*]:min-w-0">
                         <InspectionStepper />
                         {children}
                     </div>
