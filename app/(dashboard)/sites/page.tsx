@@ -1276,10 +1276,10 @@ export default function SitesPage() {
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Sites</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage client sites and employee deployments across locations.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                 <button
                     onClick={() => { setEditSite(null); setShowModal(true) }}
-                    className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
+                    className="inline-flex items-center justify-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
                     <Plus size={16} /> Add Site
                 </button>
                 </div>
@@ -1298,12 +1298,12 @@ export default function SitesPage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 flex flex-wrap items-center gap-2.5">
+            <div className="filter-bar bg-white border border-[var(--border)] rounded-[12px] p-3">
                 {/* Status Pills */}
-                <div className="flex items-center gap-1 bg-[var(--surface2)] rounded-[8px] p-1">
+                <div className="filter-full flex items-center gap-1 overflow-x-auto no-scrollbar bg-[var(--surface2)] rounded-[8px] p-1">
                     {([["", "All"], ["true", "Active"], ["false", "Inactive"]] as const).map(([val, label]) => (
                         <button key={val} onClick={() => setStatusFilter(val)}
-                            className={`px-3 py-1 rounded-[6px] text-[12px] font-medium transition-colors ${
+                            className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-[6px] text-[12px] font-medium transition-colors ${
                                 statusFilter === val
                                     ? "bg-white text-[var(--text)] shadow-sm border border-[var(--border)]"
                                     : "text-[var(--text2)] hover:text-[var(--text)]"
@@ -1314,10 +1314,10 @@ export default function SitesPage() {
                 </div>
 
                 {/* Site Type Filter */}
-                <div className="flex items-center gap-1 bg-[var(--surface2)] rounded-[8px] p-1">
+                <div className="filter-full flex items-center gap-1 overflow-x-auto no-scrollbar bg-[var(--surface2)] rounded-[8px] p-1">
                     {([["", "All Types"], ...SITE_TYPES.map(t => [t, t])] as [string, string][]).map(([val, label]) => (
                         <button key={val} onClick={() => setTypeFilter(val)}
-                            className={`px-3 py-1 rounded-[6px] text-[12px] font-medium transition-colors ${
+                            className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-[6px] text-[12px] font-medium transition-colors ${
                                 typeFilter === val
                                     ? "bg-white text-[var(--text)] shadow-sm border border-[var(--border)]"
                                     : "text-[var(--text2)] hover:text-[var(--text)]"
@@ -1328,7 +1328,7 @@ export default function SitesPage() {
                 </div>
 
                 {/* Search */}
-                <div className="relative flex-1 min-w-[180px]">
+                <div className="filter-search relative sm:flex-1 sm:min-w-[180px]">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                     <input
                         value={search}

@@ -765,15 +765,15 @@ export default function AssignmentsPage() {
 
                     {/* Table card */}
                     <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
-                        <div className="p-3.5 flex flex-wrap items-center gap-2.5 border-b border-[var(--border)]">
-                            <h2 className="text-[15px] font-semibold text-[var(--text)] flex-1">Assignments</h2>
-                            <div className="relative min-w-[200px]">
+                        <div className="filter-bar p-3.5 border-b border-[var(--border)]">
+                            <h2 className="filter-full text-[15px] font-semibold text-[var(--text)] sm:flex-1">Assignments</h2>
+                            <div className="filter-search relative sm:min-w-[200px]">
                                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                 <input value={assignmentSearch} onChange={e => setAssignmentSearch(e.target.value)}
                                     placeholder="Search by inspector, project, site..." className={inputCls + " pl-8 h-8"} />
                             </div>
                             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                                className="h-8 rounded-[8px] border border-[var(--border)] bg-white px-2.5 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
+                                className="filter-full w-full sm:w-auto h-8 rounded-[8px] border border-[var(--border)] bg-white px-2.5 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
                                 <option value="all">All Status</option>
                                 {["Active", "Scheduled", "Inactive", "Manager Only"].map(s => <option key={s} value={s}>{s}</option>)}
                             </select>

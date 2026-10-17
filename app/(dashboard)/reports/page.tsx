@@ -662,11 +662,11 @@ export default function ReportsPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-[10px] md:gap-[12px]">
                     {/* Site */}
                     {[
-                        { label: "Site", value: selectedSiteId, options: sites, setter: setSelectedSiteId, allLabel: "Global View" },
-                        { label: "Project", value: selectedProjectId, options: projects, setter: setSelectedProjectId, allLabel: "All Projects", disabled: selectedSiteId === "all" },
-                        { label: "Inspector", value: selectedInspectorId, options: scopedInspectors, setter: setSelectedInspectorId, allLabel: "All Inspectors" },
+                        { label: "Site", value: selectedSiteId, options: sites, setter: setSelectedSiteId, allLabel: "Global View", span: "" },
+                        { label: "Project", value: selectedProjectId, options: projects, setter: setSelectedProjectId, allLabel: "All Projects", disabled: selectedSiteId === "all", span: "" },
+                        { label: "Inspector", value: selectedInspectorId, options: scopedInspectors, setter: setSelectedInspectorId, allLabel: "All Inspectors", span: "col-span-2 sm:col-span-1" },
                     ].map((filter, idx) => (
-                        <div key={idx} className="flex flex-col">
+                        <div key={idx} className={`flex flex-col min-w-0 ${filter.span}`}>
                             <label className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[0.6px] mb-[5px]">{filter.label}</label>
                             <div className="relative">
                                 <select
@@ -688,14 +688,14 @@ export default function ReportsPage() {
                     {/* DATE FILTER — spans last 2 columns on desktop */}
                     <div className="col-span-2 sm:col-span-3 md:col-span-2 flex flex-col gap-[6px]">
                         {/* Mode toggle */}
-                        <div className="flex items-center justify-between">
-                            <label className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[0.6px]">Date Filter</label>
-                            <div className="flex bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] p-[2px] gap-[2px]">
+                        <div className="flex items-center justify-between gap-2">
+                            <label className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[0.6px] shrink-0">Date Filter</label>
+                            <div className="flex min-w-0 overflow-x-auto no-scrollbar bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] p-[2px] gap-[2px]">
                                 {(["month", "week", "single", "range"] as const).map(mode => (
                                     <button
                                         key={mode}
                                         onClick={() => setDateFilterMode(mode)}
-                                        className={`px-[10px] py-[4px] rounded-[6px] text-[11px] font-[600] transition-colors whitespace-nowrap ${dateFilterMode === mode
+                                        className={`shrink-0 px-[10px] py-[4px] rounded-[6px] text-[11px] font-[600] transition-colors whitespace-nowrap ${dateFilterMode === mode
                                             ? "bg-[var(--text)] text-white"
                                             : "text-[var(--text2)] hover:text-[var(--text)]"
                                             }`}
@@ -817,12 +817,12 @@ export default function ReportsPage() {
                     ))}
                 </div></div>
 
-                <div className="flex flex-wrap items-center gap-[6px]">
+                <div className="page-actions">
                     {!["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab) && (
                         <button
                             onClick={handleExportPdf}
                             disabled={loading || exportingPdf}
-                            className="flex items-center gap-[6px] bg-[#dc2626] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[#b91c1c] transition-colors disabled:opacity-50"
+                            className="flex items-center justify-center gap-[6px] bg-[#dc2626] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[#b91c1c] transition-colors disabled:opacity-50"
                         >
                             <FileText className="h-[14px] w-[14px]" />
                             <span className="hidden sm:inline">{exportingPdf ? "Generating PDF..." : "Export Full Report PDF"}</span>
@@ -833,7 +833,7 @@ export default function ReportsPage() {
                         <button
                             onClick={handleExportExcel}
                             disabled={loading || (activeTab === "Day Wise" ? !data?.dayWise?.length : activeTab === "Part Wise" ? !data?.partWise?.length : !filteredRecords?.length)}
-                            className="flex items-center gap-[6px] bg-[var(--accent)] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] focus:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
+                            className="flex items-center justify-center gap-[6px] bg-[var(--accent)] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] focus:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
                         >
                             <FileSpreadsheet className="h-[14px] w-[14px]" />
                             Excel
@@ -842,7 +842,7 @@ export default function ReportsPage() {
                     <button
                         onClick={fetchReport}
                         disabled={loading}
-                        className="flex items-center gap-[6px] bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 shadow-sm"
+                        className="flex items-center justify-center gap-[6px] bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 shadow-sm"
                     >
                         {loading ? <div className="h-[14px] w-[14px] rounded-full border-2 border-white border-t-transparent animate-spin" /> : <ExternalLink className="h-[14px] w-[14px]" />}
                         <span className="hidden sm:inline">Update Dashboard</span>
@@ -1211,12 +1211,12 @@ export default function ReportsPage() {
                                                 {filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""} &nbsp;·&nbsp; LIVE DATA FEED
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-[8px] flex-wrap">
+                                        <div className="filter-bar">
                                             {/* Global search */}
-                                            <div className="relative">
+                                            <div className="filter-search relative">
                                                 <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 h-[13px] w-[13px] text-[var(--text3)]" />
                                                 <Input
-                                                    className="w-[200px] pl-[30px] h-[34px] bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] text-[12.5px] font-[500] focus-visible:ring-0 focus:border-[var(--accent)] focus:bg-white transition-all shadow-none"
+                                                    className="w-full sm:w-[200px] pl-[30px] h-[34px] bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] text-[12.5px] font-[500] focus-visible:ring-0 focus:border-[var(--accent)] focus:bg-white transition-all shadow-none"
                                                     placeholder="Search all..."
                                                     value={searchTerm}
                                                     onChange={e => setSearchTerm(e.target.value)}
@@ -1225,7 +1225,7 @@ export default function ReportsPage() {
                                             {/* Filter toggle */}
                                             <button
                                                 onClick={() => setShowFilterRow(v => !v)}
-                                                className={`flex items-center gap-[5px] h-[34px] px-[10px] rounded-[8px] border text-[12px] font-[600] transition-colors ${showFilterRow || Object.values(colFilters).some(Boolean)
+                                                className={`flex items-center justify-center gap-[5px] h-[34px] px-[10px] rounded-[8px] border text-[12px] font-[600] transition-colors ${showFilterRow || Object.values(colFilters).some(Boolean)
                                                         ? "bg-[var(--accent)] text-white border-[var(--accent)]"
                                                         : "bg-[var(--surface2)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                                                     }`}
@@ -1243,7 +1243,7 @@ export default function ReportsPage() {
                                             <div className="relative">
                                                 <button
                                                     onClick={() => setShowColMenu(v => !v)}
-                                                    className={`flex items-center gap-[5px] h-[34px] px-[10px] rounded-[8px] border text-[12px] font-[600] transition-colors ${showColMenu
+                                                    className={`w-full flex items-center justify-center gap-[5px] h-[34px] px-[10px] rounded-[8px] border text-[12px] font-[600] transition-colors ${showColMenu
                                                             ? "bg-[var(--text)] text-white border-[var(--text)]"
                                                             : "bg-[var(--surface2)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--text)] hover:text-[var(--text)]"
                                                         }`}
@@ -1281,7 +1281,7 @@ export default function ReportsPage() {
                                             {Object.values(colFilters).some(Boolean) && (
                                                 <button
                                                     onClick={() => setColFilters({})}
-                                                    className="flex items-center gap-[4px] h-[34px] px-[8px] rounded-[8px] border border-[#fca5a5] bg-[#fef2f2] text-[#dc2626] text-[11.5px] font-[600] hover:bg-[#fee2e2] transition-colors"
+                                                    className="flex items-center justify-center gap-[4px] h-[34px] px-[8px] rounded-[8px] border border-[#fca5a5] bg-[#fef2f2] text-[#dc2626] text-[11.5px] font-[600] hover:bg-[#fee2e2] transition-colors"
                                                 >
                                                     <X className="h-[11px] w-[11px]" /> Clear filters
                                                 </button>

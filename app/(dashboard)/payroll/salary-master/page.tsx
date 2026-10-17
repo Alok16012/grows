@@ -477,7 +477,7 @@ function SalaryMasterInner() {
             </div>
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
                     <IndianRupee size={20} style={{ color: "var(--accent)" }} />
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Salary Structure Master</h1>
@@ -487,7 +487,7 @@ function SalaryMasterInner() {
                         </span>
                     )}
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="page-actions">
                     <button onClick={load} style={btnGhost}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
                     </button>
@@ -497,7 +497,7 @@ function SalaryMasterInner() {
                     {/* Sits immediately before Upload so the two read as one
                         control: the month is what the uploaded structure takes
                         effect from, not a filter on the table below. */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "4px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>
                         <CalendarRange size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
                         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>Effective</span>
                         <select value={effMonth} onChange={e => setEffMonth(Number(e.target.value))} aria-label="Effective month"
@@ -572,12 +572,14 @@ function SalaryMasterInner() {
             </div>
 
             {/* Toolbar */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", flexWrap: "wrap" }}>
-                <Search size={13} style={{ color: "var(--text3)" }} />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search employee name or code…"
-                    style={{ flex: 1, minWidth: 180, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "var(--text)" }} />
+            <div className="filter-bar" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
+                <div className="filter-search sm:flex-1 sm:min-w-[180px]" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Search size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search employee name or code…"
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", fontSize: 13, background: "transparent", color: "var(--text)" }} />
+                </div>
                 {allSites.length > 0 && (
-                    <select value={filterSite} onChange={e => setFilterSite(e.target.value)}
+                    <select value={filterSite} onChange={e => setFilterSite(e.target.value)} className="w-full sm:w-auto"
                         style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: filterSite ? "var(--text)" : "var(--text3)", outline: "none" }}>
                         <option value="">All Sites</option>
                         {allSites.map(s => <option key={s} value={s}>{s}</option>)}
@@ -587,7 +589,7 @@ function SalaryMasterInner() {
                     <input type="checkbox" checked={filterNone} onChange={e => setFilterNone(e.target.checked)} style={{ accentColor: "var(--accent)" }} />
                     Show only not-set
                 </label>
-                <span style={{ fontSize: 11, color: "var(--text3)" }}>{filtered.length}/{data.length}</span>
+                <span className="filter-full text-right sm:text-left" style={{ fontSize: 11, color: "var(--text3)" }}>{filtered.length}/{data.length}</span>
             </div>
 
             {/* Table */}
@@ -949,8 +951,8 @@ function SalaryMasterInner() {
 const th: React.CSSProperties = { padding: "8px 10px", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", textAlign: "center", whiteSpace: "nowrap" }
 const td: React.CSSProperties = { padding: "6px 10px", textAlign: "center", color: "var(--text)", whiteSpace: "nowrap" }
 const calcTag: React.CSSProperties = { marginLeft: 3, fontSize: 8, background: "#dbeafe", color: "#1d4ed8", borderRadius: 3, padding: "1px 3px", fontWeight: 400, letterSpacing: 0, textTransform: "none" }
-const btnGhost: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer", fontWeight: 600 }
-const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 12, fontWeight: 700 }
+const btnGhost: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer", fontWeight: 600 }
+const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 12, fontWeight: 700 }
 
 export default function SalaryMasterPage() {
     return <RequirePayrollView><SalaryMasterInner /></RequirePayrollView>

@@ -220,20 +220,18 @@ export default function ManagerDashboard() {
                     <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-[-0.4px]">Manager Dashboard</h1>
                     <p className="text-[13px] text-[var(--text2)] mt-[3px]">Monitor operations and review pending inspections</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <Link href="/manager/analytics" className="flex items-center gap-2 bg-white border border-[var(--border)] rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
+                <div className="page-actions">
+                    <Link href="/manager/analytics" className="flex items-center justify-center gap-2 bg-white border border-[var(--border)] rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                         <BarChart2 className="h-4 w-4 text-[var(--accent)]" /> Analytics
                     </Link>
                     <BulkImportInspectors />
                 </div>
             </div>
 
-            <div className="md:hidden mb-4">
-                <div className="flex flex-wrap gap-2 mb-3">
-                    <Link href="/manager/analytics" className="flex items-center gap-2 bg-white border border-[var(--border)] rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--text)]">
-                        <BarChart2 className="h-4 w-4 text-[var(--accent)]" /> Analytics
-                    </Link>
-                </div>
+            <div className="md:hidden page-actions mb-4">
+                <Link href="/manager/analytics" className="flex items-center justify-center gap-2 bg-white border border-[var(--border)] rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--text)]">
+                    <BarChart2 className="h-4 w-4 text-[var(--accent)]" /> Analytics
+                </Link>
                 <BulkImportInspectors />
             </div>
 

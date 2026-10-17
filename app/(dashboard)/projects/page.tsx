@@ -278,8 +278,8 @@ export default function ProjectsPage() {
     return (
         <div className="p-4 lg:p-0 space-y-4 pb-8">
             {/* Header */}
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)] flex items-center gap-2">
                         <FolderKanban className="h-6 w-6 text-[var(--accent)]" />
                         Projects
@@ -287,24 +287,26 @@ export default function ProjectsPage() {
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage inspection projects across client sites.</p>
                 </div>
                 {canManageProjects && (
-                    <Link href="/projects/create"
-                        className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
-                        <Plus size={16} /> New Project
-                    </Link>
+                    <div className="page-actions">
+                        <Link href="/projects/create"
+                            className="inline-flex items-center justify-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
+                            <Plus size={16} /> New Project
+                        </Link>
+                    </div>
                 )}
             </div>
 
             {/* Filters + stats strip */}
             <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-3 items-stretch">
                 <div className="bg-white border border-[var(--border)] rounded-[12px] p-3 space-y-2.5">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        <div className="relative flex-1 min-w-[180px]">
+                    <div className="filter-bar">
+                        <div className="filter-search relative sm:flex-1 sm:min-w-[180px]">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..."
                                 className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]/30 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]" />
                         </div>
                         <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
-                            className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] cursor-pointer min-w-[140px]">
+                            className="h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] cursor-pointer filter-full w-full sm:w-auto sm:min-w-[140px]">
                             <option value="all">All Sites</option>
                             {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                             {hasNoSiteProjects && <option value="no-site">No Site</option>}
@@ -312,10 +314,10 @@ export default function ProjectsPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[12px] font-medium text-[var(--text2)]">Status:</span>
-                        <div className="flex items-center gap-1 bg-[var(--surface2)] rounded-[8px] p-1 flex-wrap">
+                        <div className="flex items-center gap-1 bg-[var(--surface2)] rounded-[8px] p-1 min-w-0 max-w-full overflow-x-auto no-scrollbar">
                             {STATUS_FILTERS.map(s => (
                                 <button key={s} onClick={() => setStatusFilter(s)}
-                                    className={`px-2.5 py-1 rounded-[6px] text-[12px] font-medium transition-colors ${
+                                    className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-[6px] text-[12px] font-medium transition-colors ${
                                         statusFilter === s
                                             ? "bg-white text-[var(--text)] shadow-sm border border-[var(--border)]"
                                             : "text-[var(--text2)] hover:text-[var(--text)]"

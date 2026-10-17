@@ -221,7 +221,7 @@ export default function PayrollSettingsPage() {
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button onClick={handleReset} disabled={resetting || saving} style={btnGhost}>
                         {resetting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Reset to defaults
                     </button>

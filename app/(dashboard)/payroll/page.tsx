@@ -230,30 +230,30 @@ export default function PayrollPage() {
         <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48, maxWidth: 1200 }}>
 
             {/* ── Page Header ── */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Payroll</h1>
                     <p style={{ fontSize: 13.5, color: "var(--text3)", margin: "4px 0 0 0" }}>
                         {MONTHS[currentMonth - 1]} {currentYear} · Monthly payroll workflow
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="page-actions">
                     <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}
                         style={{ height: 42, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer" }}>
                         {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                     <button onClick={fetchRuns} disabled={loading}
-                        style={{ display: "flex", alignItems: "center", gap: 7, height: 42, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, height: 42, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
                         <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
                     <button onClick={() => router.push("/payroll/salary-master")}
-                        style={{ display: "flex", alignItems: "center", gap: 7, height: 42, padding: "0 18px", borderRadius: 10, border: "none", background: "var(--accent)", fontSize: 13, color: "#fff", cursor: "pointer", fontWeight: 600, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, height: 42, padding: "0 18px", borderRadius: 10, border: "none", background: "var(--accent)", fontSize: 13, color: "#fff", cursor: "pointer", fontWeight: 600, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                         <Settings2 size={15} /> Salary Structure
                     </button>
                     {can(session, "payroll.manage") && (
                         <button onClick={() => router.push("/payroll/settings")}
                             title="Edit PF / ESIC / PT rates, slabs and defaults — how salary is calculated"
-                            style={{ display: "flex", alignItems: "center", gap: 7, height: 42, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, height: 42, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
                             <SlidersHorizontal size={15} /> Calculation Settings
                         </button>
                     )}

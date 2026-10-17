@@ -203,14 +203,14 @@ function ComplianceInner() {
                         </span>
                     )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button onClick={fetchRuns} disabled={loading}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 13px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
                     <button
                         onClick={() => router.push("/payroll/compliance/master")}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, fontWeight: 700, color: "var(--text2)", cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, fontWeight: 700, color: "var(--text2)", cursor: "pointer" }}>
                         <TableProperties size={13} /> Document Master
                     </button>
                 </div>

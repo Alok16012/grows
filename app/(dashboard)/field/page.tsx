@@ -741,8 +741,8 @@ export default function FieldPage() {
         <div className="flex-1 flex flex-col min-h-0">
             {/* Header */}
             <div className="px-4 sm:px-6 pt-6 pb-0 shrink-0">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                    <div className="flex items-center gap-2.5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                         <div className="h-9 w-9 rounded-[10px] bg-[var(--accent-light)] flex items-center justify-center">
                             <Navigation size={18} className="text-[var(--accent)]" />
                         </div>
@@ -752,13 +752,15 @@ export default function FieldPage() {
                         </div>
                     </div>
                     {isAdminOrManager && activeTab === "tasks" && (
-                        <button
-                            onClick={() => setShowAssignModal(true)}
-                            className="h-9 px-4 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium flex items-center gap-2 hover:opacity-90"
-                        >
-                            <Plus size={15} />
-                            Assign Task
-                        </button>
+                        <div className="page-actions">
+                            <button
+                                onClick={() => setShowAssignModal(true)}
+                                className="h-9 px-4 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium flex items-center justify-center gap-2 hover:opacity-90"
+                            >
+                                <Plus size={15} />
+                                Assign Task
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -793,12 +795,12 @@ export default function FieldPage() {
                         {/* Filters */}
                         <div className="flex flex-wrap gap-3 items-center">
                             {/* Status pills */}
-                            <div className="flex gap-1 flex-wrap">
+                            <div className="flex gap-1 max-w-full overflow-x-auto no-scrollbar">
                                 {["ALL", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "MISSED", "CANCELLED"].map((s) => (
                                     <button
                                         key={s}
                                         onClick={() => setStatusFilter(s)}
-                                        className={`h-7 px-3 rounded-full text-[12px] font-medium transition-colors ${
+                                        className={`shrink-0 whitespace-nowrap h-7 px-3 rounded-full text-[12px] font-medium transition-colors ${
                                             statusFilter === s
                                                 ? "bg-[var(--accent)] text-white"
                                                 : "bg-[var(--surface2)] text-[var(--text2)] hover:text-[var(--text)]"
@@ -809,13 +811,13 @@ export default function FieldPage() {
                                 ))}
                             </div>
 
-                            <div className="flex gap-2 ml-auto flex-wrap">
+                            <div className="filter-bar w-full sm:w-auto sm:ml-auto">
                                 {/* Priority */}
                                 <div className="relative">
                                     <select
                                         value={priorityFilter}
                                         onChange={(e) => setPriorityFilter(e.target.value)}
-                                        className="h-8 pl-3 pr-7 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text2)] focus:outline-none appearance-none"
+                                        className="w-full h-8 pl-3 pr-7 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text2)] focus:outline-none appearance-none"
                                     >
                                         <option value="ALL">All Priority</option>
                                         <option value="LOW">Low</option>
@@ -840,7 +842,7 @@ export default function FieldPage() {
                                     value={searchFilter}
                                     onChange={(e) => setSearchFilter(e.target.value)}
                                     placeholder="Search tasks..."
-                                    className="h-8 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none w-40"
+                                    className="filter-search h-8 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none sm:w-40"
                                 />
                             </div>
                         </div>
