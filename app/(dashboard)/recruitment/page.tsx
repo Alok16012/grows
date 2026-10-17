@@ -11,7 +11,7 @@ import {
 } from "@/lib/validation"
 import {
     Plus, Search, Phone, Mail, MapPin, Calendar, Users,
-    Target, X, ChevronRight, Briefcase,
+    Target, X, ChevronLeft, ChevronRight, Briefcase,
     MessageSquare, PhoneCall, Send, Clock, Filter,
     Edit2, Trash2, CheckCircle, Loader2,
     StickyNote, ArrowRight,
@@ -1906,14 +1906,53 @@ function KanbanView({
 }) {
     void onStatusChange
     void onAdd
+    const boardRef = useRef<HTMLDivElement>(null)
+    const [edges, setEdges] = useState({ left: false, right: false })
+
+    // The board's own scrollbar sits below the fold (the columns are tall),
+    // so with a mouse there was no visible way to reach the stages on the
+    // right. Arrow buttons page through the columns instead.
+    const syncEdges = useCallback(() => {
+        const el = boardRef.current
+        if (!el) return
+        setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 })
+    }, [])
+    useEffect(() => {
+        syncEdges()
+        window.addEventListener("resize", syncEdges)
+        return () => window.removeEventListener("resize", syncEdges)
+    }, [syncEdges])
+
+    const page = (dir: 1 | -1) => {
+        const el = boardRef.current
+        const col = el?.firstElementChild as HTMLElement | null
+        if (!el || !col) return
+        // One column plus the 14px gap per click.
+        el.scrollBy({ left: dir * (col.offsetWidth + 14), behavior: "smooth" })
+    }
+
     // Columns are sized so a whole number of them fills the board (2 → 6 by
     // screen width) and scrolling snaps column by column, so the right-hand
     // column is never sliced in half at the edge.
     return (
-        <div className="flex gap-3.5 overflow-x-auto snap-x snap-mandatory scroll-px-4 lg:scroll-px-0 pb-4 px-4 lg:px-0 flex-1">
-            {STATUSES.map(status => (
-                <KanbanColumn key={status.key} status={status} colLeads={leads[status.key] ?? []} onCard={onCard} />
-            ))}
+        <div className="relative flex-1 min-w-0">
+            <div ref={boardRef} onScroll={syncEdges} className="flex gap-3.5 overflow-x-auto snap-x snap-mandatory scroll-px-4 lg:scroll-px-0 pb-4 px-4 lg:px-0">
+                {STATUSES.map(status => (
+                    <KanbanColumn key={status.key} status={status} colLeads={leads[status.key] ?? []} onCard={onCard} />
+                ))}
+            </div>
+            {edges.left && (
+                <button type="button" aria-label="Previous stages" onClick={() => page(-1)}
+                    className="absolute left-1 lg:-left-4 top-[160px] z-10 w-10 h-10 rounded-full bg-white border border-[var(--border)] shadow-[0_6px_18px_-6px_rgba(15,23,41,0.35)] flex items-center justify-center text-[var(--text)] hover:bg-[var(--surface2)] transition">
+                    <ChevronLeft size={20} />
+                </button>
+            )}
+            {edges.right && (
+                <button type="button" aria-label="Next stages" onClick={() => page(1)}
+                    className="absolute right-1 lg:-right-4 top-[160px] z-10 w-10 h-10 rounded-full bg-white border border-[var(--border)] shadow-[0_6px_18px_-6px_rgba(15,23,41,0.35)] flex items-center justify-center text-[var(--text)] hover:bg-[var(--surface2)] transition">
+                    <ChevronRight size={20} />
+                </button>
+            )}
         </div>
     )
 }
