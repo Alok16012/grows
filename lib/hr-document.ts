@@ -1,5 +1,7 @@
 // Shared helpers for HR document generation (single + bulk issue + PDF).
 
+import { COMPANY } from "@/lib/company"
+
 export function generateDocNumber() {
     const y = new Date().getFullYear()
     const r = Math.floor(1000 + Math.random() * 9000)
@@ -31,7 +33,7 @@ export function buildDocVars(employee: DocEmployee, effectiveDate?: Date | null)
         department: employee.department?.name || "",
         joining_date: employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString("en-IN") : "",
         salary: employee.basicSalary?.toString() || "",
-        company_name: employee.branch?.company?.name || "Growus Auto India Pvt. Ltd.",
+        company_name: employee.branch?.company?.name || COMPANY.legalName,
         effective_date: d.toLocaleDateString("en-IN"),
         date: new Date().toLocaleDateString("en-IN"),
     }

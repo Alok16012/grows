@@ -1,4 +1,5 @@
 import type React from "react"
+import { COMPANY } from "@/lib/company"
 import { ShieldCheck, ClipboardCheck, Users, Wallet } from "lucide-react"
 
 // Frame shared by /login and /setup-mpin.
@@ -59,7 +60,7 @@ export function AuthShell({ title, subtitle, children, footer }: {
                     <div className="mt-auto lg:mt-6 pt-8 lg:pt-0 text-center text-[12.5px] text-[var(--text3)]">
                         {footer}
                         <p className="mt-2">
-                            Developed by <a href="https://blinks-ai.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] font-medium hover:underline">Blinks AI</a>
+                            Developed by <a href={COMPANY.developerUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] font-medium hover:underline">{COMPANY.developerCredit}</a>
                         </p>
                     </div>
                 </div>
@@ -77,7 +78,7 @@ function Logo() {
                     <rect x="14" y="14" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" />
                 </svg>
             </div>
-            <span className="text-[22px] font-bold tracking-[-0.02em]">Growus <span className="text-[#7fb0ff]">ERP</span></span>
+            <span className="text-[22px] font-bold tracking-[-0.02em]">{COMPANY.shortName} <span className="text-[#7fb0ff]">{COMPANY.nameSuffix}</span></span>
         </div>
     )
 }

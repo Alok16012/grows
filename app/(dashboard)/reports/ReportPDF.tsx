@@ -1,4 +1,5 @@
 import { Document, Page, View, Text, StyleSheet, Image } from "@react-pdf/renderer"
+import { COMPANY } from "@/lib/company"
 
 const styles = StyleSheet.create({
     page: { fontFamily: "Helvetica", padding: 36, fontSize: 10, backgroundColor: "#ffffff" },
@@ -295,7 +296,7 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                 )}
 
                 {/* Footer on every page */}
-                <Text style={styles.footer} fixed>Generated: {new Date().toLocaleDateString("en-IN")}  |  {companyName}  |  Growus ERP Quality Report</Text>
+                <Text style={styles.footer} fixed>Generated: {new Date().toLocaleDateString("en-IN")}  |  {companyName}  |  {COMPANY.name} Quality Report</Text>
                 <Text style={styles.pageNum} fixed render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
             </Page>
         </Document>

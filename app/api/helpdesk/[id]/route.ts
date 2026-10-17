@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { TicketStatus, TicketPriority } from "@prisma/client"
 
 export async function GET(
     req: Request,
@@ -80,6 +81,19 @@ export async function PUT(
 
         const body = await req.json()
         const { status, priority, assignedTo, dueDate, title, description, category } = body
+
+        // Status / assignee are agent-only fields. These used to be dropped
+        // silently for a non-privileged caller while the request still returned
+        // 200, so the UI showed a change that never happened.
+        if (!isPrivileged && (status !== undefined || assignedTo !== undefined)) {
+            return new NextResponse("Only helpdesk staff can change a ticket's status or assignee", { status: 403 })
+        }
+        if (status !== undefined && !Object.values(TicketStatus).includes(status)) {
+            return new NextResponse(`Unknown status: ${status}`, { status: 400 })
+        }
+        if (priority !== undefined && !Object.values(TicketPriority).includes(priority)) {
+            return new NextResponse(`Unknown priority: ${priority}`, { status: 400 })
+        }
 
         const updateData: Record<string, unknown> = {}
         if (title !== undefined) updateData.title = title

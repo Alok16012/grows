@@ -55,7 +55,7 @@ export async function POST(
                 const total = await prisma.inspection.count({
                     where: {
                         submittedBy: user.id,
-                        status: "completed", // assuming "completed" as per schema logic
+                        status: "approved",
                         submittedAt: { gte: start, lte: end }
                     }
                 })

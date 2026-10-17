@@ -140,8 +140,8 @@ export async function POST(req: Request) {
                     skipDuplicates: true,
                 })
             }
-        } catch (mgrErr) {
-            console.log("Project manager attach skipped:", mgrErr)
+        } catch {
+            // Non-fatal: the project itself was already created.
         }
 
         try {
@@ -161,8 +161,8 @@ export async function POST(req: Request) {
                     skipDuplicates: true,
                 })
             }
-        } catch (insErr) {
-            console.log("Project inspector attach skipped:", insErr)
+        } catch {
+            // Non-fatal: the project itself was already created.
         }
 
         // Creating a project used to ALSO assign every inspector holding a

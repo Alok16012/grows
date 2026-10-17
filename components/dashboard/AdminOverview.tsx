@@ -431,7 +431,9 @@ export function AdminOverview({ stats }: { stats: any }) {
     // are slices of it, so switching needs no extra request.
     const [range, setRange] = useState<(typeof RANGES)[number]>(30)
 
-    const att = stats.attendanceToday || { present: 0, absent: 0, onLeave: 0, pct: 0 }
+    const att = stats.attendanceToday || { present: 0, absent: 0, onLeave: 0, pct: 0, attendancePct: null }
+    // null until someone is marked present/absent — nothing to grade yet.
+    const attUnmarked = (att.attendancePct ?? null) === null
     const approvals = stats.approvals || { total: 0, leaves: 0, expenses: 0, documents: 0, inspections: 0 }
     const trend = stats.inspectionTrend || { days: [], completed30d: 0, deltaPct: null }
     const onboarding = stats.onboarding || { inProgress: 0, notStarted: 0, onHold: 0 }
@@ -456,7 +458,7 @@ export function AdminOverview({ stats }: { stats: any }) {
     const prior = week7.slice(0, -1).filter(d => d.count > 0)
     const priorAvg = prior.length ? prior.reduce((s, d) => s + d.count, 0) / prior.length : 0
     const belowUsual = priorAvg > 0 && att.present < priorAvg * 0.8
-    const lowAttendance = attTotal > 0 && (belowUsual || att.pct < 75)
+    const lowAttendance = !attUnmarked && attTotal > 0 && (belowUsual || att.pct < 75)
 
     const attSlices: DonutSlice[] = [
         { label: "Present", value: att.present, color: "#16a34a" },
@@ -523,7 +525,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                 </KpiTile>
 
                 <KpiTile href="/attendance" gradient="linear-gradient(135deg,#0f766e 0%,#0b4d4a 100%)" icon={CalendarCheck} label="Today's attendance"
-                    value={`${att.pct}%`}>
+                    value={attUnmarked ? "Not marked yet" : `${att.pct}%`}>
                     <span className="flex flex-wrap items-center gap-x-5 gap-y-1 text-white/85">
                         <span>Present <b className="font-semibold text-[#8cc8ff] tabular-nums">{att.present.toLocaleString("en-IN")}</b></span>
                         <span>Absent <b className="font-semibold text-[#ff8f8f] tabular-nums">{att.absent.toLocaleString("en-IN")}</b></span>
@@ -605,8 +607,8 @@ export function AdminOverview({ stats }: { stats: any }) {
                     <PanelHead tone="mint" icon={Users} title="Today's attendance breakdown"
                         action={<HeadLink href="/attendance">View all sites</HeadLink>} />
                     <div className="flex items-center gap-4 mb-5 mt-1">
-                        <Meter pct={att.pct} className="flex-1 bg-white/80" />
-                        <span className="text-[18px] font-bold text-[var(--text)] tabular-nums">{att.pct}%</span>
+                        <Meter pct={attUnmarked ? 0 : att.pct} className="flex-1 bg-white/80" />
+                        <span className="text-[18px] font-bold text-[var(--text)] tabular-nums">{attUnmarked ? "Not marked yet" : `${att.pct}%`}</span>
                     </div>
                     {topSites.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center py-8">

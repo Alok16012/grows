@@ -6,6 +6,7 @@ import {
     Languages as LanguagesIcon, Sparkles, CheckCircle2, CalendarClock, Phone,
 } from "lucide-react"
 import { JobPosting, JobContact, STATUS_META, formatExperience, formatSalary, priorityStyle } from "./constants"
+import { COMPANY } from "@/lib/company"
 
 const yn = (v: boolean) => (v ? "Available" : "Not Available")
 
@@ -33,7 +34,7 @@ function coordsFromMapUrl(url: string): string | null {
 
 export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () => void }) {
     const meta = STATUS_META[job.status]
-    const company = job.companyName || "Growus Auto India"
+    const company = job.companyName || COMPANY.legalName
     const partLabel = job.partSectionLabel || "Inspection Part (Sample)"
     const mapQuery = job.plantAddress || job.plantLocation || ""
     // Prefer the exact pin from a pasted Google Maps link; fall back to address text.

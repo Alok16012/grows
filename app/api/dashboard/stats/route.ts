@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { unstable_cache } from "next/cache"
+import { todayAttendance, EMPTY_TODAY, PRESENT_WHERE } from "@/lib/attendance-today"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
@@ -72,23 +73,16 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     // ── Attendance (today + 7-day trend) ─────────────────────────────────────
     if (has("attendance.view")) {
         jobs.push((async () => {
-            const [todayRows, weekRows, activeCount] = await Promise.all([
+            // Same shared definition as /api/admin/stats so phone and desktop agree.
+            const activeQ = safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0)
+            const [att, weekRows] = await Promise.all([
+                safe(activeQ.then(n => todayAttendance(prisma, { gte: today.start, lt: today.end }, n)), EMPTY_TODAY),
                 safe(prisma.attendance.findMany({
-                    where: { date: { gte: today.start, lt: today.end } },
-                    select: { status: true },
-                }), [] as { status: string }[]),
-                safe(prisma.attendance.findMany({
-                    where: { date: { gte: week.start, lt: today.end }, status: { notIn: ["ABSENT"] } },
+                    where: { date: { gte: week.start, lt: today.end }, ...PRESENT_WHERE },
                     select: { date: true },
                 }), [] as { date: Date }[]),
-                safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0),
             ])
-            const present = todayRows.filter(r => ["PRESENT", "HALF_DAY", "WFH", "LATE"].includes(r.status)).length
-            const onLeave = todayRows.filter(r => ["LEAVE", "ON_LEAVE"].includes(r.status)).length
-            const absentMarked = todayRows.filter(r => r.status === "ABSENT").length
-            const absent = Math.max(absentMarked, activeCount > 0 ? activeCount - present - onLeave : 0)
-            const denom = activeCount > 0 ? activeCount : present + absent + onLeave
-            const pct = denom > 0 ? Math.round((present / denom) * 100) : 0
+            const { present, absent, onLeave, attendancePct } = att
 
             const byDay = new Map<string, number>()
             for (let i = 0; i < 7; i++) {
@@ -99,7 +93,8 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
                 const k = new Date(new Date(r.date).getTime() + 330*60*1000).toISOString().slice(0, 10)
                 if (byDay.has(k)) byDay.set(k, (byDay.get(k) || 0) + 1)
             }
-            out.attendanceToday = { present, absent, onLeave, pct }
+            // pct stays numeric for MobileHome; attendancePct is null until someone is marked.
+            out.attendanceToday = { present, absent, onLeave, pct: attendancePct ?? 0, attendancePct, unmarked: att.unmarked, late: att.late, halfDay: att.halfDay }
             out.attendanceTrend7d = Array.from(byDay.entries()).map(([day, count]) => ({ day, count }))
         })())
     }

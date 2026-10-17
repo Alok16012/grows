@@ -114,98 +114,116 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             return NextResponse.json({ error: duplicateMessage(dupConflicts), conflicts: dupConflicts }, { status: 409 })
         }
 
-        // ── Create / reuse User account ───────────────────────────────────────
+        // ── Resolve the login email ───────────────────────────────────────────
+        // Employee.userId is unique, so an existing account can only be reused
+        // if nobody else already owns it. Check up front and say so — before,
+        // this surfaced as a unique-constraint 500 with no usable message.
         const resolvedEmail = formEmail?.trim() || lead.email || `${lead.phone}@cims.local`
-        let userId: string
-        const existingUser = await prisma.user.findUnique({ where: { email: resolvedEmail } })
-        if (existingUser) {
-            userId = existingUser.id
-        } else {
-            const hash = await bcrypt.hash(lead.phone || "123456", 8)
-            const newUser = await prisma.user.create({
-                data: {
-                    name: `${firstName} ${lastName}`.trim(),
-                    email: resolvedEmail,
-                    password: hash,
-                    // Base role is vestigial; the custom role assigned after
-                    // onboarding is what actually grants access.
-                    role: "MANAGER",
-                }
-            })
-            userId = newUser.id
+        const existingUser = await prisma.user.findUnique({
+            where: { email: resolvedEmail },
+            select: { id: true, employeeProfile: { select: { employeeId: true, firstName: true, lastName: true } } },
+        })
+        if (existingUser?.employeeProfile) {
+            const owner = existingUser.employeeProfile
+            return NextResponse.json({
+                error: `Email ${resolvedEmail} already belongs to the login of ${owner.firstName} ${owner.lastName || ""}`.trim()
+                    + ` (${owner.employeeId}). Enter a different email for this candidate.`,
+            }, { status: 409 })
         }
+        // Hashed outside the transaction so a slow hash doesn't eat into its budget.
+        const passwordHash = existingUser ? null : await bcrypt.hash(lead.phone || "123456", 8)
 
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
 
-        // ── Create Employee with all fields ───────────────────────────────────
-        const employee = await prisma.employee.create({
-            data: {
-                employeeId:    finalId,
-                firstName,
-                lastName,
-                middleName:    middleName   || null,
-                phone:         normalizePhone(formPhone?.trim() || lead.phone),
-                email:         resolvedEmail !== `${lead.phone}@cims.local` ? resolvedEmail : (lead.email || null),
-                alternatePhone: alternatePhone || null,
-                designation:   designation || lead.position || null,
-                gender:        formGender  || lead.gender  || null,
-                departmentId:  departmentId || null,
-                dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
-                status:        "ONBOARDING",
-                employmentType: employmentType || "Full-time",
-                salaryType:    salaryType || "Monthly",
-                basicSalary:   basicSalary ? parseFloat(basicSalary) : 0,
-                managerId:     managerId  || null,
-                notes:         notes      || null,
-                onboardingToken,
-                userId,
-                createdBy:     session.user.id,
-                // Personal
-                dateOfBirth:   dateOfBirth ? new Date(dateOfBirth) : null,
-                aadharNumber:  aadharNumber ? digitsOnly(aadharNumber)  : null,
-                panNumber:     panNumber    ? normalizeUpper(panNumber) : null,
-                address:       address       || null,
-                city:          formCity      || lead.city || null,
-                state:         state         || null,
-                pincode:       pincode       || null,
-                permanentAddress:  permanentAddress  || null,
-                permanentCity:     permanentCity     || null,
-                permanentState:    permanentState    || null,
-                permanentPincode:  permanentPincode  || null,
-                // Bank
-                bankName:          bankName          || null,
-                bankBranch:        bankBranch        || null,
-                bankAccountNumber: bankAccountNumber || null,
-                bankIFSC:          bankIFSC ? normalizeUpper(bankIFSC) : null,
-                // Compliance / Identity
-                nameAsPerAadhar:   nameAsPerAadhar   || null,
-                fathersName:       fathersName        || null,
-                bloodGroup:        bloodGroup         || null,
-                maritalStatus:     maritalStatus      || null,
-                nationality:       nationality        || "Indian",
-                religion:          religion           || null,
-                caste:             caste              || null,
-                // Statutory
-                uan:               uan                || null,
-                pfNumber:          pfNumber           || null,
-                esiNumber:         esiNumber          || null,
-                labourCardNo:      labourCardNo       || null,
-                // Emergency
-                emergencyContact1Name:  emergencyContact1Name  || null,
-                emergencyContact1Phone: emergencyContact1Phone || null,
-                emergencyContact2Name:  emergencyContact2Name  || null,
-                emergencyContact2Phone: emergencyContact2Phone || null,
-                // Safety
-                safetyGoggles:  !!safetyGoggles,
-                safetyGloves:   !!safetyGloves,
-                safetyHelmet:   !!safetyHelmet,
-                safetyMask:     !!safetyMask,
-                safetyJacket:   !!safetyJacket,
-                safetyEarMuffs: !!safetyEarMuffs,
-                safetyShoes:    !!safetyShoes,
-                // Carry the candidate's profile photo over to the employee
-                photo:          lead.profileUrl || null,
-            },
+        // ── Create Employee + login together ──────────────────────────────────
+        // Employee first, then the account linked to it. Doing these as two
+        // separate writes left an orphan User whenever the employee create
+        // failed, and that orphan then blocked the retry with a duplicate-email error.
+        const employee = await prisma.$transaction(async tx => {
+            const emp = await tx.employee.create({
+                data: {
+                    employeeId:    finalId,
+                    firstName,
+                    lastName,
+                    middleName:    middleName   || null,
+                    phone:         normalizePhone(formPhone?.trim() || lead.phone),
+                    email:         resolvedEmail !== `${lead.phone}@cims.local` ? resolvedEmail : (lead.email || null),
+                    alternatePhone: alternatePhone || null,
+                    designation:   designation || lead.position || null,
+                    gender:        formGender  || lead.gender  || null,
+                    departmentId:  departmentId || null,
+                    dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
+                    status:        "ONBOARDING",
+                    employmentType: employmentType || "Full-time",
+                    salaryType:    salaryType || "Monthly",
+                    basicSalary:   basicSalary ? parseFloat(basicSalary) : 0,
+                    managerId:     managerId  || null,
+                    notes:         notes      || null,
+                    onboardingToken,
+                    createdBy:     session.user.id,
+                    // Personal
+                    dateOfBirth:   dateOfBirth ? new Date(dateOfBirth) : null,
+                    aadharNumber:  aadharNumber ? digitsOnly(aadharNumber)  : null,
+                    panNumber:     panNumber    ? normalizeUpper(panNumber) : null,
+                    address:       address       || null,
+                    city:          formCity      || lead.city || null,
+                    state:         state         || null,
+                    pincode:       pincode       || null,
+                    permanentAddress:  permanentAddress  || null,
+                    permanentCity:     permanentCity     || null,
+                    permanentState:    permanentState    || null,
+                    permanentPincode:  permanentPincode  || null,
+                    // Bank
+                    bankName:          bankName          || null,
+                    bankBranch:        bankBranch        || null,
+                    bankAccountNumber: bankAccountNumber || null,
+                    bankIFSC:          bankIFSC ? normalizeUpper(bankIFSC) : null,
+                    // Compliance / Identity
+                    nameAsPerAadhar:   nameAsPerAadhar   || null,
+                    fathersName:       fathersName        || null,
+                    bloodGroup:        bloodGroup         || null,
+                    maritalStatus:     maritalStatus      || null,
+                    nationality:       nationality        || "Indian",
+                    religion:          religion           || null,
+                    caste:             caste              || null,
+                    // Statutory
+                    uan:               uan                || null,
+                    pfNumber:          pfNumber           || null,
+                    esiNumber:         esiNumber          || null,
+                    labourCardNo:      labourCardNo       || null,
+                    // Emergency
+                    emergencyContact1Name:  emergencyContact1Name  || null,
+                    emergencyContact1Phone: emergencyContact1Phone || null,
+                    emergencyContact2Name:  emergencyContact2Name  || null,
+                    emergencyContact2Phone: emergencyContact2Phone || null,
+                    // Safety
+                    safetyGoggles:  !!safetyGoggles,
+                    safetyGloves:   !!safetyGloves,
+                    safetyHelmet:   !!safetyHelmet,
+                    safetyMask:     !!safetyMask,
+                    safetyJacket:   !!safetyJacket,
+                    safetyEarMuffs: !!safetyEarMuffs,
+                    safetyShoes:    !!safetyShoes,
+                    // Carry the candidate's profile photo over to the employee
+                    photo:          lead.profileUrl || null,
+                },
+            })
+
+            const userId = existingUser
+                ? existingUser.id
+                : (await tx.user.create({
+                    data: {
+                        name: `${firstName} ${lastName}`.trim(),
+                        email: resolvedEmail,
+                        password: passwordHash!,
+                        // Base role is vestigial; the custom role assigned after
+                        // onboarding is what actually grants access.
+                        role: "MANAGER",
+                    },
+                    select: { id: true },
+                })).id
+
+            return tx.employee.update({ where: { id: emp.id }, data: { userId } })
         })
 
         // ── Salary structure ──────────────────────────────────────────────────

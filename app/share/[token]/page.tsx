@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { COMPANY } from "@/lib/company"
 import { useParams } from "next/navigation"
 import { Loader2, CheckCircle2, AlertCircle, Building2, Calendar, User, Eye, Download } from "lucide-react"
 import dynamic from "next/dynamic"
@@ -67,7 +68,7 @@ export default function SharePage() {
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-[11px] font-semibold uppercase tracking-widest opacity-70 mb-1">Quality Inspection Report</p>
-                            <h1 className="text-[22px] font-bold">{site?.name || "Growus Auto India"}</h1>
+                            <h1 className="text-[22px] font-bold">{site?.name || COMPANY.legalName}</h1>
                             <p className="text-[14px] opacity-80 mt-1">{project?.name || "Project"}</p>
                         </div>
                         <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-1.5 text-[11px]">

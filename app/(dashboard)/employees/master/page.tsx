@@ -808,15 +808,24 @@ export default function EmployeeMasterPage() {
         setDeleting(true)
         setConfirmDelete(false)
         const ids = Array.from(selectedIds)
-        const results = await Promise.allSettled(
-            ids.map(id => fetch(`/api/employees/${id}`, { method: "DELETE" }))
-        )
-        const succeeded = results.filter(r => r.status === "fulfilled").length
-        const failed    = results.filter(r => r.status === "rejected").length
-        setDeleting(false)
-        setSelectedIds(new Set())
-        if (succeeded > 0) toast.success(`${succeeded} employee${succeeded > 1 ? "s" : ""} deleted`)
-        if (failed    > 0) toast.error(`${failed} deletion${failed > 1 ? "s" : ""} failed`)
+        // One bulk request. Firing N single deletes at once opened N parallel
+        // purge transactions against the same tables and tripped the function
+        // limit on large selections; the bulk endpoint deletes them in one go.
+        try {
+            const res = await fetch("/api/employees", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            const data = await res.json() as { deleted: number }
+            toast.success(`${data.deleted} employee${data.deleted !== 1 ? "s" : ""} deleted`)
+            setSelectedIds(new Set())
+        } catch (err: unknown) {
+            toast.error(err instanceof Error && err.message ? err.message : "Bulk delete failed")
+        } finally {
+            setDeleting(false)
+        }
         fetchEmployees()
     }
 

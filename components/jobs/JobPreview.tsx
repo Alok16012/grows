@@ -1,6 +1,7 @@
 "use client"
 
 import { Briefcase, MapPin, IndianRupee, Users } from "lucide-react"
+import { COMPANY } from "@/lib/company"
 import { JobPosting, formatExperience, formatSalary } from "./constants"
 
 // Candidate-facing preview of a job posting (mirrors the final wizard screen).
@@ -19,7 +20,7 @@ export function JobPreview({ job }: { job: Partial<JobPosting> }) {
                             {job.title || "Job title"}
                         </h2>
                         <p className="text-sm text-[var(--accent-text)] mt-0.5">
-                            {job.companyName || "Growus Auto India"}
+                            {job.companyName || COMPANY.legalName}
                         </p>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[13px] text-[var(--text2)]">
                             <span className="inline-flex items-center gap-1">

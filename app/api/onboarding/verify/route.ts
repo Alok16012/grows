@@ -81,26 +81,10 @@ export async function POST(req: Request) {
                 })
                 return NextResponse.json({ success: true, salary: upsertedSalary })
 
-            case "ACTIVATE":
-                // Finalize Employee — preserve dateOfJoining if already set by HR/employee
-                const finalEmployee = await prisma.employee.update({
-                    where: { id: employeeId },
-                    data: {
-                        status: "ACTIVE",
-                        dateOfJoining: employee.dateOfJoining ?? new Date(),
-                    }
-                })
-
-                // Auto-complete OnboardingRecord too
-                await prisma.onboardingRecord.update({
-                    where: { employeeId: employeeId },
-                    data: {
-                        status: "COMPLETED",
-                        completedAt: new Date()
-                    }
-                })
-
-                return NextResponse.json({ success: true, employee: finalEmployee })
+            // "ACTIVATE" was removed: nothing in the app called it, and it flipped
+            // the status to ACTIVE while leaving the PENDING- placeholder code and
+            // no login. Approval is PUT /api/onboarding/[id] with action "approve",
+            // which assigns the EMP code and provisions the account.
 
             default:
                 return new NextResponse("Invalid action type", { status: 400 })

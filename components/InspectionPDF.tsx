@@ -107,6 +107,30 @@ const styles = StyleSheet.create({
         lineHeight: 1.4,
         color: '#1a1a18',
     },
+    fieldNote: {
+        fontSize: 8,
+        color: '#9e9b95',
+        marginTop: 3,
+    },
+    photo: {
+        maxWidth: 240,
+        maxHeight: 180,
+        objectFit: 'contain',
+        marginTop: 4,
+        border: '0.5pt solid #e8e6e1',
+    },
+    signatureBlock: {
+        marginTop: 18,
+        paddingTop: 12,
+        borderTop: '0.5pt solid #e8e6e1',
+    },
+    signatureImg: {
+        width: 160,
+        height: 60,
+        objectFit: 'contain',
+        marginTop: 6,
+        border: '0.5pt solid #e8e6e1',
+    },
     footer: {
         position: 'absolute',
         bottom: 30,
@@ -125,6 +149,19 @@ interface InspectionPDFProps {
     inspection: any;
 }
 
+// @react-pdf/renderer's <Image> decodes JPEG and PNG only — not GIF, WebP or
+// PDF. Anything else keeps the text fallback.
+const PDF_IMAGE_RE = /\.(jpe?g|png)(\?|$)|^data:image\/(jpe?g|png)/i
+
+function parseGps(raw: unknown): { lat: number; lng: number } | null {
+    if (typeof raw !== 'string' || !raw) return null
+    try {
+        const gps = JSON.parse(raw)
+        if (typeof gps?.lat === 'number' && typeof gps?.lng === 'number') return gps
+    } catch { /* malformed — omit the line */ }
+    return null
+}
+
 export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
     const companyName = inspection.assignment?.project?.site?.name || 'Growus Auto India'
     const projectName = inspection.assignment?.project?.name || 'Project'
@@ -134,8 +171,25 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
     const approvedDate = inspection.approvedAt
         ? new Date(inspection.approvedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
         : 'N/A'
+    const gps = parseGps(inspection.gpsLocation)
+    const signature: string | null = typeof inspection.signature === 'string' && inspection.signature ? inspection.signature : null
 
     const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png'
+
+    const renderFileValue = (value: string | null | undefined) => {
+        if (!value) return <Text style={styles.fieldValue}>No file attached</Text>
+        if (PDF_IMAGE_RE.test(value)) {
+            // If the image can't be fetched, react-pdf renders it empty; the
+            // note below keeps the row meaningful in that case.
+            return (
+                <View>
+                    <Image src={value} style={styles.photo} />
+                    <Text style={styles.fieldNote}>Photo attached (full size in digital portal)</Text>
+                </View>
+            )
+        }
+        return <Text style={styles.fieldValue}>(File attached in digital portal)</Text>
+    }
 
     return (
         <Document>
@@ -166,10 +220,16 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
                                     <Text style={styles.metaLabel}>Report ID</Text>
                                     <Text style={styles.metaValue}>INS-{inspection.id.substring(0, 8).toUpperCase()}</Text>
                                 </View>
+                                {gps && (
+                                    <View style={styles.metaItem}>
+                                        <Text style={styles.metaLabel}>Location (GPS)</Text>
+                                        <Text style={styles.metaValue}>{gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}</Text>
+                                    </View>
+                                )}
                             </View>
 
                             <View style={styles.statusBadge}>
-                                <Text>✓ APPROVED</Text>
+                                <Text>APPROVED</Text>
                             </View>
                         </View>
 
@@ -182,7 +242,7 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
                 <Text style={styles.sectionTitle}>Inspection Details</Text>
 
                 <View>
-                    {inspection.responses
+                    {(inspection.responses || [])
                         .sort((a: any, b: any) => a.field.displayOrder - b.field.displayOrder)
                         .filter((resp: any) => {
                             const reportConfig = inspection.assignment?.project?.reportConfig
@@ -192,16 +252,27 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
                         .map((resp: any) => (
                             <View key={resp.id} style={styles.responseRow} wrap={false}>
                                 <Text style={styles.fieldLabel}>{resp.field.fieldLabel}</Text>
-                                <Text style={styles.fieldValue}>
-                                    {resp.field.fieldType === 'file'
-                                        ? '(File attached in digital portal)'
-                                        : resp.field.fieldType === 'checkbox'
-                                            ? (resp.value === 'true' ? 'Yes' : 'No')
-                                            : resp.value || 'Not recorded'}
-                                </Text>
+                                {resp.field.fieldType === 'file'
+                                    ? renderFileValue(resp.value)
+                                    : (
+                                        <Text style={styles.fieldValue}>
+                                            {resp.field.fieldType === 'checkbox'
+                                                ? (resp.value === 'true' ? 'Yes' : 'No')
+                                                : resp.value || 'Not recorded'}
+                                        </Text>
+                                    )}
                             </View>
                         ))}
                 </View>
+
+                {/* Signature */}
+                {signature && (
+                    <View style={styles.signatureBlock} wrap={false}>
+                        <Text style={styles.fieldLabel}>Digital Signature</Text>
+                        <Image src={signature} style={styles.signatureImg} />
+                        <Text style={styles.fieldNote}>Signed by {inspection.submitter?.name || 'the inspector'}</Text>
+                    </View>
+                )}
 
                 {/* Footer */}
                 <View style={styles.footer} fixed>

@@ -91,6 +91,18 @@ export async function PUT(
             return new NextResponse("Valid status required: APPROVED, REJECTED, or CANCELLED", { status: 400 })
         }
 
+        // Nobody signs off their own leave — except ADMIN, who has no one above.
+        // Mirrors the expense guard: an approver-role user is still an employee.
+        if (isAdminOrManager && (status === "APPROVED" || status === "REJECTED") && session.user.role !== "ADMIN") {
+            const me = await prisma.employee.findFirst({
+                where: { userId: session.user.id },
+                select: { id: true },
+            })
+            if (me && me.id === existing.employeeId) {
+                return new NextResponse("You cannot approve your own leave", { status: 403 })
+            }
+        }
+
         if (status === "REJECTED" && !rejectionReason) {
             return new NextResponse("rejectionReason is required when rejecting", { status: 400 })
         }

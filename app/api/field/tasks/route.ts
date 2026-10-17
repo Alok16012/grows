@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { dayWindow } from "@/lib/attendance-policy"
 
 export async function GET(req: Request) {
     try {
@@ -38,11 +39,8 @@ export async function GET(req: Request) {
         if (priority) where.priority = priority
 
         if (date) {
-            const start = new Date(date)
-            start.setHours(0, 0, 0, 0)
-            const end = new Date(date)
-            end.setHours(23, 59, 59, 999)
-            where.dueDate = { gte: start, lte: end }
+            // IST calendar day, not the server's (UTC) local day.
+            where.dueDate = dayWindow(new Date(date.slice(0, 10) + "T00:00:00.000Z"))
         }
 
         if (search) {

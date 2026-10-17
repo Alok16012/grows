@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { unstable_cache } from "next/cache"
+import { todayAttendance, EMPTY_TODAY, PRESENT_WHERE } from "@/lib/attendance-today"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
@@ -40,11 +41,13 @@ const getStats = unstable_cache(
         const month = now.getMonth() + 1
         const year = now.getFullYear()
 
+        // Shared so the attendance summary can use the same count without a second query.
+        const activeEmployeesQ = safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0)
+
         const [
             activeEmployees,
             newEmployees30d,
-            presentRows,
-            onLeaveToday,
+            att,
             pendingLeaves,
             pendingExpenses,
             pendingDocs,
@@ -67,16 +70,11 @@ const getStats = unstable_cache(
             projectStatusRows,
             weekAttendanceRows,
         ] = await Promise.all([
-            safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0),
+            activeEmployeesQ,
             safe(prisma.employee.count({ where: { status: "ACTIVE", createdAt: { gte: ago30d } } }), 0),
-            // Today's attendance rows with site, for present count + site breakdown
-            safe(prisma.attendance.findMany({
-                where: { date: { gte: today.start, lt: today.end }, checkIn: { not: null } },
-                select: { siteId: true, site: { select: { name: true, manpowerRequired: true } } },
-            }), [] as { siteId: string | null; site: { name: string; manpowerRequired: number } | null }[]),
-            safe(prisma.leave.count({
-                where: { status: "APPROVED", startDate: { lt: today.end }, endDate: { gte: today.start } },
-            }), 0),
+            // Today's present/leave/absent + site breakdown, same definition as the
+            // permission-driven dashboard so phone and desktop agree.
+            safe(activeEmployeesQ.then(n => todayAttendance(prisma, { gte: today.start, lt: today.end }, n)), EMPTY_TODAY),
             safe(prisma.leave.count({ where: { status: "PENDING" } }), 0),
             safe(prisma.expense.count({ where: { status: "SUBMITTED" } }), 0),
             safe(prisma.hrDocument.count({ where: { status: "PENDING_APPROVAL" } }), 0),
@@ -129,30 +127,18 @@ const getStats = unstable_cache(
                 prisma.project.groupBy({ by: ["status"], _count: { _all: true } }) as Promise<{ status: string; _count: { _all: number } }[]>,
                 []
             ),
-            // Present check-ins over the last 7 IST days — feeds the trend bars
+            // Present rows over the last 7 IST days — feeds the trend bars. Same
+            // "present" rule as today's tile so the two are comparable.
             safe(prisma.attendance.findMany({
-                where: { date: { gte: week.start, lt: today.end }, checkIn: { not: null } },
+                where: { date: { gte: week.start, lt: today.end }, ...PRESENT_WHERE },
                 select: { date: true },
             }), [] as { date: Date }[]),
         ])
 
         // ── Attendance aggregation ──
-        const present = presentRows.length
-        const absent = Math.max(0, activeEmployees - present - onLeaveToday)
-        const attendancePct = activeEmployees > 0 ? Math.round((present / activeEmployees) * 100) : 0
+        const { present, absent, onLeave: onLeaveToday, attendancePct } = att
 
-        const bySite = new Map<string, { name: string; present: number; required: number }>()
-        for (const r of presentRows) {
-            const key = r.siteId ?? "none"
-            const cur = bySite.get(key) ?? {
-                name: r.site?.name ?? "No site",
-                present: 0,
-                required: r.site?.manpowerRequired ?? 0,
-            }
-            cur.present++
-            bySite.set(key, cur)
-        }
-        const topSites = Array.from(bySite.values())
+        const topSites = att.bySite
             .sort((a, b) => b.present - a.present)
             .slice(0, 5)
             .map(s => ({
@@ -205,7 +191,12 @@ const getStats = unstable_cache(
         return {
             activeEmployees,
             newEmployees30d,
-            attendanceToday: { present, absent, onLeave: onLeaveToday, pct: attendancePct },
+            // pct stays numeric for older consumers; attendancePct is null until
+            // someone is marked so the UI can say "Not marked yet" instead of 0%.
+            attendanceToday: {
+                present, absent, onLeave: onLeaveToday, pct: attendancePct ?? 0,
+                attendancePct, unmarked: att.unmarked, late: att.late, halfDay: att.halfDay,
+            },
             topSites,
             approvals: {
                 total: approvalsTotal,

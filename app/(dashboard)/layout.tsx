@@ -6,6 +6,7 @@ import { TopNav } from "@/components/TopNav"
 import { InspectionStepper } from "@/components/InspectionStepper"
 import { MobileBottomNav } from "@/components/MobileBottomNav"
 import { cn } from "@/lib/utils"
+import { COMPANY } from "@/lib/company"
 
 export default function DashboardLayout({
     children,
@@ -60,7 +61,7 @@ export default function DashboardLayout({
                     {/* Bottom padding on phones clears the floating bottom nav,
                         so it never sits over the last row of a page. */}
                     <footer className="py-4 pb-[96px] md:pb-4 text-center text-[13px] text-muted-foreground/80 mt-auto">
-                        Developed by <a href="https://blinks-ai.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline font-medium">Blinks AI</a>
+                        Developed by <a href={COMPANY.developerUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline font-medium">{COMPANY.developerCredit}</a>
                     </footer>
                 </main>
             </div>

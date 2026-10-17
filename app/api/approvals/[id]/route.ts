@@ -71,6 +71,13 @@ export async function PATCH(
         const { action, reviewerNotes } = await req.json()
         const inspectionId = params.id
 
+        // Anything that wasn't "approve" or "send_back" used to fall through to
+        // a rejection — a typo'd or missing action silently rejected the work.
+        const ACTIONS = ["approve", "reject", "send_back"]
+        if (!ACTIONS.includes(action)) {
+            return NextResponse.json({ error: `Invalid action: must be one of ${ACTIONS.join(", ")}` }, { status: 400 })
+        }
+
         const inspection = await prisma.inspection.findUnique({
             where: { id: inspectionId },
             include: {
@@ -212,7 +219,8 @@ export async function PATCH(
             try {
                 await prisma.shareableLink.upsert({
                     where: { inspectionId: inspectionId },
-                    create: { inspectionId, createdBy: session!.user.id },
+                    // Same 90-day life as a manually created link (see inspections/[id]/share).
+                    create: { inspectionId, createdBy: session!.user.id, expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) },
                     update: {}
                 })
             } catch (linkErr) {

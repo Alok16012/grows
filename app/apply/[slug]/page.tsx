@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
+import { COMPANY } from "@/lib/company"
 import { useParams } from "next/navigation"
 import { Loader2, CheckCircle2, AlertCircle, Send, Briefcase, User, MapPin, Camera, Plus, Trash2 } from "lucide-react"
 import { validatePhone, validateEmail, validateAadhaar, validateDateOfBirth } from "@/lib/validation"
@@ -186,7 +187,7 @@ export default function ApplyPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                         <div style={{ width: 64, height: 64, borderRadius: 14, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src="/logo.png" alt="Growus Auto" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                            <img src="/logo.png" alt={COMPANY.legalName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <h1 style={{ fontSize: 26, fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "0.5px", lineHeight: 1.1 }}>

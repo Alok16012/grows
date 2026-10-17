@@ -126,7 +126,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         if (body.documentsSubmitted !== undefined) updateData.documentsSubmitted = Array.isArray(body.documentsSubmitted) ? body.documentsSubmitted : []
         if (body.educationDetails !== undefined) updateData.educationDetails = body.educationDetails || null
 
-        // Status change
+        // Status change. Anything outside the enum used to reach Prisma as-is
+        // and come back as a 500.
+        if (body.status !== undefined && body.status !== null
+            && !Object.values(LeadStatus).includes(body.status)) {
+            return NextResponse.json({
+                error: `Invalid status "${body.status}". Expected one of: ${Object.values(LeadStatus).join(", ")}`,
+            }, { status: 400 })
+        }
         if (body.status && body.status !== prev.status) {
             updateData.status = body.status as LeadStatus
 
@@ -154,76 +161,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     }
                 })
             }
-
-            // TRIGGER ONBOARDING if JOINED.
-            // Skipped once the lead has already been converted: this legacy path
-            // creates a bare INACTIVE employee with no salary, deployment or
-            // onboarding tasks, and repoints lead.convertedEmployeeId at it. Moving
-            // an already-converted candidate back through "Joined" therefore
-            // produced a duplicate employee and orphaned the real one. Proper
-            // conversion goes through POST /api/recruitment/[id]/convert.
-            if (body.status === "JOINED" && !prev.convertedEmployeeId) {
-                try {
-                    // Generate EMP-XXXX ID
-                    const lastEmployee = await prisma.employee.findFirst({
-                        orderBy: { createdAt: "desc" },
-                        select: { employeeId: true },
-                    })
-                    let nextNum = 1
-                    if (lastEmployee?.employeeId) {
-                        const match = lastEmployee.employeeId.match(/\d+$/)
-                        if (match) nextNum = parseInt(match[0]) + 1
-                    }
-                    const newEmployeeId = `EMP-${String(nextNum).padStart(4, "0")}`
-
-                    // Split name
-                    const nameParts = (body.candidateName || prev.candidateName || "Candidate").split(" ")
-                    const firstName = nameParts[0]
-                    const lastName = nameParts.slice(1).join(" ") || " "
-
-                    const token = crypto.randomUUID()
-
-                    // Optional: attach to first branch if one exists
-                    const branch = await prisma.branch.findFirst({ select: { id: true } })
-
-                    const employee = await prisma.employee.create({
-                        data: {
-                            employeeId: newEmployeeId,
-                            firstName,
-                            lastName,
-                            phone: body.phone || prev.phone || "0000000000",
-                            email: body.email || prev.email || null,
-                            city: body.city || prev.city || null,
-                            designation: body.position || prev.position || null,
-                            ...(branch ? { branchId: branch.id } : {}),
-                            status: "INACTIVE",
-                            onboardingToken: token,
-                            // Copy profile photo from lead if available
-                            photo: prev.profileUrl || null,
-                        }
-                    })
-
-                    await prisma.onboardingRecord.create({
-                        data: {
-                            employeeId: employee.id,
-                            status: "IN_PROGRESS",
-                            notes: "Auto-generated from Recruitment"
-                        }
-                    })
-
-                    // Update lead with converted employee reference
-                    await prisma.lead.update({
-                        where: { id: params.id },
-                        data: { convertedEmployeeId: employee.id },
-                    }).catch(() => {/* non-fatal */})
-
-                    console.log(`[ONBOARDING TRIGGER] Link generated: /onboarding/${token}`)
-                    // NOTE: In production, trigger WhatsApp / Email API here using 'token' and candidate 'phone'
-                } catch (onboardErr) {
-                    console.error("[ONBOARDING TRIGGER] Failed to create employee record:", onboardErr)
-                    // Non-fatal: status is already updated; log error but don't fail the response
-                }
-            }
+            // Moving a lead to JOINED is just a status change. Creating the
+            // employee record (with salary, deployment, onboarding tasks and a
+            // login) is POST /api/recruitment/[id]/convert; the auto-create that
+            // used to live here produced bare INACTIVE employees with a
+            // 0000000000 phone and an EMP code that collided with the import.
         }
 
         // Try update with all fields. If a new column doesn't exist yet,

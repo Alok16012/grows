@@ -31,8 +31,17 @@ export async function PUT(
 
     // The task must belong to the exit in the URL — otherwise any task id
     // could be ticked off through any exit's route.
-    const task = await prisma.exitClearanceTask.findFirst({ where: { id: params.taskId, exitId: params.id }, select: { id: true } })
+    const task = await prisma.exitClearanceTask.findFirst({
+      where: { id: params.taskId, exitId: params.id },
+      select: { id: true, exitRequest: { select: { status: true } } },
+    })
     if (!task) return new NextResponse("Clearance task not found", { status: 404 })
+    // A closed exit is a settled record: ticking or un-ticking clearance on it
+    // would silently rewrite history (and could re-trigger the F&F move).
+    const exitStatus = task.exitRequest.status
+    if (exitStatus === "COMPLETED" || exitStatus === "CANCELLED") {
+      return new NextResponse(`Exit is already ${exitStatus.toLowerCase()}; clearance can no longer be changed`, { status: 409 })
+    }
     if (status !== undefined && !["PENDING", "IN_PROGRESS", "COMPLETED", "WAIVED"].includes(status)) {
       return new NextResponse("Invalid status", { status: 400 })
     }

@@ -1071,6 +1071,12 @@ function EmployeesPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [bulkDeleting, setBulkDeleting] = useState(false)
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+    // Terminate dialog — the row action used to PUT status=TERMINATED straight
+    // away, with no confirmation, leaving date or reason.
+    const [terminateTarget, setTerminateTarget] = useState<Employee | null>(null)
+    const [terminateDate, setTerminateDate] = useState("")
+    const [terminateReason, setTerminateReason] = useState("")
+    const [terminating, setTerminating] = useState(false)
     const [exportOpen, setExportOpen] = useState(false)
     const [exporting, setExporting] = useState(false)
     const [exportCols, setExportCols] = useState<Set<string>>(new Set(EXPORT_COLUMNS))
@@ -1452,6 +1458,40 @@ function EmployeesPage() {
             }
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : "Failed to update status")
+        }
+    }
+
+    const openTerminate = (emp: Employee) => {
+        setTerminateTarget(emp)
+        setTerminateDate(format(new Date(), "yyyy-MM-dd"))
+        setTerminateReason("")
+    }
+
+    const handleTerminate = async () => {
+        if (!terminateTarget) return
+        if (!terminateDate) { toast.error("Pick a leaving date"); return }
+        setTerminating(true)
+        try {
+            const res = await fetch(`/api/employees/${terminateTarget.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    status: "TERMINATED",
+                    dateOfLeaving: terminateDate,
+                    terminationReason: terminateReason.trim() || undefined,
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success(`${employeeFullName(terminateTarget)} marked as terminated`)
+            if (drawerEmployee?.id === terminateTarget.id) {
+                setDrawerEmployee(prev => prev ? { ...prev, status: "TERMINATED" } : null)
+            }
+            setTerminateTarget(null)
+            fetchEmployees()
+        } catch (err: unknown) {
+            toast.error(err instanceof Error && err.message ? err.message : "Failed to terminate")
+        } finally {
+            setTerminating(false)
         }
     }
 
@@ -1890,7 +1930,7 @@ function EmployeesPage() {
                                                         canDelete={canDelete}
                                                         onView={() => setDrawerEmployee(emp)}
                                                         onEdit={() => { setEditEmployee(emp); setShowModal(true) }}
-                                                        onTerminate={() => handleStatusChange(emp.id, "TERMINATED")}
+                                                        onTerminate={() => openTerminate(emp)}
                                                         onDelete={() => handleDelete(emp.id)}
                                                     />
                                                 </div>
@@ -1981,6 +2021,56 @@ function EmployeesPage() {
                             >
                                 {bulkDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                                 {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Terminate Dialog */}
+            {terminateTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-6 w-full max-w-sm shadow-xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                                <ShieldOff size={18} className="text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-[15px] font-semibold text-[var(--text)]">Terminate {employeeFullName(terminateTarget)}?</h3>
+                                <p className="text-[12px] text-[var(--text3)] mt-0.5">Ends their site posting and disables their login.</p>
+                            </div>
+                        </div>
+                        <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Last working day</label>
+                        <input
+                            type="date"
+                            value={terminateDate}
+                            max={format(new Date(), "yyyy-MM-dd")}
+                            onChange={e => setTerminateDate(e.target.value)}
+                            className="w-full mb-3 px-3 py-2 rounded-[8px] text-[13px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text)]"
+                        />
+                        <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Reason <span className="text-[var(--text3)] font-normal">(optional, saved to notes)</span></label>
+                        <textarea
+                            value={terminateReason}
+                            onChange={e => setTerminateReason(e.target.value)}
+                            rows={2}
+                            placeholder="e.g. Absconding, contract ended"
+                            className="w-full px-3 py-2 rounded-[8px] text-[13px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text)] resize-none"
+                        />
+                        <div className="flex gap-2 justify-end mt-5">
+                            <button
+                                onClick={() => setTerminateTarget(null)}
+                                disabled={terminating}
+                                className="px-4 py-2 rounded-[8px] text-[13px] font-medium bg-[var(--surface2)] border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleTerminate}
+                                disabled={terminating}
+                                className="px-4 py-2 rounded-[8px] text-[13px] font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-60 inline-flex items-center gap-1.5"
+                            >
+                                {terminating ? <Loader2 size={13} className="animate-spin" /> : <ShieldOff size={13} />}
+                                {terminating ? "Saving…" : "Terminate"}
                             </button>
                         </div>
                     </div>

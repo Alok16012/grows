@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
+import { TicketPriority } from "@prisma/client"
 
 export async function GET(req: Request) {
     try {
@@ -90,24 +91,52 @@ export async function POST(req: Request) {
         if (!title || !description || !category) {
             return new NextResponse("title, description, and category are required", { status: 400 })
         }
+        if (priority !== undefined && priority !== null && !Object.values(TicketPriority).includes(priority)) {
+            return new NextResponse(`Unknown priority: ${priority}`, { status: 400 })
+        }
 
-        // Generate ticket number
-        const count = await prisma.ticket.count()
-        const ticketNo = `TKT-${String(count + 1).padStart(4, "0")}`
+        // Generate the ticket number from the MAX existing number (+ bump), NOT a
+        // row count — `ticketNo` is @unique, so a count collides with a live
+        // number as soon as any earlier ticket has been deleted (500 on create).
+        const nextTicketNo = async (bump = 0): Promise<string> => {
+            try {
+                const rows: any[] = await (prisma as any).$queryRaw`
+                    SELECT COALESCE(MAX(CAST(SUBSTRING("ticketNo" FROM 5) AS INTEGER)), 0) AS max
+                    FROM "Ticket" WHERE "ticketNo" ~ '^TKT-[0-9]+$'`
+                const max = Number(rows?.[0]?.max ?? 0)
+                return `TKT-${String(max + 1 + bump).padStart(4, "0")}`
+            } catch {
+                const count = await prisma.ticket.count()
+                return `TKT-${String(count + 1 + bump).padStart(4, "0")}`
+            }
+        }
+        const isDupTicketNo = (err: any) =>
+            err?.code === "P2002" ||
+            /23505|already exists|duplicate key|unique constraint/i.test(String(err?.message ?? ""))
 
-        const ticket = await prisma.ticket.create({
-            data: {
-                ticketNo,
-                title,
-                description,
-                category,
-                priority: priority || "MEDIUM",
-                status: "OPEN",
-                raisedBy: actorId!,
-                employeeId: employeeId || null,
-                dueDate: dueDate ? new Date(dueDate) : null,
-            },
-        })
+        // Two tickets raised at the same instant can still race on the number;
+        // retry with a bumped suffix rather than failing the whole request.
+        let ticket: any = null
+        for (let bump = 0; bump < 3 && !ticket; bump++) {
+            const ticketNo = await nextTicketNo(bump)
+            try {
+                ticket = await prisma.ticket.create({
+                    data: {
+                        ticketNo,
+                        title,
+                        description,
+                        category,
+                        priority: priority || "MEDIUM",
+                        status: "OPEN",
+                        raisedBy: actorId!,
+                        employeeId: employeeId || null,
+                        dueDate: dueDate ? new Date(dueDate) : null,
+                    },
+                })
+            } catch (err: any) {
+                if (!isDupTicketNo(err) || bump === 2) throw err
+            }
+        }
 
         return NextResponse.json(ticket)
     } catch (error) {

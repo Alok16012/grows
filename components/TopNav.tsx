@@ -7,6 +7,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { COMPANY } from "@/lib/company"
 import { formatDistanceToNow } from "date-fns"
 
 interface SearchResults {
@@ -154,14 +155,14 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
             {/* Left — phones get Zavto's brand mark where the hamburger was;
                 the full menu lives behind "More" in the bottom bar now. */}
             <div className="flex items-center gap-2 shrink-0">
-                <Link href={homeHref} className="flex md:hidden items-center gap-2.5" aria-label="Growus ERP home">
+                <Link href={homeHref} className="flex md:hidden items-center gap-2.5" aria-label={`${COMPANY.name} home`}>
                     <span className="h-9 w-9 rounded-[11px] flex items-center justify-center text-white shadow-sm" style={{ background: "var(--accent-gradient)" }}>
                         <svg viewBox="0 0 24 24" className="w-[19px] h-[19px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M3 3h18v18H3z" />
                             <path d="M18 9h-6v6h6v-3h-3" />
                         </svg>
                     </span>
-                    <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-none">Growus <span className="text-[var(--accent)]">ERP</span></span>
+                    <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-none">{COMPANY.shortName} <span className="text-[var(--accent)]">{COMPANY.nameSuffix}</span></span>
                 </Link>
                 {/* Kept for pages without the bottom bar (e.g. the inspection
                     form), so the menu is never out of reach on a phone. */}

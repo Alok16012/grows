@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { dayWindow, monthWindow } from "@/lib/attendance-policy"
+import { isValidAttendanceStatus, parseIstDateTime } from "@/lib/attendance-today"
 
 export async function GET(req: Request) {
     try {
@@ -115,12 +116,19 @@ export async function POST(req: Request) {
             return new NextResponse("employeeId and date are required", { status: 400 })
         }
 
+        if (status !== undefined && status !== null && status !== "" && !isValidAttendanceStatus(status)) {
+            return new NextResponse("Invalid status", { status: 400 })
+        }
+
         const attendanceDate = new Date(String(date).slice(0, 10) + "T00:00:00.000Z")
+        // Naive "YYYY-MM-DDTHH:mm:ss" from the HR form is IST wall-clock, not UTC.
+        const checkInAt = parseIstDateTime(checkIn)
+        const checkOutAt = parseIstDateTime(checkOut)
 
         // Calculate working hours
         let workingHrs = 0
-        if (checkIn && checkOut) {
-            const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime()
+        if (checkInAt && checkOutAt) {
+            const diff = checkOutAt.getTime() - checkInAt.getTime()
             if (diff > 0) workingHrs = Math.round((diff / (1000 * 60 * 60)) * 100) / 100
         }
 
@@ -138,8 +146,8 @@ export async function POST(req: Request) {
                 where: { id: existing.id },
                 data: {
                     siteId: siteId || null,
-                    checkIn: checkIn ? new Date(checkIn) : null,
-                    checkOut: checkOut ? new Date(checkOut) : null,
+                    checkIn: checkInAt,
+                    checkOut: checkOutAt,
                     checkInLat, checkInLng, checkOutLat, checkOutLng,
                     status: status || "PRESENT",
                     overtimeHrs: overtimeHrs || 0,
@@ -154,8 +162,8 @@ export async function POST(req: Request) {
                     employeeId,
                     siteId: siteId || null,
                     date: attendanceDate,
-                    checkIn: checkIn ? new Date(checkIn) : null,
-                    checkOut: checkOut ? new Date(checkOut) : null,
+                    checkIn: checkInAt,
+                    checkOut: checkOutAt,
                     checkInLat, checkInLng, checkOutLat, checkOutLng,
                     status: status || "PRESENT",
                     overtimeHrs: overtimeHrs || 0,

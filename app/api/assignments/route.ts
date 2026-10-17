@@ -335,8 +335,8 @@ export async function POST(req: Request) {
                         })
                     }
                 }
-            } catch (mgrErr) {
-                console.log("Manager assignment skipped:", mgrErr)
+            } catch {
+                // Non-fatal: the assignment itself was already created.
             }
         }
 

@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { can } from "@/lib/can"
+import { istDateOnly } from "@/lib/attendance-policy"
 import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -121,7 +122,8 @@ function formatTime(dateStr: string) {
 }
 
 function todayISO() {
-    return new Date().toISOString().split("T")[0]
+    // IST date; toISOString() alone is UTC and lags a day until 05:30.
+    return istDateOnly().toISOString().split("T")[0]
 }
 
 const PRIORITY_STYLES: Record<TaskPriority, string> = {

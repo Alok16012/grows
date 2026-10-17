@@ -19,9 +19,13 @@ export async function GET(req: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
-    const now = new Date()
-    const month = parseInt(searchParams.get("month") || String(now.getMonth() + 1))
-    const year = parseInt(searchParams.get("year") || String(now.getFullYear()))
+    // Users are in IST; the server runs in UTC on Vercel. Period bounds and day
+    // buckets are computed on IST calendar days and shifted to UTC instants,
+    // the same way app/api/admin/stats/route.ts builds its IST window.
+    const IST_MS = 330 * 60 * 1000
+    const nowIst = new Date(Date.now() + IST_MS)
+    const month = parseInt(searchParams.get("month") || String(nowIst.getUTCMonth() + 1))
+    const year = parseInt(searchParams.get("year") || String(nowIst.getUTCFullYear()))
     const dateFromParam = searchParams.get("dateFrom")
     const dateToParam = searchParams.get("dateTo")
     const role = session.user.role
@@ -55,14 +59,14 @@ export async function GET(req: Request) {
     let endDate: Date
     let periodLabel: string
     if (dateFromParam && dateToParam) {
-        startDate = new Date(dateFromParam + "T00:00:00.000Z")
-        endDate = new Date(dateToParam + "T23:59:59.999Z")
+        startDate = new Date(new Date(dateFromParam + "T00:00:00.000Z").getTime() - IST_MS)
+        endDate = new Date(new Date(dateToParam + "T23:59:59.999Z").getTime() - IST_MS)
         periodLabel = dateFromParam === dateToParam
             ? dateFromParam
             : `${dateFromParam} to ${dateToParam}`
     } else {
-        startDate = new Date(year, month - 1, 1)
-        endDate = new Date(year, month, 0, 23, 59, 59, 999)
+        startDate = new Date(Date.UTC(year, month - 1, 1) - IST_MS)
+        endDate = new Date(Date.UTC(year, month, 1) - IST_MS - 1)
         periodLabel = `${getMonthName(month)} ${year}`
     }
 
@@ -153,9 +157,11 @@ export async function GET(req: Request) {
             const siteName = inspection.assignment.project.site?.name ?? "No Site"
             const rowSiteId = inspection.assignment.project.siteId ?? "no-site"
             if (!resolvedSiteName) resolvedSiteName = siteName
-            const date = inspection.submittedAt
-                ? new Date(inspection.submittedAt).toISOString().slice(0, 10)
-                : new Date(inspection.createdAt).toISOString().slice(0, 10)
+            // Bucket on the IST calendar day, not the UTC one — an 11pm IST
+            // submission used to land on the previous day's bar.
+            const date = new Date(
+                new Date(inspection.submittedAt ?? inspection.createdAt).getTime() + IST_MS
+            ).toISOString().slice(0, 10)
 
             // One extractor for both the charts and the Inspection Report table
             // (lib/inspection-fields.ts). This loop used to have its own rules,

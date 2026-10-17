@@ -24,13 +24,15 @@ export async function GET(req: Request) {
         
         const hasAccess = checkAccess(session, ["MANAGER", "HR_MANAGER", "ADMIN"], "employees.view")
         if (!hasAccess) {
-            console.log("Access denied for employee GET. Session role:", session.user.role, "Permissions:", session.user.permissions)
             return new NextResponse("Forbidden", { status: 403 })
         }
 
         const { searchParams } = new URL(req.url)
-        const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
-        const pageSize = Math.min(1000, parseInt(searchParams.get("pageSize") ?? "50"))
+        // Non-numeric values parse to NaN, which used to flow into skip/take.
+        const pageParam     = parseInt(searchParams.get("page") ?? "1")
+        const pageSizeParam = parseInt(searchParams.get("pageSize") ?? "50")
+        const page     = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+        const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? Math.min(200, pageSizeParam) : 50
         // `lite=1` strips the base64 `photo` blob from each row. Profile photos
         // are stored as data URLs, so a 500-row list shipped tens of MB and took
         // ~15s. Callers that don't render avatars (e.g. Employee Master) opt in;

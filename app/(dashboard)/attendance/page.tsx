@@ -13,6 +13,7 @@ import { format, getDaysInMonth } from "date-fns"
 import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
 import { MusterRoll, AttendanceSettings, CodeLegend, cellTitle, type RegisterResponse } from "@/components/attendance/muster-roll"
 import { CODE_STYLE, lateBy, type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/attendance-policy"
+import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,8 +160,9 @@ function MarkAttendanceModal({
         setLoading(true)
         try {
             const dateStr = format(date, "yyyy-MM-dd")
-            const checkInDT = form.checkIn ? `${dateStr}T${form.checkIn}:00` : null
-            const checkOutDT = form.checkOut ? `${dateStr}T${form.checkOut}:00` : null
+            // Explicit IST offset — the server runs in UTC and must not read 09:30 as 15:00 IST.
+            const checkInDT = form.checkIn ? `${dateStr}T${form.checkIn}:00+05:30` : null
+            const checkOutDT = form.checkOut ? `${dateStr}T${form.checkOut}:00+05:30` : null
 
             if (existing) {
                 const res = await fetch(`/api/attendance/${existing.id}`, {
@@ -1102,10 +1104,10 @@ export default function AttendancePage() {
         )
     }
 
-    // Only ADMIN gets the full management view (mark/edit everyone's attendance).
-    // Every other login — including custom roles like MIS Executive that may hold
-    // attendance.view — gets their own self-service check-in/out dashboard.
-    const isAdmin = session?.user?.role === "ADMIN"
+    // ADMIN and anyone holding attendance.view get the management view (the API
+    // already gates marking on attendance.manage). Everyone else gets their own
+    // self-service check-in/out dashboard.
+    const isAdmin = session?.user?.role === "ADMIN" || can(session, "attendance.view")
 
     if (isAdmin) return <AdminView />
     return <SelfServiceView />

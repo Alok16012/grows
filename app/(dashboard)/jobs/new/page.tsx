@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useEffect, useState } from "react"
+import { COMPANY } from "@/lib/company"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -83,7 +84,7 @@ const initialForm: Form = {
     salaryMin: "", salaryMax: "", perks: [],
     department: "", jobRole: "", jobLocation: "", qualifications: [],
     educationDegree: "", genderPreference: "Any", skills: [], candidateIndustry: "", languages: [],
-    screeningQuestions: [], description: "", companyName: "Growus Auto India",
+    screeningQuestions: [], description: "", companyName: COMPANY.legalName,
     employmentType: "Full Time, Permanent", industryType: "", roleCategory: "", openings: "1",
     allowCalls: false, contactName: "", contactPhone: "", callStartTime: "09:30",
     callEndTime: "18:30", callDays: "Everyday",
@@ -115,7 +116,7 @@ function jobToForm(j: JobPosting): Form {
             id: q.id || uid(), question: q.question || "", mandatory: q.mandatory ?? true,
             type: q.type || "text", options: q.options ?? [], preferredAnswer: q.preferredAnswer ?? null,
         })),
-        description: s(j.description), companyName: s(j.companyName) || "Growus Auto India",
+        description: s(j.description), companyName: s(j.companyName) || COMPANY.legalName,
         employmentType: s(j.employmentType) || "Full Time, Permanent",
         industryType: s(j.industryType), roleCategory: s(j.roleCategory), openings: n(j.openings) || "1",
         allowCalls: !!j.allowCalls, contactName: s(j.contactName), contactPhone: s(j.contactPhone),
@@ -859,7 +860,7 @@ function StepDescription({ form, set }: { form: Form; set: <K extends keyof Form
                 <p className="text-[11px] text-[var(--text3)] mt-1 text-right">{form.description.length} characters</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextField label="About your company" value={form.companyName} onChange={(v) => set("companyName", v)} placeholder="Growus Auto India" />
+                <TextField label="About your company" value={form.companyName} onChange={(v) => set("companyName", v)} placeholder={COMPANY.legalName} />
                 <TextField label="Role category" value={form.roleCategory} onChange={(v) => set("roleCategory", v)} placeholder="e.g. Recruitment & Talent Acquisition" optional />
             </div>
         </div>

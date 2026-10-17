@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { AssetCondition } from "@prisma/client"
 
 export async function POST(
     req: Request,
@@ -30,10 +31,19 @@ export async function POST(
         if (!empAsset.isActive) return new NextResponse("Asset already returned", { status: 400 })
         if (empAsset.assetId !== params.id) return new NextResponse("Asset ID mismatch", { status: 400 })
 
-        // Determine if asset condition should be downgraded
-        const assetUpdate: Record<string, unknown> = { available: { increment: 1 } }
+        if (returnCondition !== undefined && returnCondition !== null
+            && !Object.values(AssetCondition).includes(returnCondition)) {
+            return new NextResponse(`Unknown returnCondition: ${returnCondition}`, { status: 400 })
+        }
+
+        // A unit that came back LOST or DAMAGED isn't back on the shelf, so it
+        // must not bump `available` — that's what let the stock count exceed
+        // what could actually be handed out. Record the downgraded condition only.
+        const assetUpdate: Record<string, unknown> = {}
         if (returnCondition === "DAMAGED" || returnCondition === "LOST") {
             assetUpdate.condition = returnCondition
+        } else {
+            assetUpdate.available = { increment: 1 }
         }
 
         const [assignment] = await prisma.$transaction([

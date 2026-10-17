@@ -9,14 +9,25 @@ import bcrypt from "bcryptjs"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
-    // User directory (names/roles) feeds assignee dropdowns across recruitment,
-    // helpdesk, etc. Allow ADMIN or any user with custom-role permissions; plain
-    // base-role users (inspectors/clients with no permissions) are blocked.
-    if (!session || (session.user.role !== Role.ADMIN && (session.user.permissions ?? []).length === 0)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    // Two audiences. Admins and users.manage holders get the directory the
+    // System Users page needs. Everyone else gets a name list for assignee
+    // dropdowns (recruitment, helpdesk) and nothing more: the old check let
+    // any signed-in employee through (every account carries "self.view"),
+    // and the full rows — including the stored plain password — went with it.
+    const full = session.user.role === Role.ADMIN || (session.user.permissions ?? []).includes("users.manage")
 
     try {
+        if (!full) {
+            const users = await prisma.user.findMany({
+                where: { isActive: true },
+                select: { id: true, name: true, email: true, role: true, customRole: { select: { id: true, name: true, color: true } } },
+                orderBy: { name: "asc" },
+            })
+            return NextResponse.json(users)
+        }
+
         const users = await prisma.user.findMany({
             include: {
                 customRole: {
@@ -33,9 +44,10 @@ export async function GET(req: Request) {
             }
         })
 
-        // Remove passwords from response
+        // Neither password column ever leaves the server.
         const safeUsers = users.map(user => {
-            const { password, ...safeUser } = user
+            const { password, plainPassword, ...safeUser } = user
+            void password; void plainPassword
             return safeUser
         })
 

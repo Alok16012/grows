@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { dayWindow, istDateOnly } from "@/lib/attendance-policy"
 
 export async function GET() {
     try {
@@ -69,8 +70,8 @@ export async function GET() {
         const siteNameById = new Map(sites.map(s => [s.id, s.name]))
         const checkInByEmployee = new Map(checkIns.map(c => [c.employeeId, c]))
 
-        const todayStart = new Date()
-        todayStart.setHours(0, 0, 0, 0)
+        // IST midnight — setHours(0) on the UTC server would be 05:30 IST.
+        const todayStart = dayWindow(istDateOnly()).gte
 
         const latestCheckIns = employees.map(emp => {
             const lastCheckIn = checkInByEmployee.get(emp.id) ?? null

@@ -51,6 +51,21 @@ export async function PATCH(
 
         const isAdmin = session.user.role === "ADMIN"
 
+        // `status` is a free String column, so anything the client sent used to
+        // be written verbatim. The inspector workflow only ever moves between
+        // draft and pending; approved/rejected are verdicts that belong to the
+        // approvals route (or ADMIN), so they are refused here.
+        const INSPECTOR_STATUSES = ["draft", "pending"]
+        const VERDICT_STATUSES = ["approved", "rejected"]
+        if (status !== undefined) {
+            if (typeof status !== "string" || ![...INSPECTOR_STATUSES, ...VERDICT_STATUSES].includes(status)) {
+                return NextResponse.json({ error: `Invalid status: must be one of ${[...INSPECTOR_STATUSES, ...VERDICT_STATUSES].join(", ")}` }, { status: 400 })
+            }
+            if (VERDICT_STATUSES.includes(status) && !isAdmin) {
+                return NextResponse.json({ error: "Approval verdicts are recorded through the approvals queue" }, { status: 403 })
+            }
+        }
+
         // Keyed on who the work is ASSIGNED to, not on who happened to create the
         // draft row. `submittedBy` was the wrong test in both directions: while
         // colleagues could still open each other's assignments, a draft created by
@@ -131,8 +146,6 @@ export async function PATCH(
             updateData.paperFormPhoto = validResponses[paperFormResponseIndex].value
             validResponses.splice(paperFormResponseIndex, 1)
         }
-
-        console.log(`Updating inspection ${inspectionId}, status: ${status}, responses: ${validResponses.length}`)
 
         // Filter to only valid field IDs in one query (avoids FK violations)
         const fieldIds = validResponses.map((r: any) => r.fieldId)

@@ -620,7 +620,9 @@ export default function HelpdeskPage() {
     const [showNew, setShowNew] = useState(false)
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
 
-    const isPrivileged = can(session, "helpdesk.view")
+    // Status / assignee / internal notes are helpdesk.manage actions server-side
+    // (PUT returns 403 otherwise), so a view-only user must not see the controls.
+    const isPrivileged = can(session, "helpdesk.manage")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")

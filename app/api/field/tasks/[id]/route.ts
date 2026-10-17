@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { FieldTaskStatus } from "@prisma/client"
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -68,6 +69,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         const isAdminOrManager = checkAccess(session, ["MANAGER"], "field.manage")
         const body = await req.json()
 
+        // `status` is an enum column: an unknown value used to surface as a 500.
+        if (body.status !== undefined && body.status !== null
+            && !Object.values(FieldTaskStatus).includes(body.status)) {
+            return new NextResponse(`Invalid status: must be one of ${Object.values(FieldTaskStatus).join(", ")}`, { status: 400 })
+        }
+
         if (!isAdminOrManager) {
             // Employees can only update status + completedNote on their own tasks
             const employee = await prisma.employee.findFirst({
@@ -78,6 +85,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             }
 
             const { status, completedNote } = body
+            // Once a task is marked done it is the manager's record — the
+            // employee can't quietly reopen (or cancel) it; only field.manage can.
+            if (status && task.status === "COMPLETED" && status !== "COMPLETED") {
+                return new NextResponse("A completed task can only be reopened by a manager", { status: 403 })
+            }
             const updateData: Record<string, unknown> = {}
             if (status) updateData.status = status
             if (completedNote !== undefined) updateData.completedNote = completedNote

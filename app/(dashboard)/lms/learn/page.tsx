@@ -604,12 +604,16 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
     )
 }
 
-function CertificateModal({ certificate, courseName, employeeName, onClose }: {
+function CertificateModal({ certificate, courseName, employeeName, issuedAt, onClose }: {
     certificate: string
     courseName: string
     employeeName: string
+    issuedAt?: string
     onClose: () => void
 }) {
+    // The certificate was issued when the course was completed — not whenever
+    // the modal happens to be opened.
+    const issuedDate = issuedAt ? new Date(issuedAt) : new Date()
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -624,7 +628,7 @@ function CertificateModal({ certificate, courseName, employeeName, onClose }: {
                 </div>
                 <div className="p-6 text-center">
                     <p className="text-[11px] text-[var(--text3)] font-mono">{certificate}</p>
-                    <p className="text-[11px] text-[var(--text3)] mt-1">Issued on {format(new Date(), "dd MMMM yyyy")}</p>
+                    <p className="text-[11px] text-[var(--text3)] mt-1">Issued on {format(issuedDate, "dd MMMM yyyy")}</p>
                     <button
                         onClick={onClose}
                         className="mt-4 h-10 px-6 text-[13px] bg-[var(--surface2)] text-[var(--text2)] rounded-[8px] hover:bg-[var(--border)]"
@@ -649,6 +653,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
     const [progress, setProgress] = useState(enrollment.progress || 0)
     const [status, setStatus] = useState(enrollment.status)
     const [certificate, setCertificate] = useState(enrollment.certificate)
+    const [completedAt, setCompletedAt] = useState(enrollment.completedAt)
     const [showCertificate, setShowCertificate] = useState(false)
     const [showFeedback, setShowFeedback] = useState(false)
     const [updatingProgress, setUpdatingProgress] = useState(false)
@@ -671,6 +676,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
             setProgress(upd.progress)
             setStatus(upd.status)
             if (upd.certificate) setCertificate(upd.certificate)
+            if (upd.completedAt) setCompletedAt(upd.completedAt)
             if (upd.status === "COMPLETED") { toast.success("Course completed — certificate issued!"); setShowFeedback(true) }
             else toast.success("Module completed!")
         } catch {
@@ -863,6 +869,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                     certificate={certificate!}
                     courseName={course.title}
                     employeeName={(enrollment as Enrollment & { employeeName?: string }).employeeName || "Employee"}
+                    issuedAt={completedAt}
                     onClose={() => setShowCertificate(false)}
                 />
             )}

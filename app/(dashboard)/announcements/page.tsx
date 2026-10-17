@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { COMPANY } from "@/lib/company"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -455,7 +456,7 @@ export default function AnnouncementsPage() {
 
     // Congratulate a colleague on their work anniversary.
     function congratulate(a: Anniversary) {
-        const msg = `Congratulations ${a.name} on completing ${a.years} ${a.years === 1 ? "year" : "years"} with Growus! 🎉 Thank you for your contribution.`
+        const msg = `Congratulations ${a.name} on completing ${a.years} ${a.years === 1 ? "year" : "years"} with ${COMPANY.shortName}! 🎉 Thank you for your contribution.`
         if (a.phone) {
             const digits = a.phone.replace(/\D/g, "")
             const num = digits.length === 10 ? `91${digits}` : digits

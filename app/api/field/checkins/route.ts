@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { dayWindow } from "@/lib/attendance-policy"
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371000 // Earth radius in meters
@@ -34,11 +35,8 @@ export async function GET(req: Request) {
         if (siteId) where.siteId = siteId
 
         if (date) {
-            const start = new Date(date)
-            start.setHours(0, 0, 0, 0)
-            const end = new Date(date)
-            end.setHours(23, 59, 59, 999)
-            where.checkedInAt = { gte: start, lte: end }
+            // IST calendar day, not the server's (UTC) local day.
+            where.checkedInAt = dayWindow(new Date(date.slice(0, 10) + "T00:00:00.000Z"))
         }
 
         const checkIns = await prisma.fieldCheckIn.findMany({
@@ -86,7 +84,20 @@ export async function POST(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { employeeId, siteId, latitude, longitude, accuracy, notes } = body
+        const { siteId, latitude, longitude, accuracy, notes } = body
+
+        // Only field managers may check in on someone else's behalf. Everyone
+        // else is pinned to their own employee record — the body value used to
+        // be trusted as-is, so anyone could log a check-in for any employee.
+        let employeeId: string | undefined = body.employeeId
+        if (!checkAccess(session, [], "field.manage")) {
+            const me = await prisma.employee.findFirst({
+                where: { userId: session.user.id },
+                select: { id: true },
+            })
+            if (!me) return new NextResponse("No employee record linked to your account", { status: 403 })
+            employeeId = me.id
+        }
 
         if (!employeeId || latitude === undefined || longitude === undefined) {
             return new NextResponse("employeeId, latitude and longitude are required", { status: 400 })

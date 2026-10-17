@@ -125,8 +125,8 @@ export async function PUT(
                         where: { projectId, managerId: { in: toRemove } },
                     })
                 }
-            } catch (mgrErr) {
-                console.log("Project manager sync skipped:", mgrErr)
+            } catch {
+                // Non-fatal: the project update itself already succeeded.
             }
         }
 
@@ -158,8 +158,8 @@ export async function PUT(
                 if (toRemove.length > 0) {
                     await prisma.projectInspector.deleteMany({ where: { id: { in: toRemove } } })
                 }
-            } catch (insErr) {
-                console.log("Project inspector sync skipped:", insErr)
+            } catch {
+                // Non-fatal: the project update itself already succeeded.
             }
         }
 

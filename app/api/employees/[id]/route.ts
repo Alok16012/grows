@@ -83,6 +83,9 @@ export async function PUT(
             aadharNumber, panNumber, bankAccountNumber, bankIFSC, bankName,
             photo, designation, departmentId, branchId,
             dateOfJoining, dateOfLeaving, status, employmentType, basicSalary, notes,
+            // Terminate dialog only. There is no dedicated column, so it is
+            // appended to `notes` below.
+            terminationReason,
             // New fields
             middleName, nameAsPerAadhar, fathersName, bloodGroup, maritalStatus, marriageDate, nationality, religion, caste,
             uan, pfNumber, esiNumber, labourCardNo, labourCardExpDate,
@@ -234,30 +237,56 @@ export async function PUT(
         if (safetyShoesDate !== undefined) updateData.safetyShoesDate = safetyShoesDate ? new Date(safetyShoesDate) : null
         if (bankBranch !== undefined) updateData.bankBranch = bankBranch || null
 
-        // ─── Rejoin ──────────────────────────────────────────────────────────
+        // ─── Leaving / rejoin ────────────────────────────────────────────────
         // Marking someone TERMINATED / RESIGNED — or completing their exit —
-        // does three things: sets the status, ends their site deployment, and
-        // disables their login. Flipping the status back to ACTIVE only undid
-        // the status and the login, so a rehired employee came back with no
-        // site posting, a stale leaving date, and an exit record that still
-        // counted them as gone.
+        // does three things: sets the status, ends their site deployment (below,
+        // after the update), and disables their login (further down). Flipping
+        // the status back to ACTIVE used to only undo the status and the login,
+        // so a rehired employee came back with no site posting, a stale leaving
+        // date, and an exit record that still counted them as gone.
         const TERMINAL_STATUSES: string[] = ["TERMINATED", "RESIGNED", "INACTIVE"]
+        const isLeaving = status === "TERMINATED" || status === "RESIGNED"
         let isRejoining = false
-        if (status === "ACTIVE") {
+        let leavingDate: Date | null = null
+        if (status !== undefined) {
             const before = await prisma.employee.findUnique({
                 where: { id: params.id },
-                select: { status: true },
+                select: { status: true, notes: true, dateOfLeaving: true },
             })
-            isRejoining = !!before && TERMINAL_STATUSES.includes(before.status)
-            // Someone who is back should not carry a leaving date — unless this
-            // same request deliberately set one.
-            if (isRejoining && dateOfLeaving === undefined) updateData.dateOfLeaving = null
+            if (status === "ACTIVE") {
+                isRejoining = !!before && TERMINAL_STATUSES.includes(before.status)
+                // Someone who is back should not carry a leaving date — unless this
+                // same request deliberately set one.
+                if (isRejoining && dateOfLeaving === undefined) updateData.dateOfLeaving = null
+            }
+            if (isLeaving) {
+                // The leaving date is what payroll and headcount key off, so a
+                // termination always has one: the request's, else whatever is
+                // already on the record, else today.
+                leavingDate = (updateData.dateOfLeaving as Date | null | undefined) ?? before?.dateOfLeaving ?? new Date()
+                updateData.dateOfLeaving = leavingDate
+                const reason = typeof terminationReason === "string" ? terminationReason.trim() : ""
+                if (reason) {
+                    const line = `${status === "RESIGNED" ? "Resigned" : "Terminated"} ${leavingDate.toISOString().slice(0, 10)}: ${reason}`
+                    const base = (updateData.notes as string | null | undefined) ?? before?.notes ?? ""
+                    updateData.notes = base ? `${base}\n${line}` : line
+                }
+            }
         }
 
         const employee = await prisma.employee.update({
             where: { id: params.id },
             data: updateData,
         })
+
+        if (isLeaving && leavingDate) {
+            // Relieve them from every live posting so site rosters and the
+            // deployment-based headcount stop counting someone who has left.
+            await prisma.deployment.updateMany({
+                where: { employeeId: params.id, isActive: true },
+                data: { isActive: false, endDate: leavingDate, relievedAt: new Date() },
+            })
+        }
 
         if (isRejoining) {
             // Put them back on the site they were relieved from, unless they

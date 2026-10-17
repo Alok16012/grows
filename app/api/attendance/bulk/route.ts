@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { dayWindow } from "@/lib/attendance-policy"
+import { isValidAttendanceStatus } from "@/lib/attendance-today"
 
 export async function POST(req: Request) {
     try {
@@ -21,6 +22,9 @@ export async function POST(req: Request) {
 
         if (!date || !Array.isArray(records) || records.length === 0) {
             return new NextResponse("date and records[] are required", { status: 400 })
+        }
+        if (records.some(r => !r?.employeeId || !isValidAttendanceStatus(r.status))) {
+            return new NextResponse("Invalid status", { status: 400 })
         }
 
         const attendanceDate = new Date(String(date).slice(0, 10) + "T00:00:00.000Z")

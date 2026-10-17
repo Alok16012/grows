@@ -19,12 +19,14 @@ export async function POST(
         return NextResponse.json({ error: "Only approved inspections can be shared" }, { status: 400 })
     }
 
-    // Upsert shareable link
+    // Upsert shareable link. Public links default to a 90-day lifetime — they
+    // used to be created without expiresAt, so a leaked URL worked forever.
     const link = await prisma.shareableLink.upsert({
         where: { inspectionId: params.id },
         create: {
             inspectionId: params.id,
-            createdBy: session!.user.id
+            createdBy: session!.user.id,
+            expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
         },
         update: {}
     })

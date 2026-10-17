@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { COMPANY } from "@/lib/company"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -457,7 +458,7 @@ export default function SendDocumentsPage() {
                                 </div>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[14px] font-bold text-[var(--text)]">Growus Auto</span>
+                                        <span className="text-[14px] font-bold text-[var(--text)]">{COMPANY.legalName}</span>
                                         <span className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] font-semibold">
                                             <Lock size={12} /> Locked to your account
                                         </span>
@@ -713,12 +714,12 @@ export default function SendDocumentsPage() {
                             ) : (
                                 <div className="bg-white border border-[var(--border)] rounded-[10px] p-6">
                                     <div className="border-b-2 border-[#e23b3b] pb-3 mb-4">
-                                        <p className="text-[18px] font-bold text-[var(--text)]">Growus Auto India Pvt. Ltd.</p>
-                                        <p className="text-[11px] italic text-[#e23b3b]">Pioneer in outsourcing</p>
+                                        <p className="text-[18px] font-bold text-[var(--text)]">{COMPANY.legalName}</p>
+                                        <p className="text-[11px] italic text-[#e23b3b]">{COMPANY.tagline}</p>
                                     </div>
                                     <pre className="whitespace-pre-wrap font-sans text-[13px] text-[var(--text)] leading-relaxed">{previewContent || "(empty)"}</pre>
                                     <div className="mt-8">
-                                        <p className="text-[12px] font-semibold text-[var(--text)]">For Growus Auto India Pvt. Ltd.</p>
+                                        <p className="text-[12px] font-semibold text-[var(--text)]">For {COMPANY.legalName}</p>
                                         {signature ? (
                                             <>
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}

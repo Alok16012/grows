@@ -3,10 +3,11 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { isValidAttendanceStatus, parseIstDateTime } from "@/lib/attendance-today"
 
-function calcWorkingHrs(checkIn?: string | null, checkOut?: string | null): number {
+function calcWorkingHrs(checkIn?: Date | null, checkOut?: Date | null): number {
     if (!checkIn || !checkOut) return 0
-    const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime()
+    const diff = checkOut.getTime() - checkIn.getTime()
     if (diff <= 0) return 0
     return Math.round((diff / (1000 * 60 * 60)) * 100) / 100
 }
@@ -25,14 +26,21 @@ export async function PUT(
         const body = await req.json()
         const { status, checkIn, checkOut, overtimeHrs, remarks } = body
 
-        const workingHrs = calcWorkingHrs(checkIn, checkOut)
+        if (status !== undefined && !isValidAttendanceStatus(status)) {
+            return new NextResponse("Invalid status", { status: 400 })
+        }
+
+        // Naive "YYYY-MM-DDTHH:mm:ss" from the HR form is IST wall-clock, not UTC.
+        const checkInAt = parseIstDateTime(checkIn)
+        const checkOutAt = parseIstDateTime(checkOut)
+        const workingHrs = calcWorkingHrs(checkInAt, checkOutAt)
 
         const updated = await prisma.attendance.update({
             where: { id: params.id },
             data: {
                 ...(status !== undefined && { status }),
-                ...(checkIn !== undefined && { checkIn: checkIn ? new Date(checkIn) : null }),
-                ...(checkOut !== undefined && { checkOut: checkOut ? new Date(checkOut) : null }),
+                ...(checkIn !== undefined && { checkIn: checkInAt }),
+                ...(checkOut !== undefined && { checkOut: checkOutAt }),
                 ...(overtimeHrs !== undefined && { overtimeHrs: parseFloat(overtimeHrs) || 0 }),
                 ...(remarks !== undefined && { remarks }),
                 workingHrs,

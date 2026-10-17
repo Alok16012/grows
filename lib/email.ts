@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer"
+import { COMPANY } from "@/lib/company"
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -60,7 +61,7 @@ export async function sendApprovalEmail({
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="left" style="vertical-align:middle;">
-                    <span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">Growus ERP</span>
+                    <span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">${COMPANY.name}</span>
                     <span style="font-size:12px;color:rgba(255,255,255,0.7);margin-left:8px;font-weight:500;">Quality Inspection</span>
                   </td>
                   <td align="right">
@@ -150,8 +151,8 @@ export async function sendApprovalEmail({
                 <tr>
                   <td>
                     <p style="margin:0;font-size:11px;color:#9e9b95;">
-                      CIMS — Quality Inspection Management System<br/>
-                      Developed by <a href="#" style="color:#1a9e6e;text-decoration:none;">Blinks AI</a>
+                      ${COMPANY.name} — ${COMPANY.legalName}<br/>
+                      Developed by <a href="${COMPANY.developerUrl}" style="color:#1a9e6e;text-decoration:none;">${COMPANY.developerCredit}</a>
                     </p>
                   </td>
                   <td align="right">
@@ -170,7 +171,7 @@ export async function sendApprovalEmail({
 </html>`
 
     await transporter.sendMail({
-        from: `"Growus ERP" <${process.env.GMAIL_USER}>`,
+        from: `"${COMPANY.name}" <${process.env.GMAIL_USER}>`,
         to: toEmails.join(", "),
         subject: `✅ Inspection Report Approved — ${projectName} (${companyName})`,
         html,

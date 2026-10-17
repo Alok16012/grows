@@ -5,27 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
 import bcrypt from "bcryptjs"
-
-// Generate the next sequential EMP-NNNN code. Only considers real EMP- codes so
-// temporary PENDING-xxxx placeholders (used while onboarding is unapproved)
-// never affect the sequence.
-async function generateEmployeeCode(): Promise<string> {
-    const last = await prisma.employee.findFirst({
-        where: { employeeId: { startsWith: "EMP-" } },
-        orderBy: { employeeId: "desc" },
-        select: { employeeId: true },
-    })
-    let nextNum = 1
-    const match = last?.employeeId?.match(/\d+$/)
-    if (match) nextNum = parseInt(match[0]) + 1
-    // Guard against a collision (race) by bumping until free.
-    for (let i = 0; i < 50; i++) {
-        const code = `EMP-${String(nextNum + i).padStart(4, "0")}`
-        const exists = await prisma.employee.findUnique({ where: { employeeId: code }, select: { id: true } })
-        if (!exists) return code
-    }
-    return `EMP-${Date.now()}`
-}
+import { generateEmployeeCode } from "@/lib/employee-code"
 
 // Provision a login (User account) for an approved employee if they don't have
 // one yet. Returns the credentials or null. Non-fatal on error.

@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { COMPANY } from "@/lib/company"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
@@ -1040,7 +1041,7 @@ export default function OnboardingPage() {
                                     </button>
                                 </div>
                             </div>
-                            <a href={`https://wa.me/?text=${encodeURIComponent(`Hello! Please complete your onboarding for Growus Auto using this link:\n${joinLink}`)}`}
+                            <a href={`https://wa.me/?text=${encodeURIComponent(`Hello! Please complete your onboarding for ${COMPANY.legalName} using this link:\n${joinLink}`)}`}
                                 target="_blank" rel="noreferrer"
                                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, borderRadius: 10, border: "1px solid #25d366", background: "#25d36612", color: "#128c3e", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                                 Share on WhatsApp

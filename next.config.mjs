@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // A verification build can write elsewhere so it never clobbers the running
+    // dev server's .next (NEXT_DIST_DIR=.next-build npx next build).
+    distDir: process.env.NEXT_DIST_DIR || ".next",
     compress: true,
     poweredByHeader: false,
     experimental: {

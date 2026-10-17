@@ -1,49 +1,49 @@
 import prisma from "@/lib/prisma"
 import { randomUUID } from "crypto"
 
+// The shared client is $extends-ed (lib/prisma.ts), so Prisma.TransactionClient
+// is not assignable to it; derive the tx type from the callback instead.
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 // Hard-deleting an employee must also remove every record that points at them.
 // We do NOT rely on DB-level ON DELETE CASCADE because production migrations are
 // applied out-of-band and may predate the cascade rules in schema.prisma — a
 // single missing cascade would otherwise make the whole delete fail and leave a
 // "ghost" employee (and their login) lingering in lists. So we purge dependents
-// explicitly and best-effort: a table that doesn't exist or is already empty is
-// harmless and must not abort the rest.
-async function purgeDependents(ids: string[]) {
-    const ops: Array<() => Promise<unknown>> = [
-        // Grandchildren first (reference a child, not the employee directly).
-        () => prisma.kPI.deleteMany({ where: { review: { employeeId: { in: ids } } } }),
-        () => prisma.kRA.deleteMany({ where: { review: { employeeId: { in: ids } } } }),
-        () => prisma.exitClearanceTask.deleteMany({ where: { exitRequest: { employeeId: { in: ids } } } }),
-        // Direct children. Check-ins before tasks, tasks before their parent record.
-        () => prisma.fieldCheckIn.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.fieldTask.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.onboardingTask.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.onboardingRecord.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.performanceReview.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.pIP.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.exitRequest.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.attendance.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.leave.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.payroll.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.advanceAndReimbursement.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.quizAttempt.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.courseEnrollment.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.courseFeedback.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.iLTAttendance.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.policyAcknowledgment.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.employeeAsset.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.employeeDocument.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.hrDocument.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.employeeSalary.deleteMany({ where: { employeeId: { in: ids } } }),
-        () => prisma.deployment.deleteMany({ where: { employeeId: { in: ids } } }),
-    ]
-    for (const op of ops) {
-        try {
-            await op()
-        } catch (e) {
-            console.warn("[EMPLOYEE_DELETE] dependent purge step failed (continuing)", e)
-        }
-    }
+// explicitly.
+//
+// This runs inside the caller's transaction, so there is no per-step
+// swallow-and-continue: on Postgres a failed statement aborts the whole
+// transaction anyway, and the point of the transaction is that a purge which
+// cannot complete leaves the employee — and every record under them — intact,
+// rather than half-stripped.
+async function purgeDependents(tx: Tx, ids: string[]) {
+    // Grandchildren first (reference a child, not the employee directly).
+    await tx.kPI.deleteMany({ where: { review: { employeeId: { in: ids } } } })
+    await tx.kRA.deleteMany({ where: { review: { employeeId: { in: ids } } } })
+    await tx.exitClearanceTask.deleteMany({ where: { exitRequest: { employeeId: { in: ids } } } })
+    // Direct children. Check-ins before tasks, tasks before their parent record.
+    await tx.fieldCheckIn.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.fieldTask.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.onboardingTask.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.onboardingRecord.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.performanceReview.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.pIP.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.exitRequest.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.attendance.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.leave.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.payroll.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.advanceAndReimbursement.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.quizAttempt.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.courseEnrollment.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.courseFeedback.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.iLTAttendance.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.policyAcknowledgment.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.employeeAsset.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.employeeDocument.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.hrDocument.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.employeeSalary.deleteMany({ where: { employeeId: { in: ids } } })
+    await tx.deployment.deleteMany({ where: { employeeId: { in: ids } } })
 }
 
 // Remove a linked login. Best-effort hard delete; if the account owns
@@ -87,10 +87,22 @@ export async function deleteEmployeesAndLogins(ids: string[]): Promise<{ deleted
     })
     const userIds = linked.map(l => l.userId).filter(Boolean) as string[]
 
-    await purgeDependents(ids)
+    // Purge and the final delete commit together: previously a failing employee
+    // delete (an FK we forgot, a timeout) left the person with no attendance,
+    // payroll or documents but still listed as an employee.
+    const { count: deleted } = await prisma.$transaction(async tx => {
+        await purgeDependents(tx, ids)
+        return tx.employee.deleteMany({ where: { id: { in: ids } } })
+    }, {
+        // A bulk delete across 25 tables for a few hundred ids is slow; the
+        // default 5s would abort legitimately large selections.
+        maxWait: 10_000,
+        timeout: 60_000,
+    })
 
-    const { count: deleted } = await prisma.employee.deleteMany({ where: { id: { in: ids } } })
-
+    // Logins are removed after the commit: the employee rows are already gone,
+    // and removeLogin has its own disable fallback for accounts the DB won't
+    // let us drop.
     let loginsRemoved = 0
     for (const userId of userIds) {
         if (await removeLogin(userId)) loginsRemoved++

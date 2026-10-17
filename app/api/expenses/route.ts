@@ -214,6 +214,11 @@ export async function POST(req: Request) {
         if (!title || !category || amount == null || isNaN(parsedAmount) || !date) {
             return new NextResponse("title, category, amount, and date are required", { status: 400 })
         }
+        // A zero or negative claim is never valid (and a negative one would
+        // quietly reduce the totals it's summed into).
+        if (parsedAmount <= 0) {
+            return new NextResponse("amount must be greater than 0", { status: 400 })
+        }
         if (!EXPENSE_CATEGORIES.includes(category)) {
             return new NextResponse(`Unknown category: ${category}`, { status: 400 })
         }

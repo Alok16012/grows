@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { COMPANY } from "@/lib/company"
 import {
     Loader2, CheckCircle2, Copy, Check, AlertCircle,
     ChevronRight, ChevronLeft, Upload, X, FileText, ImageIcon, Lock
@@ -1014,7 +1015,7 @@ export default function JoinPage() {
                 </div>
 
                 <p style={{ textAlign: "center", fontSize: 11, color: "var(--text3)", marginTop: 16 }}>
-                    Growus ERP · HR Management System · Your data is encrypted and secure
+                    {COMPANY.name} · HR Management System · Your data is encrypted and secure
                 </p>
             </div>
         </div>

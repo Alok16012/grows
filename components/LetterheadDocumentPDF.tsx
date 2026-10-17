@@ -1,6 +1,7 @@
 import { Document, Page, View, Text, StyleSheet, Image } from "@react-pdf/renderer"
+import { COMPANY } from "@/lib/company"
 
-// Growus Auto India letterhead, recreated digitally (matches Letter head.pdf):
+// Company letterhead (COMPANY.legalName), recreated digitally (matches Letter head.pdf):
 // red framed border, logo + company name header, body content, signature block,
 // and a footer with the office address + website.
 const RED = "#e23b3b"
@@ -44,8 +45,8 @@ export function LetterheadDocumentPDF({
                 <View style={styles.header}>
                     {logoDataUrl ? <Image src={logoDataUrl} style={styles.logo} /> : null}
                     <View>
-                        <Text style={styles.company}>Growus Auto India Pvt. Ltd.</Text>
-                        <Text style={styles.tagline}>Pioneer in outsourcing</Text>
+                        <Text style={styles.company}>{COMPANY.legalName}</Text>
+                        <Text style={styles.tagline}>{COMPANY.tagline}</Text>
                     </View>
                 </View>
                 <View style={styles.rule} />
@@ -60,7 +61,7 @@ export function LetterheadDocumentPDF({
                 <Text style={styles.body}>{content}</Text>
 
                 <View style={styles.sign}>
-                    <Text style={styles.signCompany}>For Growus Auto India Pvt. Ltd.</Text>
+                    <Text style={styles.signCompany}>For {COMPANY.legalName}</Text>
                     {signatureDataUrl ? (
                         <>
                             <Image src={signatureDataUrl} style={styles.signImage} />

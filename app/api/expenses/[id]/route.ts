@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
 import { notifyApprovers } from "@/lib/hr-notify"
-import { Prisma } from "@prisma/client"
+import { Prisma, ExpenseCategory } from "@prisma/client"
 
 // Prod DB sometimes lags behind migrations (DIRECT_URL not set on Vercel, so
 // `prisma migrate deploy` is skipped). Reading a row via the Prisma client
@@ -129,6 +129,18 @@ export async function PUT(
         const { action, title, category, amount, date, description, receiptUrl, projectId, siteId, siteName, rejectionReason, paymentMode, transactionId, paymentDate, travelDays, travelDailyRate, travelEntries, categoryItems } = body
 
         const updateData: Record<string, unknown> = {}
+
+        // Same whitelist as POST: the enum cast in the raw fallback would
+        // otherwise surface an unknown value as a 500 instead of a 400.
+        if (category !== undefined && !Object.values(ExpenseCategory).includes(category)) {
+            return new NextResponse(`Unknown category: ${category}`, { status: 400 })
+        }
+        if (amount !== undefined) {
+            const parsedAmount = parseFloat(String(amount))
+            if (isNaN(parsedAmount) || parsedAmount <= 0) {
+                return new NextResponse("amount must be greater than 0", { status: 400 })
+            }
+        }
 
         if (isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED" || expense.status === "REJECTED")) {
             // Owner can edit fields while the expense is still DRAFT or SUBMITTED
