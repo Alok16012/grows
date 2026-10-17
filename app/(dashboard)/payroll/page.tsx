@@ -227,7 +227,7 @@ export default function PayrollPage() {
     const progressPct = Math.round(((doneCount + (openStepNum !== null ? 0.5 : 0)) / STEPS.length) * 100)
 
     return (
-        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48, maxWidth: 1200 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48 }}>
 
             {/* ── Page Header ── */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

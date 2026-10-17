@@ -258,7 +258,7 @@ export default function ExitPage() {
   }
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto" }}>
+    <div className="p-4 sm:px-7 sm:py-6 lg:p-0">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" style={{ marginBottom: 24 }}>
         <div className="min-w-0">

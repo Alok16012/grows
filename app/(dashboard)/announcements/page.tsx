@@ -183,7 +183,7 @@ export default function AnnouncementsPage() {
     const upcomingHolidays = holidays.filter(h => new Date(h.date) >= startOfToday)
 
     return (
-        <div className="max-w-[1180px] mx-auto px-4 lg:px-1">
+        <div className="px-4 lg:px-0">
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
                 <div className="min-w-0">

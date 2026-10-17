@@ -342,7 +342,7 @@ export default function SendDocumentsPage() {
     }
 
     return (
-        <div className="p-5 lg:p-7 max-w-6xl mx-auto flex flex-col gap-6">
+        <div className="p-5 lg:p-0 flex flex-col gap-6">
             {/* Header */}
             <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>

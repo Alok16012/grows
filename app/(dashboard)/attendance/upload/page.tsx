@@ -286,7 +286,7 @@ export default function AttendanceUploadPage() {
     const unmatchedCount = matched?.filter(r => !r.matched).length  ?? 0
 
     return (
-        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 1100, paddingBottom: 32 }}>
+        <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 32 }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                 <div>
