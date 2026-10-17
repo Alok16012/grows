@@ -11,6 +11,7 @@ import {
     ChevronRight, Send, Lock, User, Calendar
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -688,38 +689,28 @@ export default function HelpdeskPage() {
     return (
         <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Helpdesk</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage and track support tickets.</p>
                 </div>
-                <button
-                    onClick={() => setShowNew(true)}
-                    className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold h-[42px] px-5 hover:opacity-90 transition-opacity"
-                    style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
-                >
-                    <Plus size={16} /> New Ticket
-                </button>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <button
+                        onClick={() => setShowNew(true)}
+                        className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-semibold h-[42px] px-5 hover:opacity-90 transition-opacity"
+                        style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
+                    >
+                        <Plus size={16} /> New Ticket
+                    </button>
+                </div>
             </div>
 
             {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {[
-                    { label: "Open Tickets", value: openCount, color: "#3b82f6", bg: "#eff6ff", icon: <AlertCircle size={20} /> },
-                    { label: "In Progress", value: inProgressCount, color: "#d97706", bg: "#fef3c7", icon: <Timer size={20} /> },
-                    { label: "Resolved Today", value: resolvedToday, color: "#16a34a", bg: "#dcfce7", icon: <CheckCircle2 size={20} /> },
-                    { label: "Avg Resolution (hrs)", value: avgResolution, color: "#8b5cf6", bg: "#f5f3ff", icon: <Clock size={20} /> },
-                ].map(s => (
-                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
-                        <div style={{ background: s.bg, color: s.color }} className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0">
-                            {s.icon}
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-[12px] text-[var(--text3)]">{s.label}</p>
-                            <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: s.color }}>{s.value}</p>
-                        </div>
-                    </div>
-                ))}
+            <div className={statGridClass(4)}>
+                <StatCard label="Open Tickets" value={openCount} tone="blue" icon={<AlertCircle size={20} />} seed={0} />
+                <StatCard label="In Progress" value={inProgressCount} tone="amber" icon={<Timer size={20} />} seed={1} />
+                <StatCard label="Resolved Today" value={resolvedToday} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
+                <StatCard label="Avg Resolution (hrs)" value={avgResolution} tone="violet" icon={<Clock size={20} />} seed={3} />
             </div>
 
             {/* Filters */}

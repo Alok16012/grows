@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -196,24 +197,6 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
             className="rounded-full flex items-center justify-center text-white font-semibold shrink-0 select-none"
         >
             {initials}
-        </div>
-    )
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, icon, color }: {
-    label: string; value: number | string; icon: React.ReactNode; color: string
-}) {
-    return (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-5 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: color + "22" }}>
-                <div style={{ color }}>{icon}</div>
-            </div>
-            <div>
-                <p className="text-[12px] text-[var(--text3)] font-medium">{label}</p>
-                <p className="text-[24px] font-bold text-[var(--text)] leading-tight">{value}</p>
-            </div>
         </div>
     )
 }
@@ -1703,12 +1686,12 @@ export default function LMSPage() {
         <div className="flex flex-col h-full bg-[var(--surface2)] min-h-0">
             {/* Page Header */}
             <div className="px-6 pt-6 pb-3 shrink-0">
-                <div className="flex items-start justify-between flex-wrap gap-3">
-                    <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                         <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Training (LMS)</h1>
                         <p className="text-[13.5px] text-[var(--text3)] mt-1">Training courses &amp; employee development.</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
                         <button
                             onClick={() => { setEnrollCourseId(undefined); setShowEnrollModal(true) }}
                             className="h-[42px] px-4 text-[13px] font-semibold border border-[var(--border)] bg-[var(--surface)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center gap-2"
@@ -1728,11 +1711,11 @@ export default function LMSPage() {
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard label="Total Courses" value={totalCourses} icon={<BookOpen size={22} />} color="#3b82f6" />
-                    <StatCard label="Published" value={publishedCourses} icon={<CheckCircle size={22} />} color="#16a34a" />
-                    <StatCard label="Mandatory" value={mandatoryCourses} icon={<AlertTriangle size={22} />} color="#f59e0b" />
-                    <StatCard label="Total Enrollments" value={totalEnrollments} icon={<Users size={22} />} color="#8b5cf6" />
+                <div className={statGridClass(4)}>
+                    <StatCard label="Total Courses" value={totalCourses} icon={<BookOpen size={20} />} tone="blue" seed={0} />
+                    <StatCard label="Published" value={publishedCourses} icon={<CheckCircle size={20} />} tone="teal" seed={1} />
+                    <StatCard label="Mandatory" value={mandatoryCourses} icon={<AlertTriangle size={20} />} tone="amber" seed={2} />
+                    <StatCard label="Total Enrollments" value={totalEnrollments} icon={<Users size={20} />} tone="violet" seed={3} />
                 </div>
 
                 {/* Tabs */}

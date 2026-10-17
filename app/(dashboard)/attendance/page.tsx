@@ -10,6 +10,7 @@ import {
     MapPin, LogIn, LogOut
 } from "lucide-react"
 import { format, getDaysInMonth } from "date-fns"
+import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -887,22 +888,22 @@ function AdminView() {
         return { employee: emp, present, absent, late, halfDay, leave, overtimeHrs, attendancePct, totalDays: daysInMonth }
     })
 
-    const statsCards = [
-        { label: "Present",         value: presentCount,   color: "#16a34a", bg: "#dcfce7", icon: <CheckCircle size={18} /> },
-        { label: "Absent",          value: absentCount,    color: "#dc2626", bg: "#fef2f2", icon: <XCircle size={18} /> },
-        { label: "Late / Half Day", value: lateHalfCount,  color: "#f59e0b", bg: "#fffbeb", icon: <Clock size={18} /> },
-        { label: "On Leave",        value: onLeaveCount,   color: "#8b5cf6", bg: "#f5f3ff", icon: <Users size={18} /> },
+    const statsCards: { label: string; value: number; tone: StatTone; icon: React.ReactNode }[] = [
+        { label: "Present",         value: presentCount,   tone: "teal",   icon: <CheckCircle size={20} /> },
+        { label: "Absent",          value: absentCount,    tone: "rose",   icon: <XCircle size={20} /> },
+        { label: "Late / Half Day", value: lateHalfCount,  tone: "amber",  icon: <Clock size={20} /> },
+        { label: "On Leave",        value: onLeaveCount,   tone: "violet", icon: <Users size={20} /> },
     ]
 
     return (
         <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Attendance</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Track and manage employee attendance</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <button onClick={() => setBulkModal(true)}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-[8px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
                         <Users size={15} /> Bulk Mark
@@ -950,15 +951,9 @@ function AdminView() {
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {statsCards.map(s => (
-                            <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 flex items-center gap-3">
-                                <div style={{ background: s.bg, color: s.color }} className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0">{s.icon}</div>
-                                <div>
-                                    <p className="text-[22px] font-bold text-[var(--text)] leading-tight">{s.value}</p>
-                                    <p className="text-[11.5px] text-[var(--text3)]">{s.label}</p>
-                                </div>
-                            </div>
+                    <div className={statGridClass(statsCards.length)}>
+                        {statsCards.map((s, i) => (
+                            <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={s.icon} seed={i} />
                         ))}
                     </div>
 

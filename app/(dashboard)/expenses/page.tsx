@@ -9,8 +9,10 @@ import {
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
     Upload, FileText, Paperclip, Briefcase, MapPin, Download, Eye, AlertCircle,
+    Users, ClipboardList, BarChart3, Settings, Bike, Car, AlertTriangle,
     type LucideIcon
 } from "lucide-react"
+import { StatCard, statGridClass } from "@/components/StatCard"
 import { format } from "date-fns"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -411,19 +413,20 @@ function CategoryLine({
                 <div>
                     <div style={{ background: perKmRate > 0 ? "#eff6ff" : "#fef2f2", padding: "7px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                         <div style={{ display: "flex", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, overflow: "hidden" }}>
-                            {([["2W", "🏍️ 2-Wheeler"], ["4W", "🚗 4-Wheeler"]] as const).map(([vt, label]) => (
+                            {([["2W", "2-Wheeler", Bike], ["4W", "4-Wheeler", Car]] as const).map(([vt, label, VIcon]) => (
                                 <button key={vt} type="button" onClick={() => onPatch({ vehicleType: vt })}
                                     style={{
                                         padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none",
                                         background: line.vehicleType === vt ? "#1d4ed8" : "transparent",
                                         color: line.vehicleType === vt ? "#fff" : "#3b82f6",
+                                        display: "inline-flex", alignItems: "center", gap: 4,
                                     }}>
-                                    {label}
+                                    <VIcon size={14} /> {label}
                                 </button>
                             ))}
                         </div>
-                        <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600 }}>
-                            {perKmRate > 0 ? `₹${perKmRate}/km` : "⚠️ Rate not set — ask admin"}
+                        <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {perKmRate > 0 ? `₹${perKmRate}/km` : <><AlertTriangle size={14} /> Rate not set — ask admin</>}
                         </span>
                     </div>
 
@@ -1677,38 +1680,6 @@ function ExpenseRow({
     )
 }
 
-// ─── Stat Card ─────────────────────────────────────────────────────────────────
-
-function StatCard({
-    label,
-    value,
-    sub,
-    color,
-    icon: Icon,
-}: {
-    label: string
-    value: string
-    sub?: string
-    color: string
-    icon: LucideIcon
-}) {
-    return (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
-            <div
-                className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0"
-                style={{ background: color + "1f" }}
-            >
-                <Icon size={20} color={color} />
-            </div>
-            <div className="min-w-0">
-                <p className="text-[12px] text-[var(--text3)]">{label}</p>
-                <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color }}>{value}</p>
-                {sub && <p className="text-[11px] text-[var(--text3)]">{sub}</p>}
-            </div>
-        </div>
-    )
-}
-
 // ─── Employee Summary Tab ──────────────────────────────────────────────────────
 
 // Column config for the team summary table — top categories shown as columns.
@@ -1769,8 +1740,8 @@ function ExpenseDetailModal({ title, subtitle, items, onClose }: {
                                 {journeys.length > 0 && (
                                     <div style={{ margin: "0 20px 10px", background: "#eff6ff", borderRadius: 8, overflow: "hidden", border: "1px solid #bfdbfe" }}>
                                         {(journeys[0] as any)?.vehicleType && (
-                                            <div style={{ padding: "4px 10px", background: "#dbeafe", borderBottom: "1px solid #bfdbfe", fontSize: 11, fontWeight: 700, color: "#1e40af" }}>
-                                                {(journeys[0] as any).vehicleType === "2W" ? "🏍️ 2-Wheeler" : "🚗 4-Wheeler"}
+                                            <div style={{ padding: "4px 10px", background: "#dbeafe", borderBottom: "1px solid #bfdbfe", fontSize: 11, fontWeight: 700, color: "#1e40af", display: "flex", alignItems: "center", gap: 4 }}>
+                                                {(journeys[0] as any).vehicleType === "2W" ? <><Bike size={14} /> 2-Wheeler</> : <><Car size={14} /> 4-Wheeler</>}
                                             </div>
                                         )}
                                         <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", background: "#dbeafe", gap: 8 }}>
@@ -2076,14 +2047,14 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                     <>
                         <button onClick={() => setShowRateSetting(s => !s)}
                             style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-                            ⚙️ Travel: 🏍️ ₹{travelRate2W} · 🚗 ₹{travelRate4W} /km
+                            <Settings size={14} /> Travel: <Bike size={14} /> ₹{travelRate2W} · <Car size={14} /> ₹{travelRate4W} /km
                         </button>
                         {showRateSetting && (
                             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "white", border: "1px solid var(--border)", borderRadius: 8, padding: "4px 10px", flexWrap: "wrap" }}>
-                                <span style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 3 }}>🏍️ 2-Wheeler ₹/km</span>
+                                <span style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 3 }}><Bike size={14} /> 2-Wheeler ₹/km</span>
                                 <input type="number" min="0" step="0.5" value={rate2WInput} onChange={e => setRate2WInput(e.target.value)}
                                     style={{ width: 64, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
-                                <span style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 3 }}>🚗 4-Wheeler ₹/km</span>
+                                <span style={{ fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 3 }}><Car size={14} /> 4-Wheeler ₹/km</span>
                                 <input type="number" min="0" step="0.5" value={rate4WInput} onChange={e => setRate4WInput(e.target.value)}
                                     style={{ width: 64, height: 26, border: "1px solid var(--border)", borderRadius: 6, padding: "0 8px", fontSize: 13, outline: "none" }} />
                                 <button onClick={saveRate} disabled={savingRate}
@@ -2573,12 +2544,12 @@ export default function ExpensesPage() {
     return (
         <div className="min-h-screen p-4 md:p-6">
             {/* Header */}
-            <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+                <div className="min-w-0">
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Expenses</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Track and manage employee expense claims.</p>
                 </div>
-                <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
                     <button
                         onClick={() => exportExpenses("xlsx")}
                         className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] flex items-center gap-2 transition-colors"
@@ -2618,34 +2589,38 @@ export default function ExpensesPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className={`${statGridClass(4)} mb-6`}>
                 <StatCard
                     label="My Pending"
                     value={String(stats.myPending)}
                     sub="Awaiting approval"
-                    color="#f59e0b"
-                    icon={Clock}
+                    tone="amber"
+                    icon={<Clock size={20} />}
+                    seed={0}
                 />
                 <StatCard
                     label="Approved This Month"
                     value={formatINR(stats.approvedThisMonth)}
                     sub="Approved + Paid"
-                    color="#16a34a"
-                    icon={CheckCircle2}
+                    tone="teal"
+                    icon={<CheckCircle2 size={20} />}
+                    seed={1}
                 />
                 <StatCard
                     label="Total Claimed"
                     value={formatINR(stats.claimedThisMonth)}
                     sub="This month"
-                    color="#3b82f6"
-                    icon={Wallet}
+                    tone="blue"
+                    icon={<Wallet size={20} />}
+                    seed={2}
                 />
                 <StatCard
                     label="Rejected"
                     value={String(stats.rejected)}
                     sub="All time"
-                    color="#ef4444"
-                    icon={XCircle}
+                    tone="rose"
+                    icon={<XCircle size={20} />}
+                    seed={3}
                 />
             </div>
 
@@ -2655,12 +2630,12 @@ export default function ExpensesPage() {
                     /* ── Admin / Manager tabs ── */
                     <>
                         {([
-                            { id: "employee", label: "👥 Employee Summary" },
-                            { id: "all",      label: "📋 All Expenses" },
-                            { id: "accounts", label: "💰 Accounts" },
-                            { id: "analytics", label: "📊 Analytics" },
+                            { id: "employee", label: "Employee Summary", icon: Users },
+                            { id: "all",      label: "All Expenses", icon: ClipboardList },
+                            { id: "accounts", label: "Accounts", icon: Wallet },
+                            { id: "analytics", label: "Analytics", icon: BarChart3 },
                             { id: "mine",     label: "My Claims" },
-                        ] as { id: ActiveTab; label: string }[]).map(({ id, label }) => (
+                        ] as { id: ActiveTab; label: string; icon?: LucideIcon }[]).map(({ id, label, icon: TabIcon }) => (
                             <button
                                 key={id}
                                 onClick={() => {
@@ -2678,6 +2653,7 @@ export default function ExpensesPage() {
                                 aria-selected={activeTab === id}
                                 className={`z-tab ${activeTab === id ? "is-active" : ""}`}
                             >
+                                {TabIcon && <TabIcon size={14} />}
                                 {label}
                                 {id === "all" && pendingCount > 0 && (
                                     <span style={{ background: "#ef4444", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>

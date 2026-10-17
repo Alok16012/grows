@@ -10,6 +10,7 @@ import {
     ChevronRight, ChevronLeft, User, Download,
 } from "lucide-react"
 import { format } from "date-fns"
+import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
 import { can } from "@/lib/can"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -505,11 +506,11 @@ export default function LeavesPage() {
 
     const totalReq = leaves.length
     const pctOf = (n: number) => totalReq > 0 ? `${((n / totalReq) * 100).toFixed(1)}% of total` : "—"
-    const statsCards = [
-        { label: "Pending Requests",        value: pending,           sub: pctOf(pending),        color: "#d97706", bg: "#fef3c7", icon: Clock },
-        { label: "Approved This Month",     value: approvedThisMonth, sub: "current month",       color: "#16a34a", bg: "#dcfce7", icon: CheckCircle },
-        { label: "Leave Days (Month)",      value: totalLeaveDays,    sub: "approved days",       color: "#3b82f6", bg: "#eff6ff", icon: Calendar },
-        { label: "Rejected",                value: rejected,          sub: pctOf(rejected),       color: "#dc2626", bg: "#fef2f2", icon: XCircle },
+    const statsCards: { label: string; value: number; sub: string; tone: StatTone; icon: typeof Clock }[] = [
+        { label: "Pending Requests",        value: pending,           sub: pctOf(pending),        tone: "amber", icon: Clock },
+        { label: "Approved This Month",     value: approvedThisMonth, sub: "current month",       tone: "teal",  icon: CheckCircle },
+        { label: "Leave Days (Month)",      value: totalLeaveDays,    sub: "approved days",       tone: "blue",  icon: Calendar },
+        { label: "Rejected",                value: rejected,          sub: pctOf(rejected),       tone: "rose",  icon: XCircle },
     ]
 
     const exportCsv = () => {
@@ -534,12 +535,12 @@ export default function LeavesPage() {
     return (
         <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
-            <div className="flex items-start justify-between flex-wrap gap-3">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Leaves</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage employee leave requests and approvals.</p>
                 </div>
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
                     <button onClick={exportCsv}
                         className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <Download size={16} /> Export
@@ -553,18 +554,9 @@ export default function LeavesPage() {
             </div>
 
             {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {statsCards.map(s => (
-                    <div key={s.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex items-center gap-3.5">
-                        <div style={{ background: s.bg }} className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0">
-                            <s.icon size={20} style={{ color: s.color }} />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-[12px] text-[var(--text3)]">{s.label}</p>
-                            <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: s.color }}>{s.value}</p>
-                            <p className="text-[11px] text-[var(--text3)]">{s.sub}</p>
-                        </div>
-                    </div>
+            <div className={statGridClass(statsCards.length)}>
+                {statsCards.map((s, i) => (
+                    <StatCard key={s.label} label={s.label} value={s.value} sub={s.sub} tone={s.tone} icon={<s.icon size={20} />} seed={i} />
                 ))}
             </div>
 

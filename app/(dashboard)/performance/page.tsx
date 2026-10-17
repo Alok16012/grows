@@ -17,6 +17,7 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     LineChart, Line, CartesianGrid, Legend
 } from "recharts"
+import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -424,8 +425,8 @@ export default function PerformancePage() {
     return (
         <div style={{ padding: "24px 28px", minHeight: "100vh" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between" style={{ marginBottom: 20 }}>
+                <div className="min-w-0">
                     <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: "var(--text)", letterSpacing: "-0.5px" }}>
                         Performance
                     </h1>
@@ -434,18 +435,20 @@ export default function PerformancePage() {
                     </p>
                 </div>
                 {isAdminOrManager && activeTab === "reviews" && (
-                    <button
-                        onClick={() => setShowCreateModal(true)}
-                        style={{
-                            display: "flex", alignItems: "center", gap: 7,
-                            height: 42, padding: "0 18px",
-                            background: "var(--accent)", color: "#fff", border: "none",
-                            borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer",
-                            boxShadow: "0 1px 3px rgba(26,158,110,0.35)",
-                        }}
-                    >
-                        <Plus size={16} /> New Review
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <button
+                            onClick={() => setShowCreateModal(true)}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 7,
+                                height: 42, padding: "0 18px",
+                                background: "var(--accent)", color: "#fff", border: "none",
+                                borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                                boxShadow: "0 1px 3px rgba(26,158,110,0.35)",
+                            }}
+                        >
+                            <Plus size={16} /> New Review
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -534,11 +537,11 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
 
     const { summary, rankDistrib, topPerformers, roleAvgScores, monthlyTrend } = data
 
-    const summaryCards = [
-        { label: "Total Reviews", value: summary.total, icon: FileText, color: "#3b82f6", bg: "#eff6ff" },
-        { label: "Pending Reviews", value: summary.pending, icon: Clock, color: "#d97706", bg: "#fef3c7" },
-        { label: "Completed", value: summary.completed, icon: CheckCircle2, color: "#16a34a", bg: "#dcfce7" },
-        { label: "Avg Score", value: summary.avgScore.toFixed(2), icon: TrendingUp, color: "#8b5cf6", bg: "#f5f3ff" },
+    const summaryCards: { label: string; value: number | string; icon: typeof FileText; tone: StatTone }[] = [
+        { label: "Total Reviews", value: summary.total, icon: FileText, tone: "blue" },
+        { label: "Pending Reviews", value: summary.pending, icon: Clock, tone: "amber" },
+        { label: "Completed", value: summary.completed, icon: CheckCircle2, tone: "teal" },
+        { label: "Avg Score", value: summary.avgScore.toFixed(2), icon: TrendingUp, tone: "violet" },
     ]
 
     const rankCards = [
@@ -551,29 +554,9 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {/* Summary Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
-                {summaryCards.map(c => (
-                    <div key={c.label} style={{
-                        background: "#fff",
-                        border: "1px solid var(--border)",
-                        borderRadius: 12,
-                        padding: "18px 20px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 14,
-                    }}>
-                        <div style={{
-                            width: 44, height: 44, borderRadius: "50%",
-                            background: c.bg, display: "flex", alignItems: "center", justifyContent: "center",
-                            flexShrink: 0,
-                        }}>
-                            <c.icon size={20} color={c.color} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{c.value}</div>
-                            <div style={{ fontSize: 12, color: "#6b7280" }}>{c.label}</div>
-                        </div>
-                    </div>
+            <div className={statGridClass(summaryCards.length)}>
+                {summaryCards.map((c, i) => (
+                    <StatCard key={c.label} label={c.label} value={c.value} tone={c.tone} icon={<c.icon size={20} />} seed={i} />
                 ))}
             </div>
 

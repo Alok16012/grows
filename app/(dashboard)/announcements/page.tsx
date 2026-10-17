@@ -10,6 +10,7 @@ import {
     Cake, Gift, ArrowRight, Clock, Award,
 } from "lucide-react"
 import { can } from "@/lib/can"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -184,13 +185,13 @@ export default function AnnouncementsPage() {
     return (
         <div className="max-w-[1180px] mx-auto px-4 lg:px-1">
             {/* Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+                <div className="min-w-0">
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Announcements</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Company notices &amp; holiday calendar.</p>
                 </div>
                 {canManage && (
-                    <div className="flex flex-wrap gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
                         <button onClick={() => setShowHolForm(true)}
                             className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
                             <Plus size={16} /> Add Holiday
@@ -205,11 +206,11 @@ export default function AnnouncementsPage() {
             </div>
 
             {/* ── Stat cards ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                <StatCard icon={<Megaphone size={18} />} tint="#3b82f6" value={announcements.length} label="Total Announcements" sub="All notices" />
-                <StatCard icon={<AlertCircle size={18} />} tint="#dc2626" value={criticalAnns.length} label="Critical / Pinned" sub="Need attention" />
-                <StatCard icon={<Cake size={18} />} tint="#d97706" value={todaysBirthdays.length} label="Birthdays Today" sub="Wish your colleagues" />
-                <StatCard icon={<CalendarDays size={18} />} tint="#0b5cff" value={upcomingHolidays.length} label="Upcoming Holidays" sub={`${new Date().getFullYear()}`} />
+            <div className={`${statGridClass(4)} mb-5`}>
+                <StatCard icon={<Megaphone size={20} />} tone="blue" value={announcements.length} label="Total Announcements" sub="All notices" seed={0} />
+                <StatCard icon={<AlertCircle size={20} />} tone="rose" value={criticalAnns.length} label="Critical / Pinned" sub="Need attention" seed={1} />
+                <StatCard icon={<Cake size={20} />} tone="amber" value={todaysBirthdays.length} label="Birthdays Today" sub="Wish your colleagues" seed={2} />
+                <StatCard icon={<CalendarDays size={20} />} tone="sky" value={upcomingHolidays.length} label="Upcoming Holidays" sub={`${new Date().getFullYear()}`} seed={3} />
             </div>
 
             {/* ── Critical banner ── */}
@@ -463,24 +464,6 @@ export default function AnnouncementsPage() {
             toast.success(`🎉 Anniversary wish sent to ${a.name}!`)
         }
     }
-}
-
-// ─── Stat card ────────────────────────────────────────────────────────────────
-
-function StatCard({ icon, tint, value, label, sub }: { icon: React.ReactNode; tint: string; value: number; label: string; sub: string }) {
-    return (
-        <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-[18px] flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0"
-                style={{ color: tint, backgroundColor: tint + "1a" }}>
-                {icon}
-            </div>
-            <div className="min-w-0">
-                <p className="text-[12px] text-[var(--text3)] truncate">{label}</p>
-                <p className="text-[24px] font-bold leading-tight tabular-nums" style={{ color: tint }}>{value}</p>
-                <p className="text-[11px] text-[var(--text3)] truncate">{sub}</p>
-            </div>
-        </div>
-    )
 }
 
 // ─── Announcement create form ─────────────────────────────────────────────────
