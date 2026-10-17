@@ -849,7 +849,7 @@ export default function OnboardingPage() {
                         Review, approve or reject newly joined employees
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center sm:justify-end" style={{ gap: 10 }}>
+                <div className="page-actions" style={{ gap: 10 }}>
                     <button onClick={() => setShareOpen(true)}
                         style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         <Link2 size={15} /> Share Join Link
@@ -870,8 +870,8 @@ export default function OnboardingPage() {
             </div>
 
             {/* Filter tabs + search */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
+            <div className="filter-bar sm:gap-3">
+                <div className="z-tabs-wrap filter-full"><div className="z-tabs" role="tablist">
                     {FILTER_TABS.map(t => (
                         <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => setFilter(t.key)}
                             className={`z-tab ${filter === t.key ? "is-active" : ""}`}>
@@ -879,15 +879,15 @@ export default function OnboardingPage() {
                         </button>
                     ))}
                 </div></div>
-                <div style={{ flex: 1 }} />
-                <div style={{ position: "relative", minWidth: 240, flex: "0 1 360px" }}>
+                <div className="hidden sm:block" style={{ flex: 1 }} />
+                <div className="filter-search sm:min-w-[240px]" style={{ position: "relative", flex: "0 1 360px" }}>
                     <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
                     <input value={search} onChange={e => setSearch(e.target.value)}
                         placeholder="Search by name or employee ID..."
                         style={{ width: "100%", height: 40, paddingLeft: 36, paddingRight: 12, borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", boxSizing: "border-box" }} />
                 </div>
                 <button
-                    style={{ display: "flex", alignItems: "center", gap: 7, height: 40, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, height: 40, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                     <SlidersHorizontal size={15} /> Filters
                 </button>
             </div>

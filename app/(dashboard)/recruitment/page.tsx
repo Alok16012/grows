@@ -22,7 +22,7 @@ import {
     Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
-import { StatCard } from "@/components/StatCard"
+import { StatCard, statGridClass } from "@/components/StatCard"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
@@ -916,14 +916,14 @@ export default function RecruitmentPage() {
 
             {/* ── Header ── */}
             <div className="px-4 pt-5 pb-4 lg:px-0 lg:pt-0">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                         <h1 className="text-[22px] font-bold text-[var(--text)] tracking-tight">Candidate Pipeline</h1>
                         <p className="text-[13px] text-[var(--text2)] mt-0.5">Track candidates from lead to joining</p>
                     </div>
                     {/* Wraps on narrow screens — four nowrap buttons on one row ran
                         past the viewport edge at phone width. */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <div className="page-actions">
                         <button
                             onClick={() => setShareOpen(true)}
                             title="Share the onboarding form link with a candidate"
@@ -950,7 +950,7 @@ export default function RecruitmentPage() {
                         </button>
                         <button
                             onClick={openAddForm}
-                            className="flex items-center gap-2 h-9 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[13px] font-semibold rounded-[8px] transition-colors active:scale-95 shrink-0"
+                            className="flex items-center justify-center gap-2 h-9 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[13px] font-semibold rounded-[8px] transition-colors active:scale-95 shrink-0"
                         >
                             <Plus size={16} />
                             Add Candidate
@@ -959,7 +959,7 @@ export default function RecruitmentPage() {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mt-4">
+                <div className={`${statGridClass(4)} mt-4`}>
                     {([
                         { label: "Total Candidates",   value: stats.total,      month: stats.totalMonth,      icon: Users,     tone: "blue"   },
                         { label: "Interviews",         value: stats.interviews, month: stats.interviewsMonth, icon: Calendar,  tone: "amber"  },
@@ -1003,26 +1003,25 @@ export default function RecruitmentPage() {
             {activeTab === "pipeline" && (
                 <>
                     {/* Toolbar */}
-                    <div className="px-4 pb-3 lg:px-0 flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
-                        <div className="flex items-center gap-2 flex-wrap">
+                    <div className="px-4 pb-3 lg:px-0 filter-bar">
                             {/* View toggle */}
-                            <div className="flex bg-[var(--surface2)] rounded-[8px] p-0.5 border border-[var(--border)]">
+                            <div className="filter-full flex bg-[var(--surface2)] rounded-[8px] p-0.5 border border-[var(--border)]">
                                 {(["kanban", "list"] as const).map(v => (
                                     <button key={v} onClick={() => setViewMode(v)}
-                                        className={`px-3 py-1.5 text-[12px] font-medium rounded-[6px] transition-all capitalize ${viewMode === v ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text3)]"}`}>
+                                        className={`flex-1 sm:flex-none px-3 py-1.5 text-[12px] font-medium rounded-[6px] transition-all capitalize ${viewMode === v ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text3)]"}`}>
                                         {v === "kanban" ? "Board" : "List"}
                                     </button>
                                 ))}
                             </div>
 
                             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                                className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none">
+                                className="w-full sm:w-auto h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none">
                                 <option value="ALL">All Stages</option>
                                 {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                             </select>
 
                             <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                                className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none">
+                                className="w-full sm:w-auto h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none">
                                 <option value="ALL">All Priority</option>
                                 <option value="HIGH">High</option>
                                 <option value="MEDIUM">Medium</option>
@@ -1030,7 +1029,7 @@ export default function RecruitmentPage() {
                             </select>
 
                             <select value={filterScore} onChange={e => setFilterScore(e.target.value)}
-                                className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none">
+                                className="w-full sm:w-auto h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none">
                                 <option value="ALL">All Score</option>
                                 <option value="HOT">Hot</option>
                                 <option value="WARM">Warm</option>
@@ -1038,19 +1037,18 @@ export default function RecruitmentPage() {
                             </select>
 
                             <select value={filterRecruiter} onChange={e => setFilterRecruiter(e.target.value)}
-                                className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none max-w-[160px]">
+                                className="w-full sm:w-auto h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none sm:max-w-[160px]">
                                 <option value="ALL">All Recruiters</option>
                                 {recruiterOptions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
 
                             <select value={filterPosition} onChange={e => setFilterPosition(e.target.value)}
-                                className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none max-w-[160px]">
+                                className="w-full sm:w-auto h-8 px-2 text-[12px] border border-[var(--border)] rounded-[7px] bg-white text-[var(--text2)] focus:outline-none sm:max-w-[160px]">
                                 <option value="ALL">All Positions</option>
                                 {positionOptions.map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
-                        </div>
 
-                        <div className="relative w-full sm:w-56">
+                        <div className="filter-search relative w-full sm:w-56 sm:ml-auto">
                             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                             <input
                                 value={searchQ}

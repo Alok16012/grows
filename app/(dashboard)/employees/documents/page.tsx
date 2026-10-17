@@ -343,13 +343,13 @@ export default function MasterDocumentsPage() {
                     <h1 className="text-[24px] font-bold text-[var(--text)] tracking-[-0.4px]">Document Management</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-1">Manage, upload and verify all employee documents in one place.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
-                    <button className="flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                <div className="page-actions">
+                    <button className="flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
                         <Download size={16} /> Export
                     </button>
                     {isAdmin && (
                         <button onClick={() => toast.info("Use the per-document Upload buttons in each employee's row.")}
-                            className="flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent,#0b5cff)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                            className="flex items-center justify-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent,#0b5cff)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
                             style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                             <Upload size={16} /> Upload Documents
                         </button>
@@ -367,36 +367,36 @@ export default function MasterDocumentsPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-2.5 items-center">
-                <div className="relative flex-1 min-w-[200px] max-w-[320px]">
+            <div className="filter-bar sm:gap-2.5">
+                <div className="filter-search relative flex-1 sm:min-w-[200px] sm:max-w-[320px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)]" />
                     <input placeholder="Search by employee name or ID..."
                         className="w-full h-10 pl-9 pr-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] placeholder:text-[var(--text3)] outline-none focus:border-[var(--accent)]"
                         value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
-                    className="h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
+                    className="w-full sm:w-auto h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
                     {sites.map(s => <option key={s} value={s}>{s === "ALL" ? "All Sites" : s}</option>)}
                 </select>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                    className="h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
+                    className="w-full sm:w-auto h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
                     <option value="ALL">All Status</option>
                     <option value="COMPLETE">All Docs Present</option>
                     <option value="MISSING">Missing Docs</option>
                     <option value="PENDING">Verification Pending</option>
                 </select>
                 <select value={docTypeFilter} onChange={e => setDocTypeFilter(e.target.value)}
-                    className="h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
+                    className="w-full sm:w-auto h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
                     <option value="ALL">All Document Types</option>
                     {DOC_COLS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
                 {anyFilter && (
                     <button onClick={() => { setSearch(""); setSiteFilter("ALL"); setStatusFilter("ALL"); setDocTypeFilter("ALL") }}
-                        className="h-10 px-3 rounded-[10px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center gap-1.5">
+                        className="h-10 px-3 rounded-[10px] text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center justify-center gap-1.5">
                         <X size={14} /> Clear
                     </button>
                 )}
-                <span className="text-[12.5px] text-[var(--text3)] ml-auto flex items-center gap-1.5 whitespace-nowrap">
+                <span className="filter-full text-[12.5px] text-[var(--text3)] ml-auto flex items-center justify-end gap-1.5 whitespace-nowrap">
                     <Users size={14} /> {filtered.length} employees
                 </span>
             </div>

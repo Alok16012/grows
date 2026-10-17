@@ -319,7 +319,7 @@ export default function UserManagementPage() {
                         )
                     })()}
                 </div>
-                <div className="flex flex-wrap items-center gap-[10px] sm:justify-end">
+                <div className="page-actions">
                     <button
                         onClick={handleCleanupOrphans}
                         disabled={cleaning}
@@ -341,8 +341,8 @@ export default function UserManagementPage() {
             </div>
 
             {/* Filters Bar */}
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="relative flex-1 min-w-[180px] max-w-[400px]">
+            <div className="filter-bar sm:gap-3 mb-4">
+                <div className="filter-search relative flex-1 sm:min-w-[180px] sm:max-w-[400px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <input
                         placeholder="Search name or email..."
@@ -354,7 +354,7 @@ export default function UserManagementPage() {
                 <select
                     value={roleFilter}
                     onChange={e => setRoleFilter(e.target.value)}
-                    className="w-[160px] px-3.5 py-[9px] bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text2)] focus:outline-none focus:border-[var(--accent)] appearance-none cursor-pointer"
+                    className="w-full sm:w-[160px] px-3.5 py-[9px] bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text2)] focus:outline-none focus:border-[var(--accent)] appearance-none cursor-pointer"
                 >
                     <option value="ALL">All Roles</option>
                     <option value="ADMIN">Admin</option>

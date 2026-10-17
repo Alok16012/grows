@@ -235,24 +235,26 @@ export default function DepartmentsPage() {
     return (
         <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                     <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Departments</h1>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">
                         {departments.length} department{departments.length !== 1 ? "s" : ""} · {totalEmployees} employees
                     </p>
                 </div>
-                <button
-                    onClick={() => { setEditDept(null); setShowModal(true) }}
-                    className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
-                >
-                    <Plus size={16} /> Add Department
-                </button>
+                <div className="page-actions">
+                    <button
+                        onClick={() => { setEditDept(null); setShowModal(true) }}
+                        className="inline-flex items-center justify-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
+                    >
+                        <Plus size={16} /> Add Department
+                    </button>
+                </div>
             </div>
 
             {/* Search */}
-            <div className="bg-white border border-[var(--border)] rounded-[12px] p-4">
-                <div className="relative max-w-sm">
+            <div className="filter-bar bg-white border border-[var(--border)] rounded-[12px] p-4">
+                <div className="filter-search relative flex-1 sm:max-w-sm">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                     <input
                         value={search}

@@ -151,20 +151,20 @@ export default function JobsPage() {
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Jobs</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage internal job postings across departments and sites.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+                <div className="page-actions">
                     <button onClick={exportCsv}
-                        className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
+                        className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <Download size={16} /> Export
                     </button>
                     {canManage && (
                         <button onClick={() => toast.info("Manage Templates coming soon")}
-                            className="inline-flex items-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
+                            className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                             <FileStack size={16} /> Manage Templates
                         </button>
                     )}
                     {canManage && (
                         <Link href="/jobs/new"
-                            className="inline-flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90"
+                            className="inline-flex items-center justify-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90"
                             style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                             <Plus size={16} /> Post a Job
                         </Link>
@@ -181,39 +181,39 @@ export default function JobsPage() {
             </div>
 
             {/* Filter bar */}
-            <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative flex-1 min-w-[220px] max-w-[340px]">
+            <div className="filter-bar sm:gap-2.5">
+                <div className="filter-search relative flex-1 sm:min-w-[220px] sm:max-w-[340px]">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                     <input value={search} onChange={e => setSearch(e.target.value)}
                         placeholder="Search by title, role, department or location..."
                         className="w-full h-9 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13px] outline-none focus:border-[var(--accent)]" />
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="filter-full flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                     {STATUS_FILTERS.map(s => (
                         <button key={s} onClick={() => setStatus(s)}
-                            className={`px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${status === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
+                            className={`shrink-0 whitespace-nowrap px-3.5 h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors ${status === s ? "bg-[var(--accent)] text-white" : "text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
                             {s === "ALL" ? "All" : STATUS_META[s].label}
                         </button>
                     ))}
                 </div>
-                <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className={selCls}>
+                <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className={`w-full sm:w-auto ${selCls}`}>
                     <option value="ALL">All Departments</option>
                     {departments.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <select value={locFilter} onChange={e => setLocFilter(e.target.value)} className={selCls}>
+                <select value={locFilter} onChange={e => setLocFilter(e.target.value)} className={`w-full sm:w-auto ${selCls}`}>
                     <option value="ALL">All Locations</option>
                     {locations.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
-                <select value={prioFilter} onChange={e => setPrioFilter(e.target.value)} className={selCls}>
+                <select value={prioFilter} onChange={e => setPrioFilter(e.target.value)} className={`w-full sm:w-auto ${selCls}`}>
                     <option value="ALL">All Priorities</option>
                     <option value="HIGH">High</option>
                     <option value="MEDIUM">Medium</option>
                     <option value="LOW">Low</option>
                 </select>
-                <button className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
+                <button className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                     <SlidersHorizontal size={14} /> Filters
                 </button>
-                <div className="flex items-center gap-1 border border-[var(--border)] rounded-[9px] p-0.5 bg-[var(--surface)]">
+                <div className="flex items-center justify-center gap-1 border border-[var(--border)] rounded-[9px] p-0.5 bg-[var(--surface)]">
                     <button onClick={() => setView("grid")} title="Grid"
                         className="w-8 h-8 rounded-[7px] flex items-center justify-center" style={{ background: view === "grid" ? "var(--accent-light,#e8effe)" : "transparent", color: view === "grid" ? "var(--accent)" : "var(--text3)" }}>
                         <LayoutGrid size={16} />

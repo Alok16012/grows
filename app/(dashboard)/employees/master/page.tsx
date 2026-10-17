@@ -888,8 +888,8 @@ export default function EmployeeMasterPage() {
         <>
         <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", minHeight: 0 }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0" style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                     <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--accent-light, #e8effe)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
                         <Users size={19} style={{ color: "var(--accent)" }} />
                     </div>
@@ -900,7 +900,7 @@ export default function EmployeeMasterPage() {
                         </p>
                     </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="page-actions">
                     {activeFilterCount > 0 && (
                         <button onClick={() => setColFilters({})}
                             style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 12px", borderRadius: 9, border: "1px solid #f59e0b40", background: "#fef9c3", fontSize: 12, color: "#92400e", cursor: "pointer", fontWeight: 600 }}>
@@ -930,18 +930,18 @@ export default function EmployeeMasterPage() {
             </div>
 
             {/* Search + filters */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <div style={{ position: "relative", flex: 1, minWidth: 240, maxWidth: 440 }}>
+            <div className="filter-bar sm:gap-[10px]">
+                <div className="filter-search sm:min-w-[240px]" style={{ position: "relative", flex: 1, maxWidth: 440 }}>
                     <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, employee ID, phone, email…"
                         style={{ width: "100%", height: 38, padding: "0 12px 0 36px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, outline: "none", background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }} />
                 </div>
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full sm:w-auto"
                     style={{ height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer" }}>
                     <option value="">All Status</option>
                     {["ACTIVE","INACTIVE","ON_LEAVE","TERMINATED","RESIGNED"].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)}
+                <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)} className="w-full sm:w-auto"
                     style={{ height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none", cursor: "pointer", maxWidth: 200 }}>
                     <option value="">All Sites</option>
                     {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -950,15 +950,15 @@ export default function EmployeeMasterPage() {
                 {/* Joining month. Labelled "Joined", not just a bare month, so
                     it can't be mistaken for an attendance or payroll period —
                     this grid has no month of its own. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, height: 38, padding: "0 10px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)" }}>
+                <div className="filter-full" style={{ display: "flex", alignItems: "center", gap: 6, height: 38, padding: "0 10px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)" }}>
                     <CalendarRange size={14} style={{ color: "var(--text3)", flexShrink: 0 }} />
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>Joined</span>
-                    <select value={joinMonth} onChange={e => setJoinMonth(e.target.value)} aria-label="Joining month"
+                    <select value={joinMonth} onChange={e => setJoinMonth(e.target.value)} aria-label="Joining month" className="min-w-0 flex-1 sm:flex-none"
                         style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 13, outline: "none", cursor: "pointer" }}>
                         <option value="">Any month</option>
                         {JOIN_MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                     </select>
-                    <select value={joinYear} onChange={e => setJoinYear(e.target.value)} aria-label="Joining year"
+                    <select value={joinYear} onChange={e => setJoinYear(e.target.value)} aria-label="Joining year" className="min-w-0 flex-1 sm:flex-none"
                         style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 13, outline: "none", cursor: "pointer" }}>
                         <option value="">Any year</option>
                         {JOIN_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
@@ -967,17 +967,17 @@ export default function EmployeeMasterPage() {
 
                 {(statusFilter || siteFilter || search || joinMonth || joinYear) && (
                     <button onClick={() => { setStatusFilter(""); setSiteFilter(""); setSearch(""); setJoinMonth(""); setJoinYear(""); }}
-                        style={{ display: "flex", alignItems: "center", gap: 4, height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         <X size={13} /> Clear
                     </button>
                 )}
 
-                <div style={{ flex: 1 }} />
+                <div className="hidden sm:block" style={{ flex: 1 }} />
 
                 {/* Columns picker (controls the Excel export) */}
                 <div style={{ position: "relative" }}>
                     <button onClick={() => setShowColPicker(v => !v)}
-                        style={{ display: "flex", alignItems: "center", gap: 6, height: 38, padding: "0 14px", borderRadius: 10, border: "1px solid var(--border)", background: showColPicker ? "var(--surface2)" : "var(--surface)", color: "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: 38, padding: "0 14px", borderRadius: 10, border: "1px solid var(--border)", background: showColPicker ? "var(--surface2)" : "var(--surface)", color: "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
                         <CheckSquare size={14} /> Columns ({visibleCols.length})
                     </button>
                     {showColPicker && (

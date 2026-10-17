@@ -322,7 +322,7 @@ export default function RolesPage() {
                     <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Role Management</h1>
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: "3px 0 0" }}>Create roles and define what each role can access</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button
                         onClick={() => { setEditing(null); setShowModal(true) }}
                         style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}

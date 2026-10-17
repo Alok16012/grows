@@ -211,7 +211,7 @@ export default function EmployeeLoginsPage() {
                     <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">Employee Logins</h1>
                     <p className="text-[13px] text-[var(--text2)] mt-[3px]">Every employee&apos;s login id, password and role — view, copy and update</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button
                         onClick={resetAllMobile}
                         disabled={resettingMobile || generating}
@@ -232,8 +232,8 @@ export default function EmployeeLoginsPage() {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="relative flex-1 min-w-[200px] max-w-[400px]">
+            <div className="filter-bar sm:gap-3 mb-4">
+                <div className="filter-search relative flex-1 sm:min-w-[200px] sm:max-w-[400px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <input
                         placeholder="Search name, login id or code..."
@@ -243,7 +243,7 @@ export default function EmployeeLoginsPage() {
                     />
                 </div>
                 {(() => {
-                    const selCls = "h-9 px-2.5 bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] cursor-pointer max-w-[170px]"
+                    const selCls = "w-full sm:w-auto h-9 px-2.5 bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] cursor-pointer sm:max-w-[170px]"
                     return (
                         <>
                             <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className={selCls} title="Filter by role">
@@ -270,7 +270,7 @@ export default function EmployeeLoginsPage() {
                         Clear
                     </button>
                 )}
-                <span className="text-[12px] text-[var(--text3)] ml-auto">{filtered.length} of {rows.length}</span>
+                <span className="filter-full order-last sm:order-none text-right text-[12px] text-[var(--text3)] ml-auto">{filtered.length} of {rows.length}</span>
                 <button onClick={fetchData} className="h-9 w-9 rounded-[9px] bg-white border border-[var(--border)] flex items-center justify-center hover:bg-[var(--surface2)] transition-colors" title="Refresh">
                     <RefreshCw className="h-4 w-4 text-[var(--text2)]" />
                 </button>

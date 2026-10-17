@@ -299,7 +299,7 @@ export default function DocumentTypesPage() {
                         Manage document templates and settings
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="page-actions">
                     <button
                         onClick={() => { setEditingType(null); setShowModal(true) }}
                         className="flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"

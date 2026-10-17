@@ -30,7 +30,7 @@ const EXPORT_COLUMNS = [
     "Bank Name", "Bank Branch", "Bank IFSC", "Bank Account",
 ]
 import { DocumentViewer } from "@/components/DocumentViewer"
-import { StatCard } from "@/components/StatCard"
+import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Local Types ──────────────────────────────────────────────────────────────
 
@@ -1516,8 +1516,8 @@ function EmployeesPage() {
     return (
         <div className="p-4 lg:p-0 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-3 min-w-0">
                     <div className="w-12 h-12 rounded-[14px] bg-[var(--surface)] shadow-[var(--shadow-card)] flex items-center justify-center shrink-0">
                         <Users size={23} className="text-[var(--accent)]" />
                     </div>
@@ -1526,12 +1526,12 @@ function EmployeesPage() {
                         <p className="text-[13px] sm:text-[15px] text-[var(--text2)] mt-0.5">Manage your workforce and track employee information</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                    <div style={{ position: "relative" }}>
+                <div className="page-actions">
+                    <div className="flex" style={{ position: "relative" }}>
                         <button
                             onClick={() => setExportOpen(o => !o)}
                             title="Export to Excel — pick rows & columns"
-                            className="inline-flex items-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
+                            className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
                         >
                             <Download size={17} />
                             Export{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
@@ -1578,7 +1578,7 @@ function EmployeesPage() {
                     <button
                         onClick={() => { setShowImportModal(true); setImportRows([]); setImportResult(null); if (importFileRef.current) importFileRef.current.value = "" }}
                         title="Import from Excel"
-                        className="inline-flex items-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
+                        className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
                     >
                         <Upload size={17} />
                         Import
@@ -1587,7 +1587,7 @@ function EmployeesPage() {
                         <button
                             onClick={() => setShowBulkUpdate(true)}
                             title="Update existing employees (UAN / PF / ESIC, bank …) from Excel"
-                            className="inline-flex items-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
+                            className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
                         >
                             <RefreshCw size={17} />
                             Bulk Update
@@ -1595,7 +1595,7 @@ function EmployeesPage() {
                     )}
                     <button
                         onClick={() => { setEditEmployee(null); setShowModal(true) }}
-                        className="inline-flex items-center gap-2 h-11 px-5 rounded-[10px] text-white text-[14px] font-semibold bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] shadow-[0_8px_20px_-6px_rgba(31,95,255,0.6)] hover:brightness-110 transition"
+                        className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-[10px] text-white text-[14px] font-semibold bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] shadow-[0_8px_20px_-6px_rgba(31,95,255,0.6)] hover:brightness-110 transition"
                     >
                         <Plus size={18} /> Add Employee
                     </button>
@@ -1603,7 +1603,7 @@ function EmployeesPage() {
             </div>
 
             {/* Stats Row — clicking a tile filters the table to it */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+            <div className={`${statGridClass(4)}`}>
                 <StatCard
                     label="Total Employees" value={counts?.total ?? total} tone="blue" seed={0}
                     icon={<Users size={20} />} onClick={() => setStatusFilter("")}
@@ -1658,8 +1658,8 @@ function EmployeesPage() {
             </div>
 
             {/* Search + dropdowns */}
-            <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-1 min-w-[240px]">
+            <div className="filter-bar sm:gap-3">
+                <div className="filter-search relative flex-1 sm:min-w-[240px]">
                     <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text2)]" />
                     <input
                         value={search}
@@ -1674,7 +1674,7 @@ function EmployeesPage() {
                     <select
                         value={deptFilter}
                         onChange={e => setDeptFilter(e.target.value)}
-                        className="h-12 min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
+                        className="h-12 sm:min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Departments</option>
                         {allDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -1686,7 +1686,7 @@ function EmployeesPage() {
                     <select
                         value={siteFilter}
                         onChange={e => setSiteFilter(e.target.value)}
-                        className="h-12 min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
+                        className="h-12 sm:min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Sites</option>
                         {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1698,7 +1698,7 @@ function EmployeesPage() {
                     <select
                         value={empTypeFilter}
                         onChange={e => setEmpTypeFilter(e.target.value)}
-                        className="h-12 min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
+                        className="h-12 sm:min-w-[200px] w-full rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] pl-11 pr-10 text-[14px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none"
                     >
                         <option value="">All Employment Types</option>
                         {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1708,7 +1708,7 @@ function EmployeesPage() {
                 {(deptFilter || siteFilter || empTypeFilter || search) && (
                     <button
                         onClick={() => { setDeptFilter(""); setSiteFilter(""); setEmpTypeFilter(""); setSearch("") }}
-                        className="h-12 px-4 inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors"
+                        className="h-12 px-4 inline-flex items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors"
                     >
                         <X size={14} /> Clear
                     </button>

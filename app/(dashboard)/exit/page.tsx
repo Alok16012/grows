@@ -260,15 +260,16 @@ export default function ExitPage() {
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" style={{ marginBottom: 24 }}>
+        <div className="min-w-0">
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Exit Management</h1>
           <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 4 }}>Manage employee exits, clearance &amp; F&amp;F settlements.</p>
         </div>
+        <div className="page-actions">
         <button
           onClick={() => setShowInitModal(true)}
           style={{
-            display: "flex", alignItems: "center", gap: 7,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
             background: "var(--accent)", color: "#fff",
             border: "none", borderRadius: 10, height: 42, padding: "0 18px",
             fontSize: 13, fontWeight: 600, cursor: "pointer",
@@ -277,6 +278,7 @@ export default function ExitPage() {
         >
           <Plus size={16} /> Initiate Exit
         </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -288,13 +290,12 @@ export default function ExitPage() {
       </div>
 
       {/* Filters */}
-      <div style={{
+      <div className="filter-bar sm:gap-3" style={{
         background: "var(--surface)", border: "1px solid var(--border)",
         borderRadius: 12, padding: "14px 16px", marginBottom: 20,
-        display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
       }}>
         {/* Status Pills */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div className="filter-full flex overflow-x-auto no-scrollbar sm:flex-wrap" style={{ gap: 6 }}>
           {[
             { val: "ALL", label: "All" },
             { val: "INITIATED", label: "Initiated" },
@@ -312,7 +313,7 @@ export default function ExitPage() {
                 border: `1px solid ${filterStatus === s.val ? "var(--accent)" : "var(--border)"}`,
                 background: filterStatus === s.val ? "var(--accent-light)" : "transparent",
                 color: filterStatus === s.val ? "var(--accent)" : "var(--text2)",
-                cursor: "pointer",
+                cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap",
               }}
             >
               {s.label}
@@ -320,11 +321,11 @@ export default function ExitPage() {
           ))}
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
           {/* Exit Type dropdown */}
           <select
             value={filterType}
             onChange={e => setFilterType(e.target.value)}
+            className="w-full sm:w-auto sm:ml-auto"
             style={{
               border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px",
               fontSize: 13, color: "var(--text)", background: "var(--surface)", cursor: "pointer",
@@ -339,19 +340,19 @@ export default function ExitPage() {
           </select>
 
           {/* Search */}
-          <div style={{ position: "relative" }}>
+          <div className="filter-search" style={{ position: "relative" }}>
             <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search employee..."
+              className="w-full sm:w-[200px]"
               style={{
                 border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px 6px 30px",
-                fontSize: 13, color: "var(--text)", background: "var(--surface)", width: 200,
+                fontSize: 13, color: "var(--text)", background: "var(--surface)",
               }}
             />
           </div>
-        </div>
       </div>
 
       {/* Exit List */}
