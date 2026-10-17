@@ -207,6 +207,24 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ── Module page toolbars (shared by every list page) ─────────────────── */
+/* Header actions: on phones every button grows so each row is filled edge to
+   edge at one height (no ragged wrap); from 640px they sit right-aligned. */
+.page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.page-actions > * { flex: 1 1 auto; justify-content: center; min-height: 40px; }
+@media (min-width: 640px) {
+  .page-actions { justify-content: flex-end; }
+  .page-actions > * { flex: 0 0 auto; min-height: 0; }
+}
+/* Filter rows: on phones the search box takes a full line and the dropdowns
+   pair up two per line at equal width; from 640px they flow in one row. */
+.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filter-bar > * { min-width: 0; }
+@media (max-width: 639.98px) {
+  .filter-bar > * { flex: 1 1 calc(50% - 4px); max-width: none !important; width: auto !important; }
+  .filter-bar > .filter-search, .filter-bar > .filter-full { flex-basis: 100%; }
+}
+
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
