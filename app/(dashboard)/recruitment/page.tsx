@@ -14,7 +14,7 @@ import {
     Target, X, ChevronRight, Briefcase,
     MessageSquare, PhoneCall, Send, Clock, Filter,
     Edit2, Trash2, CheckCircle, Loader2,
-    StickyNote, ArrowRight, ArrowUpRight,
+    StickyNote, ArrowRight,
     UserCheck, Banknote, Building2, Wrench,
     FileText, GraduationCap, Award, BarChart2,
     Flame, Droplet, Thermometer, Snowflake, CheckSquare, AlertCircle,
@@ -22,6 +22,7 @@ import {
     Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { StatCard } from "@/components/StatCard"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
@@ -958,34 +959,18 @@ export default function RecruitmentPage() {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-                    {[
-                        { label: "TOTAL CANDIDATES",   value: stats.total,     month: stats.totalMonth,      icon: Users,     color: "#3b82f6", bg: "#eff6ff" },
-                        { label: "INTERVIEWS",         value: stats.interviews,month: stats.interviewsMonth, icon: Calendar,  color: "#f59e0b", bg: "#fef3c7" },
-                        { label: "SELECTED / OFFERED", value: stats.selected,  month: stats.selectedMonth,   icon: UserCheck, color: "#16a34a", bg: "#dcfce7" },
-                        { label: "JOINED",             value: stats.joined,    month: stats.joinedMonth,     icon: Award,     color: "#047857", bg: "#ecfdf5" },
-                    ].map(s => (
-                        <div key={s.label} className="bg-white border border-[var(--border)] rounded-[14px] p-[18px]">
-                            <div className="flex items-start gap-3">
-                                <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: s.bg }}>
-                                    <s.icon size={20} style={{ color: s.color }} />
-                                </div>
-                                <div className="min-w-0">
-                                    {/* Wraps on phones: beside the 44px icon these cards leave
-                                        ~100px, so nowrap clipped "TOTAL CANDIDATES" mid-word. */}
-                                    <p className="text-[10.5px] font-semibold text-[var(--text3)] tracking-wider uppercase whitespace-normal sm:whitespace-nowrap">{s.label}</p>
-                                    <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
-                                        <span className="text-[28px] font-bold leading-none tabular-nums" style={{ color: s.color }}>{s.value}</span>
-                                        {s.month > 0 && (
-                                            <span className="inline-flex items-center gap-0.5 text-[11.5px] font-semibold text-[var(--accent)] whitespace-nowrap">
-                                                <ArrowUpRight size={13} className="stroke-[2.5]" />
-                                                {s.month} this month
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mt-4">
+                    {([
+                        { label: "Total Candidates",   value: stats.total,      month: stats.totalMonth,      icon: Users,     tone: "blue"   },
+                        { label: "Interviews",         value: stats.interviews, month: stats.interviewsMonth, icon: Calendar,  tone: "amber"  },
+                        { label: "Selected / Offered", value: stats.selected,   month: stats.selectedMonth,   icon: UserCheck, tone: "teal"   },
+                        { label: "Joined",             value: stats.joined,     month: stats.joinedMonth,     icon: Award,     tone: "violet" },
+                    ] as const).map((s, i) => (
+                        <StatCard
+                            key={s.label} label={s.label} value={s.value} tone={s.tone} seed={i}
+                            icon={<s.icon size={20} />}
+                            trend={s.month > 0 ? { dir: "up", text: `${s.month} this month` } : { dir: "flat", text: "No change" }}
+                        />
                     ))}
                 </div>
 
