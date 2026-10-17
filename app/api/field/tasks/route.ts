@@ -25,7 +25,7 @@ export async function GET(req: Request) {
         if (!isAdminOrManager) {
             // Find employee record linked to this user - match by email
             const employee = await prisma.employee.findFirst({
-                where: { email: session.user.email },
+                where: { userId: session.user.id },
             })
             if (!employee) return NextResponse.json([])
             where.employeeId = employee.id

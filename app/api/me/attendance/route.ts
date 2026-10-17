@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
+import { istDateOnly, dayWindow } from "@/lib/attendance-policy"
 
 // Self-service attendance punch — any logged-in user with a linked employee
 // record can check in / out for THEMSELVES only. No management permission needed
 // (it's their own attendance); the employee is always resolved from the session.
 
+// Today is the IST date (the server runs UTC). `day` is what a new record is
+// stored as; start/end is a window that also catches rows stored at IST midnight.
 function dayRange(d = new Date()) {
-    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-    const end = new Date(start)
-    end.setDate(end.getDate() + 1)
-    return { start, end }
+    const day = istDateOnly(d)
+    const { gte: start, lt: end } = dayWindow(day)
+    return { day, start, end }
 }
 
 async function linkedEmployee(userId: string) {
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
     const lng = typeof body?.lng === "number" ? body.lng : null
 
     const now = new Date()
-    const { start, end } = dayRange(now)
+    const { day, start, end } = dayRange(now)
     const existing = await prisma.attendance.findFirst({
         where: { employeeId: emp.id, date: { gte: start, lt: end } },
     })
@@ -77,7 +79,7 @@ export async function POST(req: Request) {
             })
             : await prisma.attendance.create({
                 data: {
-                    employeeId: emp.id, date: start, checkIn: now, status: "PRESENT",
+                    employeeId: emp.id, date: day, checkIn: now, status: "PRESENT",
                     checkInLat: lat, checkInLng: lng, markedBy: session.user.id,
                 },
             })

@@ -3,6 +3,19 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { notifyApprovers, notifyEmployee } from "@/lib/hr-notify"
+
+// Tell the people on the other side of each step that it's their turn.
+async function notifyReviewStep(review: { id: string; employeeId: string; status: string }, actorIsManager: boolean) {
+    const link = "/performance"
+    if (review.status === "SUBMITTED" && actorIsManager) {
+        await notifyEmployee(review.employeeId, { title: "Performance review shared", message: "Your manager has shared your performance review. Add your self-assessment and acknowledge it.", type: "performance", link })
+    } else if (review.status === "COMPLETED") {
+        await notifyEmployee(review.employeeId, { title: "Performance review completed", message: "Your performance review has been approved by HR.", type: "performance", link })
+    } else if (review.status === "ACKNOWLEDGED" && !actorIsManager) {
+        await notifyApprovers(["performance.manage"], { title: "Review acknowledged", message: "An employee has acknowledged their performance review.", type: "performance", link })
+    }
+}
 
 export async function GET(
     req: Request,
@@ -43,7 +56,7 @@ export async function GET(
         // sees their own review.
         if (!checkAccess(session, ["MANAGER"], "performance.view")) {
             const emp = await prisma.employee.findFirst({
-                where: { email: session.user.email ?? undefined },
+                where: { userId: session.user.id },
                 select: { id: true },
             })
             if (!emp || review.employeeId !== emp.id) {
@@ -77,7 +90,7 @@ export async function PATCH(
             })
             if (!target) return new NextResponse("Not Found", { status: 404 })
             const emp = await prisma.employee.findFirst({
-                where: { email: session.user.email ?? undefined },
+                where: { userId: session.user.id },
                 select: { id: true },
             })
             if (!emp || emp.id !== target.employeeId) {
@@ -156,6 +169,7 @@ export async function PATCH(
             },
         })
 
+        if (status !== undefined) await notifyReviewStep(review, canManage)
         return NextResponse.json(review)
     } catch (error) {
         console.error("[PERFORMANCE_PATCH]", error)
@@ -243,6 +257,7 @@ export async function PUT(
             },
         })
 
+        if (status !== undefined) await notifyReviewStep(review, true)
         return NextResponse.json(review)
     } catch (error) {
         console.error("[PERFORMANCE_PUT]", error)

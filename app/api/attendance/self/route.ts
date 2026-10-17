@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { istDateOnly, dayWindow, monthWindow } from "@/lib/attendance-policy"
 
 export async function GET(req: Request) {
     try {
@@ -14,27 +15,22 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url)
         const monthParam = searchParams.get("month") // YYYY-MM
 
-        const now = new Date()
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+        // "Today" is the IST date — the server runs UTC on Vercel, so a
+        // server-local day put early-morning check-ins on yesterday.
+        const today = istDateOnly()
+        const [y, m] = monthParam && /^\d{4}-\d{2}$/.test(monthParam)
+            ? monthParam.split("-").map(Number)
+            : [today.getUTCFullYear(), today.getUTCMonth() + 1]
 
         const [todayRecord, monthRecords] = await Promise.all([
             prisma.attendance.findFirst({
-                where: { employeeId: employee.id, date: { gte: todayStart, lt: todayEnd } },
+                where: { employeeId: employee.id, date: dayWindow(today) },
                 include: { site: { select: { id: true, name: true } } },
             }),
             prisma.attendance.findMany({
                 where: {
                     employeeId: employee.id,
-                    date: monthParam
-                        ? {
-                            gte: new Date(parseInt(monthParam.split("-")[0]), parseInt(monthParam.split("-")[1]) - 1, 1),
-                            lt: new Date(parseInt(monthParam.split("-")[0]), parseInt(monthParam.split("-")[1]), 1),
-                          }
-                        : {
-                            gte: new Date(now.getFullYear(), now.getMonth(), 1),
-                            lt: new Date(now.getFullYear(), now.getMonth() + 1, 1),
-                          },
+                    date: monthWindow(y, m),
                 },
                 include: { site: { select: { id: true, name: true } } },
                 orderBy: { date: "asc" },
@@ -60,11 +56,10 @@ export async function POST(req: Request) {
         const { action, lat, lng } = body // action: "checkin" | "checkout"
 
         const now = new Date()
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+        const todayStart = istDateOnly(now)
 
         const existing = await prisma.attendance.findFirst({
-            where: { employeeId: employee.id, date: { gte: todayStart, lt: todayEnd } },
+            where: { employeeId: employee.id, date: dayWindow(todayStart) },
         })
 
         if (action === "checkin") {

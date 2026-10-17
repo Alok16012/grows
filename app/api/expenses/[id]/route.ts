@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
+import { notifyApprovers } from "@/lib/hr-notify"
 import { Prisma } from "@prisma/client"
 
 // Prod DB sometimes lags behind migrations (DIRECT_URL not set on Vercel, so
@@ -129,9 +130,10 @@ export async function PUT(
 
         const updateData: Record<string, unknown> = {}
 
-        if (isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED")) {
+        if (isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED" || expense.status === "REJECTED")) {
             // Owner can edit fields while the expense is still DRAFT or SUBMITTED
-            // (i.e. before a manager approves/rejects it).
+            // (i.e. before a manager approves/rejects it), or after a rejection
+            // to correct it and send it back.
             if (title !== undefined) updateData.title = title
             if (category !== undefined) updateData.category = category
             if (amount !== undefined) updateData.amount = parseFloat(String(amount))
@@ -153,12 +155,19 @@ export async function PUT(
             }
         }
 
+        // Nobody signs off their own claim — except ADMIN, who has no one above.
+        if ((action === "APPROVE" || action === "REJECT" || action === "PAID") && isOwner && session.user.role !== "ADMIN") {
+            return new NextResponse("You can't approve or pay your own claim — another approver has to", { status: 403 })
+        }
+
         // Action-based transitions
         if (action === "SUBMIT") {
             // Owner submits DRAFT → SUBMITTED
             if (!isOwner) return new NextResponse("Only the owner can submit", { status: 403 })
-            if (expense.status !== "DRAFT") return new NextResponse("Only DRAFT can be submitted", { status: 400 })
+            // A rejected claim can be corrected and sent back for approval.
+            if (expense.status !== "DRAFT" && expense.status !== "REJECTED") return new NextResponse("Only a draft or rejected claim can be submitted", { status: 400 })
             updateData.status = "SUBMITTED"
+            if (expense.status === "REJECTED") { updateData.rejectionReason = null; updateData.rejectedAt = null }
         } else if (action === "APPROVE") {
             // Admin/Manager approves SUBMITTED → APPROVED
             if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
@@ -212,20 +221,14 @@ export async function PUT(
             const actorName = session.user.name || "Someone"
 
             if (action === "SUBMIT") {
-                // Notify admins/managers that a new expense needs approval
-                const managers = await prisma.user.findMany({
-                    where: { role: { in: ["ADMIN", "MANAGER"] }, isActive: true },
-                    select: { id: true },
-                })
-                await prisma.notification.createMany({
-                    data: managers.map(m => ({
-                        userId: m.id,
-                        title: "Expense Submitted",
-                        message: `${actorName} submitted ${expNo} — ${expTitle}`,
-                        type: "expense",
-                        link: "/expenses",
-                    })),
-                })
+                // Notify everyone who can approve it. Access comes from custom-role
+                // permissions, not the base MANAGER role, so match on those.
+                await notifyApprovers(["expenses.manage"], {
+                    title: expense.status === "REJECTED" ? "Expense Resubmitted" : "Expense Submitted",
+                    message: `${actorName} submitted ${expNo} — ${expTitle}`,
+                    type: "expense",
+                    link: "/expenses",
+                }, session.user.id)
             } else if (action === "APPROVE") {
                 await prisma.notification.create({
                     data: {

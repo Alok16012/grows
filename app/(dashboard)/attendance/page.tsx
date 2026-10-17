@@ -11,6 +11,8 @@ import {
 } from "lucide-react"
 import { format, getDaysInMonth } from "date-fns"
 import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
+import { MusterRoll, AttendanceSettings, CodeLegend, cellTitle, type RegisterResponse } from "@/components/attendance/muster-roll"
+import { CODE_STYLE, lateBy, type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/attendance-policy"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -387,32 +389,6 @@ function BulkMarkModal({ open, onClose, onSaved, employees }: {
     )
 }
 
-// ─── Monthly Summary types & helpers ─────────────────────────────────────────
-
-type MonthlySummary = {
-    employee: Employee
-    present: number
-    absent: number
-    late: number
-    halfDay: number
-    leave: number
-    overtimeHrs: number
-    attendancePct: number
-    totalDays: number
-}
-
-function AttendancePct({ pct }: { pct: number }) {
-    const color = pct >= 90 ? "#16a34a" : pct >= 75 ? "#f59e0b" : "#dc2626"
-    const bg = pct >= 90 ? "#dcfce7" : pct >= 75 ? "#fffbeb" : "#fef2f2"
-    const border = pct >= 90 ? "#bbf7d0" : pct >= 75 ? "#fde68a" : "#fecaca"
-    return (
-        <span style={{ color, background: bg, borderColor: border }}
-            className="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap">
-            {pct.toFixed(1)}%
-        </span>
-    )
-}
-
 // ─── Self-Service Check-In/Out Card ──────────────────────────────────────────
 
 function SelfCheckCard({
@@ -535,9 +511,10 @@ function SelfCheckCard({
 
 // ─── Self-Service Month Table ─────────────────────────────────────────────────
 
-function SelfMonthTable({ monthRecords, selectedMonth }: {
+function SelfMonthTable({ monthRecords, selectedMonth, register }: {
     monthRecords: SelfAttendanceRecord[]
     selectedMonth: string
+    register: RegisterResponse["rows"][number] | null
 }) {
     const [yr, mo] = selectedMonth.split("-").map(Number)
     const daysInMonth = getDaysInMonth(new Date(yr, mo - 1, 1))
@@ -548,11 +525,13 @@ function SelfMonthTable({ monthRecords, selectedMonth }: {
         recordMap.set(d.getDate(), r)
     })
 
-    // Summary stats
-    const present = monthRecords.filter(r => r.status === "PRESENT").length
-    const absent = monthRecords.filter(r => r.status === "ABSENT").length
-    const late = monthRecords.filter(r => r.status === "LATE").length
-    const leave = monthRecords.filter(r => r.status === "LEAVE").length
+    // Summary stats — from the register when it loaded (it knows about approved
+    // leave, holidays and late marking), else from the raw records.
+    const t = register?.totals
+    const present = t ? t.present + t.halfDay * 0.5 : monthRecords.filter(r => r.status === "PRESENT").length
+    const absent = t ? t.absent : monthRecords.filter(r => r.status === "ABSENT").length
+    const late = t ? t.late : monthRecords.filter(r => r.status === "LATE").length
+    const leave = t ? t.leave : monthRecords.filter(r => r.status === "LEAVE").length
     const totalHrs = monthRecords.reduce((s, r) => s + (r.workingHrs || 0), 0)
 
     const formatTime = (dt?: string | null) => dt ? format(new Date(dt), "HH:mm") : "—"
@@ -624,9 +603,15 @@ function SelfMonthTable({ monthRecords, selectedMonth }: {
                                             <span className={`text-[12px] ${isWeekend ? "text-[#dc2626] font-medium" : "text-[var(--text3)]"}`}>{dayName}</span>
                                         </td>
                                         <td className="px-3 py-2.5">
-                                            {record ? <StatusBadge status={record.status} /> : (
-                                                <span className="text-[12px] text-[var(--text3)]">Not Marked</span>
-                                            )}
+                                            {(() => {
+                                                const c = register?.cells[day - 1]
+                                                if (c && c.code && c.code !== "-") {
+                                                    const st = CODE_STYLE[c.code]
+                                                    const label = c.code === "L" ? `Leave${c.leaveType ? ` · ${c.leaveType}` : ""}` : c.code === "H" ? (c.holiday || "Holiday") : c.code === "LT" ? `Late · ${c.lateMin}m` : st.label
+                                                    return <span title={cellTitle(c, String(day))} className="px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap" style={{ color: st.color, background: st.bg }}>{label}</span>
+                                                }
+                                                return record ? <StatusBadge status={record.status} /> : <span className="text-[12px] text-[var(--text3)]">{c?.code === "" ? "" : "Not Marked"}</span>
+                                            })()}
                                         </td>
                                         <td className="px-3 py-2.5 text-[13px] text-[var(--text2)]">
                                             {formatTime(record?.checkIn)}
@@ -670,6 +655,7 @@ function SelfMonthTable({ monthRecords, selectedMonth }: {
 function SelfServiceView() {
     const [todayRecord, setTodayRecord] = useState<SelfAttendanceRecord | null>(null)
     const [monthRecords, setMonthRecords] = useState<SelfAttendanceRecord[]>([])
+    const [register, setRegister] = useState<RegisterResponse["rows"][number] | null>(null)
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"))
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
@@ -702,6 +688,12 @@ function SelfServiceView() {
     useEffect(() => {
         fetchSelf(selectedMonth)
     }, [selectedMonth, fetchSelf])
+
+    useEffect(() => {
+        setRegister(null)
+        fetch(`/api/attendance/register?month=${selectedMonth}`).then(r => r.ok ? r.json() : null)
+            .then((d: RegisterResponse | null) => setRegister(d?.rows?.[0] ?? null)).catch(() => {})
+    }, [selectedMonth, todayRecord])
 
     const handleAction = useCallback((action: "checkin" | "checkout") => {
         setActionLoading(true)
@@ -768,7 +760,8 @@ function SelfServiceView() {
                     </div>
 
                     {/* Month table */}
-                    <SelfMonthTable monthRecords={monthRecords} selectedMonth={selectedMonth} />
+                    <SelfMonthTable monthRecords={monthRecords} selectedMonth={selectedMonth} register={register} />
+                    <CodeLegend />
                 </>
             )}
         </div>
@@ -778,12 +771,15 @@ function SelfServiceView() {
 // ─── Admin / Manager View ─────────────────────────────────────────────────────
 
 function AdminView() {
-    const [tab, setTab] = useState<"daily" | "monthly">("daily")
+    const [tab, setTab] = useState<"daily" | "muster" | "settings">("daily")
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"))
     const [employees, setEmployees] = useState<Employee[]>([])
     const [attendances, setAttendances] = useState<AttendanceRecord[]>([])
-    const [monthlyAttendances, setMonthlyAttendances] = useState<AttendanceRecord[]>([])
+    const [attPolicy, setAttPolicy] = useState<AttendancePolicy>(DEFAULT_ATTENDANCE_POLICY)
+    const [weeklyOff, setWeeklyOff] = useState<number[]>([0])
+    const [leavesOnDay, setLeavesOnDay] = useState<Map<string, string>>(new Map())
+    const [holidayName, setHolidayName] = useState<string | null>(null)
     const [sites, setSites] = useState<Site[]>([])
     const [siteFilter, setSiteFilter] = useState("")
     const [search, setSearch] = useState("")
@@ -799,16 +795,36 @@ function AdminView() {
 
     useEffect(() => {
         fetch("/api/sites").then(r => r.json()).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {})
+        fetch("/api/attendance/policy").then(r => r.ok ? r.json() : null).then(d => d && setAttPolicy(d.policy)).catch(() => {})
+        fetch("/api/leaves/policy").then(r => r.ok ? r.json() : null).then(d => d && setWeeklyOff(d.policy.weeklyOff)).catch(() => {})
     }, [])
 
+    // Approved leave and the holiday calendar for the selected day, so people
+    // on leave aren't counted absent and a holiday isn't a sea of red.
+    useEffect(() => {
+        const key = format(selectedDate, "yyyy-MM-dd")
+        Promise.all([
+            fetch(`/api/leaves?month=${key.slice(0, 7)}&status=APPROVED`).then(r => r.ok ? r.json() : []),
+            fetch(`/api/holidays?year=${key.slice(0, 4)}`).then(r => r.ok ? r.json() : []),
+        ]).then(([lv, hol]) => {
+            const m = new Map<string, string>()
+            if (Array.isArray(lv)) for (const l of lv) if (l.startDate.slice(0, 10) <= key && l.endDate.slice(0, 10) >= key) m.set(l.employeeId, l.days === 0.5 ? `${l.type} ½` : l.type)
+            setLeavesOnDay(m)
+            const h = Array.isArray(hol) ? hol.find((x: { date: string; type?: string }) => x.date.slice(0, 10) === key && x.type !== "RESTRICTED") : null
+            setHolidayName(h?.name ?? null)
+        }).catch(() => {})
+    }, [selectedDate])
+
+    const [employeesLoading, setEmployeesLoading] = useState(true)
     const fetchEmployees = useCallback(async () => {
+        setEmployeesLoading(true)
         try {
             const params = new URLSearchParams({ status: "ACTIVE", pageSize: "1000" })
             if (siteFilter) params.set("siteId", siteFilter)
             const res = await fetch(`/api/employees?${params}`)
             const data = await res.json()
             setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
-        } catch { setEmployees([]) }
+        } catch { setEmployees([]) } finally { setEmployeesLoading(false) }
     }, [siteFilter])
 
     const fetchAttendances = useCallback(async () => {
@@ -831,21 +847,6 @@ function AdminView() {
         }
     }, [selectedDate, siteFilter, debouncedSearch])
 
-    const fetchMonthlyAttendances = useCallback(async () => {
-        setLoading(true)
-        try {
-            const params = new URLSearchParams({ month: selectedMonth })
-            if (siteFilter) params.set("siteId", siteFilter)
-            const res = await fetch(`/api/attendance?${params}`)
-            const data = await res.json()
-            setMonthlyAttendances(Array.isArray(data) ? data : [])
-        } catch {
-            toast.error("Failed to load monthly attendance")
-        } finally {
-            setLoading(false)
-        }
-    }, [selectedMonth, siteFilter])
-
     useEffect(() => { fetchEmployees() }, [fetchEmployees])
 
     useEffect(() => {
@@ -855,44 +856,36 @@ function AdminView() {
 
     useEffect(() => {
         if (tab === "daily") fetchAttendances()
-        else fetchMonthlyAttendances()
-    }, [tab, fetchAttendances, fetchMonthlyAttendances])
+    }, [tab, fetchAttendances])
 
     // Stats for daily view
     const attendanceMap = new Map(attendances.map(a => [a.employeeId, a]))
     const filteredEmployees = employees.filter(e =>
         !search || `${e.firstName} ${e.lastName} ${e.employeeId}`.toLowerCase().includes(search.toLowerCase())
     )
-    const presentCount = attendances.filter(a => a.status === "PRESENT").length
-    // Absent = explicitly marked ABSENT, plus anyone with no record for the day.
-    // Counting only the unmarked silently dropped every real ABSENT entry.
-    const absentCount = filteredEmployees.filter(e => {
-        const record = attendanceMap.get(e.id)
-        return !record || record.status === "ABSENT"
+    const isOffDay = weeklyOff.includes(selectedDate.getDay()) || !!holidayName
+    const isFutureDay = format(selectedDate, "yyyy-MM-dd") > format(new Date(), "yyyy-MM-dd")
+    const isLate = (a?: AttendanceRecord) => !!a && (a.status === "LATE" || ((a.status === "PRESENT") && lateBy(a.checkIn, attPolicy) > 0))
+    const presentCount = attendances.filter(a => ["PRESENT", "LATE", "HALF_DAY"].includes(a.status)).length
+    const onLeaveCount = filteredEmployees.filter(e => {
+        const r = attendanceMap.get(e.id)
+        return r?.status === "LEAVE" || (!r && leavesOnDay.has(e.id))
     }).length
-    const lateHalfCount = attendances.filter(a => a.status === "LATE" || a.status === "HALF_DAY").length
-    const onLeaveCount = attendances.filter(a => a.status === "LEAVE").length
+    // Absent = marked ABSENT, plus anyone with no record on a past working day
+    // who isn't on approved leave. Weekly offs, holidays and future days don't count.
+    const absentCount = filteredEmployees.filter(e => {
+        const r = attendanceMap.get(e.id)
+        if (r) return r.status === "ABSENT" && !leavesOnDay.has(e.id)
+        return !isOffDay && !isFutureDay && !leavesOnDay.has(e.id)
+    }).length
+    const lateCount = attendances.filter(a => isLate(a)).length
+    const unmarkedIds = filteredEmployees.filter(e => !attendanceMap.get(e.id) && !leavesOnDay.has(e.id)).map(e => e.id)
 
-    // Monthly summary computation
-    const monthlySummary: MonthlySummary[] = employees.map(emp => {
-        const empRecords = monthlyAttendances.filter(a => a.employeeId === emp.id)
-        const [yr, mo] = selectedMonth.split("-").map(Number)
-        const daysInMonth = new Date(yr, mo, 0).getDate()
-        const present = empRecords.filter(a => a.status === "PRESENT").length
-        const absent = empRecords.filter(a => a.status === "ABSENT").length
-        const late = empRecords.filter(a => a.status === "LATE").length
-        const halfDay = empRecords.filter(a => a.status === "HALF_DAY").length
-        const leave = empRecords.filter(a => a.status === "LEAVE").length
-        const overtimeHrs = empRecords.reduce((s, a) => s + (a.overtimeHrs || 0), 0)
-        const attendancePct = daysInMonth > 0 ? (present / daysInMonth) * 100 : 0
-        return { employee: emp, present, absent, late, halfDay, leave, overtimeHrs, attendancePct, totalDays: daysInMonth }
-    })
-
-    const statsCards: { label: string; value: number; tone: StatTone; icon: React.ReactNode }[] = [
-        { label: "Present",         value: presentCount,   tone: "teal",   icon: <CheckCircle size={20} /> },
-        { label: "Absent",          value: absentCount,    tone: "rose",   icon: <XCircle size={20} /> },
-        { label: "Late / Half Day", value: lateHalfCount,  tone: "amber",  icon: <Clock size={20} /> },
-        { label: "On Leave",        value: onLeaveCount,   tone: "violet", icon: <Users size={20} /> },
+    const statsCards: { label: string; value: number; sub?: string; tone: StatTone; icon: React.ReactNode }[] = [
+        { label: "Present", value: presentCount, sub: filteredEmployees.length ? `${Math.round((presentCount / filteredEmployees.length) * 100)}% of ${filteredEmployees.length}` : undefined, tone: "teal", icon: <CheckCircle size={20} /> },
+        { label: isOffDay ? "Not working" : "Absent / Not marked", value: isOffDay ? unmarkedIds.length : absentCount, sub: isOffDay ? (holidayName || "Weekly off") : undefined, tone: isOffDay ? "slate" : "rose", icon: <XCircle size={20} /> },
+        { label: "Late", value: lateCount, sub: `after ${attPolicy.shiftStart} + ${attPolicy.graceMinutes}m`, tone: "amber", icon: <Clock size={20} /> },
+        { label: "On Leave", value: onLeaveCount, sub: "approved", tone: "violet", icon: <Users size={20} /> },
     ]
 
     return (
@@ -917,10 +910,10 @@ function AdminView() {
 
             {/* Sub-tabs */}
             <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
-                {(["daily", "monthly"] as const).map(t => (
+                {(["daily", "muster", "settings"] as const).map(t => (
                     <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
                         className={`z-tab ${tab === t ? "is-active" : ""}`}>
-                        {t === "daily" ? "Daily View" : "Monthly Summary"}
+                        {t === "daily" ? "Daily View" : t === "muster" ? "Muster Roll" : "Rules"}
                     </button>
                 ))}
             </div></div>
@@ -950,15 +943,28 @@ function AdminView() {
                         </div>
                     </div>
 
+                    {(isOffDay || unmarkedIds.length > 0) && !loading && !employeesLoading && (
+                        <div className={`flex flex-wrap items-center gap-3 px-4 py-3 rounded-[12px] border text-[13px] ${isOffDay ? "bg-[#eff6ff] border-[#bfdbfe] text-[#1d4ed8]" : "bg-[var(--surface)] border-[var(--border)] text-[var(--text2)]"}`}>
+                            {isOffDay
+                                ? <span className="font-semibold">{holidayName ? `Holiday — ${holidayName}` : `${format(selectedDate, "EEEE")} is a weekly off`}. Only people who actually worked need marking.</span>
+                                : <span><b className="text-[var(--text)]">{unmarkedIds.length}</b> employee{unmarkedIds.length === 1 ? "" : "s"} not marked for {format(selectedDate, "dd MMM")}{isFutureDay ? " (future date)" : ""}.</span>}
+                            {!isOffDay && !isFutureDay && unmarkedIds.length > 0 && (
+                                <button onClick={() => setBulkModal(true)} className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] bg-[var(--accent)] text-white text-[12.5px] font-semibold">
+                                    <Users size={13} /> Bulk mark
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {/* Stats */}
                     <div className={statGridClass(statsCards.length)}>
                         {statsCards.map((s, i) => (
-                            <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={s.icon} seed={i} />
+                            <StatCard key={s.label} label={s.label} value={s.value} sub={s.sub} tone={s.tone} icon={s.icon} seed={i} />
                         ))}
                     </div>
 
                     {/* Table */}
-                    {loading ? (
+                    {loading || (employeesLoading && employees.length === 0) ? (
                         <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-[var(--accent)]" /></div>
                     ) : filteredEmployees.length === 0 ? (
                         <div className="flex min-h-[200px] items-center justify-center rounded-[14px] bg-[var(--surface)] border border-dashed border-[var(--border)]">
@@ -1006,7 +1012,16 @@ function AdminView() {
                                                         {att?.workingHrs ? `${att.workingHrs}h` : "—"}
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <StatusBadge status={att?.status || ""} />
+                                                        {!att && leavesOnDay.has(emp.id) ? (
+                                                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap" style={{ color: CODE_STYLE.L.color, background: CODE_STYLE.L.bg, borderColor: "#ddd6fe" }}>On Leave · {leavesOnDay.get(emp.id)}</span>
+                                                        ) : !att && isOffDay ? (
+                                                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap" style={{ color: holidayName ? CODE_STYLE.H.color : CODE_STYLE.WO.color, background: holidayName ? CODE_STYLE.H.bg : CODE_STYLE.WO.bg, borderColor: "var(--border)" }}>{holidayName ? "Holiday" : "Weekly off"}</span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                <StatusBadge status={att?.status || ""} />
+                                                                {isLate(att) && att?.status !== "LATE" && <span className="text-[11px] font-semibold text-[#b45309]">Late {lateBy(att?.checkIn, attPolicy)}m</span>}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3 text-[13px] text-[var(--text2)]">
                                                         {att?.overtimeHrs ? `${att.overtimeHrs}h` : "0h"}
@@ -1031,8 +1046,7 @@ function AdminView() {
                         </div>
                     )}
                 </>
-            ) : (
-                // ── Monthly Summary Tab ──
+            ) : tab === "muster" ? (
                 <>
                     <div className="filter-bar">
                         <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
@@ -1043,79 +1057,17 @@ function AdminView() {
                             {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                     </div>
-
-                    {loading ? (
-                        <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-[var(--accent)]" /></div>
-                    ) : (
-                        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-[var(--border)] bg-[var(--surface2)]/40">
-                                            <th className="text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Employee</th>
-                                            <th className="text-center text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Present</th>
-                                            <th className="text-center text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Absent</th>
-                                            <th className="text-center text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Late</th>
-                                            <th className="text-center text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Half Day</th>
-                                            <th className="text-center text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">Leave</th>
-                                            <th className="text-center text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-4 py-3">OT Hrs</th>
-                                            <th className="text-center text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] px-5 py-3">Attendance %</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {monthlySummary.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={8} className="px-5 py-12 text-center text-[13px] text-[var(--text3)]">
-                                                    No attendance data for this month
-                                                </td>
-                                            </tr>
-                                        ) : monthlySummary.map((row, i) => (
-                                            <tr key={row.employee.id} className={`border-b border-[var(--border)] hover:bg-[var(--surface2)]/30 transition-colors ${i === monthlySummary.length - 1 ? "border-b-0" : ""}`}>
-                                                <td className="px-5 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <Avatar firstName={row.employee.firstName} lastName={row.employee.lastName} photo={row.employee.photo} />
-                                                        <div>
-                                                            <p className="text-[13px] font-semibold text-[var(--text)]">{row.employee.firstName} {row.employee.lastName}</p>
-                                                            <p className="text-[11px] text-[var(--text3)]">{row.employee.employeeId}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className="text-[13px] font-semibold" style={{ color: "#16a34a" }}>{row.present}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className="text-[13px] font-semibold" style={{ color: "#dc2626" }}>{row.absent}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className="text-[13px] font-semibold" style={{ color: "#f59e0b" }}>{row.late}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className="text-[13px] font-semibold" style={{ color: "#f59e0b" }}>{row.halfDay}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className="text-[13px] font-semibold" style={{ color: "#8b5cf6" }}>{row.leave}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center text-[13px] text-[var(--text2)]">
-                                                    {row.overtimeHrs.toFixed(1)}h
-                                                </td>
-                                                <td className="px-5 py-3 text-center">
-                                                    <AttendancePct pct={row.attendancePct} />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
+                    <MusterRoll month={selectedMonth} siteId={siteFilter} />
                 </>
+            ) : (
+                <AttendanceSettings />
             )}
 
             {/* Modals */}
             <MarkAttendanceModal
                 open={markModal}
                 onClose={() => { setMarkModal(false); setSelectedEmployee(null); setExistingRecord(null) }}
-                onSaved={() => { if (tab === "daily") fetchAttendances(); else fetchMonthlyAttendances() }}
+                onSaved={() => fetchAttendances()}
                 employees={employees}
                 date={selectedDate}
                 existing={existingRecord}
@@ -1124,7 +1076,7 @@ function AdminView() {
             <BulkMarkModal
                 open={bulkModal}
                 onClose={() => setBulkModal(false)}
-                onSaved={() => { if (tab === "daily") fetchAttendances(); else fetchMonthlyAttendances() }}
+                onSaved={() => fetchAttendances()}
                 employees={employees}
             />
         </div>

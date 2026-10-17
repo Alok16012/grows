@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { notifyEmployee } from "@/lib/hr-notify"
 
 const DEFAULT_CLEARANCE = [
   { title: "Collect ID Card", department: "HR", order: 1 },
@@ -95,14 +96,23 @@ export async function POST(req: Request) {
 
     const employee = await prisma.employee.findUnique({ where: { id: employeeId } })
     if (!employee) return new NextResponse("Employee not found", { status: 404 })
+    if (employee.status === "TERMINATED" || employee.status === "RESIGNED") {
+      return new NextResponse("This employee has already left", { status: 400 })
+    }
+
+    // Without an explicit last working day, it's the end of the notice period.
+    const resigned = new Date(resignationDate)
+    const notice = noticePeriodDays !== undefined && noticePeriodDays !== "" ? Math.max(0, parseInt(String(noticePeriodDays)) || 0) : 30
+    const lwd = lastWorkingDate ? new Date(lastWorkingDate) : new Date(resigned.getTime() + notice * 86400000)
+    if (lwd < resigned) return new NextResponse("Last working day can't be before the resignation date", { status: 400 })
 
     const exit = await prisma.exitRequest.create({
       data: {
         employeeId,
         exitType,
-        resignationDate: new Date(resignationDate),
-        lastWorkingDate: lastWorkingDate ? new Date(lastWorkingDate) : null,
-        noticePeriodDays: noticePeriodDays ? parseInt(String(noticePeriodDays)) : 30,
+        resignationDate: resigned,
+        lastWorkingDate: lwd,
+        noticePeriodDays: notice,
         reason: reason || null,
         initiatedBy: session!.user.id,
         status: "INITIATED",
@@ -128,6 +138,12 @@ export async function POST(req: Request) {
         },
         clearanceTasks: true,
       },
+    })
+
+    await notifyEmployee(employeeId, {
+      title: "Exit initiated",
+      message: `Your exit has been recorded. Last working day: ${lwd.toISOString().slice(0, 10)}`,
+      type: "exit", link: "/profile",
     })
 
     return NextResponse.json(exit)

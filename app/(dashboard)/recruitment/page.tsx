@@ -1860,7 +1860,7 @@ function KanbanColumn({ status, colLeads, onCard }: {
     const remaining = colLeads.length - shown.length
 
     return (
-        <div className="flex flex-col shrink-0 w-[268px]">
+        <div className="flex flex-col shrink-0 snap-start w-[268px] md:w-[calc((100%-14px)/2)] lg:w-[calc((100%-28px)/3)] xl:w-[calc((100%-42px)/4)] 2xl:w-[calc((100%-56px)/5)] min-[1800px]:w-[calc((100%-70px)/6)]">
             {/* Filled colored column header */}
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-t-[12px]" style={{ background: status.color }}>
                 <span className="w-2 h-2 rounded-full bg-white/80 shrink-0" />
@@ -1906,8 +1906,11 @@ function KanbanView({
 }) {
     void onStatusChange
     void onAdd
+    // Columns are sized so a whole number of them fills the board (2 → 6 by
+    // screen width) and scrolling snaps column by column, so the right-hand
+    // column is never sliced in half at the edge.
     return (
-        <div className="flex gap-3.5 overflow-x-auto pb-4 px-4 lg:px-0 flex-1">
+        <div className="flex gap-3.5 overflow-x-auto snap-x snap-mandatory scroll-px-4 lg:scroll-px-0 pb-4 px-4 lg:px-0 flex-1">
             {STATUSES.map(status => (
                 <KanbanColumn key={status.key} status={status} colLeads={leads[status.key] ?? []} onCard={onCard} />
             ))}

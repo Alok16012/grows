@@ -33,7 +33,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         const isAdmin = session.user.role === "ADMIN"
         if (!isManager && !isAdmin) {
             const employee = await prisma.employee.findFirst({
-                where: { email: session.user.email },
+                where: { userId: session.user.id },
                 select: { id: true },
             })
             if (!employee || task.employeeId !== employee.id) {
@@ -71,7 +71,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         if (!isAdminOrManager) {
             // Employees can only update status + completedNote on their own tasks
             const employee = await prisma.employee.findFirst({
-                where: { email: session.user.email },
+                where: { userId: session.user.id },
             })
             if (!employee || task.employeeId !== employee.id) {
                 return new NextResponse("Forbidden", { status: 403 })

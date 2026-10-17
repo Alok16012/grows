@@ -13,9 +13,8 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url)
         const courseId = searchParams.get("courseId")
 
-        if (!session.user.email) return new NextResponse("User email required", { status: 400 })
         const employee = await prisma.employee.findFirst({
-            where: { email: session.user.email },
+            where: { userId: session.user.id },
             select: { id: true },
         })
         if (!employee) return new NextResponse("Employee not found", { status: 404 })
@@ -28,7 +27,7 @@ export async function GET(req: Request) {
         }
 
         // Return all feedback for admin view
-        if (checkAccess(session, ["MANAGER"], "lms.view")) {
+        if (checkAccess(session, ["MANAGER"], "lms.manage")) {
             const allFeedback = await prisma.courseFeedback.findMany({
                 include: {
                     course: { select: { title: true, courseCode: true } },
@@ -60,9 +59,8 @@ export async function POST(req: Request) {
             return new NextResponse("courseId and rating (1-5) are required", { status: 400 })
         }
 
-        if (!session.user.email) return new NextResponse("User email required", { status: 400 })
         const employee = await prisma.employee.findFirst({
-            where: { email: session.user.email },
+            where: { userId: session.user.id },
             select: { id: true },
         })
         if (!employee) return new NextResponse("Employee not found", { status: 404 })

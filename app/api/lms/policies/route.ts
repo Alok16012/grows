@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { checkAccess } from "@/lib/permissions"
+import { learnerEmployee } from "@/lib/lms-learner"
 
 export async function GET(req: Request) {
     try {
@@ -23,19 +24,20 @@ export async function GET(req: Request) {
         })
 
         let acknowledgments: Record<string, Date> = {}
-        if (checkAccess(session, ["MANAGER"], "lms.view")) {
-            if (employeeId) {
-                const acks = await prisma.policyAcknowledgment.findMany({
-                    where: { employeeId },
-                    select: { policyId: true, acknowledgedAt: true },
-                })
-                acknowledgments = Object.fromEntries(acks.map(a => [a.policyId, a.acknowledgedAt]))
-            }
-        } else {
+        // A manager can look up anyone's acknowledgements; without employeeId
+        // (or without the permission) it's the caller's own.
+        if (employeeId && checkAccess(session, ["MANAGER"], "lms.manage")) {
             const acks = await prisma.policyAcknowledgment.findMany({
-                where: { employeeId: session.user.id },
+                where: { employeeId },
                 select: { policyId: true, acknowledgedAt: true },
             })
+            acknowledgments = Object.fromEntries(acks.map(a => [a.policyId, a.acknowledgedAt]))
+        } else {
+            const me = await learnerEmployee(session)
+            const acks = me ? await prisma.policyAcknowledgment.findMany({
+                where: { employeeId: me.id },
+                select: { policyId: true, acknowledgedAt: true },
+            }) : []
             acknowledgments = Object.fromEntries(acks.map(a => [a.policyId, a.acknowledgedAt]))
         }
 

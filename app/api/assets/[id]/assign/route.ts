@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { notifyEmployee } from "@/lib/hr-notify"
 
 export async function POST(
     req: Request,
@@ -79,6 +80,12 @@ export async function POST(
                     },
                 },
             },
+        })
+
+        await notifyEmployee(assignment.employeeId, {
+            title: "Asset issued to you",
+            message: `${assignment.asset?.name ?? "An asset"}${assignment.asset?.assetCode ? ` (${assignment.asset.assetCode})` : ""} has been issued to you. It must be returned when you leave.`,
+            type: "asset", link: "/profile",
         })
 
         return NextResponse.json(assignment)

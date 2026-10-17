@@ -8,7 +8,7 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -77,6 +77,11 @@ export async function POST(req: Request) {
         const { courseId, employeeId, employeeIds, enrollAll, dueDate } = body
 
         if (!courseId) return new NextResponse("courseId is required", { status: 400 })
+        // Learners only ever see published courses (auto-assign has the same rule),
+        // so enrolling into a draft would hand out training nobody can open.
+        const target = await prisma.course.findUnique({ where: { id: courseId }, select: { status: true } })
+        if (!target) return new NextResponse("Course not found", { status: 404 })
+        if (target.status !== "PUBLISHED") return new NextResponse("Publish the course before enrolling employees", { status: 400 })
 
         let targetEmployeeIds: string[] = []
 
@@ -116,6 +121,20 @@ export async function POST(req: Request) {
                 dueDate: dueDate ? new Date(dueDate) : null,
             })),
         })
+
+        // Tell each new learner (those with a login) what they've been given.
+        const course = await prisma.course.findUnique({ where: { id: courseId }, select: { title: true } })
+        const users = await prisma.employee.findMany({ where: { id: { in: newIds }, userId: { not: null } }, select: { userId: true } })
+        if (users.length && course) {
+            await prisma.notification.createMany({
+                data: users.map(u => ({
+                    userId: u.userId!,
+                    title: "New training assigned",
+                    message: `You have been enrolled in "${course.title}"${dueDate ? ` — complete by ${String(dueDate).slice(0, 10)}` : ""}`,
+                    type: "lms", link: "/lms/learn",
+                })),
+            }).catch(e => console.error("[LMS_ENROLL_NOTIFY]", e))
+        }
 
         return NextResponse.json({ enrolled: created.count, skipped: existingIds.size })
     } catch (error) {

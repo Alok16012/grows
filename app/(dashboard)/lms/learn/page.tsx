@@ -410,7 +410,7 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
     const [answers, setAnswers] = useState<Record<string, string>>({})
     const [timeLeft, setTimeLeft] = useState(quiz?.timeLimit ? quiz.timeLimit * 60 : null)
     const [submitting, setSubmitting] = useState(false)
-    const [result, setResult] = useState<{ score: number; passed: boolean; results: any[] } | null>(null)
+    const [result, setResult] = useState<{ score: number; passed: boolean; attemptsLeft: number | null; results: any[] } | null>(null)
 
     useEffect(() => {
         if (timeLeft === null || timeLeft <= 0) return
@@ -470,7 +470,7 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
                         {result.passed ? "Congratulations!" : "Not Passed"}
                     </h2>
                     <p className="text-[14px] text-[var(--text3)] mt-2">
-                        {result.passed ? "You have successfully completed this quiz." : "You need more preparation. Try again!"}
+                        {result.passed ? "You have passed — your certificate is ready." : result.attemptsLeft === 0 ? "No attempts left. HR can re-enroll you." : `You need more preparation.${result.attemptsLeft != null ? ` ${result.attemptsLeft} attempt${result.attemptsLeft === 1 ? "" : "s"} left.` : ""}`}
                     </p>
                     <div className="flex items-center justify-center gap-4 mt-6">
                         <div className="text-center">
@@ -484,7 +484,7 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
                         </div>
                     </div>
                     <div className="flex gap-3 mt-8">
-                        {!result.passed && (
+                        {!result.passed && result.attemptsLeft !== 0 && (
                             <button
                                 onClick={() => { setResult(null); setAnswers({}); setCurrentQuestion(0) }}
                                 className="flex-1 h-11 text-[13px] border border-[var(--border)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center justify-center gap-2"
@@ -645,28 +645,34 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
 }) {
     const [activeView, setActiveView] = useState<"modules" | "quiz">("modules")
     const [showQuiz, setShowQuiz] = useState(false)
-    const [completedModules, setCompletedModules] = useState<Set<string>>(new Set())
+    // Modules are done in order, so progress % = "the first N are complete".
+    const [progress, setProgress] = useState(enrollment.progress || 0)
+    const [status, setStatus] = useState(enrollment.status)
+    const [certificate, setCertificate] = useState(enrollment.certificate)
     const [showCertificate, setShowCertificate] = useState(false)
     const [showFeedback, setShowFeedback] = useState(false)
     const [updatingProgress, setUpdatingProgress] = useState(false)
 
     const { course } = enrollment
-    const allModulesComplete = completedModules.size === course.modules.length
-    const canTakeQuiz = course.quiz && allModulesComplete && enrollment.status !== "COMPLETED"
+    const doneCount = status === "COMPLETED" ? course.modules.length : Math.round((progress / 100) * course.modules.length)
+    const allModulesComplete = doneCount >= course.modules.length
+    const completedModules = { size: Math.min(doneCount, course.modules.length) }
 
     const handleModuleComplete = async (moduleId: string) => {
         setUpdatingProgress(true)
         try {
-            const newProgress = Math.round(((completedModules.size + 1) / course.modules.length) * 100)
-            const res = await fetch(`/api/lms/enrollments/${enrollment.id}`, {
-                method: "PUT",
+            const res = await fetch("/api/lms/learn/progress", {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ progress: newProgress }),
+                body: JSON.stringify({ enrollmentId: enrollment.id, moduleId }),
             })
-            if (res.ok) {
-                setCompletedModules(prev => new Set([...prev, moduleId]))
-                toast.success("Module completed!")
-            }
+            if (!res.ok) { toast.error(await res.text()); return }
+            const upd = await res.json()
+            setProgress(upd.progress)
+            setStatus(upd.status)
+            if (upd.certificate) setCertificate(upd.certificate)
+            if (upd.status === "COMPLETED") { toast.success("Course completed — certificate issued!"); setShowFeedback(true) }
+            else toast.success("Module completed!")
         } catch {
             toast.error("Failed to update progress")
         } finally {
@@ -731,7 +737,8 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
             {activeView === "modules" && (
                 <div className="space-y-3">
                     {course.modules.map((mod, idx) => {
-                        const isComplete = completedModules.has(mod.id) || enrollment.progress >= ((idx + 1) / course.modules.length) * 100
+                        const isComplete = idx < doneCount
+                        const isNext = idx === doneCount
                         return (
                             <div key={mod.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4">
                                 <div className="flex items-start gap-3">
@@ -751,7 +758,10 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                                             </button>
                                         )}
                                     </div>
-                                    {!isComplete && (
+                                    {!isComplete && !isNext && (
+                                        <span className="h-8 px-3 text-[11.5px] text-[var(--text3)] flex items-center">Locked</span>
+                                    )}
+                                    {isNext && (
                                         <button
                                             onClick={() => handleModuleComplete(mod.id)}
                                             disabled={updatingProgress}
@@ -781,7 +791,15 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                             </p>
                         </div>
                     </div>
-                    {allModulesComplete ? (
+                    {status === "COMPLETED" ? (
+                        <div className="p-4 rounded-[10px] bg-green-50 border border-green-200 text-center text-[13px] text-green-700 font-medium">
+                            Passed{enrollment.score != null ? ` with ${enrollment.score}%` : ""}
+                        </div>
+                    ) : status === "FAILED" ? (
+                        <div className="p-4 rounded-[10px] bg-red-50 border border-red-200 text-center text-[13px] text-red-700">
+                            No attempts left. Ask HR to re-enroll you.
+                        </div>
+                    ) : allModulesComplete ? (
                         <button
                             onClick={() => setShowQuiz(true)}
                             className="w-full h-12 bg-[var(--accent)] text-white rounded-[10px] font-medium flex items-center justify-center gap-2"
@@ -797,7 +815,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                 </div>
             )}
 
-            {enrollment.certificate && (
+            {certificate && (
                 <button
                     onClick={() => setShowCertificate(true)}
                     className="w-full h-12 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-[10px] font-medium flex items-center justify-center gap-2"
@@ -806,7 +824,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                 </button>
             )}
 
-            {enrollment.status === "COMPLETED" && (
+            {status === "COMPLETED" && (
                 <button
                     onClick={() => setShowFeedback(true)}
                     className="w-full h-11 border-2 border-[var(--accent)] text-[var(--accent)] rounded-[10px] font-medium flex items-center justify-center gap-2 hover:bg-[var(--accent)] hover:text-white transition-colors"
@@ -842,9 +860,9 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
 
             {showCertificate && (
                 <CertificateModal
-                    certificate={enrollment.certificate!}
+                    certificate={certificate!}
                     courseName={course.title}
-                    employeeName="Employee"
+                    employeeName={(enrollment as Enrollment & { employeeName?: string }).employeeName || "Employee"}
                     onClose={() => setShowCertificate(false)}
                 />
             )}

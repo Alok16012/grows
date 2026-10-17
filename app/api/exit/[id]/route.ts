@@ -3,6 +3,27 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { computeSettlement } from "@/lib/exit-settlement"
+import { notifyEmployee } from "@/lib/hr-notify"
+
+// Exit moves forward one stage at a time. Jumping straight to COMPLETED used to
+// be possible with clearance half-done and nothing paid, which then offboarded
+// the person (status, deployment, login) with money still owed either way.
+const NEXT: Record<string, string[]> = {
+  INITIATED: ["NOTICE_PERIOD", "CLEARANCE_PENDING", "CANCELLED"],
+  NOTICE_PERIOD: ["CLEARANCE_PENDING", "CANCELLED"],
+  CLEARANCE_PENDING: ["FULL_FINAL_PENDING", "NOTICE_PERIOD", "CANCELLED"],
+  FULL_FINAL_PENDING: ["COMPLETED", "CLEARANCE_PENDING", "CANCELLED"],
+  COMPLETED: [],
+  CANCELLED: ["INITIATED"],
+}
+const STAGE_LABEL: Record<string, string> = {
+  NOTICE_PERIOD: "Your notice period has started",
+  CLEARANCE_PENDING: "Your exit clearance has started",
+  FULL_FINAL_PENDING: "Clearance is complete — your full & final settlement is being processed",
+  COMPLETED: "Your exit is complete. Your relieving documents will be shared by HR",
+  CANCELLED: "Your exit request has been withdrawn",
+}
 
 export async function GET(
   req: Request,
@@ -56,7 +77,7 @@ export async function PUT(
     }
 
     const body = await req.json()
-    const { status, lastWorkingDate, hrComments, fnfAmount, fnfPaidAt, fnfPaidBy, approvedBy } = body
+    const { status, lastWorkingDate, hrComments, fnfAmount, fnfPaidAt, fnfPaidBy, approvedBy, force } = body
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
     if (status !== undefined) {
@@ -84,10 +105,25 @@ export async function PUT(
     // status can't re-terminate someone HR has since reinstated.
     const before = await prisma.exitRequest.findUnique({
       where: { id: params.id },
-      select: { status: true },
+      select: { status: true, employeeId: true, fnfPaidAt: true, clearanceTasks: { select: { status: true, title: true } } },
     })
     if (!before) return new NextResponse("Exit request not found", { status: 404 })
     const isCompleting = status === "COMPLETED" && before.status !== "COMPLETED"
+
+    // Stage rules. ADMIN can push past them with force:true (data repair).
+    const overriding = force === true && session?.user.role === "ADMIN"
+    if (status !== undefined && status !== before.status && !overriding) {
+      if (!(NEXT[before.status] ?? []).includes(status)) {
+        return new NextResponse(`Can't move an exit from ${before.status.replace(/_/g, " ").toLowerCase()} to ${String(status).replace(/_/g, " ").toLowerCase()}`, { status: 400 })
+      }
+      if (status === "FULL_FINAL_PENDING") {
+        const open = before.clearanceTasks.filter(t => t.status !== "COMPLETED" && t.status !== "WAIVED")
+        if (open.length) return new NextResponse(`${open.length} clearance item(s) still open: ${open.slice(0, 3).map(t => t.title).join(", ")}${open.length > 3 ? "…" : ""}`, { status: 400 })
+      }
+      if (status === "COMPLETED" && !before.fnfPaidAt && !fnfPaidAt) {
+        return new NextResponse("Record the F&F payment (amount and date) before completing the exit", { status: 400 })
+      }
+    }
 
     // The ExitRequest update and the offboarding happen together. Splitting them
     // meant a failure after the first write left the exit marked COMPLETED while
@@ -145,6 +181,33 @@ export async function PUT(
 
       return updated
     })
+
+    // Moving into clearance: add a return task for every asset still held, so
+    // nothing issued walks out of the door unnoticed.
+    if (status === "CLEARANCE_PENDING" && before.status !== "CLEARANCE_PENDING") {
+      const held = await prisma.employeeAsset.findMany({
+        where: { employeeId: before.employeeId, isActive: true, returnedAt: null },
+        include: { asset: { select: { name: true, assetCode: true } } },
+      })
+      const have = new Set(exit.clearanceTasks.map(t => t.title))
+      const add = held.map(h => `Return asset: ${h.asset.name} (${h.asset.assetCode})`).filter(t => !have.has(t))
+      if (add.length) {
+        const maxOrder = exit.clearanceTasks.reduce((m, t) => Math.max(m, t.order), 0)
+        await prisma.exitClearanceTask.createMany({
+          data: add.map((title, i) => ({ exitId: exit.id, title, department: "Assets", order: maxOrder + i + 1, status: "PENDING" })),
+        })
+      }
+    }
+
+    // Recording payment without an amount: take the worked-out net.
+    if (fnfPaidAt && fnfAmount === undefined && exit.fnfAmount == null) {
+      const s = await computeSettlement(exit.id)
+      if (s) await prisma.exitRequest.update({ where: { id: exit.id }, data: { fnfAmount: s.net } })
+    }
+
+    if (status !== undefined && status !== before.status && STAGE_LABEL[status]) {
+      await notifyEmployee(before.employeeId, { title: "Exit update", message: STAGE_LABEL[status], type: "exit", link: "/profile" })
+    }
 
     return NextResponse.json(exit)
   } catch (error) {

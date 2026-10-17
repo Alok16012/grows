@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { nextCertificateNumber } from "@/lib/lms-learner"
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -32,15 +33,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
                 finalStatus = "COMPLETED"
                 if (!finalCompletedAt) finalCompletedAt = new Date()
 
-                // Generate certificate number CERT-YYYYMM-NNNN
-                const now = new Date()
-                const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`
-                const countThisMonth = await prisma.courseEnrollment.count({
-                    where: {
-                        certificate: { startsWith: `CERT-${yyyymm}-` },
-                    },
-                })
-                certificate = `CERT-${yyyymm}-${String(countThisMonth + 1).padStart(4, "0")}`
+                // Keep an existing certificate; numbering by count reused numbers
+                // once any enrollment was deleted.
+                certificate = enrollment.certificate ?? await nextCertificateNumber()
             } else if (finalStatus === undefined) {
                 finalStatus = "FAILED"
             }

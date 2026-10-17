@@ -837,6 +837,7 @@ function ExpenseDrawer({
     const [showEditModal, setShowEditModal] = useState(false)
     // Receipt verification: which receipts the approver has viewed + verified,
     // and which one is open in the one-by-one viewer (null = closed).
+    const viewerRole = useSession().data?.user?.role
     const [verified, setVerified] = useState<boolean[]>([])
     const [verifierIdx, setVerifierIdx] = useState<number | null>(null)
 
@@ -854,6 +855,8 @@ function ExpenseDrawer({
     if (!expense) return null
 
     const isOwner = expense.submittedBy === currentUserId
+    // The API refuses self-approval (ADMIN excepted), so don't offer it.
+    const canDecide = !isOwner || viewerRole === "ADMIN"
 
     // Every line-item the approver must check one by one before approving —
     // whether or not it has a receipt.
@@ -1227,7 +1230,7 @@ function ExpenseDrawer({
                         {/* Actions */}
                         <div className="space-y-3 pt-1">
                             {/* Owner can edit while still editable (DRAFT or SUBMITTED — i.e. before approval) */}
-                            {isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED") && (
+                            {isOwner && (expense.status === "DRAFT" || expense.status === "SUBMITTED" || expense.status === "REJECTED") && (
                                 <button
                                     onClick={() => setShowEditModal(true)}
                                     className="w-full h-9 rounded-[8px] border border-[var(--border)] text-[13px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center justify-center gap-2 transition-colors"
@@ -1257,8 +1260,20 @@ function ExpenseDrawer({
                                 </>
                             )}
 
-                            {/* Admin/Manager + SUBMITTED */}
-                            {isPrivileged && expense.status === "SUBMITTED" && (
+                            {/* Owner + REJECTED — fix it and send it back */}
+                            {isOwner && expense.status === "REJECTED" && (
+                                <button
+                                    onClick={() => doAction("SUBMIT")}
+                                    disabled={actionLoading}
+                                    className="w-full h-9 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+                                >
+                                    {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                    Resubmit for Approval
+                                </button>
+                            )}
+
+                            {/* Admin/Manager + SUBMITTED — never on their own claim */}
+                            {isPrivileged && expense.status === "SUBMITTED" && canDecide && (
                                 <>
                                     {verifyItems.length > 0 && (
                                         <div className="rounded-[10px] border border-[var(--border)] overflow-hidden">

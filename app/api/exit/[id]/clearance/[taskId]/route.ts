@@ -29,6 +29,17 @@ export async function PUT(
       taskUpdateData.completedBy = null
     }
 
+    // The task must belong to the exit in the URL — otherwise any task id
+    // could be ticked off through any exit's route.
+    const task = await prisma.exitClearanceTask.findFirst({ where: { id: params.taskId, exitId: params.id }, select: { id: true } })
+    if (!task) return new NextResponse("Clearance task not found", { status: 404 })
+    if (status !== undefined && !["PENDING", "IN_PROGRESS", "COMPLETED", "WAIVED"].includes(status)) {
+      return new NextResponse("Invalid status", { status: 400 })
+    }
+    if (status === "WAIVED" && !String(remarks || "").trim()) {
+      return new NextResponse("Say why this item is being waived", { status: 400 })
+    }
+
     const updatedTask = await prisma.exitClearanceTask.update({
       where: { id: params.taskId },
       data: taskUpdateData,

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { dayWindow } from "@/lib/attendance-policy"
 
 export async function POST(req: Request) {
     try {
@@ -22,16 +23,14 @@ export async function POST(req: Request) {
             return new NextResponse("date and records[] are required", { status: 400 })
         }
 
-        const attendanceDate = new Date(date)
-        const nextDay = new Date(attendanceDate)
-        nextDay.setDate(nextDay.getDate() + 1)
+        const attendanceDate = new Date(String(date).slice(0, 10) + "T00:00:00.000Z")
 
         const results = await Promise.all(
             records.map(async (rec) => {
                 const existing = await prisma.attendance.findFirst({
                     where: {
                         employeeId: rec.employeeId,
-                        date: { gte: attendanceDate, lt: nextDay },
+                        date: dayWindow(attendanceDate),
                     },
                 })
 

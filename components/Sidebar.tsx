@@ -214,6 +214,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "My Assignments",   href: "/inspection",     icon: HardHat,      roles: ["INSPECTION_BOY"], permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"] },
                 { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"], permission: "self.view" },
                 { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"], permission: "self.view" },
+                { name: "My Performance",   href: "/performance",    icon: Star,         roles: ["INSPECTION_BOY"], permission: "self.view" },
             ],
         },
 

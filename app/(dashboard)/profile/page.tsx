@@ -7,7 +7,7 @@ import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
-    UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut
+    UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut, Package
 } from "lucide-react"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
@@ -747,6 +747,50 @@ function AttendanceTab() {
 
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 // ─── Change Password (self-service) ──────────────────────────────────────────
+function AssetsTab() {
+    const [rows, setRows] = useState<any[] | null>(null)
+    useEffect(() => {
+        fetch("/api/me/assets").then(r => r.ok ? r.json() : []).then(setRows).catch(() => setRows([]))
+    }, [])
+    if (!rows) return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--accent)]" /></div>
+    const held = rows.filter(r => r.isActive && !r.returnedAt)
+    const returned = rows.filter(r => !r.isActive || r.returnedAt)
+    const fmt = (d?: string) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+    const list = (items: any[], done: boolean) => items.map(r => (
+        <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-b-0">
+            <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${done ? "bg-[var(--surface2)] text-[var(--text3)]" : "bg-[var(--accent-light)] text-[var(--accent)]"}`}><Package size={16} /></div>
+            <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-[var(--text)] truncate">{r.asset.name}</p>
+                <p className="text-[11.5px] text-[var(--text3)]">{r.asset.assetCode}{r.asset.serialNo ? ` · S/N ${r.asset.serialNo}` : ""} · {r.asset.category}</p>
+            </div>
+            <div className="text-right text-[11.5px] text-[var(--text3)] shrink-0">
+                <p>Issued {fmt(r.issuedAt)}</p>
+                {done && <p>Returned {fmt(r.returnedAt)}</p>}
+            </div>
+        </div>
+    ))
+    const card = (title: string, Icon: any, body: React.ReactNode) => (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--border)]">
+                <Icon size={16} className="text-[var(--accent)]" />
+                <h3 className="text-[14px] font-semibold text-[var(--text)]">{title}</h3>
+            </div>
+            {body}
+        </div>
+    )
+    return (
+        <div className="space-y-4">
+            {card(`With you (${held.length})`, Package, held.length ? (
+                <>
+                    {list(held, false)}
+                    <p className="text-[11.5px] text-[var(--text3)] px-5 py-3 border-t border-[var(--border)]">These must be returned before your last working day; anything not returned is recovered from your final settlement.</p>
+                </>
+            ) : <p className="text-[13px] text-[var(--text3)] px-5 py-6">No company assets are issued to you.</p>)}
+            {returned.length > 0 && card(`Returned (${returned.length})`, CheckCircle2, list(returned, true))}
+        </div>
+    )
+}
+
 function ChangePasswordCard() {
     const [current, setCurrent] = useState("")
     const [next, setNext] = useState("")
@@ -816,7 +860,7 @@ function ChangePasswordCard() {
 
 export default function ProfilePage() {
     const { data: session, update } = useSession()
-    const [activeTab, setActiveTab] = useState<"profile"|"attendance"|"documents"|"onboarding"|"payslip"|"letters">("profile")
+    const [activeTab, setActiveTab] = useState<"profile"|"attendance"|"documents"|"onboarding"|"payslip"|"letters"|"assets">("profile")
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [formData, setFormData] = useState({ name: "", email: "", phone: "", role: "", image: "" })
@@ -898,6 +942,7 @@ export default function ProfilePage() {
             { key: "letters",    label: "My Letters",    icon: BookOpen },
             { key: "onboarding", label: "My Onboarding", icon: ClipboardList },
             { key: "payslip",    label: "My Payslip",    icon: IndianRupee },
+            { key: "assets",     label: "My Assets",     icon: Package },
         ] : [])
     ] as { key: typeof activeTab; label: string; icon: any }[]
 
@@ -997,6 +1042,7 @@ export default function ProfilePage() {
             {activeTab === "letters"    && <LettersTab />}
             {activeTab === "onboarding" && <OnboardingTab />}
             {activeTab === "payslip"    && <PayslipTab />}
+            {activeTab === "assets"     && <AssetsTab />}
         </div>
     )
 }

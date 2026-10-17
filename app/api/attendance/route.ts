@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { dayWindow, monthWindow } from "@/lib/attendance-policy"
 
 export async function GET(req: Request) {
     try {
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
             const year = monthParam?.includes("-") ? monthParam.split("-")[0] : searchParams.get("year")
             const where: Record<string, unknown> = { employeeId: linkedEmployee.id }
             if (monthParam && month && year) {
-                where.date = { gte: new Date(parseInt(year), parseInt(month) - 1, 1), lt: new Date(parseInt(year), parseInt(month), 1) }
+                where.date = monthWindow(parseInt(year), parseInt(month))
             }
             const attendances = await prisma.attendance.findMany({
                 where,
@@ -50,15 +51,11 @@ export async function GET(req: Request) {
         if (siteId) where.siteId = siteId
         if (status) where.status = status
 
+        // Day and month windows also catch rows stored at IST midnight.
         if (dateStr) {
-            const date = new Date(dateStr)
-            const nextDay = new Date(date)
-            nextDay.setDate(nextDay.getDate() + 1)
-            where.date = { gte: date, lt: nextDay }
+            where.date = dayWindow(new Date(dateStr.slice(0, 10) + "T00:00:00.000Z"))
         } else if (monthParam && month && year) {
-            const startDate = new Date(parseInt(year), parseInt(month) - 1, 1)
-            const endDate = new Date(parseInt(year), parseInt(month), 1)
-            where.date = { gte: startDate, lt: endDate }
+            where.date = monthWindow(parseInt(year), parseInt(month))
         }
 
         const employeeWhere: Record<string, unknown> = {}
@@ -118,9 +115,7 @@ export async function POST(req: Request) {
             return new NextResponse("employeeId and date are required", { status: 400 })
         }
 
-        const attendanceDate = new Date(date)
-        const nextDay = new Date(attendanceDate)
-        nextDay.setDate(nextDay.getDate() + 1)
+        const attendanceDate = new Date(String(date).slice(0, 10) + "T00:00:00.000Z")
 
         // Calculate working hours
         let workingHrs = 0
@@ -133,7 +128,7 @@ export async function POST(req: Request) {
         const existing = await prisma.attendance.findFirst({
             where: {
                 employeeId,
-                date: { gte: attendanceDate, lt: nextDay },
+                date: dayWindow(attendanceDate),
             },
         })
 

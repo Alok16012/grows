@@ -21,8 +21,10 @@ export async function GET(req: Request) {
         const where: Record<string, any> = {}
 
         if (!isAdminOrManager) {
+            // By linked login, never by email: an email-less session made
+            // `email: undefined` match any employee and leaked their reviews.
             const emp = await prisma.employee.findFirst({
-                where: { email: session.user.email ?? undefined },
+                where: { userId: session.user.id },
                 select: { id: true },
             })
             if (emp) {

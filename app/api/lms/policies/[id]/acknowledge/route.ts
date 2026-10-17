@@ -2,11 +2,15 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { learnerEmployee } from "@/lib/lms-learner"
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+        const employee = await learnerEmployee(session)
+        if (!employee) return new NextResponse("No employee record linked to your login", { status: 404 })
 
         const policy = await prisma.policy.findUnique({
             where: { id: params.id },
@@ -19,7 +23,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             where: {
                 policyId_employeeId: {
                     policyId: params.id,
-                    employeeId: session.user.id,
+                    employeeId: employee.id,
                 },
             },
         })
@@ -33,7 +37,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         await prisma.policyAcknowledgment.create({
             data: {
                 policyId: params.id,
-                employeeId: session.user.id,
+                employeeId: employee.id,
                 ipAddress: ip,
             },
         })

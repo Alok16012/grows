@@ -8,7 +8,7 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.view")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

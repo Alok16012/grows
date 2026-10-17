@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { syncLeaveStatus } from "@/lib/leave-status"
+import { checkLeaveRequest } from "@/lib/leave-policy-server"
+import { notifyApprovers, notifyEmployee } from "@/lib/hr-notify"
 
 export async function GET(
     req: Request,
@@ -32,9 +34,10 @@ export async function GET(
 
         if (!leave) return new NextResponse("Not found", { status: 404 })
 
-        // Non-admin/manager can only view own employee's leave
+        // Without leaves.view, only the leave's own employee may open it.
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.view")) {
-            return new NextResponse("Forbidden", { status: 403 })
+            const me = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } })
+            if (!me || me.id !== leave.employeeId) return new NextResponse("Forbidden", { status: 403 })
         }
 
         return NextResponse.json(leave)
@@ -53,7 +56,7 @@ export async function PUT(
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
         const body = await req.json()
-        const { status, rejectionReason } = body
+        const { status, rejectionReason, override } = body
 
         const existing = await prisma.leave.findUnique({ where: { id: params.id } })
         if (!existing) return new NextResponse("Not found", { status: 404 })
@@ -76,7 +79,12 @@ export async function PUT(
                 return new NextResponse("Forbidden", { status: 403 })
             }
             if (status !== "CANCELLED") return new NextResponse("Forbidden", { status: 403 })
-            if (existing.status !== "PENDING") return new NextResponse("Only PENDING leaves can be cancelled", { status: 400 })
+            // A pending request can always be withdrawn; an approved one only
+            // while it hasn't started — once it's under way, HR has to change it.
+            const startsLater = existing.startDate.getTime() > Date.now()
+            if (!(existing.status === "PENDING" || (existing.status === "APPROVED" && startsLater))) {
+                return new NextResponse("Only pending leaves, or approved leaves that haven't started, can be cancelled", { status: 400 })
+            }
         }
 
         if (!status || !["APPROVED", "REJECTED", "CANCELLED"].includes(status)) {
@@ -85,6 +93,25 @@ export async function PUT(
 
         if (status === "REJECTED" && !rejectionReason) {
             return new NextResponse("rejectionReason is required when rejecting", { status: 400 })
+        }
+
+        // Balance may have moved since the request was filed (another leave
+        // approved in between), so approval re-runs the same checks. Overlap and
+        // type errors block; balance and notice rules can be overridden by HR.
+        if (status === "APPROVED" && existing.status !== "APPROVED") {
+            const check = await checkLeaveRequest({
+                employeeId: existing.employeeId,
+                type: existing.type,
+                startDate: existing.startDate.toISOString(),
+                endDate: existing.endDate.toISOString(),
+                halfDay: existing.days === 0.5,
+                excludeLeaveId: existing.id,
+                isManager: true,
+            })
+            if (!check.ok && check.status === 409) return new NextResponse(check.error, { status: 409 })
+            if (check.ok && check.warnings.some(w => w.startsWith("Insufficient")) && !override) {
+                return NextResponse.json({ needsConfirm: true, warnings: check.warnings.filter(w => w.startsWith("Insufficient")) }, { status: 409 })
+            }
         }
 
         const updateData: Record<string, unknown> = { status }
@@ -123,6 +150,26 @@ export async function PUT(
         // employee ON_LEAVE straight away; the daily cron moves them on the day
         // it starts and back when it ends.
         await syncLeaveStatus(leave.employeeId)
+
+        if (!isAdminOrManager && existing.status === "APPROVED") {
+            await notifyApprovers(["leaves.approve", "leaves.manage"], {
+                title: "Approved leave withdrawn",
+                message: `${leave.employee.firstName} ${leave.employee.lastName} cancelled their approved ${leave.type} leave from ${leave.startDate.toISOString().slice(0, 10)}`,
+                type: "leave", link: "/leaves",
+            }, session.user.id)
+        }
+
+        if (isAdminOrManager && status !== existing.status) {
+            const f = (d: Date) => d.toISOString().slice(0, 10)
+            const what = `${leave.type} leave (${f(leave.startDate)}${leave.days > 1 ? ` to ${f(leave.endDate)}` : ""})`
+            const msg = status === "APPROVED" ? `Your ${what} has been approved`
+                : status === "REJECTED" ? `Your ${what} was rejected: ${rejectionReason}`
+                : `Your ${what} was cancelled by HR`
+            await notifyEmployee(leave.employeeId, {
+                title: status === "APPROVED" ? "Leave approved" : status === "REJECTED" ? "Leave rejected" : "Leave cancelled",
+                message: msg, type: "leave", link: "/leaves",
+            })
+        }
 
         return NextResponse.json(leave)
     } catch (error) {

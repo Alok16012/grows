@@ -212,7 +212,7 @@ export default function ExitPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       })
-      if (!res.ok) { toast.error("Failed to update status"); return }
+      if (!res.ok) { toast.error((await res.text()) || "Failed to update status"); return }
       toast.success("Status updated")
       fetchExits()
       if (selectedExit?.id === exitId) {
@@ -910,7 +910,7 @@ function TimelineTab({
         body: JSON.stringify({ status: newStatus }),
       })
       if (res.ok) { toast.success("Status updated"); onRefresh() }
-      else toast.error("Failed to update status")
+      else toast.error((await res.text()) || "Failed to update status")
     } finally {
       setStatusLoading(false)
     }
@@ -1123,7 +1123,7 @@ function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () =>
         setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
         onRefresh()
       } else {
-        toast.error("Failed to update task")
+        toast.error((await res.text()) || "Failed to update task")
       }
     } catch {
       toast.error("Failed to update task")
@@ -1132,8 +1132,9 @@ function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () =>
     }
   }
 
-  // Group by department
-  const departments = ["HR", "IT", "Finance", "Operations", "Admin"]
+  // Group by department — the fixed five first, then any others (asset-return
+  // tasks are added under "Assets" when clearance starts).
+  const departments = Array.from(new Set(["HR", "IT", "Finance", "Operations", "Admin", ...tasks.map(t => t.department)]))
   const grouped = departments.reduce((acc, dept) => {
     acc[dept] = tasks.filter(t => t.department === dept)
     return acc
@@ -1284,6 +1285,14 @@ function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () =>
 
 // ─── F&F Settlement Tab ───────────────────────────────────────────────────────
 
+type FnfLine = { key: string; label: string; amount: number; note: string; kind: "earning" | "deduction"; auto: boolean; excluded?: boolean }
+type Settlement = {
+  lastWorkingDate: string; monthlyGross: number; basicDa: number; salarySource: string; noticeServedDays: number
+  lines: FnfLine[]; earnings: number; deductions: number; net: number
+  record: { adjustments: { label: string; amount: number; kind: "earning" | "deduction" }[]; paymentMode?: string; reference?: string; excluded?: string[] }
+  warnings: string[]
+}
+
 function FnFTab({
   exit,
   onRefresh,
@@ -1293,180 +1302,202 @@ function FnFTab({
   onRefresh: () => void
   session: ReturnType<typeof useSession>["data"]
 }) {
-  const [form, setForm] = useState({
-    fnfAmount: exit.fnfAmount ? String(exit.fnfAmount) : "",
+  const [data, setData] = useState<Settlement | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [adj, setAdj] = useState<{ label: string; amount: string; kind: "earning" | "deduction" }>({ label: "", amount: "", kind: "earning" })
+  const [pay, setPay] = useState({
+    fnfAmount: exit.fnfAmount != null ? String(exit.fnfAmount) : "",
     fnfPaidAt: exit.fnfPaidAt ? format(new Date(exit.fnfPaidAt), "yyyy-MM-dd") : "",
     fnfPaidBy: exit.fnfPaidBy || "",
     paymentMode: "NEFT",
+    reference: "",
   })
-  const [saving, setSaving] = useState(false)
-
   const canEdit = can(session, "exit.manage")
+  const paid = !!exit.fnfPaidAt
 
-  const handleSave = async () => {
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/exit/${exit.id}/settlement`)
+      if (!res.ok) throw new Error(await res.text())
+      const d: Settlement = await res.json()
+      setData(d)
+      setPay(p => ({ ...p, paymentMode: d.record.paymentMode || p.paymentMode, reference: d.record.reference || "", fnfAmount: p.fnfAmount || String(d.net) }))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to work out settlement")
+    } finally { setLoading(false) }
+  }, [exit.id])
+  useEffect(() => { load() }, [load])
+
+  const saveRecord = async (patch: Record<string, unknown>) => {
     setSaving(true)
     try {
-      const payload: Record<string, unknown> = {}
-      if (form.fnfAmount) payload.fnfAmount = parseFloat(form.fnfAmount)
-      if (form.fnfPaidAt) payload.fnfPaidAt = form.fnfPaidAt
-      if (form.fnfPaidBy) payload.fnfPaidBy = form.fnfPaidBy
-      const res = await fetch(`/api/exit/${exit.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) { toast.success("F&F details saved"); onRefresh() }
-      else toast.error("Failed to save F&F details")
-    } finally {
-      setSaving(false)
-    }
+      const res = await fetch(`/api/exit/${exit.id}/settlement`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) })
+      if (!res.ok) throw new Error(await res.text())
+      const d: Settlement = await res.json()
+      setData(d)
+      if (!paid) setPay(p => ({ ...p, fnfAmount: String(d.net) }))
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to save") } finally { setSaving(false) }
   }
 
-  const basicSalary = exit.employee.basicSalary || 0
-  const leaveEncashment = Math.round(basicSalary / 26 * 3)
-  const gratuity = Math.round((basicSalary / 26) * 15 * 1)
+  const toggleLine = (key: string) => {
+    if (!data) return
+    const ex = new Set(data.record.excluded ?? [])
+    if (ex.has(key)) ex.delete(key); else ex.add(key)
+    saveRecord({ excluded: Array.from(ex) })
+  }
+  const addAdjustment = () => {
+    if (!data || !adj.label.trim() || !(Number(adj.amount) > 0)) return toast.error("Enter a label and an amount")
+    saveRecord({ adjustments: [...data.record.adjustments, { label: adj.label, amount: Number(adj.amount), kind: adj.kind }] })
+    setAdj({ label: "", amount: "", kind: adj.kind })
+  }
+  const removeAdjustment = (i: number) => data && saveRecord({ adjustments: data.record.adjustments.filter((_, j) => j !== i) })
+
+  const recordPayment = async () => {
+    if (!pay.fnfAmount || !pay.fnfPaidAt) return toast.error("Amount and payment date are required")
+    setSaving(true)
+    try {
+      await fetch(`/api/exit/${exit.id}/settlement`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentMode: pay.paymentMode, reference: pay.reference }) })
+      const res = await fetch(`/api/exit/${exit.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fnfAmount: parseFloat(pay.fnfAmount), fnfPaidAt: pay.fnfPaidAt, fnfPaidBy: pay.fnfPaidBy || session?.user?.name || "" }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      toast.success("F&F payment recorded")
+      onRefresh()
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to record payment") } finally { setSaving(false) }
+  }
+
+  const printStatement = () => {
+    if (!data) return
+    const w = window.open("", "_blank")
+    if (!w) return
+    // Names, notes and references are typed by people — escape them before
+    // they go into the printed page.
+    const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!))
+    const row = (l: FnfLine) => `<tr><td>${esc(l.label)}<div class="n">${esc(l.note)}</div></td><td class="r">${l.kind === "deduction" ? "−" : ""}${fmtINR(l.amount)}</td></tr>`
+    const live = data.lines.filter(l => !l.excluded)
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>F&amp;F — ${esc(exit.employee.firstName)} ${esc(exit.employee.lastName)}</title>
+      <style>body{font-family:system-ui,sans-serif;max-width:720px;margin:32px auto;color:#0f1729;padding:0 16px}h1{font-size:20px;margin:0}table{width:100%;border-collapse:collapse;margin-top:12px}td{padding:8px 4px;border-bottom:1px solid #e6eaf5;font-size:13px;vertical-align:top}.r{text-align:right;white-space:nowrap}.n{color:#98a1b5;font-size:11px}h2{font-size:13px;margin:20px 0 0;text-transform:uppercase;letter-spacing:.5px;color:#5b6478}.t td{font-weight:700;font-size:15px;border-bottom:0}.meta{color:#5b6478;font-size:13px;margin-top:4px}.sig{display:flex;justify-content:space-between;margin-top:64px;font-size:12px;color:#5b6478}</style></head><body>
+      <h1>Full &amp; Final Settlement Statement</h1>
+      <div class="meta">${esc(exit.employee.firstName)} ${esc(exit.employee.lastName)} · ${esc(exit.employee.employeeId)} · ${esc(exit.employee.designation)}</div>
+      <div class="meta">Exit type: ${exit.exitType.replace(/_/g, " ")} · Resigned/notified ${fmtDate(exit.resignationDate)} · Last working day ${fmtDate(data.lastWorkingDate)}</div>
+      <div class="meta">Monthly gross ${fmtINR(data.monthlyGross)} · Basic + DA ${fmtINR(data.basicDa)}</div>
+      <h2>Earnings</h2><table>${live.filter(l => l.kind === "earning").map(row).join("")}<tr class="t"><td>Total earnings</td><td class="r">${fmtINR(data.earnings)}</td></tr></table>
+      <h2>Deductions</h2><table>${live.filter(l => l.kind === "deduction").map(row).join("") || '<tr><td class="n">None</td><td></td></tr>'}<tr class="t"><td>Total deductions</td><td class="r">${fmtINR(data.deductions)}</td></tr></table>
+      <table><tr class="t"><td>Net ${data.net >= 0 ? "payable to employee" : "recoverable from employee"}</td><td class="r">${fmtINR(Math.abs(data.net))}</td></tr></table>
+      ${exit.fnfPaidAt ? `<div class="meta">Paid ${fmtINR(exit.fnfAmount)} on ${fmtDate(exit.fnfPaidAt)}${data.record.paymentMode ? ` via ${esc(data.record.paymentMode)}` : ""}${data.record.reference ? ` · Ref ${esc(data.record.reference)}` : ""}</div>` : ""}
+      <div class="sig"><span>Prepared by (HR)</span><span>Approved by (Finance)</span><span>Employee signature</span></div>
+      <script>window.print()</script></body></html>`)
+    w.document.close()
+  }
+
+  const field: React.CSSProperties = { width: "100%", border: "1px solid var(--border2)", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "var(--text)", background: "var(--surface)", boxSizing: "border-box" }
+  const lbl: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 5 }
+
+  if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Loader2 size={24} className="animate-spin" color="var(--accent)" /></div>
+  if (!data) return null
+
+  const section = (kind: "earning" | "deduction") => {
+    const list = data.lines.filter(l => l.kind === kind)
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: kind === "earning" ? "#15803d" : "#b91c1c", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
+          {kind === "earning" ? "Earnings" : "Deductions"}
+        </div>
+        {list.length === 0 && <div style={{ fontSize: 12, color: "var(--text3)", padding: "6px 0" }}>None</div>}
+        {list.map(l => {
+          const adjIndex = l.auto ? -1 : Number(l.key.replace("adj-", ""))
+          return (
+            <div key={l.key} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border)", opacity: l.excluded ? 0.45 : 1 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: "var(--text)", textDecoration: l.excluded ? "line-through" : "none" }}>{l.label}</div>
+                <div style={{ fontSize: 11, color: "var(--text3)" }}>{l.note}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{kind === "deduction" && l.amount ? "−" : ""}{fmtINR(l.amount)}</span>
+                {canEdit && !paid && (l.auto
+                  ? <button onClick={() => toggleLine(l.key)} disabled={saving} title={l.excluded ? "Include" : "Exclude"} style={{ fontSize: 11, color: "var(--text3)", background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 6px", cursor: "pointer" }}>{l.excluded ? "Include" : "Exclude"}</button>
+                  : <button onClick={() => removeAdjustment(adjIndex)} disabled={saving} title="Remove" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)" }}><X size={14} /></button>)}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <div>
-      {/* If paid */}
-      {exit.fnfPaidAt && (
-        <div style={{
-          padding: 14, background: "#dcfce7", borderRadius: 10,
-          border: "1px solid #bbf7d0", marginBottom: 20,
-          display: "flex", gap: 12, alignItems: "flex-start",
-        }}>
-          <CheckCircle2 size={20} color="var(--accent)" style={{ marginTop: 2 }} />
+      {paid && (
+        <div style={{ padding: 14, background: "#dcfce7", borderRadius: 10, border: "1px solid #bbf7d0", marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <CheckCircle2 size={20} color="#15803d" style={{ marginTop: 2 }} />
           <div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: "var(--accent)" }}>F&F Settlement Paid</div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: "#15803d" }}>F&F settlement paid</div>
             <div style={{ fontSize: 13, color: "#065f46", marginTop: 2 }}>
-              Amount: <b>{fmtINR(exit.fnfAmount)}</b> · Date: <b>{fmtDate(exit.fnfPaidAt)}</b>
-              {exit.fnfPaidBy && <> · By: <b>{exit.fnfPaidBy}</b></>}
+              {fmtINR(exit.fnfAmount)} on {fmtDate(exit.fnfPaidAt)}{data.record.paymentMode && <> via {data.record.paymentMode}</>}{data.record.reference && <> · Ref {data.record.reference}</>}{exit.fnfPaidBy && <> · by {exit.fnfPaidBy}</>}
             </div>
           </div>
         </div>
       )}
 
-      {/* Settlement Breakdown */}
-      <div style={{
-        padding: 16, background: "var(--surface2)", borderRadius: 12,
-        border: "1px solid var(--border)", marginBottom: 20,
-      }}>
-        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", marginBottom: 12 }}>
-          Settlement Breakdown (Indicative)
+      {data.warnings.map(w => (
+        <div key={w} style={{ display: "flex", gap: 8, padding: "10px 12px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, fontSize: 12.5, color: "#92400e", marginBottom: 10 }}>
+          <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} /> {w}
         </div>
-        {[
-          { label: "Last Month Salary", amount: basicSalary, note: "Based on basic salary" },
-          { label: "Leave Encashment", amount: leaveEncashment, note: "~3 days" },
-          { label: "Gratuity", amount: gratuity, note: "15 days × 1 year" },
-          { label: "Deductions", amount: 0, note: "Advances, etc." },
-        ].map(row => (
-          <div key={row.label} style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            padding: "8px 0", borderBottom: "1px solid var(--border)",
-          }}>
-            <div>
-              <div style={{ fontSize: 13, color: "var(--text)" }}>{row.label}</div>
-              <div style={{ fontSize: 11, color: "var(--text3)" }}>{row.note}</div>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
-              {fmtINR(row.amount)}
-            </div>
-          </div>
-        ))}
-        <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10 }}>
-          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Estimated Total</span>
-          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--accent)" }}>
-            {fmtINR(basicSalary + leaveEncashment + gratuity)}
-          </span>
+      ))}
+
+      <div style={{ padding: 16, background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>Settlement working</div>
+          <div style={{ fontSize: 11.5, color: "var(--text3)" }}>LWD {fmtDate(data.lastWorkingDate)} · gross {fmtINR(data.monthlyGross)}/mo · notice served {data.noticeServedDays}d</div>
+        </div>
+        {section("earning")}
+        {section("deduction")}
+        <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 4 }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Net {data.net >= 0 ? "payable" : "recoverable"}</span>
+          <span style={{ fontWeight: 700, fontSize: 16, color: data.net >= 0 ? "var(--accent)" : "var(--red)" }}>{fmtINR(Math.abs(data.net))}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+          <button onClick={printStatement} style={{ fontSize: 12.5, fontWeight: 600, color: "var(--accent)", background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>Print statement</button>
         </div>
       </div>
 
-      {/* F&F Input */}
-      {canEdit && (
-        <div style={{
-          padding: 16, background: "var(--surface)", border: "1px solid var(--border)",
-          borderRadius: 12,
-        }}>
-          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", marginBottom: 14 }}>
-            F&F Settlement Details
+      {canEdit && !paid && (
+        <div style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", marginBottom: 10 }}>Add a line</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 120px auto", gap: 8 }}>
+            <input value={adj.label} onChange={e => setAdj(a => ({ ...a, label: e.target.value }))} placeholder="e.g. Performance bonus, damage recovery" style={field} />
+            <input type="number" min={0} value={adj.amount} onChange={e => setAdj(a => ({ ...a, amount: e.target.value }))} placeholder="₹" style={field} />
+            <select value={adj.kind} onChange={e => setAdj(a => ({ ...a, kind: e.target.value as "earning" | "deduction" }))} style={field}>
+              <option value="earning">Earning</option>
+              <option value="deduction">Deduction</option>
+            </select>
+            <button onClick={addAdjustment} disabled={saving} style={{ padding: "0 14px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
           </div>
+        </div>
+      )}
 
+      {canEdit && !paid && (
+        <div style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", marginBottom: 14 }}>Record payment</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 5 }}>
-                F&F Amount (₹)
-              </label>
-              <input
-                type="number"
-                value={form.fnfAmount}
-                onChange={e => setForm(f => ({ ...f, fnfAmount: e.target.value }))}
-                placeholder="e.g. 45000"
-                style={{
-                  width: "100%", border: "1px solid var(--border)", borderRadius: 8,
-                  padding: "8px 12px", fontSize: 13, color: "var(--text)", background: "var(--surface)", boxSizing: "border-box",
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 5 }}>
-                Payment Date
-              </label>
-              <input
-                type="date"
-                value={form.fnfPaidAt}
-                onChange={e => setForm(f => ({ ...f, fnfPaidAt: e.target.value }))}
-                style={{
-                  width: "100%", border: "1px solid var(--border)", borderRadius: 8,
-                  padding: "8px 12px", fontSize: 13, color: "var(--text)", background: "var(--surface)", boxSizing: "border-box",
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 5 }}>
-                Payment Mode
-              </label>
-              <select
-                value={form.paymentMode}
-                onChange={e => setForm(f => ({ ...f, paymentMode: e.target.value }))}
-                style={{
-                  width: "100%", border: "1px solid var(--border)", borderRadius: 8,
-                  padding: "8px 12px", fontSize: 13, color: "var(--text)", background: "var(--surface)", boxSizing: "border-box",
-                }}
-              >
-                <option value="NEFT">NEFT</option>
-                <option value="Cash">Cash</option>
-                <option value="Cheque">Cheque</option>
+            <div><label style={lbl}>Amount paid (₹)</label><input type="number" value={pay.fnfAmount} onChange={e => setPay(f => ({ ...f, fnfAmount: e.target.value }))} style={field} /></div>
+            <div><label style={lbl}>Payment date</label><input type="date" value={pay.fnfPaidAt} onChange={e => setPay(f => ({ ...f, fnfPaidAt: e.target.value }))} style={field} /></div>
+            <div><label style={lbl}>Mode</label>
+              <select value={pay.paymentMode} onChange={e => setPay(f => ({ ...f, paymentMode: e.target.value }))} style={field}>
+                {["NEFT", "IMPS", "RTGS", "Cheque", "Cash", "UPI"].map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", display: "block", marginBottom: 5 }}>
-                Paid By
-              </label>
-              <input
-                value={form.fnfPaidBy}
-                onChange={e => setForm(f => ({ ...f, fnfPaidBy: e.target.value }))}
-                placeholder="Name or employee ID..."
-                style={{
-                  width: "100%", border: "1px solid var(--border)", borderRadius: 8,
-                  padding: "8px 12px", fontSize: 13, color: "var(--text)", background: "var(--surface)", boxSizing: "border-box",
-                }}
-              />
-            </div>
+            <div><label style={lbl}>UTR / cheque no.</label><input value={pay.reference} onChange={e => setPay(f => ({ ...f, reference: e.target.value }))} style={field} /></div>
+            <div style={{ gridColumn: "1 / -1" }}><label style={lbl}>Paid by</label><input value={pay.fnfPaidBy} onChange={e => setPay(f => ({ ...f, fnfPaidBy: e.target.value }))} placeholder={session?.user?.name || "Name"} style={field} /></div>
           </div>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{
-              padding: "9px 20px", borderRadius: 8, border: "none",
-              background: "var(--accent)", color: "#fff",
-              fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer",
-              opacity: saving ? 0.7 : 1,
-              display: "flex", alignItems: "center", gap: 6,
-            }}
-          >
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            Save F&F Details
+          {Number(pay.fnfAmount) !== data.net && pay.fnfAmount && (
+            <div style={{ fontSize: 12, color: "#b45309", marginBottom: 10 }}>Amount differs from the worked-out net of {fmtINR(data.net)}.</div>
+          )}
+          <button onClick={recordPayment} disabled={saving} style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+            {saving && <Loader2 size={14} className="animate-spin" />} Record F&F payment
           </button>
         </div>
       )}

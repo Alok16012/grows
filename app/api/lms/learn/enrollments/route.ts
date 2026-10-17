@@ -2,14 +2,19 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { learnerEmployee } from "@/lib/lms-learner"
 
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+        const employee = await learnerEmployee(session)
+        if (!employee) return NextResponse.json([])
+
         const enrollments = await prisma.courseEnrollment.findMany({
-            where: { employeeId: session.user.id },
+            // Only published courses reach the learner.
+            where: { employeeId: employee.id, course: { status: "PUBLISHED" } },
             include: {
                 course: {
                     include: {
@@ -41,11 +46,6 @@ export async function GET(req: Request) {
                 },
             },
             orderBy: { enrolledAt: "desc" },
-        })
-
-        const employee = await prisma.employee.findUnique({
-            where: { id: session.user.id },
-            select: { firstName: true, lastName: true },
         })
 
         const result = enrollments.map(e => ({
