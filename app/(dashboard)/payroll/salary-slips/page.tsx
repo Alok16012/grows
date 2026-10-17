@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears } from "../_components/payroll-years"
 import { Suspense, useState, useEffect, useCallback } from "react"
 import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
@@ -299,7 +300,7 @@ ${autoPrint ? "<script>window.onload=()=>window.print()</script>" : ""}
                 </select>
                 <span style={lbl}>Year</span>
                 <select value={year} onChange={e => setYear(Number(e.target.value))} style={sel}>
-                    {[2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <button onClick={() => fetchSlips(selSiteId)} style={{ marginLeft: "auto", display: "flex", padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", cursor: "pointer" }}>
                     <RefreshCw size={12} style={{ color: "var(--text3)" }} />

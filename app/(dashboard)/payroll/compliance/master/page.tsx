@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears } from "../../_components/payroll-years"
 import { Suspense, useState, useEffect, useCallback, useRef } from "react"
 import RequirePayrollView from "../../_components/RequirePayrollView"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -411,13 +412,15 @@ function ComplianceMasterInner() {
         }
 
         const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.json_to_sheet([...xlRows, totRow])
+        // Title row first, then the table below it — adding the title at A1
+        // afterwards overwrote the header row's first cell.
+        const ws = XLSX.utils.aoa_to_sheet([
+            [`COMPLIANCE DOCUMENT MASTER — ${MONTHS[month-1].toUpperCase()} ${year}`],
+        ])
+        XLSX.utils.sheet_add_json(ws, [...xlRows, totRow], { origin: -1 })
         ws["!cols"] = Object.keys(xlRows[0]).map((k, i) => ({
             wch: i < 3 ? 20 : Math.max(k.length + 2, 10)
         }))
-        XLSX.utils.sheet_add_aoa(ws, [
-            [`COMPLIANCE DOCUMENT MASTER — ${MONTHS[month-1].toUpperCase()} ${year}`],
-        ], { origin: "A1" })
         XLSX.utils.book_append_sheet(wb, ws, `Compliance Master`)
         XLSX.writeFile(wb, `Compliance_Master_${MONTHS_SHORT[month-1]}_${year}.xlsx`)
         toast.success("Excel downloaded")
@@ -476,7 +479,7 @@ function ComplianceMasterInner() {
                         {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
                     </select>
                     <select value={year} onChange={e => setYear(Number(e.target.value))} style={selStyle}>
-                        {[2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
+                        {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                     <button onClick={fetchData} disabled={loading} style={{ ...btnStyle, background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text2)" }}>
                         <RefreshCw size={12} className={loading ? "animate-spin" : ""} />

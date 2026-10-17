@@ -104,7 +104,7 @@ function PillCell({ items, run, color, dlLoading, onDownload }: {
 
 const thStyle: React.CSSProperties = { padding:"12px 16px", fontSize:11, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px", display:"flex", alignItems:"center", gap:6 }
 
-export default function CompliancePanel({ onClose }: { onClose: () => void }) {
+export default function CompliancePanel({ onClose, initialMonth, initialYear }: { onClose: () => void; initialMonth?: number; initialYear?: number }) {
     const [runs,      setRuns]      = useState<PayrollRun[]>([])
     const [loading,   setLoading]   = useState(true)
     const [dlLoading, setDlLoading] = useState<string|null>(null)
@@ -143,19 +143,25 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
 
             const XLSX = await loadXLSX()
             const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}`)
-            if (!r.ok) { toast.error("No data found for this period"); return }
+            if (!r.ok) {
+                // The server says why (e.g. month not locked yet) — show that, not a generic line.
+                const detail = await r.text().catch(()=>"")
+                toast.error(detail.trim() || "No data found for this period"); return
+            }
             const data = await r.json()
             if (!data?.length) { toast.error("No data to download"); return }
             const wb = XLSX.utils.book_new()
             if (item.type==="wage-sheet") {
-                const ws = XLSX.utils.json_to_sheet(data)
-                const cols = Object.keys(data[0]||{})
-                ws["!cols"]=cols.map((k:string)=>({wch:Math.max(k.length+2,14)}))
-                XLSX.utils.sheet_add_aoa(ws,[
+                // Title rows first, then the table below them — adding the titles at A1
+                // afterwards overwrote the header row and the first data cells.
+                const ws = XLSX.utils.aoa_to_sheet([
                     [`FORM (II) M.W. RULES Rule (27)(1)`],
                     [`SALARIES / WAGES REGISTER FOR THE MONTH OF ${MONTHS[month-1].toUpperCase()} ${year}`],
                     [`PF CODE: ${rules.codes.pfEstablishment}`,"",`ESIC CODE: ${rules.codes.esicEstablishment}`],
-                ],{origin:"A1"})
+                ])
+                XLSX.utils.sheet_add_json(ws,data,{origin:-1})
+                const cols = Object.keys(data[0]||{})
+                ws["!cols"]=cols.map((k:string)=>({wch:Math.max(k.length+2,14)}))
                 XLSX.utils.book_append_sheet(wb,ws,"Wage Sheet")
             } else {
                 const ws=await buildHierarchicalSheet(data,item.type,item.label,month,year,rules.codes)
@@ -220,10 +226,13 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                         No payroll runs found. Process payroll first to see compliance reports here.
                     </div>
                 ) : (
-                    runs.map((run,idx)=>(
-                        <div key={run.id} style={{ display:"grid", gridTemplateColumns:"160px 1fr 2fr 1.5fr 1.5fr", minWidth:900, borderBottom:idx<runs.length-1?"1px solid var(--border)":"none", background:idx%2===0?"var(--surface)":"var(--surface2)", alignItems:"stretch" }}>
+                    runs.map((run,idx)=>{
+                        // The month the user came from (e.g. just locked on the Wage Sheet) is marked so it is easy to find.
+                        const isCurrent = initialMonth===run.month && initialYear===run.year
+                        return (
+                        <div key={run.id} style={{ display:"grid", gridTemplateColumns:"160px 1fr 2fr 1.5fr 1.5fr", minWidth:900, borderBottom:idx<runs.length-1?"1px solid var(--border)":"none", background:isCurrent?"var(--accent-light)":idx%2===0?"var(--surface)":"var(--surface2)", alignItems:"stretch", borderLeft:isCurrent?"3px solid var(--accent)":"3px solid transparent" }}>
                             <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", justifyContent:"center", gap:2 }}>
-                                <span style={{ fontSize:14, fontWeight:800, color:"var(--text)" }}>{MONTHS[run.month-1]}</span>
+                                <span style={{ fontSize:14, fontWeight:800, color:isCurrent?"var(--accent)":"var(--text)" }}>{MONTHS[run.month-1]}</span>
                                 <span style={{ fontSize:11, color:"var(--text3)" }}>{run.year}</span>
                                 <span style={{ fontSize:10, color:(run.status==="PROCESSED"||run.status==="PAID")?"#16a34a":"#d97706", fontWeight:600, marginTop:2 }}>{run._count.payrolls} emp</span>
                             </div>
@@ -232,7 +241,8 @@ export default function CompliancePanel({ onClose }: { onClose: () => void }) {
                             <PillCell items={ESIC_ITEMS} run={run} color="#0369a1" dlLoading={dlLoading} onDownload={handleDownload} />
                             <PillCell items={PT_ITEMS}   run={run} color="#7c3aed" dlLoading={dlLoading} onDownload={handleDownload} />
                         </div>
-                    ))
+                        )
+                    })
                 )}
             </div>
             {!loading && runs.length>0 && (

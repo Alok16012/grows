@@ -18,12 +18,22 @@ export async function GET(req: Request) {
 
         if (!month || !year) return NextResponse.json([])
 
-        const records = await prisma.payroll.groupBy({
-            by: ["siteId"],
-            where: { month, year, siteId: { not: null } },
-            _count: { id: true },
-            _sum: { grossSalary: true, netSalary: true },
-        })
+        const [records, byStatus] = await Promise.all([
+            prisma.payroll.groupBy({
+                by: ["siteId"],
+                where: { month, year, siteId: { not: null } },
+                _count: { id: true },
+                _sum: { grossSalary: true, netSalary: true },
+            }),
+            // Per-site status split so the UI can tell a locked site from a draft one.
+            prisma.payroll.groupBy({
+                by: ["siteId", "status"],
+                where: { month, year, siteId: { not: null } },
+                _count: { id: true },
+            }),
+        ])
+        const statusCount = (siteId: string, status: "DRAFT" | "PROCESSED" | "PAID") =>
+            byStatus.find(r => r.siteId === siteId && r.status === status)?._count.id ?? 0
 
         // Get site names
         const siteIds = records.map(r => r.siteId).filter(Boolean) as string[]
@@ -40,6 +50,9 @@ export async function GET(req: Request) {
                 siteCode:       siteMap.get(r.siteId!)?.code ?? "",
                 siteCity:       siteMap.get(r.siteId!)?.city ?? "",
                 processedCount: r._count.id,
+                draft:          statusCount(r.siteId!, "DRAFT"),
+                locked:         statusCount(r.siteId!, "PROCESSED"),
+                paid:           statusCount(r.siteId!, "PAID"),
                 totalGross:     r._sum.grossSalary ?? 0,
                 totalNet:       r._sum.netSalary   ?? 0,
             }))

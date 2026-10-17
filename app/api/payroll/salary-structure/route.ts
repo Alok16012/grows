@@ -1,11 +1,12 @@
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
-import { isValidEffectiveMonth, monthKey, revisionsForMonth } from "@/lib/salary-revision"
+import { isValidEffectiveMonth, monthKey, monthInIST, revisionsForMonth } from "@/lib/salary-revision"
 
 // GET /api/payroll/salary-structure[?month=&year=]
 // Every active employee with their salary structure (null if not set).
@@ -78,7 +79,7 @@ export async function GET(req: Request) {
 // to it, and the wage run uses that revision for any month from then on. The
 // live EmployeeSalary row is only overwritten when the increment is effective
 // NOW or earlier — a future-dated one must not change what this month pays.
-// Without an effective month the behaviour is unchanged: overwrite in place.
+// Without an effective month the save is dated to the current month.
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
@@ -91,12 +92,19 @@ export async function POST(req: Request) {
     // Effective month is optional, and invalid values are refused rather than
     // quietly ignored — silently applying an increment to the wrong month is
     // far worse than a rejected upload.
-    const hasEffective = body.effectiveMonth != null && body.effectiveYear != null
-    if (hasEffective && !isValidEffectiveMonth(body.effectiveMonth, body.effectiveYear)) {
+    const dated = body.effectiveMonth != null && body.effectiveYear != null
+    if (dated && !isValidEffectiveMonth(body.effectiveMonth, body.effectiveYear)) {
         return new NextResponse("Invalid effective month", { status: 400 })
     }
-    const effMonth = hasEffective ? Number(body.effectiveMonth) : null
-    const effYear  = hasEffective ? Number(body.effectiveYear)  : null
+    // An undated save (the Salary Master drawer and row edits) means "from
+    // this month on". Overwriting the live row in place used to change every
+    // past month too, because months without a revision fall back to it —
+    // so an undated save is dated to the current month and goes through the
+    // same history-preserving path as a dated upload.
+    const today = monthInIST()
+    const hasEffective = true
+    const effMonth = dated ? Number(body.effectiveMonth) : today.month
+    const effYear  = dated ? Number(body.effectiveYear)  : today.year
 
     const rows: {
         employeeId: string   // the UUID from Employee.id
@@ -129,8 +137,7 @@ export async function POST(req: Request) {
     // later revision already supersedes — filing what August was paid on must
     // not drag the live row back to August's figures. The second is per
     // employee, since only some of them may have a newer revision on file.
-    const now = new Date()
-    const nowKey = monthKey(now.getFullYear(), now.getMonth() + 1)
+    const nowKey = monthKey(today.year, today.month)
     const notFutureDated = !hasEffective || monthKey(effYear!, effMonth!) <= nowKey
 
     // Employees already carrying a revision that sits AFTER this one but is
@@ -217,8 +224,7 @@ export async function POST(req: Request) {
             const doj = empById.get(sal.employeeId)?.dateOfJoining
             // No joining date on file: fall back to the floor the validator
             // allows, which simply means "for as long as this employee existed".
-            const bYear  = doj ? doj.getFullYear()  : 2000
-            const bMonth = doj ? doj.getMonth() + 1 : 1
+            const { year: bYear, month: bMonth } = doj ? monthInIST(doj) : { year: 2000, month: 1 }
             // Joined on or after the increment: there is no earlier period to
             // protect, and a baseline would only sit on top of the new one.
             if (monthKey(bYear, bMonth) >= monthKey(effYear!, effMonth!)) return []
@@ -255,6 +261,14 @@ export async function POST(req: Request) {
     let updated = 0
     const errors: { employeeId: string; reason: string }[] = []
 
+    // Two round trips per row, one after the other, blew through Vercel's
+    // 30s limit at a few hundred employees and left the upload half done. So
+    // the per-row figures are worked out first, and the writes go to the
+    // database in chunks, each chunk one transaction: a chunk lands whole or
+    // not at all, and the rows it covers are reported together on failure.
+    type Op = Prisma.PrismaPromise<unknown>
+    const chunks: { ids: string[]; ops: Op[] }[] = []
+    const CHUNK = 50
     for (const row of rows) {
         try {
             const basic      = Number(row.basic) || 0
@@ -279,6 +293,7 @@ export async function POST(req: Request) {
                 isHandicap: emp?.isHandicap ?? false,
             }, { gender: emp?.gender ?? "Male" }, rules).ctc
 
+            const ops: Op[] = []
             if (hasEffective) {
                 const fields = {
                     basic, da, washing, conveyance,
@@ -294,7 +309,7 @@ export async function POST(req: Request) {
                 }
                 // Re-uploading a month corrects that month rather than stacking
                 // a second revision the lookup would have to break ties on.
-                await prisma.salaryRevision.upsert({
+                ops.push(prisma.salaryRevision.upsert({
                     where: {
                         employeeId_effectiveYear_effectiveMonth: {
                             employeeId:     row.employeeId,
@@ -310,44 +325,57 @@ export async function POST(req: Request) {
                         ...fields,
                     },
                     update: fields,
-                })
+                }))
             }
 
             // Future-dated, or already superseded for this employee: the
             // revision is filed and the live structure is left as it is.
-            if (!notFutureDated || supersededFor.has(row.employeeId)) { updated++; continue }
+            if (notFutureDated && !supersededFor.has(row.employeeId)) {
+                ops.push(prisma.employeeSalary.upsert({
+                    where: { employeeId: row.employeeId },
+                    create: {
+                        employeeId:       row.employeeId,
+                        basic, da, washing, conveyance,
+                        leaveWithWages:   lww,
+                        otherAllowance:   other,
+                        bonus,
+                        otRatePerHour:    otRate,
+                        canteenRatePerDay: canteen,
+                        hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
+                        complianceType:   cType,
+                        status:           "APPROVED",
+                        proposedBy:       session.user.id,
+                        approvedBy:       session.user.id,
+                    },
+                    update: {
+                        basic, da, washing, conveyance,
+                        leaveWithWages:   lww,
+                        otherAllowance:   other,
+                        bonus,
+                        otRatePerHour:    otRate,
+                        canteenRatePerDay: canteen,
+                        hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
+                        complianceType:   cType,
+                        status:           "APPROVED",
+                    },
+                }))
+            }
 
-            await prisma.employeeSalary.upsert({
-                where: { employeeId: row.employeeId },
-                create: {
-                    employeeId:       row.employeeId,
-                    basic, da, washing, conveyance,
-                    leaveWithWages:   lww,
-                    otherAllowance:   other,
-                    bonus,
-                    otRatePerHour:    otRate,
-                    canteenRatePerDay: canteen,
-                    hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
-                    complianceType:   cType,
-                    status:           "APPROVED",
-                    proposedBy:       session.user.id,
-                    approvedBy:       session.user.id,
-                },
-                update: {
-                    basic, da, washing, conveyance,
-                    leaveWithWages:   lww,
-                    otherAllowance:   other,
-                    bonus,
-                    otRatePerHour:    otRate,
-                    canteenRatePerDay: canteen,
-                    hra, ctcMonthly: ctcM, ctcAnnual: ctcM * 12,
-                    complianceType:   cType,
-                    status:           "APPROVED",
-                },
-            })
-            updated++
+            const last = chunks[chunks.length - 1]
+            if (!last || last.ids.length >= CHUNK) chunks.push({ ids: [row.employeeId], ops })
+            else { last.ids.push(row.employeeId); last.ops.push(...ops) }
         } catch (e) {
             errors.push({ employeeId: row.employeeId, reason: (e as Error).message })
+        }
+    }
+
+    for (const chunk of chunks) {
+        try {
+            await prisma.$transaction(chunk.ops)
+            updated += chunk.ids.length
+        } catch (e) {
+            const reason = (e as Error).message
+            for (const employeeId of chunk.ids) errors.push({ employeeId, reason })
         }
     }
 

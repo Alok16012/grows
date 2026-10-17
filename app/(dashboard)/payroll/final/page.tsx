@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears } from "../_components/payroll-years"
 import { Suspense, useState, useEffect, useCallback } from "react"
 import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
@@ -151,7 +152,7 @@ function FinalPayrollInner() {
                 </select>
                 <span style={lbl}>Year</span>
                 <select value={year} onChange={e => { setYear(e.target.value); setSelId(""); setData([]) }} style={sel}>
-                    {[2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
                     {done === sites.length && sites.length > 0 && !confirm && (

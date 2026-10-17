@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
-import { monthKey } from "@/lib/salary-revision"
+import { monthKey, monthInIST } from "@/lib/salary-revision"
 
 // Reading needs a salary permission — this returns an individual's full pay
 // breakdown, and previously any signed-in employee could fetch anyone's.
@@ -72,58 +72,61 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     // The row as it stood before this edit — needed below to preserve history.
     const before = await prisma.employeeSalary.findUnique({ where: { employeeId: params.employeeId } })
 
-    const sal = await prisma.employeeSalary.upsert({
-        where: { employeeId: params.employeeId },
-        create: {
-            employeeId: params.employeeId,
-            basic: Number(basic) || 0,
-            da: Number(da) || 0,
-            washing: Number(washing) || 0,
-            conveyance: Number(conveyance) || 0,
-            leaveWithWages: Number(leaveWithWages) || 0,
-            otherAllowance: Number(otherAllowance) || 0,
-            otRatePerHour: Number(otRatePerHour) || rules.defaults.otRatePerHour,
-            canteenRatePerDay: Number(canteenRatePerDay) || rules.defaults.canteenRatePerDay,
-            hra,
-            bonus,
-            ctcMonthly,
-            ctcAnnual: ctcMonthly * 12,
-            status: status || "APPROVED",
-            complianceType: complianceType === "CALL" ? "CALL" : "OR",
-            proposedBy: session.user.id,
-            approvedBy: session.user.id,
-        },
-        update: {
-            basic: Number(basic) || 0,
-            da: Number(da) || 0,
-            washing: Number(washing) || 0,
-            conveyance: Number(conveyance) || 0,
-            leaveWithWages: Number(leaveWithWages) || 0,
-            otherAllowance: Number(otherAllowance) || 0,
-            otRatePerHour: Number(otRatePerHour) || rules.defaults.otRatePerHour,
-            canteenRatePerDay: Number(canteenRatePerDay) || rules.defaults.canteenRatePerDay,
-            hra,
-            bonus,
-            ctcMonthly,
-            ctcAnnual: ctcMonthly * 12,
-            status: status || "APPROVED",
-            complianceType: complianceType === "CALL" ? "CALL" : "OR",
-        }
-    })
+    // One transaction: the live row, the baseline and this month's revision
+    // land together or not at all. Written separately, a failed baseline left
+    // past months falling back to the NEW live figures.
+    const sal = await prisma.$transaction(async tx => {
+        const sal = await tx.employeeSalary.upsert({
+            where: { employeeId: params.employeeId },
+            create: {
+                employeeId: params.employeeId,
+                basic: Number(basic) || 0,
+                da: Number(da) || 0,
+                washing: Number(washing) || 0,
+                conveyance: Number(conveyance) || 0,
+                leaveWithWages: Number(leaveWithWages) || 0,
+                otherAllowance: Number(otherAllowance) || 0,
+                otRatePerHour: Number(otRatePerHour) || rules.defaults.otRatePerHour,
+                canteenRatePerDay: Number(canteenRatePerDay) || rules.defaults.canteenRatePerDay,
+                hra,
+                bonus,
+                ctcMonthly,
+                ctcAnnual: ctcMonthly * 12,
+                status: status || "APPROVED",
+                complianceType: complianceType === "CALL" ? "CALL" : "OR",
+                proposedBy: session.user.id,
+                approvedBy: session.user.id,
+            },
+            update: {
+                basic: Number(basic) || 0,
+                da: Number(da) || 0,
+                washing: Number(washing) || 0,
+                conveyance: Number(conveyance) || 0,
+                leaveWithWages: Number(leaveWithWages) || 0,
+                otherAllowance: Number(otherAllowance) || 0,
+                otRatePerHour: Number(otRatePerHour) || rules.defaults.otRatePerHour,
+                canteenRatePerDay: Number(canteenRatePerDay) || rules.defaults.canteenRatePerDay,
+                hra,
+                bonus,
+                ctcMonthly,
+                ctcAnnual: ctcMonthly * 12,
+                status: status || "APPROVED",
+                complianceType: complianceType === "CALL" ? "CALL" : "OR",
+            }
+        })
 
-    // Keep payroll in step with the edit. Payroll reads SalaryRevision first
-    // and only falls back to this live row when an employee has none, so once
-    // someone had a dated upload, an edit made here showed on screen and was
-    // silently IGNORED by the wage run. An edit means "from this month on", so
-    // it is recorded as this month's revision.
-    //
-    // Only for employees already on revisions: anyone without one is still
-    // paid straight off the live row, which this edit has just updated.
-    const now = new Date()
-    const curYear = now.getFullYear(), curMonth = now.getMonth() + 1
-    const [anyRevision, earlier] = await Promise.all([
-        prisma.salaryRevision.findFirst({ where: { employeeId: params.employeeId }, select: { id: true } }),
-        prisma.salaryRevision.findFirst({
+        // Keep payroll in step with the edit. Payroll reads SalaryRevision first
+        // and only falls back to this live row when an employee has none, so once
+        // someone had a dated upload, an edit made here showed on screen and was
+        // silently IGNORED by the wage run. An edit means "from this month on", so
+        // it is recorded as this month's revision.
+        //
+        // For every employee, not only those already on revisions: months with
+        // no revision fall back to the live row, which this edit has just
+        // overwritten — so without a baseline, a September re-run would pay
+        // October's new figures.
+        const { year: curYear, month: curMonth } = monthInIST()
+        const earlier = await tx.salaryRevision.findFirst({
             where: {
                 employeeId: params.employeeId,
                 OR: [
@@ -132,19 +135,16 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
                 ],
             },
             select: { id: true },
-        }),
-    ])
+        })
 
-    if (anyRevision) {
         // Months before this one fall back to the live row unless something
         // earlier is on file — and the live row now holds the NEW figures. So
         // record what it held before, the same way the bulk upload does.
         if (!earlier && before) {
             const doj = emp?.dateOfJoining
-            const bYear = doj ? doj.getFullYear() : 2000
-            const bMonth = doj ? doj.getMonth() + 1 : 1
+            const { year: bYear, month: bMonth } = doj ? monthInIST(doj) : { year: 2000, month: 1 }
             if (monthKey(bYear, bMonth) < monthKey(curYear, curMonth)) {
-                await prisma.salaryRevision.createMany({
+                await tx.salaryRevision.createMany({
                     data: [{
                         employeeId: params.employeeId,
                         effectiveYear: bYear, effectiveMonth: bMonth,
@@ -170,7 +170,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             complianceType: sal.complianceType,
             ctcMonthly: sal.ctcMonthly, ctcAnnual: sal.ctcAnnual,
         }
-        await prisma.salaryRevision.upsert({
+        await tx.salaryRevision.upsert({
             where: {
                 employeeId_effectiveYear_effectiveMonth: {
                     employeeId: params.employeeId, effectiveYear: curYear, effectiveMonth: curMonth,
@@ -179,7 +179,9 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             create: { employeeId: params.employeeId, effectiveYear: curYear, effectiveMonth: curMonth, createdBy: session.user.id, ...fields },
             update: fields,
         })
-    }
+
+        return sal
+    })
 
     return NextResponse.json(sal)
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { payrollYears } from "../_components/payroll-years"
 import { useState, useEffect, useCallback } from "react"
 import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
@@ -81,7 +82,7 @@ function SelectSitesInner() {
                     </select>
                     <select value={year} onChange={e => setYear(e.target.value)}
                         style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, fontWeight: 700, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
-                        {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                        {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                     <button onClick={fetchSites}
                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>

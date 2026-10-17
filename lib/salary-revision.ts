@@ -30,6 +30,16 @@ export type EffectiveMonth = { month: number; year: number }
 /** Sortable key for a month, so comparisons don't need date objects. */
 export const monthKey = (year: number, month: number) => year * 12 + month
 
+// The server runs in UTC (Vercel) while payroll months are Indian calendar
+// months. Between midnight and 05:30 IST on the 1st, `new Date().getMonth()`
+// still says LAST month, so a save made then would be dated to the month just
+// closed and change what a re-run of it pays. Read the month in IST instead.
+const IST_OFFSET_MIN = 330
+export function monthInIST(d: Date = new Date()): EffectiveMonth {
+    const ist = new Date(d.getTime() + IST_OFFSET_MIN * 60000)
+    return { month: ist.getUTCMonth() + 1, year: ist.getUTCFullYear() }
+}
+
 export function isValidEffectiveMonth(m: unknown, y: unknown): boolean {
     const month = Number(m), year = Number(y)
     return Number.isInteger(month) && month >= 1 && month <= 12

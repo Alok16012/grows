@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears } from "../../payroll/_components/payroll-years"
 import { useState, useRef, useCallback, useEffect } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useRouter } from "next/navigation"
@@ -33,6 +34,7 @@ type Employee = {
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+const DEFAULT_MONTH_DAYS = 26 // Indian payroll standard: 26 working days per month
 
 /** Excel cell -> optional amount. An empty cell means "not set", not zero. */
 function optAmount(v: unknown): number | null {
@@ -196,8 +198,12 @@ export default function AttendanceUploadPage() {
                 rowIndex: i + 2,
                 rawEmployeeId: String(pick(row, "EMPLOYEE ID", "EMP ID", "EMP CODE", "EMPLOYEE CODE", "EMPLOYEE NO", "EMP NO", "EMPCODE", "EMPLOYEEID") ?? "").trim(),
                 rawName:       String(pick(row, "EMPLOYEE NAME", "NAME", "EMPLOYEE", "EMP NAME") ?? "").trim(),
-                monthDays:     Number(pick(row, "MONTH DAYS", "MONTHDAYS", "TOTAL DAYS", "WORKING DAYS IN MONTH") ?? 26) || 26,
-                days:          Number(pick(row, "DAYS WORKED", "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "PAID DAYS", "ATT DAYS", "ATTENDANCE") ?? 26) || 26,
+                // Only a BLANK cell falls back to the 26-day default. The old
+                // `Number(x ?? 26) || 26` also turned an explicit 0 (someone who
+                // did not work at all) into a full month's pay. Same rule as
+                // the hub's AttendancePanel.
+                monthDays:     (() => { const v = pick(row, "MONTH DAYS", "MONTHDAYS", "TOTAL DAYS", "WORKING DAYS IN MONTH"); return v !== undefined && v !== null && v !== "" ? Number(v) : DEFAULT_MONTH_DAYS })(),
+                days:          (() => { const v = pick(row, "DAYS WORKED", "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "PAID DAYS", "ATT DAYS", "ATTENDANCE"); return v !== undefined && v !== null && v !== "" ? Number(v) : DEFAULT_MONTH_DAYS })(),
                 otDays:        Number(pick(row, "OT DAYS", "OTDAYS", "OVERTIME", "OT") ?? 0) || 0,
                 otherDeduction:Number(pick(row, "OTHER DEDUCTION", "OTHER DED", "OTH DED") ?? 0) || 0,
                 lwf:           Number(pick(row, "LWF", "LABOUR WELFARE FUND") ?? 0) || 0,
@@ -338,7 +344,7 @@ export default function AttendanceUploadPage() {
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 5 }}>Year *</label>
                         <select value={year} onChange={e => setYear(Number(e.target.value))}
                             style={{ ...inputSt, width: "100%" }}>
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                            {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
                 </div>
@@ -508,6 +514,7 @@ export default function AttendanceUploadPage() {
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.otherDeduction,0) || "—"}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.lwf,0) || "—"}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.canteenDays,0) || "—"}</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+(r.canteenAmount ?? 0),0) || "—"}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.penalty,0) || "—"}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.advance,0) || "—"}</td>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.productionIncentive,0) || "—"}</td>

@@ -68,8 +68,14 @@ type PayrollRow = {
  * the contribution on the same ECR row disagreed.
  */
 function pfWages(p: PayrollRow, rules: PayrollRules) {
+    // No employee PF (CALL / PF disabled) → no PF wages, so every PF column
+    // derived from here (EPS, EPF-ER, EDLI, admin) is 0 for that member too.
+    if (!hasPf(p)) return 0
     return Math.min(p.basicSalary + p.da, rules.pf.wageCeiling)
 }
+
+/** A PF member this month: the engine deducted employee PF. */
+const hasPf = (p: PayrollRow) => p.pfEmployee > 0
 
 function epsContrib(p: PayrollRow, rules: PayrollRules) {
     return Math.round(pfWages(p, rules) * rules.pf.employer.epsPct / 100)
@@ -146,7 +152,9 @@ export async function GET(req: Request) {
         const pfErTotalPct = rules.pf.employer.epsPct + rules.pf.employer.epfPct +
             rules.pf.employer.edliPct + rules.pf.employer.adminPct
 
-        const where: Record<string, unknown> = { month, year }
+        // Only locked rows (PROCESSED/PAID) are filed — DRAFT rows are still
+        // being edited, same rule as the bank sheet / export routes.
+        const where: Record<string, unknown> = { month, year, status: { in: ["PROCESSED", "PAID"] } }
         if (siteId) where.siteId = siteId
 
         const payrolls = await prisma.payroll.findMany({
@@ -172,19 +180,22 @@ export async function GET(req: Request) {
         }) as PayrollRow[]
 
         if (payrolls.length === 0) {
-            return new NextResponse("No payroll data found for this period.", { status: 404 })
+            // 409: the month may well exist as a DRAFT — it just isn't filable yet.
+            return new NextResponse("No locked payroll for this month — lock the wage sheet first", { status: 409 })
         }
 
         // Apply state filter if provided
         const filtered = stateFilter
             ? payrolls.filter(p => p.employee.state?.toLowerCase() === stateFilter.toLowerCase())
             : payrolls
+        // PF member lists (ECR / challan) carry contributing members only.
+        const pfMembers = filtered.filter(hasPf)
 
         // The ECR upload file is plain text, not a table, so it returns here
         // rather than going through the JSON-to-spreadsheet path below.
         if (type === "pf-ecr" && searchParams.get("format") === "txt") {
-            if (!filtered.length) return new NextResponse("No data for this period", { status: 404 })
-            return new NextResponse(buildEcrText(filtered.map(p => ecrMember(p, rules))), {
+            if (!pfMembers.length) return new NextResponse("No PF members for this period", { status: 404 })
+            return new NextResponse(buildEcrText(pfMembers.map(p => ecrMember(p, rules))), {
                 headers: {
                     "Content-Type": "text/plain; charset=utf-8",
                     "Content-Disposition":
@@ -220,7 +231,10 @@ export async function GET(req: Request) {
                 const totPfWages   = rows.reduce((s, p) => s + pfWages(p, rules), 0)
                 const tot12        = rows.reduce((s, p) => s + p.pfEmployee, 0)
                 const totEPS       = rows.reduce((s, p) => s + epsContrib(p, rules), 0)
-                const totER367     = rows.reduce((s, p) => s + Math.max(0, p.pfEmployer - epsContrib(p, rules)), 0)
+                // p.pfEmployer already holds EDLI + admin, so "pfEmployer − EPS" put
+                // them in the 3.67% column AND again in their own columns (at the
+                // 15,000 ceiling: 700 instead of 550, total 3,900 instead of 3,750).
+                const totER367     = rows.reduce((s, p) => s + epfEmployerContrib(p, rules), 0)
                 const totEDLI      = Math.round(totPfWages * rules.pf.employer.edliPct / 100)
                 const totAdmin     = Math.round(totPfWages * rules.pf.employer.adminPct / 100)
                 const exemptRows   = rows.filter(p => p.pfEmployee === 0 && p.grossSalary > 0)
@@ -248,7 +262,7 @@ export async function GET(req: Request) {
                 const totPfW = all.reduce((s, p) => s + pfWages(p, rules), 0)
                 const t12    = all.reduce((s, p) => s + p.pfEmployee, 0)
                 const tEPS   = all.reduce((s, p) => s + epsContrib(p, rules), 0)
-                const tER    = all.reduce((s, p) => s + Math.max(0, p.pfEmployer - epsContrib(p, rules)), 0)
+                const tER    = all.reduce((s, p) => s + epfEmployerContrib(p, rules), 0) // see totER367
                 const tEDLI  = Math.round(totPfW * rules.pf.employer.edliPct / 100)
                 const tAdmin = Math.round(totPfW * rules.pf.employer.adminPct / 100)
                 const exEmps = all.filter(p => p.pfEmployee === 0 && p.grossSalary > 0)
@@ -372,7 +386,7 @@ export async function GET(req: Request) {
                     break
 
                 case "pf-challan":
-                    data = filtered.map(p => ({
+                    data = pfMembers.map(p => ({
                         "UAN": p.employee.uan ?? "",
                         "Member Name": `${p.employee.firstName} ${p.employee.lastName}`,
                         "Emp ID": p.employee.employeeId,
@@ -390,7 +404,7 @@ export async function GET(req: Request) {
                     break
 
                 case "pf-ecr":
-                    data = filtered.map(p => ({
+                    data = pfMembers.map(p => ({
                         "UAN": p.employee.uan ?? "",
                         "Member Name": `${p.employee.firstName} ${p.employee.lastName}`,
                         "Gross Wages": p.grossSalary,

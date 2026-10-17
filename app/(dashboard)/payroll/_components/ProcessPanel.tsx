@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -15,7 +16,9 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Site     = { id: string; name: string; code?: string; city?: string }
-type SiteStatus = { siteId: string | null; processedCount: number }
+// draft/locked/paid come from /api/payroll/sites-status; treat a missing
+// field as 0 so an older API shape still renders.
+type SiteStatus = { siteId: string | null; processedCount: number; draft?: number; locked?: number; paid?: number }
 
 type Employee = {
     id: string; employeeId: string; firstName: string; lastName: string
@@ -35,8 +38,28 @@ type AttRow = {
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-const fmt = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
+// ₹0 is a real amount (no HRA, no bonus) — show it like the hub does rather than a dash.
+const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 const defaultDays = 26
+
+const lockedOf = (st?: SiteStatus) => st?.locked ?? 0
+const draftOf  = (st?: SiteStatus) => st?.draft  ?? 0
+const paidOf   = (st?: SiteStatus) => st?.paid   ?? 0
+
+/** "12 draft · 30 locked · 0 paid" as small pills. */
+function StatusPills({ st }: { st?: SiteStatus }) {
+    if (!st || (st.processedCount ?? 0) === 0) return null
+    const pill = (n: number, label: string, bg: string, color: string) => (
+        <span key={label} style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: n > 0 ? bg : "#f3f4f6", color: n > 0 ? color : "#9ca3af", whiteSpace: "nowrap" }}>{n} {label}</span>
+    )
+    return (
+        <span style={{ display: "inline-flex", gap: 3, flexWrap: "wrap" }}>
+            {pill(draftOf(st),  "draft",  "#fef9c3", "#854d0e")}
+            {pill(lockedOf(st), "locked", "#dcfce7", "#15803d")}
+            {pill(paidOf(st),   "paid",   "#dbeafe", "#1d4ed8")}
+        </span>
+    )
+}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const th: React.CSSProperties = { padding: "8px 10px", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center", whiteSpace: "nowrap" }
@@ -46,18 +69,22 @@ const attInput: React.CSSProperties = { width: 50, padding: "3px 4px", borderRad
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ProcessPanel({ onClose, onDone }: { onClose: () => void; onDone?: () => void }) {
+export default function ProcessPanel({ onClose, onDone, initialMonth, initialYear }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number }) {
     const { data: session } = useSession()
     const canManage = can(session, "payroll.manage")
 
-    const [month, setMonth] = useState(String(new Date().getMonth() + 1))
-    const [year,  setYear]  = useState(String(new Date().getFullYear()))
+    // The hub passes the month/year of the history row (or its own picker) so
+    // "View" on August opens August, not the calendar month.
+    const [month, setMonth] = useState(String(initialMonth ?? currentPayrollMonth()))
+    const [year,  setYear]  = useState(String(initialYear  ?? currentPayrollYear()))
 
     const [sites,          setSites]          = useState<Site[]>([])
     const [siteStatus,     setSiteStatus]     = useState<SiteStatus[]>([])
     const [selectedSiteId, setSelectedSiteId] = useState("")
     const [employees,      setEmployees]      = useState<Employee[]>([])
     const [attRows,        setAttRows]        = useState<Record<string, Partial<AttRow>>>({})
+    /** Saved payroll status per employee id (DRAFT / PROCESSED / PAID). Locked rows are read-only. */
+    const [rowStatus,      setRowStatus]      = useState<Record<string, string>>({})
 
     const [loadingSites,     setLoadingSites]     = useState(true)
     const [loadingStatus,    setLoadingStatus]    = useState(false)
@@ -92,7 +119,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
     useEffect(() => { fetchSiteStatus() }, [fetchSiteStatus])
 
     const fetchEmployees = useCallback(async (siteId: string) => {
-        setLoadingEmployees(true); setFetched(false); setEmployees([])
+        setLoadingEmployees(true); setFetched(false); setEmployees([]); setRowStatus({})
         try {
             // Every employee on the site, not just the first page: this grid is
             // what tells /api/payroll/calculate who to pay, so anyone missing
@@ -109,7 +136,9 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                 const payrolls: any[] = await payRes.json()
                 if (Array.isArray(payrolls) && payrolls.length > 0) {
                     const filled: Record<string, Partial<AttRow>> = {}
+                    const statuses: Record<string, string> = {}
                     for (const p of payrolls) {
+                        if (p.status) statuses[p.employeeId] = p.status
                         filled[p.employeeId] = {
                             monthDays: p.workingDays ?? defaultDays, workedDays: p.presentDays ?? defaultDays,
                             otDays: p.otDays ?? 0, canteenDays: p.canteenDays ?? 0, canteenAmount: p.canteenAmount ?? null,
@@ -122,6 +151,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                         }
                     }
                     setAttRows(filled)
+                    setRowStatus(statuses)
                 }
             }
             setFetched(true)
@@ -131,7 +161,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
     }, [month, year])
 
     const selectSite = (id: string) => {
-        setSelectedSiteId(id); setSearch(""); setAttRows({})
+        setSelectedSiteId(id); setSearch(""); setAttRows({}); setRowStatus({})
         if (id) fetchEmployees(id)
         else { setEmployees([]); setFetched(false) }
     }
@@ -205,6 +235,10 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
     const handleProcess = async () => {
         if (!selectedSiteId) { toast.error("Select a site"); return }
         if (!employees.length) { toast.error("No employees found for this site"); return }
+        // No attendance row means `workedDays ?? 26` — a full month's pay for
+        // someone who may not have been on the sheet at all. Say so first.
+        const missingAtt = employees.filter(e => !attRows[e.id]).length
+        if (missingAtt > 0 && !confirm(`${missingAtt} employee${missingAtt === 1 ? " has" : "s have"} no attendance in the sheet and will be paid a full month (${defaultDays} days). Continue?`)) return
         setProcessing(true)
         try {
             const attendance = employees.map(emp => {
@@ -219,14 +253,20 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
             if (!res.ok) throw new Error(await res.text())
             const result = await res.json()
             const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "site"
+            const skippedLocked = Number(result.skippedLocked ?? 0)
             if (result.failedCount > 0) {
-                toast.warning(`${siteName}: ${result.processedCount}/${result.totalEmployees} processed. ${result.failedCount} failed — retry.`, { duration: 8000 })
+                toast.warning(`${siteName}: ${result.processedCount}/${result.totalEmployees} processed. ${result.failedCount} failed — retry.${skippedLocked > 0 ? ` ${skippedLocked} locked row(s) skipped.` : ""}`, { duration: 8000 })
                 await fetchSiteStatus()
+            } else if (skippedLocked > 0) {
+                toast.warning(`${siteName}: ${result.processedCount} processed, ${skippedLocked} skipped — already locked. Unlock to reprocess them.`, { duration: 8000 })
+                await fetchSiteStatus()
+                selectSite("")
+                onDone?.({ month: parseInt(month), year: parseInt(year) })
             } else {
                 toast.success(`${siteName}: All ${result.processedCount} employees processed ✓`)
                 await fetchSiteStatus()
                 selectSite("")
-                onDone?.()
+                onDone?.({ month: parseInt(month), year: parseInt(year) })
             }
         } catch (e: any) { toast.error(e.message || "Process failed") }
         finally { setProcessing(false) }
@@ -238,8 +278,12 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
         try {
             const res = await fetch(`/api/payroll/reset?month=${month}&year=${year}&action=unlock`, { method: "DELETE" })
             if (!res.ok) throw new Error(await res.text())
-            toast.success("Payroll unlocked — you can now reprocess")
+            const d = await res.json().catch(() => ({}))
+            const n = Number(d?.unlocked ?? 0)
+            if (n > 0) toast.success(`${n} payroll row(s) unlocked — back to DRAFT, you can now reprocess`)
+            else toast.warning("Nothing to unlock — no locked rows for this month")
             await fetchSiteStatus()
+            if (selectedSiteId) await fetchEmployees(selectedSiteId)
         } catch (e: any) { toast.error(e.message || "Unlock failed") }
         finally { setResetting(false) }
     }
@@ -252,7 +296,10 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
         try {
             const res = await fetch(`/api/payroll/reset?month=${month}&year=${year}&siteId=${selectedSiteId}&action=delete`, { method: "DELETE" })
             if (!res.ok) throw new Error(await res.text())
-            toast.success(`Payroll deleted for ${siteName}`)
+            const d = await res.json().catch(() => ({}))
+            const skipped = Number(d?.skippedLocked ?? 0)
+            if (skipped > 0) toast.warning(`Draft payroll deleted for ${siteName} — ${skipped} locked row(s) kept. Unlock first to remove them.`, { duration: 8000 })
+            else toast.success(`Payroll deleted for ${siteName}`)
             await fetchSiteStatus(); selectSite("")
         } catch (e: any) { toast.error(e.message || "Delete failed") }
         finally { setDeleting(false) }
@@ -290,7 +337,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                         </select>
                         <select value={year} onChange={e => { setYear(e.target.value); selectSite("") }}
                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
-                            {[2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
+                            {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                         <button onClick={fetchSiteStatus}
                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", cursor: "pointer", display: "flex", alignItems: "center" }}>
@@ -343,6 +390,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                         <div style={{ fontSize: 10, marginTop: 2, marginLeft: 16, color: isDone ? "#16a34a" : "#f59e0b", fontWeight: 600 }}>
                                             {isDone ? `${st!.processedCount} processed` : "Pending"}
                                         </div>
+                                        {isDone && <div style={{ marginTop: 3, marginLeft: 16 }}><StatusPills st={st} /></div>}
                                     </div>
                                 )
                             })}
@@ -376,6 +424,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                                 <div style={{ marginTop: 8, fontSize: 11, color: isDone ? "#15803d" : "var(--text3)", fontWeight: 600 }}>
                                                     {isDone ? `${st!.processedCount} employees` : "Click to process →"}
                                                 </div>
+                                                {isDone && <div style={{ marginTop: 5 }}><StatusPills st={st} /></div>}
                                             </div>
                                         )
                                     })}
@@ -401,6 +450,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                     <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>{selectedSite?.name}</span>
                                     {selectedSite?.code && <span style={{ fontSize: 10, color: "var(--text3)" }}>{selectedSite.code}</span>}
                                     {getStatus(selectedSiteId) && <span style={{ padding: "2px 7px", borderRadius: 20, background: "#dcfce7", color: "#15803d", fontSize: 10, fontWeight: 700 }}>✓ Previously Processed</span>}
+                                    <StatusPills st={getStatus(selectedSiteId)} />
                                 </div>
                                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                     <button onClick={() => fileInputRef.current?.click()} disabled={!fetched}
@@ -411,19 +461,19 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                         style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={11} className={loadingEmployees ? "animate-spin" : ""} /> Refresh
                                     </button>
-                                    {getStatus(selectedSiteId) && (
-                                        <>
+                                    {lockedOf(getStatus(selectedSiteId)) > 0 && (
                                             <button onClick={handleUnlock} disabled={resetting || deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #f59e0b", background: "#fffbeb", fontSize: 11, color: "#b45309", fontWeight: 600, cursor: "pointer", opacity: (resetting||deleting) ? 0.6 : 1 }}>
                                                 {resetting ? <Loader2 size={11} className="animate-spin" /> : <Unlock size={11} />}
                                                 {resetting ? "Unlocking…" : "Unlock"}
                                             </button>
+                                    )}
+                                    {draftOf(getStatus(selectedSiteId)) > 0 && (
                                             <button onClick={handleDelete} disabled={resetting || deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 11, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: (resetting||deleting) ? 0.6 : 1 }}>
                                                 {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                                                 {deleting ? "Deleting…" : "Delete"}
                                             </button>
-                                        </>
                                     )}
                                     <button onClick={handleProcess} disabled={processing || !fetched || employees.length === 0 || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 7, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: (processing||!fetched) ? 0.6 : 1 }}>
@@ -512,6 +562,9 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                                 const fullGross = sal ? sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance : 0
                                                 const approved = sal?.status === "APPROVED"
                                                 const monthDays = att.monthDays ?? defaultDays; const workedDays = att.workedDays ?? defaultDays
+                                                // PROCESSED/PAID rows are locked — amounts can't change until Unlock.
+                                                const locked = rowStatus[emp.id] === "PROCESSED" || rowStatus[emp.id] === "PAID"
+                                                const inp: React.CSSProperties = locked ? { ...attInput, background: "var(--surface2)", color: "var(--text3)", cursor: "not-allowed" } : attInput
                                                 const lop = monthDays - workedDays; const otDays = att.otDays ?? 0; const otHrs = Math.round(otDays * 8 * 100) / 100
                                                 return (
                                                     <tr key={emp.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>
@@ -521,18 +574,18 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                                             <div style={{ fontWeight: 600, color: "var(--text)" }}>{emp.firstName} {emp.lastName}</div>
                                                             <div style={{ fontSize: 10, color: "var(--text3)" }}>{emp.designation || "—"}</div>
                                                         </td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={1} max={31} value={att.monthDays ?? defaultDays} onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={attInput} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={1} max={31} value={att.monthDays ?? defaultDays} onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={inp} disabled={locked} /></td>
                                                         <td style={{ ...td, background: "#eff6ff", color: lop < 0 ? "#16a34a" : lop > 0 ? "#dc2626" : "var(--text3)", fontWeight: 700, fontSize: 10 }}>{lop}</td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} max={31} value={att.workedDays ?? defaultDays} onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={attInput} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} step="0.01" value={att.otDays ?? 0} onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={attInput} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} max={31} value={att.workedDays ?? defaultDays} onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} step="0.01" value={att.otDays ?? 0} onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={inp} disabled={locked} /></td>
                                                         <td style={{ ...td, background: "#eff6ff", color: "var(--text3)", fontSize: 10 }}>{otHrs}</td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.canteenDays ?? 0} onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={attInput} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} placeholder="auto" value={att.canteenAmount ?? ""} onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={attInput} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.otherDeductions ?? 0} onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={attInput} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.lwf ?? 0} onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={attInput} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.penalty ?? 0} onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={attInput} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.advance ?? 0} onChange={e => setAtt(emp.id, "advance", e.target.value)} style={attInput} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.productionIncentive ?? 0} onChange={e => setAtt(emp.id, "productionIncentive", e.target.value)} style={attInput} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.canteenDays ?? 0} onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} placeholder="auto" value={att.canteenAmount ?? ""} onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.otherDeductions ?? 0} onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.lwf ?? 0} onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.penalty ?? 0} onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.advance ?? 0} onChange={e => setAtt(emp.id, "advance", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.productionIncentive ?? 0} onChange={e => setAtt(emp.id, "productionIncentive", e.target.value)} style={inp} disabled={locked} /></td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.basic) : "—"}</td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.da) : "—"}</td>
                                                         <td style={{ ...td, background: "#f0fdf4", color: "#1d4ed8" }}>{sal ? fmt(hra) : "—"}</td>
@@ -546,6 +599,7 @@ export default function ProcessPanel({ onClose, onDone }: { onClose: () => void;
                                                             <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
                                                                 <span style={{ padding: "2px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: approved ? "#dcfce7" : "#fef9c3", color: approved ? "#15803d" : "#854d0e" }}>{approved ? "Approved" : sal ? "Pending" : "No Salary"}</span>
                                                                 <span style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: attRows[emp.id] ? "#dbeafe" : "#f3f4f6", color: attRows[emp.id] ? "#1d4ed8" : "#9ca3af" }}>{attRows[emp.id] ? "✓ Att" : "Default"}</span>
+                                                                {locked && <span title="Locked — unlock to edit" style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: "#dcfce7", color: "#15803d" }}>🔒 {rowStatus[emp.id] === "PAID" ? "Paid" : "Locked"}</span>}
                                                             </div>
                                                         </td>
                                                     </tr>

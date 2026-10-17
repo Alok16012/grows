@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -48,12 +49,13 @@ type PayrollRecord = {
 const lbl: React.CSSProperties = { fontSize:11, fontWeight:700, color:"var(--text3)", whiteSpace:"nowrap" }
 const sel: React.CSSProperties = { padding:"6px 10px", borderRadius:7, border:"1px solid var(--border)", fontSize:12, background:"var(--surface)", color:"var(--text)", outline:"none" }
 
-export default function PayslipsPanel({ onClose }: { onClose: () => void }) {
+export default function PayslipsPanel({ onClose, initialMonth, initialYear }: { onClose: () => void; initialMonth?: number; initialYear?: number }) {
     const { data: session } = useSession()
     const canManage = can(session, "payroll.manage")
 
-    const [month,    setMonth]    = useState(new Date().getMonth()+1)
-    const [year,     setYear]     = useState(new Date().getFullYear())
+    // The hub passes the history row's month/year so "Slips" on August opens August.
+    const [month,    setMonth]    = useState(initialMonth ?? currentPayrollMonth())
+    const [year,     setYear]     = useState(initialYear  ?? currentPayrollYear())
     const [sites,    setSites]    = useState<Site[]>([])
     const [status,   setStatus]   = useState<SiteStatus[]>([])
     const [selSiteId,setSelSiteId]= useState("")
@@ -221,7 +223,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                 </select>
                 <span style={lbl}>Year</span>
                 <select value={year} onChange={e=>setYear(Number(e.target.value))} style={sel}>
-                    {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
+                    {payrollYears().map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
                 <button onClick={()=>fetchSlips(selSiteId)} style={{ marginLeft:"auto", display:"flex", padding:"4px 8px", borderRadius:6, border:"1px solid var(--border)", background:"none", cursor:"pointer" }}>
                     <RefreshCw size={12} style={{ color:"var(--text3)" }} />

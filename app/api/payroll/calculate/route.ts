@@ -157,6 +157,30 @@ export async function POST(req: Request) {
             return Number.isFinite(n) ? n : null
         }
 
+        // Attendance that cannot be real (negative days, more worked than the
+        // month has) must fail the whole batch, not quietly produce a negative
+        // LWP or an over-paid month. Checked up front so nothing is written.
+        // All bad rows are named at once, by employee rather than UUID, so a
+        // 300-row sheet is fixed in one pass instead of one upload per typo.
+        const byId = new Map(employees.map(e => [e.id, e]))
+        const badRows: string[] = []
+        for (const a of (attendance as any[]) ?? []) {
+            const emp = a?.employeeId ? byId.get(a.employeeId) : undefined
+            if (!emp) continue
+            const monthDays  = parseInt(String(a.monthDays ?? defaultMonthDays)) || defaultMonthDays
+            const workedDays = numOrDefault(a.workedDays, defaultMonthDays)
+            if (monthDays < 0 || workedDays < 0 || workedDays > monthDays) {
+                badRows.push(`${emp.firstName} ${emp.lastName}: ${workedDays} worked of ${monthDays} days`)
+            }
+        }
+        if (badRows.length) {
+            return new NextResponse(
+                `Attendance has ${badRows.length} invalid row(s) — days worked must be between 0 and the month's days. `
+                + badRows.slice(0, 10).join("; ") + (badRows.length > 10 ? `; and ${badRows.length - 10} more` : ""),
+                { status: 400 }
+            )
+        }
+
         const allRows: PayrollRow[] = employees.map(emp => {
             const revision = revisions.get(emp.id)
             const sal      = emp.employeeSalary
@@ -165,12 +189,14 @@ export async function POST(req: Request) {
             const salBasic = salData?.basic ?? emp.basicSalary ?? 0
 
             const attInput = (attendance as any[])?.find((a: any) => a.employeeId === emp.id) ?? {}
+            const monthDays = parseInt(String(attInput.monthDays  ?? defaultMonthDays)) || defaultMonthDays
             const att = {
-                monthDays:           parseInt(String(attInput.monthDays  ?? defaultMonthDays)) || defaultMonthDays,
+                monthDays,
                 // `|| defaultMonthDays` treated 0 as missing, so marking an
                 // employee as having worked zero days paid them a full month.
                 // Only fall back when the value is genuinely absent or unparseable.
-                workedDays:          numOrDefault(attInput.workedDays, defaultMonthDays),
+                // Clamped to 0..monthDays as a belt-and-braces after the check above.
+                workedDays:          Math.min(Math.max(numOrDefault(attInput.workedDays, defaultMonthDays), 0), monthDays),
                 otDays:              Number(attInput.otDays)              || 0,
                 canteenDays:         Math.round(Number(attInput.canteenDays) || 0),
                 // Manual canteen amount. Blank / absent stays null so the
@@ -183,7 +209,6 @@ export async function POST(req: Request) {
                 lwf:                 Number(attInput.lwf)                 || 0,
             }
 
-            console.log(`[PAYROLL_DEBUG] ${emp.employeeId} ${emp.firstName} ${emp.lastName}: basic=${salBasic} da=${salData?.da} pfBase=min(${salBasic}+${salData?.da},15000)=${Math.min(salBasic + (salData?.da || 0), 15000)}`)
             const calc = calcGrowusPayroll({
                 basic:             salBasic,
                 da:                salData?.da               ?? 0,
@@ -225,18 +250,21 @@ export async function POST(req: Request) {
         // Then recreate all — avoids sequential per-row updates which cause timeouts
         // when Vercel (Mumbai) and Supabase are in different regions (200ms × 144 = 28s+).
         // Safe to delete: no other table has a FK referencing Payroll.id.
-        await prisma.payroll.deleteMany({
-            where: {
-                month, year,
-                employeeId: { in: employees.map(e => e.id) },
-                // Never delete a locked row, even if one slipped past the filter
-                // above (e.g. locked by someone else mid-request).
-                status: "DRAFT",
-            },
-        })
-
         // ── STEP 3: Bulk-insert ALL rows in one shot (1 DB call) ─────────────────
-        await prisma.payroll.createMany({ data: allRows })
+        // Both in one transaction: a failed insert must not leave the month's
+        // rows deleted with nothing in their place.
+        await prisma.$transaction([
+            prisma.payroll.deleteMany({
+                where: {
+                    month, year,
+                    employeeId: { in: employees.map(e => e.id) },
+                    // Never delete a locked row, even if one slipped past the filter
+                    // above (e.g. locked by someone else mid-request).
+                    status: "DRAFT",
+                },
+            }),
+            prisma.payroll.createMany({ data: allRows }),
+        ])
 
         const processedCount = allRows.length
 

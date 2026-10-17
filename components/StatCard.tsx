@@ -67,7 +67,7 @@ export function StatCard({ label, value, icon, tone, trend, sub, seed = 0, onCli
             style={{ background: STAT_GRADIENTS[tone] }}
             title={label}
             aria-pressed={onClick && active !== undefined ? active : undefined}
-            className={`relative w-full h-full overflow-hidden text-left rounded-[14px] sm:rounded-[16px] p-3.5 sm:p-5 min-h-[112px] sm:min-h-[148px] flex flex-col transition-transform hover:-translate-y-0.5 shadow-[0_8px_20px_-12px_rgba(15,23,41,0.45)] ${active ? "ring-[3px] ring-offset-2 ring-offset-[var(--bg)] ring-[var(--accent)]" : ""} ${dark ? "text-[#1d1a0f]" : "text-white"}`}
+            className={`relative w-full h-full overflow-hidden text-left [container-type:inline-size] rounded-[14px] sm:rounded-[16px] p-3.5 sm:p-5 min-h-[112px] sm:min-h-[148px] flex flex-col transition-transform hover:-translate-y-0.5 shadow-[0_8px_20px_-12px_rgba(15,23,41,0.45)] ${active ? "ring-[3px] ring-offset-2 ring-offset-[var(--bg)] ring-[var(--accent)]" : ""} ${dark ? "text-[#1d1a0f]" : "text-white"}`}
         >
             <span aria-hidden className="pointer-events-none absolute -right-10 -top-14 h-32 w-32 sm:h-40 sm:w-40 rounded-full bg-white/10" />
             <div className="relative flex items-center gap-3 mb-2.5 sm:mb-3 min-w-0">
@@ -77,8 +77,11 @@ export function StatCard({ label, value, icon, tone, trend, sub, seed = 0, onCli
                 <span className="hidden sm:block min-w-0 text-[15px] font-medium leading-tight">{label}</span>
             </div>
             <div className="relative flex items-end justify-between gap-2">
-                <p className="text-[24px] sm:text-[34px] font-bold leading-none tabular-nums tracking-[-0.02em] truncate">{shown}</p>
-                <div className="hidden sm:block opacity-90 mb-0.5"><Sparkline color={dark ? "#b45309" : ink} seed={seed} /></div>
+                {/* A six-across row on a laptop leaves ~170px per tile: at 34px a
+                    ₹1,23,85,086 was cut to "₹..". The sparkline gives way first
+                    (stat-spark, see globals.css) and the figure steps down a size. */}
+                <p className="stat-value-fit min-w-0 text-[24px] sm:text-[30px] xl:text-[32px] font-bold leading-none tabular-nums tracking-[-0.02em] truncate">{shown}</p>
+                <div className="stat-spark hidden sm:block opacity-90 mb-0.5"><Sparkline color={dark ? "#b45309" : ink} seed={seed} /></div>
             </div>
             <p className="sm:hidden relative mt-1.5 text-[12.5px] font-semibold leading-tight truncate">{label}</p>
             {trend && (

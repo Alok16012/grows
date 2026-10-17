@@ -25,21 +25,41 @@ export async function DELETE(req: Request) {
         const run = await prisma.payrollRun.findUnique({ where: { month_year: { month, year } } })
         if (!run) return new NextResponse("Payroll run not found", { status: 404 })
 
-        if (action === "unlock") {
-            // Just reset the run status to DRAFT — keep all payroll records
-            await prisma.payrollRun.update({
-                where: { id: run.id },
-                data: { status: "DRAFT" },
-            })
-            return NextResponse.json({ success: true, action: "unlocked" })
-        }
-
-        // action === "delete" — remove payroll records for this site (or all if no siteId)
-        const where = siteId
+        const scope = siteId
             ? { payrollRunId: run.id, siteId }
             : { payrollRunId: run.id }
 
-        await prisma.payroll.deleteMany({ where })
+        if (action === "unlock") {
+            // Rows must go back to DRAFT too, not just the run — calculate
+            // refuses locked rows, so a run-only unlock left the month stuck.
+            // PAID rows stay PAID: money has left the account.
+            const [unlocked] = await prisma.$transaction([
+                prisma.payroll.updateMany({
+                    where: { ...scope, status: "PROCESSED" },
+                    data: { status: "DRAFT", processedAt: null, processedBy: null },
+                }),
+                prisma.payrollRun.update({
+                    where: { id: run.id },
+                    data: { status: "DRAFT", lockedAt: null },
+                }),
+            ])
+            return NextResponse.json({ success: true, action: "unlocked", unlocked: unlocked.count })
+        }
+
+        // action === "delete" — remove DRAFT payroll records for this site (or all
+        // if no siteId). Locked rows (PROCESSED/PAID) are what challans were filed
+        // against, so they are never deleted here — unlock first.
+        const skippedLocked = await prisma.payroll.count({
+            where: { ...scope, status: { not: "DRAFT" } },
+        })
+        const deleted = await prisma.payroll.deleteMany({ where: { ...scope, status: "DRAFT" } })
+
+        if (deleted.count === 0 && skippedLocked > 0) {
+            return new NextResponse(
+                `${skippedLocked} locked payroll(s) were left untouched — unlock them first`,
+                { status: 409 }
+            )
+        }
 
         // If no payroll records remain, delete the run entirely
         const remaining = await prisma.payroll.count({ where: { payrollRunId: run.id } })
@@ -53,7 +73,13 @@ export async function DELETE(req: Request) {
             })
         }
 
-        return NextResponse.json({ success: true, action: "deleted", remaining })
+        return NextResponse.json({
+            success: true,
+            action: "deleted",
+            deleted: deleted.count,
+            skippedLocked,
+            remaining,
+        })
     } catch (error) {
         console.error("[PAYROLL_RESET]", error)
         return new NextResponse("Internal Error", { status: 500 })

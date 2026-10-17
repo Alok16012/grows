@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -10,7 +11,8 @@ const loadXLSX = () => import("xlsx")
 import { printHTML } from "@/lib/print-html"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-const fmt  = (n: number) => n ? "₹"+Math.round(n).toLocaleString("en-IN") : "—"
+// ₹0 is a real amount — show it like the hub does rather than a dash.
+const fmt  = (n: number) => "₹"+Math.round(n).toLocaleString("en-IN")
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 
 type Site    = { id: string; name: string; code?: string }
@@ -42,12 +44,19 @@ const th:  React.CSSProperties = { padding:"7px 9px", fontSize:10, fontWeight:70
 const thSec: React.CSSProperties = { padding:"5px 8px", fontSize:9, fontWeight:800, textAlign:"center", textTransform:"uppercase", letterSpacing:"0.6px", borderBottom:"1px solid var(--border)", whiteSpace:"nowrap" }
 const td:  React.CSSProperties = { padding:"5px 9px", textAlign:"center", color:"var(--text)", whiteSpace:"nowrap" }
 
-export default function WageSheetPanel({ onClose, onDone }: { onClose: () => void; onDone?: (next?: string) => void }) {
+export type PanelPeriod = { month: number; year: number }
+
+export default function WageSheetPanel({ onClose, onDone, initialMonth, initialYear }: {
+    onClose: () => void
+    /** `period` is the month/year this panel was on, so the next panel opens on the same one. */
+    onDone?: (next?: string, period?: PanelPeriod) => void
+    initialMonth?: number; initialYear?: number
+}) {
     const { data: session } = useSession()
     const canManage = can(session, "payroll.manage")
 
-    const [month,   setMonth]   = useState(String(new Date().getMonth()+1))
-    const [year,    setYear]    = useState(String(new Date().getFullYear()))
+    const [month,   setMonth]   = useState(String(initialMonth ?? currentPayrollMonth()))
+    const [year,    setYear]    = useState(String(initialYear  ?? currentPayrollYear()))
     const [sites,   setSites]   = useState<Site[]>([])
     const [status,  setStatus]  = useState<SiteStatus[]>([])
     const [selId,      setSelId]      = useState("")
@@ -181,19 +190,29 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
         XLSX.writeFile(wb,`FormII_WageSheet_${site?.name??"All"}_${MONTHS[m-1]}_${y}.xlsx`)
     }
 
-    const handleLock = async ()=>{
-        if (!selectedIds.size) { toast.error("Select employees to lock"); return }
+    const periodLabel = () => `${MONTHS[parseInt(month)-1]} ${year}`
+    const period = (): PanelPeriod => ({ month: parseInt(month), year: parseInt(year) })
+
+    // Rows still open on the selected site — what "Lock all" locks.
+    const draftIds = data.filter(p=>p.status==="DRAFT").map(p=>p.id)
+
+    const lockRows = async (ids: string[])=>{
+        if (!ids.length) { toast.error("Select employees to lock"); return }
+        if (!confirm(`Lock ${ids.length} payroll(s) for ${periodLabel()}? Amounts can't be edited after locking.`)) return
         setLocking(true)
         try {
-            const res=await fetch("/api/payroll/final/lock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({month:parseInt(month),year:parseInt(year),payrollIds:[...selectedIds]})})
+            const res=await fetch("/api/payroll/final/lock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({month:parseInt(month),year:parseInt(year),payrollIds:ids})})
             if (!res.ok) throw new Error(await res.text())
             const d=await res.json()
-            toast.success(`${d.count} employee(s) locked — going to Compliance`)
+            const n=Number(d?.count??0)
             setSelectedIds(new Set()); await fetchData(selId)
-            onDone?.("compliance")
+            if (n===0) { toast.warning("Nothing to lock — these rows are already locked"); return }
+            toast.success(`${n} employee(s) locked — going to Compliance`)
+            onDone?.("compliance", period())
         } catch(e: unknown) { toast.error(e instanceof Error?e.message:"Lock failed") }
         finally { setLocking(false) }
     }
+    const handleLock = () => lockRows([...selectedIds])
 
     const toggleSiteSelect = (id: string, e: React.MouseEvent)=>{
         e.stopPropagation()
@@ -202,14 +221,18 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
 
     const handleLockSites = async ()=>{
         if (!selectedSiteIds.size) return
+        const rows=[...selectedSiteIds].reduce((n,id)=>n+(getSt(id)?.processedCount??0),0)
+        if (!confirm(`Lock ${rows} payroll(s) across ${selectedSiteIds.size} site(s) for ${periodLabel()}? Amounts can't be edited after locking.`)) return
         setLockingSites(true)
         try {
             const res=await fetch("/api/payroll/final/lock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({month:parseInt(month),year:parseInt(year),siteIds:[...selectedSiteIds]})})
             if (!res.ok) throw new Error(await res.text())
             const d=await res.json()
-            toast.success(`${d.count} employee(s) locked from ${selectedSiteIds.size} site(s)`)
+            const n=Number(d?.count??0)
             setSelectedSiteIds(new Set()); if(selId) await fetchData(selId); await fetchStatus()
-            onDone?.("compliance")
+            if (n===0) { toast.warning("Nothing to lock — these rows are already locked"); return }
+            toast.success(`${n} employee(s) locked from ${selectedSiteIds.size} site(s)`)
+            onDone?.("compliance", period())
         } catch(e: unknown) { toast.error(e instanceof Error?e.message:"Lock failed") }
         finally { setLockingSites(false) }
     }
@@ -220,7 +243,11 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
     const getSt          = (id: string) => status.find(s=>s.siteId===id)
     const done           = status.filter(s=>(s.processedCount??0)>0).length
     const processedSites = sites.filter(s=>(getSt(s.id)?.processedCount??0)>0)
-    const totals = { gross:data.reduce((s,p)=>s+p.grossSalary,0), net:data.reduce((s,p)=>s+p.netSalary,0), ded:data.reduce((s,p)=>s+p.totalDeductions,0), pf:data.reduce((s,p)=>s+p.pfEmployee,0), esi:data.reduce((s,p)=>s+p.esiEmployee,0) }
+    // The table shows `filtered`, so the footer must add up the same rows —
+    // summing `data` under a search made the total disagree with what's visible.
+    const isFiltered     = filtered.length !== data.length
+    const rows           = filtered
+    const totals = { gross:rows.reduce((s,p)=>s+p.grossSalary,0), net:rows.reduce((s,p)=>s+p.netSalary,0), ded:rows.reduce((s,p)=>s+p.totalDeductions,0), pf:rows.reduce((s,p)=>s+p.pfEmployee,0), esi:rows.reduce((s,p)=>s+p.esiEmployee,0) }
 
     return (
         <div style={{ display:"flex", flexDirection:"column", gap:12, paddingBottom:32 }}>
@@ -243,7 +270,7 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
                 </select>
                 <span style={lbl}>Year</span>
                 <select value={year} onChange={e=>{setYear(e.target.value);setSelId("");setData([])}} style={sel}>
-                    {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
+                    {payrollYears().map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
                 <button onClick={fetchStatus} style={{ marginLeft:"auto", display:"flex", padding:"4px 8px", borderRadius:6, border:"1px solid var(--border)", background:"none", cursor:"pointer" }}>
                     <RefreshCw size={12} style={{ color:"var(--text3)" }} />
@@ -387,6 +414,15 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
                                                 <FileDown size={13}/> PDF
                                             </button>
                                         </>
+                                    )}
+                                    {/* The lock used to appear only once rows were ticked, so a new
+                                        user had no way to find it. With nothing ticked, lock everything
+                                        still open on this site in one click. */}
+                                    {selectedCount===0 && draftIds.length>0 && (
+                                        <button onClick={()=>lockRows(draftIds)} disabled={locking || !canManage} title={canManage ? "Lock every open row on this site" : "Requires payroll manage permission"} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:locking?0.6:1 }}>
+                                            {locking?<Loader2 size={13} className="animate-spin"/>:<Lock size={13}/>}
+                                            Lock all ({draftIds.length}) & go to Compliance
+                                        </button>
                                     )}
                                     {selectedCount>0 && (
                                         <button onClick={handleLock} disabled={locking || !canManage} title={canManage ? undefined : "Requires payroll manage permission"} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:locking?0.6:1 }}>
@@ -578,41 +614,41 @@ export default function WageSheetPanel({ onClose, onDone }: { onClose: () => voi
                                             {data.length>0 && (
                                                 <tfoot>
                                                     <tr style={{ background:"var(--surface2)", borderTop:"2px solid var(--border)", fontWeight:700 }}>
-                                                        <td colSpan={5} style={{...td,textAlign:"right",fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>Total ({selectedCount>0?`${selectedCount} selected`:data.length})</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{data.reduce((s,p)=>s+(p.workingDays??26),0)}</td>
+                                                        <td colSpan={5} style={{...td,textAlign:"right",fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>{isFiltered?`Filtered total (${rows.length} of ${data.length})`:`Total (${selectedCount>0?`${selectedCount} selected`:data.length})`}</td>
+                                                        <td style={{...td,background:"#eff6ff"}}>{rows.reduce((s,p)=>s+(p.workingDays??26),0)}</td>
                                                         {/* Days are decimal (half days), so round the sum like the OT column does. */}
-                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(data.reduce((s,p)=>s+((p.workingDays??26)-(p.presentDays??(p.workingDays??26))),0)*1000)/1000}</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(data.reduce((s,p)=>s+(p.presentDays??p.workingDays??26),0)*1000)/1000}</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(data.reduce((s,p)=>s+(p.otDays??0),0)*1000)/1000}</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{data.reduce((s,p)=>s+(p.overtimeHrs??0),0)}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+(p.basicFull??p.basicSalary),0))}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+(p.daFull??p.da),0))}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+(p.hraFull??p.hra),0))}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+(p.washingFull??p.washing),0))}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+(p.conveyanceFull??p.conveyance),0))}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+(p.lwwFull??p.lwwEarned),0))}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+(p.bonusFull??p.bonus),0))}</td>
-                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(data.reduce((s,p)=>s+p.otherFull,0))}</td>
-                                                        <td style={{...td,background:"#dcfce7",color:"#15803d"}}>{fmt(data.reduce((s,p)=>s+p.grossFullMonth,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.basicSalary,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.da,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.hra,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.washing,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.conveyance,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.lwwEarned,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.bonus,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.allowances,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.overtimePay,0))}</td>
-                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(data.reduce((s,p)=>s+p.productionIncentive,0))}</td>
+                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(rows.reduce((s,p)=>s+((p.workingDays??26)-(p.presentDays??(p.workingDays??26))),0)*1000)/1000}</td>
+                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(rows.reduce((s,p)=>s+(p.presentDays??p.workingDays??26),0)*1000)/1000}</td>
+                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(rows.reduce((s,p)=>s+(p.otDays??0),0)*1000)/1000}</td>
+                                                        <td style={{...td,background:"#eff6ff"}}>{rows.reduce((s,p)=>s+(p.overtimeHrs??0),0)}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.basicFull??p.basicSalary),0))}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.daFull??p.da),0))}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.hraFull??p.hra),0))}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.washingFull??p.washing),0))}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.conveyanceFull??p.conveyance),0))}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.lwwFull??p.lwwEarned),0))}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.bonusFull??p.bonus),0))}</td>
+                                                        <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+p.otherFull,0))}</td>
+                                                        <td style={{...td,background:"#dcfce7",color:"#15803d"}}>{fmt(rows.reduce((s,p)=>s+p.grossFullMonth,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.basicSalary,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.da,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.hra,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.washing,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.conveyance,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.lwwEarned,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.bonus,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.allowances,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.overtimePay,0))}</td>
+                                                        <td style={{...td,background:"#fffbeb"}}>{fmt(rows.reduce((s,p)=>s+p.productionIncentive,0))}</td>
                                                         <td style={{...td,background:"#fef9c3",color:"#854d0e"}}>{fmt(totals.gross)}</td>
                                                         <td style={{...td,background:"#fef2f2"}}>{fmt(totals.pf)}</td>
                                                         <td style={{...td,background:"#fef2f2"}}>{fmt(totals.esi)}</td>
-                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(data.reduce((s,p)=>s+p.pt,0))}</td>
-                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(data.reduce((s,p)=>s+p.lwf,0))}</td>
-                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(data.reduce((s,p)=>s+p.canteen,0))}</td>
-                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(data.reduce((s,p)=>s+p.penalty,0))}</td>
-                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(data.reduce((s,p)=>s+p.advance,0))}</td>
-                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(data.reduce((s,p)=>s+p.otherDeductions,0))}</td>
+                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(rows.reduce((s,p)=>s+p.pt,0))}</td>
+                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(rows.reduce((s,p)=>s+p.lwf,0))}</td>
+                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(rows.reduce((s,p)=>s+p.canteen,0))}</td>
+                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(rows.reduce((s,p)=>s+p.penalty,0))}</td>
+                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(rows.reduce((s,p)=>s+p.advance,0))}</td>
+                                                        <td style={{...td,background:"#fef2f2"}}>{fmt(rows.reduce((s,p)=>s+p.otherDeductions,0))}</td>
                                                         <td style={{...td,background:"#fee2e2",color:"#b91c1c"}}>{fmt(totals.ded)}</td>
                                                         <td style={{...td,background:"#dcfce7",color:"#15803d"}}>{fmt(totals.net)}</td>
                                                     </tr>

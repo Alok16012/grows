@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears } from "../_components/payroll-years"
 import { Suspense } from "react"
 import RequirePayrollView from "../_components/RequirePayrollView"
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -18,7 +19,9 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Site = { id: string; name: string; code?: string; city?: string }
-type SiteStatus = { siteId: string | null; processedCount: number }
+// draft/locked/paid come from /api/payroll/sites-status; treat a missing
+// field as 0 so an older API shape still renders.
+type SiteStatus = { siteId: string | null; processedCount: number; draft?: number; locked?: number; paid?: number }
 type PayrollRunStatus = { status: string; month: number; year: number } | null
 
 // Same 5 steps as the payroll hub — locking happens inside the Wage Sheet step.
@@ -50,7 +53,27 @@ type AttRow = {
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-const fmt = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
+// ₹0 is a real amount (no HRA, no bonus) — show it like the hub does rather than a dash.
+const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
+
+const lockedOf = (st?: SiteStatus) => st?.locked ?? 0
+const draftOf  = (st?: SiteStatus) => st?.draft  ?? 0
+const paidOf   = (st?: SiteStatus) => st?.paid   ?? 0
+
+/** "12 draft · 30 locked · 0 paid" as small pills. */
+function StatusPills({ st }: { st?: SiteStatus }) {
+    if (!st || (st.processedCount ?? 0) === 0) return null
+    const pill = (n: number, label: string, bg: string, color: string) => (
+        <span key={label} style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: n > 0 ? bg : "#f3f4f6", color: n > 0 ? color : "#9ca3af", whiteSpace: "nowrap" }}>{n} {label}</span>
+    )
+    return (
+        <span style={{ display: "inline-flex", gap: 3, flexWrap: "wrap" }}>
+            {pill(draftOf(st),  "draft",  "#fef9c3", "#854d0e")}
+            {pill(lockedOf(st), "locked", "#dcfce7", "#15803d")}
+            {pill(paidOf(st),   "paid",   "#dbeafe", "#1d4ed8")}
+        </span>
+    )
+}
 
 function ProcessPayrollPage() {
     const router = useRouter()
@@ -67,6 +90,8 @@ function ProcessPayrollPage() {
     const [selectedSiteId, setSelectedSiteId] = useState("")
     const [employees,      setEmployees]      = useState<Employee[]>([])
     const [attRows,        setAttRows]        = useState<Record<string, Partial<AttRow>>>({})
+    /** Saved payroll status per employee id (DRAFT / PROCESSED / PAID). Locked rows are read-only. */
+    const [rowStatus,      setRowStatus]      = useState<Record<string, string>>({})
 
     const [loadingSites,     setLoadingSites]     = useState(true)
     const [loadingStatus,    setLoadingStatus]    = useState(false)
@@ -136,6 +161,7 @@ function ProcessPayrollPage() {
         setLoadingEmployees(true)
         setFetched(false)
         setEmployees([])
+        setRowStatus({})
         try {
             // Fetch employees + any existing saved payroll for this site/month/year in parallel.
             // Every employee on the site, not just the first page: this grid is
@@ -153,7 +179,7 @@ function ProcessPayrollPage() {
             // Pre-fill attendance from saved payroll records (so user sees previously uploaded values)
             if (payRes.ok) {
                 const payrolls: Array<{
-                    employeeId: string
+                    employeeId: string; status?: string
                     workingDays: number | null; presentDays: number | null
                     otDays: number | null; canteenDays: number | null
                     canteenAmount: number | null
@@ -163,7 +189,9 @@ function ProcessPayrollPage() {
                 }> = await payRes.json()
                 if (Array.isArray(payrolls) && payrolls.length > 0) {
                     const filled: Record<string, Partial<AttRow>> = {}
+                    const statuses: Record<string, string> = {}
                     for (const p of payrolls) {
+                        if (p.status) statuses[p.employeeId] = p.status
                         filled[p.employeeId] = {
                             monthDays:           p.workingDays ?? defaultDays,
                             workedDays:          p.presentDays ?? defaultDays,
@@ -178,6 +206,7 @@ function ProcessPayrollPage() {
                         }
                     }
                     setAttRows(filled)
+                    setRowStatus(statuses)
                 }
             }
             setFetched(true)
@@ -192,6 +221,7 @@ function ProcessPayrollPage() {
         setSelectedSiteId(id)
         setSearch("")
         setAttRows({})
+        setRowStatus({})
         if (id) fetchEmployees(id)
         else { setEmployees([]); setFetched(false) }
     }
@@ -339,6 +369,10 @@ function ProcessPayrollPage() {
     const handleProcess = async () => {
         if (!selectedSiteId) { toast.error("Select a site"); return }
         if (!employees.length) { toast.error("No employees found for this site"); return }
+        // No attendance row means `workedDays ?? 26` — a full month's pay for
+        // someone who may not have been on the sheet at all. Say so first.
+        const missingAtt = employees.filter(e => !attRows[e.id]).length
+        if (missingAtt > 0 && !confirm(`${missingAtt} employee${missingAtt === 1 ? " has" : "s have"} no attendance in the sheet and will be paid a full month (${defaultDays} days). Continue?`)) return
 
         setProcessing(true)
         try {
@@ -368,17 +402,23 @@ function ProcessPayrollPage() {
             const result = await res.json()
             const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "site"
             const total = result.totalEmployees ?? attendance.length
+            const skippedLocked = Number(result.skippedLocked ?? 0)
 
             if (result.failedCount > 0) {
                 // Some records failed — likely DB connection pool exhaustion.
                 // Warn the user and keep the current site selected so they can retry.
                 toast.warning(
                     `${siteName}: ${result.processedCount}/${total} processed. ` +
-                    `${result.failedCount} failed — click "Process Payroll" again to retry the missing records.`,
+                    `${result.failedCount} failed — click "Process Payroll" again to retry the missing records.` +
+                    (skippedLocked > 0 ? ` ${skippedLocked} locked row(s) skipped.` : ""),
                     { duration: 8000 }
                 )
                 await fetchSiteStatus()
                 // Do NOT clear selection — user should be able to retry immediately
+            } else if (skippedLocked > 0) {
+                toast.warning(`${siteName}: ${result.processedCount} processed, ${skippedLocked} skipped — already locked. Unlock to reprocess them.`, { duration: 8000 })
+                await fetchSiteStatus()
+                selectSite("")
             } else {
                 toast.success(`${siteName}: All ${result.processedCount} employees processed ✓`)
                 await fetchSiteStatus()
@@ -397,8 +437,12 @@ function ProcessPayrollPage() {
         try {
             const res = await fetch(`/api/payroll/reset?month=${month}&year=${year}&action=unlock`, { method: "DELETE" })
             if (!res.ok) throw new Error(await res.text())
-            toast.success("Payroll unlocked — you can now reprocess")
+            const d = await res.json().catch(() => ({}))
+            const n = Number(d?.unlocked ?? 0)
+            if (n > 0) toast.success(`${n} payroll row(s) unlocked — back to DRAFT, you can now reprocess`)
+            else toast.warning("Nothing to unlock — no locked rows for this month")
             await fetchSiteStatus()
+            if (selectedSiteId) await fetchEmployees(selectedSiteId)
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Unlock failed")
         } finally { setResetting(false) }
@@ -412,7 +456,10 @@ function ProcessPayrollPage() {
         try {
             const res = await fetch(`/api/payroll/reset?month=${month}&year=${year}&siteId=${selectedSiteId}&action=delete`, { method: "DELETE" })
             if (!res.ok) throw new Error(await res.text())
-            toast.success(`Payroll deleted for ${siteName}`)
+            const d = await res.json().catch(() => ({}))
+            const skipped = Number(d?.skippedLocked ?? 0)
+            if (skipped > 0) toast.warning(`Draft payroll deleted for ${siteName} — ${skipped} locked row(s) kept. Unlock first to remove them.`, { duration: 8000 })
+            else toast.success(`Payroll deleted for ${siteName}`)
             await fetchSiteStatus()
             selectSite("")
         } catch (e: unknown) {
@@ -518,7 +565,7 @@ function ProcessPayrollPage() {
                 </select>
                 <span style={labelSt}>Year</span>
                 <select value={year} onChange={e => { setYear(e.target.value); selectSite("") }} style={selectSt}>
-                    {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text3)" }}>
                     <span>{MONTHS[parseInt(month) - 1]} {year}</span>
@@ -589,6 +636,7 @@ function ProcessPayrollPage() {
                                                     ? <span style={{ color: "#16a34a", fontWeight: 600 }}>{st!.processedCount} processed</span>
                                                     : <span style={{ color: "#f59e0b", fontWeight: 600 }}>Pending</span>}
                                             </div>
+                                            {isDone && <div style={{ marginTop: 3, marginLeft: 18 }}><StatusPills st={st} /></div>}
                                         </div>
                                     )
                                 })}
@@ -646,6 +694,7 @@ function ProcessPayrollPage() {
                                                         ? <span style={{ color: "#15803d", fontWeight: 600 }}>{st!.processedCount} employees processed</span>
                                                         : <span style={{ color: "var(--text3)" }}>Click to process →</span>}
                                                 </div>
+                                                {isDone && <div style={{ marginTop: 5 }}><StatusPills st={st} /></div>}
                                             </div>
                                         )
                                     })}
@@ -670,6 +719,7 @@ function ProcessPayrollPage() {
                                             ✓ Previously Processed
                                         </span>
                                     )}
+                                    <StatusPills st={getStatus(selectedSiteId)} />
                                 </div>
                                 <div style={{ display: "flex", gap: 8 }}>
                                     <button onClick={() => fileInputRef.current?.click()} disabled={!fetched}
@@ -681,21 +731,21 @@ function ProcessPayrollPage() {
                                         style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={12} className={loadingEmployees ? "animate-spin" : ""} /> Refresh
                                     </button>
-                                    {getStatus(selectedSiteId) && (
-                                        <>
+                                    {lockedOf(getStatus(selectedSiteId)) > 0 && (
                                             <button onClick={handleUnlock} disabled={resetting || deleting || !canManage}
                                                 title={canManage ? "Unlock payroll to reprocess" : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #f59e0b", background: "#fffbeb", fontSize: 12, color: "#b45309", fontWeight: 600, cursor: "pointer", opacity: (resetting || deleting) ? 0.6 : 1 }}>
                                                 {resetting ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />}
                                                 {resetting ? "Unlocking…" : "Unlock"}
                                             </button>
+                                    )}
+                                    {draftOf(getStatus(selectedSiteId)) > 0 && (
                                             <button onClick={handleDelete} disabled={resetting || deleting || !canManage}
                                                 title={canManage ? "Delete payroll for this site" : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 12, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: (resetting || deleting) ? 0.6 : 1 }}>
                                                 {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                                                 {deleting ? "Deleting…" : "Delete"}
                                             </button>
-                                        </>
                                     )}
                                     <button onClick={handleProcess} disabled={processing || !fetched || employees.length === 0 || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: (processing || !fetched) ? 0.6 : 1 }}>
@@ -799,6 +849,9 @@ function ProcessPayrollPage() {
                                                 const lop        = monthDays - workedDays
                                                 const otDays     = att.otDays ?? 0
                                                 const otHrs      = Math.round(otDays * 8 * 100) / 100
+                                                // PROCESSED/PAID rows are locked — amounts can't change until Unlock.
+                                                const locked = rowStatus[emp.id] === "PROCESSED" || rowStatus[emp.id] === "PAID"
+                                                const inp: React.CSSProperties = locked ? { ...attInput, background: "var(--surface2)", color: "var(--text3)", cursor: "not-allowed" } : attInput
                                                 return (
                                                     <tr key={emp.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>
                                                         <td style={td}>{i + 1}</td>
@@ -810,46 +863,46 @@ function ProcessPayrollPage() {
                                                         {/* ── ATTENDANCE (editable inputs) ─────────────────────── */}
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={1} max={31} value={att.monthDays ?? defaultDays}
-                                                                onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff", color: lop < 0 ? "#16a34a" : (lop > 0 ? "#dc2626" : "var(--text3)"), fontWeight: 700, fontSize: 10 }}>{lop}</td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} max={31} value={att.workedDays ?? defaultDays}
-                                                                onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} step="0.01" value={att.otDays ?? 0}
-                                                                onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff", color: "var(--text3)", fontSize: 10 }}>{otHrs}</td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.canteenDays ?? 0}
-                                                                onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} placeholder="auto"
                                                                 value={att.canteenAmount ?? ""}
-                                                                onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={attInput} />
+                                                                onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.otherDeductions ?? 0}
-                                                                onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.lwf ?? 0}
-                                                                onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.penalty ?? 0}
-                                                                onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.advance ?? 0}
-                                                                onChange={e => setAtt(emp.id, "advance", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "advance", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
                                                             <input type="number" min={0} value={att.productionIncentive ?? 0}
-                                                                onChange={e => setAtt(emp.id, "productionIncentive", e.target.value)} style={attInput} />
+                                                                onChange={e => setAtt(emp.id, "productionIncentive", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         {/* ── SALARY STRUCTURE (full month, read-only) ─────────── */}
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.basic) : "—"}</td>
@@ -874,6 +927,7 @@ function ProcessPayrollPage() {
                                                                     color: attRows[emp.id] ? "#1d4ed8" : "#9ca3af" }}>
                                                                     {attRows[emp.id] ? "✓ Att" : "Default"}
                                                                 </span>
+                                                                {locked && <span title="Locked — unlock to edit" style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: "#dcfce7", color: "#15803d" }}>🔒 {rowStatus[emp.id] === "PAID" ? "Paid" : "Locked"}</span>}
                                                             </div>
                                                         </td>
                                                     </tr>

@@ -1,5 +1,6 @@
 "use client"
 
+import { payrollYears } from "../_components/payroll-years"
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -313,7 +314,7 @@ export default function ReportsDownloadsPage() {
                                 onChange={e => setYear(Number(e.target.value))}
                                 className="h-9 px-3 border border-[var(--border)] rounded-[8px] text-[13px] bg-white text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                             >
-                                {[2024, 2025, 2026, 2027].map(y => (
+                                {payrollYears().map(y => (
                                     <option key={y} value={y}>{y}</option>
                                 ))}
                             </select>

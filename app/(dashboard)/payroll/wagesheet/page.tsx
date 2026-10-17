@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears } from "../_components/payroll-years"
 import { Suspense, useState, useEffect, useCallback } from "react"
 import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -107,8 +108,11 @@ function WageSheetInner() {
     const toggleAll = (rows: Payroll[]) =>
         setSelectedIds(prev => prev.size === rows.length ? new Set() : new Set(rows.map(p => p.id)))
 
+    const periodLabel = () => `${MONTHS[parseInt(month) - 1]} ${year}`
+
     const handleLock = async () => {
         if (!selectedIds.size) { toast.error("Select employees to lock"); return }
+        if (!confirm(`Lock ${selectedIds.size} payroll(s) for ${periodLabel()}? Amounts can't be edited after locking.`)) return
         setLocking(true)
         try {
             const res = await fetch("/api/payroll/final/lock", {
@@ -121,9 +125,11 @@ function WageSheetInner() {
             })
             if (!res.ok) throw new Error(await res.text())
             const d = await res.json()
-            toast.success(`${d.count} employee(s) locked — sending to Compliance`)
+            const n = Number(d?.count ?? 0)
             setSelectedIds(new Set())
             await fetchData(selId)
+            if (n === 0) { toast.warning("Nothing to lock — these rows are already locked"); return }
+            toast.success(`${n} employee(s) locked — sending to Compliance`)
             router.push(`/payroll/compliance?month=${month}&year=${year}`)
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Lock failed")
@@ -137,6 +143,8 @@ function WageSheetInner() {
 
     const handleLockSites = async () => {
         if (!selectedSiteIds.size) return
+        const rows = [...selectedSiteIds].reduce((n, id) => n + (status.find(s => s.siteId === id)?.processedCount ?? 0), 0)
+        if (!confirm(`Lock ${rows} payroll(s) across ${selectedSiteIds.size} site(s) for ${periodLabel()}? Amounts can't be edited after locking.`)) return
         setLockingSites(true)
         try {
             const res = await fetch("/api/payroll/final/lock", {
@@ -149,10 +157,12 @@ function WageSheetInner() {
             })
             if (!res.ok) throw new Error(await res.text())
             const d = await res.json()
-            toast.success(`${d.count} employee(s) locked from ${selectedSiteIds.size} site(s)`)
+            const n = Number(d?.count ?? 0)
             setSelectedSiteIds(new Set())
             if (selId) await fetchData(selId)
             await fetchStatus()
+            if (n === 0) { toast.warning("Nothing to lock — these rows are already locked"); return }
+            toast.success(`${n} employee(s) locked from ${selectedSiteIds.size} site(s)`)
             router.push(`/payroll/compliance?month=${month}&year=${year}`)
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "Lock failed")
@@ -542,7 +552,7 @@ function WageSheetInner() {
                 </select>
                 <span style={lbl}>Year</span>
                 <select value={year} onChange={e => { setYear(e.target.value); setSelId(""); setData([]) }} style={sel}>
-                    {[2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <button onClick={fetchStatus} style={{ marginLeft: "auto", display: "flex", padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", cursor: "pointer" }}>
                     <RefreshCw size={12} style={{ color: "var(--text3)" }} />

@@ -154,20 +154,26 @@ function ComplianceInner() {
 
             const XLSX = await loadXLSX()
             const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}`)
-            if (!r.ok) { toast.error("No data found for this period"); return }
+            if (!r.ok) {
+                // The server says why (e.g. month not locked yet) — show that, not a generic line.
+                const detail = await r.text().catch(() => "")
+                toast.error(detail.trim() || "No data found for this period"); return
+            }
             const data = await r.json()
             if (!data?.length) { toast.error("No data to download"); return }
 
             const wb = XLSX.utils.book_new()
             if (item.type === "wage-sheet") {
-                const ws = XLSX.utils.json_to_sheet(data)
-                const cols = Object.keys(data[0] || {})
-                ws["!cols"] = cols.map((k: string) => ({ wch: Math.max(k.length + 2, 14) }))
-                XLSX.utils.sheet_add_aoa(ws, [
+                // Title rows first, then the table below them — adding the titles at A1
+                // afterwards overwrote the header row and the first data cells.
+                const ws = XLSX.utils.aoa_to_sheet([
                     [`FORM (II) M.W. RULES Rule (27)(1)`],
                     [`SALARIES / WAGES REGISTER FOR THE MONTH OF ${MONTHS[month-1].toUpperCase()} ${year}`],
                     [`PF CODE: ${rules.codes.pfEstablishment}`, "", `ESIC CODE: ${rules.codes.esicEstablishment}`],
-                ], { origin: "A1" })
+                ])
+                XLSX.utils.sheet_add_json(ws, data, { origin: -1 })
+                const cols = Object.keys(data[0] || {})
+                ws["!cols"] = cols.map((k: string) => ({ wch: Math.max(k.length + 2, 14) }))
                 XLSX.utils.book_append_sheet(wb, ws, "Wage Sheet")
             } else {
                 const ws = await buildHierarchicalSheet(data, item.type, item.label, month, year, rules.codes)

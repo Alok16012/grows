@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { computePt } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
+import { revisionsForMonth } from "@/lib/salary-revision"
 
 export async function GET(
     req: Request,
@@ -71,15 +72,24 @@ export async function PUT(
         if (remarks !== undefined) updateData.remarks = remarks
 
         if (status !== undefined) {
-            if (!["DRAFT", "PROCESSED", "PAID"].includes(status)) {
+            const order = ["DRAFT", "PROCESSED", "PAID"]
+            if (!order.includes(status)) {
                 return new NextResponse("Invalid status", { status: 400 })
             }
-            updateData.status = status
-            if (status === "PROCESSED") {
+            // Status only moves forward here: a PAID→DRAFT edit would silently
+            // bypass the lock. Reopening is a deliberate act via Unlock.
+            if (order.indexOf(status) < order.indexOf(existing.status)) {
+                return new NextResponse(
+                    `Cannot move a ${existing.status} payroll back to ${status}. Use Unlock on the payroll run instead.`,
+                    { status: 409 }
+                )
+            }
+            if (status !== existing.status) updateData.status = status
+            if (status === "PROCESSED" && existing.status !== "PROCESSED") {
                 updateData.processedAt = new Date()
                 updateData.processedBy = session.user.id
             }
-            if (status === "PAID") {
+            if (status === "PAID" && existing.status !== "PAID") {
                 updateData.paidAt = new Date()
                 updateData.paidBy = session.user.id
             }
@@ -100,14 +110,19 @@ export async function PUT(
                 return new NextResponse("Amounts on a locked payroll cannot be edited. Unlock the run first.", { status: 409 })
             }
 
-            const [{ rules }, employee] = await Promise.all([
+            const [{ rules }, employee, revisions] = await Promise.all([
                 getPayrollRules(),
                 prisma.employee.findUnique({
                     where: { id: existing.employeeId },
                     select: { gender: true, isHandicap: true, employeeSalary: { select: { complianceType: true } } },
                 }),
+                // The compliance type in force for THIS row's month, not today's:
+                // an employee moved OR → CALL since would otherwise lose ESI/PT on
+                // an old draft while keeping PF.
+                revisionsForMonth([existing.employeeId], { month: existing.month, year: existing.year }),
             ])
-            const isCALL = employee?.employeeSalary?.complianceType === "CALL"
+            const complianceType = revisions.get(existing.employeeId)?.complianceType ?? employee?.employeeSalary?.complianceType
+            const isCALL = complianceType === "CALL"
             const isFemale = (employee?.gender ?? "").toLowerCase() === "female"
 
             const newAllowances = allowances !== undefined ? Number(allowances) || 0 : existing.allowances

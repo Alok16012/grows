@@ -1,4 +1,5 @@
 "use client"
+import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useRef, useCallback, useEffect } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
@@ -16,30 +17,41 @@ type ParsedRow = {
     rowIndex: number; rawEmployeeId: string; rawName: string
     monthDays: number; days: number; otDays: number; otherDeduction: number; lwf: number
     canteenDays: number; penalty: number; advance: number; productionIncentive: number
+    /** Manual canteen amount. null = derive from days x rate. */
+    canteenAmount: number | null
 }
 type MatchedRow = ParsedRow & { matched: boolean; employeeId?: string; dbName?: string; designation?: string }
 type Employee  = { id: string; employeeId: string; firstName: string; lastName: string; designation?: string }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-const TEMPLATE_COLS = ["Employee ID","Employee Name","MONTH DAYS","DAYS","OT DAYS","OTHER DEDUCTION","LWF","CANTEEN DAYS","PENALTY","ADVANCE","PRODUCTION INCENTIVE"]
+const TEMPLATE_COLS = ["Employee ID","Employee Name","MONTH DAYS","DAYS","OT DAYS","OTHER DEDUCTION","LWF","CANTEEN DAYS","CANTEEN AMOUNT","PENALTY","ADVANCE","PRODUCTION INCENTIVE"]
 const TEMPLATE_SAMPLE = [
-    ["EMP-0001","Rahul Kumar",   26,26,2,150,6,24,50,1000,0],
-    ["EMP-0002","Priya Sharma",  26,25,0,0,  6,20,0,0,  500],
-    ["EMP-0003","Amit Singh",    26,26,1,200,6,26,100,500,0],
+    ["EMP-0001","Rahul Kumar",   26,26,2,150,6,24,"",  50,1000,0],
+    ["EMP-0002","Priya Sharma",  26,25,0,0,  6,20,"",  0,0,  500],
+    // Canteen amount filled in: 1500 is charged and the 26 days are ignored.
+    ["EMP-0003","Amit Singh",    26,26,1,200,6,26,1500,100,500,0],
 ]
+
+/** Excel cell -> optional amount. An empty cell means "not set", not zero. */
+function optAmount(v: unknown): number | null {
+    if (v === null || v === undefined) return null
+    if (typeof v === "string" && v.trim() === "") return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+}
 
 async function downloadTemplate(siteName: string, employees: Employee[], rules: PayrollRules) {
     const XLSX = await loadXLSX()
     const wb = XLSX.utils.book_new()
     const sheetName = `${siteName.slice(0,20)} Attendance`
-    const header = [`SITE: ${siteName}`,"","","","","","","","","",""]
+    const header = [`SITE: ${siteName}`,"","","","","","","","","","",""]
     // Prefill from configured rules (Payroll → Calculation Settings) — the LWF
     // column used to be hardcoded to ₹10, which is neither the Maharashtra ₹6
     // nor "manual", and flowed straight into processing when uploaded unedited.
     const md  = rules.defaults.monthDays
     const lwf = rules.lwf.employeeDefault
     const empRows = employees.length > 0
-        ? employees.map(e => [e.employeeId,`${e.firstName} ${e.lastName}`,md,md,0,0,lwf,0,0,0,0])
+        ? employees.map(e => [e.employeeId,`${e.firstName} ${e.lastName}`,md,md,0,0,lwf,0,"",0,0,0])
         : TEMPLATE_SAMPLE
     const wsData = [header,TEMPLATE_COLS,...empRows]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -54,10 +66,9 @@ const inputSt: React.CSSProperties = { padding:"7px 10px", borderRadius:8, borde
 const btnPrimary: React.CSSProperties = { display:"flex", alignItems:"center", gap:6, padding:"8px 16px", borderRadius:8, border:"none", background:"var(--accent)", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer" }
 const btnOutline: React.CSSProperties = { display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)", color:"var(--text2)", fontSize:13, fontWeight:500, cursor:"pointer" }
 
-export default function AttendancePanel({ onClose, onDone }: { onClose: () => void; onDone?: () => void }) {
-    const now = new Date()
-    const [month,    setMonth]    = useState(now.getMonth()+1)
-    const [year,     setYear]     = useState(now.getFullYear())
+export default function AttendancePanel({ onClose, onDone, initialMonth, initialYear }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number }) {
+    const [month,    setMonth]    = useState(initialMonth ?? currentPayrollMonth())
+    const [year,     setYear]     = useState(initialYear  ?? currentPayrollYear())
     const [siteId,   setSiteId]   = useState("")
     const [sites,    setSites]    = useState<Site[]>([])
     const [sitesLoading, setSitesLoading] = useState(true)
@@ -129,6 +140,9 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                 otherDeduction:Number(pick(row,"OTHER DEDUCTION","OTHER DED","OTH DED")??0),
                 lwf:           Number(pick(row,"LWF","LABOUR WELFARE FUND")??0),
                 canteenDays:   Number(pick(row,"CANTEEN DAYS","CANTEEN","MESS DAYS")??0),
+                // Optional override. An empty cell means "work it out from
+                // days x rate"; a 0 means "no canteen this month".
+                canteenAmount: optAmount(pick(row,"CANTEEN AMOUNT","CANTEEN AMT","CANTEEN RS","MESS AMOUNT")),
                 penalty:       Number(pick(row,"PENALTY","FINE")??0),
                 advance:       Number(pick(row,"ADVANCE","ADV","LOAN")??0)||0,
                 productionIncentive: Number(pick(row,"PRODUCTION INCENTIVE","PROD INCENTIVE","PROD INC","INCENTIVE","PI")??0)||0,
@@ -162,13 +176,13 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
             const attendance = valid.map(r=>({
                 employeeId: r.employeeId!, monthDays:r.monthDays, workedDays:r.days,
                 otDays:r.otDays, otherDeductions:r.otherDeduction, lwf:r.lwf,
-                canteenDays:r.canteenDays, penalty:r.penalty, advance:r.advance, productionIncentive:r.productionIncentive,
+                canteenDays:r.canteenDays, canteenAmount:r.canteenAmount, penalty:r.penalty, advance:r.advance, productionIncentive:r.productionIncentive,
             }))
             const res = await fetch("/api/payroll/calculate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({siteId,month,year,attendance})})
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
             toast.success(`Payroll processed for ${data.processedCount} employees at ${selectedSite?.name}`)
-            onDone?.()
+            onDone?.({ month, year })
         } catch(e: unknown) { toast.error(e instanceof Error?e.message:"Processing failed") }
         finally { setProcessing(false) }
     }
@@ -220,7 +234,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                     <div>
                         <label style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:5 }}>Year *</label>
                         <select value={year} onChange={e=>setYear(Number(e.target.value))} style={{...inputSt,width:"100%"}}>
-                            {[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
+                            {payrollYears().map(y=><option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
                 </div>
@@ -333,7 +347,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                         <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
                             <thead>
                                 <tr style={{ background:"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
-                                    {["","Emp ID","Name (File)","Name (DB)","Designation","Days","OT Days","Other Ded.","LWF","Canteen Days","Penalty","Advance","Prod. Inc."].map(h=>(
+                                    {["","Emp ID","Name (File)","Name (DB)","Designation","Days","OT Days","Other Ded.","LWF","Canteen Days","Canteen ₹","Penalty","Advance","Prod. Inc."].map(h=>(
                                         <th key={h} style={{ padding:"8px 10px", textAlign:h===""?"center":"left", fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.4px", whiteSpace:"nowrap" }}>{h}</th>
                                     ))}
                                 </tr>
@@ -353,6 +367,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                                         <td style={{ padding:"7px 10px", textAlign:"right" }}>{r.otherDeduction||"—"}</td>
                                         <td style={{ padding:"7px 10px", textAlign:"right" }}>{r.lwf||"—"}</td>
                                         <td style={{ padding:"7px 10px", textAlign:"right" }}>{r.canteenDays||"—"}</td>
+                                        <td style={{ padding:"7px 10px", textAlign:"right" }}>{r.canteenAmount??"—"}</td>
                                         <td style={{ padding:"7px 10px", textAlign:"right" }}>{r.penalty||"—"}</td>
                                         <td style={{ padding:"7px 10px", textAlign:"right" }}>{r.advance||"—"}</td>
                                         <td style={{ padding:"7px 10px", textAlign:"right" }}>{r.productionIncentive||"—"}</td>
@@ -369,6 +384,7 @@ export default function AttendancePanel({ onClose, onDone }: { onClose: () => vo
                                         <td style={{ padding:"8px 10px", textAlign:"right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.otherDeduction,0)||"—"}</td>
                                         <td style={{ padding:"8px 10px", textAlign:"right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.lwf,0)||"—"}</td>
                                         <td style={{ padding:"8px 10px", textAlign:"right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.canteenDays,0)||"—"}</td>
+                                        <td style={{ padding:"8px 10px", textAlign:"right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+(r.canteenAmount??0),0)||"—"}</td>
                                         <td style={{ padding:"8px 10px", textAlign:"right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.penalty,0)||"—"}</td>
                                         <td style={{ padding:"8px 10px", textAlign:"right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.advance,0)||"—"}</td>
                                         <td style={{ padding:"8px 10px", textAlign:"right" }}>{matched.filter(r=>r.matched).reduce((s,r)=>s+r.productionIncentive,0)||"—"}</td>

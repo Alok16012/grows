@@ -32,28 +32,37 @@ export async function POST(req: Request) {
 
         // Wrap both updates in a transaction so we never end up with payrolls
         // locked but the run still DRAFT (or vice-versa) on a partial failure.
-        const [updated] = await prisma.$transaction([
-            prisma.payroll.updateMany({
+        const { updated, runLocked } = await prisma.$transaction(async tx => {
+            const updated = await tx.payroll.updateMany({
                 where,
                 data: {
                     status: "PROCESSED",
                     processedAt: new Date(),
                     processedBy: session.user.id ?? "system"
                 }
-            }),
-            prisma.payrollRun.updateMany({
+            })
+
+            // The run is month-wide but locking is done site by site. Flip it
+            // to PROCESSED only once every row for the month is locked —
+            // otherwise a partial lock reported the whole month as closed.
+            const draftLeft = await tx.payroll.count({ where: { month, year, status: "DRAFT" } })
+            if (draftLeft > 0) return { updated, runLocked: false }
+
+            await tx.payrollRun.updateMany({
                 where: { month, year, status: "DRAFT" },
                 data: {
                     status: "PROCESSED",
                     lockedAt: new Date()
                 }
-            }),
-        ])
+            })
+            return { updated, runLocked: true }
+        })
 
         return NextResponse.json({
             success: true,
             message: `Locked ${updated.count} payroll records.`,
-            count: updated.count
+            count: updated.count,
+            runLocked,
         })
     } catch (error) {
         console.error("[PAYROLL_FINAL_LOCK]", error)
