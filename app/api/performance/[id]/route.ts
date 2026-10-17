@@ -4,6 +4,50 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { notifyApprovers, notifyEmployee } from "@/lib/hr-notify"
+import { reviewScore } from "@/lib/performance-server"
+
+// The review moves DRAFT (goals set, self-appraisal) → SUBMITTED (manager has
+// evaluated) → COMPLETED (HR approved). The employee acknowledges once it's
+// been shared; acknowledging a COMPLETED review stamps acknowledgedAt but keeps
+// it COMPLETED, so HR's counts don't go backwards.
+async function statusRules(
+    reviewId: string, status: string, canManage: boolean, isAdmin: boolean,
+    updateData: Record<string, unknown>, force: boolean,
+): Promise<string | null> {
+    const cur = await prisma.performanceReview.findUnique({
+        where: { id: reviewId },
+        select: { status: true, overallRating: true, performanceRank: true, incrementPercent: true, bonusPercent: true, pipRequired: true },
+    })
+    if (!cur) return "Review not found"
+    if (status === cur.status) return null
+
+    if (!canManage) {
+        if (status !== "ACKNOWLEDGED") return "You can only acknowledge your review"
+        if (cur.status === "COMPLETED") { delete updateData.status; return null }
+        if (cur.status !== "SUBMITTED") return "Your review hasn't been shared with you yet"
+        return null
+    }
+
+    if (status === "SUBMITTED") {
+        if (cur.status !== "DRAFT") return "Only a draft review can be submitted"
+        const sc = await reviewScore(reviewId)
+        if (sc.issues.length && !(force && isAdmin)) return `Can't submit yet: ${sc.issues.join("; ")}`
+        // Fill what the manager left blank from the calculated score and band.
+        if (updateData.overallRating === undefined && cur.overallRating == null && sc.overall != null) updateData.overallRating = sc.overall
+        if (sc.band) {
+            if (updateData.performanceRank === undefined && !cur.performanceRank) updateData.performanceRank = sc.band.rank
+            if (updateData.incrementPercent === undefined && cur.incrementPercent == null) updateData.incrementPercent = sc.band.increment
+            if (updateData.bonusPercent === undefined && cur.bonusPercent == null) updateData.bonusPercent = sc.band.bonus
+            if (updateData.pipRequired === undefined && !cur.pipRequired && sc.band.pip) updateData.pipRequired = true
+        }
+    }
+    if (status === "COMPLETED") {
+        if (cur.status !== "SUBMITTED" && cur.status !== "ACKNOWLEDGED" && !(force && isAdmin)) return "Only a submitted review can be approved"
+        if (cur.overallRating == null && updateData.overallRating == null) return "Set the overall rating before approving"
+    }
+    if (status === "DRAFT" && cur.status === "COMPLETED" && !isAdmin) return "A completed review can only be reopened by an admin"
+    return null
+}
 
 // Tell the people on the other side of each step that it's their turn.
 async function notifyReviewStep(review: { id: string; employeeId: string; status: string }, actorIsManager: boolean) {
@@ -136,12 +180,18 @@ export async function PATCH(
         if (employeeComments !== undefined) updateData.employeeComments = employeeComments
         if (selfRating !== undefined) updateData.selfRating = selfRating
         if (selfComments !== undefined) updateData.selfComments = selfComments
+        if (!canManage && (selfRating !== undefined || selfComments !== undefined)) {
+            const cur = await prisma.performanceReview.findUnique({ where: { id: params.id }, select: { status: true } })
+            if (cur?.status === "COMPLETED") return new NextResponse("This review is closed", { status: 400 })
+        }
 
-        if (status !== undefined && (canManage || status === "ACKNOWLEDGED")) {
+        if (status !== undefined) {
             updateData.status = status
+            const err = await statusRules(params.id, status, canManage, session.user.role === "ADMIN", updateData, body.force === true)
+            if (err) return new NextResponse(err, { status: 400 })
             if (status === "SUBMITTED") updateData.submittedAt = new Date()
             if (status === "ACKNOWLEDGED") updateData.acknowledgedAt = new Date()
-            if (status === "COMPLETED") updateData.completedAt = new Date()
+            if (status === "COMPLETED" && updateData.status === "COMPLETED") updateData.completedAt = new Date()
         }
 
         const review = await prisma.performanceReview.update({
@@ -227,6 +277,8 @@ export async function PUT(
 
         if (status !== undefined) {
             updateData.status = status
+            const err = await statusRules(params.id, status, true, session.user.role === "ADMIN", updateData, body.force === true)
+            if (err) return new NextResponse(err, { status: 400 })
             if (status === "SUBMITTED") updateData.submittedAt = new Date()
             if (status === "ACKNOWLEDGED") updateData.acknowledgedAt = new Date()
             if (status === "COMPLETED") updateData.completedAt = new Date()

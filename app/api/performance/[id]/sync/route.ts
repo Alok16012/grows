@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
-import { Role } from "@prisma/client"
+import { checkAccess } from "@/lib/permissions"
 
 export async function POST(
     req: Request,
@@ -11,6 +11,8 @@ export async function POST(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        // Writes KPI actuals — manager territory, like editing a KPI by hand.
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) return new NextResponse("Forbidden", { status: 403 })
 
         const reviewId = params.id
         const review = await prisma.performanceReview.findUnique({
@@ -27,10 +29,8 @@ export async function POST(
         const start = new Date(periodStart)
         const end = new Date(periodEnd)
 
-        // Find the User associated with this Employee (matching email)
-        const user = employee.email ? await prisma.user.findUnique({
-            where: { email: employee.email }
-        }) : null
+        // The login linked to this employee (by userId — emails aren't reliable here).
+        const user = employee.userId ? { id: employee.userId } : null
 
         const syncResults = []
 
@@ -62,7 +62,7 @@ export async function POST(
                 // If it's "per day", divide by working days (approx 26 or exact attendance)
                 if (title.includes("/day")) {
                     const days = await prisma.attendance.count({
-                        where: { employeeId: employee.id, status: "PRESENT", date: { gte: start, lte: end } }
+                        where: { employeeId: employee.id, status: { in: ["PRESENT", "LATE", "HALF_DAY"] }, date: { gte: start, lte: end } }
                     })
                     actualValue = days > 0 ? total / days : total
                 } else {
@@ -73,7 +73,7 @@ export async function POST(
             // ATTENDANCE / DISCIPLINE
             else if (title.includes("attendance") || title.includes("on-time")) {
                 const present = await prisma.attendance.count({
-                    where: { employeeId: employee.id, status: "PRESENT", date: { gte: start, lte: end } }
+                    where: { employeeId: employee.id, status: { in: ["PRESENT", "LATE", "HALF_DAY"] }, date: { gte: start, lte: end } }
                 })
                 const totalDays = (end.getTime() - start.getTime()) / (1000 * 3600 * 24)
                 actualValue = totalDays > 0 ? (present / totalDays) * 100 : 0

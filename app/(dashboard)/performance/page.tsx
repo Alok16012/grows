@@ -18,6 +18,8 @@ import {
     LineChart, Line, CartesianGrid, Legend
 } from "recharts"
 import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
+import { GoalsPanel, BulkCycleModal, BandsEditor, useBands, SelfAssessmentPanel } from "@/components/performance/goals"
+import { scoreReview, bandFor } from "@/lib/performance-score"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -176,41 +178,6 @@ function calcRank(score: number): string {
     return "LOW_PERFORMER"
 }
 
-function calcOverallScore(kras: KRA[]): number | null {
-    if (!kras.length) return null
-    let weightedSum = 0
-    let totalWeight = 0
-    for (const kra of kras) {
-        if (!kra.kpis.length) continue
-        let kraScore = 0
-        let kraKpiWeightSum = 0
-        for (const kpi of kra.kpis) {
-            const targetNum = Number(kpi.target) || 0
-            const actualNum = Number(kpi.actual) || 0
-            const weight = kpi.weightage
-            
-            // Formula: Achievement % = (Actual/Target) * 100
-            // Score (1-5) = (Achievement/100) * 5
-            if (targetNum > 0) {
-                const achievement = (actualNum / targetNum)
-                const score1to5 = Math.min(achievement * 5, 5) // Cap at 5
-                kraScore += score1to5 * weight
-            } else {
-                // Fallback to manual rating if target is 0
-                kraScore += (kpi.rating ?? 3) * weight
-            }
-            kraKpiWeightSum += weight
-        }
-        if (kraKpiWeightSum > 0) {
-            const kraFinalScore = (kraScore / kraKpiWeightSum) 
-            weightedSum += kraFinalScore * kra.weightage
-            totalWeight += kra.weightage
-        }
-    }
-    if (totalWeight === 0) return null
-    return Math.round((weightedSum / totalWeight) * 100) / 100
-}
-
 // ─── StarRating ───────────────────────────────────────────────────────────────
 
 function StarRating({
@@ -298,6 +265,7 @@ export default function PerformancePage() {
 
     // Create modal
     const [showCreateModal, setShowCreateModal] = useState(false)
+    const [showBulk, setShowBulk] = useState(false)
     const [employees, setEmployees] = useState<EmployeeOption[]>([])
     const [creating, setCreating] = useState(false)
     const [createForm, setCreateForm] = useState({
@@ -437,6 +405,16 @@ export default function PerformancePage() {
                 {isAdminOrManager && activeTab === "reviews" && (
                     <div className="page-actions">
                         <button
+                            onClick={() => setShowBulk(true)}
+                            style={{
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                                height: 42, padding: "0 16px", background: "var(--surface)", color: "var(--text2)",
+                                border: "1px solid var(--border)", borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                            }}
+                        >
+                            <Users size={16} /> Start Review Cycle
+                        </button>
+                        <button
                             onClick={() => setShowCreateModal(true)}
                             style={{
                                 display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
@@ -489,8 +467,13 @@ export default function PerformancePage() {
 
             {/* ─── TEMPLATES TAB ─────────────────────────────────────────────── */}
             {activeTab === "templates" && (
-                <TemplatesTab templates={templates} loading={templatesLoading} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                    {isAdminOrManager && <BandsEditor />}
+                    <TemplatesTab templates={templates} loading={templatesLoading} />
+                </div>
             )}
+
+            <BulkCycleModal open={showBulk} onClose={() => setShowBulk(false)} onDone={() => fetchReviews()} />
 
             {/* ─── REVIEW DRAWER ─────────────────────────────────────────────── */}
             {selectedReview && (
@@ -940,16 +923,16 @@ function ReviewDrawer({
             <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
                 {tab === "overview" && <DrawerOverview review={review} />}
                 {tab === "self" && (
-                    <DrawerSelfReview review={review} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                        <SelfAssessmentPanel review={review} isOwner={!isAdminOrManager} onChanged={onRefresh} />
+                        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 18 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 12, color: "var(--text)" }}>Overall self-review</div>
+                            <DrawerSelfReview review={review} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
+                        </div>
+                    </div>
                 )}
                 {tab === "kra" && (
-                    <DrawerKRAKPI
-                        review={review}
-                        onRefresh={onRefresh}
-                        isAdminOrManager={isAdminOrManager}
-                        templates={templates}
-                        fetchTemplates={fetchTemplates}
-                    />
+                    <GoalsPanel review={review} isManager={isAdminOrManager} onChanged={onRefresh} />
                 )}
                 {tab === "manager" && (
                     <DrawerManagerReview review={review} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
@@ -1064,6 +1047,21 @@ function DrawerSelfReview({
         1: "Poor", 2: "Needs Improvement", 3: "Meets Expectations",
         4: "Exceeds Expectations", 5: "Outstanding",
     }
+    const closed = review.status === "COMPLETED"
+    const canAcknowledge = !isAdminOrManager && !review.acknowledgedAt && (review.status === "SUBMITTED" || review.status === "COMPLETED")
+    const [acking, setAcking] = useState(false)
+    const acknowledge = async () => {
+        setAcking(true)
+        try {
+            const res = await fetch(`/api/performance/${review.id}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "ACKNOWLEDGED", employeeComments: selfComments || undefined }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            toast.success("Review acknowledged")
+            onRefresh()
+        } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) } finally { setAcking(false) }
+    }
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -1096,485 +1094,32 @@ function DrawerSelfReview({
                 />
             </div>
 
-            <button
-                onClick={handleSave}
-                disabled={saving}
-                style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
-                    background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8,
-                    fontWeight: 600, fontSize: 13, cursor: saving ? "not-allowed" : "pointer",
-                    alignSelf: "flex-start", opacity: saving ? 0.7 : 1,
-                }}
-            >
-                {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
-                Save Self Review
-            </button>
-        </div>
-    )
-}
-
-// ─── DrawerKRAKPI ─────────────────────────────────────────────────────────────
-
-function DrawerKRAKPI({
-    review, onRefresh, isAdminOrManager, templates, fetchTemplates,
-}: {
-    review: PerformanceReview
-    onRefresh: () => void
-    isAdminOrManager: boolean
-    templates: KPITemplate[]
-    fetchTemplates: () => void
-}) {
-    const [showAddKRA, setShowAddKRA] = useState(false)
-    const [newKRATitle, setNewKRATitle] = useState("")
-    const [newKRAWeight, setNewKRAWeight] = useState(25)
-    const [addingKRA, setAddingKRA] = useState(false)
-    const [showTemplateLoad, setShowTemplateLoad] = useState(false)
-    const [isSyncing, setIsSyncing] = useState(false)
-
-    const handleSync = async () => {
-        setIsSyncing(true)
-        try {
-            const res = await fetch(`/api/performance/${review.id}/sync`, { method: "POST" })
-            if (!res.ok) throw new Error(await res.text())
-            toast.success("KPI data synced from other modules")
-            onRefresh()
-        } catch (e) {
-            toast.error(String(e))
-        } finally {
-            setIsSyncing(false)
-        }
-    }
-
-    const kras = review.kras ?? []
-    const loosekpis = review.kpis?.filter(k => !k.kraId) ?? []
-
-    const calcScore = calcOverallScore(kras)
-
-    const handleAddKRA = async () => {
-        if (!newKRATitle) return
-        setAddingKRA(true)
-        try {
-            const res = await fetch(`/api/performance/${review.id}/kras`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title: newKRATitle, weightage: newKRAWeight }),
-            })
-            if (!res.ok) throw new Error(await res.text())
-            toast.success("KRA added")
-            setNewKRATitle("")
-            setNewKRAWeight(25)
-            setShowAddKRA(false)
-            onRefresh()
-        } catch (e) {
-            toast.error(String(e))
-        } finally {
-            setAddingKRA(false)
-        }
-    }
-
-    const handleLoadTemplate = async (role: string) => {
-        if (templates.length === 0) await fetchTemplates()
-        const roleTemplates = templates.filter(t => t.role === role)
-        if (!roleTemplates.length) {
-            toast.error("No templates for this role")
-            return
-        }
-        // Group by kraTitle
-        const kraMap: Record<string, KPITemplate[]> = {}
-        for (const t of roleTemplates) {
-            if (!kraMap[t.kraTitle]) kraMap[t.kraTitle] = []
-            kraMap[t.kraTitle].push(t)
-        }
-        for (const [kraTitle, kpis] of Object.entries(kraMap)) {
-            const res = await fetch(`/api/performance/${review.id}/kras`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: kraTitle,
-                    weightage: 25,
-                    kpis: kpis.map(k => ({
-                        title: k.kpiTitle,
-                        target: k.targetHint || "—",
-                        weightage: k.weightage,
-                    })),
-                }),
-            })
-            if (!res.ok) toast.error(`Failed to add KRA: ${kraTitle}`)
-        }
-        toast.success("Template loaded")
-        setShowTemplateLoad(false)
-        onRefresh()
-    }
-
-    return (
-        <div>
-            {/* Score summary */}
-            {calcScore !== null && (
-                <div style={{
-                    background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
-                    padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12,
-                }}>
-                    <TrendingUp size={18} color="#16a34a" />
-                    <div>
-                        <div style={{ fontSize: 13, color: "#166534" }}>
-                            <strong>Calculated Overall Score:</strong> {calcScore.toFixed(2)} / 5
-                        </div>
-                        <div style={{ fontSize: 12, color: "#15803d" }}>
-                            Rank: {RANK_CONFIG[calcRank(calcScore)]?.label}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Toolbar */}
-            {isAdminOrManager && (
-                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                {!closed && (
                     <button
-                        onClick={() => setShowAddKRA(v => !v)}
+                        onClick={handleSave}
+                        disabled={saving}
                         style={{
-                            display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
-                            background: "var(--accent)", color: "#fff", border: "none",
-                            borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600,
+                            display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
+                            background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8,
+                            fontWeight: 600, fontSize: 13, cursor: saving ? "not-allowed" : "pointer",
+                            opacity: saving ? 0.7 : 1,
                         }}
                     >
-                        <Plus size={14} /> Add KRA
-                    </button>
-                    <button
-                        onClick={() => {
-                            if (templates.length === 0) fetchTemplates()
-                            setShowTemplateLoad(v => !v)
-                        }}
-                        style={{
-                            display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
-                            background: "#fff", color: "var(--accent)", border: "1px solid var(--accent)",
-                            borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600,
-                        }}
-                    >
-                        <Settings size={14} /> Load Template
-                    </button>
-                    <button
-                        onClick={handleSync}
-                        disabled={isSyncing}
-                        style={{
-                            display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
-                            background: "#fff", color: "#0b5cff", border: "1px solid #0b5cff",
-                            borderRadius: 7, fontSize: 13, cursor: isSyncing ? "not-allowed" : "pointer", fontWeight: 600,
-                            marginLeft: "auto"
-                        }}
-                    >
-                        {isSyncing ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={14} />}
-                        Sync Automation
-                    </button>
-                </div>
-            )}
-
-            {/* Load template dropdown */}
-            {showTemplateLoad && (
-                <div style={{
-                    background: "#fff", border: "1px solid var(--border)", borderRadius: 8,
-                    padding: 14, marginBottom: 14,
-                }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Select role to load template</div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {["INSPECTOR", "HR_RECRUITER", "HR_MANAGER", "PAYROLL_MANAGER"].map(r => (
-                            <button
-                                key={r}
-                                onClick={() => handleLoadTemplate(r)}
-                                style={{
-                                    padding: "6px 12px", borderRadius: 6, border: "1px solid var(--border)",
-                                    background: "#f9fafb", cursor: "pointer", fontSize: 12, fontWeight: 600,
-                                    color: "var(--text)",
-                                }}
-                            >
-                                {r.replace(/_/g, " ")}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Add KRA Form */}
-            {showAddKRA && (
-                <div style={{
-                    background: "#f9fafb", border: "1px solid var(--border)", borderRadius: 8,
-                    padding: 14, marginBottom: 14,
-                }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>KRA Title</label>
-                            <input
-                                value={newKRATitle}
-                                onChange={e => setNewKRATitle(e.target.value)}
-                                placeholder="e.g. Inspection Accuracy"
-                                style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
-                            />
-                        </div>
-                        <div style={{ width: 80 }}>
-                            <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>Weight %</label>
-                            <input
-                                type="number"
-                                value={newKRAWeight}
-                                onChange={e => setNewKRAWeight(Number(e.target.value))}
-                                style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 13 }}
-                            />
-                        </div>
-                        <button
-                            onClick={handleAddKRA}
-                            disabled={addingKRA}
-                            style={{
-                                padding: "7px 14px", background: "var(--accent)", color: "#fff",
-                                border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13,
-                            }}
-                        >
-                            {addingKRA ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Add"}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* KRAs */}
-            {kras.length === 0 && loosekpis.length === 0 && (
-                <div style={{ color: "#9ca3af", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
-                    No KRAs or KPIs yet. Add a KRA or load a template.
-                </div>
-            )}
-
-            {kras.map(kra => (
-                <KRABlock key={kra.id} kra={kra} reviewId={review.id} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
-            ))}
-
-            {/* Loose KPIs (no KRA) */}
-            {loosekpis.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#6b7280", marginBottom: 8 }}>KPIs (ungrouped)</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {loosekpis.map(kpi => (
-                            <KPIRow key={kpi.id} kpi={kpi} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-}
-
-// ─── KRABlock ─────────────────────────────────────────────────────────────────
-
-function KRABlock({
-    kra, reviewId, onRefresh, isAdminOrManager,
-}: {
-    kra: KRA
-    reviewId: string
-    onRefresh: () => void
-    isAdminOrManager: boolean
-}) {
-    const [showAddKPI, setShowAddKPI] = useState(false)
-    const [newKPITitle, setNewKPITitle] = useState("")
-    const [newKPITarget, setNewKPITarget] = useState("")
-    const [newKPIWeight, setNewKPIWeight] = useState(10)
-    const [addingKPI, setAddingKPI] = useState(false)
-
-    // KRA score calc
-    let kraScore: number | null = null
-    if (kra.kpis.length > 0) {
-        let sum = 0, wSum = 0
-        for (const kpi of kra.kpis) {
-            const rating = kpi.rating ?? 3
-            sum += rating * kpi.weightage
-            wSum += kpi.weightage
-        }
-        if (wSum > 0) kraScore = Math.round((sum / wSum) * 100) / 100
-    }
-
-    const handleAddKPI = async () => {
-        if (!newKPITitle || !newKPITarget) return
-        setAddingKPI(true)
-        try {
-            const res = await fetch(`/api/performance/${reviewId}/kpis`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: newKPITitle,
-                    target: newKPITarget,
-                    weightage: newKPIWeight,
-                    kraId: kra.id,
-                }),
-            })
-            if (!res.ok) throw new Error(await res.text())
-            toast.success("KPI added")
-            setNewKPITitle(""); setNewKPITarget(""); setNewKPIWeight(10)
-            setShowAddKPI(false)
-            onRefresh()
-        } catch (e) {
-            toast.error(String(e))
-        } finally {
-            setAddingKPI(false)
-        }
-    }
-
-    return (
-        <div style={{
-            border: "1px solid var(--border)", borderRadius: 10,
-            marginBottom: 14, overflow: "hidden",
-        }}>
-            <div style={{
-                background: "#f8fafc", padding: "10px 14px",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-                <div>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{kra.title}</span>
-                    <span style={{ fontSize: 12, color: "#6b7280", marginLeft: 8 }}>Weight: {kra.weightage}%</span>
-                    {kraScore !== null && (
-                        <span style={{ fontSize: 12, color: "#0b5cff", marginLeft: 8, fontWeight: 600 }}>
-                            Score: {kraScore.toFixed(2)}
-                        </span>
-                    )}
-                </div>
-                {isAdminOrManager && (
-                    <button
-                        onClick={() => setShowAddKPI(v => !v)}
-                        style={{
-                            display: "flex", alignItems: "center", gap: 4, padding: "4px 10px",
-                            background: "var(--accent)", color: "#fff", border: "none",
-                            borderRadius: 5, fontSize: 11, cursor: "pointer", fontWeight: 600,
-                        }}
-                    >
-                        <Plus size={11} /> KPI
+                        {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
+                        Save Self Review
                     </button>
                 )}
-            </div>
-
-            {showAddKPI && (
-                <div style={{ padding: "10px 14px", background: "#fafbff", borderBottom: "1px solid var(--border)" }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                        <input
-                            value={newKPITitle}
-                            onChange={e => setNewKPITitle(e.target.value)}
-                            placeholder="KPI Title"
-                            style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
-                        />
-                        <input
-                            value={newKPITarget}
-                            onChange={e => setNewKPITarget(e.target.value)}
-                            placeholder="Target"
-                            style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
-                        />
-                        <input
-                            type="number"
-                            value={newKPIWeight}
-                            onChange={e => setNewKPIWeight(Number(e.target.value))}
-                            placeholder="Weight"
-                            style={{ width: 60, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 5, fontSize: 12 }}
-                        />
-                        <button
-                            onClick={handleAddKPI}
-                            disabled={addingKPI}
-                            style={{
-                                padding: "6px 12px", background: "var(--accent)", color: "#fff",
-                                border: "none", borderRadius: 5, cursor: "pointer", fontWeight: 600, fontSize: 12,
-                            }}
-                        >
-                            Add
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div style={{ padding: "0 14px" }}>
-                {kra.kpis.length === 0 && (
-                    <div style={{ padding: "12px 0", color: "#9ca3af", fontSize: 12 }}>No KPIs yet</div>
+                {canAcknowledge && (
+                    <button onClick={acknowledge} disabled={acking}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "#fff", color: "var(--accent)", border: "1px solid var(--accent)", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                        {acking ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <CheckCircle2 size={14} />}
+                        Acknowledge Review
+                    </button>
                 )}
-                {kra.kpis.map(kpi => (
-                    <KPIRow key={kpi.id} kpi={kpi} onRefresh={onRefresh} isAdminOrManager={isAdminOrManager} />
-                ))}
+                {review.acknowledgedAt && <span style={{ fontSize: 12.5, color: "#15803d" }}>Acknowledged on {fmtDateFull(review.acknowledgedAt)}</span>}
+                {closed && <span style={{ fontSize: 12.5, color: "var(--text3)" }}>This review is closed.</span>}
             </div>
-        </div>
-    )
-}
-
-// ─── KPIRow ───────────────────────────────────────────────────────────────────
-
-function KPIRow({
-    kpi, onRefresh, isAdminOrManager,
-}: {
-    kpi: KPI
-    onRefresh: () => void
-    isAdminOrManager: boolean
-}) {
-    const [actual, setActual] = useState(kpi.actual ?? "")
-    const [rating, setRating] = useState<number>(kpi.rating ?? 0)
-    const [saving, setSaving] = useState(false)
-    const dirty = useRef(false)
-
-    useEffect(() => {
-        setActual(kpi.actual ?? "")
-        setRating(kpi.rating ?? 0)
-    }, [kpi.actual, kpi.rating])
-
-    const handleSave = async () => {
-        setSaving(true)
-        try {
-            const res = await fetch(`/api/performance/${kpi.reviewId}/kpis/${kpi.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ actual, rating }),
-            })
-            if (!res.ok) throw new Error(await res.text())
-            onRefresh()
-        } catch (e) {
-            toast.error(String(e))
-        } finally {
-            setSaving(false)
-            dirty.current = false
-        }
-    }
-
-    const targetNum = parseFloat(kpi.target)
-    const actualNum = parseFloat(actual)
-    let weightedScore: number | null = null
-    if (!isNaN(targetNum) && !isNaN(actualNum) && targetNum > 0 && rating > 0) {
-        weightedScore = Math.round((actualNum / targetNum) * rating * kpi.weightage * 100) / 100
-    }
-
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_80px_80px_100px_60px_36px] gap-2" style={{
-            padding: "10px 0", borderBottom: "1px solid var(--border)",
-            alignItems: "center", fontSize: 12,
-        }}>
-            <div>
-                <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 13 }}>{kpi.title}</div>
-                <div style={{ color: "#6b7280" }}>Target: {kpi.target} · Weight: {kpi.weightage}%</div>
-            </div>
-            <input
-                value={actual}
-                onChange={e => { setActual(e.target.value); dirty.current = true }}
-                placeholder="Actual"
-                style={{
-                    padding: "5px 7px", border: "1px solid var(--border)", borderRadius: 5,
-                    fontSize: 12, width: "100%", boxSizing: "border-box",
-                }}
-            />
-            <div>
-                <StarRating value={rating} onChange={v => { setRating(v); dirty.current = true }} size={13} />
-            </div>
-            <div style={{ fontSize: 11, color: "#6b7280" }}>
-                {weightedScore !== null ? `Score: ${weightedScore}` : "—"}
-            </div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>w={kpi.weightage}</div>
-            <button
-                onClick={handleSave}
-                disabled={saving}
-                title="Save"
-                style={{
-                    background: "none", border: "1px solid var(--border)", borderRadius: 5,
-                    cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-            >
-                {saving
-                    ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
-                    : <Check size={12} color="#16a34a" />
-                }
-            </button>
         </div>
     )
 }
@@ -1670,6 +1215,25 @@ function DrawerManagerReview({
         }
     }
 
+    const bands = useBands()
+    const calc = scoreReview(
+        review.kras.map(k => ({ id: k.id, title: k.title, weightage: k.weightage })),
+        [...review.kras.flatMap(k => k.kpis.map(p => ({ ...p, kraId: k.id }))), ...review.kpis.filter(p => !p.kraId)]
+            .map(p => ({ ...p, target: Number(p.target) || 0, actual: p.actual === null || p.actual === undefined || p.actual === "" ? null : Number(p.actual) })),
+    )
+    const calcBand = bandFor(calc.overall, bands)
+    const applySuggestions = () => {
+        if (calc.overall === null || !calcBand) return
+        setForm(f => ({
+            ...f,
+            overallRating: calc.overall!,
+            performanceRank: calcBand.rank,
+            incrementPercent: calcBand.increment,
+            bonusPercent: calcBand.bonus,
+            pipRequired: calcBand.pip,
+        }))
+    }
+
     if (!isAdminOrManager) {
         return (
             <div style={{ fontSize: 13, color: "#6b7280" }}>
@@ -1684,6 +1248,21 @@ function DrawerManagerReview({
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border)", background: calcBand ? `${calcBand.color}0d` : "var(--surface2)" }}>
+                <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase" }}>From KRA / KPI</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: calcBand?.color ?? "var(--text)" }}>{calc.overall?.toFixed(2) ?? "—"} <span style={{ fontSize: 12, color: "var(--text3)" }}>/ 5</span></div>
+                </div>
+                {calcBand && <div style={{ fontSize: 12.5, color: "var(--text2)" }}><b style={{ color: calcBand.color }}>{calcBand.label}</b><br />Increment {calcBand.increment}% · bonus {calcBand.bonus}%{calcBand.pip ? " · PIP" : ""}</div>}
+                {calc.overall !== null && review.status === "DRAFT" && (
+                    <button onClick={applySuggestions} style={{ marginLeft: "auto", padding: "7px 12px", borderRadius: 8, border: "1px solid var(--accent)", background: "#fff", color: "var(--accent)", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+                        Use these values
+                    </button>
+                )}
+                {calc.issues.length > 0 && review.status === "DRAFT" && (
+                    <div style={{ width: "100%", fontSize: 12, color: "#92400e" }}>Before submitting: {calc.issues.join("; ")}</div>
+                )}
+            </div>
             <div>
                 <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>Overall Rating</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1887,7 +1466,7 @@ function DrawerHRApproval({
                 </div>
             )}
 
-            {isHR && !review.hrApprovedAt && review.status === "SUBMITTED" && (
+            {isHR && !review.hrApprovedAt && (review.status === "SUBMITTED" || review.status === "ACKNOWLEDGED") && (
                 <button
                     onClick={handleApprove}
                     disabled={approving}

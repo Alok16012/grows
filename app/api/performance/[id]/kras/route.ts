@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { parseTargetHint, withDirection, kpiDirection, type Direction } from "@/lib/performance-score"
 
 export async function GET(
     req: Request,
@@ -11,6 +12,14 @@ export async function GET(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        // Managers see any review's goals; anyone else only their own.
+        if (!checkAccess(session, ["MANAGER"], "performance.view")) {
+            const [review, me] = await Promise.all([
+                prisma.performanceReview.findUnique({ where: { id: params.id }, select: { employeeId: true } }),
+                prisma.employee.findUnique({ where: { userId: session.user.id }, select: { id: true } }),
+            ])
+            if (!review || !me || review.employeeId !== me.id) return new NextResponse("Forbidden", { status: 403 })
+        }
 
         const kras = await prisma.kRA.findMany({
             where: { reviewId: params.id },
@@ -60,13 +69,16 @@ export async function POST(
                 ...(kpis && Array.isArray(kpis) && kpis.length > 0
                     ? {
                           kpis: {
-                              create: kpis.map((k: { title: string; description?: string; target: string | number; weightage?: number }) => ({
-                                  reviewId: params.id,
-                                  title: k.title,
-                                  description: k.description || null,
-                                  target: parseFloat(String(k.target)) || 0,
-                                  weightage: k.weightage ?? 10,
-                              })),
+                              create: kpis.map((k: { title: string; description?: string; target: string | number; weightage?: number; direction?: Direction }) => {
+                                  const hint = parseTargetHint(String(k.target ?? ""))
+                                  return {
+                                      reviewId: params.id,
+                                      title: k.title,
+                                      description: withDirection(k.description, k.direction ?? hint.dir ?? kpiDirection({ title: k.title })),
+                                      target: hint.value,
+                                      weightage: Number(k.weightage) || 10,
+                                  }
+                              }),
                           },
                       }
                     : {}),

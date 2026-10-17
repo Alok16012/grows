@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { parseTargetHint, withDirection } from "@/lib/performance-score"
 
 export async function PUT(
     req: Request,
@@ -16,22 +17,24 @@ export async function PUT(
         }
 
         const body = await req.json()
-        const { actual, rating, remarks, title, target, weightage } = body
+        const { actual, rating, remarks, title, target, weightage, direction } = body
 
+        const num = (v: unknown) => (v === "" || v === null ? null : Number.isFinite(Number(v)) ? Number(v) : undefined)
         const updateData: Record<string, unknown> = {}
-        if (actual !== undefined) updateData.actual = actual
-        if (rating !== undefined) updateData.rating = rating
+        if (actual !== undefined) { const n = num(actual); if (n === undefined) return new NextResponse("Actual must be a number", { status: 400 }); updateData.actual = n }
+        if (rating !== undefined) updateData.rating = rating ? Math.max(1, Math.min(5, Math.round(Number(rating)))) : null
         if (remarks !== undefined) updateData.remarks = remarks
         if (title !== undefined) updateData.title = title
-        if (target !== undefined) updateData.target = target
-        if (weightage !== undefined) updateData.weightage = weightage
+        if (target !== undefined) updateData.target = parseTargetHint(String(target)).value
+        if (weightage !== undefined) updateData.weightage = Math.max(0, Number(weightage) || 0)
 
         // The KPI must belong to the review in the URL.
         const existing = await prisma.kPI.findFirst({
             where: { id: params.kpiId, reviewId: params.id },
-            select: { id: true },
+            select: { id: true, description: true },
         })
         if (!existing) return new NextResponse("KPI not found", { status: 404 })
+        if (direction === "lower" || direction === "higher") updateData.description = withDirection(existing.description, direction)
 
         const kpi = await prisma.kPI.update({
             where: { id: params.kpiId },
@@ -56,7 +59,9 @@ export async function DELETE(
             return new NextResponse("Forbidden", { status: 403 })
         }
 
-        await prisma.kPI.delete({ where: { id: params.kpiId } })
+        // Scoped to the review in the URL, like the update above.
+        const gone = await prisma.kPI.deleteMany({ where: { id: params.kpiId, reviewId: params.id } })
+        if (!gone.count) return new NextResponse("KPI not found", { status: 404 })
 
         return NextResponse.json({ success: true })
     } catch (error) {
