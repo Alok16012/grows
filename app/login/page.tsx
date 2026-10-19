@@ -64,6 +64,9 @@ function LoginForm() {
         fetch("/api/login/options").then(r => r.json()).then(o => {
             setOtpEnabled(!!o.otp)
             if (o.mpinLength) setMpinLength(o.mpinLength)
+            // Once SMS is live, OTP is the way in for most staff — no MPIN to
+            // remember, nothing for HR to reset — so it opens on that tab.
+            if (o.otp) setMethod("otp")
         }).catch(() => {})
     }, [])
 
@@ -142,8 +145,8 @@ function LoginForm() {
     }
 
     const tabs: { key: Method; label: string; icon: typeof KeyRound }[] = [
-        { key: "mpin", label: "MPIN", icon: KeyRound },
         ...(otpEnabled ? [{ key: "otp" as const, label: "OTP", icon: MessageSquareText }] : []),
+        { key: "mpin", label: "MPIN", icon: KeyRound },
         { key: "password", label: "Password", icon: Smartphone },
     ]
 

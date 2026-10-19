@@ -10,6 +10,11 @@
 //                          Put the gateway's API key, sender ID (GROWUS) and DLT
 //                          template ID straight into the URL. Example:
 //                          https://gateway.example/send?key=XXX&sender=GROWUS&to={mobile91}&text={message}&dlt_template_id=1107...
+//                          SMS_HTTP_SUCCESS (optional) — a regex the response
+//                          body must match to count as sent, for gateways that
+//                          answer with status codes rather than words (e.g.
+//                          SendSMSBox returns "000" on success, "007" for a bad
+//                          login) — set SMS_HTTP_SUCCESS=^000 there.
 //   SMS_PROVIDER=msg91     MSG91_AUTH_KEY, MSG91_TEMPLATE_ID (OTP template with ##OTP##)
 //   SMS_PROVIDER=fast2sms  FAST2SMS_API_KEY (uses the "otp" route)
 //   SMS_PROVIDER=console   prints the OTP to the server log — development only
@@ -62,8 +67,13 @@ export async function sendOtpSms(mobile10: string, code: string): Promise<boolea
             const res = await fetch(url, { method: "GET" })
             const text = await res.text().catch(() => "")
             // Gateways differ wildly in how they report errors; a non-2xx or an
-            // obvious "error"/"fail" in the body is treated as not sent.
-            if (!res.ok || /\b(error|fail(ed|ure)?|invalid)\b/i.test(text)) {
+            // obvious "error"/"fail" in the body is treated as not sent. When
+            // SMS_HTTP_SUCCESS is set, the body must match it instead.
+            const okPattern = process.env.SMS_HTTP_SUCCESS
+            const failed = okPattern
+                ? !new RegExp(okPattern, "i").test(text.trim())
+                : /\b(error|fail(ed|ure)?|invalid)\b/i.test(text)
+            if (!res.ok || failed) {
                 console.error("[SMS:http] send failed", res.status, text.slice(0, 300))
                 return false
             }
