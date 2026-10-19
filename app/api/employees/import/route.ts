@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
-import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
+import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateEmail, validatePincode, validateUAN,
@@ -11,7 +11,6 @@ import {
     normalizePhone, digitsOnly, normalizeUpper,
 } from "@/lib/validation"
 import { generateEmployeeCode } from "@/lib/employee-code"
-import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 type Sv = string | number | undefined
@@ -357,13 +356,13 @@ export async function POST(req: Request) {
                             await prisma.employee.update({ where: { id: newEmp.id }, data: { userId: existingUser.id } })
                         }
                     } else {
-                        const plain = defaultPassword({ phone })
+                        // No password: the employee signs in with an OTP and sets an MPIN.
                         const user = await prisma.user.create({
                             data: {
                                 name: `${firstName} ${str(row.lastName)}`.trim(),
                                 email: loginEmail,
-                                password: await bcrypt.hash(plain, 8),
-                                plainPassword: plain,
+                                password: NO_PASSWORD,
+                                plainPassword: null,
                                 phone: phone || null,
                                 // Base role is vestigial; access comes from the custom role.
                                 role: "MANAGER",

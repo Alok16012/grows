@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import bcrypt from "bcryptjs"
+import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 
 export async function POST(
     req: Request,
@@ -24,7 +24,7 @@ export async function POST(
 
         const employee = await prisma.employee.findUnique({
             where: { id: params.id },
-            select: { id: true, firstName: true, lastName: true, email: true, phone: true, userId: true }
+            select: { id: true, employeeId: true, firstName: true, lastName: true, email: true, phone: true, userId: true }
         })
 
         if (!employee) return new NextResponse("Employee not found", { status: 404 })
@@ -45,10 +45,9 @@ export async function POST(
             return NextResponse.json({ created: false, message: "Role updated" })
         }
 
-        // No user account — create one
-        const loginEmail = employee.email || `${employee.phone}@cims.app`
-        const tempPassword = `Grow@${employee.phone?.slice(-4) || "1234"}`
-        const hashed = await bcrypt.hash(tempPassword, 10)
+        // No user account — create one. Same login-id rule as everywhere else;
+        // no password: the employee signs in with an OTP and sets an MPIN.
+        const loginEmail = buildLoginEmail({ email: employee.email, phone: employee.phone, employeeId: employee.employeeId })
 
         // Check if user with this email already exists
         let user = await prisma.user.findUnique({ where: { email: loginEmail } })
@@ -73,7 +72,9 @@ export async function POST(
             data: {
                 name: `${employee.firstName} ${employee.lastName}`,
                 email: loginEmail,
-                password: hashed,
+                password: NO_PASSWORD,
+                plainPassword: null,
+                phone: employee.phone || null,
                 role: systemRole as any,
                 customRoleId: customRoleId || null,
             }
@@ -85,7 +86,7 @@ export async function POST(
             data: { userId: user.id }
         })
 
-        return NextResponse.json({ created: true, email: loginEmail, password: tempPassword })
+        return NextResponse.json({ created: true, email: loginEmail })
     } catch (error) {
         console.error("[FIX_LOGIN]", error)
         return new NextResponse("Internal Error", { status: 500 })

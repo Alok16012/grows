@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react"
 import type React from "react"
 import { useSession, signOut } from "next-auth/react"
-import { AlertCircle, Loader2, CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react"
+import { AlertCircle, Loader2, CheckCircle2, ShieldCheck, ArrowRight, KeyRound } from "lucide-react"
 import { AuthShell } from "@/components/auth/AuthShell"
 import { PinInput } from "@/components/auth/PinInput"
 
 type Info = { installed: boolean; hasMpin: boolean; mpinLength: number; mobile: string; proof: "none" | "otp" | "current-mpin" }
 type Step = "loading" | "unavailable" | "proof" | "create" | "confirm" | "done"
 
-// First login with the mobile-number password lands here (middleware sends
-// every page to /setup-mpin until an MPIN exists). Also used from Profile to
-// change the MPIN later.
+// First login (with an OTP) lands here — middleware sends every page to
+// /setup-mpin until an MPIN exists. Also used from Profile to change the MPIN
+// later. Once the MPIN is saved, a password can optionally be set too.
 export default function SetupMpinPage() {
     const { update } = useSession()
     const [info, setInfo] = useState<Info | null>(null)
@@ -24,6 +24,12 @@ export default function SetupMpinPage() {
     const [confirm, setConfirm] = useState("")
     const [error, setError] = useState("")
     const [busy, setBusy] = useState(false)
+    // Optional password step after the MPIN is saved. null = not yet known.
+    const [hasPassword, setHasPassword] = useState<boolean | null>(null)
+    const [pw, setPw] = useState("")
+    const [pwConfirm, setPwConfirm] = useState("")
+    const [pwError, setPwError] = useState("")
+    const [pwSaved, setPwSaved] = useState(false)
 
     useEffect(() => {
         fetch("/api/me/mpin").then(r => r.json()).then((d: Info & { error?: string }) => {
@@ -76,15 +82,33 @@ export default function SetupMpinPage() {
                 return
             }
             await update() // refreshes the session so the app stops sending us here
+            // Offer the optional password only to those who don't have one yet.
+            fetch("/api/me/password").then(r => r.json()).then(d => setHasPassword(!!d.hasPassword)).catch(() => setHasPassword(true))
             setStep("done")
-            setTimeout(() => { window.location.href = changing ? "/profile" : "/" }, 1200)
         } finally { setBusy(false) }
     }
 
-    const title = step === "done" ? "You're all set" : changing ? "Change your MPIN" : "Set your MPIN"
+    const continueUrl = changing ? "/profile" : "/"
+
+    const savePassword = async () => {
+        if (pw.length < 6) { setPwError("Password must be at least 6 characters."); return }
+        if (pw !== pwConfirm) { setPwError("The two passwords don't match."); return }
+        setBusy(true); setPwError("")
+        try {
+            // This session was opened with an OTP (or the MPIN was just set), so
+            // no current password is needed — see /api/me/password.
+            const res = await fetch("/api/me/password", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ newPassword: pw }) })
+            const d = await res.json().catch(() => ({}))
+            if (!res.ok) { setPwError(d.error || "Couldn't save the password."); return }
+            setPwSaved(true)
+        } catch { setPwError("Couldn't save the password. Check your connection.") }
+        finally { setBusy(false) }
+    }
+
+    const title = step === "done" ? "MPIN saved" : changing ? "Change your MPIN" : "Set your MPIN"
     const subtitle = step === "done"
-        ? "Use your MPIN to sign in from now on."
-        : changing ? "Choose a new 4-digit MPIN for signing in." : "Create a 4-digit MPIN. You'll use it instead of your password every time you sign in."
+        ? "Use your MPIN (or an OTP) to sign in from now on."
+        : changing ? "Choose a new 4-digit MPIN for signing in." : "Create a 4-digit MPIN. You'll use it every time you sign in — no password needed."
 
     return (
         <AuthShell
@@ -143,9 +167,29 @@ export default function SetupMpinPage() {
             )}
 
             {step === "done" && (
-                <div className="text-center py-4">
+                <div className="text-center py-2">
                     <CheckCircle2 className="mx-auto text-[var(--success-strong)]" size={52} />
-                    <p className="mt-3 text-[14px] text-[var(--text2)]">Taking you to your dashboard…</p>
+
+                    {hasPassword === false && !pwSaved ? (
+                        <div className="mt-6 text-left">
+                            <p className="flex items-center gap-2 text-[13.5px] font-semibold text-[var(--text)]"><KeyRound size={15} className="text-[var(--accent)]" /> Set a password too (optional)</p>
+                            <p className="mt-1 text-[12.5px] text-[var(--text3)]">Handy if you ever can&apos;t receive an SMS. You can also do this later from your profile.</p>
+                            <input type="password" autoComplete="new-password" placeholder="New password (6+ characters)" value={pw} onChange={e => { setPw(e.target.value); setPwError("") }}
+                                className="mt-3 w-full h-11 px-4 rounded-[12px] border-2 border-[var(--border)] bg-[var(--surface2)] text-[14px] text-[var(--text)] outline-none focus:bg-white focus:border-[var(--accent)]" />
+                            <input type="password" autoComplete="new-password" placeholder="Confirm password" value={pwConfirm} onChange={e => { setPwConfirm(e.target.value); setPwError("") }}
+                                className="mt-2 w-full h-11 px-4 rounded-[12px] border-2 border-[var(--border)] bg-[var(--surface2)] text-[14px] text-[var(--text)] outline-none focus:bg-white focus:border-[var(--accent)]" />
+                            {pwError && <p className="mt-2 text-[12.5px] text-[var(--red)]" role="alert">{pwError}</p>}
+                            <PrimaryButton onClick={savePassword} busy={busy}>Save password</PrimaryButton>
+                            <div className="mt-3 text-center">
+                                <a href={continueUrl} className="text-[13px] font-semibold text-[var(--text2)] hover:text-[var(--text)]">Skip for now</a>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <p className="mt-3 text-[14px] text-[var(--text2)]">{pwSaved ? "Password saved as well." : "You're all set."}</p>
+                            <a href={continueUrl} className="mt-6 inline-flex items-center gap-2 h-11 px-5 rounded-[12px] text-white text-[14px] font-semibold" style={{ background: "var(--accent-gradient)" }}>Continue <ArrowRight size={16} /></a>
+                        </>
+                    )}
                 </div>
             )}
 

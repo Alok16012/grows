@@ -24,8 +24,9 @@ function messageFor(code: string, method: Method): string {
     }
     switch (code) {
         case "ACCOUNT_INACTIVE": return "This account is inactive. Please contact HR."
-        case "USE_MPIN": return "Your mobile-number password no longer works. Sign in with your MPIN or OTP."
-        case "NO_MPIN": return "You haven't set an MPIN yet. Sign in with your password first — it's your mobile number."
+        // Only reached when OTP sign-in is switched off; otherwise it is a notice + tab switch.
+        case "USE_OTP": return "No password is set for this account and OTP sign-in isn't available yet. Ask your HR or admin."
+        case "NO_MPIN": return "You haven't set an MPIN yet. Sign in with an OTP first, then set your MPIN."
         default:
             return method === "mpin" ? "Wrong MPIN. Please try again."
                 : method === "otp" ? "Wrong or expired OTP. Please try again."
@@ -114,7 +115,15 @@ function LoginForm() {
                 return
             }
             const errCode = result?.error || ""
-            if (errCode === "NO_MPIN") switchMethod("password")
+            // No password / no MPIN yet → OTP is the way in. Shown as a notice,
+            // not an error: nothing was typed wrong.
+            if ((errCode === "USE_OTP" || errCode === "NO_MPIN") && otpEnabled) {
+                switchMethod("otp")
+                setNotice(errCode === "USE_OTP"
+                    ? "No password set for this account yet — sign in with OTP, then set your MPIN (and a password if you like)."
+                    : "No MPIN set yet — sign in with OTP first, then set your MPIN.")
+                return
+            }
             setError(messageFor(errCode, method))
             setSecret("")
         } catch {
@@ -122,7 +131,7 @@ function LoginForm() {
         } finally {
             setLoading(false)
         }
-    }, [loginId, secret, method, callbackUrl, mpinLength])
+    }, [loginId, secret, method, callbackUrl, mpinLength, otpEnabled])
 
     const sendOtp = async () => {
         const id = loginId.trim()
@@ -194,7 +203,7 @@ function LoginForm() {
                             <p className="text-[13px] font-semibold text-[var(--text)] mb-3 text-center">Enter your {mpinLength}-digit MPIN</p>
                             <PinInput length={mpinLength} value={secret} onChange={v => { setSecret(v); setError("") }} onComplete={v => submit(v)} masked disabled={loading} invalid={!!error} label="MPIN" />
                             <div className="mt-4 text-center text-[13px]">
-                                <button type="button" className="font-semibold text-[var(--accent)] hover:underline" onClick={() => otpEnabled ? switchMethod("otp") : setNotice("Ask your HR or admin to reset your login. You'll then sign in with your mobile number as the password and set a new MPIN.")}>
+                                <button type="button" className="font-semibold text-[var(--accent)] hover:underline" onClick={() => otpEnabled ? switchMethod("otp") : setNotice("Ask your HR or admin to reset your login. You'll then sign in with an OTP and set a new MPIN.")}>
                                     Forgot MPIN?
                                 </button>
                             </div>
@@ -239,7 +248,7 @@ function LoginForm() {
                             </div>
                             <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] text-[var(--text3)] leading-snug">
                                 <Info size={14} className="mt-[1px] shrink-0" />
-                                First time? Your password is your mobile number. You&apos;ll set an MPIN right after.
+                                Only if you&apos;ve set a password in your profile. Otherwise sign in with OTP or MPIN.
                             </p>
                         </div>
                     )}

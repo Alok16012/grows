@@ -2,11 +2,13 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import bcrypt from "bcryptjs"
-import { resetLoginSecurity } from "@/lib/login-security"
+import { NO_PASSWORD } from "@/lib/credentials"
 
 // POST /api/admin/bulk-fix-logins
-// Server-side bulk: creates/activates user accounts for ALL employees in one DB round-trip
+// Server-side bulk: makes sure every employee with a phone has an ACTIVE login
+// linked. Creates missing accounts (with no password — they sign in with an
+// OTP), links unclaimed ones, re-activates linked ones. Never touches a
+// password or MPIN.
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== "ADMIN") {
@@ -37,15 +39,13 @@ export async function POST(req: Request) {
 
                 const name = `${emp.firstName} ${emp.lastName}`.trim()
                 const email = `${phone}@cims.local`
-                const hash = await bcrypt.hash(phone, 10)
 
                 if (emp.userId) {
                     // Update existing linked user
                     await prisma.user.update({
                         where: { id: emp.userId },
-                        data: { isActive: true, password: hash, name },
+                        data: { isActive: true, name },
                     })
-                    await resetLoginSecurity([emp.userId])
                     fixed++
                 } else {
                     // Upsert user by email, then link to employee
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
                     if (existing) {
                         await prisma.user.update({
                             where: { id: existing.id },
-                            data: { isActive: true, password: hash, name },
+                            data: { isActive: true, name },
                         })
                         userId = existing.id
                     } else {
@@ -65,7 +65,8 @@ export async function POST(req: Request) {
                                 // Base role is vestigial; access comes from the custom role.
                                 role: "MANAGER",
                                 isActive: true,
-                                password: hash,
+                                password: NO_PASSWORD,
+                                plainPassword: null,
                             },
                         })
                         userId = created.id
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
             skipped,
             failed,
             errors: errors.slice(0, 20),
-            message: `${fixed} employees ka login fix ho gaya. Password = phone number.`,
+            message: `${fixed} employees ka login fix ho gaya. Employees OTP se sign in karke MPIN set karenge.`,
         })
     } catch (e: any) {
         console.error("[BULK_FIX_LOGINS]", e)

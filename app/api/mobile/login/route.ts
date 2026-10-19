@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server"
 import { encode } from "next-auth/jwt"
 import prisma from "@/lib/prisma"
-import bcrypt from "bcryptjs"
+import {
+    verifyLogin, parseLoginMethod,
+    AUTH_INVALID, AUTH_INACTIVE, AUTH_LOCKED, AUTH_USE_OTP, AUTH_NO_MPIN,
+} from "@/lib/login-security"
 
 // Mobile (native app) login. Validates credentials against the same User /
-// Employee records the web app uses, then mints a NextAuth-compatible JWT with
-// `encode` + NEXTAUTH_SECRET. The token is verified later by lib/apiSession's
-// `decode`, so the same secret is the only shared dependency.
+// Employee records the web app uses — through the very same verifyLogin as
+// lib/auth.ts, so lockout and the no-default-password rule can't drift — then
+// mints a NextAuth-compatible JWT with `encode` + NEXTAUTH_SECRET. The token is
+// verified later by lib/apiSession's `decode`, so the same secret is the only
+// shared dependency.
+//
+// Body: { identifier, password, method?: "password" | "mpin" | "otp" }. The
+// secret always travels in `password`; `method` says what it is (default
+// "password"). An OTP is requested first via POST /api/login/otp.
 //
 // Demo logins (admin@cims.com / demo123 etc.) mirror the web's NextAuth
 // behavior and are gated by the SAME flag (DEMO_ENABLED) so the two stay in
@@ -25,12 +34,6 @@ const DEMO_USERS: Record<string, { name: string; role: string }> = {
     "inspector@cims.com": { name: "Inspection Boy", role: "INSPECTION_BOY" },
 }
 
-const phoneDigits = (s: string | null | undefined): string => {
-    if (!s) return ""
-    const d = s.replace(/\D/g, "")
-    return d.length >= 10 ? d.slice(-10) : d
-}
-
 function resolvePermissions(user: { customRole?: { isActive: boolean; permissions: string[] } | null }): string[] {
     const base = ["self.view"]
     if (user.customRole?.isActive) {
@@ -42,7 +45,7 @@ function resolvePermissions(user: { customRole?: { isActive: boolean; permission
 const roleInclude = { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
 
 // Mint the token + user payload from a (real or synthetic) user object.
-async function mintResponse(user: any) {
+async function mintResponse(user: any, extra: { needsMpin?: boolean } = {}) {
     const employee = await prisma.employee
         .findFirst({
             where: { userId: user.id },
@@ -69,6 +72,8 @@ async function mintResponse(user: any) {
 
     return NextResponse.json({
         token,
+        // The app should send the user to set an MPIN when this is true.
+        needsMpin: !!extra.needsMpin,
         user: {
             id: user.id,
             name: user.name,
@@ -91,12 +96,31 @@ async function mintResponse(user: any) {
     })
 }
 
+// Same codes as the web login (lib/login-security), as JSON with an HTTP status.
+function failResponse(code: string) {
+    if (code.startsWith(AUTH_LOCKED)) {
+        const mins = Number(code.split(":")[1]) || 15
+        return NextResponse.json({ error: `Too many wrong attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`, code: AUTH_LOCKED, minutesLeft: mins }, { status: 423 })
+    }
+    switch (code) {
+        case AUTH_INACTIVE:
+            return NextResponse.json({ error: "Your account is inactive. Contact HR.", code }, { status: 403 })
+        case AUTH_USE_OTP:
+            return NextResponse.json({ error: AUTH_USE_OTP, message: "No password set for this account yet — sign in with an OTP, then set your MPIN." }, { status: 403 })
+        case AUTH_NO_MPIN:
+            return NextResponse.json({ error: AUTH_NO_MPIN, message: "No MPIN set yet — sign in with an OTP first, then set your MPIN." }, { status: 403 })
+        case AUTH_INVALID:
+        default:
+            return NextResponse.json({ error: "Invalid credentials", code: AUTH_INVALID }, { status: 401 })
+    }
+}
+
 export async function POST(req: Request) {
     if (!secret) {
         return NextResponse.json({ error: "Server auth is not configured" }, { status: 500 })
     }
 
-    let body: { identifier?: string; password?: string; email?: string } = {}
+    let body: { identifier?: string; password?: string; email?: string; method?: string } = {}
     try {
         body = await req.json()
     } catch {
@@ -105,16 +129,14 @@ export async function POST(req: Request) {
 
     const identifier = (body.identifier ?? body.email ?? "").trim()
     const password = body.password ?? ""
+    const method = parseLoginMethod(body.method)
     if (!identifier || !password) {
-        return NextResponse.json({ error: "Employee ID / email and password are required" }, { status: 400 })
+        return NextResponse.json({ error: `Employee ID / mobile and ${method === "password" ? "password" : method.toUpperCase()} are required` }, { status: 400 })
     }
-
-    const inputClean = identifier.replace(/@cims\.local$/i, "").trim()
-    const inputDigits = phoneDigits(inputClean)
 
     try {
         // 0. Demo login — mirrors the web NextAuth provider exactly.
-        if (DEMO_ENABLED && DEMO_USERS[identifier] && password === "demo123") {
+        if (DEMO_ENABLED && method === "password" && DEMO_USERS[identifier] && password === "demo123") {
             const realUser = await prisma.user.findUnique({ where: { email: identifier }, include: roleInclude })
             if (realUser) return await mintResponse(realUser)
             // No DB row — issue a synthetic demo session like the web does.
@@ -127,47 +149,12 @@ export async function POST(req: Request) {
             })
         }
 
-        let user: any = null
-
-        // 1. Direct email match
-        user = await prisma.user.findUnique({ where: { email: identifier }, include: roleInclude })
-
-        // 2. Phone match via Employee
-        if (!user && inputDigits.length === 10) {
-            const emp = await prisma.employee.findFirst({
-                where: { phone: { endsWith: inputDigits } },
-                include: { user: { include: roleInclude } },
-            })
-            if (emp?.user) user = emp.user
+        const result = await verifyLogin({ identifier, secret: password, method })
+        if (!result.ok) {
+            console.warn(`[MOBILE_LOGIN] login failed — reason=${result.reason} method=${method}`)
+            return failResponse(result.code)
         }
-
-        // 3. Employee ID match
-        if (!user) {
-            const emp = await prisma.employee.findFirst({
-                where: { employeeId: { equals: inputClean, mode: "insensitive" } },
-                include: { user: { include: roleInclude } },
-            })
-            if (emp?.user) user = emp.user
-        }
-
-        if (!user || !user.password) {
-            return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
-        }
-
-        let passwordOk = false
-        try {
-            passwordOk = await bcrypt.compare(password, user.password)
-        } catch {
-            passwordOk = false
-        }
-        if (!passwordOk) {
-            return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
-        }
-        if (!user.isActive) {
-            return NextResponse.json({ error: "Your account is inactive. Contact HR." }, { status: 403 })
-        }
-
-        return await mintResponse(user)
+        return await mintResponse(result.user, { needsMpin: result.needsMpin })
     } catch (err) {
         if (process.env.NODE_ENV !== "production") console.error("[MOBILE_LOGIN]", err)
         return NextResponse.json({ error: "Login failed. Please try again." }, { status: 500 })

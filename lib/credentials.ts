@@ -1,11 +1,11 @@
 // Helpers for deriving employee login credentials.
-// Keep the login id + default password rules in one place so the auto-create
-// flow (on employee creation), bulk-generate and import all stay consistent.
+// Keep the login id rule in one place so the auto-create flow (on employee
+// creation), bulk-generate and import all stay consistent.
 //
-// Policy: an employee's default Login ID AND default Password are both their
-// mobile number. They can change the password after first login. (Login also
-// works by phone via the auth phone-lookup, so the mobile number is the single
-// thing they need to remember.)
+// Policy: an employee's Login ID is their mobile number. There is NO default
+// password — a new account carries the NO_PASSWORD marker and the employee
+// signs in with an OTP to that mobile, sets an MPIN, and may then choose a
+// password of their own.
 
 const tenDigitPhone = (phone?: string | null): string => {
     const d = (phone || "").replace(/\D/g, "")
@@ -23,9 +23,12 @@ export function buildLoginEmail(opts: { email?: string | null; phone?: string | 
     return `${empId}@cims.app`
 }
 
-// Default password: the mobile number. Falls back to a fixed string only when
-// no phone is on file (rare — phone is required for employees).
-export function defaultPassword(opts: { phone?: string | null }): string {
-    const phone = tenDigitPhone(opts.phone)
-    return phone.length === 10 ? phone : (phone || "changeme123")
-}
+// User.password is NOT nullable, so "no password" is this literal marker. It is
+// not a bcrypt hash, so bcrypt.compare can never match it.
+export const NO_PASSWORD = "!unset"
+
+// True only for a real bcrypt hash — i.e. a password the user set themselves.
+// The NO_PASSWORD marker and the `disabled-…` marker written on soft-delete
+// both fail this test.
+export const hasOwnPassword = (hash: string | null | undefined): boolean =>
+    typeof hash === "string" && /^\$2[aby]\$/.test(hash)

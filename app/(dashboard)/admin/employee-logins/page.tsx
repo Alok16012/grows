@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
-    KeyRound, Search, Loader2, Copy, Eye, EyeOff, Pencil, Check, X, UserPlus, ShieldCheck, RefreshCw, Smartphone,
+    KeyRound, Search, Loader2, Copy, Pencil, Check, X, UserPlus, ShieldCheck, RefreshCw, RotateCcw, Lock,
 } from "lucide-react"
 
 type Row = {
@@ -17,7 +18,9 @@ type Row = {
     hasLogin: boolean
     userId: string | null
     loginEmail: string | null
-    password: string | null
+    hasPassword: boolean
+    hasMpin: boolean
+    isLocked: boolean
     isActive: boolean | null
     systemRole: string | null
     customRole: { id: string; name: string; color: string } | null
@@ -26,6 +29,8 @@ type Row = {
 type CustomRole = { id: string; name: string; color: string }
 
 export default function EmployeeLoginsPage() {
+    const { data: session } = useSession()
+    const isAdmin = session?.user?.role === "ADMIN"
     const [rows, setRows] = useState<Row[]>([])
     const [roles, setRoles] = useState<CustomRole[]>([])
     const [loading, setLoading] = useState(true)
@@ -35,13 +40,13 @@ export default function EmployeeLoginsPage() {
     const [deptFilter, setDeptFilter] = useState("ALL")
     const [page, setPage] = useState(1)
     useEffect(() => { setPage(1) }, [search, roleFilter, siteFilter, deptFilter])
-    const [reveal, setReveal] = useState<Record<string, boolean>>({})
     const [generating, setGenerating] = useState(false)
-    const [resettingMobile, setResettingMobile] = useState(false)
+    const [resettingAll, setResettingAll] = useState(false)
+    const [resetting, setResetting] = useState<string | null>(null)
 
     // Edit modal
     const [editing, setEditing] = useState<Row | null>(null)
-    const [form, setForm] = useState({ loginEmail: "", password: "", customRoleId: "" })
+    const [form, setForm] = useState({ loginEmail: "", customRoleId: "" })
     const [saving, setSaving] = useState(false)
 
     const fetchData = async () => {
@@ -71,7 +76,7 @@ export default function EmployeeLoginsPage() {
 
     const generateMissing = async () => {
         setGenerating(true)
-        let created = 0, linked = 0, reset = 0, failed = 0
+        let created = 0, linked = 0, failed = 0
         let prevRemaining = Infinity
         try {
             // The server processes one batch per call and reports how many
@@ -87,7 +92,6 @@ export default function EmployeeLoginsPage() {
                 }
                 created += data.created || 0
                 linked += data.linked || 0
-                reset += data.reset || 0
                 failed += data.failed || 0
                 const remaining = data.remaining ?? 0
                 if (remaining <= 0) break
@@ -96,7 +100,7 @@ export default function EmployeeLoginsPage() {
                 prevRemaining = remaining
                 toast.loading(`Generating logins… ${remaining} left`, { id: "gen-logins" })
             }
-            toast.success(`Created ${created}, linked ${linked}, ${reset} password${reset === 1 ? "" : "s"} reset${failed ? `, ${failed} failed` : ""}`, { id: "gen-logins" })
+            toast.success(`Created ${created}, linked ${linked}${failed ? `, ${failed} failed` : ""}`, { id: "gen-logins" })
             fetchData()
         } catch (e: any) {
             toast.error(e.message, { id: "gen-logins" })
@@ -105,27 +109,49 @@ export default function EmployeeLoginsPage() {
         }
     }
 
-    const resetAllMobile = async () => {
-        if (!confirm("Set EVERY employee's Login ID and Password to their mobile number? This overwrites existing passwords (employees who changed theirs will be reset too).")) return
-        setResettingMobile(true)
+    // Per-employee: wipe password + MPIN so they sign in with an OTP and start over.
+    const resetLogin = async (row: Row) => {
+        if (!confirm(`Reset the login for ${row.name}? Their password and MPIN are removed. They sign in with an OTP to their mobile and set a new MPIN.`)) return
+        setResetting(row.employeeId)
         try {
-            const res = await fetch("/api/admin/employee-logins/reset-mobile", { method: "POST" })
-            const raw = await res.text()
-            let data: any = {}
-            try { data = raw ? JSON.parse(raw) : {} } catch { data = {} }
-            if (!res.ok) throw new Error(data.error || raw.slice(0, 160) || `Failed (${res.status})`)
-            toast.success(`Set to mobile — ${data.updated} updated, ${data.created} created${data.skipped ? `, ${data.skipped} skipped (no phone)` : ""}${data.failed ? `, ${data.failed} failed` : ""}`)
+            const res = await fetch(`/api/admin/employee-logins/${row.employeeId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "reset-login" }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(data.error || "Failed to reset login")
+            toast.success(`Login reset for ${row.name}`)
             fetchData()
         } catch (e: any) {
             toast.error(e.message)
         } finally {
-            setResettingMobile(false)
+            setResetting(null)
+        }
+    }
+
+    // ADMIN only: the one-shot switch to OTP-first sign-in for everybody.
+    const resetAllLogins = async () => {
+        if (!confirm("Reset EVERY employee's login? All passwords and MPINs are removed. Everyone then signs in with an OTP to their mobile and sets a new MPIN. Use this only when moving to OTP sign-in.")) return
+        setResettingAll(true)
+        try {
+            const res = await fetch("/api/admin/employee-logins/reset-login", { method: "POST" })
+            const raw = await res.text()
+            let data: any = {}
+            try { data = raw ? JSON.parse(raw) : {} } catch { data = {} }
+            if (!res.ok) throw new Error(data.error || raw.slice(0, 160) || `Failed (${res.status})`)
+            toast.success(`${data.reset} login${data.reset === 1 ? "" : "s"} reset — employees sign in with an OTP next`)
+            fetchData()
+        } catch (e: any) {
+            toast.error(e.message)
+        } finally {
+            setResettingAll(false)
         }
     }
 
     const openEdit = (row: Row) => {
         setEditing(row)
-        setForm({ loginEmail: row.loginEmail || "", password: "", customRoleId: row.customRole?.id || "" })
+        setForm({ loginEmail: row.loginEmail || "", customRoleId: row.customRole?.id || "" })
     }
 
     const saveEdit = async () => {
@@ -137,13 +163,12 @@ export default function EmployeeLoginsPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     loginEmail: form.loginEmail || undefined,
-                    password: form.password || undefined,
                     customRoleId: form.customRoleId || null,
                 }),
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to save")
-            toast.success(editing.hasLogin ? "Login updated" : "Login created")
+            toast.success(editing.hasLogin ? "Login updated" : "Login created — the employee signs in with an OTP")
             setEditing(null)
             fetchData()
         } catch (e: any) {
@@ -167,6 +192,25 @@ export default function EmployeeLoginsPage() {
         return <span className="px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium bg-[var(--surface2)] text-[var(--text3)]">No role</span>
     }
 
+    // What the employee has set up so far. No secret is ever shown — only
+    // whether one exists.
+    const statusBadges = (row: Row) => {
+        if (!row.hasLogin) return <span className="text-[12px] text-[var(--text3)]">—</span>
+        const pill = (on: boolean, label: string) => (
+            <span className={`px-[8px] py-0.5 rounded-[20px] text-[10.5px] font-medium whitespace-nowrap ${on ? "bg-[#dcfce7] text-[#15803d]" : "bg-[var(--surface2)] text-[var(--text3)]"}`}>
+                {label}{on ? " set" : " not set"}
+            </span>
+        )
+        return (
+            <div className="flex flex-wrap items-center gap-1">
+                {pill(row.hasMpin, "MPIN")}
+                {pill(row.hasPassword, "Password")}
+                {row.isLocked && <span className="px-[8px] py-0.5 rounded-[20px] text-[10.5px] font-medium bg-[#fee2e2] text-[#b91c1c] inline-flex items-center gap-1"><Lock className="h-3 w-3" /> Locked</span>}
+                {row.isActive === false && <span className="px-[8px] py-0.5 rounded-[20px] text-[10.5px] font-medium bg-[#fee2e2] text-[#b91c1c]">Inactive</span>}
+            </div>
+        )
+    }
+
     // Filter option lists derived from the loaded rows.
     const siteOptions = Array.from(new Set(rows.map(r => r.site).filter(Boolean) as string[])).sort()
     const deptOptions = Array.from(new Set(rows.map(r => r.department).filter(Boolean) as string[])).sort()
@@ -188,7 +232,7 @@ export default function EmployeeLoginsPage() {
         return true
     })
 
-    const missingCount = rows.filter(r => !r.hasLogin || !r.password).length
+    const missingCount = rows.filter(r => !r.hasLogin).length
 
     // Render pagination — thousands of rows in one grid froze the page.
     const PAGE = 100
@@ -209,25 +253,27 @@ export default function EmployeeLoginsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
                 <div className="min-w-0">
                     <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">Employee Logins</h1>
-                    <p className="text-[13px] text-[var(--text2)] mt-[3px]">Every employee&apos;s login id, password and role — view, copy and update</p>
+                    <p className="text-[13px] text-[var(--text2)] mt-[3px]">Employees sign in with an OTP to their mobile, then set an MPIN. Manage login ids and roles here — no passwords to hand out.</p>
                 </div>
                 <div className="page-actions">
-                    <button
-                        onClick={resetAllMobile}
-                        disabled={resettingMobile || generating}
-                        title="Set every employee's Login ID and Password to their mobile number"
-                        className="px-3.5 h-9 bg-white border border-[var(--accent)] text-[var(--accent)] rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#f0faf5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {resettingMobile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
-                        Set all to mobile number
-                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={resetAllLogins}
+                            disabled={resettingAll || generating}
+                            title="Remove every employee's password and MPIN — everyone signs in with an OTP next"
+                            className="px-3.5 h-9 bg-white border border-[#fca5a5] text-[#b91c1c] rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#fef2f2] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {resettingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                            Reset all logins
+                        </button>
+                    )}
                     <button
                         onClick={generateMissing}
-                        disabled={generating || resettingMobile || missingCount === 0}
+                        disabled={generating || resettingAll || missingCount === 0}
                         className="px-3.5 h-9 bg-[var(--accent)] text-white rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                        Generate logins &amp; passwords{missingCount > 0 ? ` (${missingCount})` : ""}
+                        Generate missing logins{missingCount > 0 ? ` (${missingCount})` : ""}
                     </button>
                 </div>
             </div>
@@ -278,18 +324,18 @@ export default function EmployeeLoginsPage() {
 
             <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
                 {/* Header row */}
-                <div className="grid grid-cols-[2fr_1.2fr_1.6fr_1.4fr_auto] gap-3 px-5 py-3 border-b border-[var(--border)] bg-[#faf9f7]">
+                <div className="grid grid-cols-[2fr_1.2fr_1.6fr_1.6fr_auto] gap-3 px-5 py-3 border-b border-[var(--border)] bg-[#faf9f7]">
                     <span className="text-[11px] font-semibold text-[var(--text2)] uppercase tracking-wide">Employee</span>
                     <span className="text-[11px] font-semibold text-[var(--text2)] uppercase tracking-wide">Role</span>
                     <span className="text-[11px] font-semibold text-[var(--text2)] uppercase tracking-wide">Login ID</span>
-                    <span className="text-[11px] font-semibold text-[var(--text2)] uppercase tracking-wide">Password</span>
+                    <span className="text-[11px] font-semibold text-[var(--text2)] uppercase tracking-wide">Sign-in status</span>
                     <span className="text-[11px] font-semibold text-[var(--text2)] uppercase tracking-wide text-right">Actions</span>
                 </div>
 
                 {paged.map((row, idx) => (
                     <div
                         key={row.employeeId}
-                        className={`grid grid-cols-[2fr_1.2fr_1.6fr_1.4fr_auto] gap-3 px-5 py-3.5 items-center hover:bg-[var(--surface2)] transition-colors ${idx !== paged.length - 1 ? "border-b border-[var(--border)]" : ""}`}
+                        className={`grid grid-cols-[2fr_1.2fr_1.6fr_1.6fr_auto] gap-3 px-5 py-3.5 items-center hover:bg-[var(--surface2)] transition-colors ${idx !== paged.length - 1 ? "border-b border-[var(--border)]" : ""}`}
                     >
                         {/* Employee */}
                         <div className="flex items-center gap-3 min-w-0">
@@ -320,29 +366,22 @@ export default function EmployeeLoginsPage() {
                             )}
                         </div>
 
-                        {/* Password */}
-                        <div className="min-w-0">
-                            {row.hasLogin && row.password ? (
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-[12.5px] text-[var(--text)] truncate font-mono">
-                                        {reveal[row.employeeId] ? row.password : "••••••••"}
-                                    </span>
-                                    <button onClick={() => setReveal(s => ({ ...s, [row.employeeId]: !s[row.employeeId] }))} className="shrink-0 text-[var(--text3)] hover:text-[var(--accent)]" title="Show / hide">
-                                        {reveal[row.employeeId] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                                    </button>
-                                    <button onClick={() => copy(row.password!, "Password")} className="shrink-0 text-[var(--text3)] hover:text-[var(--accent)]" title="Copy">
-                                        <Copy className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                            ) : row.hasLogin ? (
-                                <span className="text-[12px] text-[var(--text3)]">set via edit</span>
-                            ) : (
-                                <span className="text-[12px] text-[var(--text3)]">—</span>
-                            )}
-                        </div>
+                        {/* Sign-in status */}
+                        <div className="min-w-0">{statusBadges(row)}</div>
 
                         {/* Actions */}
                         <div className="flex items-center justify-end gap-1.5">
+                            {row.hasLogin && (
+                                <button
+                                    onClick={() => resetLogin(row)}
+                                    disabled={resetting === row.employeeId}
+                                    className="h-[30px] px-2.5 rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center gap-1.5 text-[12px] text-[var(--text2)] hover:bg-[#fef2f2] hover:text-[#b91c1c] hover:border-[#fca5a5] transition-colors disabled:opacity-50"
+                                    title="Remove password and MPIN — the employee signs in with an OTP and sets a new MPIN"
+                                >
+                                    {resetting === row.employeeId ? <Loader2 className="h-[13px] w-[13px] animate-spin" /> : <RotateCcw className="h-[13px] w-[13px]" />}
+                                    Reset login
+                                </button>
+                            )}
                             <button
                                 onClick={() => openEdit(row)}
                                 className="h-[30px] px-2.5 rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center gap-1.5 text-[12px] text-[var(--text2)] hover:bg-[#eff6ff] hover:text-[#1d4ed8] hover:border-[#93c5fd] transition-colors"
@@ -397,26 +436,17 @@ export default function EmployeeLoginsPage() {
                         <div className="border-t border-[var(--border)] mb-5" />
                         <div className="space-y-4">
                             <div className="space-y-1.5">
-                                <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Login ID (email)</label>
+                                <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Login ID (mobile or email)</label>
                                 <input
                                     type="text"
                                     value={form.loginEmail}
                                     onChange={e => setForm({ ...form, loginEmail: e.target.value })}
-                                    placeholder="name@cims.app"
+                                    placeholder={editing.phone || "name@cims.app"}
                                     className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)] focus:bg-white"
                                 />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">
-                                    {editing.hasLogin ? "New Password (leave blank to keep)" : "Password (blank = auto Grow@xxxx)"}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={form.password}
-                                    onChange={e => setForm({ ...form, password: e.target.value })}
-                                    placeholder={editing.hasLogin ? "Enter new password" : "Auto-generated if blank"}
-                                    className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)] focus:bg-white"
-                                />
+                                {!editing.hasLogin && (
+                                    <p className="text-[11px] text-[var(--text3)] pt-0.5">Blank = the employee&apos;s mobile number. No password is created — they sign in with an OTP and set an MPIN.</p>
+                                )}
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Role</label>

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import prisma from "@/lib/prisma"
+import { NO_PASSWORD } from "@/lib/credentials"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
@@ -12,7 +13,6 @@ import {
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import { Role } from "@prisma/client"
-import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 // POST /api/recruitment/[id]/convert
@@ -130,8 +130,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                     + ` (${owner.employeeId}). Enter a different email for this candidate.`,
             }, { status: 409 })
         }
-        // Hashed outside the transaction so a slow hash doesn't eat into its budget.
-        const passwordHash = existingUser ? null : await bcrypt.hash(lead.phone || "123456", 8)
 
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
 
@@ -215,7 +213,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                     data: {
                         name: `${firstName} ${lastName}`.trim(),
                         email: resolvedEmail,
-                        password: passwordHash!,
+                        // No password: the employee signs in with an OTP and sets an MPIN.
+                        password: NO_PASSWORD,
+                        plainPassword: null,
                         // Base role is vestigial; the custom role assigned after
                         // onboarding is what actually grants access.
                         role: "MANAGER",

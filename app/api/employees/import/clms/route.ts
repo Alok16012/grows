@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
-import bcrypt from "bcryptjs"
+import { NO_PASSWORD } from "@/lib/credentials"
 import { validateDateOfBirth, validateJoiningAge } from "@/lib/validation"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -117,7 +117,6 @@ export async function POST(req: Request) {
 
             // Auto-create user
             const emailRaw = str(row["PersonalEmailID"]) ?? `${phone}@cims.local`
-            const passwordHash = await bcrypt.hash(phone, 10)
 
             const existingUser = await prisma.user.findUnique({ where: { email: emailRaw } })
             let userId: string
@@ -128,7 +127,9 @@ export async function POST(req: Request) {
                     data: {
                         name: [firstName, str(row["LastName"])].filter(Boolean).join(" "),
                         email: emailRaw,
-                        password: passwordHash,
+                        // No password: the employee signs in with an OTP and sets an MPIN.
+                        password: NO_PASSWORD,
+                        plainPassword: null,
                         // Base role is vestigial — access comes from the custom role.
                         role: "MANAGER",
                     },

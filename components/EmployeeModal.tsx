@@ -184,10 +184,12 @@ export const EMPTY_FORM: ModalForm = {
 
 // ─── Credentials Modal ────────────────────────────────────────────────────────
 
-function CredentialsModal({ email, password, onClose }: { email: string; password: string; onClose: () => void }) {
+// Shown after a login is created. There is no password to hand over — the
+// employee signs in with an OTP to their mobile and sets an MPIN.
+function CredentialsModal({ email, onClose }: { email: string; onClose: () => void }) {
     const [copied, setCopied] = useState(false)
     const copy = () => {
-        navigator.clipboard.writeText(`Email: ${email}\nPassword: ${password}`)
+        navigator.clipboard.writeText(`Login ID: ${email}\nSign in with the OTP sent to your mobile, then set your MPIN.`)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
     }
@@ -200,7 +202,7 @@ function CredentialsModal({ email, password, onClose }: { email: string; passwor
                     </div>
                     <div>
                         <p style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", margin: 0 }}>Employee Account Created</p>
-                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share these login credentials with the employee</p>
+                        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share the login ID with the employee</p>
                     </div>
                 </div>
                 <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
@@ -210,7 +212,7 @@ function CredentialsModal({ email, password, onClose }: { email: string; passwor
                     </div>
                     <div>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 3px" }}>Password</p>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0, fontFamily: "monospace", letterSpacing: "1px" }}>{password}</p>
+                        <p style={{ fontSize: 13, color: "var(--text)", margin: 0 }}>None — they sign in with an OTP to their mobile, then set an MPIN.</p>
                     </div>
                 </div>
                 <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -241,7 +243,7 @@ export function EmployeeModal({
     allSites: { id: string; name: string }[]
 }) {
     const [loading, setLoading] = useState(false)
-    const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
+    const [newCredentials, setNewCredentials] = useState<{ email: string } | null>(null)
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
@@ -558,7 +560,7 @@ export function EmployeeModal({
                 toast.success("Saved! You can continue filling remaining sections.")
             } else {
                 if (!existingId && data._userCreated) {
-                    setNewCredentials({ email: data._loginEmail, password: data._loginPassword })
+                    setNewCredentials({ email: data._loginEmail })
                 } else {
                     toast.success(employee ? "Employee updated!" : "Employee added!")
                     onClose()
@@ -579,7 +581,7 @@ export function EmployeeModal({
     if (!open) return null
 
     if (newCredentials) {
-        return <CredentialsModal email={newCredentials.email} password={newCredentials.password} onClose={() => { setNewCredentials(null); onClose() }} />
+        return <CredentialsModal email={newCredentials.email} onClose={() => { setNewCredentials(null); onClose() }} />
     }
 
     const setCheck = (key: keyof ModalForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -822,7 +824,7 @@ export function EmployeeModal({
                                                 if (!res.ok) { alert(await res.text() || "Failed to fix login"); return }
                                                 const data = await res.json()
                                                 if (data.created) {
-                                                    setNewCredentials({ email: data.email, password: data.password })
+                                                    setNewCredentials({ email: data.email })
                                                 } else {
                                                     alert("Role update ho gaya!")
                                                 }

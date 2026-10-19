@@ -4,9 +4,26 @@
     {
       "name": "cims-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3002,
       "autoPort": true
+    },
+    {
+      "name": "grows-test",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-test",
+        "SMS_PROVIDER=console",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3002"
+      ],
+      "port": 3002
     }
   ]
 }

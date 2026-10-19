@@ -2,11 +2,10 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
-import bcrypt from "bcryptjs"
 import { Role } from "@prisma/client"
 import {
-    findLoginUser, getCredential, lockMinutesLeft, recordFailedLogin, clearFailedLogins,
-    checkMpin, verifyOtp, phoneDigits,
+    getCredential, verifyLogin, parseLoginMethod,
+    AUTH_INVALID, AUTH_INACTIVE, AUTH_LOCKED, AUTH_USE_OTP, AUTH_NO_MPIN,
 } from "@/lib/login-security"
 
 // Resolve effective permissions for a user object from the DB.
@@ -26,32 +25,20 @@ function resolvePermissions(user: { role: string; customRole?: { isActive: boole
     return base
 }
 
-// Demo users + phone-as-password auto-heal are only enabled in development
-// or when ENABLE_DEMO_LOGIN=true is explicitly set on the server. They MUST
-// be off in production to prevent trivial account takeover.
+// Demo users are only enabled in development or when ENABLE_DEMO_LOGIN=true is
+// explicitly set on the server. They MUST be off in production.
 const DEMO_ENABLED = process.env.NODE_ENV !== "production" || process.env.ENABLE_DEMO_LOGIN === "true"
-const DEV_LOG = process.env.NODE_ENV !== "production"
-const dlog = (...args: unknown[]) => { if (DEV_LOG) console.log(...args) }
 
 // ─── Login failure reporting ─────────────────────────────────────────────────
-// The client is deliberately told only two things: "this account is inactive"
-// or a generic invalid-credentials message. It is NOT told whether the account
-// exists, because the login form would otherwise let an anonymous caller
-// enumerate which phone numbers and employee IDs are registered.
+// The client is deliberately told only a coarse code: "inactive", "locked",
+// "use OTP", "no MPIN" or a generic invalid-credentials message. It is NOT told
+// whether the account exists, because the login form would otherwise let an
+// anonymous caller enumerate which phone numbers and employee IDs are registered.
 //
 // The precise reason is logged server-side instead — in production too, since
 // previously every login failure was silent there and the only way to diagnose
-// one was to query the database by hand.
-const AUTH_INACTIVE = "ACCOUNT_INACTIVE"
-const AUTH_INVALID = "INVALID_CREDENTIALS"
-// Too many failures — the client gets "ACCOUNT_LOCKED:<minutes left>".
-const AUTH_LOCKED = "ACCOUNT_LOCKED"
-// The mobile-number default password is retired once the employee has an MPIN.
-const AUTH_USE_MPIN = "USE_MPIN"
-// MPIN login attempted before one was ever set.
-const AUTH_NO_MPIN = "NO_MPIN"
-
-type LoginMethod = "password" | "mpin" | "otp"
+// one was to query the database by hand. The codes themselves live in
+// lib/login-security so the mobile API answers with the same ones.
 
 // Enough of the identifier to match against a support ticket, not enough for
 // the log stream to become a directory of employee phone numbers.
@@ -92,13 +79,12 @@ export const authOptions: NextAuthOptions = {
                 method: { label: "Method", type: "text" },
             },
             async authorize(credentials) {
-                const method: LoginMethod = credentials?.method === "mpin" || credentials?.method === "otp" ? credentials.method : "password"
+                const method = parseLoginMethod(credentials?.method)
                 if (!credentials?.email || !credentials?.password) {
                     authFail(AUTH_INVALID, `missing login id or ${method}`, credentials?.email)
                 }
 
                 const passwordRaw = credentials.password
-                const passwordDigits = passwordRaw.replace(/\D/g, "")
 
                 // Demo Mode — DEV ONLY. Disabled by default in production
                 if (DEMO_ENABLED && method === "password") {
@@ -135,141 +121,11 @@ export const authOptions: NextAuthOptions = {
 
                 try {
                     const inputRaw = credentials.email.trim()
-                    const found = await findLoginUser(inputRaw)
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    let user: any = found.user
-                    const matchedEmployee = found.matchedEmployee
-
-                    const empPhoneDigits = matchedEmployee ? phoneDigits(matchedEmployee.phone) : ""
-                    const passwordIsPhone = method === "password" && empPhoneDigits.length === 10 && passwordDigits === empPhoneDigits
-
-                    // AUTO-HEAL #1 (DEV ONLY): Employee found but no User account → create one if password is phone
-                    // This is a major attack vector in production: anyone with an employee's phone number
-                    // could create an account with arbitrary password. Disabled outside development.
-                    if (DEMO_ENABLED && !user && matchedEmployee && passwordIsPhone) {
-                        dlog("[AUTH] Auto-heal: creating user for employee", matchedEmployee.id)
-                        const email = `${empPhoneDigits}@cims.local`
-                        const hash = await bcrypt.hash(passwordRaw, 10)
-                        const name = `${matchedEmployee.firstName} ${matchedEmployee.lastName}`.trim()
-
-                        const existing = await prisma.user.findUnique({
-                            where: { email },
-                            include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                        })
-                        if (existing) {
-                            user = await prisma.user.update({
-                                where: { id: existing.id },
-                                data: { isActive: true, password: hash, name },
-                                include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                            })
-                        } else {
-                            user = await prisma.user.create({
-                                // Base role is vestigial — access comes from the custom role.
-                                data: { email, name, role: "MANAGER", isActive: true, password: hash },
-                                include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                            })
-                        }
-                        await prisma.employee.update({
-                            where: { id: matchedEmployee.id },
-                            data: { userId: user.id }
-                        })
-                    }
-
-                    if (!user) {
-                        authFail(AUTH_INVALID,
-                            "no user matched this login id (tried email, phone and employee id)",
-                            inputRaw)
-                    }
-
-                    // Lockout: 5 wrong passwords / MPINs / OTPs pause the account
-                    // for 15 minutes, whichever method the guesses came through.
-                    const credential = await getCredential(user.id)
-                    const lockedFor = lockMinutesLeft(credential)
-                    if (lockedFor > 0) {
-                        authFail(`${AUTH_LOCKED}:${lockedFor}`, `account locked for ${lockedFor} more min`, inputRaw)
-                    }
-
-                    if (method === "mpin" || method === "otp") {
-                        if (method === "mpin" && !credential.mpinHash) {
-                            authFail(AUTH_NO_MPIN, "MPIN login but no MPIN has been set", inputRaw)
-                        }
-                        const ok = method === "mpin"
-                            ? await checkMpin(credential, passwordRaw.trim())
-                            : await verifyOtp(user.id, passwordRaw.trim(), "LOGIN")
-                        if (!ok) {
-                            await recordFailedLogin(user.id)
-                            authFail(AUTH_INVALID, method === "mpin" ? "MPIN did not match" : "OTP wrong, expired or already used", inputRaw)
-                        }
-                    } else {
-                        // Verify password
-                        let passwordOk = false
-                        if (user.password) {
-                            try {
-                                passwordOk = await bcrypt.compare(passwordRaw, user.password)
-                            } catch { /* invalid hash format */ }
-                        }
-
-                        // AUTO-HEAL #2 (DEV ONLY): Password missing/wrong but matches employee phone → reset.
-                        // CRITICAL: Anyone with knowledge of an employee's phone number could reset
-                        // their password to anything they want. NEVER enable this in production.
-                        if (DEMO_ENABLED && !passwordOk && passwordIsPhone) {
-                            dlog("[AUTH] Auto-heal: resetting password for", user.email)
-                            const hash = await bcrypt.hash(passwordRaw, 10)
-                            user = await prisma.user.update({
-                                where: { id: user.id },
-                                data: { password: hash, isActive: true },
-                                include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
-                            })
-                            passwordOk = true
-                        }
-
-                        if (!passwordOk) {
-                            await recordFailedLogin(user.id)
-                            // Distinguish a genuinely wrong password from a stored
-                            // value that is not a bcrypt hash at all (soft-deleted
-                            // accounts have their password replaced with a plain
-                            // marker string, and those can never compare true).
-                            const looksHashed = typeof user.password === "string" && /^\$2[aby]\$/.test(user.password)
-                            authFail(AUTH_INVALID,
-                                looksHashed ? "password did not match the stored hash"
-                                            : "stored password is not a bcrypt hash (account disabled or never set)",
-                                inputRaw)
-                        }
-
-                        // Once the employee has an MPIN, the mobile-number default
-                        // password no longer opens the account — otherwise anyone who
-                        // knows the number still gets in.
-                        if (credential.mpinHash && passwordIsPhone) {
-                            authFail(AUTH_USE_MPIN, "default mobile-number password used after MPIN was set", inputRaw)
-                        }
-                    }
-
-                    // Deactivated accounts stay locked out. Users are deactivated
-                    // when their employee is terminated or deleted — a correct
-                    // password must NOT silently revive the account.
-                    if (!user.isActive) {
-                        authFail(AUTH_INACTIVE, "User.isActive is false", inputRaw)
-                    }
-
-                    // Look up employee record (photo + employment status)
-                    const employee = await prisma.employee.findFirst({
-                        where: { userId: user.id },
-                        select: { photo: true, status: true }
-                    }).catch(() => null)
-
-                    // Only current staff may sign in: terminated / inactive
-                    // employees are blocked even if their User row is active
-                    // (e.g. status was changed before user-sync existed).
-                    if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE" || employee.status === "RESIGNED")) {
-                        authFail(AUTH_INACTIVE, `linked employee status is ${employee.status}`, inputRaw)
-                    }
-
-                    await clearFailedLogins(user.id)
-
-                    // Employees (anyone with a mobile number on an employee
-                    // record) must set an MPIN before using the app. Skipped
-                    // while the credential tables aren't installed.
-                    const needsMpin = credential.installed && !credential.mpinHash && empPhoneDigits.length === 10
+                    // Lookup, lockout, secret check and inactive checks are
+                    // shared with /api/mobile/login — see verifyLogin.
+                    const result = await verifyLogin({ identifier: inputRaw, secret: passwordRaw, method })
+                    if (!result.ok) authFail(result.code, result.reason, inputRaw)
+                    const { user, employee, needsMpin } = result
 
                     return {
                         id: user.id,
@@ -292,7 +148,7 @@ export const authOptions: NextAuthOptions = {
                     // surfaced to the user as an indistinguishable
                     // "invalid credentials".
                     const msg = error instanceof Error ? error.message : String(error)
-                    const expected = [AUTH_INVALID, AUTH_INACTIVE, AUTH_USE_MPIN, AUTH_NO_MPIN]
+                    const expected = [AUTH_INVALID, AUTH_INACTIVE, AUTH_USE_OTP, AUTH_NO_MPIN]
                     if (!expected.includes(msg) && !msg.startsWith(AUTH_LOCKED)) {
                         // Never log raw credentials — only the error itself.
                         console.error("[AUTH] unexpected error during sign-in:", error)

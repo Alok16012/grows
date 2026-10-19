@@ -3,12 +3,12 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
-import bcrypt from "bcryptjs"
+import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { generateEmployeeCode } from "@/lib/employee-code"
 
 // Provision a login (User account) for an approved employee if they don't have
-// one yet. Returns the credentials or null. Non-fatal on error.
+// one yet. No password is set — the employee signs in with an OTP to their
+// mobile and sets an MPIN. Returns the login id or null. Non-fatal on error.
 async function ensureLogin(employeeId: string) {
     const emp = await prisma.employee.findUnique({
         where: { id: employeeId },
@@ -25,23 +25,21 @@ async function ensureLogin(employeeId: string) {
             if (!existingUser.employeeProfile) {
                 await prisma.employee.update({ where: { id: emp.id }, data: { userId: existingUser.id } })
             }
-            return { email: loginEmail, password: existingUser.plainPassword || "(unchanged)" }
+            return { email: loginEmail }
         }
-        const plain = defaultPassword({ phone: emp.phone })
-        const hashed = await bcrypt.hash(plain, 10)
         const user = await prisma.user.create({
             data: {
                 name: `${emp.firstName} ${emp.lastName || ""}`.trim(),
                 email: loginEmail,
-                password: hashed,
-                plainPassword: plain,
+                password: NO_PASSWORD,
+                plainPassword: null,
                 phone: emp.phone || null,
                 // Base role is vestigial — access comes from the custom role an admin assigns.
                 role: "MANAGER",
             },
         })
         await prisma.employee.update({ where: { id: emp.id }, data: { userId: user.id } })
-        return { email: loginEmail, password: plain }
+        return { email: loginEmail }
     } catch (err) {
         console.error("[ONBOARDING_APPROVE_LOGIN]", err)
         return null

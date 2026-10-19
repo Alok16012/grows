@@ -3,10 +3,30 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { hasOwnPassword } from "@/lib/credentials"
 
-// PATCH /api/me/password — the logged-in user changes their own password.
-// Verifies the current password, then stores the new one (and clears the
-// admin-visible plainPassword, since the user now owns a private password).
+export const dynamic = "force-dynamic"
+
+// GET /api/me/password — does the signed-in user have a password of their own?
+// Accounts are created without one; the profile page uses this to show "Set
+// password" instead of "Change password".
+export async function GET() {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) return NextResponse.json({ error: "Not logged in" }, { status: 401 })
+    try {
+        const user = await prisma.user.findUnique({ where: { id: session.user.id as string }, select: { password: true } })
+        if (!user) return NextResponse.json({ error: "Account not found" }, { status: 404 })
+        return NextResponse.json({ hasPassword: hasOwnPassword(user.password) })
+    } catch (e) {
+        console.error("[ME_PASSWORD_GET]", e)
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 })
+    }
+}
+
+// PATCH /api/me/password — the logged-in user sets or changes their own password.
+// The current password is only required when they already have one AND this
+// session was opened with it: an OTP or MPIN login has already proven who they
+// are, and a first-time password has nothing to compare against.
 export async function PATCH(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: "Not logged in" }, { status: 401 })
@@ -17,28 +37,35 @@ export async function PATCH(req: Request) {
             newPassword?: string
         }
 
-        if (!currentPassword || !newPassword) {
-            return NextResponse.json({ error: "Current and new password are required" }, { status: 400 })
+        if (!newPassword) {
+            return NextResponse.json({ error: "New password is required" }, { status: 400 })
         }
         if (String(newPassword).length < 6) {
             return NextResponse.json({ error: "New password must be at least 6 characters" }, { status: 400 })
         }
 
-        const user = await prisma.user.findUnique({ where: { id: session.user.id as string } })
-        if (!user || !user.password) {
+        const user = await prisma.user.findUnique({ where: { id: session.user.id as string }, select: { id: true, password: true } })
+        if (!user) {
             return NextResponse.json({ error: "Account not found" }, { status: 404 })
         }
 
-        const ok = await bcrypt.compare(currentPassword, user.password)
-        if (!ok) {
-            return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 })
+        const loginMethod = (session.user as { loginMethod?: string }).loginMethod || "password"
+        const mustProveCurrent = hasOwnPassword(user.password) && loginMethod === "password"
+        if (mustProveCurrent) {
+            if (!currentPassword) {
+                return NextResponse.json({ error: "Current password is required" }, { status: 400 })
+            }
+            const ok = await bcrypt.compare(currentPassword, user.password)
+            if (!ok) {
+                return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 })
+            }
         }
 
         await prisma.user.update({
             where: { id: user.id },
             data: {
-                password: await bcrypt.hash(newPassword, 10),
-                // Clear the admin-visible default — the user now owns a private password.
+                password: await bcrypt.hash(String(newPassword), 10),
+                // Never a visible password — the user is the only one who knows it.
                 plainPassword: null,
             },
         })

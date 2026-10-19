@@ -37,6 +37,7 @@ export default function AdminToolsPage() {
     }
 
     const handleFix = async () => {
+        if (!confirm("Reset this employee's login? Their password and MPIN are removed; they sign in with an OTP and set a new MPIN.")) return
         setFixing(true)
         setFixResult(null)
         try {
@@ -59,7 +60,7 @@ export default function AdminToolsPage() {
     }
 
     const handleBulkFix = async () => {
-        if (!confirm("This will fix the login for all employees (password = phone number). Continue?")) return
+        if (!confirm("This will make sure every employee has an active login. No passwords are set — employees sign in with an OTP. Continue?")) return
         setBulkFixing(true)
         setBulkResult(null)
         try {
@@ -103,7 +104,7 @@ export default function AdminToolsPage() {
                         disabled={fixing || !debugInput}
                         className="flex-1 sm:flex-none px-4 py-2 bg-amber-500 text-white rounded-[8px] text-[13px] font-medium disabled:opacity-50"
                     >
-                        {fixing ? "Fixing..." : "Fix Login"}
+                        {fixing ? "Resetting..." : "Reset Login"}
                     </button>
                 </div>
 
@@ -124,10 +125,9 @@ export default function AdminToolsPage() {
                     <div className={`mt-3 p-3 rounded-[8px] text-[12px] ${fixResult.success ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-800"}`}>
                         {fixResult.success ? (
                             <>
-                                <p className="font-bold flex items-center gap-1.5"><CheckCircle2 size={14} className="shrink-0" /> Login Fixed!</p>
-                                <p>Login: <strong>{fixResult.loginInput}</strong></p>
-                                <p>Password: <strong>{fixResult.loginPassword}</strong></p>
-                                <p>Email: {fixResult.user?.email}</p>
+                                <p className="font-bold flex items-center gap-1.5"><CheckCircle2 size={14} className="shrink-0" /> Login Reset</p>
+                                <p>Login ID: <strong>{fixResult.loginInput}</strong></p>
+                                <p>{fixResult.next}</p>
                                 <p>
                                     Custom Role: <strong>{fixResult.user?.customRoleName || "None (Field Worker)"}</strong>
                                 </p>
@@ -185,7 +185,7 @@ export default function AdminToolsPage() {
             <div className="bg-white border border-[var(--border)] rounded-[12px] p-4 sm:p-6 min-w-0">
                 <h2 className="text-[15px] font-semibold text-[var(--text)] mb-1 flex items-center gap-2"><Zap size={16} className="shrink-0 text-red-600" /> Bulk Fix All Employee Logins</h2>
                 <p className="text-[12px] text-[var(--text3)] mb-4">
-                    Sabhi active employees ke login fix karega. Password = unka phone number hoga.
+                    Sabhi employees ke liye active login ensure karega. Koi password set nahi hota — employees OTP se sign in karke MPIN set karenge.
                 </p>
                 <button
                     onClick={handleBulkFix}

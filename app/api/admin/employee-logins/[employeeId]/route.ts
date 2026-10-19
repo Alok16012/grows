@@ -3,12 +3,14 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
-import { buildLoginEmail, defaultPassword } from "@/lib/credentials"
+import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { checkAccess } from "@/lib/permissions"
-import bcrypt from "bcryptjs"
-import { resetLoginSecurity } from "@/lib/login-security"
+import { resetLogin } from "@/lib/login-security"
 
-// Update (or create) the login for a single employee: email, password, role, status.
+// Update (or create) the login for a single employee: login id, role, status.
+// Admins never set a password. `{ action: "reset-login" }` wipes the password
+// and MPIN (and any lockout) so the employee signs in with an OTP and starts
+// over. A `password` field in the body is ignored.
 export async function PATCH(
     req: Request,
     { params }: { params: { employeeId: string } }
@@ -20,9 +22,9 @@ export async function PATCH(
 
     try {
         const body = await req.json()
-        const { loginEmail, password, customRoleId, isActive } = body as {
+        const { action, loginEmail, customRoleId, isActive } = body as {
+            action?: string
             loginEmail?: string
-            password?: string
             customRoleId?: string | null
             isActive?: boolean
         }
@@ -33,26 +35,30 @@ export async function PATCH(
         })
         if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 })
 
+        if (action === "reset-login") {
+            if (!employee.userId) return NextResponse.json({ error: "This employee has no login yet" }, { status: 400 })
+            await resetLogin([employee.userId])
+            return NextResponse.json({ reset: true })
+        }
+
         const normalizedEmail = loginEmail?.trim().toLowerCase()
 
         // The base system role is vestigial — access comes from the custom role's
         // permissions, so every provisioned login gets MANAGER regardless.
         const systemRole = "MANAGER"
 
-        // No login yet → create one.
+        // No login yet → create one, without a password.
         if (!employee.userId) {
             const email = normalizedEmail || buildLoginEmail({ email: employee.email, phone: employee.phone, employeeId: employee.employeeId })
             const collision = await prisma.user.findFirst({ where: { email } })
             if (collision) return NextResponse.json({ error: "Email already in use" }, { status: 400 })
 
-            const plain = password?.trim() || defaultPassword({ phone: employee.phone })
-            const hashed = await bcrypt.hash(plain, 10)
             const user = await prisma.user.create({
                 data: {
                     name: `${employee.firstName} ${employee.lastName || ""}`.trim(),
                     email,
-                    password: hashed,
-                    plainPassword: plain,
+                    password: NO_PASSWORD,
+                    plainPassword: null,
                     phone: employee.phone || null,
                     role: systemRole as Role,
                     customRoleId: customRoleId || null,
@@ -60,7 +66,7 @@ export async function PATCH(
                 },
             })
             await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } })
-            return NextResponse.json({ created: true, email, password: plain })
+            return NextResponse.json({ created: true, email })
         }
 
         // Existing login → patch the requested fields.
@@ -70,10 +76,6 @@ export async function PATCH(
             const collision = await prisma.user.findFirst({ where: { email: normalizedEmail, NOT: { id: employee.userId } } })
             if (collision) return NextResponse.json({ error: "Email already in use" }, { status: 400 })
             updateData.email = normalizedEmail
-        }
-        if (password && password.trim()) {
-            updateData.password = await bcrypt.hash(password.trim(), 10)
-            updateData.plainPassword = password.trim()
         }
         if (customRoleId !== undefined) {
             updateData.customRoleId = customRoleId || null
@@ -88,9 +90,7 @@ export async function PATCH(
         }
 
         const user = await prisma.user.update({ where: { id: employee.userId }, data: updateData })
-        // A new password from the admin also clears the MPIN and any lockout.
-        if (updateData.password) await resetLoginSecurity([employee.userId])
-        return NextResponse.json({ created: false, email: user.email, password: user.plainPassword })
+        return NextResponse.json({ created: false, email: user.email })
     } catch (error) {
         console.error("PATCH_EMPLOYEE_LOGIN_ERROR", error)
         return NextResponse.json({ error: "Internal Error" }, { status: 500 })

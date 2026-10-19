@@ -796,6 +796,12 @@ function ChangePasswordCard() {
     const [next, setNext] = useState("")
     const [confirm, setConfirm] = useState("")
     const [saving, setSaving] = useState(false)
+    // Accounts start without a password; the first one is simply "set".
+    const [hasPassword, setHasPassword] = useState<boolean | null>(null)
+
+    useEffect(() => {
+        fetch("/api/me/password").then(r => r.ok ? r.json() : { hasPassword: true }).then(d => setHasPassword(!!d.hasPassword)).catch(() => setHasPassword(true))
+    }, [])
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -806,11 +812,12 @@ function ChangePasswordCard() {
             const res = await fetch("/api/me/password", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ currentPassword: current, newPassword: next }),
+                body: JSON.stringify(hasPassword ? { currentPassword: current, newPassword: next } : { newPassword: next }),
             })
             const data = await res.json().catch(() => ({}))
-            if (!res.ok) throw new Error(data.error || "Failed to change password")
-            toast.success("Password changed")
+            if (!res.ok) throw new Error(data.error || "Failed to save password")
+            toast.success(hasPassword ? "Password changed" : "Password set")
+            setHasPassword(true)
             setCurrent(""); setNext(""); setConfirm("")
         } catch (err) {
             toast.error((err as Error).message)
@@ -833,13 +840,19 @@ function ChangePasswordCard() {
         </div>
         <form onSubmit={submit} className="bg-white border border-[var(--border)] rounded-2xl p-6 space-y-4 mt-5">
             <div>
-                <h3 className="text-[14px] font-semibold text-[var(--text)]">Change Password</h3>
-                <p className="text-[12px] text-[var(--text3)] mt-0.5">Used for signing in with a password. Most people sign in with their MPIN instead.</p>
+                <h3 className="text-[14px] font-semibold text-[var(--text)]">{hasPassword ? "Change Password" : "Set Password"}</h3>
+                <p className="text-[12px] text-[var(--text3)] mt-0.5">
+                    {hasPassword
+                        ? "Used for signing in with a password. Most people sign in with their MPIN or an OTP instead."
+                        : "Optional. You sign in with an OTP or your MPIN; a password is a backup for when SMS isn't available."}
+                </p>
             </div>
-            <div>
-                <label className={labelCls}>Current Password</label>
-                <input type="password" value={current} onChange={e => setCurrent(e.target.value)} className={inputCls} autoComplete="current-password" />
-            </div>
+            {hasPassword && (
+                <div>
+                    <label className={labelCls}>Current Password</label>
+                    <input type="password" value={current} onChange={e => setCurrent(e.target.value)} className={inputCls} autoComplete="current-password" />
+                </div>
+            )}
             <div>
                 <label className={labelCls}>New Password</label>
                 <input type="password" value={next} onChange={e => setNext(e.target.value)} className={inputCls} autoComplete="new-password" />
@@ -848,10 +861,10 @@ function ChangePasswordCard() {
                 <label className={labelCls}>Confirm New Password</label>
                 <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} className={inputCls} autoComplete="new-password" />
             </div>
-            <button type="submit" disabled={saving || !current || !next}
+            <button type="submit" disabled={saving || hasPassword === null || (hasPassword && !current) || !next}
                 className="w-full py-2.5 bg-[var(--accent)] text-white rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                Update Password
+                {hasPassword ? "Update Password" : "Set Password"}
             </button>
         </form>
         </>

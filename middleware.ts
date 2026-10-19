@@ -48,9 +48,9 @@ export default withAuth(
             return NextResponse.redirect(login)
         }
 
-        // Employees who signed in with the mobile-number password must set an
-        // MPIN before anything else. /setup-mpin itself stays reachable so it
-        // can also be used later to change the MPIN.
+        // Employees who signed in without an MPIN (first OTP login, or after an
+        // admin reset) must set one before anything else. /setup-mpin itself
+        // stays reachable so it can also be used later to change the MPIN.
         if (path === "/setup-mpin") return NextResponse.next()
         if (needsMpin) {
             return NextResponse.redirect(new URL("/setup-mpin", req.url))
