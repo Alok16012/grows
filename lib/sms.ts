@@ -28,6 +28,10 @@
 
 type Provider = "http" | "msg91" | "fast2sms" | "console"
 
+function parseJson(text: string): Record<string, unknown> | null {
+    try { const v = JSON.parse(text); return v && typeof v === "object" ? v as Record<string, unknown> : null } catch { return null }
+}
+
 // DLT template "GROWUS_Login_OTP" (Service Implicit, approved on the STPL portal).
 const DEFAULT_OTP_TEXT = "Your OTP for GROWUS login is {otp}. It is valid for 10 minutes. Do not share it with anyone."
 
@@ -69,12 +73,25 @@ export async function sendOtpSms(mobile10: string, code: string): Promise<boolea
             // Gateways differ wildly in how they report errors; a non-2xx or an
             // obvious "error"/"fail" in the body is treated as not sent. When
             // SMS_HTTP_SUCCESS is set, the body must match it instead.
-            const okPattern = process.env.SMS_HTTP_SUCCESS
-            const failed = okPattern
-                ? !new RegExp(okPattern, "i").test(text.trim())
-                : /\b(error|fail(ed|ure)?|invalid)\b/i.test(text)
+            // A JSON body with an ErrorCode (SendSMSBox and similar panels) is
+            // read directly: all-zero means sent. The docs say "000" but the
+            // gateway actually answers "0" / "7", so a fixed-string pattern
+            // reported every send as failed even when the SMS went out.
+            let failed: boolean
+            let detail = text.slice(0, 300)
+            const json = parseJson(text)
+            if (json && "ErrorCode" in json) {
+                const code = String(json.ErrorCode ?? "").trim()
+                failed = !/^0+$/.test(code)
+                detail = `ErrorCode=${code} ${String(json.ErrorMessage ?? "")}`.trim()
+            } else {
+                const okPattern = process.env.SMS_HTTP_SUCCESS
+                failed = okPattern
+                    ? !new RegExp(okPattern, "i").test(text.trim())
+                    : /\b(error|fail(ed|ure)?|invalid)\b/i.test(text)
+            }
             if (!res.ok || failed) {
-                console.error("[SMS:http] send failed", res.status, text.slice(0, 300))
+                console.error("[SMS:http] send failed", res.status, detail)
                 return false
             }
             return true
