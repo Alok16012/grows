@@ -51,7 +51,7 @@ async function statusRules(
 
 // Tell the people on the other side of each step that it's their turn.
 async function notifyReviewStep(review: { id: string; employeeId: string; status: string }, actorIsManager: boolean) {
-    const link = "/performance"
+    const link = `/performance?id=${review.id}`
     if (review.status === "SUBMITTED" && actorIsManager) {
         await notifyEmployee(review.employeeId, { title: "Performance review shared", message: "Your manager has shared your performance review. Add your self-assessment and acknowledge it.", type: "performance", link })
     } else if (review.status === "COMPLETED") {

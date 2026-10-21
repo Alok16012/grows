@@ -239,7 +239,7 @@ export async function PUT(
                     title: expense.status === "REJECTED" ? "Expense Resubmitted" : "Expense Submitted",
                     message: `${actorName} submitted ${expNo} — ${expTitle}`,
                     type: "expense",
-                    link: "/expenses",
+                    link: `/expenses?id=${params.id}`,
                 }, session.user.id)
             } else if (action === "APPROVE") {
                 await prisma.notification.create({
@@ -248,7 +248,7 @@ export async function PUT(
                         title: "Expense Approved ✓",
                         message: `Your expense ${expNo} (${expTitle}) has been approved`,
                         type: "expense",
-                        link: "/expenses",
+                        link: `/expenses?id=${params.id}`,
                     },
                 })
             } else if (action === "REJECT") {
@@ -258,7 +258,7 @@ export async function PUT(
                         title: "Expense Rejected ✗",
                         message: `Your expense ${expNo} (${expTitle}) was rejected: ${rejectionReason}`,
                         type: "expense",
-                        link: "/expenses",
+                        link: `/expenses?id=${params.id}`,
                     },
                 })
             } else if (action === "PAID") {
@@ -268,7 +268,7 @@ export async function PUT(
                         title: "Payment Completed 💰",
                         message: `Your expense ${expNo} (${expTitle}) has been paid via ${paymentMode}`,
                         type: "expense",
-                        link: "/expenses",
+                        link: `/expenses?id=${params.id}`,
                     },
                 })
             }

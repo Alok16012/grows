@@ -139,7 +139,7 @@ export async function POST(req: Request) {
                         title: "Training Overdue",
                         message: `Your training "${enrollment.course.title}" is overdue. Please complete it immediately.`,
                         type: "LMS_OVERDUE",
-                        link: "/lms/learn",
+                        link: `/lms/learn?course=${enrollment.courseId}`,
                     })
                 }
             }
@@ -169,7 +169,7 @@ export async function POST(req: Request) {
                         title: "Training Deadline Tomorrow",
                         message: `"${enrollment.course.title}" is due tomorrow. Complete it before the deadline.`,
                         type: "LMS_DUE_SOON",
-                        link: "/lms/learn",
+                        link: `/lms/learn?course=${enrollment.courseId}`,
                     })
                 }
             }
@@ -208,7 +208,7 @@ export async function POST(req: Request) {
                         ? `Your certificate for "${enrollment.course.title}" expires in ${daysLeft} days.`
                         : `Your certificate for "${enrollment.course.title}" expires on ${expiryDate.toLocaleDateString()}. Please renew.`,
                     type: "LMS_CERT_EXPIRY",
-                    link: "/lms/learn",
+                    link: `/lms/learn?course=${enrollment.courseId}`,
                 })
             }
         }

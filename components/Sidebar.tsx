@@ -59,11 +59,22 @@ type NavLink = {
     // Visible if the user holds ANY of these permissions (OR). Use when a
     // page is reachable through more than one permission.
     permissionAny?: string[]
-    badge?: boolean
+    // Which pending count to show; the three add up to the dashboard's
+    // "Pending approvals" total (inspections + leaves + expenses).
+    badge?: BadgeKey
     subLinks?: { name: string; href: string }[]
     // Extra path prefixes that should mark this link active (e.g. the
     // Inspection entry stays highlighted across the whole stepper flow).
     matchPrefixes?: string[]
+}
+
+type BadgeKey = "approvals" | "leaves" | "expenses"
+
+// Count endpoint and tooltip per badge.
+const BADGES: Record<BadgeKey, { url: string; title: string }> = {
+    approvals: { url: "/api/approvals?count=true", title: "Inspection reports awaiting review" },
+    leaves: { url: "/api/leaves?status=PENDING&count=true", title: "Leave requests awaiting approval" },
+    expenses: { url: "/api/expenses?status=SUBMITTED&count=true", title: "Expense claims awaiting approval" },
 }
 
 type NavSection = {
@@ -76,26 +87,34 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const { data: session } = useSession()
     const role = session?.user?.role as string | undefined
 
-    const [pendingCount, setPendingCount] = useState(0)
+    const [badgeCounts, setBadgeCounts] = useState<Record<BadgeKey, number>>({ approvals: 0, leaves: 0, expenses: 0 })
 
-    // Approval count poll — pauses when tab is hidden to avoid wasted fetches.
-    // Interval bumped 60s → 5min; the badge isn't time-critical.
+    // Pending-count polls — pause when tab is hidden to avoid wasted fetches.
+    // Interval bumped 60s → 5min; the badges aren't time-critical. Each badge
+    // is gated by the same permission as its nav item.
     useEffect(() => {
-        const perms = (session?.user as any)?.permissions || []
-        if (role !== "ADMIN" && !perms.includes("approvals.view")) return
+        const perms: string[] = (session?.user as any)?.permissions || []
+        const gate: Record<BadgeKey, string> = { approvals: "approvals.view", leaves: "leaves.view", expenses: "expenses.view" }
+        const keys = (Object.keys(BADGES) as BadgeKey[]).filter(k => role === "ADMIN" || perms.includes(gate[k]))
+        if (keys.length === 0) return
         let stopped = false
         const ac = new AbortController()
-        const fetchCount = async () => {
+        const fetchCounts = () => {
             if (document.hidden) return
-            try {
-                const res = await fetch("/api/approvals?count=true", { signal: ac.signal })
-                const data = await res.json()
-                if (!stopped) setPendingCount(data.count || 0)
-            } catch { /* silent */ }
+            for (const k of keys) {
+                fetch(BADGES[k].url, { signal: ac.signal })
+                    .then(res => res.json())
+                    .then(data => { if (!stopped) setBadgeCounts(prev => ({ ...prev, [k]: data.count || 0 })) })
+                    .catch(() => { /* silent */ })
+            }
         }
-        fetchCount()
-        const interval = setInterval(fetchCount, 5 * 60_000)
-        return () => { stopped = true; clearInterval(interval); ac.abort() }
+        fetchCounts()
+        const interval = setInterval(fetchCounts, 5 * 60_000)
+        // A tab opened in the background skipped the first fetch and then
+        // showed no badges for five minutes; catch up as soon as it's seen.
+        const onVisible = () => { if (!document.hidden) fetchCounts() }
+        document.addEventListener("visibilitychange", onVisible)
+        return () => { stopped = true; clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); ac.abort() }
     }, [role])
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
@@ -156,10 +175,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "HR OPERATIONS",
             links: [
                 { name: "Attendance",   href: "/attendance", icon: Clock,       roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
-                { name: "Leaves",       href: "/leaves",     icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view" },
+                { name: "Leaves",       href: "/leaves",     icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view", badge: "leaves" },
                 { name: "Payroll",      href: "/payroll",    icon: Wallet,      roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
                 { name: "Assets",       href: "/assets",     icon: Package,     roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
-                { name: "Expenses",     href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"], permission: "expenses.view" },
+                { name: "Expenses",     href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"], permission: "expenses.view", badge: "expenses" },
             ],
         },
 
@@ -177,7 +196,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "OPERATIONS",
             links: [
-                { name: "Approvals",    href: "/approvals",     icon: CheckSquare,  roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: true },
+                { name: "Approvals",    href: "/approvals",     icon: CheckSquare,  roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: "approvals" },
                 { name: "Announcements", href: "/announcements", icon: Megaphone,   roles: ["ADMIN", "MANAGER"], permission: "announcements.view" },
                 { name: "Helpdesk",     href: "/helpdesk",      icon: Headphones,   roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
             ],
@@ -342,9 +361,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                                                 {hasSubLinks && (
                                                     <ChevronRight size={13} className={cn("transition-transform text-white/60", showSub && "rotate-90")} />
                                                 )}
-                                                {link.badge && pendingCount > 0 && (
-                                                    <div className="h-[17px] min-w-[17px] rounded-full bg-[var(--red)] text-white text-[10px] font-bold flex items-center justify-center px-1">
-                                                        {pendingCount}
+                                                {link.badge && badgeCounts[link.badge] > 0 && (
+                                                    <div title={BADGES[link.badge].title} className="h-[17px] min-w-[17px] rounded-full bg-[var(--red)] text-white text-[10px] font-bold flex items-center justify-center px-1">
+                                                        {badgeCounts[link.badge]}
                                                     </div>
                                                 )}
                                             </Link>

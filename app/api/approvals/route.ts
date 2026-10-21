@@ -6,6 +6,7 @@ import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
 import { inspectionScopeForApprover } from "@/lib/approval-scope"
 import { unstable_cache } from "next/cache"
+import { dayWindow, istDateOnly } from "@/lib/attendance-policy"
 
 // Sidebar polls this count every 5 minutes. Cache for 60s so concurrent
 // badge fetches don't hammer the DB. Keyed per caller: the queue is scoped to
@@ -40,8 +41,18 @@ export async function GET(req: Request) {
             })
         }
 
+        // ?date=today = everything submitted in today's IST day, whatever its
+        // outcome, so the dashboard's "inspections today" figure lands on the
+        // same rows. A status narrows it; without one the queue stays pending-only.
+        const todayOnly = searchParams.get("date") === "today"
+        const statusParam = searchParams.get("status")
+        const statusWhere = statusParam && statusParam !== "all"
+            ? { status: statusParam }
+            : todayOnly ? { status: { not: "draft" } } : { status: "pending" }
+        const dateWhere = todayOnly ? { submittedAt: dayWindow(istDateOnly()) } : {}
+
         const pendingInspections = await prisma.inspection.findMany({
-            where: { status: "pending", ...(scope ?? {}) },
+            where: { ...statusWhere, ...dateWhere, ...(scope ?? {}) },
             include: {
                 submitter: {
                     select: { name: true }

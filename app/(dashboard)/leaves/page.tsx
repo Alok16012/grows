@@ -12,6 +12,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths } from "date-fns"
 import { can } from "@/lib/can"
 import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
+import { OpenFromQuery } from "@/components/OpenFromQuery"
 import type { LeavePolicy, LeaveTypeRule, LeaveBalance } from "@/lib/leave-policy"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -930,13 +931,17 @@ function PolicyTab({ policy, defaults, onSaved }: { policy: LeavePolicy; default
 
 type Tab = "requests" | "calendar" | "balances" | "policy"
 
-export default function LeavesPage() {
+export default function LeavesPage({ searchParams }: { searchParams?: { status?: string } }) {
     const { data: session, status } = useSession()
     const router = useRouter()
 
     const [leaves, setLeaves] = useState<Leave[]>([])
     const [loading, setLoading] = useState(true)
-    const [statusFilter, setStatusFilter] = useState("")
+    // ?status=PENDING (dashboard "Pending approvals") opens on that filter.
+    const [statusFilter, setStatusFilter] = useState(() => {
+        const s = searchParams?.status?.toUpperCase() ?? ""
+        return ["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(s) ? s : ""
+    })
     const [typeFilter, setTypeFilter] = useState("")
     const [monthFilter, setMonthFilter] = useState("")
     const [search, setSearch] = useState("")
@@ -992,6 +997,16 @@ export default function LeavesPage() {
     useEffect(() => { if (status === "authenticated") fetchLeaves() }, [fetchLeaves, status])
 
     const refresh = () => { fetchLeaves(); if (!canView) fetchMine() }
+
+    // A notification link (?id=…) opens that one leave in the drawer — from the
+    // loaded list when it's there, else by id (it may be outside the filters).
+    const openLeaveById = useCallback(async (id: string) => {
+        const inList = leaves.find(l => l.id === id)
+        if (inList) { setSelectedLeave(inList); return }
+        const res = await fetch(`/api/leaves/${id}`).catch(() => null)
+        if (res?.ok) setSelectedLeave(await res.json())
+        else toast.error("This record is no longer available")
+    }, [leaves])
 
     // Pending first (oldest first — first come, first served), then the rest newest first.
     const sorted = useMemo(() => {
@@ -1264,6 +1279,7 @@ export default function LeavesPage() {
                 </>
             )}
 
+            <OpenFromQuery ready={status === "authenticated" && !loading} onOpen={openLeaveById} />
             <LeaveDrawer
                 leave={selectedLeave}
                 onClose={() => setSelectedLeave(null)}

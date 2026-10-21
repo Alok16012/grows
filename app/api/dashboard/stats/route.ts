@@ -94,7 +94,11 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
                 if (byDay.has(k)) byDay.set(k, (byDay.get(k) || 0) + 1)
             }
             // pct stays numeric for MobileHome; attendancePct is null until someone is marked.
-            out.attendanceToday = { present, absent, onLeave, pct: attendancePct ?? 0, attendancePct, unmarked: att.unmarked, late: att.late, halfDay: att.halfDay }
+            // Both are present ÷ (active − on leave), the same rule as /api/admin/stats.
+            out.attendanceToday = {
+                present, absent, onLeave, pct: att.pct ?? 0, attendancePct, unmarked: att.unmarked, late: att.late, halfDay: att.halfDay,
+                expected: att.expected, notMarked: att.notMarked,
+            }
             out.attendanceTrend7d = Array.from(byDay.entries()).map(([day, count]) => ({ day, count }))
         })())
     }

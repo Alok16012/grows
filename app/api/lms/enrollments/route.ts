@@ -131,7 +131,7 @@ export async function POST(req: Request) {
                     userId: u.userId!,
                     title: "New training assigned",
                     message: `You have been enrolled in "${course.title}"${dueDate ? ` — complete by ${String(dueDate).slice(0, 10)}` : ""}`,
-                    type: "lms", link: "/lms/learn",
+                    type: "lms", link: `/lms/learn?course=${courseId}`,
                 })),
             }).catch(e => console.error("[LMS_ENROLL_NOTIFY]", e))
         }

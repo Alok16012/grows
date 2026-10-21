@@ -110,6 +110,13 @@ export async function GET(req: Request) {
             ]
         }
 
+        // Sidebar badge: just the number (e.g. ?status=SUBMITTED&count=true), same
+        // scoping as the list — non-privileged callers only count their own.
+        if (searchParams.get("count") === "true") {
+            const count = await prisma.expense.count({ where }).catch(() => 0)
+            return NextResponse.json({ count })
+        }
+
         // Try full query with project include; fall back progressively
         // if new columns / tables don't yet exist in DB (pre-migration).
         let expenses: any[]

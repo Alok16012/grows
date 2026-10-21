@@ -62,6 +62,11 @@ export async function GET(req: Request) {
             }
         }
 
+        // Sidebar badge: just the number (e.g. ?status=PENDING&count=true), same filters.
+        if (searchParams.get("count") === "true") {
+            return NextResponse.json({ count: await prisma.leave.count({ where }) })
+        }
+
         const leaves = await prisma.leave.findMany({
             where,
             include: {
@@ -144,11 +149,11 @@ export async function POST(req: Request) {
         const who = `${leave.employee.firstName} ${leave.employee.lastName}`.trim()
         const span = `${check.breakdown.days} day${check.breakdown.days === 1 ? "" : "s"} from ${startDate.slice(0, 10)}`
         await notifyApprovers(["leaves.approve", "leaves.manage"], {
-            title: "Leave request", message: `${who} applied for ${check.type} — ${span}`, type: "leave", link: "/leaves",
+            title: "Leave request", message: `${who} applied for ${check.type} — ${span}`, type: "leave", link: `/leaves?id=${leave.id}`,
         }, session.user.id)
         if (isManager) {
             await notifyEmployee(employeeId, {
-                title: "Leave recorded", message: `HR recorded ${check.type} for you — ${span}, awaiting approval`, type: "leave", link: "/leaves",
+                title: "Leave recorded", message: `HR recorded ${check.type} for you — ${span}, awaiting approval`, type: "leave", link: `/leaves?id=${leave.id}`,
             })
         }
 

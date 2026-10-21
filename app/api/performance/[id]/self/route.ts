@@ -54,7 +54,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         await notifyApprovers(["performance.manage"], {
             title: "Self-assessment submitted",
             message: `${review.employee.firstName} ${review.employee.lastName} has submitted their self-assessment — ready for your evaluation`,
-            type: "performance", link: "/performance",
+            type: "performance", link: `/performance?id=${params.id}`,
         }, session.user.id)
     }
     return NextResponse.json(saved)

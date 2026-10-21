@@ -85,7 +85,8 @@ export async function POST(
         await notifyEmployee(assignment.employeeId, {
             title: "Asset issued to you",
             message: `${assignment.asset?.name ?? "An asset"}${assignment.asset?.assetCode ? ` (${assignment.asset.assetCode})` : ""} has been issued to you. It must be returned when you leave.`,
-            type: "asset", link: "/profile",
+            // The employee can't open /assets (needs assets.view); their own list is the profile tab.
+            type: "asset", link: "/profile?tab=assets",
         })
 
         return NextResponse.json(assignment)

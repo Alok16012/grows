@@ -79,8 +79,9 @@ const getStats = unstable_cache(
             safe(prisma.expense.count({ where: { status: "SUBMITTED" } }), 0),
             safe(prisma.hrDocument.count({ where: { status: "PENDING_APPROVAL" } }), 0),
             safe(prisma.inspection.count({ where: { status: "pending" } }), 0),
-            safe(prisma.inspection.count({ where: { submittedAt: { gte: today.start, lt: today.end } } }), 0),
-            safe(prisma.inspection.count({ where: { submittedAt: { gte: yesterday.start, lt: yesterday.end } } }), 0),
+            // Drafts excluded so the tile matches the /approvals?date=today list it opens.
+            safe(prisma.inspection.count({ where: { status: { not: "draft" }, submittedAt: { gte: today.start, lt: today.end } } }), 0),
+            safe(prisma.inspection.count({ where: { status: { not: "draft" }, submittedAt: { gte: yesterday.start, lt: yesterday.end } } }), 0),
             // Daily submitted counts for the 30-day chart
             safe(
                 (prisma as any).$queryRawUnsafe(
@@ -138,16 +139,23 @@ const getStats = unstable_cache(
         // ── Attendance aggregation ──
         const { present, absent, onLeave: onLeaveToday, attendancePct } = att
 
-        const topSites = att.bySite
-            .sort((a, b) => b.present - a.present)
-            .slice(0, 5)
-            .map(s => ({
-                name: s.name,
-                present: s.present,
-                absent: Math.max(0, s.required - s.present),
-                pct: s.required > 0 ? Math.min(100, Math.round((s.present / s.required) * 100)) : 100,
-            }))
-        const lowAttendanceSites = topSites.filter(s => s.pct < 80).length
+        // Same rule as the overall figure: present ÷ (deployed − on leave).
+        // bySite is already sorted by expected headcount, largest first.
+        const topSites = att.bySite.slice(0, 5).map(s => ({
+            siteId: s.siteId,
+            name: s.name,
+            present: s.present,
+            absent: s.absent,
+            onLeave: s.onLeave,
+            expected: s.expected,
+            notMarked: s.notMarked,
+            pct: s.pct,
+        }))
+        // Only grade sites that have mostly been marked — an unmarked site is a
+        // "not marked yet" problem, not a low-attendance one.
+        const lowAttendanceSites = att.bySite.filter(s =>
+            s.pct !== null && s.notMarked <= s.expected / 2 && s.pct < 80
+        ).length
 
         // ── 30-day inspection trend, missing days filled with 0 ──
         // Keys must be IST days to match the shifted bucketing in the SQL above;
@@ -194,8 +202,9 @@ const getStats = unstable_cache(
             // pct stays numeric for older consumers; attendancePct is null until
             // someone is marked so the UI can say "Not marked yet" instead of 0%.
             attendanceToday: {
-                present, absent, onLeave: onLeaveToday, pct: attendancePct ?? 0,
+                present, absent, onLeave: onLeaveToday, pct: att.pct ?? 0,
                 attendancePct, unmarked: att.unmarked, late: att.late, halfDay: att.halfDay,
+                expected: att.expected, notMarked: att.notMarked,
             },
             topSites,
             approvals: {
@@ -207,7 +216,8 @@ const getStats = unstable_cache(
             },
             inspectionsToday,
             inspectionsYesterday,
-            inspectionTrend: { days: trend, completed30d, deltaPct: completedDeltaPct },
+            // previous30d lets the UI show an absolute change when the base is too small for a % to mean anything.
+            inspectionTrend: { days: trend, completed30d, previous30d: completedPrev30d, deltaPct: completedDeltaPct },
             onboarding: {
                 inProgress: onboardingInProgress,
                 notStarted: onboardingNotStarted,
@@ -232,7 +242,7 @@ const getStats = unstable_cache(
             })),
         }
     },
-    ["admin-stats-v3"],
+    ["admin-stats-v4"],
     { revalidate: 30, tags: ["admin-stats"] },
 )
 

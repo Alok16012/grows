@@ -10,15 +10,20 @@ import {
     ChevronRight,
     Loader2,
     Search,
-    ClipboardCheck
+    ClipboardCheck,
+    X
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { can } from "@/lib/can"
 import Link from "next/link"
 
-export default function ApprovalsPage() {
+export default function ApprovalsPage({ searchParams }: { searchParams?: { date?: string } }) {
     const { data: session, status: authStatus } = useSession()
     const router = useRouter()
+    // ?date=today (from the dashboard's "Inspections today") shows every report
+    // submitted today, whatever its status, not just the pending queue.
+    const dateParamToday = searchParams?.date === "today"
+    const [todayOnly, setTodayOnly] = useState(dateParamToday)
 
     const [inspections, setInspections] = useState<any[]>([])
     const [counts, setCounts] = useState<Record<string, number>>({
@@ -29,7 +34,19 @@ export default function ApprovalsPage() {
     })
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
-    const [activeTab, setActiveTab] = useState("pending")
+    const [activeTab, setActiveTab] = useState(dateParamToday ? "all" : "pending")
+
+    // Client-side navigation to /approvals?date=today while already here.
+    useEffect(() => {
+        setTodayOnly(dateParamToday)
+        if (dateParamToday) setActiveTab("all")
+    }, [dateParamToday])
+
+    const clearToday = () => {
+        setTodayOnly(false)
+        setActiveTab("pending")
+        router.replace("/approvals")
+    }
 
     useEffect(() => {
         if (authStatus === "unauthenticated") {
@@ -46,6 +63,20 @@ export default function ApprovalsPage() {
     const fetchData = async (status: string) => {
         setLoading(true)
         try {
+            if (todayOnly) {
+                // Today's list is small: fetch all statuses once and derive the tab counts from it.
+                const res = await fetch("/api/approvals?date=today")
+                const data = await res.json()
+                const all: any[] = Array.isArray(data) ? data : []
+                setInspections(status === "all" ? all : all.filter(i => i.status === status))
+                setCounts({
+                    pending: all.filter(i => i.status === "pending").length,
+                    approved: all.filter(i => i.status === "approved").length,
+                    rejected: all.filter(i => i.status === "rejected").length,
+                    all: all.length
+                })
+                return
+            }
             const url = `/api/inspections/all?status=${status}&limit=100&withCounts=true`
             const res = await fetch(url)
             const data = await res.json()
@@ -98,7 +129,7 @@ export default function ApprovalsPage() {
         if (authStatus === "authenticated") {
             fetchData(activeTab)
         }
-    }, [authStatus, activeTab])
+    }, [authStatus, activeTab, todayOnly])
 
     const filteredInspections = inspections.filter(i =>
         i.assignment?.project?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -122,47 +153,59 @@ export default function ApprovalsPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div className="flex items-center bg-white border border-[var(--border)] rounded-[10px] p-1 overflow-x-auto no-scrollbar">
-                    <button
-                        onClick={() => setActiveTab("pending")}
-                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
-                            activeTab === "pending"
-                                ? "bg-[#fef3c7] text-[#d97706]"
-                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
-                        }`}
-                    >
-                        Pending {counts.pending > 0 && <span className="ml-1 text-[10px]">({counts.pending})</span>}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("approved")}
-                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
-                            activeTab === "approved"
-                                ? "bg-[var(--success-light)] text-[var(--success)]"
-                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
-                        }`}
-                    >
-                        Approved
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("rejected")}
-                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
-                            activeTab === "rejected"
-                                ? "bg-[#fef2f2] text-[#dc2626]"
-                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
-                        }`}
-                    >
-                        Rejected
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("all")}
-                        className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
-                            activeTab === "all"
-                                ? "bg-[var(--text)] text-white"
-                                : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
-                        }`}
-                    >
-                        All
-                    </button>
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <div className="flex items-center bg-white border border-[var(--border)] rounded-[10px] p-1 overflow-x-auto no-scrollbar">
+                        <button
+                            onClick={() => setActiveTab("pending")}
+                            className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                                activeTab === "pending"
+                                    ? "bg-[#fef3c7] text-[#d97706]"
+                                    : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
+                            }`}
+                        >
+                            Pending {counts.pending > 0 && <span className="ml-1 text-[10px]">({counts.pending})</span>}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("approved")}
+                            className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                                activeTab === "approved"
+                                    ? "bg-[var(--success-light)] text-[var(--success)]"
+                                    : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
+                            }`}
+                        >
+                            Approved
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("rejected")}
+                            className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                                activeTab === "rejected"
+                                    ? "bg-[#fef2f2] text-[#dc2626]"
+                                    : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
+                            }`}
+                        >
+                            Rejected
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("all")}
+                            className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
+                                activeTab === "all"
+                                    ? "bg-[var(--text)] text-white"
+                                    : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
+                            }`}
+                        >
+                            All
+                        </button>
+                    </div>
+
+                    {todayOnly && (
+                        <span className="inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full bg-[#e3ecff] text-[#1f5fff] text-[12.5px] font-medium">
+                            Submitted today
+                            <button onClick={clearToday} aria-label="Clear Submitted today filter" title="Clear filter"
+                                className="h-5 w-5 rounded-full flex items-center justify-center hover:bg-[#1f5fff] hover:text-white transition-colors">
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    )}
                 </div>
 
                 <div className="relative w-full sm:w-[280px]">
@@ -189,7 +232,7 @@ export default function ApprovalsPage() {
                         </div>
                         <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1.5">All caught up!</h3>
                         <p className="text-[13px] text-[var(--text2)] max-w-[250px] mx-auto leading-relaxed">
-                            No {activeTab !== "all" ? activeTab : ""} inspections found matching your criteria.
+                            No {activeTab !== "all" ? activeTab : ""} inspections {todayOnly ? "submitted today" : "found matching your criteria"}.
                         </p>
                     </div>
                 ) : (

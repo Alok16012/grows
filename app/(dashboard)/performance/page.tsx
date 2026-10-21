@@ -18,6 +18,7 @@ import {
     LineChart, Line, CartesianGrid, Legend
 } from "recharts"
 import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
+import { OpenFromQuery } from "@/components/OpenFromQuery"
 import { GoalsPanel, BulkCycleModal, BandsEditor, useBands, SelfAssessmentPanel } from "@/components/performance/goals"
 import { scoreReview, bandFor } from "@/lib/performance-score"
 
@@ -387,6 +388,17 @@ export default function PerformancePage() {
         }
     }
 
+    // A notification link (?id=…) opens that one review in the drawer. Fetched by
+    // id (the same full detail openDrawer loads); the list copy is the fallback.
+    const openReviewById = useCallback(async (id: string) => {
+        const res = await fetch(`/api/performance/${id}`).catch(() => null)
+        const inList = reviews.find(r => r.id === id)
+        if (res?.ok) setSelectedReview(await res.json())
+        else if (inList) setSelectedReview(inList)
+        else { toast.error("This record is no longer available"); return }
+        setDrawerTab("overview")
+    }, [reviews])
+
     // ─── Tabs ──────────────────────────────────────────────────────────────────
     const tabCls = (active: boolean) => `z-tab ${active ? "is-active" : ""}`
 
@@ -474,6 +486,8 @@ export default function PerformancePage() {
             )}
 
             <BulkCycleModal open={showBulk} onClose={() => setShowBulk(false)} onDone={() => fetchReviews()} />
+
+            <OpenFromQuery ready={status === "authenticated" && !loading} onOpen={openReviewById} />
 
             {/* ─── REVIEW DRAWER ─────────────────────────────────────────────── */}
             {selectedReview && (

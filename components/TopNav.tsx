@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Search, Menu, X, Building2, Folder, ClipboardCheck, Loader2, UserCircle, LogOut, ChevronDown, Bell, Settings, CheckCheck, ExternalLink } from "lucide-react"
+import { Search, Menu, X, Building2, Folder, ClipboardCheck, Loader2, UserCircle, LogOut, ChevronDown, Bell, CheckCheck, ExternalLink } from "lucide-react"
 import { useSession, signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -320,10 +320,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                             </div>
                         )}
                     </div>
-
-                    <Link href="/profile" aria-label="Settings" className="hidden sm:flex h-11 w-11 rounded-full items-center justify-center text-[var(--text)] hover:bg-[var(--surface)] hover:text-[var(--accent)] transition-colors">
-                        <Settings size={21} />
-                    </Link>
+                    {/* Settings lives in the profile dropdown ("Profile Settings"); a second gear here was a duplicate. */}
                 </div>
 
                 

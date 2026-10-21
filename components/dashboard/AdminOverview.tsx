@@ -10,7 +10,7 @@ import { format } from "date-fns"
 import {
     Users, CalendarCheck, ClipboardCheck, FileCheck, ChevronRight, ChevronDown,
     ArrowUpRight, ArrowDownRight, ArrowRight, AlertTriangle, BarChart3, BarChart2,
-    PieChart, Box, Bell, CalendarDays, UserPlus, LogOut, Wallet, Clock, Folder,
+    Box, Bell, CalendarDays, UserPlus, LogOut, Wallet, Clock, Folder,
     ClipboardList, Send, CreditCard, Loader2, CheckCircle2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -71,8 +71,7 @@ function KpiTile({ href, gradient, dark, icon: Icon, label, value, children }: {
     label: string; value: string; children: React.ReactNode
 }) {
     return (
-        <Link
-            href={href}
+        <div
             style={{ background: gradient }}
             className={cn(
                 "relative overflow-hidden rounded-[16px] p-5 min-h-[156px] flex flex-col group transition-transform hover:-translate-y-0.5",
@@ -80,11 +79,16 @@ function KpiTile({ href, gradient, dark, icon: Icon, label, value, children }: {
                 dark ? "text-[#1d1a0f]" : "text-white"
             )}
         >
+            {/* Whole-tile link underneath; content above ignores the pointer so
+                clicks fall through, except links in `children` (pointer-events-auto).
+                Avoids nesting <a> inside <a>. */}
+            <Link href={href} aria-label={label} className="absolute inset-0 rounded-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" />
+
             {/* soft light blooms, purely decorative */}
             <span aria-hidden className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10" />
             <span aria-hidden className="pointer-events-none absolute right-16 -bottom-20 h-36 w-36 rounded-full bg-white/[0.07]" />
 
-            <div className="relative flex items-center justify-between mb-3">
+            <div className="relative pointer-events-none flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                     <div className={cn("h-11 w-11 rounded-[12px] flex items-center justify-center", dark ? "bg-white/45" : "bg-white/20")}>
                         <Icon size={20} />
@@ -93,9 +97,9 @@ function KpiTile({ href, gradient, dark, icon: Icon, label, value, children }: {
                 </div>
                 <ChevronRight size={20} className="opacity-80 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <div className="relative text-[38px] font-bold leading-none tabular-nums tracking-[-0.02em] mb-3">{value}</div>
-            <div className="relative mt-auto text-[13px]">{children}</div>
-        </Link>
+            <div className="relative pointer-events-none text-[38px] font-bold leading-none tabular-nums tracking-[-0.02em] mb-3">{value}</div>
+            <div className="relative pointer-events-none mt-auto text-[13px]">{children}</div>
+        </div>
     )
 }
 
@@ -200,6 +204,21 @@ function Meter({ pct, className }: { pct: number; className?: string }) {
             <div className="h-full rounded-full bg-[#1f5fff] transition-all" style={{ width: `${Math.max(pct > 0 ? 2 : 0, Math.min(100, pct))}%` }} />
         </div>
     )
+}
+
+/** Attendance % for display: "—" when nobody is expected, "<1%" rather than a misleading 0% once someone is present. */
+function fmtAttPct(pct: number | null | undefined, present: number): string {
+    if (pct === null || pct === undefined) return "—"
+    return pct === 0 && present > 0 ? "<1%" : `${pct}%`
+}
+
+/** A % delta is noise on a tiny base; below this, show the absolute change instead. */
+const MIN_DELTA_BASE = 20
+
+/** Signed % with the display capped, so 21,567% reads ">999%". */
+function fmtDeltaPct(pct: number): string {
+    if (pct > 999) return ">999%"
+    return `${pct >= 0 ? "+" : ""}${pct}%`
 }
 
 function Initials({ name }: { name: string }) {
@@ -431,40 +450,43 @@ export function AdminOverview({ stats }: { stats: any }) {
     // are slices of it, so switching needs no extra request.
     const [range, setRange] = useState<(typeof RANGES)[number]>(30)
 
-    const att = stats.attendanceToday || { present: 0, absent: 0, onLeave: 0, pct: 0, attendancePct: null }
-    // null until someone is marked present/absent — nothing to grade yet.
-    const attUnmarked = (att.attendancePct ?? null) === null
+    const att = stats.attendanceToday || { present: 0, absent: 0, onLeave: 0, pct: 0, attendancePct: null, expected: 0, notMarked: 0 }
+    // attendance % = present ÷ expected, expected = active − on leave (computed server-side).
+    const attExpected: number = att.expected ?? 0
+    const attNotMarked: number = att.notMarked ?? Math.max(0, attExpected - att.present - att.absent)
+    const attPct: number | null = attExpected > 0 ? att.pct : null
+    const attPctLabel = fmtAttPct(attPct, att.present)
     const approvals = stats.approvals || { total: 0, leaves: 0, expenses: 0, documents: 0, inspections: 0 }
     const trend = stats.inspectionTrend || { days: [], completed30d: 0, deltaPct: null }
     const onboarding = stats.onboarding || { inProgress: 0, notStarted: 0, onHold: 0 }
     const exits = stats.exits || { pending: 0, clearancePending: 0 }
     const payroll = stats.payroll || { total: 0, processed: 0, pending: 0, pct: 0 }
     const alerts = stats.alerts || { contractsExpiring: 0, docExpiries: 0, lowAttendanceSites: 0 }
-    const topSites: { name: string; present: number; absent: number; pct: number }[] = stats.topSites || []
+    const topSites: { siteId: string | null; name: string; present: number; absent: number; expected: number; notMarked: number; pct: number | null }[] = stats.topSites || []
     const week7: { day: string; count: number }[] = stats.attendanceTrend7d || []
 
     const inspToday = stats.inspectionsToday ?? 0
     const inspYesterday = stats.inspectionsYesterday ?? 0
-    const inspDelta = inspYesterday > 0 ? Math.round(((inspToday - inspYesterday) / inspYesterday) * 100) : null
+    // Under MIN_DELTA_BASE yesterday a % swing is meaningless — show both counts instead.
+    const inspDelta = inspYesterday >= MIN_DELTA_BASE ? Math.round(((inspToday - inspYesterday) / inspYesterday) * 100) : null
 
     const allDays: { day: string; count: number }[] = trend.days || []
     const days = allDays.slice(-range)
     const completed = range === 30 ? (trend.completed30d ?? 0) : days.reduce((s, d) => s + d.count, 0)
     const completedDelta: number | null = range === 30 ? trend.deltaPct : null
+    // Previous-period count; on a small base the change is shown in absolute numbers.
+    const completedPrev: number | null = range === 30 && typeof trend.previous30d === "number" ? trend.previous30d : null
+    const completedSmallBase = completedPrev !== null && completedPrev < MIN_DELTA_BASE
 
-    const attTotal = att.present + att.absent + att.onLeave
-    // "Lower than usual" = today's check-ins under 80% of the previous six
-    // days' average; failing that, flag anything under 75%.
+    // One rule for the banner and the alert: mostly unmarked → "not marked yet";
+    // otherwise under 75% → low attendance; otherwise nothing.
+    const attNotMarkedYet = attExpected > 0 && attNotMarked > attExpected * 0.5
+    const lowAttendance = !attNotMarkedYet && attPct !== null && attPct < 75
+    // Wording only: "lower than usual" when today's check-ins are under 80% of
+    // the previous six days' average.
     const prior = week7.slice(0, -1).filter(d => d.count > 0)
     const priorAvg = prior.length ? prior.reduce((s, d) => s + d.count, 0) / prior.length : 0
     const belowUsual = priorAvg > 0 && att.present < priorAvg * 0.8
-    const lowAttendance = !attUnmarked && attTotal > 0 && (belowUsual || att.pct < 75)
-
-    const attSlices: DonutSlice[] = [
-        { label: "Present", value: att.present, color: "#16a34a" },
-        { label: "Absent", value: att.absent, color: "#ef3b3b" },
-        { label: "On leave", value: att.onLeave, color: "#f59e0b" },
-    ]
     const pbs = stats.projectsByStatus || {}
     const projSlices: DonutSlice[] = [
         { label: "Active", value: pbs.ACTIVE ?? 0, color: "#16a34a" },
@@ -473,17 +495,23 @@ export function AdminOverview({ stats }: { stats: any }) {
         { label: "Completed", value: pbs.COMPLETED ?? 0, color: "#9333ea" },
     ]
 
+    // Each row links to the page that shows that alert's own records.
     const alertItems = [
-        lowAttendance ? { dot: "bg-[#f59e0b]", title: "Low attendance today", text: `Only ${att.pct}% attendance across all sites.`, href: "/attendance" } : null,
-        inspToday > 0 ? { dot: "bg-[#1f5fff]", title: `${inspToday} inspection${inspToday === 1 ? "" : "s"} submitted today`, text: "Keep an eye on completion rates.", href: "/approvals" } : null,
+        attNotMarkedYet ? { dot: "bg-[#f59e0b]", title: "Attendance not marked", text: `Not marked yet for ${attNotMarked.toLocaleString("en-IN")} of ${attExpected.toLocaleString("en-IN")} employees today.`, href: "/attendance" } : null,
+        lowAttendance ? { dot: "bg-[#f59e0b]", title: "Low attendance today", text: `Only ${attPctLabel} attendance across all sites.`, href: "/attendance" } : null,
+        inspToday > 0 ? { dot: "bg-[#1f5fff]", title: `${inspToday} inspection${inspToday === 1 ? "" : "s"} submitted today`, text: "Keep an eye on completion rates.", href: "/approvals?date=today" } : null,
         approvals.total > 0 ? { dot: "bg-[#9333ea]", title: `${approvals.total} approval${approvals.total === 1 ? "" : "s"} waiting`, text: "Leaves, expenses and inspections pending review.", href: "/approvals" } : null,
         alerts.lowAttendanceSites > 0 ? { dot: "bg-[#ef3b3b]", title: "Low attendance sites", text: `${alerts.lowAttendanceSites} site(s) are below 80% attendance today.`, href: "/attendance" } : null,
         alerts.docExpiries > 0 ? { dot: "bg-[#f59e0b]", title: "Document expiries", text: `${alerts.docExpiries} labour card(s) expire in the next 30 days.`, href: "/employees/master" } : null,
     ].filter((a): a is NonNullable<typeof a> => a !== null)
 
-    const approvalBits = [
-        `${approvals.leaves} leaves`, `${approvals.expenses} expenses`, `${approvals.inspections} inspections`,
-    ].join(" · ")
+    // Each part opens the queue that owns it — /approvals only holds inspections.
+    const approvalBits: { label: string; href?: string }[] = [
+        { label: `${approvals.leaves} leaves`, href: "/leaves?status=PENDING" },
+        { label: `${approvals.expenses} expenses`, href: "/expenses?status=PENDING" },
+        { label: `${approvals.inspections} inspections`, href: "/approvals" },
+        ...((approvals.documents ?? 0) > 0 ? [{ label: `${approvals.documents} documents` }] : []),
+    ]
 
     return (
         <div className="p-4 lg:p-0 space-y-5">
@@ -525,44 +553,61 @@ export function AdminOverview({ stats }: { stats: any }) {
                 </KpiTile>
 
                 <KpiTile href="/attendance" gradient="linear-gradient(135deg,#0f766e 0%,#0b4d4a 100%)" icon={CalendarCheck} label="Today's attendance"
-                    value={attUnmarked ? "Not marked yet" : `${att.pct}%`}>
-                    <span className="flex flex-wrap items-center gap-x-5 gap-y-1 text-white/85">
+                    value={attPctLabel}>
+                    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-white/85">
                         <span>Present <b className="font-semibold text-[#8cc8ff] tabular-nums">{att.present.toLocaleString("en-IN")}</b></span>
+                        <span aria-hidden>·</span>
                         <span>Absent <b className="font-semibold text-[#ff8f8f] tabular-nums">{att.absent.toLocaleString("en-IN")}</b></span>
+                        <span aria-hidden>·</span>
                         <span>On leave <b className="font-semibold text-[#ffd54d] tabular-nums">{att.onLeave.toLocaleString("en-IN")}</b></span>
+                        <span aria-hidden>·</span>
+                        <span>Not marked <b className="font-semibold text-white tabular-nums">{attNotMarked.toLocaleString("en-IN")}</b></span>
                     </span>
                 </KpiTile>
 
                 <KpiTile href="/approvals" dark gradient="linear-gradient(135deg,#ffd84d 0%,#f7a823 100%)" icon={ClipboardCheck} label="Pending approvals"
                     value={String(approvals.total)}>
-                    <span className="font-medium">{approvalBits}</span>
+                    <span className="font-medium flex flex-wrap items-center gap-x-1.5">
+                        {approvalBits.map((b, i) => (
+                            <span key={b.label} className="inline-flex items-center gap-x-1.5">
+                                {i > 0 && <span aria-hidden>·</span>}
+                                {b.href
+                                    ? <Link href={b.href} className="pointer-events-auto underline-offset-2 hover:underline">{b.label}</Link>
+                                    : <span>{b.label}</span>}
+                            </span>
+                        ))}
+                    </span>
                 </KpiTile>
 
-                <KpiTile href="/sites" gradient="linear-gradient(135deg,#8b3cf6 0%,#5b21b6 100%)" icon={FileCheck} label="Inspections today"
+                <KpiTile href="/approvals?date=today" gradient="linear-gradient(135deg,#8b3cf6 0%,#5b21b6 100%)" icon={FileCheck} label="Inspections today"
                     value={String(inspToday)}>
                     {inspDelta === null ? (
-                        <span className="text-white/75">No inspections yesterday to compare</span>
+                        <span className="text-white/85 tabular-nums">{inspToday.toLocaleString("en-IN")} today · {inspYesterday.toLocaleString("en-IN")} yesterday</span>
                     ) : (
                         <span className={cn(
                             "inline-flex items-center gap-1 h-8 px-3 rounded-full bg-white font-semibold",
                             inspDelta >= 0 ? "text-[#15803d]" : "text-[#dc2626]"
                         )}>
                             {inspDelta >= 0 ? <ArrowUpRight size={16} className="stroke-[2.5px]" /> : <ArrowDownRight size={16} className="stroke-[2.5px]" />}
-                            {inspDelta >= 0 ? "+" : ""}{inspDelta}% vs yesterday
+                            {fmtDeltaPct(inspDelta)} vs yesterday
                         </span>
                     )}
                 </KpiTile>
             </div>
 
-            {/* ── Low attendance banner ── */}
-            {lowAttendance && (
+            {/* ── Attendance banner: not marked yet, else low ── */}
+            {(attNotMarkedYet || lowAttendance) && (
                 <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[#fbe0a6] bg-[#fff9ea] px-5 py-3">
                     <AlertTriangle size={24} className="text-[#f08c00] shrink-0" />
                     <p className="flex-1 min-w-[220px] text-[14px] text-[var(--text)]">
-                        Today&apos;s attendance is {att.pct}%, which is <b className="font-semibold">{belowUsual ? "lower than usual" : "below 75%"}</b>. Review attendance to identify any issues.
+                        {attNotMarkedYet ? (
+                            <>Attendance not marked yet for <b className="font-semibold">{attNotMarked.toLocaleString("en-IN")} of {attExpected.toLocaleString("en-IN")}</b> employees today.</>
+                        ) : (
+                            <>Today&apos;s attendance is {attPctLabel}, which is <b className="font-semibold">{belowUsual ? "lower than usual" : "below 75%"}</b>. Review attendance to identify any issues.</>
+                        )}
                     </p>
                     <Link href="/attendance" className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[9px] border border-[var(--border2)] bg-white text-[12.5px] font-medium text-[var(--text)] hover:border-[#1f5fff] transition-colors">
-                        View attendance <ChevronRight size={15} />
+                        {attNotMarkedYet ? "Mark attendance" : "View attendance"} <ChevronRight size={15} />
                     </Link>
                 </div>
             )}
@@ -575,13 +620,25 @@ export function AdminOverview({ stats }: { stats: any }) {
                     <div className="flex items-baseline flex-wrap gap-x-4 gap-y-2 mb-5">
                         <span className="text-[38px] font-bold text-[var(--text)] tabular-nums leading-none tracking-[-0.02em]">{completed.toLocaleString("en-IN")}</span>
                         <span className="text-[14px] text-[var(--text2)]">completed inspections</span>
-                        {completedDelta !== null && completedDelta !== undefined && (
+                        {completedSmallBase ? (() => {
+                            // Tiny previous period: the absolute change, with the base in brackets.
+                            const diff = completed - (completedPrev ?? 0)
+                            return (
+                                <span className={cn(
+                                    "inline-flex items-center gap-0.5 h-6 px-2 rounded-full text-[11.5px] font-semibold tabular-nums",
+                                    diff >= 0 ? "bg-[#d3f3e3] text-[#157a3c]" : "bg-[#ffe0dc] text-[#c62828]"
+                                )}>
+                                    {diff >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+                                    {diff >= 0 ? "+" : ""}{diff.toLocaleString("en-IN")} vs previous 30 days ({(completedPrev ?? 0).toLocaleString("en-IN")})
+                                </span>
+                            )
+                        })() : completedDelta !== null && completedDelta !== undefined && (
                             <span className={cn(
                                 "inline-flex items-center gap-0.5 h-6 px-2 rounded-full text-[11.5px] font-semibold",
                                 completedDelta >= 0 ? "bg-[#d3f3e3] text-[#157a3c]" : "bg-[#ffe0dc] text-[#c62828]"
                             )}>
                                 {completedDelta >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                                {completedDelta >= 0 ? "+" : ""}{completedDelta}% vs previous
+                                {fmtDeltaPct(completedDelta)} vs previous
                             </span>
                         )}
                     </div>
@@ -607,30 +664,33 @@ export function AdminOverview({ stats }: { stats: any }) {
                     <PanelHead tone="mint" icon={Users} title="Today's attendance breakdown"
                         action={<HeadLink href="/attendance">View all sites</HeadLink>} />
                     <div className="flex items-center gap-4 mb-5 mt-1">
-                        <Meter pct={attUnmarked ? 0 : att.pct} className="flex-1 bg-white/80" />
-                        <span className="text-[18px] font-bold text-[var(--text)] tabular-nums">{attUnmarked ? "Not marked yet" : `${att.pct}%`}</span>
+                        <Meter pct={attPct ?? 0} className="flex-1 bg-white/80" />
+                        <span className="text-[18px] font-bold text-[var(--text)] tabular-nums">{attPctLabel}</span>
                     </div>
                     {topSites.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center py-8">
                             <CalendarCheck size={26} className="text-[var(--text3)] mb-2" />
-                            <p className="text-[13px] text-[var(--text2)]">No attendance marked yet today.</p>
+                            <p className="text-[13px] text-[var(--text2)]">No employees expected today.</p>
                         </div>
                     ) : (
                         <div className="text-[13px]">
-                            <div className="grid grid-cols-[1.6fr_0.7fr_0.7fr_1.5fr] gap-2 text-[12.5px] text-[var(--text2)] pb-2.5 border-b border-[#c8eedb]">
-                                <span>Top sites</span>
+                            {/* Per site: present ÷ (deployed − on leave); "—" when nobody is expected there. */}
+                            <div className="grid grid-cols-[1.5fr_0.65fr_0.65fr_0.8fr_1.4fr] gap-2 text-[12.5px] text-[var(--text2)] pb-2.5 border-b border-[#c8eedb]">
+                                <span>Site</span>
                                 <span className="text-center">Present</span>
                                 <span className="text-center">Absent</span>
+                                <span className="text-center">Not marked</span>
                                 <span className="text-right">Attendance</span>
                             </div>
                             {topSites.map(s => (
-                                <div key={s.name} className="grid grid-cols-[1.6fr_0.7fr_0.7fr_1.5fr] gap-2 items-center py-3 border-b border-[#d6f2e4] last:border-0">
-                                    <span className="font-semibold text-[var(--text)] truncate">{s.name}</span>
+                                <div key={s.siteId ?? s.name} className="grid grid-cols-[1.5fr_0.65fr_0.65fr_0.8fr_1.4fr] gap-2 items-center py-3 border-b border-[#d6f2e4] last:border-0">
+                                    <span title={`${s.name} · ${s.expected} expected`} className="font-semibold text-[var(--text)] truncate">{s.name}</span>
                                     <span className="text-center font-semibold text-[#1f5fff] tabular-nums">{s.present}</span>
                                     <span className={cn("text-center tabular-nums", s.absent > 0 ? "font-semibold text-[#dc2626]" : "text-[var(--text2)]")}>{s.absent}</span>
+                                    <span className={cn("text-center tabular-nums", (s.notMarked ?? 0) > 0 ? "font-semibold text-[#b45309]" : "text-[var(--text2)]")}>{s.notMarked ?? 0}</span>
                                     <span className="flex items-center gap-3 justify-end">
-                                        <Meter pct={s.pct} className="w-[90px] bg-white/80" />
-                                        <span className="font-medium text-[var(--text)] tabular-nums w-10 text-right">{s.pct}%</span>
+                                        <Meter pct={s.pct ?? 0} className="w-[72px] bg-white/80" />
+                                        <span className="font-medium text-[var(--text)] tabular-nums w-10 text-right">{fmtAttPct(s.pct, s.present)}</span>
                                     </span>
                                 </div>
                             ))}
@@ -639,20 +699,9 @@ export function AdminOverview({ stats }: { stats: any }) {
                 </Panel>
             </div>
 
-            {/* ── Donuts · weekly trend ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
-                <Panel tone="rose">
-                    <PanelHead tone="rose" icon={PieChart} title="Attendance split" hint="Today" />
-                    {attTotal === 0 ? (
-                        <p className="text-[13px] text-[var(--text2)] text-center py-10">No employees yet.</p>
-                    ) : (
-                        <div className="flex items-center gap-5">
-                            <Donut centerLabel="EMPLOYEES" slices={attSlices} />
-                            <DonutLegend slices={attSlices} />
-                        </div>
-                    )}
-                </Panel>
-
+            {/* ── Projects donut · weekly trend ── */}
+            {/* The "Attendance split" donut was dropped: it repeated the KPI tile. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                 <Panel tone="violet">
                     <PanelHead tone="violet" icon={Box} title="Projects by status" />
                     {projSlices.every(s => s.value === 0) ? (
@@ -665,7 +714,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     )}
                 </Panel>
 
-                <Panel tone="blue" className="flex flex-col md:col-span-2 xl:col-span-1">
+                <Panel tone="blue" className="flex flex-col">
                     <PanelHead tone="blue" icon={BarChart3} title="Attendance" hint="Last 7 days" sub="Employees checked in per day" />
                     {week7.length === 0 ? (
                         <p className="text-[13px] text-[var(--text2)] text-center py-10">No attendance data yet.</p>
@@ -692,8 +741,8 @@ export function AdminOverview({ stats }: { stats: any }) {
                 <RecruitmentPanel />
 
                 <Panel tone="amber" className="flex flex-col">
-                    <PanelHead tone="amber" icon={Bell} title="Alerts & important"
-                        action={<HeadLink href="/approvals">View all</HeadLink>} />
+                    {/* No "View all": alerts span attendance, inspections and approvals; each row links to its own page. */}
+                    <PanelHead tone="amber" icon={Bell} title="Alerts & important" />
                     {alertItems.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center py-8 text-center">
                             <CheckCircle2 size={28} className="text-[#16a34a] mb-2" />

@@ -167,7 +167,7 @@ export async function PUT(
             await notifyApprovers(["leaves.approve", "leaves.manage"], {
                 title: "Approved leave withdrawn",
                 message: `${leave.employee.firstName} ${leave.employee.lastName} cancelled their approved ${leave.type} leave from ${leave.startDate.toISOString().slice(0, 10)}`,
-                type: "leave", link: "/leaves",
+                type: "leave", link: `/leaves?id=${leave.id}`,
             }, session.user.id)
         }
 
@@ -179,7 +179,7 @@ export async function PUT(
                 : `Your ${what} was cancelled by HR`
             await notifyEmployee(leave.employeeId, {
                 title: status === "APPROVED" ? "Leave approved" : status === "REJECTED" ? "Leave rejected" : "Leave cancelled",
-                message: msg, type: "leave", link: "/leaves",
+                message: msg, type: "leave", link: `/leaves?id=${leave.id}`,
             })
         }
 

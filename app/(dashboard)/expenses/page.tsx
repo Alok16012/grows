@@ -13,6 +13,7 @@ import {
     type LucideIcon
 } from "lucide-react"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import { OpenFromQuery } from "@/components/OpenFromQuery"
 import { format } from "date-fns"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -2298,8 +2299,14 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
 type ActiveTab = "mine" | "all" | "accounts" | "analytics" | "employee"
 type StatusFilter = "ALL" | ExpenseStatus
 
-export default function ExpensesPage() {
+export default function ExpensesPage({ searchParams }: { searchParams?: { status?: string } }) {
     const { data: session, status: sessionStatus } = useSession()
+    // ?status=PENDING (dashboard "Pending approvals") = submitted claims awaiting a decision.
+    const initialStatus: StatusFilter | null = (() => {
+        const s = searchParams?.status?.toUpperCase()
+        if (s === "PENDING") return "SUBMITTED"
+        return s && ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"].includes(s) ? s as StatusFilter : null
+    })()
     const role = session?.user?.role
     const userId = session?.user?.id || ""
     // Admin/Manager full view (All Expenses, Accounts, Analytics, Employee Summary,
@@ -2316,7 +2323,7 @@ export default function ExpensesPage() {
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [loading, setLoading] = useState(false)
     const [activeTab, setActiveTab] = useState<ActiveTab>("mine")
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL")
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus ?? "ALL")
     const [categoryFilter, setCategoryFilter] = useState<string>("ALL")
     const [projectFilter, setProjectFilter] = useState<string>("ALL")
     const [monthFilter, setMonthFilter] = useState<string>("")  // YYYY-MM
@@ -2361,7 +2368,8 @@ export default function ExpensesPage() {
     useEffect(() => {
         if (sessionStatus === "loading" || sessionReady) return
         setSessionReady(true)
-        if (isPrivileged) setActiveTab("employee")
+        // A status filter only applies to a list tab; "All Expenses" is the approver's queue.
+        if (isPrivileged) setActiveTab(initialStatus ? "all" : "employee")
     }, [sessionStatus, isPrivileged, sessionReady])
 
     const fetchExpenses = useCallback(async () => {
@@ -2474,6 +2482,17 @@ export default function ExpensesPage() {
         fetchExpenses()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusFilter, categoryFilter, projectFilter, monthFilter, dateFrom, dateTo, search, activeTab, userId, sessionReady])
+
+    // A notification link (?id=…) opens that one expense in the drawer. Fetched by
+    // id because it may sit outside the current tab/filters (admins land on the
+    // Employee Summary, which loads no expense list at all).
+    const openExpenseById = useCallback(async (id: string) => {
+        const res = await fetch(`/api/expenses/${id}`).catch(() => null)
+        if (res?.ok) { setSelectedExpense(await res.json()); return }
+        const inList = expenses.find(e => e.id === id)
+        if (inList) setSelectedExpense(inList)
+        else toast.error("This record is no longer available")
+    }, [expenses])
 
     // Stats computed from all "mine" data (independent call)
     const [stats, setStats] = useState({
@@ -2888,6 +2907,7 @@ export default function ExpensesPage() {
                     fetchExpenses()
                 }}
             />
+            <OpenFromQuery ready={sessionReady} onOpen={openExpenseById} />
             <ExpenseDrawer
                 expense={selectedExpense}
                 onClose={() => { if (reviewQueue) exitReview(); else setSelectedExpense(null) }}

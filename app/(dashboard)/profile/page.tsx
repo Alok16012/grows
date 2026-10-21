@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { roleLabel } from "@/lib/role-label"
+import { OpenFromQuery } from "@/components/OpenFromQuery"
 import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
@@ -947,6 +948,11 @@ export default function ProfilePage() {
     }
     const badge = roleBadge[formData.role] ?? { bg: "#f5f7fd", color: "#5b6478" }
 
+    // Notification links can land on a tab (asset issued → ?tab=assets).
+    const openTab = (key: string) => {
+        if (["attendance", "documents", "letters", "onboarding", "payslip", "assets"].includes(key)) setActiveTab(key as typeof activeTab)
+    }
+
     const tabs = [
         { key: "profile",    label: "Profile",       icon: User },
         ...(isEmployee ? [
@@ -961,6 +967,7 @@ export default function ProfilePage() {
 
     return (
         <div className="max-w-3xl mx-auto p-4 pb-12 lg:px-0 lg:pt-0 space-y-5">
+            <OpenFromQuery param="tab" onOpen={openTab} />
             {/* Header card */}
             <div className="bg-white border border-[var(--border)] rounded-2xl p-6 flex items-center gap-4">
                 <div className="relative shrink-0">

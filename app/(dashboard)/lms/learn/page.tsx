@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { OpenFromQuery } from "@/components/OpenFromQuery"
 
 type Enrollment = {
     id: string
@@ -907,6 +908,14 @@ export default function LearnPage() {
 
     useEffect(() => { fetchEnrollments() }, [fetchEnrollments])
 
+    // LMS notifications link ?course=<courseId>: open the learner's enrollment in
+    // that course, the same view a card click opens.
+    const openCourseById = useCallback((courseId: string) => {
+        const enrollment = enrollments.find(e => e.courseId === courseId)
+        if (enrollment) setSelectedEnrollment(enrollment)
+        else toast.error("This record is no longer available")
+    }, [enrollments])
+
     const stats = {
         total: enrollments.length,
         inProgress: enrollments.filter(e => e.status === "IN_PROGRESS").length,
@@ -988,6 +997,7 @@ export default function LearnPage() {
                     </div>
                 )}
             </div>
+            <OpenFromQuery param="course" ready={!loading} onOpen={openCourseById} />
             <DocumentViewer 
                 url={previewUrl} 
                 fileName={previewName} 

@@ -143,6 +143,7 @@ export async function POST(req: Request) {
     await notifyEmployee(employeeId, {
       title: "Exit initiated",
       message: `Your exit has been recorded. Last working day: ${lwd.toISOString().slice(0, 10)}`,
+      // Not /exit: that page needs exit.view, which the departing employee lacks.
       type: "exit", link: "/profile",
     })
 

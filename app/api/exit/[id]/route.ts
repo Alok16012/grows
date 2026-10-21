@@ -205,6 +205,7 @@ export async function PUT(
       if (s) await prisma.exitRequest.update({ where: { id: exit.id }, data: { fnfAmount: s.net } })
     }
 
+    // Links to /profile, not /exit: the employee being notified lacks exit.view.
     if (status !== undefined && status !== before.status && STAGE_LABEL[status]) {
       await notifyEmployee(before.employeeId, { title: "Exit update", message: STAGE_LABEL[status], type: "exit", link: "/profile" })
     }
