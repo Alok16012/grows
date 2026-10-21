@@ -43,7 +43,7 @@ import {
     BookOpen,
     Settings2,
     Layers,
-    CheckSquare,
+    CheckSquare, ListChecks,
     UserCog,
     Megaphone,
     KeyRound,
@@ -62,6 +62,12 @@ type NavLink = {
     // Which pending count to show; the three add up to the dashboard's
     // "Pending approvals" total (inspections + leaves + expenses).
     badge?: BadgeKey
+    // Self-service entries ("My Attendance") duplicate a management page for
+    // anyone who already has it ("Attendance Management" → same route). Hide
+    // the self-service copy for ADMIN and for holders of this permission.
+    hideIfHas?: string
+    // Employee-only entries (My Onboarding, My Learning…) that ADMIN never needs.
+    hideForAdmin?: boolean
     subLinks?: { name: string; href: string }[]
     // Extra path prefixes that should mark this link active (e.g. the
     // Inspection entry stays highlighted across the whole stepper flow).
@@ -148,11 +154,13 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "INSPECTIONS",
             links: [
-                // Single entry that opens the guided stepper flow (starts on the
-                // real HR Sites list = /sites). The individual pages — Sites,
-                // Projects, Assignments, Field Tasks — are reached via the stepper
-                // rail, not the sidebar. (Groups was removed.)
-                { name: "Inspection", href: "/sites", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/assignments", "/field"] },
+                // Opens the guided stepper flow (starts on the HR Sites list =
+                // /sites); Sites, Projects and Field Tasks are reached via its rail.
+                { name: "Inspection", href: "/sites", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/field"] },
+                // Reviewing inspection reports belongs with inspections, not with
+                // general "operations" — its badge counts inspection reports only.
+                { name: "Approvals",   href: "/approvals",   icon: CheckSquare, roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: "approvals" },
+                { name: "Assignments", href: "/assignments", icon: ListChecks,  roles: ["ADMIN", "MANAGER"], permission: "assignments.view" },
             ],
         },
 
@@ -174,11 +182,15 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "HR OPERATIONS",
             links: [
-                { name: "Attendance",   href: "/attendance", icon: Clock,       roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
-                { name: "Leaves",       href: "/leaves",     icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view", badge: "leaves" },
-                { name: "Payroll",      href: "/payroll",    icon: Wallet,      roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
-                { name: "Assets",       href: "/assets",     icon: Package,     roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
-                { name: "Expenses",     href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"], permission: "expenses.view", badge: "expenses" },
+                // "Management" in the label tells these apart from the employee's
+                // own My Attendance / My Leaves, which point at the same routes.
+                { name: "Attendance Management", href: "/attendance", icon: Clock,       roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
+                { name: "Leave Management",      href: "/leaves",     icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view", badge: "leaves" },
+                { name: "Payroll",               href: "/payroll",    icon: Wallet,      roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
+                { name: "Assets",                href: "/assets",     icon: Package,     roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
+                { name: "Expenses",              href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"], permission: "expenses.view", badge: "expenses" },
+                // An employee leaving is an HR process (clearance, F&F), not growth.
+                { name: "Exit Management",       href: "/exit",       icon: LogOut,      roles: ["ADMIN", "MANAGER"], permission: "exit.view" },
             ],
         },
 
@@ -187,18 +199,16 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "TALENT & GROWTH",
             links: [
                 { name: "Performance",      href: "/performance", icon: Star,          roles: ["ADMIN", "MANAGER"], permission: "performance.view" },
-                { name: "Exit Management",  href: "/exit",        icon: LogOut,        roles: ["ADMIN", "MANAGER"], permission: "exit.view" },
                 { name: "Training (LMS)",   href: "/lms",         icon: GraduationCap, roles: ["ADMIN", "MANAGER"], permission: "lms.manage" },
             ],
         },
 
-        // ── OPERATIONS (approvals + support) ─────────────────────────────────
+        // ── OPERATIONS (company-wide communication + support) ────────────────
         {
             title: "OPERATIONS",
             links: [
-                { name: "Approvals",    href: "/approvals",     icon: CheckSquare,  roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: "approvals" },
-                { name: "Announcements", href: "/announcements", icon: Megaphone,   roles: ["ADMIN", "MANAGER"], permission: "announcements.view" },
-                { name: "Helpdesk",     href: "/helpdesk",      icon: Headphones,   roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
+                { name: "Announcements",       href: "/announcements", icon: Megaphone,  roles: ["ADMIN", "MANAGER"], permission: "announcements.view" },
+                { name: "Helpdesk Management", href: "/helpdesk",      icon: Headphones, roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
             ],
         },
 
@@ -231,10 +241,10 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 // Points at the Inspector Workspace (/inspection) — the only screen
                 // that can open and submit an inspection form. /assignments is the
                 // manager-side wizard and just bounces inspectors back here.
-                { name: "My Assignments",   href: "/inspection",     icon: HardHat,      roles: ["INSPECTION_BOY"], permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"] },
-                { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"], permission: "self.view" },
-                { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"], permission: "self.view" },
-                { name: "My Performance",   href: "/performance",    icon: Star,         roles: ["INSPECTION_BOY"], permission: "self.view" },
+                { name: "My Assignments",   href: "/inspection",     icon: HardHat,      roles: ["INSPECTION_BOY"], permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"], hideForAdmin: true },
+                { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "attendance.view" },
+                { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "leaves.view" },
+                { name: "My Performance",   href: "/performance",    icon: Star,         roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "performance.view" },
             ],
         },
 
@@ -242,7 +252,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "LEARNING",
             links: [
-                { name: "My Learning",      href: "/lms/learn",      icon: GraduationCap, roles: ["INSPECTION_BOY"], permission: "lms.view" },
+                { name: "My Learning",      href: "/lms/learn",      icon: GraduationCap, roles: ["INSPECTION_BOY"], permission: "lms.view", hideForAdmin: true },
             ],
         },
 
@@ -251,9 +261,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             title: "MY ACCOUNT",
             links: [
                 { name: "My Profile",       href: "/profile",        icon: UserCheck,    roles: ["INSPECTION_BOY"], permission: "self.view" },
-                { name: "My Onboarding",    href: "/self-onboarding", icon: BadgeCheck,  roles: ["INSPECTION_BOY"], permission: "self.view" },
-                { name: "Announcements",    href: "/announcements",  icon: Megaphone,    roles: ["INSPECTION_BOY"], permission: "self.view" },
-                { name: "Help & Support",   href: "/helpdesk",       icon: Headphones,   roles: ["INSPECTION_BOY"], permission: "self.view" },
+                { name: "My Onboarding",    href: "/self-onboarding", icon: BadgeCheck,  roles: ["INSPECTION_BOY"], permission: "self.view", hideForAdmin: true },
+                { name: "Announcements",    href: "/announcements",  icon: Megaphone,    roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "announcements.view" },
+                { name: "Help & Support",   href: "/helpdesk",       icon: Headphones,   roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "helpdesk.view" },
             ],
         },
 
@@ -291,7 +301,9 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     const currentRole = String(role || "")
 
                     const filteredLinks = section.links.filter(link => {
-                        if (currentRole === "ADMIN") return true
+                        // Self-service copies of a page this user already manages.
+                        if (link.hideIfHas && (currentRole === "ADMIN" || userPermissions.includes(link.hideIfHas))) return false
+                        if (currentRole === "ADMIN") return !link.hideForAdmin
 
                         // The universal dashboard is available to every user who
                         // holds at least one permission — it self-adapts to them.
