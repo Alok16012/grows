@@ -8,7 +8,7 @@ import { toast } from "sonner"
 import dynamic from "next/dynamic"
 import {
     Loader2, RefreshCw, FileSpreadsheet, ShieldCheck, Upload, IndianRupee,
-    Clock, Trash2, TrendingUp, Settings2, Lock, CheckCircle2, ChevronRight,
+    Clock, Trash2, TrendingUp, Settings2, Lock, Unlock, CheckCircle2, ChevronRight,
     ChevronLeft, SlidersHorizontal, CalendarRange, Users, Wallet, Pencil, BadgeCheck,
 } from "lucide-react"
 import { can } from "@/lib/can"
@@ -106,6 +106,7 @@ export default function PayrollPage() {
     const [sites,       setSites]      = useState<SiteStatus[]>([])
     const [deleting,    setDeleting]   = useState<string | null>(null)
     const [markingPaid, setMarkingPaid]= useState(false)
+    const [lockingMonth, setLockingMonth] = useState<"lock" | "unlock" | null>(null)
     const [activePanel, setActivePanel]= useState<Panel | null>(null)
 
     const fetchRuns = useCallback(async (year: number) => {
@@ -218,6 +219,40 @@ export default function PayrollPage() {
             refresh()
         } catch { toast.error("Could not mark as paid") }
         finally { setMarkingPaid(false) }
+    }
+
+    // Month-level lock/unlock. The wage sheet's per-site and per-row locks stay
+    // for partial months, but the normal case is "September is done — lock it",
+    // and that must not mean ticking 40 site checkboxes first. The lock API
+    // with only month/year covers every DRAFT row of the month; unlock without
+    // a site reopens every PROCESSED row (PAID stays PAID).
+    const lockMonth = async () => {
+        if (!confirm(`Lock all ${counts.draft} open payroll rows for ${periodLabel}?\n\nAmounts can't be edited after locking. You can unlock the month later if something must change.`)) return
+        setLockingMonth("lock")
+        try {
+            const res = await fetch("/api/payroll/final/lock", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ month: period.month, year: period.year }),
+            })
+            if (!res.ok) { toast.error(await res.text()); return }
+            const d = await res.json()
+            toast.success(d.count ? `${periodLabel} locked — ${d.count} rows` : "Nothing to lock")
+            refresh()
+        } catch { toast.error("Could not lock the month") }
+        finally { setLockingMonth(null) }
+    }
+
+    const unlockMonth = async () => {
+        if (!confirm(`Unlock ${periodLabel}?\n\nAll ${counts.locked} locked rows go back to draft so days and amounts can be edited and re-processed. Paid rows stay paid.`)) return
+        setLockingMonth("unlock")
+        try {
+            const res = await fetch(`/api/payroll/reset?month=${period.month}&year=${period.year}&action=unlock`, { method: "DELETE" })
+            if (!res.ok) { toast.error(await res.text()); return }
+            const d = await res.json()
+            toast.success(d.unlocked ? `${periodLabel} unlocked — ${d.unlocked} rows editable again` : "Nothing to unlock")
+            refresh()
+        } catch { toast.error("Could not unlock the month") }
+        finally { setLockingMonth(null) }
     }
 
     const role = session?.user?.role
@@ -351,6 +386,18 @@ export default function PayrollPage() {
                                             <Pencil size={12} /> {counts.rows > 0 ? "Fix days by site" : "Enter days by site"}
                                         </button>
                                     )}
+                                    {s.step === 2 && canManage && counts.draft > 0 && (
+                                        <button onClick={lockMonth} disabled={lockingMonth !== null} title="Lock every open row of this month, all sites at once"
+                                            style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                                            {lockingMonth === "lock" ? <Loader2 size={12} className="animate-spin" /> : <Lock size={12} />} Lock whole month ({counts.draft})
+                                        </button>
+                                    )}
+                                    {s.step === 2 && canManage && counts.locked > 0 && (
+                                        <button onClick={unlockMonth} disabled={lockingMonth !== null} title="Reopen every locked row of this month for editing (paid rows stay paid)"
+                                            style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                                            {lockingMonth === "unlock" ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />} Unlock month ({counts.locked})
+                                        </button>
+                                    )}
                                     {s.step === 4 && canManage && counts.locked > 0 && counts.draft === 0 && (
                                         <button onClick={markAllPaid} disabled={markingPaid}
                                             style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#15803d", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
@@ -366,7 +413,7 @@ export default function PayrollPage() {
                 <div style={{ padding: "10px 20px 12px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", gap: 8 }}>
                     <Lock size={11} style={{ color: "var(--text3)", flexShrink: 0 }} />
                     <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>
-                        Reports and payslips open only after the wage sheet is locked. A locked row can't be edited — use <b>Unlock</b> in &quot;Fix days by site&quot; if something must change.
+                        Lock the whole month from Step 2 once the sheet is checked; reports and payslips open after that. Locked rows can&apos;t be edited — <b>Unlock month</b> reopens them (paid rows stay paid).
                     </p>
                 </div>
             </div>
