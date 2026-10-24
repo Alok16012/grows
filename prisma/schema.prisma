@@ -45,6 +45,7 @@ model User {
   siteAssignmentsAsAssigner SiteAssignment[]    @relation("SiteAssignmentAssigner")
   credential                UserCredential?
   loginOtps                 LoginOtp[]
+  perfReviewees             PerfAssignment[]    @relation("PerfReviewer")
 }
 
 // Login hardening kept OUT of the User table on purpose: production schema is
@@ -788,6 +789,9 @@ model Employee {
   hrDocuments           HrDocument[]
   assetRequestItems     AssetRequestItem[]
   assetIssues           AssetIssue[]
+  perfRegisterEntries   PerfRegisterEntry[]
+  perfAssignment        PerfAssignment?
+  perfReports           PerfReport[]
 
   @@index([branchId])
   @@index([status])
@@ -1469,6 +1473,180 @@ model KPITemplate {
   targetHint  String?
   weightage   Float    @default(10)
   createdAt   DateTime @default(now())
+}
+
+// ─── PERFORMANCE HUB ─────────────────────────────────────────────────────────
+// KRA/KPI templates, data registers and Daily/Weekly/Monthly KPI reports with
+// approval. Lives beside the PerformanceReview module, in NEW tables only:
+// production schema is applied by hand (scripts/perf-hub.sql), so until that
+// SQL runs every /api/perf-hub route answers 503 instead of breaking.
+
+model PerfTemplate {
+  id          String            @id @default(uuid())
+  name        String
+  roleLabel   String?
+  version     Int               @default(1)
+  status      String            @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  familyId    String // shared by every version of one template
+  publishedAt DateTime?
+  createdBy   String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  kras        PerfTemplateKra[]
+  kpis        PerfTemplateKpi[]
+  reports     PerfReport[]
+
+  @@index([familyId])
+  @@index([status])
+}
+
+model PerfTemplateKra {
+  id         String            @id @default(uuid())
+  templateId String
+  title      String
+  weight     Float // points; a template's KRAs total 100
+  sortOrder  Int               @default(0)
+  template   PerfTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  kpis       PerfTemplateKpi[]
+
+  @@index([templateId])
+}
+
+model PerfTemplateKpi {
+  id               String            @id @default(uuid())
+  kraId            String
+  templateId       String
+  name             String
+  code             String?
+  frequency        String // DAILY | WEEKLY | MONTHLY
+  measurable       String?
+  valueType        String // COUNT | PERCENT | NUMBER | CURRENCY | YESNO
+  direction        String            @default("HIGHER") // HIGHER | LOWER
+  target           Float
+  targetLabel      String?
+  weightage        Float // points within the KRA; a KRA's KPIs total its weight
+  rollup           String            @default("AVG") // AVG | SUM | LAST | MIN | MAX
+  greenAt          Float             @default(95)
+  amberAt          Float             @default(80)
+  evidenceRequired Boolean           @default(false)
+  sourceType       String            @default("MANUAL") // MANUAL | REGISTER | SYSTEM
+  registerId       String?
+  registerMode     String? // SINGLE | RATIO
+  valueField       String?
+  numeratorField   String?
+  denominatorField String?
+  aggregate        String? // SUM | AVG | COUNT | LAST | MAX | MIN
+  systemMetric     String?
+  sortOrder        Int               @default(0)
+  kra              PerfTemplateKra   @relation(fields: [kraId], references: [id], onDelete: Cascade)
+  template         PerfTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  register         PerfRegister?     @relation(fields: [registerId], references: [id], onDelete: SetNull)
+  values           PerfReportValue[]
+
+  @@index([kraId])
+  @@index([templateId])
+  @@index([registerId])
+}
+
+model PerfRegister {
+  id          String              @id @default(uuid())
+  name        String
+  code        String?
+  frequency   String              @default("DAILY")
+  description String?
+  fields      Json // [{ key, label, type, options?, required? }]
+  isActive    Boolean             @default(true)
+  createdBy   String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  entries     PerfRegisterEntry[]
+  kpis        PerfTemplateKpi[]
+}
+
+model PerfRegisterEntry {
+  id         String       @id @default(uuid())
+  registerId String
+  employeeId String
+  date       DateTime // IST calendar day at UTC midnight, like attendance
+  values     Json
+  createdBy  String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  register   PerfRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  employee   Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([registerId, employeeId, date])
+  @@index([employeeId])
+}
+
+model PerfAssignment {
+  id               String   @id @default(uuid())
+  employeeId       String   @unique
+  templateFamilyId String // the employee always reports on the PUBLISHED version
+  reviewerUserId   String?
+  effectiveFrom    DateTime
+  createdBy        String
+  updatedAt        DateTime @updatedAt
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewer         User?    @relation("PerfReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull)
+
+  @@index([templateFamilyId])
+  @@index([reviewerUserId])
+}
+
+model PerfReport {
+  id           String               @id @default(uuid())
+  employeeId   String
+  templateId   String // the exact version reported on
+  frequency    String // DAILY | WEEKLY | MONTHLY
+  periodStart  DateTime // IST day at UTC midnight
+  periodEnd    DateTime // last IST day of the period (inclusive)
+  status       String               @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | RETURNED
+  score        Float?
+  submittedAt  DateTime?
+  decidedBy    String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  employee     Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  template     PerfTemplate         @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  values       PerfReportValue[]
+  activity     PerfReportActivity[]
+
+  @@unique([employeeId, frequency, periodStart])
+  @@index([templateId])
+  @@index([status])
+  @@index([periodStart])
+}
+
+model PerfReportValue {
+  id             String          @id @default(uuid())
+  reportId       String
+  kpiId          String
+  actual         Float?
+  isAuto         Boolean         @default(false)
+  achievementPct Float?
+  rag            String? // GREEN | AMBER | RED
+  remark         String?
+  evidenceUrl    String?
+  report         PerfReport      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  kpi            PerfTemplateKpi @relation(fields: [kpiId], references: [id], onDelete: Restrict)
+
+  @@unique([reportId, kpiId])
+  @@index([kpiId])
+}
+
+model PerfReportActivity {
+  id        String     @id @default(uuid())
+  reportId  String
+  action    String // CREATED | SAVED | SUBMITTED | APPROVED | RETURNED | AUTO_REFRESHED
+  userId    String
+  note      String?
+  createdAt DateTime   @default(now())
+  report    PerfReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
 }
 
 // ─── EXIT MANAGEMENT ──────────────────────────────────────────────────────────

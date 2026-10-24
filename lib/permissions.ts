@@ -394,3 +394,20 @@ export function canIssueAssets(session: PermSession): boolean {
 export function canOverseeAssets(session: PermSession): boolean {
     return canApproveAssets(session) || canIssueAssets(session)
 }
+
+// ─── Performance Hub ─────────────────────────────────────────────────────────
+// Designer, registers and People & Roles are HR's (performance.manage). Team
+// views also open to performance.view; reviewers get their reviewees through
+// PerfAssignment data, not a permission.
+export function canManagePerfHub(session: PermSession): boolean {
+    return checkAccess(session, [], "performance.manage")
+}
+
+export function canViewPerfHub(session: PermSession): boolean {
+    return checkAccess(session, [], "performance.view") || canManagePerfHub(session)
+}
+
+// Filing your own KPI reports / register entries is self-service.
+export function canSelfServePerfHub(session: PermSession): boolean {
+    return checkAccess(session, [], "self.view") || canViewPerfHub(session)
+}

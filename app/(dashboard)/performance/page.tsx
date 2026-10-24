@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 import {
@@ -442,6 +443,9 @@ export default function PerformancePage() {
                 )}
             </div>
 
+            {/* Performance Hub strip — DWM reports, registers and scorecards live under /performance/hub */}
+            <PerfHubStrip canView={isAdminOrManager} canManage={can(session, "performance.manage")} />
+
             {/* Tab Bar */}
             <div className="z-tabs-wrap" style={{ marginBottom: 24 }}><div className="z-tabs" role="tablist">
                 <button role="tab" aria-selected={activeTab === "dashboard"} className={tabCls(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>
@@ -515,6 +519,32 @@ export default function PerformancePage() {
                     creating={creating}
                 />
             )}
+        </div>
+    )
+}
+
+// ─── Performance Hub links ────────────────────────────────────────────────────
+
+function PerfHubStrip({ canView, canManage }: { canView: boolean; canManage: boolean }) {
+    const links: { href: string; label: string; show: boolean }[] = [
+        { href: "/performance/hub/reports", label: "My DWM Reports", show: true },
+        { href: "/performance/hub/registers", label: "Registers", show: true },
+        { href: "/performance/hub/me", label: "My Scorecard", show: true },
+        { href: "/performance/hub/review", label: "Review Queue", show: canView || canManage },
+        { href: "/performance/hub/team", label: "Team Dashboard", show: canView || canManage },
+        { href: "/performance/hub/designer", label: "KPI Designer", show: canManage },
+        { href: "/performance/hub/registers-designer", label: "Register Designer", show: canManage },
+        { href: "/performance/hub/people", label: "People & Roles", show: canManage },
+    ]
+    return (
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[12.5px]" style={{ marginBottom: 14 }}>
+            <span className="px-2 py-1 rounded-lg font-semibold text-[var(--accent)] bg-[var(--accent-light)]">Reviews</span>
+            {links.filter(l => l.show).map(l => (
+                <span key={l.href} className="inline-flex items-center gap-1">
+                    <span className="text-[var(--text3)]" aria-hidden>·</span>
+                    <Link href={l.href} className="px-2 py-1 rounded-lg text-[var(--text2)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors">{l.label}</Link>
+                </span>
+            ))}
         </div>
     )
 }

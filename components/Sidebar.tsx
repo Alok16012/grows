@@ -187,7 +187,8 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "Attendance Management", href: "/attendance", icon: Clock,       roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
                 { name: "Leave Management",      href: "/leaves",     icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view", badge: "leaves" },
                 { name: "Payroll",               href: "/payroll",    icon: Wallet,      roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
-                { name: "Assets",                href: "/assets",     icon: Package,     roles: ["ADMIN", "MANAGER"], permission: "assets.view" },
+                // Requesters / approvers / store staff work here without assets.view.
+                { name: "Assets",                href: "/assets",     icon: Package,     roles: ["ADMIN", "MANAGER"], permissionAny: ["assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue"] },
                 { name: "Expenses",              href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"], permission: "expenses.view", badge: "expenses" },
                 // An employee leaving is an HR process (clearance, F&F), not growth.
                 { name: "Exit Management",       href: "/exit",       icon: LogOut,      roles: ["ADMIN", "MANAGER"], permission: "exit.view" },
@@ -198,7 +199,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         {
             title: "TALENT & GROWTH",
             links: [
-                { name: "Performance",      href: "/performance", icon: Star,          roles: ["ADMIN", "MANAGER"], permission: "performance.view" },
+                { name: "Performance",      href: "/performance", icon: Star,          roles: ["ADMIN", "MANAGER"], permission: "performance.view", matchPrefixes: ["/performance/hub"] },
                 { name: "Training (LMS)",   href: "/lms",         icon: GraduationCap, roles: ["ADMIN", "MANAGER"], permission: "lms.manage" },
             ],
         },
@@ -244,7 +245,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 { name: "My Assignments",   href: "/inspection",     icon: HardHat,      roles: ["INSPECTION_BOY"], permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"], hideForAdmin: true },
                 { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "attendance.view" },
                 { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "leaves.view" },
-                { name: "My Performance",   href: "/performance",    icon: Star,         roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "performance.view" },
+                { name: "My Performance",   href: "/performance",    icon: Star,         roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "performance.view", matchPrefixes: ["/performance/hub"] },
             ],
         },
 
