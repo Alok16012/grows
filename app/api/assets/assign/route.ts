@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { notifyEmployee } from "@/lib/hr-notify"
+import { ifWorkflowInstalled, recordLedgerOnly } from "@/lib/asset-workflow"
 
 export async function GET(req: Request) {
     try {
@@ -148,6 +149,12 @@ export async function POST(req: Request) {
                 },
             },
         })
+
+        // Keep the stock ledger complete; a no-op until the workflow tables exist.
+        await ifWorkflowInstalled(() => recordLedgerOnly(prisma, {
+            assetId: assetId, type: "ISSUE", qty: -1, balanceAfter: assetAfter[0].available,
+            refType: "LEGACY", refId: assignment.id, userId: session.user.id,
+        }), "[ASSET_ASSIGN_LEDGER]")
 
         await notifyEmployee(assignment.employeeId, {
             title: "Asset issued to you",

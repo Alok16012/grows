@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { AssetCondition } from "@prisma/client"
+import { WorkflowError, ifWorkflowInstalled, recordLedgerOnly, returnLinkedIssue } from "@/lib/asset-workflow"
 
 export async function POST(
     req: Request,
@@ -36,6 +37,35 @@ export async function POST(
             return new NextResponse(`Unknown returnCondition: ${returnCondition}`, { status: 400 })
         }
 
+        const include = {
+            employee: { select: { id: true, firstName: true, lastName: true, employeeId: true } },
+            asset: { select: { id: true, assetCode: true, name: true } },
+        } as const
+
+        // Issued through the workflow: return the whole remaining quantity via
+        // the issue, so the ledger, issue status and audit stay in step.
+        try {
+            const handled = await returnLinkedIssue(employeeAssetId, {
+                returnCondition: returnCondition ?? null, note: notes || null, actorId: session.user.id,
+                returnedAt: returnedAt ? new Date(returnedAt) : undefined,
+            })
+            if (handled) {
+                const assignment = await prisma.employeeAsset.update({
+                    where: { id: employeeAssetId },
+                    data: {
+                        returnedAt: returnedAt ? new Date(returnedAt) : undefined,
+                        returnCondition: returnCondition || undefined,
+                        notes: notes || empAsset.notes || null,
+                    },
+                    include,
+                })
+                return NextResponse.json(assignment)
+            }
+        } catch (e) {
+            if (e instanceof WorkflowError) return new NextResponse(e.message, { status: e.status })
+            throw e
+        }
+
         // A unit that came back LOST or DAMAGED isn't back on the shelf, so it
         // must not bump `available` — that's what let the stock count exceed
         // what could actually be handed out. Record the downgraded condition only.
@@ -56,29 +86,22 @@ export async function POST(
                     returnCondition: returnCondition || null,
                     notes: notes || empAsset.notes || null,
                 },
-                include: {
-                    employee: {
-                        select: {
-                            id: true,
-                            firstName: true,
-                            lastName: true,
-                            employeeId: true,
-                        },
-                    },
-                    asset: {
-                        select: {
-                            id: true,
-                            assetCode: true,
-                            name: true,
-                        },
-                    },
-                },
+                include,
             }),
             prisma.asset.update({
                 where: { id: params.id },
                 data: assetUpdate,
             }),
         ])
+
+        const backOnShelf = !(returnCondition === "DAMAGED" || returnCondition === "LOST")
+        await ifWorkflowInstalled(() => recordLedgerOnly(prisma, {
+            assetId: params.id,
+            type: backOnShelf ? "RETURN" : returnCondition === "LOST" ? "LOST" : "DAMAGED",
+            qty: backOnShelf ? 1 : 0,
+            refType: "LEGACY", refId: employeeAssetId, userId: session.user.id,
+            note: backOnShelf ? null : `1 ${String(returnCondition).toLowerCase()} on return`,
+        }), "[ASSET_RETURN_LEDGER]")
 
         return NextResponse.json(assignment)
     } catch (error) {

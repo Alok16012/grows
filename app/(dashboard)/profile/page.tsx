@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { roleLabel } from "@/lib/role-label"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
+import { StatCard, statGridClass } from "@/components/StatCard"
 import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
@@ -748,15 +749,59 @@ function AttendanceTab() {
 
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 // ─── Change Password (self-service) ──────────────────────────────────────────
+type MyIssue = {
+    id: string; issueNo: string; quantity: number; size?: string | null; serialNo?: string | null
+    status: "ACTIVE" | "RETURNED" | "REPLACED" | "LOST" | "DAMAGED" | "WRITTEN_OFF"
+    returnedQty: number; issuedAt: string; acknowledgedAt?: string | null
+    asset: { id: string; assetCode: string; name: string; category: string }
+    request: { id: string; requestNo: string } | null
+}
+const ISSUE_TONE: Record<MyIssue["status"], { label: string; cls: string }> = {
+    ACTIVE: { label: "Active", cls: "bg-green-100 text-green-700" },
+    RETURNED: { label: "Returned", cls: "bg-gray-100 text-gray-600" },
+    REPLACED: { label: "Replaced", cls: "bg-sky-100 text-sky-700" },
+    LOST: { label: "Lost", cls: "bg-red-100 text-red-600" },
+    DAMAGED: { label: "Damaged", cls: "bg-orange-100 text-orange-700" },
+    WRITTEN_OFF: { label: "Written off", cls: "bg-gray-100 text-gray-700" },
+}
+
 function AssetsTab() {
     const [rows, setRows] = useState<any[] | null>(null)
-    useEffect(() => {
-        fetch("/api/me/assets").then(r => r.ok ? r.json() : []).then(setRows).catch(() => setRows([]))
-    }, [])
+    const [issues, setIssues] = useState<MyIssue[]>([])
+    const [acking, setAcking] = useState<string | null>(null)
+    function load() {
+        // withIssues=1 → { assignments, issues }; older servers answer with the plain array.
+        fetch("/api/me/assets?withIssues=1").then(r => r.ok ? r.json() : []).then(d => {
+            if (Array.isArray(d)) { setRows(d); setIssues([]) }
+            else { setRows(d?.assignments ?? []); setIssues(d?.issues ?? []) }
+        }).catch(() => setRows([]))
+    }
+    useEffect(() => { load() }, [])
+    async function acknowledge(i: MyIssue) {
+        setAcking(i.id)
+        try {
+            const res = await fetch(`/api/assets/issues/${i.id}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ACKNOWLEDGE" }),
+            })
+            if (!res.ok) {
+                const t = await res.text()
+                let msg = t
+                try { msg = JSON.parse(t).error || t } catch { /* plain text */ }
+                toast.error(msg || "Couldn't acknowledge"); return
+            }
+            toast.success(`Receipt of ${i.asset.name} acknowledged`)
+            load()
+        } finally { setAcking(null) }
+    }
     if (!rows) return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--accent)]" /></div>
-    const held = rows.filter(r => r.isActive && !r.returnedAt)
-    const returned = rows.filter(r => !r.isActive || r.returnedAt)
-    const fmt = (d?: string) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+    const fmt = (d?: string | null) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+    // Workflow issues carry their own EmployeeAsset row; show only the assignments
+    // that pre-date the workflow in the classic lists below.
+    const classic = rows.filter(r => !r.issue)
+    const held = classic.filter(r => r.isActive && !r.returnedAt)
+    const returned = classic.filter(r => !r.isActive || r.returnedAt)
+    const activeIssues = issues.filter(i => i.status === "ACTIVE")
+    const pendingAck = activeIssues.filter(i => !i.acknowledgedAt)
     const list = (items: any[], done: boolean) => items.map(r => (
         <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-b-0">
             <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${done ? "bg-[var(--surface2)] text-[var(--text3)]" : "bg-[var(--accent-light)] text-[var(--accent)]"}`}><Package size={16} /></div>
@@ -779,14 +824,68 @@ function AssetsTab() {
             {body}
         </div>
     )
+    const th = "text-left px-4 py-3 text-[11px] font-semibold text-[var(--text3)] uppercase tracking-[0.5px] whitespace-nowrap"
     return (
         <div className="space-y-4">
-            {card(`With you (${held.length})`, Package, held.length ? (
-                <>
-                    {list(held, false)}
-                    <p className="text-[11.5px] text-[var(--text3)] px-5 py-3 border-t border-[var(--border)]">These must be returned before your last working day; anything not returned is recovered from your final settlement.</p>
-                </>
+            <div className={statGridClass(4)}>
+                <StatCard label="Total issued" value={issues.length + classic.length} sub="all time" tone="blue" icon={<Package size={20} />} seed={0} />
+                <StatCard label="Currently active" value={activeIssues.length + held.length} sub="with you now" tone="green" icon={<CheckCircle2 size={20} />} seed={1} />
+                <StatCard label="Returned" value={issues.filter(i => i.status === "RETURNED").length + returned.length} sub="handed back" tone="slate" icon={<LogIn size={20} />} seed={2} />
+                <StatCard label="Pending acknowledgement" value={pendingAck.length} sub={pendingAck.length ? "confirm receipt below" : "all confirmed"} tone="amber" icon={<Clock size={20} />} seed={3} />
+            </div>
+
+            {issues.length > 0 && card(`Issued to you (${issues.length})`, Package, (
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-[13px]">
+                        <thead>
+                            <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
+                                <th className={th}>Asset</th><th className={th}>Issue date</th><th className={`${th} !text-right`}>Qty</th><th className={th}>Size</th>
+                                <th className={th}>Request ID</th><th className={th}>Issue No / Serial</th><th className={th}>Status</th><th className={th}></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                            {issues.map(i => {
+                                const tone = ISSUE_TONE[i.status] ?? ISSUE_TONE.ACTIVE
+                                return (
+                                    <tr key={i.id}>
+                                        <td className="px-4 py-3">
+                                            <p className="font-medium text-[var(--text)]">{i.asset.name}</p>
+                                            <p className="text-[11px] text-[var(--text3)]">{i.asset.assetCode} · {i.asset.category}</p>
+                                        </td>
+                                        <td className="px-4 py-3 text-[var(--text2)] whitespace-nowrap">{fmt(i.issuedAt)}</td>
+                                        <td className="px-4 py-3 text-right tabular-nums">{i.quantity}{i.returnedQty > 0 && <span className="block text-[10.5px] text-[var(--text3)]">{i.returnedQty} returned</span>}</td>
+                                        <td className="px-4 py-3 text-[var(--text2)]">{i.size || "—"}</td>
+                                        <td className="px-4 py-3 font-mono text-[11.5px] text-[var(--text2)]">{i.request?.requestNo ?? "—"}</td>
+                                        <td className="px-4 py-3 font-mono text-[11.5px]">
+                                            <span className="text-[var(--accent)] font-semibold">{i.issueNo}</span>
+                                            {i.serialNo && <span className="block text-[var(--text3)]">S/N {i.serialNo}</span>}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${tone.cls}`}>{tone.label}</span>
+                                            {i.acknowledgedAt && <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Acknowledged {fmt(i.acknowledgedAt)}</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {i.status === "ACTIVE" && !i.acknowledgedAt && (
+                                                <button onClick={() => acknowledge(i)} disabled={acking === i.id}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-60 whitespace-nowrap">
+                                                    {acking === i.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}Acknowledge
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            ))}
+
+            {(held.length > 0 || issues.length === 0) && card(`${issues.length ? "Earlier assignments with you" : "With you"} (${held.length})`, Package, held.length ? (
+                <>{list(held, false)}</>
             ) : <p className="text-[13px] text-[var(--text3)] px-5 py-6">No company assets are issued to you.</p>)}
+            {(activeIssues.length > 0 || held.length > 0) && (
+                <p className="text-[11.5px] text-[var(--text3)] px-1">Company assets must be returned before your last working day; anything not returned is recovered from your final settlement.</p>
+            )}
             {returned.length > 0 && card(`Returned (${returned.length})`, CheckCircle2, list(returned, true))}
         </div>
     )

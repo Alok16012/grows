@@ -151,6 +151,9 @@ export const PERMISSION_GROUPS = [
         permissions: [
             { key: "assets.view",   label: "View Assets" },
             { key: "assets.manage", label: "Assign / Return Assets" },
+            { key: "assets.request", label: "Raise asset requests" },
+            { key: "assets.approve", label: "Approve / reject asset requests" },
+            { key: "assets.issue",   label: "Issue assets, receive returns, manage stock" },
         ]
     },
     {
@@ -255,7 +258,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "attendance.view", "attendance.manage",
     "leaves.view", "leaves.manage", "leaves.approve",
     "payroll.view", "payroll.manage",
-    "assets.view", "assets.manage",
+    "assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue",
     "expenses.view", "expenses.manage",
     "performance.view", "performance.manage",
     "exit.view", "exit.manage",
@@ -275,7 +278,7 @@ export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "attendance.view", "attendance.manage",
     "leaves.view", "leaves.manage", "leaves.approve",
     "payroll.view", "payroll.manage",
-    "assets.view", "assets.manage",
+    "assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue",
     "expenses.view", "expenses.manage",
     "performance.view", "performance.manage",
     "exit.view", "exit.manage",
@@ -370,4 +373,24 @@ export function canSendDocuments(session: PermSession): boolean {
 // see what they issued, `documents.send`.
 export function canViewDocuments(session: PermSession): boolean {
     return checkAccess(session, [], "documents.view") || checkAccess(session, [], "documents.send")
+}
+
+// ─── Asset workflow ──────────────────────────────────────────────────────────
+// `assets.manage` predates the request → approve → issue split, so it implies
+// all three: roles granted it before the split keep every asset capability.
+export function canRequestAssets(session: PermSession): boolean {
+    return checkAccess(session, [], "assets.request") || checkAccess(session, [], "assets.manage")
+}
+
+export function canApproveAssets(session: PermSession): boolean {
+    return checkAccess(session, [], "assets.approve") || checkAccess(session, [], "assets.manage")
+}
+
+export function canIssueAssets(session: PermSession): boolean {
+    return checkAccess(session, [], "assets.issue") || checkAccess(session, [], "assets.manage")
+}
+
+// Sees every asset request / issue, not just the ones they raised.
+export function canOverseeAssets(session: PermSession): boolean {
+    return canApproveAssets(session) || canIssueAssets(session)
 }

@@ -786,6 +786,8 @@ model Employee {
   salaryRevisions       SalaryRevision[]
   advances              AdvanceAndReimbursement[]
   hrDocuments           HrDocument[]
+  assetRequestItems     AssetRequestItem[]
+  assetIssues           AssetIssue[]
 
   @@index([branchId])
   @@index([status])
@@ -1120,24 +1122,29 @@ enum AssetCondition {
 }
 
 model Asset {
-  id           String          @id @default(uuid())
-  assetCode    String          @unique
+  id           String             @id @default(uuid())
+  assetCode    String             @unique
   name         String
   category     String
   description  String?
   serialNo     String?
-  quantity     Int             @default(1)
-  available    Int             @default(1)
-  condition    AssetCondition  @default(NEW)
+  quantity     Int                @default(1)
+  available    Int                @default(1)
+  condition    AssetCondition     @default(NEW)
   purchaseDate DateTime?
   purchaseCost Float?
   vendor       String?
   location     String?
-  isActive     Boolean         @default(true)
+  isActive     Boolean            @default(true)
   createdBy    String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
   assignments  EmployeeAsset[]
+  // Asset workflow back-relations — relation fields only, no Asset columns.
+  requestItems AssetRequestItem[]
+  issues       AssetIssue[]
+  stockTxns    AssetStockTxn[]
+  meta         AssetMeta?
 
   @@index([category])
   @@index([isActive])
@@ -1157,10 +1164,133 @@ model EmployeeAsset {
   isActive        Boolean         @default(true)
   employee        Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   asset           Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  workflowIssue   AssetIssue?
 
   @@index([employeeId])
   @@index([assetId])
   @@index([isActive])
+}
+
+// ─── ASSET WORKFLOW (request → approve → issue → acknowledge → return) ───────
+// All in NEW tables on purpose: prod SQL is applied by hand
+// (prisma/migrations/20261024120000_asset_workflow), and code can deploy first.
+// A new column on Asset/EmployeeAsset would break every existing asset query
+// until then; missing tables only switch the workflow off (lib/asset-workflow).
+
+model AssetRequest {
+  id               String             @id @default(uuid())
+  requestNo        String             @unique
+  requestType      String // INDIVIDUAL | MULTIPLE
+  reason           String // NEW_JOINING | REPLACEMENT | DAMAGED | ADDITIONAL | OTHER
+  remarks          String?
+  attachmentUrl    String?
+  requestedBy      String // User.id
+  status           String             @default("SUBMITTED") // SUBMITTED | APPROVED | PARTIALLY_APPROVED | REJECTED | CANCELLED
+  fulfilmentStatus String             @default("NOT_ISSUED") // NOT_ISSUED | PARTIALLY_ISSUED | FULFILLED
+  decidedBy        String?
+  decidedAt        DateTime?
+  decisionNote     String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  items            AssetRequestItem[]
+
+  @@index([status])
+  @@index([requestedBy])
+  @@index([createdAt])
+}
+
+model AssetRequestItem {
+  id           String       @id @default(uuid())
+  requestId    String
+  employeeId   String
+  assetId      String
+  size         String?
+  requestedQty Int
+  approvedQty  Int?
+  issuedQty    Int          @default(0)
+  remarks      String?
+  request      AssetRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  // Restrict: an asset with request history is deactivated, not deleted.
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  issues       AssetIssue[]
+
+  @@index([requestId])
+  @@index([employeeId])
+  @@index([assetId])
+}
+
+model AssetIssue {
+  id              String            @id @default(uuid())
+  issueNo         String            @unique
+  requestItemId   String?
+  employeeAssetId String?           @unique
+  employeeId      String
+  assetId         String
+  quantity        Int
+  size            String?
+  serialNo        String?
+  issuedBy        String
+  issuedAt        DateTime          @default(now())
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?
+  idempotencyKey  String?           @unique
+  remarks         String?
+  attachmentUrl   String?
+  status          String            @default("ACTIVE") // ACTIVE | RETURNED | REPLACED | LOST | DAMAGED | WRITTEN_OFF
+  returnedQty     Int               @default(0)
+  replacesIssueId String?
+  createdAt       DateTime          @default(now())
+  requestItem     AssetRequestItem? @relation(fields: [requestItemId], references: [id], onDelete: SetNull)
+  employeeAsset   EmployeeAsset?    @relation(fields: [employeeAssetId], references: [id], onDelete: SetNull)
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  asset           Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([employeeId])
+  @@index([assetId])
+  @@index([requestItemId])
+  @@index([status])
+}
+
+// Stock ledger: every movement of Asset.available, with the balance after it.
+model AssetStockTxn {
+  id           String   @id @default(uuid())
+  assetId      String
+  type         String // OPENING | RECEIPT | ISSUE | RETURN | ADJUSTMENT | DAMAGED | LOST
+  qty          Int // signed: issue negative, return/receipt positive
+  balanceAfter Int
+  refType      String?
+  refId        String?
+  userId       String?
+  note         String?
+  createdAt    DateTime @default(now())
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([createdAt])
+}
+
+model AssetMeta {
+  assetId      String   @id
+  size         String?
+  reorderLevel Int      @default(0)
+  trackSerial  Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+model AssetAuditLog {
+  id        String   @id @default(uuid())
+  entity    String
+  entityId  String
+  action    String
+  userId    String?
+  reason    String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
 }
 
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────

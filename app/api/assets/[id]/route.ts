@@ -120,6 +120,10 @@ export async function DELETE(
         await prisma.asset.delete({ where: { id: params.id } })
         return NextResponse.json({ success: true })
     } catch (error) {
+        // Request/issue history (asset workflow) holds the row: keep it, deactivate instead.
+        if ((error as { code?: string })?.code === "P2003") {
+            return new NextResponse("This asset has request or issue history — deactivate it instead of deleting", { status: 400 })
+        }
         console.error("[ASSET_DELETE]", error)
         return new NextResponse("Internal Error", { status: 500 })
     }
