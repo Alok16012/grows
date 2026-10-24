@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getHrContacts } from "@/lib/hr-contacts"
 import { isPhotoDoc } from "@/lib/employee-photo"
+import { pendingTitles } from "@/lib/policy-signoff"
 import {
     collectErrors, validationResponse,
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
@@ -114,6 +115,17 @@ export async function POST(req: Request, { params }: { params: { token: string }
         })
         // The onboarding form reads a failed response with res.text().
         if (errors) return new NextResponse(validationResponse(errors).message, { status: 400 })
+
+        // Every policy for the designation being saved must be signed (step 3
+        // of the form). Checked before anything is written, like the fields above.
+        const pendingPolicies = await pendingTitles(existing.id, designation || existing.designation)
+        if (pendingPolicies.length > 0) {
+            return NextResponse.json({
+                error: `Sign these policies before submitting: ${pendingPolicies.join(", ")}`,
+                code: "POLICIES_PENDING",
+                pending: pendingPolicies,
+            }, { status: 409 })
+        }
 
         // 1. Update Employee Record
         const updatedEmployee = await prisma.employee.update({

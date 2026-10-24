@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { pendingTitles } from "@/lib/policy-signoff"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
@@ -132,18 +133,27 @@ export async function PUT(
             // Types are stored inconsistently cased ("PHOTO" vs "Photo").
             const heldTypes = new Set(held.map(d => d.type.toUpperCase()))
             const missing = REQUIRED_DOCS.filter(t => !heldTypes.has(t))
+            // Policies for the employee's designation that are still unsigned —
+            // e.g. HR corrected the designation after the joiner submitted.
+            const emp = await prisma.employee.findUnique({ where: { id: onboardingRecord.employeeId }, select: { designation: true } })
+            const pendingPolicies = await pendingTitles(onboardingRecord.employeeId, emp?.designation)
             // `force` lets HR approve a record that predates this check, or one
             // whose documents were collected on paper, rather than being stuck.
-            if (missing.length > 0 && !body.force) {
+            // Unsigned policies then stay pending on the employee's profile.
+            if ((missing.length > 0 || pendingPolicies.length > 0) && !body.force) {
                 const label: Record<string, string> = {
                     AADHAAR: "Aadhaar card", PAN: "PAN card", PHOTO: "Passport photo",
                     BANK_DETAILS: "Bank passbook / cancelled cheque",
                 }
+                const parts: string[] = []
+                if (missing.length) parts.push(`not on file: ${missing.map(m => label[m]).join(", ")}`)
+                if (pendingPolicies.length) parts.push(`policies not signed: ${pendingPolicies.join(", ")}`)
                 return NextResponse.json({
-                    error: "Missing documents",
+                    error: missing.length ? "Missing documents" : "Policies not signed",
                     missing,
+                    pendingPolicies,
                     canForce: true,
-                    message: `Cannot approve — not on file: ${missing.map(m => label[m]).join(", ")}.`,
+                    message: `Cannot approve — ${parts.join("; ")}.`,
                 }, { status: 400 })
             }
 

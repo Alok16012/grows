@@ -109,6 +109,15 @@ export const PERMISSION_GROUPS = [
         ]
     },
     {
+        group: "Policy Sign-off",
+        key: "policy",
+        permissions: [
+            { key: "policy.view",   label: "View policies" },
+            { key: "policy.manage", label: "Create, publish, assign & archive policies" },
+            { key: "policy.report", label: "View & export policy sign-offs" },
+        ]
+    },
+    {
         group: "Documents",
         key: "documents",
         permissions: [
@@ -254,6 +263,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "recruitment.view", "recruitment.manage",
     "jobs.view", "jobs.manage",
     "onboarding.view", "onboarding.manage",
+    "policy.view", "policy.manage", "policy.report",
     "documents.view", "documents.upload", "documents.send", "documents.verify",
     "attendance.view", "attendance.manage",
     "leaves.view", "leaves.manage", "leaves.approve",
@@ -274,6 +284,7 @@ export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "recruitment.view", "recruitment.manage",
     "jobs.view", "jobs.manage",
     "onboarding.view", "onboarding.manage",
+    "policy.view", "policy.manage", "policy.report",
     "documents.view", "documents.upload", "documents.verify",
     "attendance.view", "attendance.manage",
     "leaves.view", "leaves.manage", "leaves.approve",
@@ -410,4 +421,19 @@ export function canViewPerfHub(session: PermSession): boolean {
 // Filing your own KPI reports / register entries is self-service.
 export function canSelfServePerfHub(session: PermSession): boolean {
     return checkAccess(session, [], "self.view") || canViewPerfHub(session)
+}
+
+// ─── Policy sign-off ─────────────────────────────────────────────────────────
+// policy.manage writes policies; policy.report reads who signed what. Signing
+// itself is the employee's own (self-service / onboarding link), not a permission.
+export function canManagePolicies(session: PermSession): boolean {
+    return checkAccess(session, [], "policy.manage")
+}
+
+export function canReportPolicies(session: PermSession): boolean {
+    return checkAccess(session, [], "policy.report") || canManagePolicies(session)
+}
+
+export function canViewPolicies(session: PermSession): boolean {
+    return checkAccess(session, [], "policy.view") || canReportPolicies(session)
 }

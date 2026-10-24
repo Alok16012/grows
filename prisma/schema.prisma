@@ -781,6 +781,7 @@ model Employee {
   fieldTasks            FieldTask[]
   checkIns              FieldCheckIn[]
   policyAcknowledgments PolicyAcknowledgment[]
+  policySignoffs        SignoffAck[]
   iltAttendances        ILTAttendance[]
   courseFeedbacks       CourseFeedback[]
   employeeSalary        EmployeeSalary?
@@ -2432,4 +2433,99 @@ model Holiday {
   targetRoleIds String[] @default([])
 
   @@index([date])
+}
+
+// ─── Policy sign-off (onboarding policy acknowledgement) ─────────────────────
+// Separate from the LMS Policy / PolicyAcknowledgment pair: these policies are
+// versioned, mapped to designations, and signed with evidence (scroll time,
+// typed name, optional drawn signature, IP, user agent) against an immutable
+// version and its SHA-256 content hash. New tables only — scripts/policy-signoff.sql.
+
+model SignoffPolicy {
+  id                 String                     @id @default(uuid())
+  title              String
+  category           String?
+  status             String                     @default("DRAFT") // DRAFT | ACTIVE | ARCHIVED
+  requiresSignature  Boolean                    @default(true)
+  // Every designation, including ones that don't exist yet (e.g. Code of Conduct).
+  appliesToAll       Boolean                    @default(false)
+  currentVersionId   String?
+  draftContent       String                     @default("")
+  draftAttachmentUrl String?
+  draftEffectiveFrom DateTime?
+  draftChangeNote    String?
+  createdBy          String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  versions           SignoffPolicyVersion[]
+  designations       SignoffPolicyDesignation[]
+
+  @@index([status])
+}
+
+model SignoffPolicyVersion {
+  id            String        @id @default(uuid())
+  policyId      String
+  versionNo     Int
+  title         String
+  content       String
+  contentHash   String
+  attachmentUrl String?
+  changeNote    String?
+  effectiveFrom DateTime?
+  requireResign Boolean       @default(false)
+  publishedBy   String?
+  publishedAt   DateTime      @default(now())
+  policy        SignoffPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  acks          SignoffAck[]
+
+  @@unique([policyId, versionNo])
+  @@index([policyId])
+}
+
+model SignoffPolicyDesignation {
+  policyId       String
+  // Lower-cased, single-spaced designation: Employee.designation is free text.
+  designationKey String
+  designation    String
+  assignedBy     String?
+  assignedAt     DateTime      @default(now())
+  policy         SignoffPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@id([policyId, designationKey])
+  @@index([designationKey])
+}
+
+model SignoffAck {
+  id             String               @id @default(uuid())
+  employeeId     String
+  versionId      String
+  scrolledAt     DateTime?
+  signedAt       DateTime?
+  signatureType  String? // TYPED | DRAWN
+  typedName      String?
+  // PNG data URL, kept in the database rather than public storage.
+  signatureImage String?
+  ipAddress      String?
+  userAgent      String?
+  channel        String? // ONBOARDING_LINK | SELF_SERVICE
+  createdAt      DateTime             @default(now())
+  employee       Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  version        SignoffPolicyVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, versionId])
+  @@index([versionId])
+}
+
+model SignoffAudit {
+  id        String   @id @default(uuid())
+  actorId   String?
+  entity    String
+  entityId  String
+  action    String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
 }

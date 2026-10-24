@@ -5,11 +5,12 @@ import { toast } from "sonner"
 import { roleLabel } from "@/lib/role-label"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import { PolicySignStep } from "@/components/PolicySignStep"
 import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
-    UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut, Package
+    UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut, Package, FileSignature
 } from "lucide-react"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
@@ -973,7 +974,7 @@ function ChangePasswordCard() {
 
 export default function ProfilePage() {
     const { data: session, update } = useSession()
-    const [activeTab, setActiveTab] = useState<"profile"|"attendance"|"documents"|"onboarding"|"payslip"|"letters"|"assets">("profile")
+    const [activeTab, setActiveTab] = useState<"profile"|"attendance"|"documents"|"onboarding"|"payslip"|"letters"|"assets"|"policies">("profile")
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [formData, setFormData] = useState({ name: "", email: "", phone: "", role: "", image: "" })
@@ -1049,7 +1050,7 @@ export default function ProfilePage() {
 
     // Notification links can land on a tab (asset issued → ?tab=assets).
     const openTab = (key: string) => {
-        if (["attendance", "documents", "letters", "onboarding", "payslip", "assets"].includes(key)) setActiveTab(key as typeof activeTab)
+        if (["attendance", "documents", "letters", "onboarding", "payslip", "assets", "policies"].includes(key)) setActiveTab(key as typeof activeTab)
     }
 
     const tabs = [
@@ -1061,6 +1062,7 @@ export default function ProfilePage() {
             { key: "onboarding", label: "My Onboarding", icon: ClipboardList },
             { key: "payslip",    label: "My Payslip",    icon: IndianRupee },
             { key: "assets",     label: "My Assets",     icon: Package },
+            { key: "policies",   label: "My Policies",   icon: FileSignature },
         ] : [])
     ] as { key: typeof activeTab; label: string; icon: any }[]
 
@@ -1162,6 +1164,13 @@ export default function ProfilePage() {
             {activeTab === "onboarding" && <OnboardingTab />}
             {activeTab === "payslip"    && <PayslipTab />}
             {activeTab === "assets"     && <AssetsTab />}
+            {activeTab === "policies"   && (
+                <div className="bg-white border border-[var(--border)] rounded-2xl p-5">
+                    <p className="text-[15px] font-semibold text-[var(--text)] mb-0.5">My Policies</p>
+                    <p className="text-[12px] text-[var(--text3)] mb-4">Company policies for your designation. New or updated ones that need your signature show here.</p>
+                    <PolicySignStep source={{ kind: "self" }} theme="light" />
+                </div>
+            )}
         </div>
     )
 }

@@ -4,7 +4,7 @@ import { COMPANY } from "@/lib/company"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
-    Search, Loader2, CheckCircle2, XCircle, Clock,
+    Search, Loader2, CheckCircle2, XCircle, Clock, AlertCircle,
     User, Phone, MapPin, X, ChevronRight, ChevronLeft, MoreVertical,
     Building2, Calendar, RefreshCw, FileText, Eye, Link2, Copy, Check,
     Users, ClipboardList, SlidersHorizontal, ChevronsUpDown,
@@ -153,6 +153,46 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
+// Which policies this candidate has signed for their designation (step 3 of joining).
+type PolicyRow = { policyId: string; title: string; versionNo: number; status: "TO_READ" | "READY" | "SIGNED"; signedAt: string | null; signedVersionNo: number | null; ackId: string | null }
+function PolicySignoffPanel({ employeeId }: { employeeId: string }) {
+    const [data, setData] = useState<{ ready: boolean; designation?: string | null; policies: PolicyRow[] } | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    useEffect(() => {
+        let stop = false
+        fetch(`/api/policies/employee/${employeeId}`)
+            .then(async r => { const j = await r.json().catch(() => null); if (!r.ok) throw new Error(j?.error || "Couldn't load policies"); return j })
+            .then(j => { if (!stop) setData(j) })
+            .catch(err => { if (!stop) setError(err.message) })
+        return () => { stop = true }
+    }, [employeeId])
+    if (error) return <p style={{ fontSize: 13, color: "var(--text3)" }}>{error}</p>
+    if (!data) return <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text3)" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></div>
+    if (!data.ready) return <p style={{ fontSize: 13, color: "var(--text3)" }}>Policy sign-off isn&apos;t set up yet.</p>
+    const signed = data.policies.filter(p => p.status === "SIGNED").length
+    return (
+        <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid var(--border)" }}>
+                Policy sign-off · {signed} of {data.policies.length} signed{data.designation ? ` · ${data.designation}` : ""}
+            </div>
+            {data.policies.length === 0 ? (
+                <p style={{ fontSize: 13, color: "var(--text3)" }}>No policies apply to this designation.</p>
+            ) : data.policies.map(p => (
+                <div key={p.policyId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", marginBottom: 8 }}>
+                    {p.status === "SIGNED" ? <CheckCircle2 size={16} style={{ color: "#16a34a", flexShrink: 0 }} /> : <AlertCircle size={16} style={{ color: "#d97706", flexShrink: 0 }} />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", margin: 0 }}>{p.title} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 11.5 }}>v{p.versionNo}</span></p>
+                        <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>
+                            {p.status === "SIGNED" ? `Signed ${p.signedAt ? format(new Date(p.signedAt), "dd MMM yyyy, HH:mm") : ""}${p.signedVersionNo && p.signedVersionNo !== p.versionNo ? ` (v${p.signedVersionNo})` : ""}` : p.status === "READY" ? "Read, not signed yet" : "Not read yet"}
+                        </p>
+                    </div>
+                    {p.ackId && <a href={`/api/policies/acks/${p.ackId}/pdf`} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>PDF</a>}
+                </div>
+            ))}
+        </div>
+    )
+}
+
 function DetailModal({ record: listRecord, onClose, onAction }: {
     record: OnboardingRecord
     onClose: () => void
@@ -177,7 +217,7 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
     }, [listRecord.id])
 
     const e = record.employee
-    const [tab, setTab] = useState<"personal" | "employment" | "bank" | "safety" | "docs">("personal")
+    const [tab, setTab] = useState<"personal" | "employment" | "bank" | "safety" | "policies" | "docs">("personal")
     const [acting, setActing] = useState(false)
     const [showReject, setShowReject] = useState(false)
     const [rejectReason, setRejectReason] = useState(listRecord.notes || "")
@@ -263,9 +303,9 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
 
                     {/* Tabs */}
                     <div className="z-tabs-wrap" style={{ paddingBottom: 12 }}><div className="z-tabs z-tabs--inset" role="tablist">
-                        {(["personal", "employment", "bank", "safety", "docs"] as const).map(t => (
+                        {(["personal", "employment", "bank", "safety", "policies", "docs"] as const).map(t => (
                             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={tabCls(t)}>
-                                {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "bank" ? "Bank & Compliance" : t === "safety" ? "Safety" : `Documents${docs.length ? ` (${docs.length})` : ""}`}
+                                {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "bank" ? "Bank & Compliance" : t === "safety" ? "Safety" : t === "policies" ? "Policies" : `Documents${docs.length ? ` (${docs.length})` : ""}`}
                             </button>
                         ))}
                     </div></div>
@@ -369,6 +409,8 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
                             <Field label="Safety Shoes" value={e.safetyShoes} />
                         </Section>
                     )}
+
+                    {tab === "policies" && <PolicySignoffPanel employeeId={e.id} />}
 
                     {tab === "docs" && (
                         <div>

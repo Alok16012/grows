@@ -7,8 +7,9 @@ import {
     User, MapPin, Shield, CreditCard, Users, CheckCircle2,
     ChevronRight, ChevronLeft, Save, Loader2, AlertCircle,
     RefreshCw, BadgeCheck, Clock, Building2, CalendarDays,
-    FileText, UploadCloud
+    FileText, UploadCloud, FileSignature
 } from "lucide-react"
+import { PolicySignStep, type PolicyProgress } from "@/components/PolicySignStep"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
@@ -54,13 +55,16 @@ function completion(p: EmpProfile | null) {
 }
 
 // ── Steps config ─────────────────────────────────────────────────────────────
+// Policies sit third, right after the details that decide who you are.
+const POLICY_STEP = 3
 const STEPS = [
-    { id: 1, label: "Personal",  icon: User,       desc: "Basic identity & contact" },
-    { id: 2, label: "Address",   icon: MapPin,      desc: "Current & permanent address" },
-    { id: 3, label: "Documents", icon: Shield,      desc: "Aadhar, PAN & statutory IDs" },
-    { id: 4, label: "Bank",      icon: CreditCard,  desc: "Salary bank account details" },
-    { id: 5, label: "Emergency", icon: Users,       desc: "Emergency contacts" },
-    { id: 6, label: "Uploads",   icon: FileText,    desc: "Upload identity documents" },
+    { id: 1, label: "Personal",  icon: User,          desc: "Basic identity & contact" },
+    { id: 2, label: "Address",   icon: MapPin,        desc: "Current & permanent address" },
+    { id: 3, label: "Policies",  icon: FileSignature, desc: "Read and sign company policies" },
+    { id: 4, label: "Documents", icon: Shield,        desc: "Aadhar, PAN & statutory IDs" },
+    { id: 5, label: "Bank",      icon: CreditCard,    desc: "Salary bank account details" },
+    { id: 6, label: "Emergency", icon: Users,         desc: "Emergency contacts" },
+    { id: 7, label: "Uploads",   icon: FileText,      desc: "Upload identity documents" },
 ]
 
 const DOC_UPLOAD_TYPES = [
@@ -200,7 +204,22 @@ export default function SelfOnboardingPage() {
         finally { setSaving(false) }
     }
 
-    const saveAndNext = async () => { await save(); if (step < STEPS.length) setStep(s => s + 1) }
+    const [policyProgress, setPolicyProgress] = useState<PolicyProgress | null>(null)
+    const onPolicyProgress = useCallback((p: PolicyProgress) => setPolicyProgress(p), [])
+
+    const saveAndNext = async () => {
+        // Nothing to save on the policy step — each policy is saved when signed.
+        if (step === POLICY_STEP) {
+            if (policyProgress && !policyProgress.allSigned) {
+                toast.error(policyProgress.loading ? "Loading policies…" : `Sign all policies to continue (${policyProgress.signed} of ${policyProgress.total} signed)`)
+                return
+            }
+            setStep(s => s + 1)
+            return
+        }
+        await save()
+        if (step < STEPS.length) setStep(s => s + 1)
+    }
 
     const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
         const file = e.target.files?.[0]
@@ -476,8 +495,13 @@ export default function SelfOnboardingPage() {
                     </div>
                 )}
 
-                {/* ── Step 3: Documents / Statutory ─────────────────────── */}
-                {step === 3 && (
+                {/* ── Step 3: Policies ─────────────────────────────────── */}
+                {step === POLICY_STEP && (
+                    <PolicySignStep source={{ kind: "self" }} theme="light" onProgress={onPolicyProgress} />
+                )}
+
+                {/* ── Step 4: Documents / Statutory ─────────────────────── */}
+                {step === 4 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                         <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1d4ed8" }}>
                             Ensure your Aadhar and PAN numbers are accurate — they are used for PF, ESIC and income tax processing.
@@ -502,8 +526,8 @@ export default function SelfOnboardingPage() {
                     </div>
                 )}
 
-                {/* ── Step 4: Bank Details ──────────────────────────────── */}
-                {step === 4 && (
+                {/* ── Step 5: Bank Details ──────────────────────────────── */}
+                {step === 5 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                         <div style={{ padding: "10px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #86efac", fontSize: 12, color: "#15803d" }}>
                             Your salary will be credited to this account. Please double-check the account number and IFSC code.
@@ -528,8 +552,8 @@ export default function SelfOnboardingPage() {
                     </div>
                 )}
 
-                {/* ── Step 5: Emergency Contacts ────────────────────────── */}
-                {step === 5 && (
+                {/* ── Step 6: Emergency Contacts ────────────────────────── */}
+                {step === 6 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                         <div>
                             <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", marginBottom: 12 }}>Primary Emergency Contact</p>
@@ -558,7 +582,7 @@ export default function SelfOnboardingPage() {
                         <div style={{ background: "var(--surface2)", borderRadius: 12, padding: "16px 20px", border: "1px solid var(--border)" }}>
                             <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", margin: "0 0 12px" }}>Onboarding Summary</p>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                                {STEPS.slice(0, 5).map(s => {
+                                {STEPS.slice(0, 6).map(s => {
                                     const Icon = s.icon
                                     return (
                                         <div key={s.id} onClick={() => setStep(s.id)}
@@ -577,8 +601,8 @@ export default function SelfOnboardingPage() {
                     </div>
                 )}
 
-                {/* ── Step 6: Upload Docs ───────────────────────────────── */}
-                {step === 6 && (
+                {/* ── Step 7: Upload Docs ───────────────────────────────── */}
+                {step === 7 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1d4ed8" }}>
                             Upload clear, legible copies of each document. Accepted formats: PDF, JPG, PNG.

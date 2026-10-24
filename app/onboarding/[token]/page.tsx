@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import {
     UploadCloud, CheckCircle2, AlertCircle, FileText, Loader2,
-    User, Banknote, ShieldAlert, Phone, MapPin, ChevronRight, ChevronLeft, Camera
+    User, Banknote, ShieldAlert, Phone, MapPin, ChevronRight, ChevronLeft, Camera, FileSignature
 } from "lucide-react"
+import { PolicySignStep, type PolicyProgress } from "@/components/PolicySignStep"
 import { toast } from "sonner"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
@@ -96,14 +97,18 @@ const DOC_TYPES: { type: string; label: string }[] = [
     { type: "BANK_DETAILS", label: "Bank Proof" },
 ]
 
+// Policies sit third: the designation picked on step 1 decides which ones apply.
+const POLICY_STEP = 3
 const STEPS = [
     { id: 1, label: "Personal", icon: User },
     { id: 2, label: "Address", icon: MapPin },
-    { id: 3, label: "Emergency", icon: Phone },
-    { id: 4, label: "KYC", icon: ShieldAlert },
-    { id: 5, label: "Bank", icon: Banknote },
-    { id: 6, label: "Documents", icon: FileText },
+    { id: 3, label: "Policies", icon: FileSignature },
+    { id: 4, label: "Emergency", icon: Phone },
+    { id: 5, label: "KYC", icon: ShieldAlert },
+    { id: 6, label: "Bank", icon: Banknote },
+    { id: 7, label: "Documents", icon: FileText },
 ]
+const DOCS_STEP = 7
 
 // ─── Input helpers ─────────────────────────────────────────────────────────────
 
@@ -136,6 +141,8 @@ export default function OnboardingPortal() {
     const [photoUploading, setPhotoUploading] = useState(false)
     const [sites, setSites] = useState<SiteOption[]>([])
     const [hrUsers, setHrUsers] = useState<HrOption[]>([])
+    const [policyProgress, setPolicyProgress] = useState<PolicyProgress | null>(null)
+    const onPolicyProgress = useCallback((p: PolicyProgress) => setPolicyProgress(p), [])
 
     useEffect(() => {
         if (!token) return
@@ -287,7 +294,7 @@ export default function OnboardingPortal() {
         if (firstError) { toast.error(firstError); return }
         if (missingRequiredDocs.length > 0) {
             toast.error(`Upload required documents: ${missingRequiredDocs.map(d => d.label).join(", ")}`)
-            setStep(6)
+            setStep(DOCS_STEP)
             return
         }
         setSubmitting(true)
@@ -297,7 +304,19 @@ export default function OnboardingPortal() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...form, uploadedDocs: docs }),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) {
+                const raw = await res.text()
+                let parsed: { code?: string; error?: string } | null = null
+                try { parsed = JSON.parse(raw) } catch { /* plain-text error */ }
+                // The server re-checks policies against the designation being saved.
+                if (parsed?.code === "POLICIES_PENDING") {
+                    toast.error(parsed.error || "Sign all policies before submitting")
+                    setStep(POLICY_STEP)
+                    window.scrollTo({ top: 0, behavior: "smooth" })
+                    return
+                }
+                throw new Error(parsed?.error || raw)
+            }
             toast.success("Details submitted for verification!")
             window.location.reload()
         } catch (err: any) {
@@ -573,8 +592,21 @@ export default function OnboardingPortal() {
                         </div>
                     )}
 
-                    {/* STEP 3 — Emergency Contacts */}
-                    {step === 3 && (
+                    {/* STEP 3 — Policies: read to the end and sign */}
+                    {step === POLICY_STEP && (
+                        <div>
+                            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Company Policies</h2>
+                            <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
+                                Read every policy for your role to the end and sign it. You can&apos;t submit your joining form until all of them are signed.
+                            </p>
+                            <PolicySignStep theme="dark" onProgress={onPolicyProgress}
+                                source={{ kind: "token", token, designation: form.designation }}
+                                emptyDesignationHint="Enter your Designation / Job Role on step 1 first — the policies you sign depend on it." />
+                        </div>
+                    )}
+
+                    {/* STEP 4 — Emergency Contacts */}
+                    {step === 4 && (
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Emergency Contacts</h2>
 
@@ -592,8 +624,8 @@ export default function OnboardingPortal() {
                         </div>
                     )}
 
-                    {/* STEP 4 — KYC */}
-                    {step === 4 && (
+                    {/* STEP 5 — KYC */}
+                    {step === 5 && (
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>KYC Verification</h2>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -647,8 +679,8 @@ export default function OnboardingPortal() {
                         </div>
                     )}
 
-                    {/* STEP 5 — Bank Details */}
-                    {step === 5 && (
+                    {/* STEP 6 — Bank Details */}
+                    {step === 6 && (
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Bank Details</h2>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -677,8 +709,8 @@ export default function OnboardingPortal() {
                         </div>
                     )}
 
-                    {/* STEP 6 — Documents */}
-                    {step === 6 && (
+                    {/* STEP 7 — Documents */}
+                    {step === 7 && (
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Document Uploads</h2>
                             <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>Upload clear, legible copies of each document.</p>
@@ -738,6 +770,13 @@ export default function OnboardingPortal() {
                     )}
                     {step < STEPS.length ? (
                         <button onClick={() => {
+                            // Every policy must be signed before moving past the policy step.
+                            if (step === POLICY_STEP && policyProgress && !policyProgress.allSigned) {
+                                toast.error(policyProgress.loading
+                                    ? "Loading policies…"
+                                    : `Sign all policies to continue (${policyProgress.signed} of ${policyProgress.total} signed)`)
+                                return
+                            }
                             setStep(s => s + 1)
                             // Back to the top of the new step — on a phone you tap
                             // Continue at the bottom and otherwise land at the bottom
