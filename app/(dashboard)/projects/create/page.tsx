@@ -10,7 +10,7 @@ import {
 } from "@/components/StaffPicker"
 import {
     ChevronLeft, Loader2, FileText, Users, Search, ShieldCheck,
-    CheckCircle2, Globe, Sparkles, Lock, Phone,
+    CheckCircle2, XCircle, Globe, Sparkles, Lock, Phone,
 } from "lucide-react"
 
 type Site = { id: string; name: string; code?: string | null; city?: string | null }
@@ -30,6 +30,8 @@ const STATUS_OPTIONS = [
 
 const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
 const selectCls = inputCls + " cursor-pointer"
+// Red border once a field has a visible error — paired with the message below it.
+const errCls = " border-[var(--red)] focus:border-[var(--red)]"
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
     return (
@@ -37,6 +39,57 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
             {children}{required && <span className="text-[var(--red)] ml-0.5">*</span>}
         </label>
     )
+}
+
+function FieldError({ msg }: { msg?: string }) {
+    if (!msg) return null
+    return <p className="text-[11px] text-[var(--red)] mt-1">{msg}</p>
+}
+
+type FormState = {
+    name: string; description: string; siteId: string; projectType: string
+    startDate: string; endDate: string; priority: string; status: string
+}
+type Errors = Partial<Record<keyof FormState | "managers" | "inspectors", string>>
+
+// The five asterisked fields + team + date range. Drafts (Save as Draft) only
+// go through the first two rules — they are a parking spot, not a project.
+function validate(form: FormState, managerIds: string[], inspectorIds: string[], draft: boolean): Errors {
+    const e: Errors = {}
+    if (!form.name.trim()) e.name = "Project Name is required"
+    if (!form.siteId) e.siteId = "Site is required"
+    // A draft may leave dates blank, but not contradict itself.
+    if (form.startDate && form.endDate && form.endDate < form.startDate) {
+        e.endDate = "Target End Date must be on or after Estimated Start Date"
+    }
+    if (draft) return e
+    if (!form.projectType) e.projectType = "Project Type is required"
+    if (!form.startDate) e.startDate = "Estimated Start Date is required"
+    if (!form.endDate) e.endDate = "Target End Date is required"
+    if (!form.priority) e.priority = "Priority is required"
+    if (!form.status) e.status = "Status is required"
+    if (managerIds.length === 0) e.managers = "At least one Manager is required"
+    if (inspectorIds.length === 0) e.inspectors = "At least one Inspector is required"
+    return e
+}
+
+const FIELD_NAMES: Record<string, string> = {
+    name: "Project Name", siteId: "Site", projectType: "Project Type", startDate: "Estimated Start Date",
+    endDate: "Target End Date", priority: "Priority", status: "Status",
+}
+
+// One toast, same wording as the API's 400, so the user sees the same text
+// whichever side catches it.
+function summarizeErrors(e: Errors): string {
+    const missing = Object.entries(e)
+        .filter(([k, v]) => FIELD_NAMES[k] && v?.endsWith("is required"))
+        .map(([k]) => FIELD_NAMES[k])
+    const parts: string[] = []
+    if (missing.length) parts.push(`Missing required fields: ${missing.join(", ")}`)
+    if (e.endDate && !e.endDate.endsWith("is required")) parts.push(e.endDate)
+    if (e.managers) parts.push(e.managers)
+    if (e.inspectors) parts.push(e.inspectors)
+    return parts.join(". ")
 }
 
 function PersonCard({ person, checked, onToggle, showContact }: {
@@ -91,12 +144,15 @@ function CreateProjectForm() {
     const [managerScope, setManagerScope] = useState("")
     const [inspectorScope, setInspectorScope] = useState("")
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<FormState>({
         name: "", description: "", siteId: "", projectType: "",
         startDate: "", endDate: "", priority: "Medium", status: "PLANNING",
     })
     const [managerIds, setManagerIds] = useState<string[]>([])
     const [inspectorIds, setInspectorIds] = useState<string[]>([])
+    // Errors are computed live but only shown after the first failed attempt, so
+    // a fresh form isn't a wall of red; once shown they clear as fields are fixed.
+    const [attempted, setAttempted] = useState<false | "create" | "draft">(false)
 
     useEffect(() => {
         if (initialSiteId) setForm(f => ({ ...f, siteId: initialSiteId }))
@@ -160,17 +216,30 @@ function CreateProjectForm() {
     const filteredInspectors = useMemo(() => matchPeople(inspectors, inspectorSearch), [inspectors, inspectorSearch])
 
 
+    const fullErrors = useMemo(() => validate(form, managerIds, inspectorIds, false), [form, managerIds, inspectorIds])
+    const draftErrors = useMemo(() => validate(form, managerIds, inspectorIds, true), [form, managerIds, inspectorIds])
+    // Which rule set the user last tried to satisfy decides what is underlined.
+    const shown: Errors = attempted === "create" ? fullErrors : attempted === "draft" ? draftErrors : {}
+
+    const dateRangeOk = !form.startDate || !form.endDate || form.endDate >= form.startDate
     const requirements = [
-        { label: "Project Name is required", ok: form.name.trim().length > 0 },
-        { label: "Site selection is required", ok: !!form.siteId },
-        { label: "At least one Manager is required", ok: managerIds.length > 0 },
-        { label: "At least one Inspector is required", ok: inspectorIds.length > 0 },
+        { label: "Project Name is required", ok: !fullErrors.name },
+        { label: "Site selection is required", ok: !fullErrors.siteId },
+        { label: "Project Type is required", ok: !fullErrors.projectType },
+        { label: "Estimated Start Date is required", ok: !fullErrors.startDate },
+        { label: "Target End Date is required", ok: !!form.endDate },
+        { label: "Target End Date is on or after Estimated Start Date", ok: !!form.startDate && !!form.endDate && dateRangeOk },
+        { label: "Priority is required", ok: !fullErrors.priority },
+        { label: "Status is required", ok: !fullErrors.status },
+        { label: "At least one Manager is required", ok: !fullErrors.managers },
+        { label: "At least one Inspector is required", ok: !fullErrors.inspectors },
     ]
-    const canSubmit = form.name.trim().length > 0 && !!form.siteId
 
     const submit = async (mode: "create" | "draft") => {
-        if (!canSubmit) {
-            toast.error("Project Name and Site are required")
+        const errors = mode === "draft" ? draftErrors : fullErrors
+        setAttempted(mode)
+        if (Object.keys(errors).length > 0) {
+            toast.error(summarizeErrors(errors))
             return
         }
         setSaving(mode)
@@ -180,7 +249,9 @@ function CreateProjectForm() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...form,
-                    status: mode === "draft" ? "PLANNING" : form.status,
+                    // DRAFT is a real status: hidden from assignment pickers and
+                    // shown with its own badge, instead of posing as PLANNING.
+                    status: mode === "draft" ? "DRAFT" : form.status,
                     startDate: form.startDate || undefined,
                     endDate: form.endDate || undefined,
                     managerIds,
@@ -228,7 +299,8 @@ function CreateProjectForm() {
                             <div>
                                 <FieldLabel required>Project Name</FieldLabel>
                                 <input value={form.name} onChange={e => set("name", e.target.value)}
-                                    className={inputCls} placeholder="e.g. Annual Electrical Safety Audit" />
+                                    className={inputCls + (shown.name ? errCls : "")} placeholder="e.g. Annual Electrical Safety Audit" />
+                                <FieldError msg={shown.name} />
                             </div>
                             <div className="sm:row-span-2">
                                 <FieldLabel>Description</FieldLabel>
@@ -240,39 +312,47 @@ function CreateProjectForm() {
                             </div>
                             <div>
                                 <FieldLabel required>Site</FieldLabel>
-                                <select value={form.siteId} onChange={e => changeSite(e.target.value)} className={selectCls} disabled={loadingSites}>
+                                <select value={form.siteId} onChange={e => changeSite(e.target.value)} className={selectCls + (shown.siteId ? errCls : "")} disabled={loadingSites}>
                                     <option value="">{loadingSites ? "Loading sites..." : "Select a site"}</option>
                                     {sites.map(s => (
                                         <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>
                                     ))}
                                 </select>
+                                <FieldError msg={shown.siteId} />
                             </div>
                             <div>
                                 <FieldLabel required>Project Type</FieldLabel>
-                                <select value={form.projectType} onChange={e => set("projectType", e.target.value)} className={selectCls}>
+                                <select value={form.projectType} onChange={e => set("projectType", e.target.value)} className={selectCls + (shown.projectType ? errCls : "")}>
                                     <option value="">Select project type</option>
                                     {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
+                                <FieldError msg={shown.projectType} />
                             </div>
                             <div>
                                 <FieldLabel required>Estimated Start Date</FieldLabel>
-                                <input type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)} className={inputCls} />
+                                <input type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)} className={inputCls + (shown.startDate ? errCls : "")} />
+                                <FieldError msg={shown.startDate} />
                             </div>
                             <div>
                                 <FieldLabel required>Target End Date</FieldLabel>
-                                <input type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} className={inputCls} />
+                                {/* min stops the native picker offering days before the start. */}
+                                <input type="date" value={form.endDate} min={form.startDate || undefined}
+                                    onChange={e => set("endDate", e.target.value)} className={inputCls + (shown.endDate ? errCls : "")} />
+                                <FieldError msg={shown.endDate} />
                             </div>
                             <div>
                                 <FieldLabel required>Priority</FieldLabel>
-                                <select value={form.priority} onChange={e => set("priority", e.target.value)} className={selectCls}>
+                                <select value={form.priority} onChange={e => set("priority", e.target.value)} className={selectCls + (shown.priority ? errCls : "")}>
                                     {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.value}</option>)}
                                 </select>
+                                <FieldError msg={shown.priority} />
                             </div>
                             <div>
                                 <FieldLabel required>Status</FieldLabel>
-                                <select value={form.status} onChange={e => set("status", e.target.value)} className={selectCls}>
+                                <select value={form.status} onChange={e => set("status", e.target.value)} className={selectCls + (shown.status ? errCls : "")}>
                                     {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                 </select>
+                                <FieldError msg={shown.status} />
                             </div>
                         </div>
                     </div>
@@ -330,6 +410,7 @@ function CreateProjectForm() {
                                 </p>
                             </>
                         )}
+                        <FieldError msg={shown.managers} />
                     </div>
 
                     {/* Inspectors */}
@@ -385,6 +466,7 @@ function CreateProjectForm() {
                                 </p>
                             </>
                         )}
+                        <FieldError msg={shown.inspectors} />
                     </div>
 
                     {/* Footer actions */}
@@ -437,11 +519,14 @@ function CreateProjectForm() {
                         <ul className="space-y-2">
                             {requirements.map(r => (
                                 <li key={r.label} className="flex items-center gap-2 text-[12px]">
-                                    <CheckCircle2 size={14} className={r.ok ? "text-[var(--accent)]" : "text-[var(--text3)] opacity-40"} />
-                                    <span className={r.ok ? "text-[var(--text)]" : "text-[var(--text3)]"}>{r.label}</span>
+                                    {r.ok
+                                        ? <CheckCircle2 size={14} className="text-[#16a34a] shrink-0" />
+                                        : <XCircle size={14} className="text-[var(--red)] shrink-0" />}
+                                    <span className={r.ok ? "text-[var(--text)]" : "text-[var(--red)]"}>{r.label}</span>
                                 </li>
                             ))}
                         </ul>
+                        <p className="text-[11px] text-[var(--text3)] mt-3">Save as Draft only needs Project Name and Site. Drafts can&apos;t be assigned work until they are created.</p>
                     </div>
 
                     <div className={sectionCls}>

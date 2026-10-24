@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess, INSPECTION_PERMISSIONS, PROJECT_MANAGER_PERMISSIONS } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
+import { unassignableUserWhere, UNASSIGNABLE_USER_SELECT, unassignableMessage } from "@/lib/employee-filter"
 
 // The site team: which staff work at this site. Membership is many-to-many, so one
 // inspector can cover several sites at once — the HR Deployment record cannot say
@@ -97,6 +98,11 @@ export async function POST(
 
         const site = await prisma.site.findUnique({ where: { id: params.id }, select: { id: true } })
         if (!site) return new NextResponse("Site not found", { status: 404 })
+
+        // A resigned / terminated / inactive employee must not join a site team —
+        // the pickers would then offer them for projects.
+        const blocked = await prisma.user.findFirst({ where: unassignableUserWhere(userIds), select: UNASSIGNABLE_USER_SELECT })
+        if (blocked) return new NextResponse(unassignableMessage(blocked), { status: 400 })
 
         // Only staff who could actually be picked on a project are worth adding —
         // otherwise the team fills up with people no picker will ever show.

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { normalizeEmploymentType } from "@/lib/employment-type"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
@@ -238,7 +239,7 @@ export async function POST(req: Request) {
                     email:         strN(row.email),
                     alternatePhone: strN(row.alternatePhone),
                     designation:   strN(row.designation),
-                    employmentType: str(row.employmentType) || "Full-time",
+                    employmentType: normalizeEmploymentType(str(row.employmentType)) || "Full-time",
                     status:        "ACTIVE",
                     onboardingToken,
                     dateOfJoining: dt(row.dateOfJoining),

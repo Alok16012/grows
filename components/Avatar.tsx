@@ -30,7 +30,10 @@ export function Avatar({
     size?: number
     className?: string
 }) {
-    const [imgErr, setImgErr] = useState(false)
+    // Remember WHICH src failed, so a new photo prop on a reused instance (list
+    // re-sort, pagination) gets its own attempt instead of inheriting the error.
+    const [failedSrc, setFailedSrc] = useState<string | null>(null)
+    const imgErr = !!photo && failedSrc === photo
     const first = firstProp || firstName || name?.split(" ")[0] || ""
     const last = lastProp || lastNameProp || name?.split(" ").slice(1).join(" ") || ""
     const initials = `${first[0] || ""}${last[0] || ""}`.toUpperCase()
@@ -44,7 +47,7 @@ export function Avatar({
                 width={size}
                 height={size}
                 className={`rounded-full object-cover shrink-0 select-none ${className}`}
-                onError={() => setImgErr(true)}
+                onError={() => setFailedSrc(photo)}
             />
         )
     }

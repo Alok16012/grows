@@ -84,7 +84,8 @@ export async function GET() {
             }
         })
 
-        return NextResponse.json(latestCheckIns)
+        // "Refresh" on the Field Activity tab must hit the DB, never a cached copy.
+        return NextResponse.json(latestCheckIns, { headers: { "Cache-Control": "no-store" } })
     } catch (error) {
         console.error("[FIELD_CHECKINS_LATEST_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })

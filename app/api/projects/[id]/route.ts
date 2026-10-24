@@ -5,6 +5,7 @@ import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
+import { unassignableUserWhere, UNASSIGNABLE_USER_SELECT, unassignableMessage } from "@/lib/employee-filter"
 
 export async function GET(
     req: Request,
@@ -72,6 +73,17 @@ export async function PUT(
         const { name, description, reportConfig, siteId, managerIds, inspectorIds, projectType, priority, status, startDate, endDate } = body
         const projectId = params.id
 
+        // PUT is a partial update (report-config sends only reportConfig), so the
+        // checks below run on the merged result, not the bare body.
+        const existing = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: {
+                status: true, projectType: true, priority: true, startDate: true, endDate: true,
+                _count: { select: { projectManagers: true, projectInspectors: true } },
+            },
+        })
+        if (!existing) return new NextResponse("Not Found", { status: 404 })
+
         const updateData: any = {}
         if (name !== undefined) {
             if (!name) return new NextResponse("Name is required", { status: 400 })
@@ -81,17 +93,70 @@ export async function PUT(
         if (reportConfig !== undefined) updateData.reportConfig = reportConfig
         if (projectType !== undefined) updateData.projectType = projectType || null
         if (priority !== undefined) updateData.priority = priority || null
-        if (status !== undefined) {
-            const VALID_STATUSES = ["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]
-            if (VALID_STATUSES.includes(status)) updateData.status = status
-        }
+        const VALID_STATUSES = ["DRAFT", "PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]
+        if (status !== undefined && VALID_STATUSES.includes(status)) updateData.status = status
         if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null
         if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null
+        for (const k of ["startDate", "endDate"] as const) {
+            if (updateData[k] instanceof Date && isNaN(updateData[k].getTime())) {
+                return new NextResponse(`${k === "startDate" ? "Estimated Start Date" : "Target End Date"} is not a valid date`, { status: 400 })
+            }
+        }
+
+        const nextStatus: string = updateData.status ?? existing.status
+        const nextStart: Date | null = startDate !== undefined ? updateData.startDate : existing.startDate
+        const nextEnd: Date | null = endDate !== undefined ? updateData.endDate : existing.endDate
+        if (nextStart && nextEnd && nextEnd < nextStart) {
+            return new NextResponse("Target End Date must be on or after Estimated Start Date", { status: 400 })
+        }
+
+        // Once a project is real it may have assignments; hiding it again as a
+        // draft would orphan them in the wizard.
+        if (existing.status !== "DRAFT" && nextStatus === "DRAFT") {
+            return new NextResponse("A project cannot be moved back to Draft", { status: 400 })
+        }
+
+        // Promoting a draft is the real "Create Project" — same rules as POST.
+        if (existing.status === "DRAFT" && nextStatus !== "DRAFT") {
+            const nextType = projectType !== undefined ? updateData.projectType : existing.projectType
+            const nextPriority = priority !== undefined ? updateData.priority : existing.priority
+            const mgrCount = Array.isArray(managerIds) ? managerIds.length : existing._count.projectManagers
+            const insCount = Array.isArray(inspectorIds) ? inspectorIds.length : existing._count.projectInspectors
+            const problems: string[] = []
+            const missing: string[] = []
+            if (!nextType) missing.push("Project Type")
+            if (!nextStart) missing.push("Estimated Start Date")
+            if (!nextEnd) missing.push("Target End Date")
+            if (!nextPriority) missing.push("Priority")
+            if (missing.length) problems.push(`Missing required fields: ${missing.join(", ")}`)
+            if (mgrCount === 0) problems.push("At least one Manager is required")
+            if (insCount === 0) problems.push("At least one Inspector is required")
+            if (problems.length) return new NextResponse(problems.join(". "), { status: 400 })
+        }
 
         if (siteId !== undefined && siteId) {
             const site = await prisma.site.findUnique({ where: { id: siteId }, select: { id: true } })
             if (!site) return new NextResponse("Site not found", { status: 400 })
             updateData.siteId = siteId
+        }
+
+        // A resigned / terminated / inactive employee must not be newly picked as
+        // a Manager or Inspector. Only additions are checked — someone already on
+        // the team who has since left stays until they are unticked.
+        const newPicks = new Set<string>()
+        if (Array.isArray(managerIds) && managerIds.length) {
+            const current = await prisma.projectManager.findMany({ where: { projectId }, select: { managerId: true } })
+            const have = new Set(current.map((m) => m.managerId))
+            for (const id of managerIds as string[]) if (!have.has(id)) newPicks.add(id)
+        }
+        if (Array.isArray(inspectorIds) && inspectorIds.length) {
+            const current = await prisma.projectInspector.findMany({ where: { projectId }, select: { inspectorId: true } })
+            const have = new Set(current.map((pi) => pi.inspectorId))
+            for (const id of inspectorIds as string[]) if (!have.has(id)) newPicks.add(id)
+        }
+        if (newPicks.size > 0) {
+            const blocked = await prisma.user.findFirst({ where: unassignableUserWhere([...newPicks]), select: UNASSIGNABLE_USER_SELECT })
+            if (blocked) return new NextResponse(unassignableMessage(blocked), { status: 400 })
         }
 
         const project = await prisma.project.update({

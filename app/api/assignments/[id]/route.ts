@@ -25,6 +25,9 @@ export async function GET(
                         site: { select: { id: true, name: true } },
                         projectManagers: {
                             include: { manager: { select: { id: true, name: true, email: true } } }
+                        },
+                        projectInspectors: {
+                            include: { inspector: { select: { id: true, name: true, email: true } } }
                         }
                     }
                 },
@@ -59,7 +62,10 @@ export async function GET(
                 name: assignment.project.name,
                 site: (assignment.project as any).site ?? null,
                 projectId: assignment.project.id, // For compatibility
-                managers: assignment.project.projectManagers.map(pm => pm.manager)
+                managers: assignment.project.projectManagers.map(pm => pm.manager),
+                // Same shape as the list route — team membership, not who holds
+                // this assignment (that is inspectionBoy).
+                inspectors: assignment.project.projectInspectors.map(pi => pi.inspector),
             }
         }
 

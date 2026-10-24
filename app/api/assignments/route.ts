@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { ASSIGNMENT_OVERSIGHT_PERMISSIONS, checkAccess, isSelfScopedInspector } from "@/lib/permissions"
 import { ensureProjectSchema } from "@/lib/prisma"
+import { unassignableUserWhere, UNASSIGNABLE_USER_SELECT, unassignableMessage } from "@/lib/employee-filter"
 
 export const dynamic = "force-dynamic"
 
@@ -49,8 +50,14 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (status && status !== "all" && status !== "manager_only") {
-        where.status = status
+    // "not_assigned" is not a stored status: it names the virtual row GET
+    // invents for a project that has a team but no assignment yet. The filter
+    // used to be called "manager_only" — old links still send that.
+    const wantsNotAssigned = status === "not_assigned" || status === "manager_only"
+    const realStatus = status && status !== "all" && !wantsNotAssigned ? status : null
+
+    if (realStatus) {
+        where.status = realStatus
     }
 
     try {
@@ -106,27 +113,35 @@ export async function GET(req: Request) {
             return NextResponse.json(result);
         }
 
-        // 1. Get all projects that have either an assignment OR a project manager
-        const assignmentWhere = status && status !== "all" && status !== "manager_only"
-            ? { some: { status } }
-            : { some: {} }
+        // 1. Get all projects that have an assignment, OR a team (managers /
+        //    inspectors) but no assignment yet. The latter get a virtual
+        //    "not_assigned" row so admins can see work still to be issued.
+        //    Draft and archived projects are not candidates for new work, so
+        //    they get no virtual row (real assignments on them still show).
+        const assignmentWhere = realStatus ? { some: { status: realStatus } } : { some: {} }
+        const hasTeamNoWork = {
+            status: { notIn: ["DRAFT", "ARCHIVED"] },
+            assignments: { none: {} },
+            OR: [
+                { projectManagers: { some: {} } },
+                { projectInspectors: { some: {} } },
+            ],
+        }
 
         const projects = await prisma.project.findMany({
-            where: {
-                OR: [
-                    { assignments: assignmentWhere },
-                    { projectManagers: { some: {} } }
-                ]
-            },
+            where: realStatus
+                ? { assignments: assignmentWhere }
+                : wantsNotAssigned
+                    ? hasTeamNoWork
+                    : { OR: [{ assignments: assignmentWhere }, hasTeamNoWork] },
             select: {
                 id: true,
                 name: true,
+                status: true,
                 createdAt: true,
                 site: { select: { id: true, name: true } },
                 assignments: {
-                    where: status && status !== "all" && status !== "manager_only"
-                        ? { status }
-                        : undefined,
+                    where: realStatus ? { status: realStatus } : undefined,
                     select: {
                         id: true,
                         projectId: true,
@@ -148,6 +163,13 @@ export async function GET(req: Request) {
                     select: {
                         manager: { select: { id: true, name: true, email: true } }
                     }
+                },
+                // Team inspectors — membership only; the virtual row lists them so
+                // the admin can see who is waiting to be issued the work.
+                projectInspectors: {
+                    select: {
+                        inspector: { select: { id: true, name: true, email: true } }
+                    }
                 }
             },
             orderBy: { createdAt: "desc" }
@@ -158,36 +180,35 @@ export async function GET(req: Request) {
 
         projects.forEach(project => {
             const managers = project.projectManagers.map(pm => pm.manager)
+            const inspectors = project.projectInspectors.map(pi => pi.inspector)
+            const projectRow = {
+                id: project.id,
+                name: project.name,
+                status: project.status,
+                site: project.site,
+                managers,
+                inspectors,
+            }
 
             if (project.assignments.length > 0) {
+                if (wantsNotAssigned) return
                 project.assignments.forEach(a => {
-                    result.push({
-                        ...a,
-                        project: {
-                            id: project.id,
-                            name: project.name,
-                            site: project.site,
-                            managers
-                        }
-                    })
+                    result.push({ ...a, project: projectRow })
                 })
-            } else if (managers.length > 0 && (!status || status === "all" || status === "manager_only")) {
-                // Virtual assignment for manager-only project
+            } else if (!realStatus && !["DRAFT", "ARCHIVED"].includes(project.status)) {
+                // Virtual row: the project has a team but nobody has issued an
+                // assignment yet. It used to be called "manager_only" with a fake
+                // "Pending Inspector" person, which read as a broken assignment.
                 result.push({
                     id: `virtual-${project.id}`,
                     projectId: project.id,
                     inspectionBoyId: null,
                     assignedBy: null,
-                    status: "manager_only",
+                    status: "not_assigned",
                     createdAt: project.createdAt,
-                    project: {
-                        id: project.id,
-                        name: project.name,
-                        site: project.site,
-                        managers
-                    },
-                    inspectionBoy: { name: "Pending Inspector" },
-                    assigner: { name: "System" }
+                    project: projectRow,
+                    inspectionBoy: null,
+                    assigner: null,
                 })
             }
         })
@@ -235,25 +256,55 @@ export async function POST(req: Request) {
         // - wholeSite + siteId  → every current project under that real HR Site
         // - projectIds[]        → the specific projects selected via checkboxes
         // - projectId           → single project (backward-compatible)
+        //
+        // Draft and archived projects cannot take new work: "All Projects" skips
+        // them silently, an explicit pick of one is rejected so the caller knows.
+        const CLOSED_PROJECT_STATUSES = ["DRAFT", "ARCHIVED"]
         let targetProjectIds: string[] = []
         if (wholeSite && siteId) {
             const siteProjects = await prisma.project.findMany({
-                where: { siteId },
+                where: { siteId, status: { notIn: CLOSED_PROJECT_STATUSES } },
                 select: { id: true },
             })
             targetProjectIds = siteProjects.map(p => p.id)
-        } else if (Array.isArray(projectIds) && projectIds.length > 0) {
-            targetProjectIds = [...new Set(projectIds.filter(Boolean))]
-        } else if (projectId) {
-            targetProjectIds = [projectId]
+        } else {
+            if (Array.isArray(projectIds) && projectIds.length > 0) {
+                targetProjectIds = [...new Set(projectIds.filter(Boolean))] as string[]
+            } else if (projectId) {
+                targetProjectIds = [projectId]
+            }
+            if (targetProjectIds.length > 0) {
+                const closed = await prisma.project.findFirst({
+                    where: { id: { in: targetProjectIds }, status: { in: CLOSED_PROJECT_STATUSES } },
+                    select: { name: true, status: true },
+                })
+                if (closed) {
+                    const what = closed.status === "DRAFT" ? "a draft" : "archived"
+                    return NextResponse.json(
+                        { error: `Project ${closed.name} is ${what} — complete or restore it first` },
+                        { status: 400 },
+                    )
+                }
+            }
         }
 
         const hasInspectors = inspectorIds && Array.isArray(inspectorIds) && inspectorIds.length > 0
         const mgrIds: string[] = managerIds && Array.isArray(managerIds) ? managerIds : (managerId ? [managerId] : [])
 
-        if (targetProjectIds.length === 0 || (!hasInspectors && mgrIds.length === 0)) {
+        if (targetProjectIds.length === 0) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 })
         }
+        // An assignment is inspector work. Letting a manager-only request through
+        // used to attach managers to the project and create nothing, so the
+        // "assignment" could never be found again. Managers stay optional.
+        if (!hasInspectors) {
+            return NextResponse.json({ error: "Select at least one inspector" }, { status: 400 })
+        }
+        // A resigned / terminated / inactive employee cannot be handed new work
+        // or attached as a manager. The picker hides them; this catches a stale form.
+        const pickedIds = [...new Set<string>([...inspectorIds, ...mgrIds])]
+        const blocked = await prisma.user.findFirst({ where: unassignableUserWhere(pickedIds), select: UNASSIGNABLE_USER_SELECT })
+        if (blocked) return NextResponse.json({ error: unassignableMessage(blocked) }, { status: 400 })
 
         const created: any[] = []
         const failed: any[] = []

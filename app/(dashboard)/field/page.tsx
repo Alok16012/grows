@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -9,6 +9,8 @@ import {
     RefreshCw,
     Plus,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     X,
     CheckCircle2,
     Clock,
@@ -20,11 +22,15 @@ import {
     Trash2,
     Eye,
     MapPin,
+    Search,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { can } from "@/lib/can"
 import { istDateOnly } from "@/lib/attendance-policy"
 import { StatCard, statGridClass } from "@/components/StatCard"
+// Shared avatar: falls back to initials when the photo 404s (some stored photo
+// URLs point at /api/photo/<id> for employees whose row no longer has a blob).
+import { Avatar } from "@/components/Avatar"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,6 +69,9 @@ interface EmployeeOption {
     firstName: string
     lastName: string
     designation: string | null
+    // /api/employees already ships the one active deployment (with its site),
+    // so the Site field can be pre-filled without another request.
+    deployments?: { siteId: string; site?: { id: string; name: string } | null }[]
 }
 
 interface SiteOption {
@@ -107,10 +116,6 @@ interface LatestCheckIn {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function getInitials(first: string, last: string) {
-    return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase()
-}
-
 function formatDate(dateStr: string) {
     const d = new Date(dateStr)
     return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
@@ -141,62 +146,51 @@ const STATUS_STYLES: Record<FieldTaskStatus, string> = {
     CANCELLED: "bg-gray-100 text-gray-500",
 }
 
-// ─── Avatar ────────────────────────────────────────────────────────────────────
-
-function Avatar({ photo, firstName, lastName, size = 32 }: { photo: string | null; firstName: string; lastName: string; size?: number }) {
-    if (photo) {
-        return (
-            <img
-                src={photo}
-                alt={`${firstName} ${lastName}`}
-                style={{ width: size, height: size }}
-                className="rounded-full object-cover shrink-0"
-            />
-        )
-    }
-    return (
-        <div
-            style={{ width: size, height: size, fontSize: size * 0.35 }}
-            className="rounded-full bg-[var(--accent-light)] text-[var(--accent)] font-semibold flex items-center justify-center shrink-0"
-        >
-            {getInitials(firstName, lastName)}
-        </div>
-    )
-}
-
 // ─── Assign Task Modal ─────────────────────────────────────────────────────────
 
 function AssignTaskModal({
     employees,
+    employeesError,
     sites,
     onClose,
     onCreated,
 }: {
     employees: EmployeeOption[]
+    employeesError: string
     sites: SiteOption[]
     onClose: () => void
-    onCreated: () => void
+    onCreated: (task: FieldTask) => void
 }) {
+    const today = todayISO()
     const [form, setForm] = useState({
         title: "",
         description: "",
         employeeId: "",
         siteId: "",
         priority: "MEDIUM" as TaskPriority,
-        dueDate: todayISO(),
+        dueDate: today,
         dueTime: "",
     })
+    // Once the user picks a site themselves, changing employee stops overriding it.
+    const [siteTouched, setSiteTouched] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState("")
 
     const set = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }))
 
+    function selectEmployee(id: string) {
+        const dep = employees.find((e) => e.id === id)?.deployments?.[0]
+        // Only pre-fill with a site that is actually in the dropdown (active).
+        const depSite = dep && sites.some((s) => s.id === dep.siteId) ? dep.siteId : ""
+        setForm((f) => ({ ...f, employeeId: id, siteId: siteTouched ? f.siteId : depSite }))
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        if (!form.title || !form.employeeId || !form.dueDate) {
-            setError("Title, employee and due date are required")
-            return
-        }
+        if (!form.title.trim()) { setError("Title is required"); return }
+        if (!form.employeeId) { setError("Select an employee"); return }
+        if (!form.dueDate) { setError("Due date is required"); return }
+        if (form.dueDate < today) { setError("Due date cannot be in the past"); return }
         setSaving(true)
         setError("")
         try {
@@ -205,6 +199,7 @@ function AssignTaskModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...form,
+                    title: form.title.trim(),
                     siteId: form.siteId || null,
                     dueTime: form.dueTime || null,
                 }),
@@ -214,7 +209,7 @@ function AssignTaskModal({
                 setError(msg || "Failed to create task")
                 return
             }
-            onCreated()
+            onCreated(await res.json())
             onClose()
         } catch {
             setError("Network error")
@@ -222,6 +217,10 @@ function AssignTaskModal({
             setSaving(false)
         }
     }
+
+    const employeesEmptyMsg = employeesError
+        ? `Couldn't load employees: ${employeesError}`
+        : employees.length === 0 ? "No active employees found — the task cannot be assigned." : ""
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -236,6 +235,10 @@ function AssignTaskModal({
                 <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
                     {error && (
                         <div className="text-[13px] text-red-600 bg-red-50 border border-red-200 rounded-[8px] px-3 py-2">{error}</div>
+                    )}
+                    {/* A silently empty Employee dropdown is what made the form look broken. */}
+                    {employeesEmptyMsg && (
+                        <div className="text-[13px] text-amber-700 bg-amber-50 border border-amber-200 rounded-[8px] px-3 py-2">{employeesEmptyMsg}</div>
                     )}
                     <div>
                         <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Title *</label>
@@ -262,7 +265,7 @@ function AssignTaskModal({
                             <div className="relative">
                                 <select
                                     value={form.employeeId}
-                                    onChange={(e) => set("employeeId", e.target.value)}
+                                    onChange={(e) => selectEmployee(e.target.value)}
                                     className="w-full h-9 px-3 pr-8 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] appearance-none"
                                 >
                                     <option value="">Select employee</option>
@@ -280,7 +283,7 @@ function AssignTaskModal({
                             <div className="relative">
                                 <select
                                     value={form.siteId}
-                                    onChange={(e) => set("siteId", e.target.value)}
+                                    onChange={(e) => { setSiteTouched(true); set("siteId", e.target.value) }}
                                     className="w-full h-9 px-3 pr-8 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] appearance-none"
                                 >
                                     <option value="">No site</option>
@@ -314,12 +317,13 @@ function AssignTaskModal({
                             <input
                                 type="date"
                                 value={form.dueDate}
+                                min={today}
                                 onChange={(e) => set("dueDate", e.target.value)}
                                 className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                             />
                         </div>
                         <div>
-                            <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Due Time</label>
+                            <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Due time (optional)</label>
                             <input
                                 type="time"
                                 value={form.dueTime}
@@ -587,11 +591,18 @@ export default function FieldPage() {
     const [showAssignModal, setShowAssignModal] = useState(false)
     const [selectedTask, setSelectedTask] = useState<FieldTask | null>(null)
     const [employees, setEmployees] = useState<EmployeeOption[]>([])
+    const [employeesError, setEmployeesError] = useState("")
     const [sites, setSites] = useState<SiteOption[]>([])
+    // Success banner after Assign Task — the modal just closing gave no feedback.
+    const [notice, setNotice] = useState("")
 
     // Activity tab state
     const [latestCheckIns, setLatestCheckIns] = useState<LatestCheckIn[]>([])
     const [checkInsLoading, setCheckInsLoading] = useState(false)
+    const [checkInsUpdatedAt, setCheckInsUpdatedAt] = useState<Date | null>(null)
+    const [locSearch, setLocSearch] = useState("")
+    const [locPage, setLocPage] = useState(1)
+    const [locPageSize, setLocPageSize] = useState(25)
     const [historyDate, setHistoryDate] = useState(todayISO())
     const [historyCheckIns, setHistoryCheckIns] = useState<CheckIn[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
@@ -628,10 +639,13 @@ export default function FieldPage() {
 
     const fetchEmployees = useCallback(async () => {
         try {
-            const { employees } = await fetchAllEmployees({ status: "ACTIVE" })
-            setEmployees(employees as any)
-        } catch {
-            // ignore
+            const { employees } = await fetchAllEmployees<EmployeeOption>({ status: "ACTIVE" })
+            setEmployees(employees)
+            setEmployeesError("")
+        } catch (e) {
+            // Surfaced in the Assign modal — an empty dropdown with no reason
+            // reads as "can't create a task".
+            setEmployeesError(e instanceof Error && e.message ? e.message : "request failed")
         }
     }, [])
 
@@ -697,10 +711,12 @@ export default function FieldPage() {
     const fetchLatestCheckIns = useCallback(async () => {
         setCheckInsLoading(true)
         try {
-            const res = await fetch("/api/field/checkins/latest")
+            // no-store: Refresh must reach the server, not the HTTP cache.
+            const res = await fetch("/api/field/checkins/latest", { cache: "no-store" })
             if (res.ok) {
                 const data = await res.json()
                 setLatestCheckIns(Array.isArray(data) ? data : [])
+                setCheckInsUpdatedAt(new Date())
             }
         } finally {
             setCheckInsLoading(false)
@@ -710,7 +726,7 @@ export default function FieldPage() {
     const fetchHistoryCheckIns = useCallback(async () => {
         setHistoryLoading(true)
         try {
-            const res = await fetch(`/api/field/checkins?date=${historyDate}`)
+            const res = await fetch(`/api/field/checkins?date=${historyDate}`, { cache: "no-store" })
             if (res.ok) {
                 const data = await res.json()
                 setHistoryCheckIns(Array.isArray(data) ? data : [])
@@ -719,6 +735,50 @@ export default function FieldPage() {
             setHistoryLoading(false)
         }
     }, [historyDate])
+
+    // Refresh = locations + today's history + the "Active Today" stat, all live.
+    function refreshActivity() {
+        fetchLatestCheckIns()
+        fetchHistoryCheckIns()
+        fetchStats()
+    }
+
+    // Client-side search + paging over the loaded list; neither refetches.
+    const filteredLocations = useMemo(() => {
+        const q = locSearch.trim().toLowerCase()
+        if (!q) return latestCheckIns
+        return latestCheckIns.filter(({ employee: e }) =>
+            `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) || e.employeeId.toLowerCase().includes(q)
+        )
+    }, [latestCheckIns, locSearch])
+    const locTotalPages = Math.max(1, Math.ceil(filteredLocations.length / locPageSize))
+    const locSafePage = Math.min(locPage, locTotalPages)
+    const pagedLocations = filteredLocations.slice((locSafePage - 1) * locPageSize, locSafePage * locPageSize)
+
+    function handleTaskCreated(task: FieldTask) {
+        // The list is filtered to one due date (today by default), so a task due
+        // later vanished the moment the modal closed and looked like a failed
+        // create. Jump the filters to where the new task is.
+        const due = task.dueDate.slice(0, 10)
+        const filtersChange = due !== dateFilter || statusFilter !== "ALL" || priorityFilter !== "ALL" || searchFilter !== ""
+        if (filtersChange) {
+            setDateFilter(due)
+            setStatusFilter("ALL")
+            setPriorityFilter("ALL")
+            setSearchFilter("")
+            // the filter effect refetches
+        } else {
+            fetchTasks()
+        }
+        fetchStats()
+        setNotice(`${task.taskNo} assigned to ${task.employee.firstName} ${task.employee.lastName} · due ${formatDate(task.dueDate)}${task.dueTime ? ` ${task.dueTime}` : ""}`)
+    }
+
+    useEffect(() => {
+        if (!notice) return
+        const t = setTimeout(() => setNotice(""), 8000)
+        return () => clearTimeout(t)
+    }, [notice])
 
     async function handleStatusChange(taskId: string, newStatus: FieldTaskStatus) {
         await fetch(`/api/field/tasks/${taskId}`, {
@@ -794,6 +854,12 @@ export default function FieldPage() {
             <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
                 {activeTab === "tasks" && (
                     <div className="space-y-4">
+                        {notice && (
+                            <div className="flex items-center justify-between gap-3 text-[13px] text-green-800 bg-green-50 border border-green-200 rounded-[8px] px-3 py-2">
+                                <span className="flex items-center gap-2"><CheckCircle2 size={14} className="text-green-600 shrink-0" />{notice}</span>
+                                <button onClick={() => setNotice("")} aria-label="Dismiss" className="p-1 rounded hover:bg-green-100 text-green-700"><X size={14} /></button>
+                            </div>
+                        )}
                         {/* Filters */}
                         <div className="flex flex-wrap gap-3 items-center">
                             {/* Status pills */}
@@ -956,22 +1022,42 @@ export default function FieldPage() {
                     <div className="space-y-6">
                         {/* Last Known Locations */}
                         <div>
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                 <h2 className="text-[15px] font-semibold text-[var(--text)]">Last Known Locations</h2>
-                                <button
-                                    onClick={fetchLatestCheckIns}
-                                    disabled={checkInsLoading}
-                                    className="h-8 px-3 rounded-[8px] border border-[var(--border)] text-[12px] text-[var(--text2)] flex items-center gap-1.5 hover:bg-[var(--surface2)] disabled:opacity-50"
-                                >
-                                    <RefreshCw size={13} className={checkInsLoading ? "animate-spin" : ""} />
-                                    Refresh
-                                </button>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="relative">
+                                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" />
+                                        <input
+                                            type="search"
+                                            value={locSearch}
+                                            onChange={(e) => { setLocSearch(e.target.value); setLocPage(1) }}
+                                            placeholder="Search name or code..."
+                                            aria-label="Search employees"
+                                            className="h-8 pl-8 pr-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text)] focus:outline-none w-48 sm:w-56"
+                                        />
+                                    </div>
+                                    {checkInsUpdatedAt && (
+                                        <span className="text-[11px] text-[var(--text3)] whitespace-nowrap">
+                                            Updated {checkInsUpdatedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={refreshActivity}
+                                        disabled={checkInsLoading}
+                                        className="h-8 px-3 rounded-[8px] border border-[var(--border)] text-[12px] text-[var(--text2)] flex items-center gap-1.5 hover:bg-[var(--surface2)] disabled:opacity-50"
+                                    >
+                                        <RefreshCw size={13} className={checkInsLoading ? "animate-spin" : ""} />
+                                        Refresh
+                                    </button>
+                                </div>
                             </div>
 
                             {checkInsLoading ? (
                                 <div className="text-center py-10 text-[var(--text3)] text-[14px]">Loading...</div>
                             ) : latestCheckIns.length === 0 ? (
                                 <div className="text-center py-10 text-[var(--text3)] text-[14px]">No employees found</div>
+                            ) : filteredLocations.length === 0 ? (
+                                <div className="text-center py-10 text-[var(--text3)] text-[14px]">No employees match “{locSearch.trim()}”</div>
                             ) : (
                                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
                                     <div className="overflow-x-auto">
@@ -986,7 +1072,7 @@ export default function FieldPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {latestCheckIns.map(({ employee, lastCheckIn, checkedInToday }) => (
+                                            {pagedLocations.map(({ employee, lastCheckIn, checkedInToday }) => (
                                                 <tr
                                                     key={employee.id}
                                                     className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface2)] transition-colors"
@@ -1067,6 +1153,24 @@ export default function FieldPage() {
                                             ))}
                                         </tbody>
                                     </table>
+                                    </div>
+                                    <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] flex-wrap gap-3">
+                                        <span className="text-[12px] text-[var(--text3)]">
+                                            Showing {(locSafePage - 1) * locPageSize + 1}–{(locSafePage - 1) * locPageSize + pagedLocations.length} of {filteredLocations.length}
+                                        </span>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <button disabled={locSafePage === 1} onClick={() => setLocPage((p) => Math.max(1, p - 1))} aria-label="Previous page"
+                                                    className="w-8 h-8 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--text2)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+                                                <span className="text-[12px] text-[var(--text2)] px-1">Page {locSafePage} of {locTotalPages}</span>
+                                                <button disabled={locSafePage === locTotalPages} onClick={() => setLocPage((p) => Math.min(locTotalPages, p + 1))} aria-label="Next page"
+                                                    className="w-8 h-8 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--text2)] disabled:opacity-40"><ChevronRight size={15} /></button>
+                                            </div>
+                                            <select value={locPageSize} onChange={(e) => { setLocPageSize(Number(e.target.value)); setLocPage(1) }} aria-label="Rows per page"
+                                                className="h-8 px-2 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text2)] outline-none cursor-pointer">
+                                                {[10, 25, 50].map((n) => <option key={n} value={n}>{n} per page</option>)}
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1163,9 +1267,10 @@ export default function FieldPage() {
             {showAssignModal && (
                 <AssignTaskModal
                     employees={employees}
+                    employeesError={employeesError}
                     sites={sites}
                     onClose={() => setShowAssignModal(false)}
-                    onCreated={() => { fetchTasks(); fetchStats() }}
+                    onCreated={handleTaskCreated}
                 />
             )}
 

@@ -9,6 +9,8 @@
  * you were looking at.
  */
 
+import { employmentTypeVariants } from "./employment-type"
+
 export type EmployeeFilters = {
     branchId?: string | null
     departmentId?: string | null
@@ -61,22 +63,84 @@ export function buildEmployeeWhere(f: EmployeeFilters): Record<string, any> {
     // live in the Onboarding module until approved.
     where.NOT = { onboardingRecord: { is: { status: { not: "COMPLETED" } } } }
 
-    if (f.employmentType) where.employmentType = f.employmentType
+    if (f.employmentType) {
+        // Stored spellings vary ("CONTRACT", "Contractual", …), so match every
+        // raw form of the chosen type, not just the dropdown's label.
+        where.AND = [{
+            OR: employmentTypeVariants(f.employmentType).map(v => ({
+                employmentType: { equals: v, mode: "insensitive" },
+            })),
+        }]
+    }
 
     if (f.siteId) {
         where.deployments = { some: { siteId: f.siteId, isActive: true } }
     }
 
-    if (f.search) {
-        where.OR = [
-            { firstName:   { contains: f.search, mode: "insensitive" } },
-            { middleName:  { contains: f.search, mode: "insensitive" } },
-            { lastName:    { contains: f.search, mode: "insensitive" } },
-            { employeeId:  { contains: f.search, mode: "insensitive" } },
-            { phone:       { contains: f.search, mode: "insensitive" } },
-            { designation: { contains: f.search, mode: "insensitive" } },
-        ]
+    // Each whitespace-separated word must hit at least one field, so "Rahul",
+    // "Kumar", "Rahul Kumar" and "Kumar Rahul" all find Rahul Kumar. A single
+    // word behaves exactly as the old one-term search did.
+    const tokens = (f.search ?? "").split(/\s+/).map(t => t.trim()).filter(Boolean)
+    if (tokens.length) {
+        const perToken = tokens.map(token => ({
+            OR: [
+                { firstName:   { contains: token, mode: "insensitive" } },
+                { middleName:  { contains: token, mode: "insensitive" } },
+                { lastName:    { contains: token, mode: "insensitive" } },
+                { employeeId:  { contains: token, mode: "insensitive" } },
+                { phone:       { contains: token, mode: "insensitive" } },
+                { designation: { contains: token, mode: "insensitive" } },
+            ],
+        }))
+        where.AND = [...(where.AND ?? []), ...perToken]
     }
 
     return where
+}
+
+// ─── Who may be picked as a Manager / Inspector ──────────────────────────────
+
+/**
+ * Employee statuses that keep a person out of the Manager / Inspector pickers
+ * and off a fresh save. ON_LEAVE is allowed — they are still on the payroll.
+ */
+export const UNASSIGNABLE_EMPLOYEE_STATUSES = ["ONBOARDING", "INACTIVE", "TERMINATED", "RESIGNED"] as const
+
+/** The `where` for the one picker-eligible user list: active login, active employee. */
+export const ASSIGNABLE_USER_WHERE = {
+    isActive: true,
+    employeeProfile: { is: { status: { notIn: [...UNASSIGNABLE_EMPLOYEE_STATUSES] } } },
+}
+
+/**
+ * A `where` that finds the first of `userIds` who must not be newly assigned.
+ * Shared by the project, assignment and site-team save routes, which pass it
+ * to `prisma.user.findFirst` and turn a hit into `unassignableMessage`.
+ */
+export function unassignableUserWhere(userIds: string[]) {
+    return {
+        id: { in: userIds },
+        OR: [
+            { isActive: false },
+            { employeeProfile: { is: { status: { in: [...UNASSIGNABLE_EMPLOYEE_STATUSES] } } } },
+        ],
+    }
+}
+
+/** Select to pair with `unassignableUserWhere`. */
+export const UNASSIGNABLE_USER_SELECT = {
+    name: true, isActive: true, employeeProfile: { select: { status: true } },
+} as const
+
+/** "Rahul Kumar is resigned and can't be assigned" — the 400 body for a blocked pick. */
+export function unassignableMessage(u: { name: string; isActive: boolean; employeeProfile: { status: string } | null }): string {
+    const status = u.employeeProfile?.status
+    const why =
+        status === "RESIGNED" ? "resigned"
+        : status === "TERMINATED" ? "terminated"
+        : status === "INACTIVE" ? "inactive"
+        : status === "ONBOARDING" ? "still onboarding"
+        : !u.isActive ? "deactivated"
+        : "not an active employee"
+    return `${u.name} is ${why} and can't be assigned`
 }

@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
+import { EMPLOYMENT_TYPES as CANONICAL_EMPLOYMENT_TYPES } from "@/lib/employment-type"
 import {
     Plus, Search, UserCheck, X, Loader2, Users,
     Calendar, TrendingDown, Edit2, Eye, ChevronDown,
@@ -39,7 +40,9 @@ type Department = { id: string; name: string }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Daily Wage"]
+// Canonical spellings live in lib/employment-type.ts; the API maps legacy
+// values ("CONTRACT", "Permanent", …) onto them when filtering.
+const EMPLOYMENT_TYPES: readonly string[] = CANONICAL_EMPLOYMENT_TYPES
 const SALARY_TYPES = ["Monthly", "Daily", "Hourly"]
 const ROLE_OPTIONS = [
     "Security Guard",
@@ -1053,10 +1056,14 @@ function EmployeesPage() {
     const [page, setPage] = useState(1)
     const [totalPages, setTotalPages] = useState(1)
     const [totalCount, setTotalCount] = useState(0)
-    const [counts, setCounts] = useState<{
+    type StatusCounts = {
         total: number; active: number; onLeave: number; inactive: number; terminated: number; resigned: number
         newThisMonth: { total: number; active: number; terminated: number }
-    } | null>(null)
+    }
+    // `counts` honours the dept / site / type / search filters (tab badges);
+    // `totals` is the whole company (stat cards).
+    const [counts, setCounts] = useState<StatusCounts | null>(null)
+    const [totals, setTotals] = useState<StatusCounts | null>(null)
     const [PAGE_SIZE, setPageSize] = useState(50)
     const [showModal, setShowModal] = useState(false)
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
@@ -1068,6 +1075,13 @@ function EmployeesPage() {
     const [importProgress, setImportProgress] = useState({ done: 0, total: 0 })
     const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
     const importFileRef = useRef<HTMLInputElement>(null)
+    // Paging from the footer left the viewport at the bottom of the old page,
+    // so the new page's first rows were off-screen. Scroll the table back up.
+    const tableWrapRef = useRef<HTMLDivElement>(null)
+    const goToPage = (next: number | ((p: number) => number)) => {
+        setPage(next)
+        tableWrapRef.current?.scrollIntoView({ block: "start", behavior: "smooth" })
+    }
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [bulkDeleting, setBulkDeleting] = useState(false)
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
@@ -1111,6 +1125,7 @@ function EmployeesPage() {
                 setTotalPages(data.totalPages ?? 1)
                 setTotalCount(data.total ?? 0)
                 if (data.counts) setCounts(data.counts)
+                if (data.totals) setTotals(data.totals)
             } else {
                 // fallback for old API shape
                 setEmployees(Array.isArray(data) ? data : [])
@@ -1642,27 +1657,28 @@ function EmployeesPage() {
                 </div>
             </div>
 
-            {/* Stats Row — clicking a tile filters the table to it */}
+            {/* Stats Row — company-wide totals, untouched by the filters below;
+                clicking a tile filters the table to that status */}
             <div className={`${statGridClass(4)}`}>
                 <StatCard
-                    label="Total Employees" value={counts?.total ?? total} tone="blue" seed={0}
+                    label="Total Employees" value={totals?.total ?? total} tone="blue" seed={0}
                     icon={<Users size={20} />} onClick={() => setStatusFilter("")}
-                    trend={counts && counts.newThisMonth.total > 0 ? { dir: "up", text: `${counts.newThisMonth.total} this month` } : { dir: "flat", text: "No change" }}
+                    trend={totals && totals.newThisMonth.total > 0 ? { dir: "up", text: `${totals.newThisMonth.total} this month` } : { dir: "flat", text: "No change" }}
                 />
                 <StatCard
-                    label="Active Employees" value={counts?.active ?? active} tone="teal" seed={1}
+                    label="Active Employees" value={totals?.active ?? active} tone="teal" seed={1}
                     icon={<CheckCircle size={20} />} onClick={() => setStatusFilter("ACTIVE")}
-                    trend={counts && counts.newThisMonth.active > 0 ? { dir: "up", text: `${counts.newThisMonth.active} this month` } : { dir: "flat", text: "No change" }}
+                    trend={totals && totals.newThisMonth.active > 0 ? { dir: "up", text: `${totals.newThisMonth.active} this month` } : { dir: "flat", text: "No change" }}
                 />
                 <StatCard
-                    label="On Leave" value={counts?.onLeave ?? onLeave} tone="amber" seed={2}
+                    label="On Leave" value={totals?.onLeave ?? onLeave} tone="amber" seed={2}
                     icon={<Clock size={20} />} onClick={() => setStatusFilter("ON_LEAVE")}
                     trend={{ dir: "flat", text: "No change" }}
                 />
                 <StatCard
-                    label="Terminated / Resigned" value={counts ? counts.terminated + counts.resigned : terminatedResigned} tone="violet" seed={1}
+                    label="Terminated / Resigned" value={totals ? totals.terminated + totals.resigned : terminatedResigned} tone="violet" seed={1}
                     icon={<TrendingDown size={20} />}
-                    trend={counts && counts.newThisMonth.terminated > 0 ? { dir: "down", text: `${counts.newThisMonth.terminated} this month` } : { dir: "flat", text: "No change" }}
+                    trend={totals && totals.newThisMonth.terminated > 0 ? { dir: "down", text: `${totals.newThisMonth.terminated} this month` } : { dir: "flat", text: "No change" }}
                 />
             </div>
 
@@ -1796,7 +1812,7 @@ function EmployeesPage() {
                         </button>
                     </div>
                 )}
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] overflow-hidden">
+                <div ref={tableWrapRef} className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] overflow-hidden">
                     <div className="overflow-x-auto">
                         {/* Fixed layout with percentage widths: the columns share the
                             card's width, so the table fits the window instead of
@@ -1953,7 +1969,7 @@ function EmployeesPage() {
                                 <span className="relative">
                                     <select
                                         value={PAGE_SIZE}
-                                        onChange={e => { setPage(1); setPageSize(Number(e.target.value)) }}
+                                        onChange={e => { goToPage(1); setPageSize(Number(e.target.value)) }}
                                         className="appearance-none h-10 pl-3.5 pr-9 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] text-[var(--text)] outline-none focus:border-[var(--accent)] cursor-pointer"
                                     >
                                         {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
@@ -1962,7 +1978,7 @@ function EmployeesPage() {
                                 </span>
                             </label>
                             <button
-                                onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                                onClick={() => goToPage(p => Math.max(1, p - 1))} disabled={page === 1}
                                 className="h-10 px-3.5 inline-flex items-center gap-1 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] text-[var(--text)] disabled:text-[var(--text3)] disabled:cursor-not-allowed hover:border-[var(--accent)] transition-colors"
                             >
                                 <ChevronLeft size={16} /> Previous
@@ -1971,7 +1987,7 @@ function EmployeesPage() {
                                 <span key={`gap-${i}`} className="w-7 text-center text-[var(--text2)]">…</span>
                             ) : (
                                 <button
-                                    key={p} onClick={() => setPage(p)} aria-current={p === page ? "page" : undefined}
+                                    key={p} onClick={() => goToPage(p)} aria-current={p === page ? "page" : undefined}
                                     className={`h-10 min-w-[40px] px-2 rounded-[10px] text-[13.5px] tabular-nums transition-colors ${
                                         p === page
                                             ? "bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] text-white font-semibold shadow-[0_4px_12px_rgba(31,95,255,0.3)]"
@@ -1982,7 +1998,7 @@ function EmployeesPage() {
                                 </button>
                             ))}
                             <button
-                                onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                                onClick={() => goToPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
                                 className="h-10 px-3.5 inline-flex items-center gap-1 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] text-[13.5px] font-medium text-[var(--text)] disabled:text-[var(--text3)] disabled:cursor-not-allowed hover:border-[var(--accent)] transition-colors"
                             >
                                 Next <ChevronRight size={16} />

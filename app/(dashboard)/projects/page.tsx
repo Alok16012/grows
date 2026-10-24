@@ -32,9 +32,14 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: 
     PLANNING: { label: "Planning", bg: "#eff6ff", fg: "#1d4ed8", dot: "#3b82f6" },
     ON_HOLD: { label: "On Hold", bg: "#fef2f2", fg: "#b91c1c", dot: "#ef4444" },
     COMPLETED: { label: "Completed", bg: "#f3f4f6", fg: "#374151", dot: "#6b7280" },
+    // Saved with Name + Site only; not assignable until it is created from the edit page.
+    DRAFT: { label: "Draft", bg: "#f3f4f6", fg: "#6b7280", dot: "#9ca3af" },
     ARCHIVED: { label: "Archived", bg: "#f3f4f6", fg: "#9ca3af", dot: "#9ca3af" },
 }
-const STATUS_FILTERS = ["ALL", "ACTIVE", "PLANNING", "ON_HOLD", "COMPLETED", "ARCHIVED"] as const
+const STATUS_FILTERS = ["ALL", "ACTIVE", "PLANNING", "ON_HOLD", "COMPLETED", "DRAFT", "ARCHIVED"] as const
+// The headline strip: Total = these four. Draft and Archived are shown beside
+// them so Total + Draft + Archived = everything.
+const LIVE_STATUSES = ["ACTIVE", "PLANNING", "ON_HOLD", "COMPLETED"] as const
 
 function StatusBadge({ status }: { status?: string | null }) {
     const meta = STATUS_META[status ?? "ACTIVE"] ?? STATUS_META.ACTIVE
@@ -119,18 +124,22 @@ export default function ProjectsPage() {
     const [search, setSearch] = useState("")
     const [siteFilter, setSiteFilter] = useState("all")
     const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("ALL")
+    // Archived rows are noise day to day; "All" leaves them out unless asked.
+    const [includeArchived, setIncludeArchived] = useState(false)
     const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name">("recent")
     const [view, setView] = useState<"grid" | "list">("grid")
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(12)
 
-    useEffect(() => { setPage(1) }, [search, siteFilter, statusFilter, perPage, sortBy])
+    useEffect(() => { setPage(1) }, [search, siteFilter, statusFilter, includeArchived, perPage, sortBy])
 
     const fetchProjects = useCallback(async () => {
         setLoading(true)
         setLoadError(null)
         try {
-            const res = await fetch("/api/projects")
+            // The API hides drafts by default (assignment pickers share it); this
+            // list is where drafts are picked up again.
+            const res = await fetch("/api/projects?includeDrafts=1")
             // A failed request used to fall through to setProjects([]), so a 403,
             // a 500 or a timeout was indistinguishable from genuinely having no
             // projects — the screen just said "No projects found".
@@ -160,9 +169,14 @@ export default function ProjectsPage() {
     const hasNoSiteProjects = useMemo(() => projects.some(p => !p.site), [projects])
 
     // Status counts for the stats strip (over the full list, not filtered).
+    // Total excludes drafts and archived so it reads as "projects in play".
     const counts = useMemo(() => {
-        const c: Record<string, number> = { total: projects.length, ACTIVE: 0, PLANNING: 0, ON_HOLD: 0, COMPLETED: 0, ARCHIVED: 0 }
-        projects.forEach(p => { const s = p.status ?? "ACTIVE"; if (c[s] !== undefined) c[s]++ })
+        const c: Record<string, number> = { total: 0, ACTIVE: 0, PLANNING: 0, ON_HOLD: 0, COMPLETED: 0, DRAFT: 0, ARCHIVED: 0 }
+        projects.forEach(p => {
+            const s = p.status ?? "ACTIVE"
+            if (c[s] !== undefined) c[s]++
+            if (s !== "DRAFT" && s !== "ARCHIVED") c.total++
+        })
         return c
     }, [projects])
 
@@ -177,7 +191,9 @@ export default function ProjectsPage() {
             )) return false
             if (siteFilter === "no-site" && p.site) return false
             if (siteFilter !== "all" && siteFilter !== "no-site" && p.site?.id !== siteFilter) return false
-            if (statusFilter !== "ALL" && (p.status ?? "ACTIVE") !== statusFilter) return false
+            const status = p.status ?? "ACTIVE"
+            if (statusFilter !== "ALL" && status !== statusFilter) return false
+            if (statusFilter === "ALL" && status === "ARCHIVED" && !includeArchived) return false
             return true
         })
         list.sort((a, b) => {
@@ -186,7 +202,7 @@ export default function ProjectsPage() {
             return sortBy === "oldest" ? d : -d
         })
         return list
-    }, [projects, search, siteFilter, statusFilter, sortBy])
+    }, [projects, search, siteFilter, statusFilter, includeArchived, sortBy])
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
     const safePage = Math.min(page, totalPages)
@@ -194,8 +210,8 @@ export default function ProjectsPage() {
     const showFrom = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
     const showTo = Math.min(safePage * perPage, filtered.length)
 
-    const hasFilters = search !== "" || siteFilter !== "all" || statusFilter !== "ALL"
-    const clearAll = () => { setSearch(""); setSiteFilter("all"); setStatusFilter("ALL") }
+    const hasFilters = search !== "" || siteFilter !== "all" || statusFilter !== "ALL" || includeArchived
+    const clearAll = () => { setSearch(""); setSiteFilter("all"); setStatusFilter("ALL"); setIncludeArchived(false) }
 
     const handleDelete = async (project: Project) => {
         if (!confirm(
@@ -256,7 +272,14 @@ export default function ProjectsPage() {
                     <TeamAvatars team={project.team} />
                 </div>
             </div>
-            {canManageProjects && (
+            {canManageProjects && project.status === "DRAFT" ? (
+                /* A draft has no team or forms yet — the only sensible action is to finish it. */
+                <div className="flex items-center mt-auto pt-1">
+                    <Link href={`/projects/${project.id}/edit`} className={actionBtn + " text-[var(--accent)] border-[var(--accent)]/40"}>
+                        <Pencil size={12} /> Complete setup
+                    </Link>
+                </div>
+            ) : canManageProjects && (
                 <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
                     <Link href={`/projects/${project.id}/form-builder`} className={actionBtn}>
                         <LayoutTemplate size={12} /> Form Builder
@@ -326,6 +349,13 @@ export default function ProjectsPage() {
                                 </button>
                             ))}
                         </div>
+                        {statusFilter === "ALL" && (
+                            <label className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text2)] cursor-pointer select-none">
+                                <input type="checkbox" checked={includeArchived} onChange={e => setIncludeArchived(e.target.checked)}
+                                    className="accent-[var(--accent)]" />
+                                Include archived{counts.ARCHIVED > 0 ? ` (${counts.ARCHIVED})` : ""}
+                            </label>
+                        )}
                         {hasFilters && (
                             <button onClick={clearAll} className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline ml-1">
                                 <X size={12} /> Clear all
@@ -345,7 +375,7 @@ export default function ProjectsPage() {
                             <p className="text-[10.5px] text-[var(--text3)] mt-0.5">Total Projects</p>
                         </div>
                     </div>
-                    {(["ACTIVE", "PLANNING", "ON_HOLD", "COMPLETED"] as const).map(s => (
+                    {LIVE_STATUSES.map(s => (
                         <div key={s}>
                             <p className="text-[18px] font-bold text-[var(--text)] leading-none tabular-nums flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full inline-block" style={{ background: STATUS_META[s].dot }} />
@@ -353,6 +383,17 @@ export default function ProjectsPage() {
                             </p>
                             <p className="text-[10.5px] text-[var(--text3)] mt-0.5">{STATUS_META[s].label}</p>
                         </div>
+                    ))}
+                    {/* Outside the Total — muted so they read as "also exists", not "in play". */}
+                    {(["DRAFT", "ARCHIVED"] as const).map(s => (
+                        <button key={s} type="button" onClick={() => setStatusFilter(s)} title={`Show ${STATUS_META[s].label.toLowerCase()} projects`}
+                            className="text-left pl-3 border-l border-[var(--border)] hover:opacity-80 transition-opacity">
+                            <p className="text-[18px] font-bold text-[var(--text3)] leading-none tabular-nums flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: STATUS_META[s].dot }} />
+                                {counts[s]}
+                            </p>
+                            <p className="text-[10.5px] text-[var(--text3)] mt-0.5">{STATUS_META[s].label}</p>
+                        </button>
                     ))}
                 </div>
             </div>

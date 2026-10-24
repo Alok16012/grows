@@ -45,8 +45,12 @@ const STATUS_OPTIONS = [
     { value: "ARCHIVED", label: "Archived" },
 ]
 
+// A draft is promoted from here, so it can only land on a "fresh" status.
+const DRAFT_PROMOTE_OPTIONS = STATUS_OPTIONS.filter(s => ["PLANNING", "ACTIVE", "ON_HOLD"].includes(s.value))
+
 const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
 const selectCls = inputCls + " cursor-pointer"
+const errCls = " border-[var(--red)] focus:border-[var(--red)]"
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
     return (
@@ -54,6 +58,55 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
             {children}{required && <span className="text-[var(--red)] ml-0.5">*</span>}
         </label>
     )
+}
+
+function FieldError({ msg }: { msg?: string }) {
+    if (!msg) return null
+    return <p className="text-[11px] text-[var(--red)] mt-1">{msg}</p>
+}
+
+type FormState = {
+    name: string; description: string; siteId: string; projectType: string
+    startDate: string; endDate: string; priority: string; status: string
+}
+type Errors = Partial<Record<keyof FormState | "managers" | "inspectors", string>>
+
+// Same rules as the create page. `full` is the "Create Project" rule set, used
+// when a draft is promoted; a plain edit (or re-saving a draft) only checks
+// Name, Site and that the dates don't contradict each other.
+function validate(form: FormState, managerIds: string[], inspectorIds: string[], full: boolean): Errors {
+    const e: Errors = {}
+    if (!form.name.trim()) e.name = "Project Name is required"
+    if (!form.siteId) e.siteId = "Site is required"
+    if (form.startDate && form.endDate && form.endDate < form.startDate) {
+        e.endDate = "Target End Date must be on or after Estimated Start Date"
+    }
+    if (!full) return e
+    if (!form.projectType) e.projectType = "Project Type is required"
+    if (!form.startDate) e.startDate = "Estimated Start Date is required"
+    if (!form.endDate) e.endDate = "Target End Date is required"
+    if (!form.priority) e.priority = "Priority is required"
+    if (!form.status) e.status = "Status is required"
+    if (managerIds.length === 0) e.managers = "At least one Manager is required"
+    if (inspectorIds.length === 0) e.inspectors = "At least one Inspector is required"
+    return e
+}
+
+const FIELD_NAMES: Record<string, string> = {
+    name: "Project Name", siteId: "Site", projectType: "Project Type", startDate: "Estimated Start Date",
+    endDate: "Target End Date", priority: "Priority", status: "Status",
+}
+
+function summarizeErrors(e: Errors): string {
+    const missing = Object.entries(e)
+        .filter(([k, v]) => FIELD_NAMES[k] && v?.endsWith("is required"))
+        .map(([k]) => FIELD_NAMES[k])
+    const parts: string[] = []
+    if (missing.length) parts.push(`Missing required fields: ${missing.join(", ")}`)
+    if (e.endDate && !e.endDate.endsWith("is required")) parts.push(e.endDate)
+    if (e.managers) parts.push(e.managers)
+    if (e.inspectors) parts.push(e.inspectors)
+    return parts.join(". ")
 }
 
 function PersonCard({ person, checked, onToggle, showContact }: {
@@ -102,12 +155,14 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     const [saving, setSaving] = useState<false | "save" | "draft">(false)
     const [copied, setCopied] = useState(false)
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<FormState>({
         name: "", description: "", siteId: "", projectType: "",
         startDate: "", endDate: "", priority: "Medium", status: "ACTIVE",
     })
     const [managerIds, setManagerIds] = useState<string[]>([])
     const [inspectorIds, setInspectorIds] = useState<string[]>([])
+    // Errors show only after a failed attempt, then clear live as fields are fixed.
+    const [attempted, setAttempted] = useState<false | "save" | "draft">(false)
 
     const [sites, setSites] = useState<Site[]>([])
     const [managers, setManagers] = useState<Person[]>([])
@@ -140,7 +195,8 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                     startDate: toDateInput(d.startDate),
                     endDate: toDateInput(d.endDate),
                     priority: d.priority || "Medium",
-                    status: d.status || "ACTIVE",
+                    // A draft's Status picker chooses what it becomes; PLANNING by default.
+                    status: !d.status || d.status === "DRAFT" ? "PLANNING" : d.status,
                 })
                 const mIds = Array.isArray(d.managerIds) ? d.managerIds : []
                 const iIds = Array.isArray(d.inspectorIds) ? d.inspectorIds : []
@@ -203,9 +259,21 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     const filteredManagers = useMemo(() => matchPeople(managers, managerSearch), [managers, managerSearch])
     const filteredInspectors = useMemo(() => matchPeople(inspectors, inspectorSearch), [inspectors, inspectorSearch])
 
+    const isDraft = project?.status === "DRAFT"
+    // "Create Project" on a draft runs the full rule set; everything else is a
+    // light edit (Name, Site, date order). Non-drafts cannot be re-drafted — the
+    // API refuses it, so the button isn't offered.
+    const errors = useMemo(
+        () => validate(form, managerIds, inspectorIds, isDraft && attempted === "save"),
+        [form, managerIds, inspectorIds, isDraft, attempted],
+    )
+    const shown: Errors = attempted ? errors : {}
+
     const save = async (mode: "save" | "draft") => {
-        if (!form.name.trim() || !form.siteId) {
-            toast.error("Project Name and Site are required")
+        setAttempted(mode)
+        const errs = validate(form, managerIds, inspectorIds, isDraft && mode === "save")
+        if (Object.keys(errs).length > 0) {
+            toast.error(summarizeErrors(errs))
             return
         }
         setSaving(mode)
@@ -215,7 +283,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...form,
-                    status: mode === "draft" ? "PLANNING" : form.status,
+                    status: mode === "draft" ? "DRAFT" : form.status,
                     startDate: form.startDate || null,
                     endDate: form.endDate || null,
                     managerIds,
@@ -223,7 +291,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                 }),
             })
             if (!res.ok) throw new Error(await res.text() || "Failed to update")
-            toast.success(mode === "draft" ? "Saved as draft" : "Project updated!")
+            toast.success(mode === "draft" ? "Draft saved" : isDraft ? "Project created!" : "Project updated!")
             router.push("/projects")
             router.refresh()
         } catch (e) {
@@ -274,8 +342,10 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                     <FileText size={20} className="text-white" />
                 </div>
                 <div>
-                    <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Edit Project</h1>
-                    <p className="text-[13px] text-[var(--text3)]">Update project information and assignments.</p>
+                    <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">{isDraft ? "Create Project" : "Edit Project"}</h1>
+                    <p className="text-[13px] text-[var(--text3)]">
+                        {isDraft ? "This project is a draft. Complete the details below to create it." : "Update project information and assignments."}
+                    </p>
                 </div>
             </div>
 
@@ -295,14 +365,16 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mt-4">
                             <div>
                                 <FieldLabel required>Project Name</FieldLabel>
-                                <input value={form.name} onChange={e => set("name", e.target.value)} className={inputCls} />
+                                <input value={form.name} onChange={e => set("name", e.target.value)} className={inputCls + (shown.name ? errCls : "")} />
+                                <FieldError msg={shown.name} />
                             </div>
                             <div>
                                 <FieldLabel required>Project Type</FieldLabel>
-                                <select value={form.projectType} onChange={e => set("projectType", e.target.value)} className={selectCls}>
+                                <select value={form.projectType} onChange={e => set("projectType", e.target.value)} className={selectCls + (shown.projectType ? errCls : "")}>
                                     <option value="">Select project type</option>
                                     {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
+                                <FieldError msg={shown.projectType} />
                             </div>
                             <div>
                                 <FieldLabel>Description</FieldLabel>
@@ -313,32 +385,40 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                             </div>
                             <div>
                                 <FieldLabel required>Site</FieldLabel>
-                                <select value={form.siteId} onChange={e => changeSite(e.target.value)} className={selectCls}>
+                                <select value={form.siteId} onChange={e => changeSite(e.target.value)} className={selectCls + (shown.siteId ? errCls : "")}>
                                     <option value="">Select a site</option>
                                     {sites.map(s => (
                                         <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>
                                     ))}
                                 </select>
+                                <FieldError msg={shown.siteId} />
                             </div>
                             <div>
-                                <FieldLabel>Start Date</FieldLabel>
-                                <input type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)} className={inputCls} />
+                                <FieldLabel required={isDraft}>Estimated Start Date</FieldLabel>
+                                <input type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)} className={inputCls + (shown.startDate ? errCls : "")} />
+                                <FieldError msg={shown.startDate} />
                             </div>
                             <div>
-                                <FieldLabel>End Date</FieldLabel>
-                                <input type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} className={inputCls} />
+                                <FieldLabel required={isDraft}>Target End Date</FieldLabel>
+                                {/* min stops the native picker offering days before the start. */}
+                                <input type="date" value={form.endDate} min={form.startDate || undefined}
+                                    onChange={e => set("endDate", e.target.value)} className={inputCls + (shown.endDate ? errCls : "")} />
+                                <FieldError msg={shown.endDate} />
                             </div>
                             <div>
-                                <FieldLabel>Priority</FieldLabel>
-                                <select value={form.priority} onChange={e => set("priority", e.target.value)} className={selectCls}>
+                                <FieldLabel required={isDraft}>Priority</FieldLabel>
+                                <select value={form.priority} onChange={e => set("priority", e.target.value)} className={selectCls + (shown.priority ? errCls : "")}>
                                     {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                                 </select>
+                                <FieldError msg={shown.priority} />
                             </div>
                             <div>
-                                <FieldLabel>Status</FieldLabel>
-                                <select value={form.status} onChange={e => set("status", e.target.value)} className={selectCls}>
-                                    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                <FieldLabel required={isDraft}>Status</FieldLabel>
+                                <select value={form.status} onChange={e => set("status", e.target.value)} className={selectCls + (shown.status ? errCls : "")}>
+                                    {(isDraft ? DRAFT_PROMOTE_OPTIONS : STATUS_OPTIONS).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                 </select>
+                                <FieldError msg={shown.status} />
+                                {isDraft && <p className="text-[11px] text-[var(--text3)] mt-1">The status this project will have once created.</p>}
                             </div>
                         </div>
                         <p className="text-[11px] text-[var(--text3)] mt-2 flex items-center gap-1">
@@ -399,6 +479,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                                 </p>
                             </>
                         )}
+                        <FieldError msg={shown.managers} />
                     </div>
 
                     {/* Inspectors */}
@@ -454,6 +535,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                                 </p>
                             </>
                         )}
+                        <FieldError msg={shown.inspectors} />
                     </div>
 
                     {/* Footer actions */}
@@ -462,15 +544,17 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                             className="px-4 h-9 inline-flex items-center rounded-[9px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
                             Cancel
                         </Link>
-                        <button onClick={() => save("draft")} disabled={!!saving}
-                            className="px-4 h-9 inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--accent)] bg-white text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors disabled:opacity-50">
-                            {saving === "draft" && <Loader2 size={13} className="animate-spin" />}
-                            Save Draft
-                        </button>
+                        {isDraft && (
+                            <button onClick={() => save("draft")} disabled={!!saving}
+                                className="px-4 h-9 inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--accent)] bg-white text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors disabled:opacity-50">
+                                {saving === "draft" && <Loader2 size={13} className="animate-spin" />}
+                                Save as Draft
+                            </button>
+                        )}
                         <button onClick={() => save("save")} disabled={!!saving}
                             className="px-5 h-9 inline-flex items-center gap-1.5 rounded-[9px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
                             {saving === "save" && <Loader2 size={13} className="animate-spin" />}
-                            Save Changes
+                            {isDraft ? "Create Project" : "Save Changes"}
                         </button>
                     </div>
                 </div>
@@ -490,6 +574,10 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                                     )}
                                 </span>
                             } />
+                        {isDraft && (
+                            <SummaryRow icon={<Info size={13} />} label="Status"
+                                value="Draft — not yet created. Drafts cannot be assigned work." valueClass="text-[var(--text2)]" />
+                        )}
                         <SummaryRow icon={<Clock size={13} />} label="Created On"
                             value={new Date(project.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} />
                         <SummaryRow icon={<User size={13} />} label="Created By" value={project.createdByName || "—"} />

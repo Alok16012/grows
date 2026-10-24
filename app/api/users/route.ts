@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess, INSPECTION_PERMISSIONS, PROJECT_MANAGER_PERMISSIONS } from "@/lib/permissions"
+import { ASSIGNABLE_USER_WHERE } from "@/lib/employee-filter"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -44,8 +45,11 @@ export async function GET(req: Request) {
         }
 
         const where: any = {
-            // Only real staff — users with a linked Employee record.
-            employeeProfile: { isNot: null },
+            // Only real staff — users with a linked Employee record — who are
+            // still with us: a deactivated login or a resigned / terminated /
+            // inactive / still-onboarding employee never appears in a picker.
+            // (ON_LEAVE stays in.) The save routes enforce the same rule.
+            ...ASSIGNABLE_USER_WHERE,
             customRole: { isActive: true, permissions: { hasSome: permissions } },
         }
 

@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import {
     Loader2, Check, ChevronLeft, ChevronRight, Search, Trash2, X,
     Users, Sparkles, Eye, MoreVertical, Calendar, RefreshCw,
-    ClipboardList, StopCircle, FileText, CheckCircle2, Layers,
+    ClipboardList, StopCircle, FileText, CheckCircle2, Layers, Plus,
 } from "lucide-react"
 import { can, canAny } from "@/lib/can"
 import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
@@ -34,19 +34,46 @@ type Assignment = {
         name: string
         site?: { id: string; name: string } | null
         managers?: { id: string; name: string | null; email?: string | null }[]
+        // Team inspectors (ProjectInspector) — membership, not who holds this
+        // assignment. Shown on the "No assignment yet" row.
+        inspectors?: { id: string; name: string | null; email?: string | null }[]
     } | null
 }
+
+// A "virtual-<projectId>" row is not a stored assignment: the API invents one
+// per project that has a team but no assignment yet.
+const isVirtual = (a: Assignment) => a.id.startsWith("virtual-")
 
 // Older assignments predate the ASG-… codes — derive a stable readable
 // number from the row id so every assignment has one.
 function assignmentNo(a: Assignment) {
-    // Manager-only rows are not stored assignments: the API invents one per
-    // project that has a manager but no inspector yet, with the id
-    // "virtual-<projectId>". Running that through the fallback produced
-    // "ASG-VIRTUA" on every such row, which read as a set of identical broken
-    // assignments that could not be deleted.
-    if (a.id.startsWith("virtual-")) return "—"
+    // Running a virtual id through the fallback produced "ASG-VIRTUA" on every
+    // such row, which read as a set of identical broken assignments.
+    if (isVirtual(a)) return "—"
     return a.code ?? `ASG-${a.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`
+}
+
+// Projects that cannot take new work. Mirrors the projects module: a draft is
+// not yet real, an archived project is finished.
+const CLOSED_PROJECT_STATUSES = ["DRAFT", "ARCHIVED"]
+
+// Status filter: values are stable keys (the old "Manager Only" label became
+// "Not assigned yet"; its old value manager_only is still accepted from links).
+const FILTER_OPTIONS = [
+    { value: "active", label: "Active" },
+    { value: "scheduled", label: "Scheduled" },
+    { value: "completed", label: "Completed" },
+    { value: "inactive", label: "Inactive" },
+    { value: "not_assigned", label: "Not assigned yet" },
+]
+const normalizeFilter = (v: string | null) =>
+    v === "manager_only" ? "not_assigned"
+        : v && ["all", ...FILTER_OPTIONS.map(o => o.value)].includes(v) ? v : "all"
+
+// Local YYYY-MM-DD, to compare against the date input without timezone drift.
+const todayStr = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
 const WIZARD_STEPS = [
@@ -67,11 +94,13 @@ const selectCls = inputCls + " cursor-pointer"
 
 // Derived display status: active assignments whose start date is in the
 // future read as "Scheduled" — matches how admins think about them.
-function displayStatus(a: Assignment): { label: string; bg: string; fg: string } {
-    if (a.status === "manager_only") return { label: "Manager Only", bg: "#f5f3ff", fg: "#7c3aed" }
-    if (a.status === "inactive") return { label: "Inactive", bg: "#f3f4f6", fg: "#6b7280" }
-    if (a.startDate && new Date(a.startDate) > new Date()) return { label: "Scheduled", bg: "#eff6ff", fg: "#1d4ed8" }
-    return { label: "Active", bg: "#dcfce7", fg: "#15803d" }
+function displayStatus(a: Assignment): { key: string; label: string; bg: string; fg: string } {
+    // not_assigned = virtual row (manager_only is the pre-rename API value).
+    if (a.status === "not_assigned" || a.status === "manager_only") return { key: "not_assigned", label: "No assignment yet", bg: "var(--amber-light)", fg: "var(--amber)" }
+    if (a.status === "inactive") return { key: "inactive", label: "Inactive", bg: "#f3f4f6", fg: "#6b7280" }
+    if (a.status === "completed") return { key: "completed", label: "Completed", bg: "#f3f4f6", fg: "#374151" }
+    if (a.startDate && new Date(a.startDate) > new Date()) return { key: "scheduled", label: "Scheduled", bg: "#eff6ff", fg: "#1d4ed8" }
+    return { key: "active", label: "Active", bg: "#dcfce7", fg: "#15803d" }
 }
 
 function fmtDate(s?: string | null) {
@@ -82,9 +111,11 @@ function fmtDate(s?: string | null) {
 function PersonRow({ person, checked, onToggle }: { person: Person; checked: boolean; onToggle: () => void }) {
     const initials = (person.name || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()
     return (
-        <button type="button" onClick={onToggle}
-            className={`flex items-center gap-2.5 p-[9px_12px] w-full text-left border-b border-[var(--border)] last:border-0 transition-colors ${
-                checked ? "bg-[#f0fdf4]" : "hover:bg-[var(--surface2)]"
+        // Selected rows get an accent edge + tint + trailing check: the tiny
+        // checkbox alone was easy to miss in a long list.
+        <button type="button" onClick={onToggle} aria-pressed={checked}
+            className={`flex items-center gap-2.5 p-[9px_12px] w-full text-left border-b border-[var(--border)] last:border-0 border-l-[3px] transition-colors ${
+                checked ? "bg-[var(--accent-light)] border-l-[var(--accent)]" : "border-l-transparent hover:bg-[var(--surface2)]"
             }`}>
             <span className={`flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] shrink-0 transition-colors ${
                 checked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border2)] bg-white"
@@ -94,11 +125,43 @@ function PersonRow({ person, checked, onToggle }: { person: Person; checked: boo
             <span className="w-7 h-7 rounded-full bg-[var(--surface2)] text-[var(--text2)] text-[10px] font-bold flex items-center justify-center shrink-0">
                 {initials}
             </span>
-            <span className="min-w-0">
-                <span className="block text-[12.5px] font-semibold text-[var(--text)] truncate">{person.name || "Unnamed"}</span>
+            <span className="min-w-0 flex-1">
+                <span className={`block text-[12.5px] font-semibold truncate ${checked ? "text-[var(--accent)]" : "text-[var(--text)]"}`}>{person.name || "Unnamed"}</span>
                 <span className="block text-[11px] text-[var(--text3)] truncate">{person.phone || person.email || "—"}</span>
             </span>
+            {checked && <CheckCircle2 size={15} className="text-[var(--accent)] shrink-0" />}
         </button>
+    )
+}
+
+// "Selected: A, B, C" strip above a people list, each chip removable.
+function SelectedChips({ people, ids, onRemove }: { people: Person[]; ids: string[]; onRemove: (id: string) => void }) {
+    if (ids.length === 0) return null
+    return (
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            <span className="text-[11px] font-medium text-[var(--text3)]">Selected:</span>
+            {ids.map(id => {
+                const p = people.find(x => x.id === id)
+                return (
+                    <span key={id} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent)] text-[11px] font-semibold">
+                        {p?.name || "Unnamed"}
+                        <button type="button" onClick={() => onRemove(id)} aria-label={`Remove ${p?.name || "person"}`}
+                            className="p-0.5 rounded-full hover:bg-[var(--accent)]/15 transition-colors">
+                            <X size={10} strokeWidth={2.5} />
+                        </button>
+                    </span>
+                )
+            })}
+        </div>
+    )
+}
+
+// Note shown when the wizard copied the project's team into the selection.
+function PrefillNote() {
+    return (
+        <p className="flex items-center gap-1.5 text-[11px] text-[var(--text3)] mb-2">
+            <Sparkles size={11} className="text-[var(--accent)]" /> Pre-filled from the project team — change if needed.
+        </p>
     )
 }
 
@@ -118,8 +181,7 @@ function RowMenu({ assignment, onDelete, onStopRecurrence, onClose, onToggleMult
         document.addEventListener("mousedown", handler)
         return () => document.removeEventListener("mousedown", handler)
     }, [])
-    const isVirtual = assignment.id.startsWith("virtual-")
-    if (isVirtual) return <span className="w-7 inline-block" />
+    if (isVirtual(assignment)) return null
     return (
         <div className="relative inline-block" ref={ref}>
             <button onClick={() => setOpen(o => !o)}
@@ -203,6 +265,14 @@ export default function AssignmentsPage() {
     const [loading, setLoading] = useState(false)
     const [inspectorSearch, setInspectorSearch] = useState("")
     const [managerSearch, setManagerSearch] = useState("")
+    // True once the team pre-fill below has written the selection, so the steps
+    // can say where the ticks came from.
+    const [prefilled, setPrefilled] = useState(false)
+    // "Create assignment" on a not-assigned row: the project to tick once the
+    // site change has loaded that site's projects (the site effect clears the
+    // selection, so it has to be re-applied there rather than set directly).
+    const pendingProjectRef = useRef<string | null>(null)
+    const wizardRef = useRef<HTMLDivElement>(null)
 
     // ── Table state ──
     const [assignmentSearch, setAssignmentSearch] = useState("")
@@ -213,6 +283,15 @@ export default function AssignmentsPage() {
 
     useEffect(() => { setPage(1) }, [assignmentSearch, filterStatus, perPage])
 
+    // Deep links: /assignments?status=not_assigned (or the old manager_only).
+    // Read off window rather than useSearchParams so the page needs no Suspense
+    // boundary.
+    useEffect(() => {
+        if (!mounted) return
+        const q = new URLSearchParams(window.location.search).get("status")
+        if (q) setFilterStatus(normalizeFilter(q))
+    }, [mounted])
+
     useEffect(() => {
         if (mounted && isManagerOrAdmin) fetchInitialData()
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,11 +300,15 @@ export default function AssignmentsPage() {
     useEffect(() => {
         if (selectedSiteId) fetchProjects(selectedSiteId)
         else setProjects([])
-        // Changing Site resets the project selection.
-        setSelectedProjectIds([])
+        // Changing Site resets the project selection — unless a row's "Create
+        // assignment" asked for a specific project under the new site.
+        const pending = pendingProjectRef.current
+        pendingProjectRef.current = null
+        setSelectedProjectIds(pending ? [pending] : [])
     }, [selectedSiteId])
 
-    // Auto-fill inspectors & managers from the chosen projects' existing members.
+    // Pre-fill inspectors & managers from the chosen projects' team
+    // (ProjectInspector / ProjectManager). The user can still add or remove.
     useEffect(() => {
         const sourceProjects = wholeSite ? projects : projects.filter(p => selectedProjectIds.includes(p.id))
         if (sourceProjects.length === 0) return
@@ -237,6 +320,7 @@ export default function AssignmentsPage() {
         })
         setSelectedManagerIds(Array.from(mgr))
         setSelectedInspectorIds(Array.from(ins))
+        setPrefilled(mgr.size > 0 || ins.size > 0)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedProjectIds, wholeSite, projects])
 
@@ -267,7 +351,8 @@ export default function AssignmentsPage() {
         try {
             const res = await fetch(`/api/projects?siteId=${siteId}`)
             const data = res.ok ? await res.json() : []
-            setProjects(Array.isArray(data) ? data : [])
+            // Draft / archived projects cannot take new work.
+            setProjects(Array.isArray(data) ? data.filter((p: any) => !CLOSED_PROJECT_STATUSES.includes(p.status)) : [])
         } catch {
             setProjects([])
         }
@@ -291,12 +376,34 @@ export default function AssignmentsPage() {
         setIsMultiPart(false)
         setStartDate("")
         setNotes("")
+        setPrefilled(false)
         setWizardStep(0)
+    }
+
+    // "Create assignment" on a not-assigned row: open the wizard on that
+    // project only, with its team pre-filled by the effect above.
+    const startAssignmentFor = (a: Assignment) => {
+        const siteId = a.project?.site?.id
+        const projectId = a.project?.id ?? a.projectId
+        if (!siteId || !projectId) return
+        setWholeSite(false)
+        if (siteId === selectedSiteId) {
+            setSelectedProjectIds([projectId])
+        } else {
+            pendingProjectRef.current = projectId
+            setSelectedSiteId(siteId)
+        }
+        setWizardStep(0)
+        wizardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
     }
 
     const handleAssign = async () => {
         const hasProjects = wholeSite ? !!selectedSiteId : selectedProjectIds.length > 0
-        if (!hasProjects || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)) return
+        // Inspector required: an assignment is inspector work (server enforces too).
+        if (!hasProjects || selectedInspectorIds.length === 0) return
+        // Backdating is allowed, but it skips "Scheduled" — make that explicit.
+        if (startDate && startDate < todayStr() &&
+            !confirm("Start date is in the past — the assignment will be Active immediately. Continue?")) return
         setLoading(true)
         try {
             const res = await fetch("/api/assignments", {
@@ -384,16 +491,24 @@ export default function AssignmentsPage() {
     // ── Wizard helpers ──
     const hasProjectAccess = wholeSite ? !!selectedSiteId : selectedProjectIds.length > 0
     const canLeaveStep0 = !!selectedSiteId && hasProjectAccess && !!startDate
+    // Step 2 needs an inspector; managers (step 3) are optional.
+    const canLeaveStep1 = selectedInspectorIds.length > 0
+    const canLeaveStep = (step: number) => step === 0 ? canLeaveStep0 : step === 1 ? canLeaveStep1 : true
     const goNext = () => {
-        if (wizardStep === 0 && !canLeaveStep0) return
+        if (!canLeaveStep(wizardStep)) return
         setWizardStep(s => Math.min(s + 1, WIZARD_STEPS.length - 1))
     }
     const goBack = () => setWizardStep(s => Math.max(s - 1, 0))
     const goToStep = (target: number) => {
         if (target === wizardStep) return
         if (target < wizardStep) { setWizardStep(target); return }
-        if (canLeaveStep0) setWizardStep(target)
+        // Every step between here and the target must be complete.
+        for (let s = wizardStep; s < target; s++) if (!canLeaveStep(s)) return
+        setWizardStep(target)
     }
+    // Shown on the Review step and used by the past-date confirm.
+    const startsInPast = !!startDate && startDate < todayStr()
+    const startsInFuture = !!startDate && startDate > todayStr()
     const toggleId = (id: string, setter: React.Dispatch<React.SetStateAction<string[]>>) =>
         setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
@@ -409,7 +524,7 @@ export default function AssignmentsPage() {
         : managers
 
     // ── Table data ──
-    const realAssignments = useMemo(() => assignments.filter(a => !a.id.startsWith("virtual-")), [assignments])
+    const realAssignments = useMemo(() => assignments.filter(a => !isVirtual(a)), [assignments])
     const stats = useMemo(() => ({
         total: realAssignments.length,
         active: realAssignments.filter(a => displayStatus(a).label === "Active").length,
@@ -420,10 +535,11 @@ export default function AssignmentsPage() {
     const filteredAssignments = useMemo(() => {
         const q = assignmentSearch.trim().toLowerCase()
         return assignments.filter(a => {
-            if (filterStatus !== "all" && displayStatus(a).label !== filterStatus) return false
+            if (filterStatus !== "all" && displayStatus(a).key !== filterStatus) return false
             if (q) {
                 const hay = [
                     a.inspectionBoy?.name,
+                    ...(a.project?.inspectors ?? []).map(i => i.name),
                     a.project?.name,
                     a.project?.site?.name,
                 ].filter(Boolean).join(" ").toLowerCase()
@@ -467,7 +583,7 @@ export default function AssignmentsPage() {
 
                 {/* ── LEFT: New Assignment wizard ── */}
                 {canManageAssignments && (
-                <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
+                <div ref={wizardRef} className="bg-white border border-[var(--border)] rounded-[14px] p-5 scroll-mt-4">
                     <div className="flex items-center gap-2 mb-0.5">
                         <Sparkles size={15} className="text-[var(--accent)]" />
                         <h2 className="text-[15px] font-semibold text-[var(--text)]">New Assignment</h2>
@@ -622,18 +738,25 @@ export default function AssignmentsPage() {
                     {wizardStep === 1 && (
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
-                                <span className="text-[12px] font-medium text-[var(--text)]">Select Inspectors</span>
+                                <span className="text-[12px] font-medium text-[var(--text)]">Select Inspectors <span className="text-[var(--red)]">*</span></span>
                                 {selectedInspectorIds.length > 0 && (
                                     <span className="bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-full text-[11px] font-medium">
                                         {selectedInspectorIds.length} selected
                                     </span>
                                 )}
                             </div>
+                            {prefilled && <PrefillNote />}
+                            {selectedInspectorIds.length === 0 && (
+                                <p className="text-[12px] text-[var(--red)] bg-[var(--red-light)] rounded-[9px] px-3 py-2 mb-2">
+                                    Select at least one inspector — an assignment is inspector work.
+                                </p>
+                            )}
                             <div className="relative mb-2">
                                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                 <input value={inspectorSearch} onChange={e => setInspectorSearch(e.target.value)}
                                     placeholder="Search inspectors by name or email..." className={inputCls + " pl-8"} />
                             </div>
+                            <SelectedChips people={inspectors} ids={selectedInspectorIds} onRemove={id => toggleId(id, setSelectedInspectorIds)} />
                             <div className={listBox}>
                                 {filteredInspectors.length === 0 ? (
                                     <p className="p-4 text-center text-[12px] text-[var(--text3)]">No inspectors found.</p>
@@ -648,18 +771,20 @@ export default function AssignmentsPage() {
                     {wizardStep === 2 && (
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
-                                <span className="text-[12px] font-medium text-[var(--text)]">Select Managers</span>
+                                <span className="text-[12px] font-medium text-[var(--text)]">Select Managers <span className="text-[var(--text3)] font-normal">(Optional)</span></span>
                                 {selectedManagerIds.length > 0 && (
                                     <span className="bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-full text-[11px] font-medium">
                                         {selectedManagerIds.length} selected
                                     </span>
                                 )}
                             </div>
+                            {prefilled && <PrefillNote />}
                             <div className="relative mb-2">
                                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                 <input value={managerSearch} onChange={e => setManagerSearch(e.target.value)}
                                     placeholder="Search managers by name or email..." className={inputCls + " pl-8"} />
                             </div>
+                            <SelectedChips people={managers} ids={selectedManagerIds} onRemove={id => toggleId(id, setSelectedManagerIds)} />
                             <div className={listBox}>
                                 {filteredManagers.length === 0 ? (
                                     <p className="p-4 text-center text-[12px] text-[var(--text3)]">No managers found.</p>
@@ -677,6 +802,9 @@ export default function AssignmentsPage() {
                                 { label: "Site", value: selectedSite ? selectedSite.name : "—" },
                                 { label: "Scope", value: wholeSite ? `All Projects (${projects.length})` : `${selectedProjectIds.length} specific project(s)` },
                                 { label: "Start Date", value: startDate ? fmtDate(startDate) : "—" },
+                                // Past/today → Active at once; future → Scheduled. Said here so the
+                                // confirm on Create is not the first time the user hears it.
+                                { label: "Status on creation", value: startsInFuture ? "Scheduled" : startsInPast ? "Active immediately (backdated)" : "Active immediately" },
                                 { label: "Recurrence", value: RECURRENCE_OPTIONS.find(o => o.value === recurrenceType)?.label ?? "One-time" },
                                 { label: "Inspectors", value: selectedInspectorIds.length > 0 ? `${selectedInspectorIds.length} selected` : "None" },
                                 { label: "Managers", value: selectedManagerIds.length > 0 ? `${selectedManagerIds.length} selected` : "None" },
@@ -692,9 +820,9 @@ export default function AssignmentsPage() {
                                     <p className="text-[12.5px] text-[var(--text)]">{notes}</p>
                                 </div>
                             )}
-                            {selectedInspectorIds.length === 0 && selectedManagerIds.length === 0 && (
+                            {selectedInspectorIds.length === 0 && (
                                 <p className="text-[12px] text-[var(--red)] bg-[var(--red-light)] rounded-[9px] px-3 py-2">
-                                    Select at least one inspector or manager before creating the assignment.
+                                    Select at least one inspector before creating the assignment.
                                 </p>
                             )}
                         </div>
@@ -712,13 +840,16 @@ export default function AssignmentsPage() {
                                 Cancel
                             </button>
                             {wizardStep < WIZARD_STEPS.length - 1 ? (
-                                <button onClick={goNext} disabled={wizardStep === 0 && !canLeaveStep0}
+                                <button onClick={goNext} disabled={!canLeaveStep(wizardStep)}
                                     className="inline-flex items-center gap-1 px-4 h-9 rounded-[9px] bg-[var(--accent)] text-white text-[12.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
-                                    Next <ChevronRight size={13} />
+                                    {/* People steps show the count so a selection is never in doubt. */}
+                                    {wizardStep === 1 ? `Next (${selectedInspectorIds.length} selected)`
+                                        : wizardStep === 2 ? `Next (${selectedManagerIds.length} selected)`
+                                            : "Next"} <ChevronRight size={13} />
                                 </button>
                             ) : (
                                 <button onClick={handleAssign}
-                                    disabled={loading || (selectedInspectorIds.length === 0 && selectedManagerIds.length === 0)}
+                                    disabled={loading || selectedInspectorIds.length === 0}
                                     className="inline-flex items-center gap-1.5 px-4 h-9 rounded-[9px] bg-[var(--accent)] text-white text-[12.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
                                     {loading && <Loader2 size={13} className="animate-spin" />}
                                     Create Assignment
@@ -775,7 +906,7 @@ export default function AssignmentsPage() {
                             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                                 className="filter-full w-full sm:w-auto h-8 rounded-[8px] border border-[var(--border)] bg-white px-2.5 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">
                                 <option value="all">All Status</option>
-                                {["Active", "Scheduled", "Inactive", "Manager Only"].map(s => <option key={s} value={s}>{s}</option>)}
+                                {FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
                         </div>
 
@@ -783,7 +914,20 @@ export default function AssignmentsPage() {
                             <p className="text-center text-[13px] text-[var(--text3)] py-12">No assignments found.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[720px]" style={{ fontSize: 12.5 }}>
+                                {/* Fixed layout: long names ellipsize (full text in the title)
+                                    instead of pushing the row wide. Below ~1100px the table keeps
+                                    a floor width and the wrapper scrolls; Actions stays pinned on
+                                    the right so the row can always be acted on. */}
+                                <table className="w-full table-fixed min-w-[900px] min-[1100px]:min-w-0" style={{ fontSize: 12.5 }}>
+                                    <colgroup>
+                                        <col style={{ width: 150 }} />
+                                        <col />
+                                        <col />
+                                        <col style={{ width: 130 }} />
+                                        <col style={{ width: 150 }} />
+                                        <col style={{ width: 110 }} />
+                                        <col style={{ width: canManageAssignments ? 150 : 70 }} />
+                                    </colgroup>
                                     <thead>
                                         <tr className="bg-[var(--surface2)]/60 text-[11px] text-[var(--text3)] uppercase tracking-wide">
                                             <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Assignment #</th>
@@ -792,35 +936,53 @@ export default function AssignmentsPage() {
                                             <th className="text-left font-semibold px-3 py-2.5">Status</th>
                                             <th className="text-left font-semibold px-3 py-2.5">Type</th>
                                             <th className="text-left font-semibold px-3 py-2.5 whitespace-nowrap">Start Date</th>
-                                            <th className="text-right font-semibold px-4 py-2.5">Actions</th>
+                                            <th className="text-right font-semibold px-4 py-2.5 sticky right-0 bg-[#f9fafe] shadow-[inset_1px_0_0_var(--border)]">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[var(--border)]">
                                         {pageRows.map(a => {
                                             const st = displayStatus(a)
+                                            const virtual = isVirtual(a)
+                                            const teamInspectors = (a.project?.inspectors ?? []).map(i => i.name || "Unnamed")
+                                            const projectName = a.project?.name || "—"
+                                            const siteName = a.project?.site?.name || "—"
                                             return (
                                                 <tr key={a.id} onClick={() => setDetail(a)}
-                                                    className="hover:bg-[var(--surface2)]/40 transition-colors cursor-pointer">
+                                                    className="group hover:bg-[var(--surface2)]/40 transition-colors cursor-pointer">
                                                     <td className="px-4 py-2.5">
-                                                        <p className="font-mono text-[11.5px] font-semibold text-[var(--accent)] whitespace-nowrap">{assignmentNo(a)}</p>
-                                                        <p className="text-[10.5px] text-[var(--text3)] whitespace-nowrap">{a.project?.site?.name || "—"}</p>
+                                                        {virtual ? (
+                                                            <p className="font-mono text-[11.5px] font-semibold text-[var(--text3)] cursor-help"
+                                                                title="Created when you issue the assignment">—</p>
+                                                        ) : (
+                                                            <p className="font-mono text-[11.5px] font-semibold text-[var(--accent)] truncate">{assignmentNo(a)}</p>
+                                                        )}
+                                                        <p className="text-[10.5px] text-[var(--text3)] truncate" title={siteName}>{siteName}</p>
                                                     </td>
                                                     <td className="px-3 py-2.5">
-                                                        <p className="font-semibold text-[var(--text)] leading-tight">{a.inspectionBoy?.name || "—"}</p>
-                                                        {/* A manager-only row has no inspector, so labelling it
-                                                            "Inspector" made it look like a real assignment. */}
-                                                        <p className="text-[10.5px] text-[var(--text3)]">
-                                                            {a.id.startsWith("virtual-") ? "Not assigned yet" : "Inspector"}
-                                                        </p>
+                                                        {virtual ? (
+                                                            // Team inspectors, not an assignee: nothing has been issued yet.
+                                                            <>
+                                                                <p className={`leading-tight truncate ${teamInspectors.length ? "font-semibold text-[var(--text)]" : "text-[var(--text3)] italic"}`}
+                                                                    title={teamInspectors.join(", ") || undefined}>
+                                                                    {teamInspectors.length ? teamInspectors.join(", ") : "No inspectors on team"}
+                                                                </p>
+                                                                <p className="text-[10.5px] text-[var(--text3)]">Team inspector{teamInspectors.length === 1 ? "" : "s"} · not yet issued</p>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <p className="font-semibold text-[var(--text)] leading-tight truncate" title={a.inspectionBoy?.name || undefined}>{a.inspectionBoy?.name || "—"}</p>
+                                                                <p className="text-[10.5px] text-[var(--text3)]">Inspector</p>
+                                                            </>
+                                                        )}
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-[var(--text2)] max-w-[150px] truncate">{a.project?.name || "—"}</td>
+                                                    <td className="px-3 py-2.5 text-[var(--text2)] truncate" title={projectName}>{projectName}</td>
                                                     <td className="px-3 py-2.5">
                                                         <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold whitespace-nowrap" style={{ background: st.bg, color: st.fg }}>
                                                             {st.label}
                                                         </span>
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text2)] whitespace-nowrap">
-                                                        {(a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring"}
+                                                        {virtual ? "—" : (a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring"}
                                                         {a.isMultiPart && (
                                                             <span title="Inspected over several visits — stays open until closed"
                                                                 className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#eef2ff] text-[#4338ca] text-[10px] font-semibold align-middle">
@@ -828,14 +990,22 @@ export default function AssignmentsPage() {
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{fmtDate(a.startDate ?? a.createdAt)}</td>
-                                                    <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                    <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{virtual ? "—" : fmtDate(a.startDate ?? a.createdAt)}</td>
+                                                    <td className="px-4 py-2.5 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-[#f6f8fc] shadow-[inset_1px_0_0_var(--border)] transition-colors"
+                                                        onClick={e => e.stopPropagation()}>
                                                         <div className="inline-flex items-center gap-1.5">
-                                                            <button onClick={() => setDetail(a)} title="View details"
-                                                                className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
-                                                                <Eye size={13} />
-                                                            </button>
-                                                            {canManageAssignments && (
+                                                            {virtual && canManageAssignments ? (
+                                                                <button onClick={() => startAssignmentFor(a)} title="Open the New Assignment wizard for this project"
+                                                                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-[6px] bg-[var(--accent)] text-white text-[11.5px] font-medium hover:opacity-90 transition-opacity">
+                                                                    <Plus size={12} strokeWidth={2.5} /> Create assignment
+                                                                </button>
+                                                            ) : (
+                                                                <button onClick={() => setDetail(a)} title="View details"
+                                                                    className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
+                                                                    <Eye size={13} />
+                                                                </button>
+                                                            )}
+                                                            {canManageAssignments && !virtual && (
                                                                 <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
                                                             )}
                                                         </div>
@@ -905,7 +1075,11 @@ export default function AssignmentsPage() {
                             </button>
                         </div>
                         <div className="p-5 space-y-2.5 overflow-y-auto">
-                            {[
+                            {(isVirtual(detail) ? [
+                                { label: "Project", value: detail.project?.name || "—" },
+                                { label: "Site", value: detail.project?.site?.name || "—" },
+                                { label: "Status", value: displayStatus(detail).label },
+                            ] : [
                                 { label: "Project", value: detail.project?.name || "—" },
                                 { label: "Site", value: detail.project?.site?.name || "—" },
                                 { label: "Status", value: displayStatus(detail).label },
@@ -913,31 +1087,49 @@ export default function AssignmentsPage() {
                                 { label: "Start Date", value: fmtDate(detail.startDate ?? detail.createdAt) },
                                 { label: "Assigned By", value: detail.assigner?.name || "—" },
                                 { label: "Created", value: fmtDate(detail.createdAt) },
-                            ].map(r => (
+                            ]).map(r => (
                                 <div key={r.label} className="flex items-center justify-between">
                                     <span className="text-[12.5px] text-[var(--text2)]">{r.label}</span>
-                                    <span className="text-[12.5px] font-semibold text-[var(--text)] text-right max-w-[60%] truncate">{r.value}</span>
+                                    <span className="text-[12.5px] font-semibold text-[var(--text)] text-right max-w-[60%] truncate" title={r.value}>{r.value}</span>
                                 </div>
                             ))}
-                            {/* People on this assignment */}
+                            {/* An assignment stores one inspector; managers are not stored per
+                                assignment, only on the project — so the two are kept apart
+                                rather than shown as one "People" list. */}
                             <div className="pt-2.5 border-t border-[var(--border)]">
-                                <p className="text-[12px] text-[var(--text2)] mb-1.5">People</p>
+                                <p className="text-[12px] text-[var(--text2)] mb-1.5">{isVirtual(detail) ? "Team inspectors (nothing issued yet)" : "Assigned inspector"}</p>
                                 <div className="flex flex-wrap gap-1.5">
-                                    {detail.inspectionBoy?.name && (
+                                    {isVirtual(detail) ? (
+                                        (detail.project?.inspectors ?? []).length > 0 ? (detail.project?.inspectors ?? []).map(i => (
+                                            <span key={i.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--surface2)] text-[var(--text2)] text-[11px] font-semibold">
+                                                <Users size={10} /> {i.name || "Unnamed"}
+                                            </span>
+                                        )) : <span className="text-[12px] text-[var(--text3)]">No inspectors on team.</span>
+                                    ) : detail.inspectionBoy?.name ? (
                                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--accent-light)] text-[var(--accent)] text-[11px] font-semibold">
-                                            <Users size={10} /> {detail.inspectionBoy.name} · Inspector
+                                            <Users size={10} /> {detail.inspectionBoy.name}
                                         </span>
-                                    )}
-                                    {(detail.project?.managers ?? []).map(m => (
-                                        <span key={m.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#eff6ff] text-[#1d4ed8] text-[11px] font-semibold">
-                                            <Users size={10} /> {m.name || "Unnamed"} · Manager
-                                        </span>
-                                    ))}
-                                    {!detail.inspectionBoy?.name && (detail.project?.managers ?? []).length === 0 && (
-                                        <span className="text-[12px] text-[var(--text3)]">No people linked.</span>
+                                    ) : (
+                                        <span className="text-[12px] text-[var(--text3)]">No inspector linked.</span>
                                     )}
                                 </div>
                             </div>
+                            <div className="pt-2.5 border-t border-[var(--border)]">
+                                <p className="text-[12px] text-[var(--text2)] mb-1.5">Project managers</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(detail.project?.managers ?? []).length > 0 ? (detail.project?.managers ?? []).map(m => (
+                                        <span key={m.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#eff6ff] text-[#1d4ed8] text-[11px] font-semibold">
+                                            <Users size={10} /> {m.name || "Unnamed"}
+                                        </span>
+                                    )) : <span className="text-[12px] text-[var(--text3)]">No managers on the project.</span>}
+                                </div>
+                            </div>
+                            {isVirtual(detail) && canManageAssignments && (
+                                <button onClick={() => { startAssignmentFor(detail); setDetail(null) }}
+                                    className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] bg-[var(--accent)] text-white text-[12.5px] font-medium hover:opacity-90 transition-opacity">
+                                    <Plus size={13} strokeWidth={2.5} /> Create assignment
+                                </button>
+                            )}
                             {detail.notes && (
                                 <div className="pt-2 border-t border-[var(--border)]">
                                     <p className="text-[12px] text-[var(--text2)] mb-1">Notes</p>

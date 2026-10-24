@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { ensureProjectSchema } from "@/lib/prisma"
 import { checkAccess } from "@/lib/permissions"
+import { unassignableUserWhere, UNASSIGNABLE_USER_SELECT, unassignableMessage } from "@/lib/employee-filter"
 
 export async function GET(req: Request) {
     try {
@@ -14,9 +15,15 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url)
         const siteId = searchParams.get("siteId")
+        // Drafts are half-filled projects (Name + Site only) — nothing may be
+        // assigned to them. Every project picker (assignment wizard, bulk import,
+        // reports) lists projects off this endpoint, so drafts are hidden unless
+        // the caller asks for them; only the Projects list does.
+        const includeDrafts = searchParams.get("includeDrafts") === "1"
 
         const where: Record<string, unknown> = {}
         if (siteId) where.siteId = siteId
+        if (!includeDrafts) where.status = { not: "DRAFT" }
 
         await ensureProjectSchema()
 
@@ -84,6 +91,44 @@ export async function POST(req: Request) {
             return new NextResponse("Name and Site ID are required", { status: 400 })
         }
 
+        const mgrIds: string[] = Array.isArray(managerIds) ? managerIds : []
+        const insIds: string[] = Array.isArray(inspectorIds) ? inspectorIds : []
+
+        // DRAFT = "save what I have so far": only Name + Site are needed and the
+        // project stays out of every assignment picker. Anything else is a real
+        // project, so the fields the form marks mandatory are enforced here too —
+        // the client check alone let a Name + Site POST through.
+        const isDraft = status === "DRAFT"
+        const start = startDate ? new Date(startDate) : null
+        const end = endDate ? new Date(endDate) : null
+        const validStart = !!start && !isNaN(start.getTime())
+        const validEnd = !!end && !isNaN(end.getTime())
+        if (!isDraft) {
+            const problems: string[] = []
+            const missing: string[] = []
+            if (!projectType) missing.push("Project Type")
+            if (!validStart) missing.push("Estimated Start Date")
+            if (!validEnd) missing.push("Target End Date")
+            if (!priority) missing.push("Priority")
+            if (!status) missing.push("Status")
+            if (missing.length) problems.push(`Missing required fields: ${missing.join(", ")}`)
+            if (validStart && validEnd && end! < start!) problems.push("Target End Date must be on or after Estimated Start Date")
+            if (mgrIds.length === 0) problems.push("At least one Manager is required")
+            if (insIds.length === 0) problems.push("At least one Inspector is required")
+            if (problems.length) return new NextResponse(problems.join(". "), { status: 400 })
+        } else if (validStart && validEnd && end! < start!) {
+            // A draft may leave dates blank, but not contradict itself.
+            return new NextResponse("Target End Date must be on or after Estimated Start Date", { status: 400 })
+        }
+
+        // A resigned / terminated / inactive employee must not become a Manager
+        // or Inspector. The picker already hides them; this catches a stale form.
+        const pickedIds = [...new Set([...mgrIds, ...insIds])]
+        if (pickedIds.length > 0) {
+            const blocked = await prisma.user.findFirst({ where: unassignableUserWhere(pickedIds), select: UNASSIGNABLE_USER_SELECT })
+            if (blocked) return new NextResponse(unassignableMessage(blocked), { status: 400 })
+        }
+
         await ensureProjectSchema()
 
         // Projects hang off a real HR Site — the Company concept is retired.
@@ -107,7 +152,7 @@ export async function POST(req: Request) {
         if (match) nextNum = parseInt(match[1]) + 1
         const code = `PRJ-${year}-${String(nextNum).padStart(5, "0")}`
 
-        const VALID_STATUSES = ["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]
+        const VALID_STATUSES = ["DRAFT", "PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]
         const project = await prisma.project.create({
             data: {
                 name,
@@ -117,8 +162,8 @@ export async function POST(req: Request) {
                 status: VALID_STATUSES.includes(status) ? status : "PLANNING",
                 projectType: projectType || null,
                 priority: priority || "Medium",
-                startDate: startDate ? new Date(startDate) : null,
-                endDate: endDate ? new Date(endDate) : null,
+                startDate: validStart ? start : null,
+                endDate: validEnd ? end : null,
                 createdBy: actorId!,
             },
         })
@@ -129,7 +174,6 @@ export async function POST(req: Request) {
         // active Assignment on this project. Wrapped defensively so a project
         // is still created even if these follow-up writes fail.
         try {
-            const mgrIds: string[] = Array.isArray(managerIds) ? managerIds : []
             if (mgrIds.length > 0) {
                 await prisma.projectManager.createMany({
                     data: mgrIds.map((managerId) => ({
@@ -150,7 +194,6 @@ export async function POST(req: Request) {
             // its team — the job appeared in their workspace before anyone had
             // decided what, or when, they were inspecting. Work is issued from the
             // Assignments screen.
-            const insIds: string[] = Array.isArray(inspectorIds) ? inspectorIds : []
             if (insIds.length > 0) {
                 await prisma.projectInspector.createMany({
                     data: insIds.map((inspectorId) => ({

@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { normalizeEmploymentType } from "@/lib/employment-type"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -174,7 +175,7 @@ export async function PUT(
         if (dateOfJoining !== undefined) updateData.dateOfJoining = dateOfJoining ? new Date(dateOfJoining) : null
         if (dateOfLeaving !== undefined) updateData.dateOfLeaving = dateOfLeaving ? new Date(dateOfLeaving) : null
         if (status !== undefined) updateData.status = status
-        if (employmentType !== undefined) updateData.employmentType = employmentType
+        if (employmentType !== undefined) updateData.employmentType = normalizeEmploymentType(employmentType)
         if (basicSalary !== undefined) {
             // Guard against NaN/Infinity — Prisma rejects them on a numeric column.
             const n = typeof basicSalary === "number" ? basicSalary : parseFloat(basicSalary)

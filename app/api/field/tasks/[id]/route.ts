@@ -3,7 +3,19 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { FieldTaskStatus } from "@prisma/client"
+import { FieldTaskStatus, TaskPriority } from "@prisma/client"
+import { istDateOnly } from "@/lib/attendance-policy"
+
+// "YYYY-MM-DD" → UTC midnight of that calendar day (the istDateOnly convention,
+// which the list's `date=` filter relies on). Mirrors ../route.ts.
+function parseDueDate(raw: unknown): Date | null {
+    if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+    const d = new Date(raw + "T00:00:00.000Z")
+    if (Number.isNaN(d.getTime())) return null
+    return d.toISOString().slice(0, 10) === raw ? d : null
+}
+
+const DUE_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -102,17 +114,50 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             return NextResponse.json(updated)
         }
 
-        // Admin/Manager can update all fields
+        // Admin/Manager can update all fields. Same per-field 400s as POST so bad
+        // input never surfaces as a 500.
         const { title, description, employeeId, siteId, priority, status, dueDate, dueTime, completedNote } = body
         const updateData: Record<string, unknown> = {}
-        if (title !== undefined) updateData.title = title
-        if (description !== undefined) updateData.description = description
-        if (employeeId !== undefined) updateData.employeeId = employeeId
-        if (siteId !== undefined) updateData.siteId = siteId || null
-        if (priority !== undefined) updateData.priority = priority
+        if (title !== undefined) {
+            if (typeof title !== "string" || !title.trim()) return new NextResponse("Title cannot be empty", { status: 400 })
+            updateData.title = title.trim()
+        }
+        if (description !== undefined) updateData.description = description || null
+        if (employeeId !== undefined) {
+            const employee = typeof employeeId === "string" && employeeId
+                ? await prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true } })
+                : null
+            if (!employee) return new NextResponse("Employee not found", { status: 400 })
+            updateData.employeeId = employeeId
+        }
+        if (siteId !== undefined) {
+            if (siteId) {
+                const site = typeof siteId === "string"
+                    ? await prisma.site.findUnique({ where: { id: siteId }, select: { id: true } })
+                    : null
+                if (!site) return new NextResponse("Site not found", { status: 400 })
+            }
+            updateData.siteId = siteId || null
+        }
+        if (priority !== undefined) {
+            if (!Object.values(TaskPriority).includes(priority)) {
+                return new NextResponse(`Invalid priority: must be one of ${Object.values(TaskPriority).join(", ")}`, { status: 400 })
+            }
+            updateData.priority = priority
+        }
         if (status !== undefined) updateData.status = status
-        if (dueDate !== undefined) updateData.dueDate = new Date(dueDate)
-        if (dueTime !== undefined) updateData.dueTime = dueTime || null
+        if (dueDate !== undefined) {
+            const due = parseDueDate(dueDate)
+            if (!due) return new NextResponse("Due date must be a valid YYYY-MM-DD date", { status: 400 })
+            if (due < istDateOnly()) return new NextResponse("Due date cannot be in the past", { status: 400 })
+            updateData.dueDate = due
+        }
+        if (dueTime !== undefined) {
+            if (dueTime && (typeof dueTime !== "string" || !DUE_TIME_RE.test(dueTime))) {
+                return new NextResponse("Due time must be HH:MM (24-hour)", { status: 400 })
+            }
+            updateData.dueTime = dueTime || null
+        }
         if (completedNote !== undefined) updateData.completedNote = completedNote
         if (status === "COMPLETED" && !task.completedAt) updateData.completedAt = new Date()
 

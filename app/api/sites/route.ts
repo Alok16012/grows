@@ -4,6 +4,40 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { checkAccess } from "@/lib/permissions"
+import { collectErrors, siteFieldChecks, validationResponse } from "@/lib/validation"
+
+/**
+ * Case-insensitive, trimmed name clash. Site names are what supervisors pick
+ * from in every dropdown, so "ABC HQ" and "abc hq " side by side are a bug.
+ * Returns the 409 body or null.
+ */
+async function findSiteNameClash(name: string, excludeId?: string) {
+    const trimmed = name.trim()
+    const clash = await prisma.site.findFirst({
+        where: {
+            name: { equals: trimmed, mode: "insensitive" },
+            ...(excludeId ? { id: { not: excludeId } } : {}),
+        },
+        select: { id: true, name: true },
+    })
+    if (!clash) return null
+    const message = `A site named '${clash.name}' already exists`
+    return { error: message, message, fields: { name: message } }
+}
+
+/** Trimmed string or null — blank optional fields are stored as NULL, not "". */
+const str = (v: unknown): string | null => {
+    if (v === null || v === undefined) return null
+    const t = String(v).trim()
+    return t ? t : null
+}
+
+/** Finite number or null. Callers validate the range first; this only converts. */
+const num = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === "") return null
+    const n = typeof v === "number" ? v : Number(String(v).trim())
+    return Number.isFinite(n) ? n : null
+}
 
 export async function GET(req: Request) {
     try {
@@ -88,9 +122,17 @@ export async function POST(req: Request) {
             manpowerRequired, contactPerson, contactPhone, siteType, shift,
         } = body
 
-        if (!name || !address) {
-            return new NextResponse("Name and address are required", { status: 400 })
-        }
+        // Field-level 400s: the wizard shows `fields` under the inputs and
+        // toasts `error`. Nothing malformed gets as far as Prisma, so a bad
+        // pincode or "abc" manpower can no longer surface as "Internal Error".
+        const errors = collectErrors(siteFieldChecks(
+            { name, address, city, state, pincode, contactPerson, contactPhone, manpowerRequired, latitude, longitude, radius },
+            { requireCore: true },
+        ))
+        if (errors) return NextResponse.json(validationResponse(errors), { status: 400 })
+
+        const clash = await findSiteNameClash(name)
+        if (clash) return NextResponse.json(clash, { status: 409 })
 
         // Auto-generate site code as SITE-NNNN
         const lastSite = await prisma.site.findFirst({
@@ -109,20 +151,20 @@ export async function POST(req: Request) {
 
         const site = await prisma.site.create({
             data: {
-                name,
+                name: String(name).trim(),
                 code: finalCode,
-                address,
-                city: city || null,
-                state: state || null,
-                pincode: pincode || null,
-                clientName: clientName || null,
-                clientId: clientId || null,
-                latitude: latitude ? parseFloat(latitude) : null,
-                longitude: longitude ? parseFloat(longitude) : null,
-                radius: radius ? parseFloat(radius) : 100,
-                manpowerRequired: manpowerRequired ? parseInt(manpowerRequired) : 1,
-                contactPerson: contactPerson || null,
-                contactPhone: contactPhone || null,
+                address: String(address).trim(),
+                city: str(city),
+                state: str(state),
+                pincode: str(pincode),
+                clientName: str(clientName),
+                clientId: str(clientId),
+                latitude: num(latitude),
+                longitude: num(longitude),
+                radius: num(radius) ?? 100,
+                manpowerRequired: num(manpowerRequired) ?? 1,
+                contactPerson: str(contactPerson),
+                contactPhone: str(contactPhone),
                 siteType: siteType || null,
                 shift: shift || null,
                 createdBy: actorId!,
@@ -132,6 +174,11 @@ export async function POST(req: Request) {
         return NextResponse.json(site)
     } catch (error) {
         console.error("[SITES_POST]", error)
+        // A Prisma constraint/shape failure is a bad request, not an outage —
+        // tell the client plainly instead of a bare "Internal Error".
+        if ((error as { code?: string })?.code?.startsWith("P2")) {
+            return NextResponse.json({ error: "Could not save the site — check the field values and try again." }, { status: 400 })
+        }
         return new NextResponse("Internal Error", { status: 500 })
     }
 }

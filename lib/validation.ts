@@ -291,3 +291,128 @@ export function validationResponse(errors: ValidationMap) {
         fields: errors,
     }
 }
+
+// ─── Generic format helpers ──────────────────────────────────────────────────
+
+/** Trims, then caps the length. Empty is valid — pair with `required()`. */
+export function validateMaxLength(value: unknown, label: string, max: number): FieldError {
+    const v = typeof value === "string" ? value.trim() : value == null ? "" : String(value)
+    if (!v) return null
+    if (v.length > max) return `${label} must be ${max} characters or fewer`
+    return null
+}
+
+/**
+ * A person or place name: letters, spaces, dots and hyphens only. Catches the
+ * "123" / "asdf@@" values testers type into City or Contact Person, which the
+ * schema happily stores and which then break reports and SMS templates.
+ */
+export function validateNameText(value: unknown, label: string, max = 80): FieldError {
+    const v = typeof value === "string" ? value.trim() : value == null ? "" : String(value)
+    if (!v) return null
+    if (v.length > max) return `${label} must be ${max} characters or fewer`
+    if (!/^[A-Za-z][A-Za-z .\-]*$/.test(v)) return `${label} may only contain letters, spaces, dots and hyphens`
+    return null
+}
+
+/**
+ * Exactly six digits, no spaces or separators. `validatePincode` strips
+ * non-digits first, so "12-34-56" slips through it; the Site form wants the
+ * literal shape because the value is printed on documents as typed.
+ */
+export function validateStrictPincode(value: unknown): FieldError {
+    const v = typeof value === "string" ? value.trim() : value == null ? "" : String(value)
+    if (!v) return null
+    if (!/^\d{6}$/.test(v)) return "Pincode must be exactly 6 digits"
+    if (v[0] === "0") return "Pincode cannot start with 0"
+    return null
+}
+
+/**
+ * A whole number inside [min, max]. Accepts the string a form field sends or a
+ * number from JSON; rejects NaN, decimals and anything that would otherwise
+ * reach Prisma as `parseInt(NaN)` and surface as "Internal Error".
+ */
+export function validateIntegerRange(value: unknown, label: string, min: number, max: number): FieldError {
+    if (value === null || value === undefined || value === "") return null
+    const n = typeof value === "number" ? value : Number(String(value).trim())
+    if (!Number.isFinite(n) || !Number.isInteger(n)) return `${label} must be a whole number`
+    if (n < min) return `${label} must be at least ${min}`
+    if (n > max) return `${label} cannot exceed ${max}`
+    return null
+}
+
+/** A finite number inside [min, max]; same empty-is-valid contract. */
+export function validateNumberRange(value: unknown, label: string, min: number, max: number): FieldError {
+    if (value === null || value === undefined || value === "") return null
+    const n = typeof value === "number" ? value : Number(String(value).trim())
+    if (!Number.isFinite(n)) return `${label} must be a number`
+    if (n < min || n > max) return `${label} must be between ${min} and ${max}`
+    return null
+}
+
+// ─── Sites ───────────────────────────────────────────────────────────────────
+
+// One rule set for the Add/Edit Site wizard AND /api/sites, so the inline
+// messages the form shows are the exact ones the server would send back.
+export const SITE_LIMITS = {
+    name: 120,
+    address: 300,
+    text: 80,          // city, state, contact person
+    manpowerMin: 1,
+    manpowerMax: 5000,
+    radiusMin: 10,
+    radiusMax: 5000,   // metres
+} as const
+
+export type SiteFieldInput = Partial<Record<
+    "name" | "address" | "city" | "state" | "pincode" | "contactPerson" | "contactPhone"
+    | "manpowerRequired" | "latitude" | "longitude" | "radius",
+    unknown
+>>
+
+/** Info-tab fields of the Site wizard; the rest live on the Geofencing tab. */
+export const SITE_INFO_FIELDS = [
+    "name", "address", "city", "state", "pincode", "contactPerson", "contactPhone", "manpowerRequired",
+] as const
+
+/**
+ * Per-field checks for a site payload. Only keys that are PRESENT (not
+ * undefined) are checked, so a partial PUT such as `{ isActive: false }` is
+ * not asked for a name. Pass `{ requireCore: true }` on create and when the
+ * form is about to save, so a missing name/address is reported too.
+ */
+export function siteFieldChecks(f: SiteFieldInput, opts: { requireCore?: boolean } = {}): ValidationMap {
+    const has = (k: keyof SiteFieldInput) => f[k] !== undefined
+    const checks: ValidationMap = {}
+
+    if (opts.requireCore || has("name")) {
+        checks.name = required(f.name, "Site Name") ?? validateMaxLength(f.name, "Site Name", SITE_LIMITS.name)
+    }
+    if (opts.requireCore || has("address")) {
+        checks.address = required(f.address, "Address") ?? validateMaxLength(f.address, "Address", SITE_LIMITS.address)
+    }
+    if (has("city")) checks.city = validateNameText(f.city, "City", SITE_LIMITS.text)
+    if (has("state")) checks.state = validateNameText(f.state, "State", SITE_LIMITS.text)
+    if (has("pincode")) checks.pincode = validateStrictPincode(f.pincode)
+    if (has("contactPerson")) checks.contactPerson = validateNameText(f.contactPerson, "Contact Person", SITE_LIMITS.text)
+    if (has("contactPhone")) checks.contactPhone = validatePhone(f.contactPhone as string)
+    if (has("manpowerRequired")) {
+        checks.manpowerRequired = validateIntegerRange(
+            f.manpowerRequired, "Manpower Required", SITE_LIMITS.manpowerMin, SITE_LIMITS.manpowerMax,
+        )
+    }
+    if (has("latitude")) checks.latitude = validateNumberRange(f.latitude, "Latitude", -90, 90)
+    if (has("longitude")) checks.longitude = validateNumberRange(f.longitude, "Longitude", -180, 180)
+    if (has("radius")) {
+        checks.radius = validateNumberRange(f.radius, "Geofence Radius", SITE_LIMITS.radiusMin, SITE_LIMITS.radiusMax)
+    }
+    // A single coordinate is meaningless for geofencing — ask for both or neither.
+    const lat = f.latitude, lng = f.longitude
+    const latSet = lat !== undefined && lat !== null && lat !== ""
+    const lngSet = lng !== undefined && lng !== null && lng !== ""
+    if (latSet !== lngSet && !checks.latitude && !checks.longitude) {
+        checks[latSet ? "longitude" : "latitude"] = "Enter both latitude and longitude, or leave both empty"
+    }
+    return checks
+}

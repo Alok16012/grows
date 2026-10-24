@@ -15,6 +15,7 @@ import {
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import { buildEmployeeWhere, employeeFiltersFromParams } from "@/lib/employee-filter"
+import { normalizeEmploymentType } from "@/lib/employment-type"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
@@ -73,21 +74,27 @@ export async function GET(req: Request) {
             prisma.employee.count({ where }),
         ])
 
-        // Status counts for the stat cards — computed across ALL statuses
-        // (ignoring the active status-tab filter) but honouring the dept / site
-        // / type / search filters, so the cards reflect the current view. Plus
-        // "joined this month" per status for the trend indicators.
+        // Two sets of per-status numbers:
+        //  - `counts`  — across ALL statuses (ignoring the status tab) but
+        //    honouring dept / site / type / search, for the tab badges that sit
+        //    inside the filter row.
+        //  - `totals`  — the whole company, no filters at all beyond the default
+        //    exclusions, for the four stat cards at the top of the page.
+        // Plus "joined this month" per status for the cards' trend indicators.
         const countsWhere = { ...where }
         delete (countsWhere as any).status
+        const totalsWhere = buildEmployeeWhere({})
+        delete (totalsWhere as any).status
         const monthStart = new Date()
         monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
         const inMonth = { dateOfJoining: { gte: monthStart } }
-        // Two grouped aggregates instead of nine separate counts. Each of those
-        // counts re-ran the same onboardingRecord join, so the stat cards alone
-        // cost nine round trips on every list load.
-        const [byStatus, byStatusThisMonth] = await Promise.all([
+        // Grouped aggregates instead of separate counts. Each of those counts
+        // re-ran the same onboardingRecord join, so the stat cards alone cost
+        // nine round trips on every list load.
+        const [byStatus, byStatusTotal, byStatusThisMonth] = await Promise.all([
             prisma.employee.groupBy({ by: ["status"], where: countsWhere, _count: { _all: true } }),
-            prisma.employee.groupBy({ by: ["status"], where: { ...countsWhere, ...inMonth }, _count: { _all: true } }),
+            prisma.employee.groupBy({ by: ["status"], where: totalsWhere, _count: { _all: true } }),
+            prisma.employee.groupBy({ by: ["status"], where: { ...totalsWhere, ...inMonth }, _count: { _all: true } }),
         ])
 
         const tally = (rows: typeof byStatus) => {
@@ -95,24 +102,25 @@ export async function GET(req: Request) {
             for (const row of rows) out[row.status] = row._count._all
             return out
         }
-        const all = tally(byStatus)
         const month = tally(byStatusThisMonth)
         const sumExcludingOnboarding = (m: Record<string, number>) =>
             Object.entries(m).reduce((sum, [status, n]) => status === "ONBOARDING" ? sum : sum + n, 0)
 
-        const counts = {
-            total: sumExcludingOnboarding(all),
-            active: all.ACTIVE ?? 0,
-            onLeave: all.ON_LEAVE ?? 0,
-            inactive: all.INACTIVE ?? 0,
-            terminated: all.TERMINATED ?? 0,
-            resigned: all.RESIGNED ?? 0,
+        const shape = (m: Record<string, number>) => ({
+            total: sumExcludingOnboarding(m),
+            active: m.ACTIVE ?? 0,
+            onLeave: m.ON_LEAVE ?? 0,
+            inactive: m.INACTIVE ?? 0,
+            terminated: m.TERMINATED ?? 0,
+            resigned: m.RESIGNED ?? 0,
             newThisMonth: {
                 total: sumExcludingOnboarding(month),
                 active: month.ACTIVE ?? 0,
                 terminated: (month.TERMINATED ?? 0) + (month.RESIGNED ?? 0),
             },
-        }
+        })
+        const counts = shape(tally(byStatus))
+        const totals = shape(tally(byStatusTotal))
 
         // Backfill profile photo from an uploaded Photo document for any
         // employee whose `photo` column is still empty. Photos land with
@@ -171,7 +179,7 @@ export async function GET(req: Request) {
             }
         }
 
-        return NextResponse.json({ employees, total, counts, page, pageSize, totalPages: Math.ceil(total / pageSize), canViewSalary }, {
+        return NextResponse.json({ employees, total, counts, totals, page, pageSize, totalPages: Math.ceil(total / pageSize), canViewSalary }, {
             headers: {
                 // Browser-cache for 10s — back-button / list re-renders within
                 // 10s reuse the cached response instead of re-querying.
@@ -294,7 +302,8 @@ export async function POST(req: Request) {
                 branchId: branchId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
                 status: "ONBOARDING",
-                employmentType: employmentType || "Full-time",
+                // Canonical spelling on write, so new rows filter without the variant map.
+                employmentType: normalizeEmploymentType(employmentType) || "Full-time",
                 basicSalary: basicSalary ? parseFloat(basicSalary) : 0,
                 // New fields
                 middleName: middleName || null,

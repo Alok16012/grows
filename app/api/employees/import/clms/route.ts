@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { normalizeEmploymentType } from "@/lib/employment-type"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
@@ -216,7 +217,7 @@ export async function POST(req: Request) {
                     // System
                     branchId: branch.id,
                     status: "ACTIVE",
-                    employmentType: str(row["EmployementType"]) ?? "Full-time",
+                    employmentType: normalizeEmploymentType(str(row["EmployementType"])) || "Full-time",
                     userId,
                 },
             })

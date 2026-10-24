@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import { collectErrors, siteFieldChecks, SITE_INFO_FIELDS, SITE_LIMITS, type ValidationMap } from "@/lib/validation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,8 @@ type Deployment = {
     relievedAt?: string
     notes?: string
     employee: DeployedEmployee
+    /** Present on GET /api/deployments rows; absent on a site's nested list. */
+    site?: { id: string; name: string; code?: string }
 }
 
 type Site = {
@@ -156,19 +159,47 @@ function ShiftBadge({ shift }: { shift?: string }) {
 
 // ─── Input ─────────────────────────────────────────────────────────────────
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, error, children }: {
+    label: string; required?: boolean; error?: string | null; children: React.ReactNode
+}) {
     return (
         <div>
             <label className="block text-[12px] text-[var(--text2)] mb-1 font-medium">
                 {label}{required && <span className="text-[var(--red)] ml-0.5">*</span>}
             </label>
             {children}
+            {error && <p className="text-[11px] text-red-500 mt-0.5 flex items-center gap-1">⚠ {error}</p>}
         </div>
     )
 }
 
 const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
+// Red border for an input whose Field shows an error.
+const errCls = " !border-red-400"
 const selectCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
+
+// ─── Staffing ─────────────────────────────────────────────────────────────────
+
+// deployed ÷ manpowerRequired. ≥100% green ("Full" / "Over by N"), 70–99%
+// amber, <70% red ("Short by N"). The bar never exceeds 100% so an
+// over-staffed site doesn't paint outside its track. No requirement → "—".
+function staffing(deployed: number, required: number) {
+    if (!required || required <= 0) {
+        return { pct: 0, barPct: 0, color: "var(--border)", label: "—", short: false, text: "text-[var(--text3)]" }
+    }
+    const pct = Math.round((deployed / required) * 100)
+    const diff = deployed - required
+    if (pct >= 100) {
+        return {
+            pct, barPct: 100, color: "var(--success-strong)", short: false,
+            label: diff > 0 ? `Over by ${diff}` : "Full", text: "text-[var(--success-strong)]",
+        }
+    }
+    if (pct >= 70) {
+        return { pct, barPct: pct, color: "var(--amber)", short: true, label: `Short by ${-diff}`, text: "text-[var(--amber)]" }
+    }
+    return { pct, barPct: pct, color: "var(--red)", short: true, label: `Short by ${-diff}`, text: "text-[var(--red)]" }
+}
 
 // ─── Add Site Modal ───────────────────────────────────────────────────────────
 
@@ -179,6 +210,7 @@ function AddSiteModal({
 }) {
     const [tab, setTab] = useState<"info" | "geo">("info")
     const [loading, setLoading] = useState(false)
+    const [errors, setErrors] = useState<ValidationMap>({})
     const [form, setForm] = useState({
         name: "", address: "", city: "", state: "", pincode: "",
         clientName: "", contactPerson: "", contactPhone: "",
@@ -214,14 +246,49 @@ function AddSiteModal({
             })
         }
         setTab("info")
+        setErrors({})
     }, [open, site])
 
-    const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+    // Clear a field's error as soon as it is edited, so the red text tracks
+    // what the user is doing rather than the last failed attempt.
+    const set = (k: string, v: string) => {
+        setForm(f => ({ ...f, [k]: v }))
+        if (errors[k]) setErrors(e => ({ ...e, [k]: null }))
+    }
+
+    // Same rules the server applies — see siteFieldChecks in lib/validation.ts.
+    const validate = (fields?: readonly string[]): ValidationMap | null => {
+        const all = collectErrors(siteFieldChecks(form, { requireCore: true })) ?? {}
+        const picked = fields ? Object.fromEntries(Object.entries(all).filter(([k]) => fields.includes(k))) : all
+        return Object.keys(picked).length ? picked : null
+    }
+
+    // "Next: Geofencing" — and Enter on the Info tab — only ever moves to the
+    // next step. Nothing is sent to the server from here.
+    const goToGeo = () => {
+        const errs = validate(SITE_INFO_FIELDS)
+        if (errs) {
+            setErrors(errs)
+            toast.error(Object.values(errs).find(Boolean) || "Please fix the highlighted fields")
+            return
+        }
+        setErrors({})
+        setTab("geo")
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!form.name || !form.address) {
-            toast.error("Site Name and Address are required")
+        // Enter inside a text field submits the form even though the submit
+        // button isn't rendered on this tab (INS-01/06). Treat it as "Next".
+        if (tab === "info") { goToGeo(); return }
+
+        const errs = validate()
+        if (errs) {
+            setErrors(errs)
+            // Send the user back to the tab that holds the first problem.
+            const firstKey = Object.keys(errs)[0]
+            if ((SITE_INFO_FIELDS as readonly string[]).includes(firstKey)) setTab("info")
+            toast.error(Object.values(errs).find(Boolean) || "Please fix the highlighted fields")
             return
         }
         setLoading(true)
@@ -233,7 +300,18 @@ function AddSiteModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) {
+                // 400/409 carry { error, fields }; anything else is plain text.
+                const raw = await res.text()
+                let parsed: { error?: string; fields?: ValidationMap } | null = null
+                try { parsed = JSON.parse(raw) } catch { /* plain text body */ }
+                if (parsed?.fields) {
+                    setErrors(parsed.fields)
+                    const firstKey = Object.keys(parsed.fields)[0]
+                    setTab((SITE_INFO_FIELDS as readonly string[]).includes(firstKey) ? "info" : "geo")
+                }
+                throw new Error(parsed?.error || raw || "Failed to save")
+            }
             toast.success(site ? "Site updated!" : "Site created!")
             onSaved()
             onClose()
@@ -261,7 +339,8 @@ function AddSiteModal({
                 {/* Tabs */}
                 <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-5 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
                     {(["info", "geo"] as const).map(t => (
-                        <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                        <button key={t} type="button" role="tab" aria-selected={tab === t}
+                            onClick={() => (t === "geo" ? goToGeo() : setTab("info"))}
                             className={`z-tab ${tab === t ? "is-active" : ""}`}>
                             {t === "info" ? "Site Info" : "Geofencing"}
                         </button>
@@ -274,29 +353,37 @@ function AddSiteModal({
                         {tab === "info" ? (
                             <>
                                 <div className="grid grid-cols-2 gap-3">
+                                    {/* No native `required` here: the browser popup only fires on
+                                        this tab and said nothing on Geofencing. Our own check runs
+                                        on both Next and Create. */}
                                     <div className="col-span-2">
-                                        <Field label="Site Name" required>
+                                        <Field label="Site Name" required error={errors.name}>
                                             <input value={form.name} onChange={e => set("name", e.target.value)}
-                                                className={inputCls} placeholder="e.g. ABC Corporate HQ" required />
+                                                maxLength={SITE_LIMITS.name}
+                                                className={inputCls + (errors.name ? errCls : "")} placeholder="e.g. ABC Corporate HQ" />
                                         </Field>
                                     </div>
                                     <div className="col-span-2">
-                                        <Field label="Address" required>
+                                        <Field label="Address" required error={errors.address}>
                                             <input value={form.address} onChange={e => set("address", e.target.value)}
-                                                className={inputCls} placeholder="Full address" required />
+                                                maxLength={SITE_LIMITS.address}
+                                                className={inputCls + (errors.address ? errCls : "")} placeholder="Full address" />
                                         </Field>
                                     </div>
-                                    <Field label="City">
+                                    <Field label="City" error={errors.city}>
                                         <input value={form.city} onChange={e => set("city", e.target.value)}
-                                            className={inputCls} placeholder="City" />
+                                            maxLength={SITE_LIMITS.text}
+                                            className={inputCls + (errors.city ? errCls : "")} placeholder="City" />
                                     </Field>
-                                    <Field label="State">
+                                    <Field label="State" error={errors.state}>
                                         <input value={form.state} onChange={e => set("state", e.target.value)}
-                                            className={inputCls} placeholder="State" />
+                                            maxLength={SITE_LIMITS.text}
+                                            className={inputCls + (errors.state ? errCls : "")} placeholder="State" />
                                     </Field>
-                                    <Field label="Pincode">
+                                    <Field label="Pincode" error={errors.pincode}>
                                         <input value={form.pincode} onChange={e => set("pincode", e.target.value)}
-                                            className={inputCls} placeholder="Pincode" />
+                                            inputMode="numeric" maxLength={6}
+                                            className={inputCls + (errors.pincode ? errCls : "")} placeholder="6-digit pincode" />
                                     </Field>
                                     <Field label="Site Type">
                                         <select value={form.siteType} onChange={e => set("siteType", e.target.value)} className={selectCls}>
@@ -316,17 +403,20 @@ function AddSiteModal({
                                                 className={inputCls} placeholder="Client company name" />
                                         </Field>
                                     </div>
-                                    <Field label="Contact Person">
+                                    <Field label="Contact Person" error={errors.contactPerson}>
                                         <input value={form.contactPerson} onChange={e => set("contactPerson", e.target.value)}
-                                            className={inputCls} placeholder="Contact name" />
+                                            maxLength={SITE_LIMITS.text}
+                                            className={inputCls + (errors.contactPerson ? errCls : "")} placeholder="Contact name" />
                                     </Field>
-                                    <Field label="Contact Phone">
+                                    <Field label="Contact Phone" error={errors.contactPhone}>
                                         <input value={form.contactPhone} onChange={e => set("contactPhone", e.target.value)}
-                                            className={inputCls} placeholder="+91 XXXXX XXXXX" />
+                                            inputMode="tel"
+                                            className={inputCls + (errors.contactPhone ? errCls : "")} placeholder="10-digit mobile number" />
                                     </Field>
-                                    <Field label="Manpower Required">
-                                        <input type="number" min="1" value={form.manpowerRequired} onChange={e => set("manpowerRequired", e.target.value)}
-                                            className={inputCls} placeholder="1" />
+                                    <Field label="Manpower Required" error={errors.manpowerRequired}>
+                                        <input type="number" min={SITE_LIMITS.manpowerMin} max={SITE_LIMITS.manpowerMax} step={1}
+                                            value={form.manpowerRequired} onChange={e => set("manpowerRequired", e.target.value)}
+                                            className={inputCls + (errors.manpowerRequired ? errCls : "")} placeholder="1" />
                                     </Field>
                                 </div>
                             </>
@@ -342,18 +432,18 @@ function AddSiteModal({
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Field label="Latitude">
+                                    <Field label="Latitude" error={errors.latitude}>
                                         <input type="number" step="any" value={form.latitude} onChange={e => set("latitude", e.target.value)}
-                                            className={inputCls} placeholder="e.g. 28.6139" />
+                                            className={inputCls + (errors.latitude ? errCls : "")} placeholder="e.g. 28.6139" />
                                     </Field>
-                                    <Field label="Longitude">
+                                    <Field label="Longitude" error={errors.longitude}>
                                         <input type="number" step="any" value={form.longitude} onChange={e => set("longitude", e.target.value)}
-                                            className={inputCls} placeholder="e.g. 77.2090" />
+                                            className={inputCls + (errors.longitude ? errCls : "")} placeholder="e.g. 77.2090" />
                                     </Field>
                                 </div>
-                                <Field label="Geofence Radius (meters)">
-                                    <input type="number" min="10" value={form.radius} onChange={e => set("radius", e.target.value)}
-                                        className={inputCls} placeholder="100" />
+                                <Field label="Geofence Radius (meters)" error={errors.radius}>
+                                    <input type="number" min={SITE_LIMITS.radiusMin} max={SITE_LIMITS.radiusMax} value={form.radius} onChange={e => set("radius", e.target.value)}
+                                        className={inputCls + (errors.radius ? errCls : "")} placeholder="100" />
                                 </Field>
                                 {form.latitude && form.longitude && (
                                     <div className="bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] p-3 text-[12px] text-[var(--text2)]">
@@ -387,7 +477,7 @@ function AddSiteModal({
                                 Cancel
                             </button>
                             {tab === "info" ? (
-                                <button type="button" onClick={() => setTab("geo")}
+                                <button type="button" onClick={goToGeo}
                                     className="inline-flex items-center gap-2 px-5 py-2 bg-[var(--accent)] text-white rounded-[8px] text-[13px] font-medium hover:opacity-90 transition-opacity">
                                     Next: Geofencing
                                 </button>
@@ -476,9 +566,8 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
 }) {
     const deployed = site._count.deployments
     const required = site.manpowerRequired
-    const understaffed = deployed < required
     const hasGeo = !!(site.latitude && site.longitude)
-    const strengthPct = required > 0 ? Math.min((deployed / required) * 100, 100) : 0
+    const staff = staffing(deployed, required)
 
     return (
         <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] hover:border-[var(--accent)]/20 transition-all flex flex-col">
@@ -541,17 +630,15 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
                             <Users size={12} className="text-[var(--text3)]" />
                             Deployed Strength
                         </span>
-                        <span className={`text-[12px] font-semibold ${understaffed ? "text-[var(--red)]" : "text-[var(--accent)]"}`}>
-                            {deployed}/{required}
-                            {understaffed && <AlertTriangle size={11} className="inline ml-1" />}
+                        <span className={`text-[12px] font-semibold ${staff.text}`}>
+                            {deployed}/{required || "—"}
+                            <span className="font-medium ml-1.5">· {staff.label}</span>
+                            {staff.short && <AlertTriangle size={11} className="inline ml-1" />}
                         </span>
                     </div>
                     <div className="h-1.5 bg-[var(--surface2)] rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all"
-                            style={{
-                                width: `${strengthPct}%`,
-                                background: understaffed ? "var(--red)" : "var(--accent)"
-                            }} />
+                            style={{ width: `${staff.barPct}%`, background: staff.color }} />
                     </div>
                 </div>
 
@@ -579,10 +666,12 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
 
 // ─── Assign Employee Form ─────────────────────────────────────────────────────
 
-function AssignForm({ siteId, onAssigned, onCancel }: {
-    siteId: string; onAssigned: () => void; onCancel: () => void
+type AssignOption = Employee & { currentSite?: { id: string; name: string } }
+
+function AssignForm({ siteId, siteName, onAssigned, onCancel }: {
+    siteId: string; siteName: string; onAssigned: () => void; onCancel: () => void
 }) {
-    const [employees, setEmployees] = useState<Employee[]>([])
+    const [employees, setEmployees] = useState<AssignOption[]>([])
     const [loading, setLoading] = useState(false)
     const [fetching, setFetching] = useState(true)
     const [form, setForm] = useState({
@@ -593,29 +682,48 @@ function AssignForm({ siteId, onAssigned, onCancel }: {
         setFetching(true)
         fetchAllEmployees<Employee>({ status: "ACTIVE" })
             .then(async (data) => {
-                const all: Employee[] = data.employees
-                // filter out already deployed employees
+                // This used to drop everyone with an active deployment. Nearly
+                // the whole roster is deployed somewhere, so the dropdown was
+                // empty (INS-08). Now everyone active is listed; those posted
+                // elsewhere are labelled and can be MOVED, and only people
+                // already at THIS site are hidden.
                 const depsRes = await fetch("/api/deployments?isActive=true")
                 const deps: Deployment[] = depsRes.ok ? await depsRes.json() : []
-                const deployedIds = new Set((Array.isArray(deps) ? deps : []).map(d => d.employeeId))
-                setEmployees(all.filter(e => !deployedIds.has(e.id)))
+                const bySite = new Map<string, { id: string; name: string }>()
+                for (const d of Array.isArray(deps) ? deps : []) {
+                    bySite.set(d.employeeId, { id: d.siteId, name: d.site?.name || "another site" })
+                }
+                setEmployees(
+                    data.employees
+                        .filter(e => bySite.get(e.id)?.id !== siteId)
+                        .map(e => ({ ...e, currentSite: bySite.get(e.id) }))
+                )
             })
             .catch(() => setEmployees([]))
             .finally(() => setFetching(false))
-    }, [])
+    }, [siteId])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!form.employeeId) { toast.error("Select an employee"); return }
+        const chosen = employees.find(emp => emp.id === form.employeeId)
+        const move = !!chosen?.currentSite
+        if (move && chosen) {
+            const ok = confirm(
+                `Move ${chosen.firstName} ${chosen.lastName} from ${chosen.currentSite!.name} to ${siteName}? ` +
+                `Their current deployment will be ended today.`
+            )
+            if (!ok) return
+        }
         setLoading(true)
         try {
             const res = await fetch("/api/deployments", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, siteId }),
+                body: JSON.stringify({ ...form, siteId, move }),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success("Employee assigned!")
+            toast.success(move ? `Moved to ${siteName}` : "Employee assigned!")
             onAssigned()
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : "Failed to assign")
@@ -635,9 +743,13 @@ function AssignForm({ siteId, onAssigned, onCancel }: {
                         {employees.map(emp => (
                             <option key={emp.id} value={emp.id}>
                                 {emp.firstName} {emp.lastName} ({emp.employeeId})
+                                {emp.currentSite ? ` — currently at ${emp.currentSite.name}` : ""}
                             </option>
                         ))}
                     </select>
+                    {!fetching && employees.length === 0 && (
+                        <p className="text-[11px] text-[var(--text3)] mt-1">No active employees found</p>
+                    )}
                 </div>
                 <input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                     className={inputCls} placeholder="Role (e.g. Guard)" />
@@ -953,8 +1065,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
     const deployments = detailedSite?.deployments || []
     const deployed = deployments.filter(d => d.isActive)
     const required = s.manpowerRequired
-    const strengthPct = required > 0 ? Math.min((deployed.length / required) * 100, 100) : 0
-    const understaffed = deployed.length < required
+    const staff = staffing(deployed.length, required)
     const hasGeo = !!(s.latitude && s.longitude)
 
     return (
@@ -1024,11 +1135,12 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                                 Current Deployment
                             </h3>
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                                understaffed
-                                    ? "bg-red-50 text-[var(--red)] border-red-200"
-                                    : "bg-[var(--accent-light)] text-[var(--accent)] border-[#93bdfb]"
+                                !required ? "bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]"
+                                : staff.pct >= 100 ? "bg-[var(--success-light)] text-[var(--success-strong)] border-[var(--success-border)]"
+                                : staff.pct >= 70 ? "bg-[var(--amber-light)] text-[var(--amber)] border-[#fcd34d]"
+                                : "bg-red-50 text-[var(--red)] border-red-200"
                             }`}>
-                                {deployed.length}/{required}
+                                {deployed.length}/{required || "—"} · {staff.label}
                             </span>
                         </div>
 
@@ -1036,13 +1148,13 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                         <div className="mb-4">
                             <div className="flex items-center justify-between mb-1">
                                 <span className="text-[11px] text-[var(--text3)]">
-                                    {deployed.length} of {required} deployed
+                                    {required ? `${deployed.length} of ${required} deployed` : "No manpower requirement set"}
                                 </span>
-                                <span className="text-[11px] text-[var(--text3)]">{Math.round(strengthPct)}%</span>
+                                <span className="text-[11px] text-[var(--text3)]">{required ? `${staff.pct}%` : "—"}</span>
                             </div>
                             <div className="h-2 bg-[var(--surface2)] rounded-full overflow-hidden">
                                 <div className="h-full rounded-full transition-all"
-                                    style={{ width: `${strengthPct}%`, background: understaffed ? "var(--red)" : "var(--accent)" }} />
+                                    style={{ width: `${staff.barPct}%`, background: staff.color }} />
                             </div>
                         </div>
 
@@ -1112,6 +1224,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                         {showAssign && (
                             <AssignForm
                                 siteId={site.id}
+                                siteName={s.name}
                                 onAssigned={() => { setShowAssign(false); fetchDetail(); onRefresh() }}
                                 onCancel={() => setShowAssign(false)}
                             />
@@ -1179,7 +1292,7 @@ export default function SitesPage() {
     const router = useRouter()
     const role = session?.user?.role
 
-    const [sites, setSites] = useState<Site[]>([])
+    const [allSites, setAllSites] = useState<Site[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState<"" | "true" | "false">("")
@@ -1199,40 +1312,50 @@ export default function SitesPage() {
     }, [status, router])
 
 
+    // One unfiltered fetch; the Active/Inactive/type/search filters are applied
+    // here so the four summary cards can keep showing OVERALL totals while the
+    // grid narrows. `sites` below is the filtered list.
     const fetchSites = useCallback(async () => {
         setLoading(true)
         try {
-            const params = new URLSearchParams()
-            if (statusFilter !== "") params.set("isActive", statusFilter)
-            if (typeFilter) params.set("siteType", typeFilter)
-            if (search) params.set("search", search)
-            const res = await fetch(`/api/sites?${params}`)
+            const res = await fetch("/api/sites")
             if (!res.ok) {
                 const errText = await res.text().catch(() => "")
                 console.error("[fetchSites] HTTP", res.status, errText)
                 toast.error(`Failed to load sites (${res.status})${errText ? ": " + errText.slice(0, 80) : ""}`)
-                setSites([])
+                setAllSites([])
                 return
             }
             const data = await res.json()
-            setSites(Array.isArray(data) ? data : [])
+            setAllSites(Array.isArray(data) ? data : [])
         } catch (e) {
             console.error("[fetchSites]", e)
             toast.error("Failed to load sites")
         } finally {
             setLoading(false)
         }
-    }, [statusFilter, typeFilter, search])
+    }, [])
 
     useEffect(() => {
         fetchSites()
     }, [fetchSites])
 
-    // Stats
-    const totalSites = sites.length
-    const activeSites = sites.filter(s => s.isActive).length
-    const totalDeployed = sites.reduce((acc, s) => acc + s._count.deployments, 0)
-    const understaffedSites = sites.filter(s => s._count.deployments < s.manpowerRequired).length
+    // Mirrors the server's search (name / code / client, case-insensitive).
+    const sites = useMemo(() => {
+        const q = search.trim().toLowerCase()
+        return allSites.filter(s =>
+            (statusFilter === "" || String(s.isActive) === statusFilter) &&
+            (!typeFilter || s.siteType === typeFilter) &&
+            (!q || [s.name, s.code, s.clientName].some(v => (v || "").toLowerCase().includes(q)))
+        )
+    }, [allSites, statusFilter, typeFilter, search])
+    const filtersActive = search.trim() !== "" || statusFilter !== "" || typeFilter !== ""
+
+    // Stats — overall, not the filtered view.
+    const totalSites = allSites.length
+    const activeSites = allSites.filter(s => s.isActive).length
+    const totalDeployed = allSites.reduce((acc, s) => acc + s._count.deployments, 0)
+    const understaffedSites = allSites.filter(s => s.manpowerRequired > 0 && s._count.deployments < s.manpowerRequired).length
 
     // Client-side pagination over the filtered list.
     const totalPages = Math.max(1, Math.ceil(sites.length / perPage))
@@ -1338,6 +1461,14 @@ export default function SitesPage() {
                     />
                 </div>
             </div>
+
+            {/* Showing N of M — the cards above are overall totals. */}
+            {!loading && allSites.length > 0 && (
+                <p className="text-[12px] text-[var(--text3)] -mt-2">
+                    Showing {sites.length} of {allSites.length} site{allSites.length !== 1 ? "s" : ""}
+                    {filtersActive ? " matching the current filters" : ""}
+                </p>
+            )}
 
             {/* Site Grid */}
             {loading ? (
