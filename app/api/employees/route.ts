@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { guard, employeeScope, maskEmployee, lockedFieldNames, accessFrom } from "@/lib/access"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { pickPhotoUrl } from "@/lib/employee-photo"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
@@ -20,13 +21,12 @@ import crypto from "crypto"
 
 export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        
-        const hasAccess = checkAccess(session, ["MANAGER", "HR_MANAGER", "ADMIN"], "employees.view")
-        if (!hasAccess) {
-            return new NextResponse("Forbidden", { status: 403 })
-        }
+        const g = await guard(req, "employees.view")
+        if (g instanceof NextResponse) return g
+        const { session, access } = g
+        // Data scope: an Assigned-sites role sees the people posted to its
+        // sites, a My-team role its reports. The cards below use the same filter.
+        const scope = await employeeScope(access)
 
         const { searchParams } = new URL(req.url)
         // Non-numeric values parse to NaN, which used to flow into skip/take.
@@ -42,7 +42,8 @@ export async function GET(req: Request) {
 
         // Shared with the Excel export, so the two can't disagree about what
         // the current view contains. See lib/employee-filter.ts.
-        const where = buildEmployeeWhere(employeeFiltersFromParams(searchParams))
+        const filtered = buildEmployeeWhere(employeeFiltersFromParams(searchParams))
+        const where = scope ? { AND: [filtered, scope] } : filtered
 
         const [employees, total] = await Promise.all([
             prisma.employee.findMany({
@@ -81,10 +82,12 @@ export async function GET(req: Request) {
         //  - `totals`  — the whole company, no filters at all beyond the default
         //    exclusions, for the four stat cards at the top of the page.
         // Plus "joined this month" per status for the cards' trend indicators.
-        const countsWhere = { ...where }
-        delete (countsWhere as any).status
-        const totalsWhere = buildEmployeeWhere({})
-        delete (totalsWhere as any).status
+        const countsFiltered = { ...filtered }
+        delete (countsFiltered as any).status
+        const countsWhere = scope ? { AND: [countsFiltered, scope] } : countsFiltered
+        const totalsBase = buildEmployeeWhere({})
+        delete (totalsBase as any).status
+        const totalsWhere = scope ? { AND: [totalsBase, scope] } : totalsBase
         const monthStart = new Date()
         monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
         const inMonth = { dateOfJoining: { gte: monthStart } }
@@ -179,7 +182,12 @@ export async function GET(req: Request) {
             }
         }
 
-        return NextResponse.json({ employees, total, counts, totals, page, pageSize, totalPages: Math.ceil(total / pageSize), canViewSalary }, {
+        // KYC, bank and personal fields leave the server only for roles that
+        // hold the matching switch; onboardingToken never does.
+        const rows = employees.map(e => maskEmployee(e, access))
+        const lockedFields = lockedFieldNames(access)
+
+        return NextResponse.json({ employees: rows, total, counts, totals, page, pageSize, totalPages: Math.ceil(total / pageSize), canViewSalary, lockedFields }, {
             headers: {
                 // Browser-cache for 10s — back-button / list re-renders within
                 // 10s reuse the cached response instead of re-querying.
@@ -371,8 +379,10 @@ export async function POST(req: Request) {
         // they're cleared.
         const _login: { email: string; password: string } | null = null
 
+        // The creator gets the joining link once, here; the token itself is not
+        // echoed with the record (lib/access NEVER_RETURNED).
         return NextResponse.json({
-            ...employee,
+            ...maskEmployee(employee, accessFrom(session)),
             _onboardingLink: `/onboarding/${onboardingToken}`,
             _login,
         })

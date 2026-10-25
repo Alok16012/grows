@@ -32,6 +32,16 @@ export async function GET(_req: Request, { params }: { params: { token: string }
 
         if (!employee) return new NextResponse("Invalid or expired link", { status: 404 })
 
+        // The link is a credential with no session behind it. Once joining is
+        // finalised it shows only the "complete" screen; for anyone who has
+        // since left it opens nothing at all.
+        if (employee.status === "ACTIVE") {
+            return NextResponse.json({ status: employee.status, firstName: employee.firstName })
+        }
+        if (employee.status !== "ONBOARDING" && employee.status !== "INACTIVE") {
+            return new NextResponse("This joining link is no longer valid", { status: 410 })
+        }
+
         // Active sites + HR users in parallel — both small lists, fine to bundle
         // into the onboarding GET response.
         const [sites, hrUsers] = await Promise.all([
@@ -43,8 +53,12 @@ export async function GET(_req: Request, { params }: { params: { token: string }
             getHrContacts(),
         ])
 
+        // The joiner sees what they fill in, not HR's working fields.
+        const INTERNAL = ["onboardingToken", "basicSalary", "salaryType", "notes", "medicalRemark",
+            "backgroundCheckRemark", "isBackgroundChecked", "createdBy", "userId", "managerId"]
+        const own = Object.fromEntries(Object.entries(employee).filter(([k]) => !INTERNAL.includes(k)))
         return NextResponse.json({
-            ...employee,
+            ...own,
             // Convenience fields for the form
             currentSiteId: employee.deployments?.[0]?.siteId ?? null,
             sites,
@@ -238,7 +252,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
             }).catch(() => {})
         }
 
-        return NextResponse.json({ success: true, employee: updatedEmployee })
+        return NextResponse.json({ success: true, employee: { id: updatedEmployee.id, status: updatedEmployee.status } })
     } catch (error) {
         console.error("[ONBOARDING_EXTERNAL_POST]", error)
         return NextResponse.json(

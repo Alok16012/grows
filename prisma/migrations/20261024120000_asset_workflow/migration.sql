@@ -179,3 +179,8 @@ SELECT gen_random_uuid()::text, a."id", 'OPENING', a."available", a."available",
        (NOW() AT TIME ZONE 'UTC')
 FROM "Asset" a
 WHERE NOT EXISTS (SELECT 1 FROM "AssetStockTxn" t WHERE t."assetId" = a."id");
+
+-- The app connects as "postgres". When this script is run by another role (e.g.
+-- grows_local via DIRECT_URL) that role owns the tables, so grant the app full
+-- access — otherwise it can read but every write fails with "permission denied".
+GRANT ALL ON TABLE "AssetAuditLog", "AssetIssue", "AssetMeta", "AssetRequest", "AssetRequestItem", "AssetStockTxn" TO postgres;

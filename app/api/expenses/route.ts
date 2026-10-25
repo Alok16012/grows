@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
+import { accessFrom, teamUserIds } from "@/lib/access"
 
 // All ExpenseCategory enum values (mirrors prisma/schema.prisma). Used to (a)
 // whitelist the incoming category before any raw SQL, and (b) self-heal the
@@ -75,6 +76,16 @@ export async function GET(req: Request) {
             where.submittedBy = session.user.id
         } else {
             if (submittedBy) where.submittedBy = submittedBy
+            // Approvers see their data scope only: claims for their sites, or
+            // from the people who report to them (their own always included).
+            const access = accessFrom(session)
+            if (access.scope === "ASSIGNED_SITES") {
+                where.AND = [{ OR: [{ siteId: { in: access.siteIds } }, { submittedBy: access.userId }] }]
+            } else if (access.scope === "MY_TEAM") {
+                where.AND = [{ submittedBy: { in: [access.userId, ...(await teamUserIds(access.userId))] } }]
+            } else if (access.scope === "SELF") {
+                where.submittedBy = access.userId
+            }
         }
 
         // Accounts view: only payment-relevant statuses (approved = to-pay, paid = settled)

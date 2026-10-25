@@ -14,6 +14,7 @@ import { StatCard, statGridClass, type StatTone } from "@/components/StatCard"
 import { MusterRoll, AttendanceSettings, CodeLegend, cellTitle, type RegisterResponse } from "@/components/attendance/muster-roll"
 import { CODE_STYLE, lateBy, type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/attendance-policy"
 import { can } from "@/lib/can"
+import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -821,11 +822,10 @@ function AdminView() {
     const fetchEmployees = useCallback(async () => {
         setEmployeesLoading(true)
         try {
-            const params = new URLSearchParams({ status: "ACTIVE", pageSize: "1000" })
-            if (siteFilter) params.set("siteId", siteFilter)
-            const res = await fetch(`/api/employees?${params}`)
-            const data = await res.json()
-            setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
+            // Picker-shaped roster, cut to the caller's scope. The old call asked
+            // /api/employees for 1000 rows, got at most 200 and dropped the rest.
+            const { employees } = await fetchEmployeeOptions({ status: "ACTIVE", siteId: siteFilter || undefined })
+            setEmployees(employees as any)
         } catch { setEmployees([]) } finally { setEmployeesLoading(false) }
     }, [siteFilter])
 

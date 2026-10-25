@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
-import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -1181,7 +1181,7 @@ function EnrollModal({ open, onClose, onSaved, courses, preselectedCourseId }: {
         setSearchEmp("")
 
         setLoadingEmps(true)
-        fetchAllEmployees({ status: "ACTIVE" })
+        fetchEmployeeOptions({ status: "ACTIVE" })
             .then(r => setEmployees(r.employees as any))
             .catch(() => setEmployees([]))
             .finally(() => setLoadingEmps(false))

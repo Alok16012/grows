@@ -893,6 +893,8 @@ function AssetsTab() {
 }
 
 function ChangePasswordCard() {
+    const { data: session, update } = useSession()
+    const mustChange = !!(session?.user as { mustChangePassword?: boolean } | undefined)?.mustChangePassword
     const [current, setCurrent] = useState("")
     const [next, setNext] = useState("")
     const [confirm, setConfirm] = useState("")
@@ -906,7 +908,7 @@ function ChangePasswordCard() {
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (next.length < 6) { toast.error("New password must be at least 6 characters"); return }
+        if (next.length < (mustChange ? 10 : 6)) { toast.error(`New password must be at least ${mustChange ? 10 : 6} characters`); return }
         if (next !== confirm) { toast.error("New passwords do not match"); return }
         setSaving(true)
         try {
@@ -919,6 +921,8 @@ function ChangePasswordCard() {
             if (!res.ok) throw new Error(data.error || "Failed to save password")
             toast.success(hasPassword ? "Password changed" : "Password set")
             setHasPassword(true)
+            // Clears the "change your password first" lock on the session.
+            if (mustChange) await update()
             setCurrent(""); setNext(""); setConfirm("")
         } catch (err) {
             toast.error((err as Error).message)
@@ -939,6 +943,11 @@ function ChangePasswordCard() {
             </div>
             <a href="/setup-mpin" className="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-[var(--border)] text-[13px] font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">Change MPIN</a>
         </div>
+        {mustChange && (
+            <div className="mt-5 rounded-2xl border border-[#f6d9a8] bg-[#fff8ee] px-4 py-3 text-[13px] text-[#7c4a03]">
+                <b>Change your password to continue.</b> Your account was given a temporary password. Choose a new one (10+ characters) before using the app.
+            </div>
+        )}
         <form onSubmit={submit} className="bg-white border border-[var(--border)] rounded-2xl p-6 space-y-4 mt-5">
             <div>
                 <h3 className="text-[14px] font-semibold text-[var(--text)]">{hasPassword ? "Change Password" : "Set Password"}</h3>

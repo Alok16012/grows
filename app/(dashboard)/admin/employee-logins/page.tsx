@@ -135,7 +135,11 @@ export default function EmployeeLoginsPage() {
         if (!confirm("Reset EVERY employee's login? All passwords and MPINs are removed. Everyone then signs in with an OTP to their mobile and sets a new MPIN. Use this only when moving to OTP sign-in.")) return
         setResettingAll(true)
         try {
-            const res = await fetch("/api/admin/employee-logins/reset-login", { method: "POST" })
+            const res = await fetch("/api/admin/employee-logins/reset-login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ confirm: "RESET ALL LOGINS" }),
+            })
             const raw = await res.text()
             let data: any = {}
             try { data = raw ? JSON.parse(raw) : {} } catch { data = {} }

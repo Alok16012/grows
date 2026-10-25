@@ -3,6 +3,7 @@ import type { Session } from "next-auth"
 import { decode } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { resolveAccess, accessVersion } from "@/lib/access-session"
 
 const secret = process.env.NEXTAUTH_SECRET
 
@@ -25,12 +26,22 @@ export async function getApiSession(req?: Request): Promise<Session | null> {
                     // terminating an employee kills their app access at once.
                     // (Demo users have no DB row — skip them in dev.)
                     const uid = decoded.id as string
+                    let live: { role: string; permissions: string[]; scope: string | null; siteIds: string[] } | null = null
                     if (!uid.startsWith("demo-")) {
                         const u = await prisma.user
-                            .findUnique({ where: { id: uid }, select: { isActive: true } })
+                            .findUnique({
+                                where: { id: uid },
+                                select: { id: true, role: true, isActive: true, customRoleId: true, customRole: { select: { isActive: true, permissions: true } } },
+                            })
                             .catch(() => undefined)
                         // undefined = DB hiccup (fail open); null = user deleted
                         if (u === null || u?.isActive === false) return null
+                        // Role, status or sites changed since the token was minted:
+                        // answer with what the user may do now, not 30 days ago.
+                        if (u && (await accessVersion(uid)) !== ((decoded.accessVersion as number) ?? 0)) {
+                            const a = await resolveAccess(u)
+                            live = { role: u.role, permissions: a.permissions, scope: a.scope, siteIds: a.siteIds }
+                        }
                     }
                     // Shaped to match the NextAuth session.user so existing helpers
                     // (checkAccess, audienceWhere, prisma lookups by session.user.id)
@@ -40,8 +51,10 @@ export async function getApiSession(req?: Request): Promise<Session | null> {
                             id: decoded.id as string,
                             email: (decoded.email as string) ?? null,
                             name: (decoded.name as string) ?? null,
-                            role: (decoded.role as string) ?? "INSPECTION_BOY",
-                            permissions: ((decoded.permissions as string[]) ?? []),
+                            role: live?.role ?? (decoded.role as string) ?? "INSPECTION_BOY",
+                            permissions: live?.permissions ?? ((decoded.permissions as string[]) ?? []),
+                            scope: live ? live.scope : ((decoded.scope as string) ?? null),
+                            siteIds: live?.siteIds ?? ((decoded.siteIds as string[]) ?? []),
                             customRoleName: (decoded.customRoleName as string) ?? null,
                             customRoleColor: (decoded.customRoleColor as string) ?? null,
                             photo: (decoded.photo as string) ?? null,

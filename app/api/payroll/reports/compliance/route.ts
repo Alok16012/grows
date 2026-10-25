@@ -6,6 +6,7 @@ import { checkAccess } from "@/lib/permissions"
 import { PayrollRules } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { buildEcrText, EcrMember } from "@/lib/ecr-format"
+import { accessFrom, has } from "@/lib/access"
 
 type PayrollRow = {
     id: string
@@ -132,6 +133,10 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
             return new NextResponse("Unauthorized", { status: 401 })
+        }
+        // A statutory return is UAN / PF / ESI numbers by definition.
+        if (!has(accessFrom(session), "employees.viewKyc")) {
+            return new NextResponse("Forbidden — this report needs the View Aadhaar, PAN, UAN, PF, ESI switch", { status: 403 })
         }
 
         const { searchParams } = new URL(req.url)

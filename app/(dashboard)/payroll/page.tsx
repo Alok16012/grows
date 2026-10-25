@@ -190,12 +190,16 @@ export default function PayrollPage() {
     const totalNetYTD   = runs.reduce((s, r) => s + r.totalNet, 0)
     const periodLabel   = `${MONTHS[period.month - 1]} ${period.year}`
     const canManage     = can(session, "payroll.manage")
+    // Lock, reopen and mark paid are separate switches on a role.
+    const canLock       = can(session, "payroll.lock")
+    const canUnlock     = can(session, "payroll.unlock")
+    const canMarkPaid   = can(session, "payroll.markPaid")
 
     const deleteRun = async (run: PayrollRun) => {
         if (!confirm(`Delete the ${MONTHS_SHORT[run.month - 1]} ${run.year} draft payroll? Locked and paid rows are kept. This cannot be undone.`)) return
         setDeleting(run.id)
         try {
-            const res = await fetch(`/api/payroll/reset?month=${run.month}&year=${run.year}&action=delete`, { method: "DELETE" })
+            const res = await fetch(`/api/payroll/reset?month=${run.month}&year=${run.year}&action=delete&confirm=MONTH`, { method: "DELETE" })
             if (res.ok) {
                 const d = await res.json().catch(() => ({}))
                 toast.success(d.skippedLocked ? `Draft rows deleted · ${d.skippedLocked} locked row(s) kept` : "Payroll run deleted")
@@ -386,19 +390,19 @@ export default function PayrollPage() {
                                             <Pencil size={12} /> {counts.rows > 0 ? "Fix days by site" : "Enter days by site"}
                                         </button>
                                     )}
-                                    {s.step === 2 && canManage && counts.draft > 0 && (
+                                    {s.step === 2 && canLock && counts.draft > 0 && (
                                         <button onClick={lockMonth} disabled={lockingMonth !== null} title="Lock every open row of this month, all sites at once"
                                             style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                                             {lockingMonth === "lock" ? <Loader2 size={12} className="animate-spin" /> : <Lock size={12} />} Lock whole month ({counts.draft})
                                         </button>
                                     )}
-                                    {s.step === 2 && canManage && counts.locked > 0 && (
+                                    {s.step === 2 && canUnlock && counts.locked > 0 && (
                                         <button onClick={unlockMonth} disabled={lockingMonth !== null} title="Reopen every locked row of this month for editing (paid rows stay paid)"
                                             style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                                             {lockingMonth === "unlock" ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />} Unlock month ({counts.locked})
                                         </button>
                                     )}
-                                    {s.step === 4 && canManage && counts.locked > 0 && counts.draft === 0 && (
+                                    {s.step === 4 && canMarkPaid && counts.locked > 0 && counts.draft === 0 && (
                                         <button onClick={markAllPaid} disabled={markingPaid}
                                             style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#15803d", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                                             {markingPaid ? <Loader2 size={12} className="animate-spin" /> : <BadgeCheck size={13} />} Mark all {counts.locked} paid

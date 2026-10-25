@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess, canSendDocuments, canViewDocuments } from "@/lib/permissions"
 import { ensureHrDocRecallSchema, type HrDocHistoryEvent } from "@/lib/hr-doc-schema"
+import { accessFrom, maskEmployee } from "@/lib/access"
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
@@ -21,20 +22,28 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
         // Same visibility rules as the list route: ADMIN sees everything, a
         // sender only what they issued, everyone else only their own ISSUED doc.
+        let ownDoc = false
         if (session.user.role !== "ADMIN") {
             if (canViewDocuments(session)) {
                 if (doc.createdBy !== session.user.id && doc.issuedBy !== session.user.id) {
                     return new NextResponse("Forbidden", { status: 403 })
                 }
             } else {
-                const emp = await prisma.employee.findFirst({ where: { userId: session.user.id } })
+                const emp = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } })
                 if (!emp || doc.employeeId !== emp.id || doc.status !== "ISSUED") {
                     return new NextResponse("Forbidden", { status: 403 })
                 }
+                ownDoc = true
             }
         }
 
-        return NextResponse.json(doc)
+        // The letter text is stored already filled in. The recipient record
+        // that rides along is masked like any other employee row, and the
+        // joining token never goes out at all.
+        const employee = ownDoc
+            ? Object.fromEntries(Object.entries(doc.employee).filter(([k]) => k !== "onboardingToken"))
+            : maskEmployee(doc.employee, accessFrom(session))
+        return NextResponse.json({ ...doc, employee })
     } catch (e) {
         console.error("[HR_DOC_GET]", e)
         return new NextResponse("Internal Error", { status: 500 })

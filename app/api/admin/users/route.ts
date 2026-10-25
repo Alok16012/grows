@@ -4,10 +4,12 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
-import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
-import bcrypt from "bcryptjs"
+import { usersTable, createUser } from "./_table"
 
 export async function GET(req: Request) {
+    // The Users screen asks for one page at a time (?page=…) with its filters.
+    if (new URL(req.url).searchParams.has("page")) return usersTable(req)
+
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -20,6 +22,14 @@ export async function GET(req: Request) {
 
     try {
         if (!full) {
+            // The name list is only for staff who assign work (helpdesk,
+            // recruitment). A self-service login — every field worker has
+            // one — must not be able to pull every colleague's email and role.
+            const perms = session.user.permissions ?? []
+            const ASSIGNERS = ["helpdesk.manage", "helpdesk.view", "recruitment.view", "recruitment.manage", "onboarding.manage"]
+            if (!ASSIGNERS.some(p => perms.includes(p))) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+            }
             const users = await prisma.user.findMany({
                 where: { isActive: true },
                 select: { id: true, name: true, email: true, role: true, customRole: { select: { id: true, name: true, color: true } } },
@@ -58,87 +68,7 @@ export async function GET(req: Request) {
     }
 }
 
+// Create user (Users → Create user). Rules in ./_table.
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== Role.ADMIN) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    try {
-        const body = await req.json()
-        const { name, email, password, role, customRoleId } = body
-
-        if (!name || !email || !password || !role) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-        }
-
-        const existingUser = await prisma.user.findUnique({
-            where: { email }
-        })
-
-        if (existingUser) {
-            return NextResponse.json({ error: "User already exists" }, { status: 400 })
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10)
-
-        const user = await prisma.user.create({
-            data: {
-                name,
-                email,
-                password: hashedPassword,
-                role: role as any,
-                customRoleId: customRoleId || null,
-            }
-        })
-
-        // Auto-create Employee record for inspectors so they appear in HR workflows
-        // and inspector pickers — those match on a linked Employee record. Who counts
-        // as an inspector comes from the assigned custom role's inspection permissions:
-        // this screen always sends base role MANAGER alongside a custom role, so the
-        // INSPECTION_BOY base role never identified a real inspector here.
-        const isInspector = customRoleId
-            ? !!(await prisma.customRole.findFirst({
-                where: {
-                    id: customRoleId,
-                    permissions: { hasSome: INSPECTION_PERMISSIONS },
-                },
-                select: { id: true },
-            }))
-            : false
-
-        if (isInspector) {
-            const nameParts = name.trim().split(" ")
-            const firstName = nameParts[0]
-            const lastName = nameParts.slice(1).join(" ") || "-"
-            // Generate unique employeeId: INS-<timestamp suffix>
-            const empId = "INS-" + Date.now().toString().slice(-6)
-            try {
-                await prisma.employee.create({
-                    data: {
-                        employeeId: empId,
-                        firstName,
-                        lastName,
-                        email,
-                        phone: body.phone || null,
-                        designation: "Inspector",
-                        status: "ACTIVE",
-                        userId: user.id,
-                    }
-                })
-            } catch (empErr) {
-                console.error("Failed to auto-create Employee for inspector:", empErr)
-                // Non-fatal: user is created, employee will be linked manually if needed
-            }
-        }
-
-        const { password: _, ...safeUser } = user
-        return NextResponse.json(safeUser)
-    } catch (error: any) {
-        console.error("POST_ADMIN_USER_ERROR", error)
-        return NextResponse.json({
-            error: "Internal Error",
-            message: error.message
-        }, { status: 500 })
-    }
+    return createUser(req)
 }

@@ -13,6 +13,8 @@ import {
 } from "@/lib/validation"
 import { generateEmployeeCode } from "@/lib/employee-code"
 import crypto from "crypto"
+import { accessFrom } from "@/lib/access"
+import { assertCanAssignRole, RuleError } from "@/lib/role-rules"
 
 type Sv = string | number | undefined
 
@@ -82,6 +84,15 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    const importer = accessFrom(session!)
+    const refusals = new Map<string, string | null>()
+    const roleRefusal = async (roleId: string) => {
+        if (!refusals.has(roleId)) {
+            try { await assertCanAssignRole(importer, roleId); refusals.set(roleId, null) }
+            catch (e) { refusals.set(roleId, e instanceof RuleError ? e.message : "not allowed") }
+        }
+        return refusals.get(roleId) ?? null
     }
 
     const body = await req.json()
@@ -341,9 +352,14 @@ export async function POST(req: Request) {
             if (newEmp) {
                 try {
                     const roleName = str(row.role)
-                    const customRoleId = roleName ? (roleByName.get(roleName.toLowerCase()) ?? null) : null
+                    let customRoleId = roleName ? (roleByName.get(roleName.toLowerCase()) ?? null) : null
                     if (roleName && !customRoleId) {
                         warning = `Role "${roleName}" not found — employee created without a role`
+                    }
+                    // A sheet cannot hand out a role above the importer's own.
+                    if (customRoleId) {
+                        const refusal = await roleRefusal(customRoleId)
+                        if (refusal) { warning = `Role "${roleName}" not given — ${refusal}`; customRoleId = null }
                     }
 
                     const loginEmail = buildLoginEmail({ email: strN(row.email), phone, employeeId: finalId })

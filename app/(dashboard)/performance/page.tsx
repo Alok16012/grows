@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
-import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -322,16 +322,19 @@ export default function PerformancePage() {
     }, [])
 
     const fetchEmployees = useCallback(async () => {
-        const { employees } = await fetchAllEmployees()
+        const { employees } = await fetchEmployeeOptions()
         setEmployees(employees as any)
     }, [])
 
     useEffect(() => {
-        if (status !== "unauthenticated") {
+        if (status === "authenticated") {
             fetchReviews()
-            fetchDashboard()
+            // The dashboard and templates are HR/manager views (the API answers 403
+            // to everyone else); an employee only has their own reviews.
+            if (isAdminOrManager) fetchDashboard()
+            else setActiveTab("reviews")
         }
-    }, [status, fetchReviews, fetchDashboard])
+    }, [status, isAdminOrManager, fetchReviews, fetchDashboard])
 
     useEffect(() => {
         if (activeTab === "templates" && templates.length === 0) {
@@ -448,15 +451,19 @@ export default function PerformancePage() {
 
             {/* Tab Bar */}
             <div className="z-tabs-wrap" style={{ marginBottom: 24 }}><div className="z-tabs" role="tablist">
-                <button role="tab" aria-selected={activeTab === "dashboard"} className={tabCls(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>
-                    <BarChart2 size={14} /> Dashboard
-                </button>
+                {isAdminOrManager && (
+                    <button role="tab" aria-selected={activeTab === "dashboard"} className={tabCls(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>
+                        <BarChart2 size={14} /> Dashboard
+                    </button>
+                )}
                 <button role="tab" aria-selected={activeTab === "reviews"} className={tabCls(activeTab === "reviews")} onClick={() => setActiveTab("reviews")}>
-                    <FileText size={14} /> Reviews
+                    <FileText size={14} /> {isAdminOrManager ? "Reviews" : "My reviews"}
                 </button>
-                <button role="tab" aria-selected={activeTab === "templates"} className={tabCls(activeTab === "templates")} onClick={() => setActiveTab("templates")}>
-                    <Settings size={14} /> Templates
-                </button>
+                {isAdminOrManager && (
+                    <button role="tab" aria-selected={activeTab === "templates"} className={tabCls(activeTab === "templates")} onClick={() => setActiveTab("templates")}>
+                        <Settings size={14} /> Templates
+                    </button>
+                )}
             </div></div>
 
             {/* ─── DASHBOARD TAB ─────────────────────────────────────────────── */}

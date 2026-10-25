@@ -1,6 +1,7 @@
 "use client"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { useSession } from "next-auth/react"
 import {
     Search, Loader2, ClipboardList, Check, XCircle, Ban, PackageCheck, Eye, Paperclip, History, Info, Calendar,
 } from "lucide-react"
@@ -41,6 +42,7 @@ export function RequestsTab({ mineOnly, canApprove, canIssue, meId, refreshKey, 
 }) {
     const onError = useApiError()
     const [status, setStatus] = useState<StatusTab>(canApprove && !mineOnly ? "SUBMITTED" : "ALL")
+    const isAdmin = useSession().data?.user?.role === "ADMIN"
     const [search, setSearch] = useState("")
     const [from, setFrom] = useState("")
     const [to, setTo] = useState("")
@@ -115,7 +117,8 @@ export function RequestsTab({ mineOnly, canApprove, canIssue, meId, refreshKey, 
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
                                 {rows.map(r => {
-                                    const mine = !!meId && r.requestedBy?.id === meId
+                                    // The server lets ADMIN sign off their own request (no one above them).
+                                    const mine = !!meId && r.requestedBy?.id === meId && !isAdmin
                                     const issuable = issuableItems(r)
                                     const approvedSum = isApproved(r) ? sumBy(r.items, i => i.approvedQty) : null
                                     return (
@@ -203,9 +206,12 @@ export function RequestDrawer({ id, canApprove, canIssue, meId, refreshKey, onCl
     useEffect(() => { load() }, [load])
     useEffect(() => { setMode("view"); setNote("") }, [id])
 
+    const isAdmin = useSession().data?.user?.role === "ADMIN"
     const mine = !!req && !!meId && req.requestedBy?.id === meId
     const pending = req?.status === "SUBMITTED"
-    const canDecide = canApprove && pending && !mine
+    // Same rule as the API: nobody decides their own request — except ADMIN, who has no one above.
+    const selfBlocked = mine && !isAdmin
+    const canDecide = canApprove && pending && !selfBlocked
     const canCancel = !!req && (
         (pending && (mine || canApprove)) ||
         (canApprove && isApproved(req) && req.fulfilmentStatus === "NOT_ISSUED")
@@ -241,9 +247,9 @@ export function RequestDrawer({ id, canApprove, canIssue, meId, refreshKey, onCl
 
     const footer = req && (
         mode === "view" ? (
-            (canDecide || canCancel || (canApprove && pending && mine)) ? (
+            (canDecide || canCancel || (canApprove && pending && selfBlocked)) ? (
                 <div className="space-y-2">
-                    {canApprove && pending && mine && (
+                    {canApprove && pending && selfBlocked && (
                         <p className="flex items-center gap-1.5 text-[12px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
                             <Info size={13} /> You raised this — another approver must decide.
                         </p>

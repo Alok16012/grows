@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
+import { accessFrom, employeeScope, withEmployeeScope } from "@/lib/access"
 import { checkLeaveRequest } from "@/lib/leave-policy-server"
 import { notifyApprovers, notifyEmployee } from "@/lib/hr-notify"
 
@@ -62,13 +63,17 @@ export async function GET(req: Request) {
             }
         }
 
+        // Data scope: an Assigned-sites manager sees leave for their sites only;
+        // the sidebar badge below counts the same rows.
+        const scoped = withEmployeeScope(where, await employeeScope(accessFrom(session)))
+
         // Sidebar badge: just the number (e.g. ?status=PENDING&count=true), same filters.
         if (searchParams.get("count") === "true") {
-            return NextResponse.json({ count: await prisma.leave.count({ where }) })
+            return NextResponse.json({ count: await prisma.leave.count({ where: scoped }) })
         }
 
         const leaves = await prisma.leave.findMany({
-            where,
+            where: scoped,
             include: {
                 employee: {
                     select: {

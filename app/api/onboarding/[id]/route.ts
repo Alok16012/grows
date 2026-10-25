@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { generateEmployeeCode } from "@/lib/employee-code"
+import { accessFrom, maskEmployee, lockedFieldNames } from "@/lib/access"
 
 // Provision a login (User account) for an approved employee if they don't have
 // one yet. No password is set — the employee signs in with an OTP to their
@@ -90,7 +91,13 @@ export async function GET(
         })
 
         if (!record) return new NextResponse("Not found", { status: 404 })
-        return NextResponse.json(record)
+        // KYC review shows ID, bank and salary only to roles allowed to see them.
+        const access = accessFrom(session)
+        return NextResponse.json({
+            ...record,
+            employee: record.employee ? maskEmployee(record.employee, access) : record.employee,
+            lockedFields: lockedFieldNames(access),
+        })
     } catch (error) {
         console.error("[ONBOARDING_ID_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })

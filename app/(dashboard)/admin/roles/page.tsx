@@ -1,472 +1,245 @@
 "use client"
-import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
+// Roles — one card per role: what it is for, which records it sees, who holds
+// it. Open goes to the full-page editor (/admin/roles/[id]).
+
+import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, Shield, Users, ChevronRight, X, Check, Loader2, Search, KeyRound } from "lucide-react"
-import { StatCard, statGridClass } from "@/components/StatCard"
-import { PERMISSION_GROUPS } from "@/lib/permissions"
+import { Plus, Search, Shield, Trash2, Columns3, X } from "lucide-react"
+import { MODULES, ACTION_SHORT, modulePermission, SPECIAL_ACTIONS, SENSITIVE_FIELDS } from "@/lib/permission-catalogue"
+import {
+    api, ApiError, Loading, Empty, Modal, btnPrimary, btnGhost, btnDanger, inputCls,
+    PageHead, Stat, ScopeBadge, NotSetUp, NoAccess, type RoleCard,
+} from "../_access/ui"
 
-const ROLE_COLORS = [
-    "#6366f1", "#8b5cf6", "#ec4899", "#ef4444", "#f97316",
-    "#eab308", "#22c55e", "#14b8a6", "#0ea5e9", "#64748b",
-]
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type CustomRole = {
-    id: string
-    name: string
-    description: string | null
-    permissions: string[]
-    color: string
-    isActive: boolean
-    createdAt: string
-    _count: { users: number }
+type Payload = {
+    roles: RoleCard[]
+    stats: { roles: number; usersWithRole: number; usersWithoutRole: number; changesLast30Days: number | null }
+    canCreate: boolean; canEdit: boolean; canDelete: boolean
 }
-
-type RoleForm = {
-    name: string
-    description: string
-    permissions: string[]
-    color: string
-}
-
-const EMPTY_FORM: RoleForm = { name: "", description: "", permissions: [], color: "#6366f1" }
-
-// ─── Role Form Modal ──────────────────────────────────────────────────────────
-
-function RoleModal({ open, onClose, onSaved, editing }: {
-    open: boolean
-    onClose: () => void
-    onSaved: () => void
-    editing: CustomRole | null
-}) {
-    const [form, setForm] = useState<RoleForm>(EMPTY_FORM)
-    const [saving, setSaving] = useState(false)
-    const [search, setSearch] = useState("")
-
-    useEffect(() => {
-        if (open) {
-            setForm(editing ? {
-                name: editing.name,
-                description: editing.description || "",
-                permissions: editing.permissions,
-                color: editing.color,
-            } : EMPTY_FORM)
-            setSearch("")
-        }
-    }, [open, editing])
-
-    const togglePermission = (key: string) => {
-        setForm(f => ({
-            ...f,
-            permissions: f.permissions.includes(key)
-                ? f.permissions.filter(p => p !== key)
-                : [...f.permissions, key]
-        }))
-    }
-
-    const toggleGroup = (groupPerms: string[]) => {
-        const allSelected = groupPerms.every(p => form.permissions.includes(p))
-        if (allSelected) {
-            setForm(f => ({ ...f, permissions: f.permissions.filter(p => !groupPerms.includes(p)) }))
-        } else {
-            setForm(f => ({ ...f, permissions: [...new Set([...f.permissions, ...groupPerms])] }))
-        }
-    }
-
-    const handleSubmit = async () => {
-        if (!form.name.trim()) { toast.error("Role name is required"); return }
-        setSaving(true)
-        try {
-            const url = editing ? `/api/admin/roles/${editing.id}` : "/api/admin/roles"
-            const method = editing ? "PUT" : "POST"
-            const res = await fetch(url, {
-                method,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
-            })
-            if (!res.ok) throw new Error(await res.text())
-            toast.success(editing ? "Role updated!" : "Role created!")
-            onSaved()
-            onClose()
-        } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : "Failed to save")
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    if (!open) return null
-
-    const filteredGroups = search
-        ? PERMISSION_GROUPS.map(g => ({
-            ...g,
-            permissions: g.permissions.filter(p => p.label.toLowerCase().includes(search.toLowerCase()))
-        })).filter(g => g.permissions.length > 0)
-        : PERMISSION_GROUPS
-
-    return (
-        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: 16 }}>
-            <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 680, maxHeight: "92vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
-                {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid var(--border)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 34, height: 34, borderRadius: 9, background: form.color + "22", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Shield size={17} style={{ color: form.color }} />
-                        </div>
-                        <div>
-                            <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>{editing ? "Edit Role" : "Create New Role"}</h2>
-                            <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>{form.permissions.length} permissions selected</p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} style={{ padding: 6, borderRadius: 8, border: "none", background: "none", cursor: "pointer", color: "var(--text3)" }}>
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div style={{ display: "flex", gap: 0, flex: 1, overflow: "hidden" }}>
-                    {/* Left — basic info */}
-                    <div style={{ width: 220, padding: "20px 16px", borderRight: "1px solid var(--border)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-                        <div>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.4px" }}>Role Name *</label>
-                            <input
-                                value={form.name}
-                                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                                placeholder="e.g. HR Executive"
-                                style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "#fff", color: "var(--text)", boxSizing: "border-box", outline: "none" }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.4px" }}>Description</label>
-                            <textarea
-                                value={form.description}
-                                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                                placeholder="What does this role do?"
-                                rows={3}
-                                style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, background: "#fff", color: "var(--text)", resize: "none", boxSizing: "border-box", outline: "none" }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.4px" }}>Color</label>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {ROLE_COLORS.map(c => (
-                                    <button
-                                        key={c}
-                                        onClick={() => setForm(f => ({ ...f, color: c }))}
-                                        style={{ width: 24, height: 24, borderRadius: 6, background: c, border: form.color === c ? "2.5px solid #000" : "2px solid transparent", cursor: "pointer", outline: "none" }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                        <div style={{ marginTop: "auto" }}>
-                            <button
-                                onClick={() => setForm(f => ({ ...f, permissions: PERMISSION_GROUPS.flatMap(g => g.permissions.map(p => p.key)) }))}
-                                style={{ width: "100%", padding: "6px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
-                            >
-                                Select All Permissions
-                            </button>
-                            <button
-                                onClick={() => setForm(f => ({ ...f, permissions: [] }))}
-                                style={{ width: "100%", padding: "6px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 12, color: "var(--text3)" }}
-                            >
-                                Clear All
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Right — permissions */}
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px" }}>
-                                <Search size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
-                                <input
-                                    value={search}
-                                    onChange={e => setSearch(e.target.value)}
-                                    placeholder="Search permissions…"
-                                    style={{ flex: 1, border: "none", background: "none", fontSize: 13, color: "var(--text)", outline: "none" }}
-                                />
-                            </div>
-                        </div>
-                        <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
-                            {filteredGroups.map(group => {
-                                const groupKeys = group.permissions.map(p => p.key)
-                                const allChecked = groupKeys.every(k => form.permissions.includes(k))
-                                const someChecked = groupKeys.some(k => form.permissions.includes(k))
-                                return (
-                                    <div key={group.key}>
-                                        <div
-                                            onClick={() => toggleGroup(groupKeys)}
-                                            style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, cursor: "pointer" }}
-                                        >
-                                            <div style={{ width: 16, height: 16, borderRadius: 4, border: "1.5px solid", borderColor: allChecked ? "var(--accent)" : someChecked ? "var(--accent)" : "var(--border)", background: allChecked ? "var(--accent)" : someChecked ? "var(--accent)22" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                {allChecked && <Check size={10} style={{ color: "#fff" }} />}
-                                                {someChecked && !allChecked && <div style={{ width: 8, height: 2, background: "var(--accent)", borderRadius: 2 }} />}
-                                            </div>
-                                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{group.group}</span>
-                                        </div>
-                                        <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 8 }}>
-                                            {group.permissions.map(perm => (
-                                                <label key={perm.key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "5px 8px", borderRadius: 6, background: form.permissions.includes(perm.key) ? "var(--accent-light, #eef2ff)" : "transparent" }}>
-                                                    <div
-                                                        onClick={() => togglePermission(perm.key)}
-                                                        style={{ width: 16, height: 16, borderRadius: 4, border: "1.5px solid", borderColor: form.permissions.includes(perm.key) ? "var(--accent)" : "var(--border)", background: form.permissions.includes(perm.key) ? "var(--accent)" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}
-                                                    >
-                                                        {form.permissions.includes(perm.key) && <Check size={10} style={{ color: "#fff" }} />}
-                                                    </div>
-                                                    <span style={{ fontSize: 13, color: "var(--text)" }}>{perm.label}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div style={{ padding: "14px 24px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                    <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 9, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13, color: "var(--text)" }}>
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={saving}
-                        style={{ padding: "8px 20px", borderRadius: 9, background: "var(--accent)", color: "#fff", border: "none", cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                        {saving && <Loader2 size={13} className="animate-spin" />}
-                        {editing ? "Save Changes" : "Create Role"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─── Delete Confirm ───────────────────────────────────────────────────────────
-
-function DeleteModal({ role, onClose, onDeleted }: { role: CustomRole; onClose: () => void; onDeleted: () => void }) {
-    const [deleting, setDeleting] = useState(false)
-    const handleDelete = async () => {
-        setDeleting(true)
-        try {
-            const res = await fetch(`/api/admin/roles/${role.id}`, { method: "DELETE" })
-            if (!res.ok) throw new Error(await res.text())
-            toast.success("Role deleted")
-            onDeleted()
-            onClose()
-        } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : "Failed to delete")
-        } finally {
-            setDeleting(false)
-        }
-    }
-    return (
-        <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: 16 }}>
-            <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: "100%", maxWidth: 380 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-                    <Trash2 size={20} style={{ color: "#dc2626" }} />
-                </div>
-                <h3 style={{ fontWeight: 700, fontSize: 16, color: "var(--text)", margin: "0 0 6px" }}>Delete &quot;{role.name}&quot;?</h3>
-                <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 20px" }}>
-                    This role will be unassigned from <strong>{role._count.users}</strong> user{role._count.users !== 1 ? "s" : ""}. This action cannot be undone.
-                </p>
-                <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={onClose} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 13 }}>Cancel</button>
-                    <button onClick={handleDelete} disabled={deleting} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "#dc2626", color: "#fff", border: "none", cursor: deleting ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, opacity: deleting ? 0.7 : 1 }}>
-                        {deleting ? "Deleting…" : "Delete Role"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function RolesPage() {
-    const { data: session, status } = useSession()
     const router = useRouter()
-    const [roles, setRoles] = useState<CustomRole[]>([])
-    const [loading, setLoading] = useState(true)
-    const [showModal, setShowModal] = useState(false)
-    const [editing, setEditing] = useState<CustomRole | null>(null)
-    const [deleting, setDeleting] = useState<CustomRole | null>(null)
-    const [selectedRole, setSelectedRole] = useState<CustomRole | null>(null)
+    const [data, setData] = useState<Payload | null>(null)
+    const [forbidden, setForbidden] = useState(false)
+    const [q, setQ] = useState("")
+    const [comparing, setComparing] = useState(false)
+    const [picked, setPicked] = useState<string[]>([])
+    const [deleting, setDeleting] = useState<RoleCard | null>(null)
+    const [busy, setBusy] = useState(false)
 
-    useEffect(() => {
-        if (status === "unauthenticated") router.push("/login")
-        if (status === "authenticated" && session?.user?.role !== "ADMIN") router.push("/")
-    }, [status, session, router])
-
-    const fetchRoles = async () => {
-        setLoading(true)
+    const load = useCallback(async () => {
         try {
-            const r = await fetch("/api/admin/roles")
-            if (r.ok) setRoles(await r.json())
-        } catch { /* ignore */ }
-        finally { setLoading(false) }
+            setData(await api<Payload>("/api/admin/roles?full=1"))
+        } catch (e) {
+            if (e instanceof ApiError && e.status === 403) setForbidden(true)
+            else toast.error(e instanceof Error ? e.message : "Couldn't load roles")
+        }
+    }, [])
+    useEffect(() => { load() }, [load])
+
+    const shown = useMemo(() => {
+        const s = q.trim().toLowerCase()
+        const list = data?.roles ?? []
+        return s ? list.filter(r => r.name.toLowerCase().includes(s) || (r.description ?? "").toLowerCase().includes(s)) : list
+    }, [data, q])
+
+    const notSetUp = !!data && data.stats.changesLast30Days === null
+
+    async function duplicate(r: RoleCard) {
+        router.push(`/admin/roles/new?from=${encodeURIComponent(r.id)}`)
     }
 
-    useEffect(() => { fetchRoles() }, [])
+    async function confirmDelete() {
+        if (!deleting) return
+        setBusy(true)
+        try {
+            await api(`/api/admin/roles/${deleting.id}`, { method: "DELETE" })
+            toast.success(`${deleting.name} deleted`)
+            setDeleting(null)
+            load()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Couldn't delete the role")
+        } finally {
+            setBusy(false)
+        }
+    }
 
-    const allPermCount = PERMISSION_GROUPS.reduce((s, g) => s + g.permissions.length, 0)
+    function togglePick(id: string) {
+        setPicked(p => p.includes(id) ? p.filter(x => x !== id) : p.length >= 3 ? p : [...p, id])
+    }
+
+    if (forbidden) return <div className="p-4 lg:p-0"><NoAccess what="Roles" perm="roles.view" /></div>
 
     return (
-        <div className="p-4 sm:px-8 sm:py-7" style={{ minHeight: "100vh", background: "var(--bg)" }}>
-            {/* Header */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between" style={{ marginBottom: 28 }}>
-                <div className="min-w-0">
-                    <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Role Management</h1>
-                    <p style={{ fontSize: 13, color: "var(--text3)", margin: "3px 0 0" }}>Create roles and define what each role can access</p>
-                </div>
-                <div className="page-actions">
-                    <button
-                        onClick={() => { setEditing(null); setShowModal(true) }}
-                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
-                    >
-                        <Plus size={15} /> Create Role
-                    </button>
-                </div>
-            </div>
-
-            {/* Stats row */}
-            <div className={statGridClass(3)} style={{ marginBottom: 28 }}>
-                <StatCard label="Total Roles" value={roles.length} tone="blue" icon={<Shield size={20} />} seed={0} />
-                <StatCard label="Total Permissions" value={allPermCount} tone="violet" icon={<KeyRound size={20} />} seed={1} />
-                <StatCard label="Users with Custom Role" value={roles.reduce((s, r) => s + r._count.users, 0)} tone="sky" icon={<Users size={20} />} seed={2} />
-            </div>
-
-            {/* Content */}
-            {loading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 80 }}>
-                    <Loader2 size={28} className="animate-spin" style={{ color: "var(--accent)" }} />
-                </div>
-            ) : roles.length === 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 80, gap: 12, background: "#fff", borderRadius: 14, border: "1px solid var(--border)" }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 16, background: "#eef2ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Shield size={28} style={{ color: "#6366f1" }} />
+        <div className="flex flex-col gap-5 p-4 lg:p-0">
+            <PageHead
+                title="Roles"
+                sub="Each role sets what people can do and which records they can see."
+                right={<>
+                    <div className="relative">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search roles" aria-label="Search roles"
+                            className={inputCls("pl-9 w-56 bg-[var(--surface)] h-10")} />
                     </div>
-                    <p style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", margin: 0 }}>No roles created yet</p>
-                    <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>Create your first role to manage employee access</p>
-                    <button
-                        onClick={() => { setEditing(null); setShowModal(true) }}
-                        style={{ marginTop: 8, padding: "9px 20px", borderRadius: 9, background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
-                    >
-                        Create First Role
+                    <button type="button" className={btnGhost} onClick={() => { setComparing(c => !c); setPicked([]) }} aria-pressed={comparing}>
+                        <Columns3 size={15} /> {comparing ? "Done comparing" : "Compare roles"}
                     </button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16, alignItems: "start" }}>
-                    {/* Roles list */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {roles.map(role => (
-                            <div
-                                key={role.id}
-                                onClick={() => setSelectedRole(role.id === selectedRole?.id ? null : role)}
-                                style={{ background: "#fff", border: `1.5px solid ${selectedRole?.id === role.id ? role.color : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", transition: "border-color 0.15s" }}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                    <div style={{ width: 40, height: 40, borderRadius: 10, background: role.color + "20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                        <Shield size={18} style={{ color: role.color }} />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>{role.name}</p>
-                                            {!role.isActive && (
-                                                <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#fee2e2", color: "#dc2626", fontWeight: 600 }}>Inactive</span>
-                                            )}
-                                        </div>
-                                        {role.description && <p style={{ fontSize: 12, color: "var(--text3)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{role.description}</p>}
-                                        <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                                            <span style={{ fontSize: 11, color: "var(--text3)", display: "flex", alignItems: "center", gap: 4 }}>
-                                                <Shield size={11} /> {role.permissions.length} permissions
-                                            </span>
-                                            <span style={{ fontSize: 11, color: "var(--text3)", display: "flex", alignItems: "center", gap: 4 }}>
-                                                <Users size={11} /> {role._count.users} user{role._count.users !== 1 ? "s" : ""}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: "flex", gap: 6 }}>
-                                        <button
-                                            onClick={e => { e.stopPropagation(); setEditing(role); setShowModal(true) }}
-                                            style={{ padding: 7, borderRadius: 7, border: "1px solid var(--border)", background: "none", cursor: "pointer", color: "var(--text3)" }}
-                                        >
-                                            <Pencil size={13} />
-                                        </button>
-                                        <button
-                                            onClick={e => { e.stopPropagation(); setDeleting(role) }}
-                                            style={{ padding: 7, borderRadius: 7, border: "1px solid #fee2e2", background: "none", cursor: "pointer", color: "#dc2626" }}
-                                        >
-                                            <Trash2 size={13} />
-                                        </button>
-                                        <ChevronRight size={16} style={{ color: "var(--text3)", alignSelf: "center", transform: selectedRole?.id === role.id ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                    {data?.canCreate && (
+                        <Link href="/admin/roles/new" className={btnPrimary}><Plus size={15} /> Create role</Link>
+                    )}
+                </>}
+            />
+
+            {notSetUp && <NotSetUp />}
+
+            {!data ? <Loading /> : (
+                <>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <Stat label="Roles" value={data.stats.roles} />
+                        <Stat label="Users with a role" value={data.stats.usersWithRole} />
+                        <Stat label="Users waiting for a role" value={data.stats.usersWithoutRole} warn={data.stats.usersWithoutRole > 0}
+                            onClick={() => router.push("/admin/users?role=none")} />
+                        <Stat label="Role changes, last 30 days" value={data.stats.changesLast30Days} />
                     </div>
 
-                    {/* Permission detail panel */}
-                    {selectedRole ? (
-                        <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 14, padding: "20px 22px", position: "sticky", top: 24 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 9, background: selectedRole.color + "20", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                    <Shield size={16} style={{ color: selectedRole.color }} />
-                                </div>
-                                <div>
-                                    <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>{selectedRole.name}</p>
-                                    <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>{selectedRole.permissions.length} of {allPermCount} permissions granted</p>
-                                </div>
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                                {PERMISSION_GROUPS.map(group => {
-                                    const granted = group.permissions.filter(p => selectedRole.permissions.includes(p.key))
-                                    if (granted.length === 0) return null
-                                    return (
-                                        <div key={group.key}>
-                                            <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 6px" }}>{group.group}</p>
-                                            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                                                {granted.map(p => (
-                                                    <span key={p.key} style={{ fontSize: 11, padding: "3px 9px", borderRadius: 20, background: selectedRole.color + "15", color: selectedRole.color, fontWeight: 600 }}>
-                                                        {p.label}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                                {selectedRole.permissions.length === 0 && (
-                                    <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>No permissions assigned to this role.</p>
-                                )}
-                            </div>
-                        </div>
-                    ) : (
-                        <div style={{ background: "#f8fafc", border: "1px dashed var(--border)", borderRadius: 14, padding: 40, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                            <Shield size={28} style={{ color: "var(--text3)" }} />
-                            <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>Click a role to see its permissions</p>
+                    {comparing && (
+                        <div className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-light)] px-4 py-3 text-[13px] text-[var(--accent-text)]">
+                            Pick two or three roles to compare side by side. {picked.length > 0 && <b>{picked.length} picked.</b>}
                         </div>
                     )}
-                </div>
+
+                    {shown.length === 0 ? (
+                        <Empty icon={<Shield size={36} />} title="No roles match" sub="Try another search." />
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {shown.map(r => (
+                                <RoleCardView key={r.id} role={r}
+                                    comparing={comparing} picked={picked.includes(r.id)} onPick={() => togglePick(r.id)}
+                                    canCreate={data.canCreate} canDelete={data.canDelete}
+                                    onDuplicate={() => duplicate(r)} onDelete={() => setDeleting(r)} />
+                            ))}
+                        </div>
+                    )}
+
+                    <p className="text-[12px] text-[var(--text3)]">Delete stays disabled while a role has users. Move them to another role first.</p>
+
+                    {comparing && picked.length >= 2 && (
+                        <CompareTable roles={picked.map(id => data.roles.find(r => r.id === id)!).filter(Boolean)} onClose={() => setPicked([])} />
+                    )}
+                </>
             )}
 
-            {showModal && (
-                <RoleModal
-                    open={showModal}
-                    onClose={() => setShowModal(false)}
-                    onSaved={fetchRoles}
-                    editing={editing}
-                />
-            )}
             {deleting && (
-                <DeleteModal
-                    role={deleting}
-                    onClose={() => setDeleting(null)}
-                    onDeleted={fetchRoles}
-                />
+                <Modal title={`Delete ${deleting.name}?`} onClose={() => setDeleting(null)}
+                    footer={<>
+                        <button className={btnGhost} onClick={() => setDeleting(null)}>Cancel</button>
+                        <button className={btnDanger} onClick={confirmDelete} disabled={busy}>Delete role</button>
+                    </>}>
+                    <p className="p-5 text-[13.5px] text-[var(--text2)]">The role is removed for good. Nobody holds it, so no one loses access. This is written to the audit log.</p>
+                </Modal>
             )}
+        </div>
+    )
+}
+
+function RoleCardView({ role: r, comparing, picked, onPick, canCreate, canDelete, onDuplicate, onDelete }: {
+    role: RoleCard; comparing: boolean; picked: boolean; onPick: () => void
+    canCreate: boolean; canDelete: boolean; onDuplicate: () => void; onDelete: () => void
+}) {
+    const deleteBlocked = r.isSystem ? "The Admin role cannot be deleted" : r.users > 0 ? `Move the ${r.users} user${r.users === 1 ? "" : "s"} first` : ""
+    return (
+        <div className={`rounded-2xl border bg-[var(--surface)] p-4 flex flex-col gap-3 ${picked ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : "border-[var(--border)]"}`}>
+            <div className="flex items-start gap-3">
+                <div className="h-10 w-10 shrink-0 rounded-xl flex items-center justify-center" style={{ background: `${r.color}1a`, color: r.color }}>
+                    <Shield size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="text-[15.5px] font-semibold text-[var(--text)]">{r.name}</h3>
+                        {r.isSystem && <span className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[10.5px] font-bold text-white">System</span>}
+                        {!r.isActive && <span className="rounded-full bg-[var(--surface2)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--text2)]">Off</span>}
+                        {r.legacy && <span title="Saved before the permission catalogue. Open and save it to convert it and set its data scope."
+                            className="rounded-full bg-[#fff1e0] px-2 py-0.5 text-[10.5px] font-semibold text-[#b45309]">Not converted</span>}
+                    </div>
+                    <p className="text-[12.5px] text-[var(--text2)] mt-0.5 line-clamp-2">{r.description || "No description yet."}</p>
+                </div>
+                {comparing && (
+                    <input type="checkbox" checked={picked} onChange={onPick} aria-label={`Compare ${r.name}`} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
+                )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+                <ScopeBadge scope={r.scope} />
+                <span className="inline-flex rounded-full border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-0.5 text-[11.5px] text-[var(--text2)]">
+                    {r.users.toLocaleString("en-IN")} user{r.users === 1 ? "" : "s"}{r.users !== r.activeUsers ? ` · ${r.activeUsers} active` : ""}
+                </span>
+                {!r.isSystem && <span className="inline-flex rounded-full border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-0.5 text-[11.5px] text-[var(--text2)]">{r.permissionCount} permissions</span>}
+            </div>
+            <div className="mt-auto flex items-center gap-2 border-t border-[var(--border)] pt-3">
+                <Link href={`/admin/roles/${r.id}`} className="flex-1 inline-flex justify-center rounded-xl bg-[var(--accent-light)] px-3 py-2 text-[13px] font-semibold text-[var(--accent-text)] hover:opacity-90">Open</Link>
+                {canCreate && !r.isSystem && (
+                    <button type="button" onClick={onDuplicate} className="flex-1 inline-flex justify-center rounded-xl border border-[var(--border)] px-3 py-2 text-[13px] text-[var(--text2)] hover:bg-[var(--surface2)]">Duplicate</button>
+                )}
+                {canDelete && (
+                    <button type="button" onClick={onDelete} disabled={!!deleteBlocked} title={deleteBlocked || "Delete role"} aria-label={`Delete ${r.name}`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text3)] hover:text-[var(--red)] hover:border-[var(--red)] disabled:opacity-40 disabled:hover:text-[var(--text3)] disabled:hover:border-[var(--border)] disabled:cursor-not-allowed">
+                        <Trash2 size={15} />
+                    </button>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// Two or three roles side by side; rows where they differ are highlighted.
+function CompareTable({ roles, onClose }: { roles: RoleCard[]; onClose: () => void }) {
+    const sets = roles.map(r => new Set(r.permissions))
+    const rows = [
+        ...MODULES.map(m => ({
+            key: m.key, label: m.label,
+            cells: sets.map(s => m.actions.filter(a => s.has(modulePermission(m.key, a))).map(a => ACTION_SHORT[a]).join(" ") || "—"),
+        })),
+        ...[...SPECIAL_ACTIONS, ...SENSITIVE_FIELDS].map(x => ({
+            key: x.key, label: x.label, cells: sets.map(s => (s.has(x.key) ? "✓" : "—")),
+        })),
+    ]
+    const scopeRow = { key: "scope", label: "Data scope", cells: roles.map(r => r.scope ?? "ALL") }
+    const all = [scopeRow, ...rows]
+    const [onlyDiff, setOnlyDiff] = useState(false)
+    const visible = onlyDiff ? all.filter(r => new Set(r.cells).size > 1) : all
+    return (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--border)]">
+                <h3 className="text-[14px] font-semibold text-[var(--text)]">Compare roles</h3>
+                <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-[12.5px] text-[var(--text2)]">
+                        <input type="checkbox" checked={onlyDiff} onChange={e => setOnlyDiff(e.target.checked)} className="accent-[var(--accent)]" /> Only differences
+                    </label>
+                    <button onClick={onClose} aria-label="Close comparison" className="text-[var(--text3)] hover:text-[var(--text)]"><X size={16} /></button>
+                </div>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-[12.5px]">
+                    <thead>
+                        <tr className="bg-[var(--surface2)]">
+                            <th className="text-left px-3 py-2 font-semibold text-[var(--text3)]">Module</th>
+                            {roles.map(r => <th key={r.id} className="text-left px-3 py-2 font-semibold text-[var(--text)]">{r.name}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {visible.map(row => {
+                            const differs = new Set(row.cells).size > 1
+                            return (
+                                <tr key={row.key} className={`border-t border-[var(--border)] ${differs ? "bg-[#fffbeb]" : ""}`}>
+                                    <td className="px-3 py-1.5 text-[var(--text2)]">{row.label}</td>
+                                    {row.cells.map((c, i) => <td key={i} className={`px-3 py-1.5 font-mono ${differs ? "text-[#92400e] font-semibold" : "text-[var(--text2)]"}`}>{c}</td>)}
+                                </tr>
+                            )
+                        })}
+                    </tbody>
+                </table>
+            </div>
         </div>
     )
 }

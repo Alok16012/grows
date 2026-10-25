@@ -1,4 +1,5 @@
 "use client"
+import { liveSearchParam } from "@/lib/utils"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -2303,7 +2304,8 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
     const { data: session, status: sessionStatus } = useSession()
     // ?status=PENDING (dashboard "Pending approvals") = submitted claims awaiting a decision.
     const initialStatus: StatusFilter | null = (() => {
-        const s = searchParams?.status?.toUpperCase()
+        // Live URL first: the prerendered page gets an empty searchParams prop on Vercel.
+        const s = liveSearchParam("status", searchParams?.status)?.toUpperCase()
         if (s === "PENDING") return "SUBMITTED"
         return s && ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"].includes(s) ? s as StatusFilter : null
     })()

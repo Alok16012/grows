@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { encode } from "next-auth/jwt"
 import prisma from "@/lib/prisma"
+import { resolveAccess, accessVersion } from "@/lib/access-session"
+import { recordLogin, recordLoginFailure, requestMetaOf } from "@/lib/access-audit"
 import {
     verifyLogin, parseLoginMethod,
     AUTH_INVALID, AUTH_INACTIVE, AUTH_LOCKED, AUTH_USE_OTP, AUTH_NO_MPIN,
@@ -34,14 +36,6 @@ const DEMO_USERS: Record<string, { name: string; role: string }> = {
     "inspector@cims.com": { name: "Inspection Boy", role: "INSPECTION_BOY" },
 }
 
-function resolvePermissions(user: { customRole?: { isActive: boolean; permissions: string[] } | null }): string[] {
-    const base = ["self.view"]
-    if (user.customRole?.isActive) {
-        return Array.from(new Set([...base, ...user.customRole.permissions]))
-    }
-    return base
-}
-
 const roleInclude = { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
 
 // Mint the token + user payload from a (real or synthetic) user object.
@@ -59,7 +53,13 @@ async function mintResponse(user: any, extra: { needsMpin?: boolean } = {}) {
         return NextResponse.json({ error: "Your account is inactive. Please contact HR." }, { status: 403 })
     }
 
-    const permissions = user.permissions ?? resolvePermissions(user)
+    // Same resolution as the web session (lib/auth): catalogue permissions
+    // expanded into the earlier keys, plus the role's data scope and sites.
+    const access = String(user.id).startsWith("demo-")
+        ? { permissions: user.permissions ?? ["self.view"], scope: null, siteIds: [] as string[] }
+        : await resolveAccess(user)
+    const permissions = access.permissions
+    const accessVersionNow = String(user.id).startsWith("demo-") ? 0 : await accessVersion(user.id)
     const customRoleName = user.customRoleName ?? (user.customRole?.isActive ? user.customRole.name : null)
     const customRoleColor = user.customRoleColor ?? (user.customRole?.isActive ? user.customRole.color : null)
     const photo = employee?.photo || user.photo || null
@@ -67,7 +67,10 @@ async function mintResponse(user: any, extra: { needsMpin?: boolean } = {}) {
     const token = await encode({
         secret: secret!,
         maxAge: MAX_AGE,
-        token: { id: user.id, name: user.name, email: user.email, role: user.role, permissions, customRoleName, customRoleColor, photo },
+        token: {
+            id: user.id, name: user.name, email: user.email, role: user.role, permissions, customRoleName, customRoleColor, photo,
+            scope: access.scope, siteIds: access.siteIds, accessVersion: accessVersionNow,
+        },
     })
 
     return NextResponse.json({
@@ -150,10 +153,13 @@ export async function POST(req: Request) {
         }
 
         const result = await verifyLogin({ identifier, secret: password, method })
+        const meta = requestMetaOf(req)
         if (!result.ok) {
             console.warn(`[MOBILE_LOGIN] login failed — reason=${result.reason} method=${method}`)
+            recordLoginFailure({ loginId: identifier.length > 4 ? `${identifier.slice(0, 2)}***${identifier.slice(-2)}` : "***", method, reason: result.code, ...meta })
             return failResponse(result.code)
         }
+        recordLogin({ userId: result.user.id, name: result.user.name, method: `${method} (app)`, ...meta })
         return await mintResponse(result.user, { needsMpin: result.needsMpin })
     } catch (err) {
         if (process.env.NODE_ENV !== "production") console.error("[MOBILE_LOGIN]", err)

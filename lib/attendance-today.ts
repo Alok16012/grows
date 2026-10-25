@@ -82,18 +82,21 @@ type Db = {
  * numerator and denominator come from different sets and a site can read 100%
  * with nobody deployed there. Employees with no active deployment form "No site".
  */
-export async function todayAttendance(db: Db, window: { gte: Date; lt: Date }, activeEmployees: number): Promise<TodayAttendance> {
+// `employeeWhere` narrows every count to one data scope (lib/access), e.g. an
+// Assigned-sites manager's dashboard counts only their sites' people.
+export async function todayAttendance(db: Db, window: { gte: Date; lt: Date }, activeEmployees: number, employeeWhere?: Record<string, unknown> | null): Promise<TodayAttendance> {
+    const inScope = employeeWhere ? { employee: employeeWhere } : {}
     const [rows, leaves, deployments] = await Promise.all([
         db.attendance.findMany({
-            where: { date: window },
+            where: { date: window, ...inScope },
             select: { employeeId: true, status: true, checkIn: true },
         }).catch(() => [] as any[]),
         db.leave.findMany({
-            where: { status: "APPROVED", startDate: { lt: window.lt }, endDate: { gte: window.gte } },
+            where: { status: "APPROVED", startDate: { lt: window.lt }, endDate: { gte: window.gte }, ...inScope },
             select: { employeeId: true },
         }).catch(() => [] as any[]),
         db.deployment.findMany({
-            where: { isActive: true, employee: { status: "ACTIVE" } },
+            where: { isActive: true, employee: employeeWhere ? { AND: [{ status: "ACTIVE" }, employeeWhere] } : { status: "ACTIVE" } },
             select: { employeeId: true, siteId: true, site: { select: { name: true } } },
             orderBy: { startDate: "desc" },
         }).catch(() => [] as any[]),

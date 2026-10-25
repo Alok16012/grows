@@ -13,8 +13,8 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
-            return new NextResponse("Forbidden", { status: 403 })
+        if (!checkAccess(session, [], "payroll.markPaid")) {
+            return new NextResponse("Forbidden — missing payroll.markPaid", { status: 403 })
         }
 
         const { month, year, siteIds } = await req.json()

@@ -67,6 +67,12 @@ export async function POST(req: Request) {
             return new NextResponse("name and category are required", { status: 400 })
         }
 
+        // The form blocks a negative or non-numeric cost; a direct POST must not slip one in.
+        if (purchaseCost !== undefined && purchaseCost !== null && purchaseCost !== "") {
+            const c = Number(purchaseCost)
+            if (!Number.isFinite(c) || c < 0) return new NextResponse("purchaseCost must be 0 or more", { status: 400 })
+        }
+
         const qty = parseInt(quantity ?? "1")
         if (isNaN(qty) || qty < 1) {
             return new NextResponse("quantity must be a positive integer", { status: 400 })

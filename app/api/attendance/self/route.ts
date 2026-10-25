@@ -4,6 +4,14 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { istDateOnly, dayWindow, monthWindow } from "@/lib/attendance-policy"
 
+// Own record, minus the joining token and HR's internal remarks.
+const SELF_HIDDEN = ["onboardingToken", "notes", "createdBy", "backgroundCheckRemark", "medicalRemark"]
+function ownRecord<T extends Record<string, unknown> | null>(e: T): T {
+    if (!e) return e
+    return Object.fromEntries(Object.entries(e).filter(([k]) => !SELF_HIDDEN.includes(k))) as T
+}
+
+
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -37,7 +45,7 @@ export async function GET(req: Request) {
             }),
         ])
 
-        return NextResponse.json({ employee, todayRecord, monthRecords })
+        return NextResponse.json({ employee: ownRecord(employee), todayRecord, monthRecords })
     } catch (error) {
         console.error("[ATTENDANCE_SELF_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })

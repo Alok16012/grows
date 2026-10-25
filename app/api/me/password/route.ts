@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { hasOwnPassword } from "@/lib/credentials"
+import { mustChangePasswordFor } from "@/lib/access-session"
 
 export const dynamic = "force-dynamic"
 
@@ -40,8 +41,12 @@ export async function PATCH(req: Request) {
         if (!newPassword) {
             return NextResponse.json({ error: "New password is required" }, { status: 400 })
         }
-        if (String(newPassword).length < 6) {
-            return NextResponse.json({ error: "New password must be at least 6 characters" }, { status: 400 })
+        // Replacing an admin-set initial password follows the same rule it was
+        // set with (Users → Create user): 10+ characters, not the same one.
+        const mustChange = await mustChangePasswordFor(session.user.id as string)
+        const minLength = mustChange ? 10 : 6
+        if (String(newPassword).length < minLength) {
+            return NextResponse.json({ error: `New password must be at least ${minLength} characters` }, { status: 400 })
         }
 
         const user = await prisma.user.findUnique({ where: { id: session.user.id as string }, select: { id: true, password: true } })
@@ -61,6 +66,10 @@ export async function PATCH(req: Request) {
             }
         }
 
+        if (mustChange && hasOwnPassword(user.password) && (await bcrypt.compare(String(newPassword), user.password))) {
+            return NextResponse.json({ error: "Choose a new password, not the one you were given" }, { status: 400 })
+        }
+
         await prisma.user.update({
             where: { id: user.id },
             data: {
@@ -69,6 +78,9 @@ export async function PATCH(req: Request) {
                 plainPassword: null,
             },
         })
+        if (mustChange) {
+            await prisma.userAccess.update({ where: { userId: user.id }, data: { mustChangePassword: false } }).catch(() => { /* table missing */ })
+        }
 
         return NextResponse.json({ success: true })
     } catch (e) {

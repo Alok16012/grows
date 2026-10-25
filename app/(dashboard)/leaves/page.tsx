@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -192,7 +192,7 @@ function ApplyLeaveModal({ open, onClose, onSaved, canManage, policy }: {
         // Only managers pick an employee. Everyone else applies for themselves,
         // and /api/employees would 403 for them anyway.
         if (canManage) {
-            fetchAllEmployees({ status: "ACTIVE" }).then(r => setEmployees(r.employees as any)).catch(() => {})
+            fetchEmployeeOptions({ status: "ACTIVE" }).then(r => setEmployees(r.employees as any)).catch(() => {})
         }
         setForm({ employeeId: "", type: activeTypes[0]?.code || "CL", startDate: "", endDate: "", halfDay: false, reason: "" })
         setPreview(null); setConfirmWarnings(null); setEmpSearch(""); setBalances([])

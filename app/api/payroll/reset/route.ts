@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { auditLater, requestMeta } from "@/lib/access"
 
 // DELETE /api/payroll/reset?month=4&year=2026&siteId=xxx&action=delete|unlock
 export async function DELETE(req: Request) {
@@ -18,9 +19,24 @@ export async function DELETE(req: Request) {
         const month  = parseInt(searchParams.get("month")  ?? "")
         const year   = parseInt(searchParams.get("year")   ?? "")
         const siteId = searchParams.get("siteId") ?? null
-        const action = searchParams.get("action") ?? "delete" // "delete" | "unlock"
+        // No default: a bare DELETE used to mean "delete", which wiped drafts by accident.
+        const action = searchParams.get("action") // "delete" | "unlock"
+        if (action !== "delete" && action !== "unlock") {
+            return new NextResponse("action must be delete or unlock", { status: 400 })
+        }
 
         if (!month || !year) return new NextResponse("month and year required", { status: 400 })
+        // Reopening a locked month is its own switch; Payroll Executive can
+        // lock but only Admin reopens (Role & User Manager spec).
+        if (action === "unlock" && !checkAccess(session, [], "payroll.unlock")) {
+            return new NextResponse("Forbidden — only roles with Unlock a locked month can reopen it", { status: 403 })
+        }
+
+        // Deleting every site's drafts for the month must be asked for by name;
+        // without a siteId and without confirm=MONTH nothing is removed.
+        if (action === "delete" && !siteId && searchParams.get("confirm") !== "MONTH") {
+            return new NextResponse("Deleting the whole month's drafts needs confirm=MONTH (or pass a siteId)", { status: 400 })
+        }
 
         const run = await prisma.payrollRun.findUnique({ where: { month_year: { month, year } } })
         if (!run) return new NextResponse("Payroll run not found", { status: 404 })
@@ -43,6 +59,12 @@ export async function DELETE(req: Request) {
                     data: { status: "DRAFT", lockedAt: null },
                 }),
             ])
+            auditLater({
+                actorId: session.user.id, actorName: session.user.name ?? null, action: "payroll.unlock", targetType: "Payroll",
+                targetId: `${year}-${String(month).padStart(2, "0")}`, targetName: `${month}/${year}`,
+                summary: `${month}/${year} reopened · ${unlocked.count} rows${siteId ? " · 1 site" : " · all sites"}`,
+                after: { month, year, rows: unlocked.count, siteId }, ...requestMeta(req),
+            })
             return NextResponse.json({ success: true, action: "unlocked", unlocked: unlocked.count })
         }
 

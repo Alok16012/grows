@@ -7,55 +7,27 @@ import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import { COMPANY } from "@/lib/company"
 import {
-    LayoutDashboard,
-    Users,
-    HardHat,
+    Home,
     ClipboardCheck,
-    FileText,
-    X,
-    Folder,
-    BarChart2,
-    Users2,
-    ChevronRight,
-    TrendingUp,
-    Target,
-    UserCheck,
-    MapPin,
+    UserPlus,
+    UsersRound,
     Clock,
-    CalendarOff,
     Wallet,
-    ClipboardList,
-    Star,
-    LogOut,
+    TrendingUp,
     Package,
-    Headphones,
-    CreditCard,
-    GraduationCap,
-    Navigation,
-    Shield,
-    Briefcase,
-    ShieldCheck,
-    FolderOpen,
-    Files,
-    IndianRupee,
-    TableProperties,
-    BadgeCheck,
-    BookOpen,
-    Settings2,
-    Layers,
-    CheckSquare, ListChecks,
-    UserCog,
     Megaphone,
-    KeyRound,
-    SendHorizontal,
-    FileSignature,
+    BarChart3,
+    SlidersHorizontal,
+    CircleUser,
+    HardHat,
+    ChevronDown,
+    Search,
+    X,
 } from "lucide-react"
 
 type NavLink = {
     name: string
     href: string
-    icon: any
-    roles: string[]
     permission?: string
     // Visible if the user holds ANY of these permissions (OR). Use when a
     // page is reachable through more than one permission.
@@ -64,12 +36,14 @@ type NavLink = {
     // "Pending approvals" total (inspections + leaves + expenses).
     badge?: BadgeKey
     // Self-service entries ("My Attendance") duplicate a management page for
-    // anyone who already has it ("Attendance Management" → same route). Hide
-    // the self-service copy for ADMIN and for holders of this permission.
+    // anyone who already has it ("Attendance" → same route). Hide the
+    // self-service copy for ADMIN and for holders of this permission.
     hideIfHas?: string
     // Employee-only entries (My Onboarding, My Learning…) that ADMIN never needs.
     hideForAdmin?: boolean
-    subLinks?: { name: string; href: string }[]
+    // Small heading printed above this link inside its category (Settings
+    // splits into Organisation / Users & Access / HR & Payroll Rules).
+    group?: string
     // Extra path prefixes that should mark this link active (e.g. the
     // Inspection entry stays highlighted across the whole stepper flow).
     matchPrefixes?: string[]
@@ -84,10 +58,15 @@ const BADGES: Record<BadgeKey, { url: string; title: string }> = {
     expenses: { url: "/api/expenses?status=SUBMITTED&count=true", title: "Expense claims awaiting approval" },
 }
 
-type NavSection = {
+type NavCategory = {
     title: string
+    icon: any
     links: NavLink[]
 }
+
+// Which categories the user folded away. Per-browser convenience only.
+const COLLAPSED_KEY = "grows.sidebar.collapsed"
+const COLLAPSED_EVENT = "grows:sidebar-collapsed"
 
 export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const pathname = usePathname()
@@ -95,6 +74,11 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const role = session?.user?.role as string | undefined
 
     const [badgeCounts, setBadgeCounts] = useState<Record<BadgeKey, number>>({ approvals: 0, leaves: 0, expenses: 0 })
+    const [collapsed, setCollapsed] = useState<string[]>([])
+    // The category holding the current page, held open without touching the
+    // saved folds (so visiting a page doesn't undo the user's choice).
+    const [revealed, setRevealed] = useState<string | null>(null)
+    const [query, setQuery] = useState("")
 
     // Pending-count polls — pause when tab is hidden to avoid wasted fetches.
     // Interval bumped 60s → 5min; the badges aren't time-critical. Each badge
@@ -124,6 +108,23 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         return () => { stopped = true; clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); ac.abort() }
     }, [role])
 
+    // The layout mounts two sidebars (desktop rail + mobile drawer); an event
+    // keeps their folds in step so neither saves over the other.
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "[]")
+            if (Array.isArray(saved)) setCollapsed(saved.filter((s): s is string => typeof s === "string"))
+        } catch { /* storage blocked — start expanded */ }
+        const onChange = (e: Event) => setCollapsed((e as CustomEvent<string[]>).detail)
+        window.addEventListener(COLLAPSED_EVENT, onChange)
+        return () => window.removeEventListener(COLLAPSED_EVENT, onChange)
+    }, [])
+
+    const saveCollapsed = (next: string[]) => {
+        try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+        window.dispatchEvent(new CustomEvent(COLLAPSED_EVENT, { detail: next }))
+    }
+
     const userPermissions: string[] = (session?.user as any)?.permissions || []
 
     // ADMIN → admin home; everyone else → the universal permission-driven
@@ -131,149 +132,204 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     const dashboardHref = role === "ADMIN" ? "/admin" : "/dashboard"
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NAVIGATION CONFIG
-    // Three views:
-    //   • Admin / Manager  — full operational access
-    //   • INSPECTION_BOY   — inspector self-service
+    // NAVIGATION CONFIG — category → module, per the admin navigation review.
+    // The management categories come first; "My Work" / "My Account" hold the
+    // self-service copies an employee without management rights sees.
     // ─────────────────────────────────────────────────────────────────────────
-    const navigation: NavSection[] = [
-
-        // ── MAIN ──────────────────────────────────────────────────────────────
+    const navigation: NavCategory[] = [
         {
-            title: "MAIN",
+            title: "Home",
+            icon: Home,
             links: [
-                {
-                    name: "Dashboard",
-                    href: dashboardHref,
-                    icon: LayoutDashboard,
-                    roles: ["ADMIN", "MANAGER", "HR_MANAGER", "INSPECTION_BOY"],
-                },
+                { name: "Dashboard", href: dashboardHref },
+                { name: "Approvals Inbox", href: "/approvals", permission: "approvals.view", badge: "approvals" },
             ],
         },
-
-        // ── INSPECTIONS (core product) ────────────────────────────────────────
         {
-            title: "INSPECTIONS",
+            title: "Inspections & Projects",
+            icon: ClipboardCheck,
             links: [
                 // Opens the guided stepper flow (starts on the HR Sites list =
                 // /sites); Sites, Projects and Field Tasks are reached via its rail.
-                { name: "Inspection", href: "/sites", icon: ClipboardCheck, roles: ["ADMIN", "MANAGER"], permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/field"] },
-                // Reviewing inspection reports belongs with inspections, not with
-                // general "operations" — its badge counts inspection reports only.
-                { name: "Approvals",   href: "/approvals",   icon: CheckSquare, roles: ["ADMIN", "MANAGER"], permission: "approvals.view", badge: "approvals" },
-                { name: "Assignments", href: "/assignments", icon: ListChecks,  roles: ["ADMIN", "MANAGER"], permission: "assignments.view" },
+                { name: "Projects & Sites", href: "/sites", permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/field"] },
+                { name: "Inspection Assignments", href: "/assignments", permission: "assignments.view" },
             ],
         },
-
-        // ── WORKFORCE (employee management) ──────────────────────────────────
         {
-            title: "WORKFORCE",
+            title: "Talent Acquisition",
+            icon: UserPlus,
             links: [
-                { name: "Employees",        href: "/employees",           icon: UserCheck,    roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
-                { name: "Employee Master",  href: "/employees/master",    icon: TableProperties, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "employees.view" },
-                { name: "Recruitment",      href: "/recruitment",         icon: Target,       roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "recruitment.view" },
-                { name: "Jobs",             href: "/jobs",                icon: Briefcase,    roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "jobs.view" },
-                { name: "Onboarding",       href: "/onboarding",          icon: ClipboardList, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permissionAny: ["onboarding.view", "recruitment.view"] },
-                { name: "Policies",         href: "/policies",            icon: FileSignature, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permissionAny: ["policy.view", "policy.manage", "policy.report"] },
-                { name: "Documents",        href: "/employees/documents", icon: Files,        roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permission: "documents.view" },
-                { name: "Send Documents",   href: "/documents/send",      icon: SendHorizontal, roles: ["ADMIN", "MANAGER", "HR_MANAGER"], permissionAny: ["documents.send", "documents.view"] },
+                { name: "Job Openings", href: "/jobs", permission: "jobs.view" },
+                { name: "Candidates & Recruitment", href: "/recruitment", permission: "recruitment.view" },
+                { name: "Onboarding", href: "/onboarding", permissionAny: ["onboarding.view", "recruitment.view"] },
             ],
         },
-
-        // ── HR OPERATIONS ─────────────────────────────────────────────────────
         {
-            title: "HR OPERATIONS",
+            title: "Employee Management",
+            icon: UsersRound,
             links: [
-                // "Management" in the label tells these apart from the employee's
-                // own My Attendance / My Leaves, which point at the same routes.
-                { name: "Attendance Management", href: "/attendance", icon: Clock,       roles: ["ADMIN", "MANAGER"], permission: "attendance.view" },
-                { name: "Leave Management",      href: "/leaves",     icon: CalendarOff, roles: ["ADMIN", "MANAGER"], permission: "leaves.view", badge: "leaves" },
-                { name: "Payroll",               href: "/payroll",    icon: Wallet,      roles: ["ADMIN", "MANAGER"], permission: "payroll.view" },
-                // Requesters / approvers / store staff work here without assets.view.
-                { name: "Assets",                href: "/assets",     icon: Package,     roles: ["ADMIN", "MANAGER"], permissionAny: ["assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue"] },
-                { name: "Expenses",              href: "/expenses",   icon: CreditCard,  roles: ["ADMIN", "MANAGER"], permission: "expenses.view", badge: "expenses" },
+                { name: "Employee Directory", href: "/employees", permission: "employees.view" },
+                { name: "Employee Master Data", href: "/employees/master", permission: "employees.view" },
+                { name: "Employee Documents", href: "/employees/documents", permission: "documents.view" },
+                { name: "Letters & Documents", href: "/documents/send", permissionAny: ["documents.send", "documents.view"] },
+                { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.manage", "policy.report"] },
                 // An employee leaving is an HR process (clearance, F&F), not growth.
-                { name: "Exit Management",       href: "/exit",       icon: LogOut,      roles: ["ADMIN", "MANAGER"], permission: "exit.view" },
+                { name: "Exit Management", href: "/exit", permission: "exit.view" },
             ],
         },
-
-        // ── TALENT & GROWTH ───────────────────────────────────────────────────
         {
-            title: "TALENT & GROWTH",
+            title: "Time & Attendance",
+            icon: Clock,
             links: [
-                { name: "Performance",      href: "/performance", icon: Star,          roles: ["ADMIN", "MANAGER"], permission: "performance.view", matchPrefixes: ["/performance/hub"] },
-                { name: "Training (LMS)",   href: "/lms",         icon: GraduationCap, roles: ["ADMIN", "MANAGER"], permission: "lms.manage" },
+                { name: "Attendance", href: "/attendance", permission: "attendance.view" },
+                { name: "Leave", href: "/leaves", permission: "leaves.view", badge: "leaves" },
             ],
         },
-
-        // ── OPERATIONS (company-wide communication + support) ────────────────
         {
-            title: "OPERATIONS",
+            title: "Payroll & Expenses",
+            icon: Wallet,
             links: [
-                { name: "Announcements",       href: "/announcements", icon: Megaphone,  roles: ["ADMIN", "MANAGER"], permission: "announcements.view" },
-                { name: "Helpdesk Management", href: "/helpdesk",      icon: Headphones, roles: ["ADMIN", "MANAGER"], permission: "helpdesk.view" },
+                { name: "Payroll", href: "/payroll", permission: "payroll.view" },
+                { name: "Expense Claims", href: "/expenses", permission: "expenses.view", badge: "expenses" },
             ],
         },
-
-        // ── ANALYTICS ─────────────────────────────────────────────────────────
         {
-            title: "ANALYTICS",
+            title: "Performance & Learning",
+            icon: TrendingUp,
             links: [
-                { name: "Analytics",    href: "/manager/analytics", icon: TrendingUp, roles: ["ADMIN", "MANAGER"], permission: "reports.view" },
-                { name: "Reports",      href: "/reports",           icon: BarChart2,  roles: ["ADMIN", "MANAGER"], permission: "reports.view" },
+                { name: "Performance", href: "/performance", permission: "performance.view", matchPrefixes: ["/performance/hub"] },
+                { name: "Training (LMS)", href: "/lms", permission: "lms.manage" },
             ],
         },
-
-        // ── CONFIGURATION (ADMIN only) ────────────────────────────────────────
         {
-            title: "CONFIGURATION",
+            title: "Assets",
+            icon: Package,
             links: [
-                { name: "Departments",      href: "/departments",   icon: Briefcase,  roles: ["ADMIN"] },
-                { name: "System Users",     href: "/admin/users",   icon: Users,      roles: ["ADMIN"] },
-                { name: "Employee Logins",  href: "/admin/employee-logins", icon: KeyRound, roles: ["ADMIN"], permission: "users.manage" },
-                { name: "Roles",            href: "/admin/roles",   icon: Shield,     roles: ["ADMIN"] },
-                { name: "Wage Rule Book",   href: "/admin/rule-book", icon: BookOpen, roles: ["ADMIN"] },
-                { name: "Doc Types",        href: "/documents/types", icon: FolderOpen, roles: ["ADMIN"], permission: "documents.view" },
+                // Requesters / approvers / store staff work here without assets.view.
+                { name: "Asset Register", href: "/assets", permissionAny: ["assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue"] },
             ],
         },
-
-        // ── INSPECTION BOY — MY WORK ──────────────────────────────────────────
         {
-            title: "MY WORK",
+            title: "Communication & Support",
+            icon: Megaphone,
+            links: [
+                { name: "Announcements", href: "/announcements", permission: "announcements.view" },
+                { name: "Helpdesk", href: "/helpdesk", permission: "helpdesk.view" },
+            ],
+        },
+        {
+            title: "Reports & Analytics",
+            icon: BarChart3,
+            links: [
+                { name: "Analytics", href: "/manager/analytics", permission: "reports.view" },
+                { name: "Reports", href: "/reports", permission: "reports.view" },
+            ],
+        },
+        {
+            // Admin, or the matching permission (users.view, roles.view,
+            // audit.view, users.manage, documents.view).
+            title: "Settings",
+            icon: SlidersHorizontal,
+            links: [
+                { name: "Departments", href: "/departments", group: "Organisation" },
+                { name: "System Users", href: "/admin/users", permissionAny: ["users.view", "users.manage"], group: "Users & Access" },
+                { name: "Employee Logins", href: "/admin/employee-logins", permission: "users.manage", group: "Users & Access" },
+                { name: "Roles", href: "/admin/roles", permission: "roles.view", group: "Users & Access" },
+                { name: "Audit log", href: "/admin/audit", permission: "audit.view", group: "Users & Access" },
+                { name: "Wage Rule Book", href: "/admin/rule-book", group: "HR & Payroll Rules" },
+                { name: "Document Types", href: "/documents/types", permission: "documents.view", group: "HR & Payroll Rules" },
+            ],
+        },
+        {
+            title: "My Work",
+            icon: HardHat,
             links: [
                 // Points at the Inspector Workspace (/inspection) — the only screen
                 // that can open and submit an inspection form. /assignments is the
                 // manager-side wizard and just bounces inspectors back here.
-                { name: "My Assignments",   href: "/inspection",     icon: HardHat,      roles: ["INSPECTION_BOY"], permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"], hideForAdmin: true },
-                { name: "My Attendance",    href: "/attendance",     icon: Clock,        roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "attendance.view" },
-                { name: "My Leaves",        href: "/leaves",         icon: CalendarOff,  roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "leaves.view" },
-                { name: "My Performance",   href: "/performance",    icon: Star,         roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "performance.view", matchPrefixes: ["/performance/hub"] },
+                { name: "My Assignments", href: "/inspection", permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"], hideForAdmin: true },
+                { name: "My Attendance", href: "/attendance", permission: "self.view", hideIfHas: "attendance.view" },
+                { name: "My Leaves", href: "/leaves", permission: "self.view", hideIfHas: "leaves.view" },
+                { name: "My Performance", href: "/performance", permission: "self.view", hideIfHas: "performance.view", matchPrefixes: ["/performance/hub"] },
+                { name: "My Learning", href: "/lms/learn", permission: "lms.view", hideForAdmin: true },
             ],
         },
-
-        // ── INSPECTION BOY — LEARNING ─────────────────────────────────────────
         {
-            title: "LEARNING",
+            title: "My Account",
+            icon: CircleUser,
             links: [
-                { name: "My Learning",      href: "/lms/learn",      icon: GraduationCap, roles: ["INSPECTION_BOY"], permission: "lms.view", hideForAdmin: true },
+                { name: "My Profile", href: "/profile", permission: "self.view" },
+                { name: "My Onboarding", href: "/self-onboarding", permission: "self.view", hideForAdmin: true },
+                { name: "Announcements", href: "/announcements", permission: "self.view", hideIfHas: "announcements.view" },
+                { name: "Help & Support", href: "/helpdesk", permission: "self.view", hideIfHas: "helpdesk.view" },
             ],
         },
-
-        // ── INSPECTION BOY — MY ACCOUNT ───────────────────────────────────────
-        {
-            title: "MY ACCOUNT",
-            links: [
-                { name: "My Profile",       href: "/profile",        icon: UserCheck,    roles: ["INSPECTION_BOY"], permission: "self.view" },
-                { name: "My Onboarding",    href: "/self-onboarding", icon: BadgeCheck,  roles: ["INSPECTION_BOY"], permission: "self.view", hideForAdmin: true },
-                { name: "Announcements",    href: "/announcements",  icon: Megaphone,    roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "announcements.view" },
-                { name: "Help & Support",   href: "/helpdesk",       icon: Headphones,   roles: ["INSPECTION_BOY"], permission: "self.view", hideIfHas: "helpdesk.view" },
-            ],
-        },
-
     ]
-    // Every link across all sections — a prefix match yields to any more specific
-    // link anywhere in the menu (e.g. Dashboard "/admin" vs Roles "/admin/roles").
-    const allLinks = navigation.flatMap(s => s.links)
+
+    const currentRole = String(role || "")
+    const canSee = (link: NavLink) => {
+        // Self-service copies of a page this user already manages.
+        if (link.hideIfHas && (currentRole === "ADMIN" || userPermissions.includes(link.hideIfHas))) return false
+        if (currentRole === "ADMIN") return !link.hideForAdmin
+
+        // The universal dashboard is available to every user who
+        // holds at least one permission — it self-adapts to them.
+        if (link.href === "/dashboard") return userPermissions.length > 0
+
+        // Everything is gated PURELY by custom-role permissions.
+        // No hardcoded role (MANAGER/HR_MANAGER/INSPECTION_BOY/CLIENT)
+        // grants anything — Admin → Roles is the single source of truth.
+        // A link without a permission is ADMIN-only.
+        if (link.permissionAny) return link.permissionAny.some(p => userPermissions.includes(p))
+        if (link.permission) return userPermissions.includes(link.permission)
+        return false
+    }
+
+    // Every link across all categories — a prefix match yields to any more
+    // specific link anywhere in the menu (e.g. Dashboard "/admin" vs Roles "/admin/roles").
+    const allLinks = navigation.flatMap(c => c.links)
+    const isActive = (link: NavLink) => {
+        const prefixMatch = link.href !== "/" && pathname.startsWith(link.href + "/")
+            && !allLinks.some(other => other.href.length > link.href.length
+                && (pathname === other.href || pathname.startsWith(other.href + "/")))
+        return pathname === link.href
+            || prefixMatch
+            || (link.matchPrefixes?.some(p => pathname === p || pathname.startsWith(p + "/")) ?? false)
+    }
+
+    const visible = navigation
+        .map(c => ({ ...c, links: c.links.filter(canSee) }))
+        .filter(c => c.links.length > 0)
+
+    const q = query.trim().toLowerCase()
+    const shown = q
+        ? visible
+            .map(c => c.title.toLowerCase().includes(q) ? c : { ...c, links: c.links.filter(l => l.name.toLowerCase().includes(q)) })
+            .filter(c => c.links.length > 0)
+        : visible
+    const moduleCount = visible.reduce((n, c) => n + c.links.length, 0)
+
+    // The category holding the current page opens itself on arrival, even if
+    // it was folded away earlier.
+    const activeCategory = visible.find(c => c.links.some(isActive))?.title ?? null
+    useEffect(() => { setRevealed(activeCategory) }, [pathname, activeCategory])
+
+    // A search shows every match; otherwise honour the fold.
+    const isOpen = (title: string) => !!q || title === revealed || !collapsed.includes(title)
+    const allCollapsed = visible.length > 0 && visible.every(c => !isOpen(c.title))
+    const toggle = (title: string) => {
+        if (isOpen(title)) {
+            if (title === revealed) setRevealed(null)
+            if (!collapsed.includes(title)) saveCollapsed([...collapsed, title])
+        } else {
+            saveCollapsed(collapsed.filter(t => t !== title))
+        }
+    }
+    const toggleAll = () => {
+        if (allCollapsed) return saveCollapsed([])
+        setRevealed(null)
+        saveCollapsed(visible.map(c => c.title))
+    }
 
     return (
         // Deep-blue rail with white type — the dashboard's "Operations overview"
@@ -281,7 +337,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
         <div className="flex h-full w-full flex-col overflow-hidden rounded-r-[24px] md:rounded-none text-white bg-[linear-gradient(180deg,#0b2a8f_0%,#0a1f6e_55%,#081a5c_100%)]">
 
             {/* ── Logo / Header ── */}
-            <div className="flex h-[80px] items-center justify-between px-5 shrink-0">
+            <div className="flex h-[72px] items-center justify-between px-5 shrink-0">
                 <Link href="/" className="flex items-center gap-2.5">
                     <div className="h-10 w-10 rounded-[12px] flex items-center justify-center text-white bg-[#1f6bff] ring-1 ring-white/25 shadow-[0_6px_16px_rgba(11,92,255,0.45)]">
                         <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -298,124 +354,109 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                 )}
             </div>
 
+            {/* ── Find a module ── */}
+            <div className="px-3 shrink-0">
+                <div className="relative">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/55 pointer-events-none" aria-hidden="true" />
+                    <input
+                        type="search"
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Escape") setQuery("") }}
+                        placeholder="Find a module..."
+                        aria-label="Find a module"
+                        className="w-full h-10 rounded-[10px] bg-white/10 pl-9 pr-3 text-[13px] text-white placeholder:text-white/55 outline-none ring-1 ring-white/10 focus:ring-white/35 [&::-webkit-search-cancel-button]:invert"
+                    />
+                </div>
+                {visible.length > 1 && (
+                    <div className="flex items-center justify-between px-1 pt-3 pb-1">
+                        <p className="text-[10.5px] font-semibold tracking-[1px] uppercase text-white/55">
+                            {visible.length} {visible.length === 1 ? "category" : "categories"} · {moduleCount} {moduleCount === 1 ? "module" : "modules"}
+                        </p>
+                        {!q && (
+                            <button
+                                type="button"
+                                onClick={toggleAll}
+                                className="shrink-0 whitespace-nowrap text-[11px] font-medium text-white/70 hover:text-white"
+                            >
+                                {allCollapsed ? "Expand all" : "Collapse all"}
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {/* ── Navigation ── */}
-            <div className="flex-1 overflow-y-auto pt-2 px-3 scrollbar-thin [scrollbar-color:rgba(255,255,255,0.2)_transparent]">
-                {navigation.map((section) => {
-                    const currentRole = String(role || "")
-
-                    const filteredLinks = section.links.filter(link => {
-                        // Self-service copies of a page this user already manages.
-                        if (link.hideIfHas && (currentRole === "ADMIN" || userPermissions.includes(link.hideIfHas))) return false
-                        if (currentRole === "ADMIN") return !link.hideForAdmin
-
-                        // The universal dashboard is available to every user who
-                        // holds at least one permission — it self-adapts to them.
-                        if (link.name === "Dashboard") return userPermissions.length > 0
-
-                        // Everything is gated PURELY by custom-role permissions now.
-                        // No hardcoded role (MANAGER/HR_MANAGER/INSPECTION_BOY/CLIENT)
-                        // grants anything — Admin → Roles is the single source of truth.
-                        if (link.permissionAny) return link.permissionAny.some(p => userPermissions.includes(p))
-                        if (link.permission) return userPermissions.includes(link.permission)
-
-                        // No universal exceptions: a link without a permission is
-                        // hidden for everyone except ADMIN. Access is governed
-                        // solely by custom-role permissions.
-                        return false
-                    })
-
-                    if (filteredLinks.length === 0) return null
+            <nav aria-label="Main" className="flex-1 overflow-y-auto pt-1 pb-3 px-3 scrollbar-thin [scrollbar-color:rgba(255,255,255,0.2)_transparent]">
+                {q && shown.length === 0 && (
+                    <p className="px-3 py-6 text-[13px] text-white/60">No module matches “{query.trim()}”.</p>
+                )}
+                {shown.map((category) => {
+                    const Icon = category.icon
+                    const open = isOpen(category.title)
+                    const holdsActive = category.links.some(isActive)
+                    const listId = `nav-${category.title.replace(/\W+/g, "-").toLowerCase()}`
 
                     return (
-                        <div key={section.title} className="mb-5">
-                            <h3 className="px-3 mb-2 text-[11px] font-semibold text-white/60 tracking-[1.2px] uppercase">
-                                {section.title}
-                            </h3>
-                            <nav className="space-y-0.5">
-                                {filteredLinks.map((link) => {
-                                    const Icon = link.icon
-                                    const hasSubLinks = !!link.subLinks && link.subLinks.length > 0
-                                    const isSubActive  = hasSubLinks && link.subLinks!.some(sub => pathname === sub.href || (sub.href !== "/" && pathname.startsWith(sub.href)))
-                                    // A prefix match yields to a more specific link (e.g.
-                                    // "/employees" stays inactive on "/employees/master").
-                                    const prefixMatch = link.href !== "/" && pathname.startsWith(link.href + "/")
-                                        && !allLinks.some(other => other.href.length > link.href.length
-                                            && (pathname === other.href || pathname.startsWith(other.href + "/")))
-                                    const isItemActive = pathname === link.href
-                                        || prefixMatch
-                                        || (link.matchPrefixes?.some(p => pathname === p || pathname.startsWith(p + "/")) ?? false)
-                                    const showSub = isSubActive || isItemActive
+                        <div key={category.title} className="mb-1">
+                            <button
+                                type="button"
+                                onClick={() => toggle(category.title)}
+                                aria-expanded={open}
+                                aria-controls={listId}
+                                disabled={!!q}
+                                className={cn(
+                                    "w-full flex items-center gap-2.5 rounded-[10px] px-3 py-2 min-h-[40px] text-left text-[13.5px] font-semibold transition-colors",
+                                    holdsActive ? "text-white" : "text-white/85 hover:text-white",
+                                    !q && "hover:bg-white/10"
+                                )}
+                            >
+                                <Icon size={17} className={holdsActive ? "text-white" : "text-white/70"} aria-hidden="true" />
+                                <span className="flex-1 leading-tight">{category.title}</span>
+                                <span className="text-[11px] font-medium text-white/50 tabular-nums">{category.links.length}</span>
+                                <ChevronDown size={14} className={cn("text-white/55 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
+                            </button>
 
-                                    return (
-                                        <div key={`${link.href}-${link.name}`} className="flex flex-col gap-0.5">
-                                            <Link
-                                                href={link.href}
-                                                onClick={onMobileClose}
-                                                aria-current={isItemActive && !hasSubLinks ? "page" : undefined}
-                                                className={cn(
-                                                    "flex items-center justify-between rounded-[12px] px-3.5 py-2 min-h-[46px] text-[14px] font-medium transition-all group",
-                                                    isItemActive && !hasSubLinks
-                                                        ? "bg-[#1f6bff] text-white font-semibold shadow-[0_8px_20px_rgba(11,92,255,0.45)]"
-                                                        : (isSubActive || isItemActive)
-                                                            ? "bg-white/10 text-white"
-                                                            : "text-white/85 hover:bg-white/10 hover:text-white"
+                            {open && (
+                                <div id={listId} className="flex flex-col gap-0.5 pb-2 pt-0.5">
+                                    {category.links.map((link, i) => {
+                                        const active = isActive(link)
+                                        const heading = link.group && link.group !== category.links[i - 1]?.group ? link.group : null
+                                        return (
+                                            <div key={`${link.href}-${link.name}`}>
+                                                {heading && (
+                                                    <p className="pl-[42px] pr-3 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-[#8fb6ff]">{heading}</p>
                                                 )}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <Icon
-                                                        size={18}
-                                                        className={cn(
-                                                            isItemActive || isSubActive
-                                                                ? "text-white"
-                                                                : "text-white/75 group-hover:text-white"
-                                                        )}
-                                                        aria-hidden="true"
-                                                    />
-                                                    {link.name}
-                                                </div>
-                                                {hasSubLinks && (
-                                                    <ChevronRight size={13} className={cn("transition-transform text-white/60", showSub && "rotate-90")} />
-                                                )}
-                                                {link.badge && badgeCounts[link.badge] > 0 && (
-                                                    <div title={BADGES[link.badge].title} className="h-[17px] min-w-[17px] rounded-full bg-[var(--red)] text-white text-[10px] font-bold flex items-center justify-center px-1">
-                                                        {badgeCounts[link.badge]}
-                                                    </div>
-                                                )}
-                                            </Link>
-
-                                            {hasSubLinks && showSub && (
-                                                <div className="flex flex-col gap-0.5 ml-4 border-l border-white/15 pl-3 my-0.5">
-                                                    {link.subLinks!.map(sub => {
-                                                        const isSubLinkActive = pathname === sub.href
-                                                        return (
-                                                            <Link
-                                                                key={sub.href}
-                                                                href={sub.href}
-                                                                onClick={onMobileClose}
-                                                                className={cn(
-                                                                    "rounded-[6px] px-[10px] py-[6px] text-[12px] transition-all",
-                                                                    isSubLinkActive
-                                                                        ? "bg-white/15 text-white font-medium"
-                                                                        : "text-white/65 hover:text-white hover:bg-white/10"
-                                                                )}
-                                                            >
-                                                                {sub.name}
-                                                            </Link>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
-                                })}
-                            </nav>
+                                                <Link
+                                                    href={link.href}
+                                                    onClick={onMobileClose}
+                                                    aria-current={active ? "page" : undefined}
+                                                    className={cn(
+                                                        "flex items-center justify-between gap-2 rounded-[10px] pl-[42px] pr-3 py-2 min-h-[38px] text-[13.5px] transition-all",
+                                                        active
+                                                            ? "bg-[#1f6bff] text-white font-semibold shadow-[0_8px_20px_rgba(11,92,255,0.45)]"
+                                                            : "text-white/80 hover:bg-white/10 hover:text-white"
+                                                    )}
+                                                >
+                                                    <span className="leading-tight">{link.name}</span>
+                                                    {link.badge && badgeCounts[link.badge] > 0 && (
+                                                        <span title={BADGES[link.badge].title} className="h-[18px] min-w-[18px] shrink-0 rounded-full bg-[var(--red)] text-white text-[10px] font-bold flex items-center justify-center px-1.5">
+                                                            {badgeCounts[link.badge]}
+                                                        </span>
+                                                    )}
+                                                </Link>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )
                 })}
-            </div>
+            </nav>
 
             {/* ── Footer ── */}
-            <div className="px-5 py-4 mt-auto">
+            <div className="px-5 py-4 mt-auto shrink-0">
                 <div className="flex flex-col gap-1">
                     <p className="text-[11px] text-white/60">{`v${COMPANY.version} · ${COMPANY.name}`}</p>
                     <Link href="/terms" className="text-[11px] text-white/60 hover:text-white">Terms & Conditions</Link>

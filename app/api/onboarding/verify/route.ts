@@ -33,7 +33,8 @@ export async function POST(req: Request) {
                     data: {
                         isKycVerified: status === "VERIFIED",
                         kycRejectionNote: status === "REJECTED" ? rejectionReason : null
-                    }
+                    },
+                    select: { id: true, isKycVerified: true, kycRejectionNote: true, status: true },
                 })
                 return NextResponse.json({ success: true, employee: updatedKyc })
 

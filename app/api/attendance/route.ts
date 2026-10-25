@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { dayWindow, monthWindow } from "@/lib/attendance-policy"
 import { isValidAttendanceStatus, parseIstDateTime } from "@/lib/attendance-today"
+import { accessFrom, employeeScope, withEmployeeScope } from "@/lib/access"
 
 export async function GET(req: Request) {
     try {
@@ -73,7 +74,8 @@ export async function GET(req: Request) {
         }
 
         const attendances = await prisma.attendance.findMany({
-            where,
+            // Only people in the caller's data scope (their sites, their team…).
+            where: withEmployeeScope(where, await employeeScope(accessFrom(session))),
             include: {
                 employee: {
                     select: {

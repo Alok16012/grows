@@ -6,12 +6,20 @@ import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { ensureProjectSchema } from "@/lib/prisma"
 import { checkAccess } from "@/lib/permissions"
+import { accessFrom } from "@/lib/access"
 import { unassignableUserWhere, UNASSIGNABLE_USER_SELECT, unassignableMessage } from "@/lib/employee-filter"
 
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        // Every caller is a management screen (projects, assignments, reports,
+        // bulk import). A self-service login must not list every client
+        // project with its site and team.
+        const PROJECT_READERS = ["projects.view", "projects.manage", "assignments.view", "assignments.manage", "approvals.view", "reports.view"]
+        if (!PROJECT_READERS.some(p => checkAccess(session, [], p))) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
 
         const { searchParams } = new URL(req.url)
         const siteId = searchParams.get("siteId")
@@ -23,6 +31,9 @@ export async function GET(req: Request) {
 
         const where: Record<string, unknown> = {}
         if (siteId) where.siteId = siteId
+        // An Assigned-sites role lists only projects on its sites.
+        const access = accessFrom(session)
+        if (access.scope === "ASSIGNED_SITES") where.AND = [{ siteId: { in: access.siteIds } }]
         if (!includeDrafts) where.status = { not: "DRAFT" }
 
         await ensureProjectSchema()

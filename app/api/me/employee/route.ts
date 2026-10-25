@@ -3,12 +3,20 @@ import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { pickPhotoUrl } from "@/lib/employee-photo"
 import {
+
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
     validateIFSC, validateBankAccount, validatePincode, validateUAN,
     validateESIC, validatePFNumber, validateDateOfBirth,
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
+
+// Own record, minus the joining token and HR's internal remarks.
+const SELF_HIDDEN = ["onboardingToken", "notes", "createdBy", "backgroundCheckRemark", "medicalRemark"]
+function ownRecord<T extends Record<string, unknown> | null>(e: T): T {
+    if (!e) return e
+    return Object.fromEntries(Object.entries(e).filter(([k]) => !SELF_HIDDEN.includes(k))) as T
+}
 
 // Fields employee can self-edit (safe list — no salary, no role, no IDs)
 const EDITABLE_FIELDS = [
@@ -62,7 +70,7 @@ export async function GET(req: Request) {
         if (url) (emp as any).photo = url
     }
 
-    return NextResponse.json(emp)
+    return NextResponse.json(ownRecord(emp))
 }
 
 export async function PATCH(req: Request) {
@@ -124,5 +132,5 @@ export async function PATCH(req: Request) {
         })
     }
 
-    return NextResponse.json(updated)
+    return NextResponse.json(ownRecord(updated))
 }

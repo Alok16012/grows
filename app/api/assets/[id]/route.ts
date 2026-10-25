@@ -68,6 +68,10 @@ export async function PUT(
         if (serialNo !== undefined) updateData.serialNo = serialNo || null
         if (condition !== undefined) updateData.condition = condition
         if (purchaseDate !== undefined) updateData.purchaseDate = purchaseDate ? new Date(purchaseDate) : null
+        if (purchaseCost !== undefined && purchaseCost !== null && purchaseCost !== "") {
+            const c = Number(purchaseCost)
+            if (!Number.isFinite(c) || c < 0) return new NextResponse("purchaseCost must be 0 or more", { status: 400 })
+        }
         if (purchaseCost !== undefined) updateData.purchaseCost = purchaseCost ? parseFloat(purchaseCost) : null
         if (vendor !== undefined) updateData.vendor = vendor || null
         if (location !== undefined) updateData.location = location || null

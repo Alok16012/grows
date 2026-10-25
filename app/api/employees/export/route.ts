@@ -5,6 +5,7 @@ import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
 import * as XLSX from "xlsx"
 import { buildEmployeeWhere, employeeFiltersFromParams, type EmployeeFilters } from "@/lib/employee-filter"
+import { type Access, accessFrom, has, employeeScope, auditLater, requestMeta } from "@/lib/access"
 
 // Ordered column list for the employee export. "Basic Salary" is only included
 // for users allowed to see salary. The Employees page column picker mirrors this.
@@ -64,11 +65,23 @@ function buildRow(e: EmpWithRels): Record<string, string | number> {
     }
 }
 
+// Columns that need a sensitive-field switch (lib/permission-catalogue).
+const LOCKED_COLUMNS: Record<string, string> = {
+    "Basic Salary": "employees.viewSalary",
+    "Name As Per Aadhar": "employees.viewKyc", "UAN": "employees.viewKyc", "PF No": "employees.viewKyc",
+    "ESI No": "employees.viewKyc", "Aadhar No": "employees.viewKyc", "PAN No": "employees.viewKyc",
+    "Labour Card No": "employees.viewKyc",
+    "Bank Name": "employees.viewBank", "Bank Branch": "employees.viewBank", "Bank IFSC": "employees.viewBank",
+    "Bank Account": "employees.viewBank",
+    "Father's Name": "employees.viewPersonal", "Blood Group": "employees.viewPersonal", "City": "employees.viewPersonal",
+}
+
 async function buildWorkbook(opts: {
     ids?: string[]
     cols?: string[]
     filters?: EmployeeFilters
     canViewSalary: boolean
+    access: Access
 }) {
     // Ticked rows win: an explicit selection is the most specific thing the
     // user can say. Otherwise export exactly what the current filters select —
@@ -76,9 +89,13 @@ async function buildWorkbook(opts: {
     // search. This used to be `{}`, so choosing the Active tab and hitting
     // Export still returned every employee in the table, RESIGNED rows and
     // PENDING-xxxx onboarding records included.
-    const where = opts.ids && opts.ids.length
+    const picked = opts.ids && opts.ids.length
         ? { id: { in: opts.ids } }
         : buildEmployeeWhere(opts.filters ?? {})
+    // Same data scope as the list: an export never holds more people than the
+    // caller can open on screen.
+    const scope = await employeeScope(opts.access)
+    const where = scope ? { AND: [picked, scope] } : picked
     const employees = await loadEmployees(where)
 
     // Resolve which columns to include, honouring the order + salary permission.
@@ -86,6 +103,8 @@ async function buildWorkbook(opts: {
         ? EXPORT_COLUMNS.filter(c => opts.cols!.includes(c))
         : [...EXPORT_COLUMNS]
     if (!opts.canViewSalary) columns = columns.filter(c => c !== "Basic Salary")
+    columns = columns.filter(c => !LOCKED_COLUMNS[c] || has(opts.access, LOCKED_COLUMNS[c]))
+    const sensitive = columns.filter(c => LOCKED_COLUMNS[c])
 
     const rows = employees.map(e => {
         const full = buildRow(e)
@@ -97,7 +116,17 @@ async function buildWorkbook(opts: {
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(rows, { header: columns })
     XLSX.utils.book_append_sheet(wb, ws, "Employees")
-    return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer
+    return { buf: XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer, rows: rows.length, sensitive }
+}
+
+// An export carrying salary, KYC, bank or personal columns is an audit event.
+function auditExport(req: Request, access: Access, result: { rows: number; sensitive: string[] }, filters: unknown) {
+    if (!result.sensitive.length) return
+    auditLater({
+        actorId: access.userId, actorName: access.name, action: "export.sensitive", targetType: "Export",
+        targetName: "Employees", summary: `Employees export with ${result.sensitive.slice(0, 3).join(", ")}${result.sensitive.length > 3 ? "…" : ""} · ${result.rows} rows`,
+        after: { module: "employees", columns: result.sensitive, rows: result.rows, filters }, ...requestMeta(req),
+    })
 }
 
 function fileResponse(buf: Buffer) {
@@ -120,9 +149,13 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     const canViewSalary = checkAccess(session, [], "employees.viewSalary")
+    const access = accessFrom(session!)
+    if (!has(access, "employees.export")) return NextResponse.json({ error: "Forbidden — missing employees.export" }, { status: 403 })
     const { searchParams } = new URL(req.url)
-    const buf = await buildWorkbook({ filters: employeeFiltersFromParams(searchParams), canViewSalary })
-    return fileResponse(buf)
+    const filters = employeeFiltersFromParams(searchParams)
+    const result = await buildWorkbook({ filters, canViewSalary, access })
+    auditExport(req, access, result, filters)
+    return fileResponse(result.buf)
 }
 
 // POST — export a chosen set of rows (ids) and/or columns (cols).
@@ -145,6 +178,9 @@ export async function POST(req: Request) {
         search:         typeof body?.search         === "string" ? body.search         : null,
         employmentType: typeof body?.employmentType === "string" ? body.employmentType : null,
     }
-    const buf = await buildWorkbook({ ids, cols, filters, canViewSalary })
-    return fileResponse(buf)
+    const access = accessFrom(session!)
+    if (!has(access, "employees.export")) return NextResponse.json({ error: "Forbidden — missing employees.export" }, { status: 403 })
+    const result = await buildWorkbook({ ids, cols, filters, canViewSalary, access })
+    auditExport(req, access, result, ids ? { ids: ids.length } : filters)
+    return fileResponse(result.buf)
 }

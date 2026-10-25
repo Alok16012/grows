@@ -222,3 +222,8 @@ DO $$ BEGIN
     ALTER TABLE "PerfReportActivity" ADD CONSTRAINT "PerfReportActivity_reportId_fkey"
         FOREIGN KEY ("reportId") REFERENCES "PerfReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- The app connects as "postgres". When this script is run by another role (e.g.
+-- grows_local via DIRECT_URL) that role owns the tables, so grant the app full
+-- access — otherwise it can read but every write fails with "permission denied".
+GRANT ALL ON TABLE "PerfAssignment", "PerfRegister", "PerfRegisterEntry", "PerfReport", "PerfReportActivity", "PerfReportValue", "PerfTemplate", "PerfTemplateKpi", "PerfTemplateKra" TO postgres;

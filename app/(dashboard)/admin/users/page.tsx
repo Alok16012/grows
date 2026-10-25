@@ -1,695 +1,419 @@
 "use client"
+// Users — who can sign in, with which role, for which sites. Search, filters
+// and paging run on the server (50 a page). Create and edit open the user form
+// (/admin/users/new, /admin/users/[id]).
 
-import { useState, useEffect } from "react"
-import { roleLabel } from "@/lib/role-label"
-import { useSession } from "next-auth/react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import {
-    Users,
-    UserPlus,
-    Search,
-    Building2,
-    Shield,
-    Mail,
-    Loader2,
-    Plus,
-    X,
-    MoreVertical,
-    Lock,
-    UserX,
-    UserCheck,
-    Filter,
-    KeyRound,
-    UserCog,
-    Pencil,
-    Trash2
-} from "lucide-react"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { format } from "date-fns"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
-import BulkImportInspectors from "@/components/BulkImportInspectors"
+import { Plus, Search, Pencil, RotateCcw, History, ChevronLeft, ChevronRight, Users as UsersIcon, Loader2, Ban, CheckCircle2 } from "lucide-react"
+import { liveSearchParam } from "@/lib/utils"
+import {
+    api, ApiError, Loading, Empty, Modal, Label, inputCls, filterCls, btnPrimary, btnGhost, btnDanger,
+    PageHead, Stat, RoleChip, StatusChip, NotSetUp, NoAccess, SitePicker, maskMobile, ago, initials, fmtDate,
+} from "../_access/ui"
 
-export default function UserManagementPage() {
-    const [users, setUsers] = useState<any[]>([])
-    const [customRoles, setCustomRoles] = useState<any[]>([])
+type Row = {
+    id: string; name: string; employeeCode: string | null; employeeId: string | null; designation: string | null
+    mobile: string | null; email: string | null
+    role: { id: string; name: string; color: string; system: boolean; off?: boolean } | null
+    scope: string | null; sites: { id: string; name: string }[]
+    isActive: boolean; loginMethod: string; lastLoginAt: string | null; createdAt: string
+}
+type Payload = {
+    users: Row[]; total: number; page: number; pageSize: number; totalPages: number
+    stats: { total: number; active: number; disabled: number; neverLoggedIn: number | null; withoutRole: number }
+    accessReady: boolean
+    can: { create: boolean; edit: boolean; resetLogin: boolean; deactivate: boolean; export: boolean; admin: boolean }
+}
+type RoleOpt = { id: string; name: string; color: string; isActive: boolean }
+type SiteOpt = { id: string; name: string }
+type Filters = { q: string; role: string; site: string; status: string; login: string; lastLogin: string }
+type Bulk = { action: "role" | "sites" | "disable" | "enable"; roleId: string; siteIds: string[]; typed: string }
+
+const CONFIRM_ABOVE = 20
+
+export default function UsersPage() {
+    const router = useRouter()
+    const [filters, setFilters] = useState<Filters>({ q: "", role: "", site: "", status: "", login: "", lastLogin: "" })
+    const [qInput, setQInput] = useState("")
+    const [page, setPage] = useState(1)
+    const [data, setData] = useState<Payload | null>(null)
     const [loading, setLoading] = useState(true)
-    const [search, setSearch] = useState("")
-    const [roleFilter, setRoleFilter] = useState("ALL")
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-    const [isResetModalOpen, setIsResetModalOpen] = useState(false)
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
-    const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-    const [newPassword, setNewPassword] = useState("")
-    const [submitting, setSubmitting] = useState(false)
-    const [editData, setEditData] = useState({ name: "", email: "", role: "", customRoleId: "" })
-    const [cleaning, setCleaning] = useState(false)
+    const [forbidden, setForbidden] = useState(false)
+    const [roles, setRoles] = useState<RoleOpt[]>([])
+    const [sites, setSites] = useState<SiteOpt[]>([])
+    const [selected, setSelected] = useState<Set<string>>(new Set())
+    const [bulk, setBulk] = useState<Bulk | null>(null)
+    const [busy, setBusy] = useState(false)
+    const [confirmRow, setConfirmRow] = useState<{ kind: "reset" | "disable" | "enable"; row: Row } | null>(null)
+    const [danger, setDanger] = useState<"reset" | "cleanup" | null>(null)
+    const latest = useRef(0)
 
-    const [managers, setManagers] = useState<any[]>([])
-
-
-    // Form state
-    const [formData, setFormData] = useState({
-        name: "",
-        email: "",
-        password: "",
-        role: "ADMIN",
-        customRoleId: ""
-    })
-
-    const fetchData = async () => {
-        setLoading(true)
-        try {
-            const [usersRes, managersRes, rolesRes] = await Promise.all([
-                fetch("/api/admin/users"),
-                fetch("/api/users?role=MANAGER"),
-                fetch("/api/admin/roles")
-            ])
-            const [usersData, managersData, rolesData] = await Promise.all([
-                usersRes.json(),
-                managersRes.json(),
-                rolesRes.ok ? rolesRes.json() : []
-            ])
-            setUsers(Array.isArray(usersData) ? usersData : [])
-            setManagers(Array.isArray(managersData) ? managersData : [])
-            setCustomRoles(Array.isArray(rolesData) ? rolesData : [])
-        } catch (error) {
-            console.error("Failed to fetch admin data", error)
-            toast.error("Failed to load user data")
-        } finally {
-            setLoading(false)
-        }
-    }
-
+    // ?role=<id> (e.g. from a role card) pre-filters the list.
     useEffect(() => {
-        fetchData()
+        const role = liveSearchParam("role")
+        if (role) setFilters(f => ({ ...f, role }))
     }, [])
 
-    // Remove orphan logins — User rows with no linked Employee record.
-    // Dry-run preview first, then a confirm before anything is deleted.
-    const handleCleanupOrphans = async () => {
-        setCleaning(true)
+    useEffect(() => {
+        api<RoleOpt[]>("/api/admin/roles").then(setRoles).catch(() => {})
+        fetch("/api/sites?isActive=true").then(r => (r.ok ? r.json() : [])).then(d => {
+            const list = Array.isArray(d) ? d : (d.sites ?? [])
+            setSites(list.map((s: SiteOpt) => ({ id: s.id, name: s.name })))
+        }).catch(() => {})
+    }, [])
+
+    // Debounced search box.
+    useEffect(() => {
+        const t = setTimeout(() => { setFilters(f => (f.q === qInput.trim() ? f : { ...f, q: qInput.trim() })); setPage(1) }, 300)
+        return () => clearTimeout(t)
+    }, [qInput])
+
+    const query = useMemo(() => {
+        const p = new URLSearchParams({ page: String(page) })
+        for (const [k, v] of Object.entries(filters)) if (v) p.set(k, v)
+        return p.toString()
+    }, [filters, page])
+
+    const load = useCallback(async () => {
+        const id = ++latest.current
+        setLoading(true)
         try {
-            const res = await fetch("/api/admin/cleanup-users")
-            if (!res.ok) throw new Error("Preview failed")
-            const preview = await res.json()
-
-            if (preview.deletable === 0) {
-                toast.info(
-                    preview.blocked > 0
-                        ? `No deletable logins. ${preview.blocked} non-employee login(s) were skipped because they have linked records.`
-                        : "All logins are linked to employees — nothing to clean."
-                )
-                return
-            }
-
-            const ok = confirm(
-                `${preview.orphanLogins} login(s) have no employee record.\n\n` +
-                `• ${preview.deletable} will be DELETED permanently\n` +
-                `• ${preview.blocked} will be skipped (linked to inspections/projects/other records)\n\n` +
-                `Admin, Client and demo accounts are never touched. Continue?`
-            )
-            if (!ok) return
-
-            const delRes = await fetch("/api/admin/cleanup-users", { method: "POST" })
-            if (!delRes.ok) throw new Error("Cleanup failed")
-            const result = await delRes.json()
-            toast.success(
-                `Deleted ${result.deleted} login(s). ` +
-                (result.skipped > 0 ? `Skipped ${result.skipped} with linked records. ` : "") +
-                (result.failed > 0 ? `${result.failed} failed. ` : "") +
-                `Total users now: ${result.totalUsers}.`
-            )
-            fetchData()
-        } catch {
-            toast.error("Could not clean up users. Please try again.")
+            const d = await api<Payload>(`/api/admin/users?${query}`)
+            if (id === latest.current) setData(d)
+        } catch (e) {
+            if (e instanceof ApiError && e.status === 403) setForbidden(true)
+            else toast.error(e instanceof Error ? e.message : "Couldn't load users")
         } finally {
-            setCleaning(false)
+            if (id === latest.current) setLoading(false)
         }
-    }
+    }, [query])
+    useEffect(() => { load() }, [load])
 
-    const handleCreateUser = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setSubmitting(true)
-        try {
-            const res = await fetch("/api/admin/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData)
-            })
+    const setFilter = (k: keyof Filters, v: string) => { setFilters(f => ({ ...f, [k]: v })); setPage(1); setSelected(new Set()) }
 
-            if (!res.ok) {
-                const data = await res.json()
-                throw new Error(data.message || data.error || "Failed to create user")
-            }
-
-            await res.json()
-            toast.success("User created successfully")
-
-            setIsCreateModalOpen(false)
-            setFormData({ name: "", email: "", password: "", role: "ADMIN", customRoleId: "" })
-            fetchData()
-        } catch (error: any) {
-            toast.error(error.message)
-        } finally {
-            setSubmitting(false)
-        }
-    }
-
-    const toggleUserStatus = async (id: string, currentStatus: boolean) => {
-        try {
-            const res = await fetch(`/api/admin/users/${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isActive: !currentStatus })
-            })
-
-            if (!res.ok) throw new Error("Failed to update status")
-
-            setUsers(users.map(u => u.id === id ? { ...u, isActive: !currentStatus } : u))
-            toast.success(`User ${!currentStatus ? 'enabled' : 'disabled'} successfully`)
-        } catch (error) {
-            toast.error("Failed to update user status")
-        }
-    }
-
-    const handlePasswordReset = async () => {
-        if (!selectedUserId || !newPassword) return
-        setSubmitting(true)
-        try {
-            const res = await fetch(`/api/admin/users/${selectedUserId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password: newPassword })
-            })
-
-            if (!res.ok) throw new Error("Failed to reset password")
-
-            toast.success("Password reset successfully")
-            setIsResetModalOpen(false)
-            setNewPassword("")
-        } catch (error) {
-            toast.error("Failed to reset password")
-        } finally {
-            setSubmitting(false)
-        }
-    }
-
-    const handleEditUser = async () => {
-        if (!selectedUserId) return
-        setSubmitting(true)
-        try {
-            const res = await fetch(`/api/admin/users/${selectedUserId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(editData)
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || "Failed to update user")
-            setUsers(users.map(u => u.id === selectedUserId ? { ...u, ...data } : u))
-            toast.success("User updated successfully")
-            setIsEditModalOpen(false)
-        } catch (error: any) {
-            toast.error(error.message)
-        } finally {
-            setSubmitting(false)
-        }
-    }
-
-    const handleDeleteUser = async () => {
-        if (!selectedUserId) return
-        setSubmitting(true)
-        try {
-            const res = await fetch(`/api/admin/users/${selectedUserId}`, { method: "DELETE" })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || "Failed to delete user")
-            setUsers(users.filter(u => u.id !== selectedUserId))
-            toast.success("User deleted successfully")
-            setIsDeleteConfirmOpen(false)
-            setSelectedUserId(null)
-        } catch (error: any) {
-            toast.error(error.message)
-        } finally {
-            setSubmitting(false)
-        }
-    }
-
-    const filteredUsers = users.filter(u => {
-        const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
-            u.email.toLowerCase().includes(search.toLowerCase())
-        const matchesRole = roleFilter === "ALL"
-            || (roleFilter === "ADMIN" ? u.role === "ADMIN" : u.customRole?.id === roleFilter)
-        return matchesSearch && matchesRole
+    const rows = data?.users ?? []
+    const allOnPage = rows.length > 0 && rows.every(r => selected.has(r.id))
+    const toggleAll = () => setSelected(s => {
+        const n = new Set(s)
+        if (allOnPage) rows.forEach(r => n.delete(r.id)); else rows.forEach(r => n.add(r.id))
+        return n
     })
+    const toggle = (id: string) => setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
-    const getRoleBadge = (user: any) => {
-        if (user.customRole?.name) {
-            const color = user.customRole.color || "#6366f1"
-            return (
-                <Badge style={{ background: `${color}15`, color, borderColor: `${color}40` }}
-                    className="px-2 py-0 h-5 text-[10px] font-bold border">
-                    {user.customRole.name.toUpperCase()}
-                </Badge>
-            )
-        }
-        switch (user.role) {
-            case "ADMIN": return <Badge className="bg-red-50 text-red-600 hover:bg-red-50 border-red-100 px-2 py-0 h-5 text-[10px] font-bold">ADMIN</Badge>
-            case "MANAGER": return <Badge className="bg-blue-50 text-blue-600 hover:bg-blue-50 border-blue-100 px-2 py-0 h-5 text-[10px] font-bold">MANAGER</Badge>
-            case "HR_MANAGER": return <Badge className="bg-teal-50 text-teal-600 hover:bg-teal-50 border-teal-100 px-2 py-0 h-5 text-[10px] font-bold">HR MANAGER</Badge>
-            case "INSPECTION_BOY": return <Badge className="bg-amber-50 text-amber-600 hover:bg-amber-50 border-amber-100 px-2 py-0 h-5 text-[10px] font-bold">INSPECTOR</Badge>
-            case "CLIENT": return <Badge className="bg-purple-50 text-purple-600 hover:bg-purple-50 border-purple-100 px-2 py-0 h-5 text-[10px] font-bold">CLIENT</Badge>
-            default: return <Badge variant="outline" className="px-2 py-0 h-5 text-[10px] font-bold">{user.role}</Badge>
+    async function runBulk() {
+        if (!bulk) return
+        const ids = Array.from(selected)
+        if (ids.length > CONFIRM_ABOVE && bulk.typed.trim() !== String(ids.length)) { toast.error(`Type ${ids.length} to confirm`); return }
+        if (bulk.action === "role" && !bulk.roleId) { toast.error("Choose a role"); return }
+        setBusy(true)
+        try {
+            await api("/api/admin/users/bulk", { body: { action: bulk.action, userIds: ids, roleId: bulk.roleId, siteIds: bulk.siteIds, confirm: ids.length > CONFIRM_ABOVE ? Number(bulk.typed) : undefined } })
+            toast.success(`${ids.length} user${ids.length === 1 ? "" : "s"} updated`)
+            setBulk(null); setSelected(new Set()); load()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Bulk change failed")
+        } finally {
+            setBusy(false)
         }
     }
 
-    if (loading && users.length === 0) {
-        return (
-            <div className="p-6 lg:p-7 flex h-[70vh] items-center justify-center">
-                <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-10 w-10 animate-spin text-[var(--accent)]" />
-                    <p className="text-[13px] font-medium text-[var(--text2)]">Loading users...</p>
-                </div>
-            </div>
-        )
+    async function runRow() {
+        if (!confirmRow) return
+        setBusy(true)
+        try {
+            if (confirmRow.kind === "reset") {
+                await api(`/api/admin/users/${confirmRow.row.id}/reset-login`, { body: {} })
+                toast.success(`${confirmRow.row.name} will sign in with an OTP next time`)
+            } else {
+                await api(`/api/admin/users/${confirmRow.row.id}`, { method: "PATCH", body: { isActive: confirmRow.kind === "enable" } })
+                toast.success(`${confirmRow.row.name} ${confirmRow.kind === "enable" ? "enabled" : "disabled"}`)
+            }
+            setConfirmRow(null); load()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Couldn't update the user")
+        } finally {
+            setBusy(false)
+        }
     }
+
+    if (forbidden) return <div className="p-4 lg:p-0"><NoAccess what="Users" perm="users.view" /></div>
+
+    const can = data?.can
+    const exportHref = `/api/admin/users?${query}&format=csv`
 
     return (
-        <div className="p-4 sm:p-6 lg:p-7">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
-                <div className="min-w-0">
-                    <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">System Users</h1>
-                    <p className="text-[13px] text-[var(--text2)] mt-[3px]">Manage access, roles, and account security</p>
-                    {users.length > 0 && (() => {
-                        // Why total users > employee logins: admins, client-portal
-                        // accounts and legacy logins (kept for work history) also
-                        // live in this table. Categories are mutually exclusive.
-                        const emp = users.filter(u => u.employeeProfile).length
-                        const rest = users.filter(u => !u.employeeProfile)
-                        const admins = rest.filter(u => u.role === "ADMIN").length
-                        const clients = rest.filter(u => u.role === "CLIENT").length
-                        const legacy = rest.length - admins - clients
-                        return (
-                            <p className="text-[12px] text-[var(--text3)] mt-[6px]">
-                                <span className="font-semibold text-[var(--text)]">{users.length}</span> total
-                                {" · "}<span className="text-[var(--accent-text)] font-medium">{emp} employee logins</span>
-                                {clients > 0 && <>{" · "}{clients} client portal</>}
-                                {admins > 0 && <>{" · "}{admins} admin</>}
-                                {legacy > 0 && <>{" · "}{legacy} legacy (kept — have work history)</>}
-                            </p>
-                        )
-                    })()}
-                </div>
-                <div className="page-actions">
-                    <button
-                        onClick={handleCleanupOrphans}
-                        disabled={cleaning}
-                        className="px-3.5 h-9 bg-white border border-[var(--border)] text-[#b91c1c] rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[#fef2f2] hover:border-[#fca5a5] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                        title="Delete logins that have no linked employee record"
-                    >
-                        {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />}
-                        Clean Non-Employee Logins
-                    </button>
-                    <BulkImportInspectors onImportComplete={fetchData} />
-                    <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="px-3.5 h-9 bg-[var(--accent)] text-white rounded-[9px] text-[13px] font-medium flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-colors"
-                    >
-                        <UserPlus className="h-4 w-4" />
-                        Create User
-                    </button>
-                </div>
-            </div>
+        <div className="flex flex-col gap-5 p-4 lg:p-0">
+            <PageHead
+                title="Users"
+                sub="Who can sign in, with which role, for which sites."
+                right={<>
+                    {can?.export && <a href={exportHref} className={btnGhost}>Export</a>}
+                    {can?.create && <Link href="/admin/users/new" className={btnPrimary}><Plus size={15} /> Create user</Link>}
+                </>}
+            />
 
-            {/* Filters Bar */}
-            <div className="filter-bar sm:gap-3 mb-4">
-                <div className="filter-search relative flex-1 sm:min-w-[180px] sm:max-w-[400px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
-                    <input
-                        placeholder="Search name or email..."
-                        className="w-full pl-9 pr-4 py-[9px] bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] transition-shadow"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                    />
-                </div>
-                <select
-                    value={roleFilter}
-                    onChange={e => setRoleFilter(e.target.value)}
-                    className="w-full sm:w-[160px] px-3.5 py-[9px] bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text2)] focus:outline-none focus:border-[var(--accent)] appearance-none cursor-pointer"
-                >
-                    <option value="ALL">All Roles</option>
-                    <option value="ADMIN">Admin</option>
-                    {customRoles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                </select>
-            </div>
+            {data && !data.accessReady && <NotSetUp />}
 
-            <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
-                {filteredUsers.map((user, idx) => (
-                    <div
-                        key={user.id}
-                        className={`flex items-center gap-3.5 p-5 hover:bg-[var(--surface2)] transition-colors ${
-                            idx !== filteredUsers.length - 1 ? "border-b border-[var(--border)]" : ""
-                        } ${!user.isActive ? "opacity-60" : ""}`}
-                    >
-                        <div className={`h-9 w-9 rounded-full flex items-center justify-center text-[14px] font-semibold shrink-0 ${
-                            user.role === "ADMIN" ? "bg-[var(--accent-light)] text-[var(--accent-text)]" :
-                            user.role === "MANAGER" ? "bg-[#eff6ff] text-[#1d4ed8]" :
-                            user.role === "INSPECTION_BOY" ? "bg-[#fef3c7] text-[#92400e]" :
-                            "bg-[var(--surface2)] text-[var(--text2)]"
-                        }`}
-                        style={user.customRole?.color ? { background: `${user.customRole.color}20`, color: user.customRole.color } : {}}>
-                            {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[13.5px] font-medium text-[var(--text)]">{user.name}</span>
-                                {user.customRole?.name ? (
-                                    <span className="px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium"
-                                        style={{ background: `${user.customRole.color || "#6366f1"}20`, color: user.customRole.color || "#6366f1" }}>
-                                        {user.customRole.name}
-                                    </span>
-                                ) : (
-                                    <span className={`px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium ${
-                                        user.role === "INSPECTION_BOY" ? "bg-[#fef3c7] text-[#92400e]" :
-                                        user.role === "MANAGER" ? "bg-[#eff6ff] text-[#1d4ed8]" :
-                                        user.role === "ADMIN" ? "bg-[var(--accent-light)] text-[var(--accent-text)]" :
-                                        "bg-[var(--surface2)] text-[var(--text2)]"
-                                    }`}>
-                                        {roleLabel(user.role, { designation: user.employeeProfile?.designation })}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                                <Mail className="h-3 w-3 text-[var(--text3)]" />
-                                <span className="text-[12.5px] text-[var(--text2)]">{user.email}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 ml-auto">
-                            <button
-                                onClick={() => {
-                                    setSelectedUserId(user.id)
-                                    setIsResetModalOpen(true)
-                                }}
-                                className="h-[30px] w-[30px] rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center justify-center hover:bg-[#fef3c7] hover:text-[#d97706] hover:border-[#fcd34d] transition-colors"
-                                title="Reset Password"
-                            >
-                                <KeyRound className="h-[14px] w-[14px] text-[var(--text2)]" />
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setSelectedUserId(user.id)
-                                    setEditData({ name: user.name, email: user.email, role: user.role, customRoleId: user.customRole?.id || "" })
-                                    setIsEditModalOpen(true)
-                                }}
-                                className="h-[30px] w-[30px] rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center justify-center hover:bg-[#eff6ff] hover:text-[#1d4ed8] hover:border-[#93c5fd] transition-colors"
-                                title="Edit User"
-                            >
-                                <Pencil className="h-[14px] w-[14px] text-[var(--text2)]" />
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setSelectedUserId(user.id)
-                                    setIsDeleteConfirmOpen(true)
-                                }}
-                                className="h-[30px] w-[30px] rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center justify-center hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors"
-                                title="Delete User"
-                            >
-                                <Trash2 className="h-[14px] w-[14px] text-[var(--text2)]" />
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Create New User Modal */}
-            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-                <DialogContent className="bg-white rounded-2xl w-[480px] max-w-[95vw] p-7 shadow-[0_20px_60px_rgba(0,0,0,0.12)] border-none [&>button]:hidden">
-                    <div className="flex items-start justify-between mb-5">
-                        <div>
-                            <h2 className="text-[17px] font-semibold text-[var(--text)]">Create New User</h2>
-                            <p className="text-[13px] text-[var(--text2)] mt-1 leading-relaxed">Provision a new account with specific role-based permissions.</p>
-                        </div>
-                        <button
-                            onClick={() => setIsCreateModalOpen(false)}
-                            className="h-[30px] w-[30px] rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] text-[16px] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
-                        >
-                            ✕
-                        </button>
-                    </div>
-
-                    <div className="border-t border-[var(--border)] mb-5" />
-
-                    <form onSubmit={handleCreateUser} className="space-y-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Full Name</label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.name}
-                                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="John Doe"
-                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Email Address</label>
-                            <input
-                                type="email"
-                                required
-                                value={formData.email}
-                                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                placeholder="john@example.com"
-                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Initial Password</label>
-                            <input
-                                type="password"
-                                required
-                                value={formData.password}
-                                onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                placeholder="••••••••"
-                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Role</label>
-                            <select
-                                value={formData.role === "ADMIN" ? "ADMIN" : formData.customRoleId}
-                                onChange={e => {
-                                    const v = e.target.value
-                                    if (v === "ADMIN") setFormData({ ...formData, role: "ADMIN", customRoleId: "" })
-                                    else setFormData({ ...formData, role: "MANAGER", customRoleId: v })
-                                }}
-                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
-                            >
-                                <option value="ADMIN">Administrator</option>
-                                {customRoles.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="border-t border-[var(--border)] mt-1 pt-4">
-                            <button
-                                type="submit"
-                                disabled={submitting}
-                                className="w-full py-3 bg-[var(--accent)] text-white border-none rounded-[9px] text-[13.5px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                {submitting ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        Creating...
-                                    </span>
-                                ) : (
-                                    "Complete Provisioning"
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Password Reset Modal */}
-            <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
-                <DialogContent className="bg-white rounded-2xl w-[400px] max-w-[95vw] p-7 shadow-[0_20px_60px_rgba(0,0,0,0.12)] border-none [&>button]:hidden">
-                    <div className="flex items-start justify-between mb-5">
-                        <div>
-                            <h2 className="text-[17px] font-semibold text-[var(--text)]">Reset Account Password</h2>
-                            <p className="text-[13px] text-[var(--text2)] mt-1">Create a new secure password for this user.</p>
-                        </div>
-                        <button
-                            onClick={() => setIsResetModalOpen(false)}
-                            className="h-[30px] w-[30px] rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] text-[16px] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
-                        >
-                            ✕
-                        </button>
-                    </div>
-
-                    <div className="border-t border-[var(--border)] mb-5" />
-
-                    <div className="space-y-1.5 mb-4">
-                        <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">New Password</label>
-                        <input
-                            type="password"
-                            value={newPassword}
-                            onChange={e => setNewPassword(e.target.value)}
-                            placeholder="Enter strong password"
-                            className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
-                        />
-                    </div>
-
-                    <div className="flex gap-2.5">
-                        <button
-                            onClick={() => setIsResetModalOpen(false)}
-                            className="flex-1 py-2.5 bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handlePasswordReset}
-                            disabled={submitting || !newPassword}
-                            className="flex-1 py-2.5 bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                            {submitting ? (
-                                <span className="flex items-center justify-center gap-2">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Resetting...
-                                </span>
-                            ) : (
-                                "Confirm Reset"
-                            )}
-                        </button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Edit User Modal */}
-            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                <DialogContent className="bg-white rounded-2xl w-[440px] max-w-[95vw] p-7 shadow-[0_20px_60px_rgba(0,0,0,0.12)] border-none [&>button]:hidden">
-                    <div className="flex items-start justify-between mb-5">
-                        <div>
-                            <h2 className="text-[17px] font-semibold text-[var(--text)]">Edit User</h2>
-                            <p className="text-[13px] text-[var(--text2)] mt-1">Update user details and role.</p>
-                        </div>
-                        <button
-                            onClick={() => setIsEditModalOpen(false)}
-                            className="h-[30px] w-[30px] rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] cursor-pointer hover:bg-[#fef2f2] hover:text-[#dc2626] hover:border-[#fca5a5] transition-colors flex items-center justify-center"
-                        >✕</button>
-                    </div>
-                    <div className="border-t border-[var(--border)] mb-5" />
-                    <div className="space-y-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Full Name</label>
-                            <input
-                                type="text"
-                                value={editData.name}
-                                onChange={e => setEditData({ ...editData, name: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Email Address</label>
-                            <input
-                                type="email"
-                                value={editData.email}
-                                onChange={e => setEditData({ ...editData, email: e.target.value })}
-                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)]"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[11.5px] font-medium text-[var(--text2)] uppercase tracking-wide">Role</label>
-                            <select
-                                value={editData.role === "ADMIN" ? "ADMIN" : editData.customRoleId}
-                                onChange={e => {
-                                    const v = e.target.value
-                                    if (v === "ADMIN") setEditData({ ...editData, role: "ADMIN", customRoleId: "" })
-                                    else setEditData({ ...editData, role: "MANAGER", customRoleId: v })
-                                }}
-                                className="w-full px-3.5 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:bg-white focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] appearance-none cursor-pointer"
-                            >
-                                <option value="" disabled>— Select role —</option>
-                                <option value="ADMIN">Administrator</option>
-                                {customRoles.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="border-t border-[var(--border)] pt-4">
-                            <button
-                                onClick={handleEditUser}
-                                disabled={submitting}
-                                className="w-full py-3 bg-[var(--accent)] text-white border-none rounded-[9px] text-[13.5px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
-                            </button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Delete Confirmation Modal */}
-            {isDeleteConfirmOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-[16px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[360px] max-w-[90vw]">
-                        <div className="w-[44px] h-[44px] bg-[#fef2f2] rounded-full flex items-center justify-center mb-4">
-                            <Trash2 className="h-5 w-5 text-[#dc2626]" />
-                        </div>
-                        <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1">Delete User?</h3>
-                        <p className="text-[13px] text-[var(--text2)] mb-5 leading-relaxed">
-                            This will permanently remove the user account. This action cannot be undone.
-                        </p>
-                        <div className="flex gap-2.5">
-                            <button
-                                onClick={() => { setIsDeleteConfirmOpen(false); setSelectedUserId(null) }}
-                                className="flex-1 py-2.5 bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors"
-                            >Cancel</button>
-                            <button
-                                onClick={handleDeleteUser}
-                                disabled={submitting}
-                                className="flex-1 py-2.5 bg-[#dc2626] text-white rounded-[9px] text-[13px] font-medium hover:bg-[#b91c1c] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                            >
-                                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                                Delete User
-                            </button>
-                        </div>
-                    </div>
+            {data && (
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                    <Stat label="Total" value={data.stats.total} onClick={() => setFilters({ q: "", role: "", site: "", status: "", login: "", lastLogin: "" })} />
+                    <Stat label="Active" value={data.stats.active} onClick={() => setFilter("status", "active")} active={filters.status === "active"} />
+                    <Stat label="Disabled" value={data.stats.disabled} onClick={() => setFilter("status", "disabled")} active={filters.status === "disabled"} />
+                    <Stat label="Never logged in" value={data.stats.neverLoggedIn} onClick={data.accessReady ? () => setFilter("lastLogin", "never") : undefined} active={filters.lastLogin === "never"} />
+                    <Stat label="Without a role" value={data.stats.withoutRole} warn={data.stats.withoutRole > 0} onClick={() => setFilter("role", "none")} active={filters.role === "none"} />
                 </div>
             )}
 
-            {filteredUsers.length === 0 && (
-                <div className="bg-white border border-[var(--border)] rounded-[14px] py-[60px] text-center">
-                    <div className="w-[56px] h-[56px] bg-[var(--accent-light)] rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Users className="h-6 w-6 text-[var(--accent)]" />
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-2 p-3 border-b border-[var(--border)]">
+                    <div className="relative flex-1 min-w-[220px]">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
+                        <input value={qInput} onChange={e => setQInput(e.target.value)} placeholder="Name, EMP ID or mobile" aria-label="Search users"
+                            className={inputCls("pl-9 h-10 bg-[var(--surface)]")} />
                     </div>
-                    <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1.5">No users found</h3>
-                    <p className="text-[13px] text-[var(--text2)] max-w-[250px] mx-auto leading-relaxed">
-                        No system users found matching your criteria.
+                    <select aria-label="Role" className={`${filterCls} h-10`} value={filters.role} onChange={e => setFilter("role", e.target.value)}>
+                        <option value="">All roles</option>
+                        <option value="admin">Admin</option>
+                        {roles.map(r => <option key={r.id} value={r.id}>{r.name}{r.isActive ? "" : " (off)"}</option>)}
+                        <option value="none">No role</option>
+                    </select>
+                    <select aria-label="Site" className={`${filterCls} h-10 max-w-[180px]`} value={filters.site} onChange={e => setFilter("site", e.target.value)}>
+                        <option value="">All sites</option>
+                        {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    <select aria-label="Sign-in method" className={`${filterCls} h-10`} value={filters.login} onChange={e => setFilter("login", e.target.value)} disabled={!data?.accessReady}>
+                        <option value="">Any sign-in</option>
+                        <option value="OTP">OTP and MPIN</option>
+                        <option value="PASSWORD">Password</option>
+                    </select>
+                    <select aria-label="Last login" className={`${filterCls} h-10`} value={filters.lastLogin} onChange={e => setFilter("lastLogin", e.target.value)} disabled={!data?.accessReady}>
+                        <option value="">Any last login</option>
+                        <option value="never">Never logged in</option>
+                        <option value="30d">Not in 30 days</option>
+                    </select>
+                    <div className="flex rounded-xl bg-[var(--surface2)] p-1" role="group" aria-label="Status">
+                        {[["", "All"], ["active", "Active"], ["disabled", "Disabled"]].map(([v, l]) => (
+                            <button key={v} type="button" onClick={() => setFilter("status", v)} aria-pressed={filters.status === v}
+                                className={`px-3 py-1.5 rounded-lg text-[12.5px] ${filters.status === v ? "bg-[var(--surface)] shadow-sm font-semibold text-[var(--text)]" : "text-[var(--text2)]"}`}>{l}</button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Bulk bar */}
+                {selected.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-[var(--accent-light)] border-b border-[var(--border)] text-[13px]">
+                        <b className="text-[var(--accent-text)]">{selected.size} selected</b>
+                        {can?.edit && <button className={btnGhost} onClick={() => setBulk({ action: "role", roleId: "", siteIds: [], typed: "" })}>Change role</button>}
+                        {can?.edit && <button className={btnGhost} onClick={() => setBulk({ action: "sites", roleId: "", siteIds: [], typed: "" })}>Assign sites</button>}
+                        {can?.deactivate && <button className={btnGhost} onClick={() => setBulk({ action: "disable", roleId: "", siteIds: [], typed: "" })}>Disable</button>}
+                        {can?.deactivate && <button className={btnGhost} onClick={() => setBulk({ action: "enable", roleId: "", siteIds: [], typed: "" })}>Enable</button>}
+                        <button className="ml-auto text-[12.5px] text-[var(--text2)] hover:underline" onClick={() => setSelected(new Set())}>Clear selection</button>
+                    </div>
+                )}
+
+                {/* Table */}
+                {!data ? <Loading /> : rows.length === 0 ? (
+                    <Empty icon={<UsersIcon size={36} />} title="No users match" sub="Change the filters or search." />
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[1000px] text-[13px]">
+                            <thead>
+                                <tr className="bg-[var(--surface2)] text-[11.5px] text-[var(--text2)]">
+                                    <th className="w-10 px-3 py-2.5"><input type="checkbox" checked={allOnPage} onChange={toggleAll} aria-label="Select all on this page" className="accent-[var(--accent)]" /></th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">User</th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">Mobile</th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">Role</th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">Sites</th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">Status</th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">Last login</th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">Created</th>
+                                    <th className="text-left px-3 py-2.5 font-semibold">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className={loading ? "opacity-60" : ""}>
+                                {rows.map(r => (
+                                    <tr key={r.id} className="border-t border-[var(--border)] hover:bg-[var(--surface2)]/50">
+                                        <td className="px-3 py-2.5"><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} className="accent-[var(--accent)]" /></td>
+                                        <td className="px-3 py-2.5">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="h-8 w-8 shrink-0 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11.5px] font-bold flex items-center justify-center">{initials(r.name)}</span>
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-[var(--text)] truncate max-w-[200px]">{r.name}</p>
+                                                    <p className="text-[11.5px] text-[var(--text3)] truncate max-w-[200px]">{r.employeeCode ?? (r.email ?? "Non-employee account")}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2.5 tabular-nums text-[var(--text2)]" title={r.mobile ?? undefined}>{maskMobile(r.mobile)}</td>
+                                        <td className="px-3 py-2.5"><RoleChip role={r.role} /></td>
+                                        <td className="px-3 py-2.5 text-[12.5px] text-[var(--text2)] max-w-[180px]">
+                                            {!r.role ? "—" : r.scope === "ALL" ? "All sites" : r.scope === "SELF" ? "Self only" : r.scope === "MY_TEAM" ? "My team"
+                                                : r.sites.length ? <span className="line-clamp-2">{r.sites.map(s => s.name).join(", ")}</span>
+                                                : r.scope === "ASSIGNED_SITES" ? <span className="text-[#b45309]">No sites set</span> : "All sites"}
+                                        </td>
+                                        <td className="px-3 py-2.5"><StatusChip active={r.isActive} /></td>
+                                        <td className="px-3 py-2.5 text-[var(--text2)] whitespace-nowrap">{data.accessReady ? ago(r.lastLoginAt) : "—"}</td>
+                                        <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap">{fmtDate(r.createdAt)}</td>
+                                        <td className="px-3 py-2.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <IconBtn label="Edit" onClick={() => router.push(`/admin/users/${r.id}`)}><Pencil size={14} /></IconBtn>
+                                                {can?.resetLogin && <IconBtn label="Reset login" onClick={() => setConfirmRow({ kind: "reset", row: r })}><RotateCcw size={14} /></IconBtn>}
+                                                {can?.deactivate && (r.isActive
+                                                    ? <IconBtn label="Disable" onClick={() => setConfirmRow({ kind: "disable", row: r })}><Ban size={14} /></IconBtn>
+                                                    : <IconBtn label="Enable" onClick={() => setConfirmRow({ kind: "enable", row: r })}><CheckCircle2 size={14} /></IconBtn>)}
+                                                <IconBtn label="View audit history" onClick={() => router.push(`/admin/audit?target=${r.id}`)}><History size={14} /></IconBtn>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {data && data.total > 0 && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-3 border-t border-[var(--border)] text-[12.5px] text-[var(--text2)]">
+                        <span>Showing {(data.page - 1) * data.pageSize + 1}–{Math.min(data.page * data.pageSize, data.total)} of {data.total.toLocaleString("en-IN")}</span>
+                        <div className="flex items-center gap-1.5">
+                            <IconBtn label="Previous page" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft size={14} /></IconBtn>
+                            <span className="px-2 tabular-nums">Page {data.page} of {data.totalPages}</span>
+                            <IconBtn label="Next page" disabled={page >= data.totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight size={14} /></IconBtn>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Danger zone */}
+            {can?.admin && (
+                <section className="rounded-2xl border border-[#fecaca] bg-[#fff5f5] p-4">
+                    <h3 className="text-[15px] font-semibold text-[#b91c1c]">Danger zone</h3>
+                    <p className="text-[12.5px] text-[#b91c1c]/80 mt-0.5">Admin only. Each action asks you to type a confirmation and is written to the audit log.</p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                        <button className="rounded-xl border border-[#fca5a5] bg-white px-4 py-2 text-[13px] text-[#b91c1c] hover:bg-[#fef2f2]" onClick={() => setDanger("reset")}>Reset all logins…</button>
+                        <button className="rounded-xl border border-[#fca5a5] bg-white px-4 py-2 text-[13px] text-[#b91c1c] hover:bg-[#fef2f2]" onClick={() => setDanger("cleanup")}>Remove non-employee logins…</button>
+                    </div>
+                </section>
+            )}
+
+            {bulk && <BulkDialog bulk={bulk} setBulk={setBulk} count={selected.size} roles={roles} sites={sites} busy={busy} onRun={runBulk} isAdmin={!!can?.admin} />}
+
+            {confirmRow && (
+                <Modal
+                    title={confirmRow.kind === "reset" ? `Reset ${confirmRow.row.name}'s login?` : confirmRow.kind === "disable" ? `Disable ${confirmRow.row.name}?` : `Enable ${confirmRow.row.name}?`}
+                    onClose={() => setConfirmRow(null)}
+                    footer={<>
+                        <button className={btnGhost} onClick={() => setConfirmRow(null)}>Cancel</button>
+                        <button className={confirmRow.kind === "enable" ? btnPrimary : btnDanger} onClick={runRow} disabled={busy}>
+                            {busy && <Loader2 size={14} className="animate-spin" />}
+                            {confirmRow.kind === "reset" ? "Reset login" : confirmRow.kind === "disable" ? "Disable" : "Enable"}
+                        </button>
+                    </>}>
+                    <p className="p-5 text-[13.5px] text-[var(--text2)]">
+                        {confirmRow.kind === "reset" && "Their password and MPIN are cleared. Next time they sign in with an OTP to their mobile and set a new MPIN."}
+                        {confirmRow.kind === "disable" && "They are signed out on their next request and cannot sign in until enabled again."}
+                        {confirmRow.kind === "enable" && "They can sign in again with their role's access."}
                     </p>
-                </div>
+                </Modal>
             )}
+
+            {danger && <DangerDialog kind={danger} onClose={() => setDanger(null)} onDone={load} />}
         </div>
+    )
+}
+
+function IconBtn({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+    return (
+        <button type="button" onClick={onClick} disabled={disabled} title={label} aria-label={label}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text2)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed">
+            {children}
+        </button>
+    )
+}
+
+function BulkDialog({ bulk, setBulk, count, roles, sites, busy, onRun, isAdmin }: {
+    bulk: Bulk; setBulk: (b: Bulk | null) => void; count: number; roles: RoleOpt[]; sites: SiteOpt[]; busy: boolean; onRun: () => void; isAdmin: boolean
+}) {
+    const title = bulk.action === "role" ? "Change role" : bulk.action === "sites" ? "Assign sites" : bulk.action === "disable" ? "Disable users" : "Enable users"
+    const needTyped = count > CONFIRM_ABOVE
+    return (
+        <Modal title={`${title} · ${count} user${count === 1 ? "" : "s"}`} onClose={() => setBulk(null)}
+            footer={<>
+                <button className={btnGhost} onClick={() => setBulk(null)}>Cancel</button>
+                <button className={bulk.action === "disable" ? btnDanger : btnPrimary} onClick={onRun}
+                    disabled={busy || (needTyped && bulk.typed.trim() !== String(count))}>
+                    {busy && <Loader2 size={14} className="animate-spin" />} Apply to {count}
+                </button>
+            </>}>
+            <div className="p-5 flex flex-col gap-4 text-[13px] text-[var(--text2)]">
+                {bulk.action === "role" && (
+                    <div>
+                        <Label>New role</Label>
+                        <select className={inputCls("bg-[var(--surface)]")} value={bulk.roleId} onChange={e => setBulk({ ...bulk, roleId: e.target.value })}>
+                            <option value="">Choose a role</option>
+                            {isAdmin && <option value="admin">Admin</option>}
+                            {roles.filter(r => r.isActive).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                    </div>
+                )}
+                {bulk.action === "sites" && (
+                    <div>
+                        <Label hint="Replaces each user's sites with this list.">Sites</Label>
+                        <SitePicker sites={sites} value={bulk.siteIds} onChange={siteIds => setBulk({ ...bulk, siteIds })} />
+                    </div>
+                )}
+                {bulk.action === "disable" && <p>They are signed out on their next request and cannot sign in until enabled again.</p>}
+                {bulk.action === "enable" && <p>They can sign in again with their role&apos;s access.</p>}
+                <p>One audit row is written per user.</p>
+                {needTyped && (
+                    <div>
+                        <Label>Type <b>{count}</b> to confirm</Label>
+                        <input className={inputCls("bg-[var(--surface)]")} value={bulk.typed} onChange={e => setBulk({ ...bulk, typed: e.target.value })} inputMode="numeric" autoFocus />
+                    </div>
+                )}
+            </div>
+        </Modal>
+    )
+}
+
+function DangerDialog({ kind, onClose, onDone }: { kind: "reset" | "cleanup"; onClose: () => void; onDone: () => void }) {
+    const phrase = kind === "reset" ? "RESET ALL LOGINS" : "DELETE ORPHAN LOGINS"
+    const [typed, setTyped] = useState("")
+    const [busy, setBusy] = useState(false)
+    async function run() {
+        setBusy(true)
+        try {
+            if (kind === "reset") {
+                const r = await api<{ reset: number }>("/api/admin/employee-logins/reset-login", { body: { confirm: phrase } })
+                toast.success(`${r.reset} logins reset — everyone signs in with an OTP next time`)
+            } else {
+                const r = await api<{ deleted: number; skipped: number }>("/api/admin/cleanup-users", { body: { confirm: phrase } })
+                toast.success(`${r.deleted} non-employee logins removed${r.skipped ? `, ${r.skipped} kept (they own records)` : ""}`)
+            }
+            onClose(); onDone()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "The action failed")
+        } finally {
+            setBusy(false)
+        }
+    }
+    return (
+        <Modal title={kind === "reset" ? "Reset all logins" : "Remove non-employee logins"} onClose={onClose}
+            footer={<>
+                <button className={btnGhost} onClick={onClose}>Cancel</button>
+                <button className={btnDanger} onClick={run} disabled={busy || typed !== phrase}>{busy && <Loader2 size={14} className="animate-spin" />} {kind === "reset" ? "Reset all logins" : "Remove logins"}</button>
+            </>}>
+            <div className="p-5 flex flex-col gap-3 text-[13px] text-[var(--text2)]">
+                {kind === "reset"
+                    ? <p>Every employee&apos;s password and MPIN are cleared. Each of them must sign in with an OTP and set a new MPIN. Use only when switching everyone to OTP sign-in.</p>
+                    : <p>Deletes logins that are not linked to any employee and own no records (demo accounts are kept). This cannot be undone.</p>}
+                <div>
+                    <Label>Type <b className="font-mono">{phrase}</b> to confirm</Label>
+                    <input className={inputCls("bg-[var(--surface)] font-mono")} value={typed} onChange={e => setTyped(e.target.value)} autoFocus />
+                </div>
+            </div>
+        </Modal>
     )
 }

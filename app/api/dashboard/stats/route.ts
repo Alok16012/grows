@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { unstable_cache } from "next/cache"
 import { todayAttendance, EMPTY_TODAY, PRESENT_WHERE } from "@/lib/attendance-today"
+import { Prisma } from "@prisma/client"
+import { accessFrom, employeeScope, teamUserIds } from "@/lib/access"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
@@ -33,21 +35,35 @@ export async function GET() {
 
     const isAdmin = session.user.role === "ADMIN"
     const perms: string[] = (session.user as any).permissions || []
+    // Data scope: an Assigned-sites role counts its sites' people only, a
+    // My-team role its reports — the same rows its lists show.
+    const access = accessFrom(session)
+    const scope = await employeeScope(access)
+    const scopeKey = access.scope === "ALL" ? "" : access.scope === "ASSIGNED_SITES" ? `S:${[...access.siteIds].sort().join(",")}` : `U:${access.userId}`
+    const expenseScope = access.scope === "ASSIGNED_SITES"
+        ? { OR: [{ siteId: { in: access.siteIds } }, { submittedBy: access.userId }] }
+        : access.scope === "MY_TEAM" ? { submittedBy: { in: [access.userId, ...(await teamUserIds(access.userId))] } }
+        : access.scope === "SELF" ? { submittedBy: access.userId } : null
 
     // 30-second server cache, keyed by the permission set (NOT the user) — all
     // users sharing a role hit the same cached snapshot instead of re-running
     // 15+ DB queries per dashboard load. Data contains no user-specific values.
-    const cacheKey = isAdmin ? "ADMIN" : [...perms].sort().join(",")
+    const cacheKey = (isAdmin ? "ADMIN" : [...perms].sort().join(",")) + (scopeKey ? `|${scopeKey}` : "")
     const getStats = unstable_cache(
-        () => computeStats(isAdmin, perms),
+        () => computeStats(isAdmin, perms, scope, expenseScope),
         ["dashboard-stats", cacheKey],
         { revalidate: 30 }
     )
     return NextResponse.json(await getStats())
 }
 
-async function computeStats(isAdmin: boolean, perms: string[]) {
+type EmpWhere = Prisma.EmployeeWhereInput | null
+
+async function computeStats(isAdmin: boolean, perms: string[], scope: EmpWhere, expenseScope: Prisma.ExpenseWhereInput | null) {
     const has = (p: string) => isAdmin || perms.includes(p)
+    // Employee filter with the caller's scope ANDed in.
+    const emp = (w: Prisma.EmployeeWhereInput): Prisma.EmployeeWhereInput => (scope ? { AND: [w, scope] } : w)
+    const viaEmp = scope ? { employee: scope } : {}
 
     const now = new Date()
     const today = istDayRange(0)
@@ -63,8 +79,8 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     if (has("employees.view")) {
         jobs.push((async () => {
             const [active, new30d] = await Promise.all([
-                safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0),
-                safe(prisma.employee.count({ where: { status: "ACTIVE", createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } } }), 0),
+                safe(prisma.employee.count({ where: emp({ status: "ACTIVE" }) }), 0),
+                safe(prisma.employee.count({ where: emp({ status: "ACTIVE", createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } }) }), 0),
             ])
             out.employees = { active, new30d }
         })())
@@ -74,11 +90,11 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     if (has("attendance.view")) {
         jobs.push((async () => {
             // Same shared definition as /api/admin/stats so phone and desktop agree.
-            const activeQ = safe(prisma.employee.count({ where: { status: "ACTIVE" } }), 0)
+            const activeQ = safe(prisma.employee.count({ where: emp({ status: "ACTIVE" }) }), 0)
             const [att, weekRows] = await Promise.all([
-                safe(activeQ.then(n => todayAttendance(prisma, { gte: today.start, lt: today.end }, n)), EMPTY_TODAY),
+                safe(activeQ.then(n => todayAttendance(prisma, { gte: today.start, lt: today.end }, n, scope as Record<string, unknown> | null)), EMPTY_TODAY),
                 safe(prisma.attendance.findMany({
-                    where: { date: { gte: week.start, lt: today.end }, ...PRESENT_WHERE },
+                    where: { date: { gte: week.start, lt: today.end }, ...PRESENT_WHERE, ...viaEmp },
                     select: { date: true },
                 }), [] as { date: Date }[]),
             ])
@@ -107,9 +123,9 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     jobs.push((async () => {
         const [leaves, expenses, inspections] = await Promise.all([
             has("leaves.view") || has("leaves.approve")
-                ? safe(prisma.leave.count({ where: { status: "PENDING" } }), 0) : Promise.resolve(-1),
+                ? safe(prisma.leave.count({ where: { status: "PENDING", ...viaEmp } }), 0) : Promise.resolve(-1),
             has("expenses.view") || has("expenses.manage")
-                ? safe(prisma.expense.count({ where: { status: "SUBMITTED" } }), 0) : Promise.resolve(-1),
+                ? safe(prisma.expense.count({ where: { status: "SUBMITTED", ...(expenseScope ? { AND: [expenseScope] } : {}) } }), 0) : Promise.resolve(-1),
             has("approvals.view")
                 ? safe(prisma.inspection.count({ where: { status: "pending" } }), 0) : Promise.resolve(-1),
         ])
@@ -128,9 +144,9 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     if (has("onboarding.view")) {
         jobs.push((async () => {
             const [inProgress, notStarted, onHold] = await Promise.all([
-                safe(prisma.onboardingRecord.count({ where: { status: "IN_PROGRESS" } }), 0),
-                safe(prisma.onboardingRecord.count({ where: { status: "NOT_STARTED" } }), 0),
-                safe(prisma.onboardingRecord.count({ where: { status: "ON_HOLD" } }), 0),
+                safe(prisma.onboardingRecord.count({ where: { status: "IN_PROGRESS", ...viaEmp } }), 0),
+                safe(prisma.onboardingRecord.count({ where: { status: "NOT_STARTED", ...viaEmp } }), 0),
+                safe(prisma.onboardingRecord.count({ where: { status: "ON_HOLD", ...viaEmp } }), 0),
             ])
             out.onboarding = { inProgress, notStarted, onHold }
         })())
@@ -140,8 +156,8 @@ async function computeStats(isAdmin: boolean, perms: string[]) {
     if (has("exit.view")) {
         jobs.push((async () => {
             const [pending, clearancePending] = await Promise.all([
-                safe(prisma.exitRequest.count({ where: { status: { in: ["INITIATED", "NOTICE_PERIOD"] } } }), 0),
-                safe(prisma.exitRequest.count({ where: { status: "CLEARANCE_PENDING" } }), 0),
+                safe(prisma.exitRequest.count({ where: { status: { in: ["INITIATED", "NOTICE_PERIOD"] }, ...viaEmp } }), 0),
+                safe(prisma.exitRequest.count({ where: { status: "CLEARANCE_PENDING", ...viaEmp } }), 0),
             ])
             out.exits = { pending, clearancePending }
         })())

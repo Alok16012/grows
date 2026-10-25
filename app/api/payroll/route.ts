@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { accessFrom, maskEmployee } from "@/lib/access"
 
 export async function GET(req: Request) {
     try {
@@ -69,7 +70,9 @@ export async function GET(req: Request) {
             orderBy: [{ year: "desc" }, { month: "desc" }, { employee: { firstName: "asc" } }],
         })
 
-        return NextResponse.json(payrolls)
+        // Bank and statutory numbers ride along only for roles allowed to see them.
+        const access = accessFrom(session)
+        return NextResponse.json(payrolls.map(p => ({ ...p, employee: p.employee ? maskEmployee(p.employee, access) : p.employee })))
     } catch (error) {
         console.error("[PAYROLL_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })

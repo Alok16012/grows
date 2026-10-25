@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
+import { accessFrom } from "@/lib/access"
+import { assertCanAssignRole, RuleError } from "@/lib/role-rules"
 
 export async function POST(
     req: Request,
@@ -21,6 +23,13 @@ export async function POST(
         }
 
         const { customRoleId } = await req.json()
+        // No role above the caller's own (lib/role-rules).
+        try {
+            await assertCanAssignRole(accessFrom(session!), customRoleId || null)
+        } catch (e) {
+            if (e instanceof RuleError) return NextResponse.json({ error: e.message }, { status: e.status })
+            throw e
+        }
 
         const employee = await prisma.employee.findUnique({
             where: { id: params.id },

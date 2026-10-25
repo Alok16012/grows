@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { csvSafe } from "@/lib/csv-safe"
+import { accessFrom, has } from "@/lib/access"
 
 export async function GET(req: Request) {
     try {
@@ -11,6 +12,10 @@ export async function GET(req: Request) {
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
             return new NextResponse("Unauthorized", { status: 401 })
+        }
+        // The bank sheet is account numbers by definition.
+        if (!has(accessFrom(session), "employees.viewBank")) {
+            return new NextResponse("Forbidden — this sheet needs the View bank details switch", { status: 403 })
         }
 
         const { searchParams } = new URL(req.url)

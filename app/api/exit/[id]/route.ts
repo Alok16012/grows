@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { computeSettlement } from "@/lib/exit-settlement"
 import { notifyEmployee } from "@/lib/hr-notify"
+import { accessFrom, maskEmployee } from "@/lib/access"
 
 // Exit moves forward one stage at a time. Jumping straight to COMPLETED used to
 // be possible with clearance half-done and nothing paid, which then offboarded
@@ -59,7 +60,8 @@ export async function GET(
 
     if (!exit) return new NextResponse("Not Found", { status: 404 })
 
-    return NextResponse.json(exit)
+    // Basic salary is shown only to roles with the salary switch.
+    return NextResponse.json({ ...exit, employee: exit.employee ? maskEmployee(exit.employee, accessFrom(session!)) : exit.employee })
   } catch (error) {
     console.error("[EXIT_GET_ID]", error)
     return new NextResponse("Internal Error", { status: 500 })

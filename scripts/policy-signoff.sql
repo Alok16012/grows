@@ -152,3 +152,9 @@ CREATE TRIGGER "SignoffAck_no_update_when_signed" BEFORE UPDATE ON "SignoffAck"
 DROP TRIGGER IF EXISTS "SignoffAudit_append_only" ON "SignoffAudit";
 CREATE TRIGGER "SignoffAudit_append_only" BEFORE UPDATE OR DELETE ON "SignoffAudit"
     FOR EACH ROW EXECUTE FUNCTION signoff_block_change();
+
+-- The app connects as "postgres". When this script is run by another role (e.g.
+-- grows_local via DIRECT_URL) that role owns the tables, so grant the app full
+-- access — otherwise it can read but every write fails with "permission denied".
+GRANT ALL ON TABLE "SignoffAck", "SignoffAudit", "SignoffPolicy", "SignoffPolicyDesignation", "SignoffPolicyVersion" TO postgres;
+GRANT EXECUTE ON FUNCTION signoff_block_change(), signoff_block_signed_ack_update() TO postgres;

@@ -4,6 +4,11 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import {
+    accessFrom, employeeScope, maskEmployee, lockedFieldNames, has, hasAny,
+    accessTablesReady, bumpAccessVersion, audit, requestMeta,
+} from "@/lib/access"
+import { assertCanAssignRole, assertKeepsAnAdmin, RuleError } from "@/lib/role-rules"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import { pickPhotoUrl } from "@/lib/employee-photo"
@@ -46,6 +51,13 @@ export async function GET(
 
         if (!employee) return new NextResponse("Not Found", { status: 404 })
 
+        // Out of the caller's data scope reads as not found, like a wrong id.
+        const access = accessFrom(session)
+        const scope = await employeeScope(access)
+        if (scope && !(await prisma.employee.count({ where: { AND: [{ id: params.id }, scope] } }))) {
+            return new NextResponse("Not Found", { status: 404 })
+        }
+
         // Backfill profile photo from an uploaded Photo document if the
         // `photo` column is empty (onboarding photos come in as "Photo", HR
         // uploads as "PHOTO" — pickPhotoUrl matches both, plus passport-style
@@ -55,7 +67,13 @@ export async function GET(
             if (url) (employee as any).photo = url
         }
 
-        return NextResponse.json(employee)
+        // Payslip amounts need the salary switch; uploaded ID and bank scans
+        // need document or KYC access. Locked fields never leave the server.
+        const out: Record<string, unknown> = maskEmployee({ ...employee }, access)
+        if (!has(access, "employees.viewSalary")) out.payrolls = []
+        if (!hasAny(access, ["documents.view", "employees.viewKyc"])) out.documents = []
+        out.lockedFields = lockedFieldNames(access)
+        return NextResponse.json(out)
     } catch (error) {
         console.error("[EMPLOYEE_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })
@@ -77,7 +95,16 @@ export async function PUT(
             return new NextResponse("Forbidden", { status: 403 })
         }
 
+        // A role that cannot see KYC / bank / personal fields cannot change
+        // them either: its form never held their values, so whatever it sends
+        // for them (often "") would wipe the real ones.
+        const access = accessFrom(session)
+        const scope = await employeeScope(access)
+        if (scope && !(await prisma.employee.count({ where: { AND: [{ id: params.id }, scope] } }))) {
+            return new NextResponse("Not Found", { status: 404 })
+        }
         const body = await req.json()
+        for (const f of lockedFieldNames(access)) delete body[f]
         const {
             firstName, lastName, email, phone, alternatePhone,
             dateOfBirth, gender, address, city, state, pincode,
@@ -335,8 +362,16 @@ export async function PUT(
                 // Role changes require users.manage. Non-admins can still update
                 // the employee record itself (name, designation, salary …) but
                 // cannot grant or revoke system roles.
-                if (canChangeRole && systemRole && VALID_ROLES.includes(systemRole)) userUpdate.role = systemRole
-                if (customRoleId !== undefined) userUpdate.customRoleId = customRoleId || null
+                if (canChangeRole && systemRole && VALID_ROLES.includes(systemRole)) {
+                    await assertKeepsAnAdmin([empWithUser.userId])
+                    userUpdate.role = systemRole
+                }
+                // Same rules as the Users screen: needs the right to change
+                // roles, and the role may not hold more than the caller does.
+                if (customRoleId !== undefined) {
+                    await assertCanAssignRole(access, customRoleId || null)
+                    userUpdate.customRoleId = customRoleId || null
+                }
                 // Sync login email when employee email is updated
                 if (email && email.trim() && !email.includes("@cims.local")) {
                     userUpdate.email = email.trim()
@@ -348,13 +383,27 @@ export async function PUT(
                     userUpdate.isActive = !(status === "TERMINATED" || status === "INACTIVE" || status === "RESIGNED")
                 }
                 if (Object.keys(userUpdate).length > 0) {
-                    await prisma.user.update({ where: { id: empWithUser.userId }, data: userUpdate })
+                    const userId = empWithUser.userId
+                    const before = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, customRoleId: true, isActive: true, email: true } })
+                    const accessChanged = "role" in userUpdate || "customRoleId" in userUpdate || "isActive" in userUpdate
+                    await prisma.$transaction(async tx => {
+                        await tx.user.update({ where: { id: userId }, data: userUpdate })
+                        if (accessChanged && (await accessTablesReady())) {
+                            await bumpAccessVersion(tx, [userId])
+                            await audit(tx, {
+                                actorId: access.userId, actorName: access.name, action: "user.update", targetType: "User",
+                                targetId: userId, targetName: before?.name ?? null, summary: "Changed from the employee record",
+                                before, after: { ...before, ...userUpdate }, ...requestMeta(req),
+                            })
+                        }
+                    })
                 }
             }
         }
 
-        return NextResponse.json(employee)
+        return NextResponse.json(maskEmployee(employee, access))
     } catch (error) {
+        if (error instanceof RuleError) return NextResponse.json({ error: error.message }, { status: error.status })
         console.error("[EMPLOYEE_PUT]", error)
         // Surface the real reason — a bare "Internal Error" gives the user
         // nothing to act on when a save fails.

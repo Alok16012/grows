@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { checkAccess } from "@/lib/permissions"
 import { collectErrors, siteFieldChecks, validationResponse } from "@/lib/validation"
+import { accessFrom } from "@/lib/access"
 
 /**
  * Case-insensitive, trimmed name clash. Site names are what supervisors pick
@@ -72,6 +73,9 @@ export async function GET(req: Request) {
         const search = searchParams.get("search")
 
         const where: Record<string, unknown> = {}
+        // An Assigned-sites role lists only the sites set on the user.
+        const access = accessFrom(session)
+        if (access.scope === "ASSIGNED_SITES") where.id = { in: access.siteIds }
         if (isActive !== null && isActive !== "") where.isActive = isActive === "true"
         if (city) where.city = { contains: city, mode: "insensitive" }
         if (siteType) where.siteType = siteType

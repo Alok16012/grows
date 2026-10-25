@@ -1,7 +1,7 @@
 "use client"
 import { payrollYears } from "../../payroll/_components/payroll-years"
 import { useState, useRef, useCallback, useEffect } from "react"
-import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { fetchAllEmployees, fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import { useRouter } from "next/navigation"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -115,7 +115,7 @@ export default function AttendanceUploadPage() {
 
     useEffect(() => {
         if (!siteId) { setSiteEmployees([]); return }
-        fetchAllEmployees({ siteId, status: "ACTIVE" })
+        fetchEmployeeOptions({ siteId, status: "ACTIVE" })
             .then(d => setSiteEmployees(d.employees as any))
             .catch(() => setSiteEmployees([]))
     }, [siteId])

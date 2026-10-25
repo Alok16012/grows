@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { auditLater, requestMeta } from "@/lib/access"
 
 export const maxDuration = 60
 
@@ -112,10 +113,16 @@ export async function GET() {
     }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!requireAdmin(session)) return new NextResponse("Forbidden", { status: 403 })
+        // Hard-deletes logins, so it runs only when asked for explicitly (the
+        // screen previews with GET first, then confirms).
+        const body = await req.json().catch(() => ({}))
+        if (body?.confirm !== "DELETE ORPHAN LOGINS") {
+            return NextResponse.json({ error: 'Send { "confirm": "DELETE ORPHAN LOGINS" } to delete orphan logins' }, { status: 400 })
+        }
 
         const { deletable, blocked } = await findCandidates()
         const ids = deletable.map((u) => u.id)
@@ -147,6 +154,11 @@ export async function POST() {
         }
 
         const totalUsers = await prisma.user.count()
+        auditLater({
+            actorId: session?.user?.id ?? null, actorName: session?.user?.name ?? null, action: "user.delete", targetType: "User",
+            targetName: "Non-employee logins", summary: `Removed non-employee logins · ${deleted} deleted, ${blocked.length} skipped`,
+            after: { deleted, failed, skipped: blocked.length }, ...requestMeta(req),
+        })
         return NextResponse.json({ deleted, failed, skipped: blocked.length, totalUsers })
     } catch (error) {
         console.error("[CLEANUP_USERS_POST]", error)

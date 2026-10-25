@@ -3,26 +3,23 @@ import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
+import { resolveAccess, accessVersion, mustChangePasswordFor } from "@/lib/access-session"
+import { recordLogin, recordLoginFailure } from "@/lib/access-audit"
 import {
     getCredential, verifyLogin, parseLoginMethod,
     AUTH_INVALID, AUTH_INACTIVE, AUTH_LOCKED, AUTH_USE_OTP, AUTH_NO_MPIN,
 } from "@/lib/login-security"
 
-// Resolve effective permissions for a user object from the DB.
-// Permissions come EXCLUSIVELY from an assigned custom role (Admin → Roles).
-// System roles like MANAGER / HR_MANAGER no longer carry any hardcoded default
-// permissions — the custom roles configured in the app are the single source of
-// truth. ADMIN remains a superuser (handled separately in checkAccess / can()).
-function resolvePermissions(user: { role: string; customRole?: { isActive: boolean; permissions: string[] } | null }): string[] {
-    // Every authenticated user gets employee self-service by default — access to
-    // their OWN data only (profile, payslip, leaves, attendance, helpdesk). This
-    // is a universal baseline, NOT a privilege bypass, so it needs no manual role
-    // assignment. All other access still comes solely from the custom role.
-    const base = ["self.view"]
-    if (user.customRole?.isActive) {
-        return Array.from(new Set([...base, ...user.customRole.permissions]))
-    }
-    return base
+// Effective permissions, data scope and assigned sites for a user, from the DB.
+// Permissions come EXCLUSIVELY from an assigned custom role (Admin → Roles),
+// expanded into the earlier permission keys the older routes still check
+// (lib/permission-catalogue). Every user also gets "self.view" — their OWN data
+// only — as a baseline, not a privilege. ADMIN is the superuser (checkAccess).
+type AccessUser = { id: string; role: string; customRoleId?: string | null; customRole?: { isActive: boolean; permissions: string[] } | null }
+
+async function accessFields(user: AccessUser) {
+    const [access, version] = await Promise.all([resolveAccess(user), accessVersion(user.id)])
+    return { permissions: access.permissions, scope: access.scope, siteIds: access.siteIds, accessVersion: version }
 }
 
 // Demo users are only enabled in development or when ENABLE_DEMO_LOGIN=true is
@@ -78,13 +75,18 @@ export const authOptions: NextAuthOptions = {
                 password: { label: "Password", type: "password" },
                 method: { label: "Method", type: "text" },
             },
-            async authorize(credentials) {
+            async authorize(credentials, req) {
                 const method = parseLoginMethod(credentials?.method)
                 if (!credentials?.email || !credentials?.password) {
                     authFail(AUTH_INVALID, `missing login id or ${method}`, credentials?.email)
                 }
 
                 const passwordRaw = credentials.password
+                const hdr = (req?.headers ?? {}) as Record<string, string | undefined>
+                const loginMeta = {
+                    ip: (hdr["x-forwarded-for"] ?? hdr["x-real-ip"] ?? "").split(",")[0].trim() || null,
+                    userAgent: hdr["user-agent"] ?? null,
+                }
 
                 // Demo Mode — DEV ONLY. Disabled by default in production
                 if (DEMO_ENABLED && method === "password") {
@@ -101,10 +103,11 @@ export const authOptions: NextAuthOptions = {
                                 include: { customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                             })
                             if (realUser) {
+                                recordLogin({ userId: realUser.id, name: realUser.name, method: "password (demo)", ...loginMeta })
                                 return {
                                     id: realUser.id, name: realUser.name, email: realUser.email,
                                     role: realUser.role,
-                                    permissions: resolvePermissions(realUser),
+                                    ...(await accessFields(realUser)),
                                     customRoleName: realUser.customRole?.isActive ? realUser.customRole.name : null,
                                     customRoleColor: realUser.customRole?.isActive ? realUser.customRole.color : null,
                                 } as any
@@ -124,19 +127,26 @@ export const authOptions: NextAuthOptions = {
                     // Lookup, lockout, secret check and inactive checks are
                     // shared with /api/mobile/login — see verifyLogin.
                     const result = await verifyLogin({ identifier: inputRaw, secret: passwordRaw, method })
-                    if (!result.ok) authFail(result.code, result.reason, inputRaw)
+                    if (!result.ok) {
+                        recordLoginFailure({ loginId: maskLoginId(inputRaw), method, reason: result.code, ...loginMeta })
+                        authFail(result.code, result.reason, inputRaw)
+                    }
                     const { user, employee, needsMpin } = result
+                    recordLogin({ userId: user.id, name: user.name, method, ...loginMeta })
+                    // An account given an initial password must replace it first.
+                    const mustChangePassword = method === "password" && (await mustChangePasswordFor(user.id))
 
                     return {
                         id: user.id,
                         name: user.name,
                         email: user.email,
                         role: user.role,
-                        permissions: resolvePermissions(user),
+                        ...(await accessFields(user)),
                         customRoleName: user.customRole?.isActive ? user.customRole.name : null,
                         customRoleColor: user.customRole?.isActive ? user.customRole.color : null,
                         photo: employee?.photo || null,
                         needsMpin,
+                        mustChangePassword,
                         loginMethod: method,
                     } as any
                 } catch (error) {
@@ -162,10 +172,14 @@ export const authOptions: NextAuthOptions = {
         async jwt({ token, user, trigger }) {
             if (user) {
                 ;(token as any).needsMpin = !!(user as any).needsMpin
+                ;(token as any).mustChangePassword = !!(user as any).mustChangePassword
                 ;(token as any).loginMethod = (user as any).loginMethod || "password"
                 token.id = user.id
                 token.role = user.role
                 token.permissions = (user as any).permissions || []
+                ;(token as any).scope = (user as any).scope || null
+                ;(token as any).siteIds = (user as any).siteIds || []
+                ;(token as any).accessVersion = (user as any).accessVersion ?? 0
                 ;(token as any).customRoleName = (user as any).customRoleName || null
                 ;(token as any).customRoleColor = (user as any).customRoleColor || null
                 ;(token as any).photo = (user as any).photo || null
@@ -177,6 +191,9 @@ export const authOptions: NextAuthOptions = {
             // permission changes quickly enough, at ~1/6th the DB load.
             // After /setup-mpin the client calls session.update(); re-read the
             // MPIN state from the DB rather than trusting anything it sends.
+            if (trigger === "update" && token.id && (token as any).mustChangePassword) {
+                ;(token as any).mustChangePassword = await mustChangePasswordFor(token.id as string)
+            }
             if (trigger === "update" && token.id && (token as any).needsMpin) {
                 try {
                     const c = await getCredential(token.id as string)
@@ -186,7 +203,15 @@ export const authOptions: NextAuthOptions = {
 
             const REFRESH_INTERVAL_MS = 3 * 60 * 1000
             const lastRefresh = (token as { roleRefreshedAt?: number }).roleRefreshedAt ?? 0
-            const needsRefresh = token.id && !user && (Date.now() - lastRefresh > REFRESH_INTERVAL_MS)
+            // A role, status or site change bumps the user's access version; a
+            // session holding an older one refreshes now instead of in 3 minutes,
+            // so a demoted user loses access on their next request.
+            let versionChanged = false
+            if (token.id && !user && !String(token.id).startsWith("demo-")) {
+                const v = await accessVersion(token.id as string)
+                versionChanged = v !== ((token as any).accessVersion ?? 0)
+            }
+            const needsRefresh = token.id && !user && (versionChanged || Date.now() - lastRefresh > REFRESH_INTERVAL_MS)
 
             if (needsRefresh) {
                 try {
@@ -195,7 +220,7 @@ export const authOptions: NextAuthOptions = {
                     const [dbUser, employee] = await Promise.all([
                         prisma.user.findUnique({
                             where: { id: token.id as string },
-                            select: { role: true, isActive: true, customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
+                            select: { id: true, role: true, isActive: true, customRoleId: true, customRole: { select: { name: true, color: true, permissions: true, isActive: true } } }
                         }),
                         prisma.employee.findFirst({
                             where: { userId: token.id as string },
@@ -213,8 +238,12 @@ export const authOptions: NextAuthOptions = {
                     if (lockedOut) {
                         ;(token as any).invalidated = true
                     } else if (dbUser) {
+                        const fields = await accessFields(dbUser)
                         token.role = dbUser.role
-                        token.permissions = resolvePermissions(dbUser)
+                        token.permissions = fields.permissions
+                        ;(token as any).scope = fields.scope
+                        ;(token as any).siteIds = fields.siteIds
+                        ;(token as any).accessVersion = fields.accessVersion
                         ;(token as any).customRoleName = dbUser.customRole?.isActive ? dbUser.customRole.name : null
                         ;(token as any).customRoleColor = dbUser.customRole?.isActive ? dbUser.customRole.color : null
                         ;(token as any).photo = employee?.photo || null
@@ -239,10 +268,13 @@ export const authOptions: NextAuthOptions = {
                 session.user.id = token.id
                 session.user.role = token.role as Role
                 session.user.permissions = (token.permissions as string[]) || []
+                ;(session.user as any).scope = (token as any).scope || null
+                ;(session.user as any).siteIds = (token as any).siteIds || []
                 ;(session.user as any).customRoleName = (token as any).customRoleName || null
                 ;(session.user as any).customRoleColor = (token as any).customRoleColor || null
                 ;(session.user as any).photo = (token as any).photo || null
                 ;(session.user as any).needsMpin = !!(token as any).needsMpin
+                ;(session.user as any).mustChangePassword = !!(token as any).mustChangePassword
                 ;(session.user as any).loginMethod = (token as any).loginMethod || "password"
             }
             return session

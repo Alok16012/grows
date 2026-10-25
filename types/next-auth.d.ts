@@ -8,6 +8,10 @@ declare module "next-auth" {
             id: string
             role: Role
             permissions: string[]
+            // Data scope of the user's role and the sites they cover
+            // (lib/access). Absent on sessions minted before the role manager.
+            scope?: string | null
+            siteIds?: string[]
         } & DefaultSession["user"]
     }
 

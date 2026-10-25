@@ -61,3 +61,23 @@ export async function fetchAllEmployees<T = any>(
 
     return { employees, total, truncated: employees.length < total }
 }
+
+/**
+ * Employees for a picker or roster: name, code, designation, department and
+ * site only (GET /api/employees/options). Use this instead of fetchAllEmployees
+ * whenever the screen does not need the full record — it is one request, it
+ * is cut to the caller's data scope, and it carries no KYC, bank or salary data.
+ */
+export async function fetchEmployeeOptions<T = any>(
+    query: Record<string, string | number | boolean | undefined | null> = {},
+): Promise<FetchAllEmployeesResult<T>> {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== null && value !== "") params.set(key, String(value))
+    }
+    const res = await fetch(`/api/employees/options?${params.toString()}`)
+    if (!res.ok) throw new Error(await res.text())
+    const data = await res.json()
+    const employees: T[] = data.employees ?? []
+    return { employees, total: data.total ?? employees.length, truncated: !!data.truncated }
+}

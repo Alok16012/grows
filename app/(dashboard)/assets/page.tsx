@@ -18,8 +18,9 @@ import {
 } from "lucide-react"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
+import { liveSearchParam } from "@/lib/utils"
 import { can } from "@/lib/can"
-import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import {
     AssetRequest, PickerEmployee, RequestItem, RequestPrefill, StockItem,
     ApiError, WorkflowContext, SetupNotice,
@@ -76,13 +77,17 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
     }, [isStaff, canApprove, canIssue])
 
     // ── Tab state (?tab= on load) ──
+    // Read from the live URL: in the production build this page is prerendered,
+    // so the `searchParams` prop arrives empty and deep links (?tab=inventory,
+    // notification links to ?tab=approvals) all fell back to Dashboard.
+    const urlTab = useMemo(() => liveSearchParam("tab", searchParams?.tab) ?? "", [searchParams?.tab])
     const [tab, setTabState] = useState<Tab | null>(null)
     useEffect(() => {
         if (status !== "authenticated" || tab) return
-        const wanted = TAB_ALIASES[(searchParams?.tab ?? "").toLowerCase()]
+        const wanted = TAB_ALIASES[urlTab.toLowerCase()]
         const allowed = tabs.map(t => t.id)
         setTabState(wanted && allowed.includes(wanted) ? wanted : allowed[0])
-    }, [status, tabs, tab, searchParams?.tab])
+    }, [status, tabs, tab, urlTab])
     const setTab = useCallback((t: Tab) => {
         setTabState(t)
         try {
@@ -101,8 +106,8 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
     }, [status, hasAccess])
     // Before the migration only the classic screens work — land on Inventory.
     useEffect(() => {
-        if (missing && isStaff && tab && WORKFLOW_ONLY.includes(tab) && !searchParams?.tab) setTabState("stock")
-    }, [missing, isStaff, tab, searchParams?.tab])
+        if (missing && isStaff && tab && WORKFLOW_ONLY.includes(tab) && !urlTab) setTabState("stock")
+    }, [missing, isStaff, tab, urlTab])
 
     // ── Shared refresh + overlays ──
     const [refreshKey, setRefreshKey] = useState(0)
@@ -125,7 +130,7 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
     const [employees, setEmployees] = useState<PickerEmployee[]>([])
     useEffect(() => {
         if (status !== "authenticated" || !(canIssue || canManage)) return
-        fetchAllEmployees<PickerEmployee>({ status: "ACTIVE", lite: 1 }).then(r => setEmployees(r.employees)).catch(() => { })
+        fetchEmployeeOptions<PickerEmployee>({ status: "ACTIVE" }).then(r => setEmployees(r.employees)).catch(() => { })
     }, [status, canIssue, canManage])
 
     async function openEdit(assetId: string) {

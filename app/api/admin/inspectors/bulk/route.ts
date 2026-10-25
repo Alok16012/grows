@@ -7,6 +7,8 @@ import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 import bcrypt from "bcryptjs"
+import { accessFrom } from "@/lib/access"
+import { assertCanAssignRole, RuleError } from "@/lib/role-rules"
 
 function generateTempPassword(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
@@ -35,11 +37,24 @@ export async function POST(req: Request) {
         // access now comes only from the custom role — the base role grants nothing.
         // Without one they could sign in, be handed assignments, and still have no
         // way to open a single inspection. Refuse rather than create dead logins.
-        const inspectorRole = await prisma.customRole.findFirst({
+        // The role called "Inspector" when there is one; otherwise the narrowest
+        // role that can open inspections. This used to take the OLDEST role with
+        // any inspection permission — on production that is an HR role, so
+        // imported inspectors would have been given HR access.
+        const candidates = await prisma.customRole.findMany({
             where: { isActive: true, permissions: { hasSome: INSPECTION_PERMISSIONS } },
-            orderBy: { createdAt: "asc" },
-            select: { id: true, name: true },
+            select: { id: true, name: true, permissions: true },
         })
+        const inspectorRole = candidates.find(r => r.name.trim().toLowerCase() === "inspector")
+            ?? [...candidates].sort((a, b) => a.permissions.length - b.permissions.length)[0]
+        if (inspectorRole) {
+            try {
+                await assertCanAssignRole(accessFrom(session), inspectorRole.id)
+            } catch (e) {
+                if (e instanceof RuleError) return NextResponse.json({ error: e.message }, { status: e.status })
+                throw e
+            }
+        }
         if (!inspectorRole) {
             return NextResponse.json({
                 error: "No inspector role available",

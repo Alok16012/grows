@@ -55,6 +55,10 @@ export default withAuth(
         if (needsMpin) {
             return NextResponse.redirect(new URL("/setup-mpin", req.url))
         }
+        // An initial password set by an admin must be replaced before anything else.
+        if ((token as any)?.mustChangePassword && path !== "/profile") {
+            return NextResponse.redirect(new URL("/profile?password=change", req.url))
+        }
 
         const ownDashboard = customLanding || rolePaths[role] || "/"
 
@@ -62,9 +66,17 @@ export default withAuth(
         // /admin → ADMIN only, EXCEPT the Employee Logins screen which any custom
         // role holding the `users.manage` permission may access.
         if (path.startsWith("/admin") && role !== "ADMIN") {
-            const canManageLogins =
-                path.startsWith("/admin/employee-logins") && permissions.includes("users.manage")
-            if (!canManageLogins) {
+            // Role & User Manager screens open on their own permissions; the
+            // APIs behind them check again on every request.
+            const ADMIN_SCREENS: [string, string[]][] = [
+                ["/admin/employee-logins", ["users.manage"]],
+                ["/admin/users", ["users.view", "users.manage"]],
+                ["/admin/roles", ["roles.view"]],
+                ["/admin/audit", ["audit.view"]],
+            ]
+            const allowed = ADMIN_SCREENS.some(([prefix, perms]) =>
+                (path === prefix || path.startsWith(prefix + "/")) && perms.some(p => permissions.includes(p)))
+            if (!allowed) {
                 return NextResponse.redirect(new URL(ownDashboard, req.url))
             }
         }

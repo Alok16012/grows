@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { NO_PASSWORD } from "@/lib/credentials"
 
 // POST /api/admin/bulk-fix-logins
-// Server-side bulk: makes sure every employee with a phone has an ACTIVE login
+// Server-side bulk: makes sure every ACTIVE / ON_LEAVE employee with a phone has an ACTIVE login
 // linked. Creates missing accounts (with no password — they sign in with an
 // OTP), links unclaimed ones, re-activates linked ones. Never touches a
 // password or MPIN.
@@ -17,8 +17,10 @@ export async function POST(req: Request) {
 
     try {
         // Fetch all employees that have a phone number
+        // Only people who work here now. A joiner gets a login when HR approves
+        // their onboarding; someone who has left must not have theirs re-activated.
         const employees = await prisma.employee.findMany({
-            where: { phone: { not: "" } },
+            where: { phone: { not: "" }, status: { in: ["ACTIVE", "ON_LEAVE"] } },
             select: {
                 id: true,
                 firstName: true,

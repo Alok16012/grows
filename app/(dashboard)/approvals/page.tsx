@@ -1,6 +1,7 @@
 
 "use client"
 
+import { liveSearchParam } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -22,7 +23,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
     const router = useRouter()
     // ?date=today (from the dashboard's "Inspections today") shows every report
     // submitted today, whatever its status, not just the pending queue.
-    const dateParamToday = searchParams?.date === "today"
+    // Live URL first: the prerendered page gets an empty searchParams prop on Vercel.
+    const dateParamToday = liveSearchParam("date", searchParams?.date) === "today"
     const [todayOnly, setTodayOnly] = useState(dateParamToday)
 
     const [inspections, setInspections] = useState<any[]>([])
