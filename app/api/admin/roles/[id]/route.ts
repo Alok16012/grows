@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { guard, has, audit, requestMeta, bumpAccessVersion } from "@/lib/access"
 import { RuleError, ADMIN_ROLE_ID } from "@/lib/role-rules"
-import { isScope, type DataScope } from "@/lib/permission-catalogue"
+import { isScope, toCataloguePermissions, type DataScope } from "@/lib/permission-catalogue"
 import {
     parseRoleInput, assertNameFree, requireAccessTables, ruleResponse, roleSnapshot, diffSummary, listRoleCards,
 } from "@/lib/role-admin"
@@ -39,7 +39,10 @@ async function save(req: Request, { params }: Ctx) {
         const users = await prisma.user.findMany({ where: { customRoleId: role.id }, select: { id: true } })
         const beforeScope: DataScope | null = isScope(meta?.scope) ? meta!.scope as DataScope : null
         const before = roleSnapshot(role, beforeScope)
-        const summary = diffSummary({ permissions: role.permissions, scope: beforeScope ?? "ALL" }, { permissions: input.permissions, scope: input.scope }, users.length)
+        // A role saved before the catalogue holds the earlier keys; compare it
+        // in catalogue terms so renamed keys don't count as added / removed.
+        const beforePerms = meta ? role.permissions : toCataloguePermissions(role.permissions)
+        const summary = diffSummary({ permissions: beforePerms, scope: beforeScope ?? "ALL" }, { permissions: input.permissions, scope: input.scope }, users.length)
 
         await prisma.$transaction(async tx => {
             const updated = await tx.customRole.update({
