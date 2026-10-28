@@ -580,7 +580,9 @@ export default function AssignmentsPage() {
                 <p className="text-[13px] text-[var(--text3)] mt-0.5">Assign inspectors and managers to projects and define access, scope, and schedules.</p>
             </div>
 
-            <div className={canManageAssignments ? "grid grid-cols-1 xl:grid-cols-[440px_1fr] gap-4 items-start" : "grid grid-cols-1 gap-4 items-start"}>
+            {/* Side by side only when there's room for the full table next to the
+                440px wizard; below that the wizard sits above a full-width table. */}
+            <div className={canManageAssignments ? "grid grid-cols-1 min-[1680px]:grid-cols-[440px_1fr] gap-4 items-start" : "grid grid-cols-1 gap-4 items-start"}>
 
                 {/* ── LEFT: New Assignment wizard ── */}
                 {canManageAssignments && (
@@ -916,18 +918,19 @@ export default function AssignmentsPage() {
                         ) : (
                             <div className="overflow-x-auto">
                                 {/* Fixed layout: long names ellipsize (full text in the title)
-                                    instead of pushing the row wide. Below ~1100px the table keeps
-                                    a floor width and the wrapper scrolls; Actions stays pinned on
-                                    the right so the row can always be acted on. */}
-                                <table className="w-full table-fixed min-w-[900px] min-[1100px]:min-w-0" style={{ fontSize: 12.5 }}>
+                                    instead of pushing the row wide. The table always keeps a
+                                    floor width — it sits in a container, so a viewport breakpoint
+                                    can't tell how wide it really is — and the wrapper scrolls when
+                                    narrower; Actions stays pinned on the right. */}
+                                <table className="w-full table-fixed min-w-[1080px]" style={{ fontSize: 12.5 }}>
                                     <colgroup>
                                         <col style={{ width: 150 }} />
                                         <col />
                                         <col />
-                                        <col style={{ width: 130 }} />
                                         <col style={{ width: 150 }} />
+                                        <col style={{ width: 175 }} />
                                         <col style={{ width: 110 }} />
-                                        <col style={{ width: canManageAssignments ? 150 : 70 }} />
+                                        <col style={{ width: canManageAssignments ? 185 : 80 }} />
                                     </colgroup>
                                     <thead>
                                         <tr className="bg-[var(--surface2)]/60 text-[11px] text-[var(--text3)] uppercase tracking-wide">
@@ -967,7 +970,7 @@ export default function AssignmentsPage() {
                                                                     title={teamInspectors.join(", ") || undefined}>
                                                                     {teamInspectors.length ? teamInspectors.join(", ") : "No inspectors on team"}
                                                                 </p>
-                                                                <p className="text-[10.5px] text-[var(--text3)]">Team inspector{teamInspectors.length === 1 ? "" : "s"} · not yet issued</p>
+                                                                <p className="text-[10.5px] text-[var(--text3)] truncate">Team inspector{teamInspectors.length === 1 ? "" : "s"} · not yet issued</p>
                                                             </>
                                                         ) : (
                                                             <>
