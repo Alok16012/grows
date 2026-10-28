@@ -147,10 +147,14 @@ function SalaryMasterInner() {
     const [viewMonth, setViewMonth] = useState("")
     const [viewYear,  setViewYear]  = useState("")
     const isHistoricalView = !!(viewMonth && viewYear)
-    // Editing is off while looking at a past month. The table is showing that
-    // month's figures, but every edit path writes the LIVE structure — so a save
-    // from here would silently push old values onto the current one.
-    const canManage = canManagePerm && !isHistoricalView
+    // Editing works in every view. A save made while viewing a month is dated
+    // to THAT month (a SalaryRevision effective from it), the same history-
+    // preserving path an upload takes; in the current view it is dated to this
+    // month, as before. It used to be switched off here — with buttons that
+    // still looked clickable — so Edit appeared broken for any chosen month.
+    const canManage = canManagePerm
+    const editEffective = isHistoricalView ? { effectiveMonth: Number(viewMonth), effectiveYear: Number(viewYear) } : {}
+    const editEffectiveLabel = isHistoricalView ? `${MONTHS_LONG[Number(viewMonth) - 1]} ${viewYear}` : "this month"
     const [filterNone, setFilterNone] = useState(false)
     const [filterSite, setFilterSite] = useState("")
     // Quick-change compliance type without entering full edit mode
@@ -210,10 +214,10 @@ function SalaryMasterInner() {
             const res = await fetch("/api/payroll/salary-structure", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows: [{ employeeId: drawerEmp.id, ...drawerForm }] }),
+                body: JSON.stringify({ rows: [{ employeeId: drawerEmp.id, ...drawerForm }], ...editEffective }),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success(`Salary saved for ${drawerEmp.firstName} ${drawerEmp.lastName}`)
+            toast.success(`Salary saved for ${drawerEmp.firstName} ${drawerEmp.lastName} — effective ${editEffectiveLabel}`)
             setDrawerEmp(null)
             await load()
         } catch (e) {
@@ -239,7 +243,7 @@ function SalaryMasterInner() {
                     bonus: s.bonus ?? 0,
                     otRatePerHour: s.otRatePerHour, canteenRatePerDay: s.canteenRatePerDay,
                     complianceType: newType,
-                }] }),
+                }], ...editEffective }),
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(`Compliance type updated to ${newType}`)
@@ -259,10 +263,10 @@ function SalaryMasterInner() {
             const res = await fetch("/api/payroll/salary-structure", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows: [{ employeeId: emp.id, ...editForm }] }),
+                body: JSON.stringify({ rows: [{ employeeId: emp.id, ...editForm }], ...editEffective }),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success(`Salary structure saved for ${emp.firstName} ${emp.lastName}`)
+            toast.success(`Salary structure saved for ${emp.firstName} ${emp.lastName} — effective ${editEffectiveLabel}`)
             setEditId(null)
             await load()
         } catch (e) { toast.error((e as Error).message) }
@@ -551,7 +555,8 @@ function SalaryMasterInner() {
                     <Search size={14} style={{ flexShrink: 0 }} />
                     <span>
                         Showing the structure <b>{MONTHS_LONG[Number(viewMonth) - 1]} {viewYear}</b> is paid on — exactly what payroll
-                        reads for that month. Read-only: editing and upload change the structure going forward, not the past.
+                        reads for that month. <b>Edit</b> here saves a structure effective from {MONTHS_LONG[Number(viewMonth) - 1]} {viewYear} onward
+                        (until any later structure); locked payroll for that month is not recalculated.
                     </span>
                 </div>
             )}
@@ -751,14 +756,14 @@ function SalaryMasterInner() {
                                             ) : (
                                                 <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
                                                     <button onClick={() => openDrawer(emp)} disabled={!canManage}
-                                                        title={canManage ? "Open detailed edit form" : isHistoricalView ? "Viewing a past month — switch back to the current structure to edit" : "Requires payroll manage permission"}
-                                                        style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                                                        title={canManage ? `Open detailed edit form — saves effective ${editEffectiveLabel}` : "Requires payroll manage permission"}
+                                                        style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", fontSize: 11, fontWeight: 700, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.45, display: "flex", alignItems: "center", gap: 4 }}>
                                                         <Edit2 size={11} /> {s ? "Edit" : "Add Salary"}
                                                     </button>
                                                     {s && (
                                                         <button onClick={() => startEdit(emp)} disabled={!canManage}
-                                                            title={canManage ? "Quick inline edit" : isHistoricalView ? "Viewing a past month — switch back to the current structure to edit" : "Requires payroll manage permission"}
-                                                            style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, cursor: "pointer", color: "var(--text3)" }}>
+                                                            title={canManage ? `Quick inline edit — saves effective ${editEffectiveLabel}` : "Requires payroll manage permission"}
+                                                            style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", fontSize: 11, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.45, color: "var(--text3)" }}>
                                                             ⚡
                                                         </button>
                                                     )}
@@ -860,6 +865,9 @@ function SalaryMasterInner() {
                                         <span style={{ color: "var(--accent)", fontWeight: 700 }}>{drawerEmp.employeeId}</span>
                                         {" · "}{drawerEmp.firstName} {drawerEmp.lastName}
                                         {drawerEmp.deployments?.[0]?.site?.name && <span style={{ color: "var(--text3)" }}> · 📍 {drawerEmp.deployments[0].site.name}</span>}
+                                    </p>
+                                    <p style={{ fontSize: 11.5, color: "#6d28d9", margin: "4px 0 0 0", fontWeight: 600 }}>
+                                        Saves effective {editEffectiveLabel}{isHistoricalView ? " onward" : ""}
                                     </p>
                                 </div>
                                 <button onClick={closeDrawer} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--border)", background: "none", cursor: "pointer", color: "var(--text3)", display: "flex" }}>
