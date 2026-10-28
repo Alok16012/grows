@@ -1,5 +1,6 @@
 "use client"
 
+import { sortSitesByName } from "@/lib/site-sort"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -333,7 +334,7 @@ export default function AssignmentsPage() {
                 fetch("/api/users?role=MANAGER"),
                 fetch(`/api/assignments?t=${Date.now()}`),
             ])
-            if (siteRes.ok) setSites(await siteRes.json())
+            if (siteRes.ok) setSites(sortSitesByName(await siteRes.json()))
             if (insRes.ok) setInspectors(await insRes.json())
             if (mgrRes.ok) setManagers(await mgrRes.json())
             if (assRes.ok) {

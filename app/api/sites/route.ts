@@ -1,3 +1,4 @@
+import { sortSitesByName } from "@/lib/site-sort"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -97,10 +98,11 @@ export async function GET(req: Request) {
                     },
                 },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: { name: "asc" },
         })
 
-        return NextResponse.json(sites)
+        // A–Z by name for every site dropdown and list (lib/site-sort).
+        return NextResponse.json(sortSitesByName(sites))
     } catch (error) {
         console.error("[SITES_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })

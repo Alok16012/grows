@@ -1,5 +1,6 @@
 "use client"
 
+import { sortSitesByName } from "@/lib/site-sort"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -207,7 +208,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             .catch(() => setProject(null))
             .finally(() => setLoading(false))
 
-        fetch("/api/sites?isActive=true").then(r => r.ok ? r.json() : []).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {})
+        fetch("/api/sites?isActive=true").then(r => r.ok ? r.json() : []).then(d => setSites(sortSitesByName(d))).catch(() => {})
     }, [params.id])
 
     // Pickers follow the selected site — see components/StaffPicker for the

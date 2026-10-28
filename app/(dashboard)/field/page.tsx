@@ -1,5 +1,6 @@
 "use client"
 
+import { sortSitesByName } from "@/lib/site-sort"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
@@ -654,7 +655,7 @@ export default function FieldPage() {
             const res = await fetch("/api/sites?isActive=true")
             if (res.ok) {
                 const data = await res.json()
-                setSites(Array.isArray(data) ? data : [])
+                setSites(sortSitesByName(data))
             }
         } catch {
             // ignore

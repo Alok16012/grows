@@ -1,5 +1,6 @@
 "use client"
 
+import { sortSitesByName } from "@/lib/site-sort"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
@@ -164,7 +165,7 @@ export default function ProjectsPage() {
     const sites = useMemo(() => {
         const map = new Map<string, string>()
         projects.forEach(p => { if (p.site) map.set(p.site.id, p.site.name) })
-        return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+        return sortSitesByName(Array.from(map.entries()).map(([id, name]) => ({ id, name })))
     }, [projects])
     const hasNoSiteProjects = useMemo(() => projects.some(p => !p.site), [projects])
 

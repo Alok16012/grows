@@ -1,4 +1,5 @@
 "use client"
+import { sortSitesByName } from "@/lib/site-sort"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
@@ -1327,7 +1328,7 @@ export default function SitesPage() {
                 return
             }
             const data = await res.json()
-            setAllSites(Array.isArray(data) ? data : [])
+            setAllSites(sortSitesByName(data))
         } catch (e) {
             console.error("[fetchSites]", e)
             toast.error("Failed to load sites")

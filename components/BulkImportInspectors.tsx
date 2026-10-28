@@ -1,5 +1,6 @@
 "use client"
 
+import { sortSitesByName } from "@/lib/site-sort"
 import { useState, useRef, useEffect } from "react"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -92,7 +93,7 @@ export default function BulkImportInspectors({ onImportComplete }: BulkImportIns
                 fetch("/api/sites?isActive=true"),
                 fetch("/api/users?role=MANAGER")
             ])
-            if (siteRes.ok) setSites(await siteRes.json())
+            if (siteRes.ok) setSites(sortSitesByName(await siteRes.json()))
             if (mgrRes.ok) setManagers(await mgrRes.json())
         } catch (error) {
             console.error("Failed to fetch sites/managers", error)

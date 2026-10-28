@@ -1,5 +1,6 @@
 "use client"
 
+import { sortSitesByName } from "@/lib/site-sort"
 import { Suspense, useState, useEffect, useMemo, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -162,7 +163,7 @@ function CreateProjectForm() {
     useEffect(() => {
         fetch("/api/sites?isActive=true")
             .then(r => r.ok ? r.json() : [])
-            .then(d => setSites(Array.isArray(d) ? d : []))
+            .then(d => setSites(sortSitesByName(d)))
             .catch(() => toast.error("Failed to load sites"))
             .finally(() => setLoadingSites(false))
     }, [])
