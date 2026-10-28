@@ -280,6 +280,24 @@ export default function PayrollPage() {
                     <p style={{ fontSize: 13.5, color: "var(--text3)", margin: "4px 0 0 0" }}>Pick a month, then follow the four steps.</p>
                 </div>
                 <div className="page-actions" style={{ flexWrap: "wrap" }}>
+                    {/* Month lock / unlock — beside the month it applies to. Lock covers
+                        every open (draft) row of the month, all sites; Unlock reopens
+                        locked rows (paid rows stay paid). A locked row can't be edited
+                        or re-processed until the month is unlocked (enforced server-side). */}
+                    {canLock && counts.draft > 0 && (
+                        <button onClick={lockMonth} disabled={lockingMonth !== null}
+                            title={`Lock all ${counts.draft} open rows of ${periodLabel}, all sites at once`}
+                            style={{ ...quietBtn, border: "none", background: "#7c3aed", color: "#fff" }}>
+                            {lockingMonth === "lock" ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />} Lock month ({counts.draft})
+                        </button>
+                    )}
+                    {canUnlock && counts.locked > 0 && (
+                        <button onClick={unlockMonth} disabled={lockingMonth !== null}
+                            title={`Reopen the ${counts.locked} locked rows of ${periodLabel} for editing (paid rows stay paid)`}
+                            style={{ ...quietBtn, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309" }}>
+                            {lockingMonth === "unlock" ? <Loader2 size={15} className="animate-spin" /> : <Unlock size={15} />} Unlock month ({counts.locked})
+                        </button>
+                    )}
                     <div style={{ display: "flex", alignItems: "center", height: 40, borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", overflow: "hidden" }}>
                         <button aria-label="Previous month" onClick={() => choosePeriod(shiftMonth(period, -1))}
                             style={{ width: 36, height: "100%", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -390,18 +408,6 @@ export default function PayrollPage() {
                                             <Pencil size={12} /> {counts.rows > 0 ? "Fix days by site" : "Enter days by site"}
                                         </button>
                                     )}
-                                    {s.step === 2 && canLock && counts.draft > 0 && (
-                                        <button onClick={lockMonth} disabled={lockingMonth !== null} title="Lock every open row of this month, all sites at once"
-                                            style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                                            {lockingMonth === "lock" ? <Loader2 size={12} className="animate-spin" /> : <Lock size={12} />} Lock whole month ({counts.draft})
-                                        </button>
-                                    )}
-                                    {s.step === 2 && canUnlock && counts.locked > 0 && (
-                                        <button onClick={unlockMonth} disabled={lockingMonth !== null} title="Reopen every locked row of this month for editing (paid rows stay paid)"
-                                            style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                                            {lockingMonth === "unlock" ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />} Unlock month ({counts.locked})
-                                        </button>
-                                    )}
                                     {s.step === 4 && canMarkPaid && counts.locked > 0 && counts.draft === 0 && (
                                         <button onClick={markAllPaid} disabled={markingPaid}
                                             style={{ display: "flex", alignItems: "center", gap: 5, height: 34, padding: "0 10px", borderRadius: 8, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#15803d", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
@@ -417,7 +423,7 @@ export default function PayrollPage() {
                 <div style={{ padding: "10px 20px 12px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", gap: 8 }}>
                     <Lock size={11} style={{ color: "var(--text3)", flexShrink: 0 }} />
                     <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>
-                        Lock the whole month from Step 2 once the sheet is checked; reports and payslips open after that. Locked rows can&apos;t be edited — <b>Unlock month</b> reopens them (paid rows stay paid).
+                        Use <b>Lock month</b> at the top once the sheet is checked; reports and payslips open after that. A locked month can&apos;t be edited or re-processed — <b>Unlock month</b> reopens it (paid rows stay paid).
                     </p>
                 </div>
             </div>
