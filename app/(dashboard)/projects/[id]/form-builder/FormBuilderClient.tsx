@@ -1,5 +1,6 @@
 "use client"
 
+import { orderBasicFields } from "@/lib/form-field-order"
 import Link from "next/link"
 import { toast } from "sonner"
 import { useState, useEffect, useCallback } from "react"
@@ -595,7 +596,8 @@ export default function FormBuilderClient({
                                 <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px]">
                                     Basic Info
                                 </div>
-                                {fields.filter(f => f.category === "FIXED").map(field => (
+                                {/* Same order the inspector sees (lib/form-field-order). */}
+                                {orderBasicFields(fields.filter(f => f.category === "FIXED")).map(field => (
                                     <FieldPreview key={field.id} field={field} />
                                 ))}
 

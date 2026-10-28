@@ -1,5 +1,6 @@
 "use client"
 
+import { orderBasicFields } from "@/lib/form-field-order"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -332,7 +333,9 @@ export default function InspectionFormPage() {
     // Hidden fields are retired questions: kept so their past answers survive
     // (deleting a field cascades and erases them), but no longer asked.
     const visibleTemplates = templates.filter(t => !t.isHidden)
-    const fixedFields = visibleTemplates.filter(t => t.category === "FIXED")
+    // Fixed inspector order: Date, Shift, Location, Part Name, Part Number,
+    // any other basic fields, then Inspected Qty and Rework Qty last.
+    const fixedFields = orderBasicFields(visibleTemplates.filter(t => t.category === "FIXED"))
     const defectFields = visibleTemplates.filter(t => t.category === "DEFECT")
     const autoFields = templates.filter(t => t.category === "AUTO")
 
