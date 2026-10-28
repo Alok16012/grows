@@ -276,9 +276,12 @@ function ComplianceMasterInner() {
                         // by the configured rules instead of hardcoded rates.
                         const pfBase = Math.min(Number(p.basicSalary ?? 0) + Number(p.da ?? 0), rules.pf.wageCeiling)
                         const er = rules.pf.employer
+                        // Outside the pension scheme (Employee Master): no EPS,
+                        // the whole employer share is EPF — same as the engine.
+                        const noEps = p.pensionApplicable === false
                         return {
-                            eps:      Math.round(pfBase * er.epsPct / 100),
-                            epfEr:    Math.round(pfBase * er.epfPct / 100),
+                            eps:      noEps ? 0 : Math.round(pfBase * er.epsPct / 100),
+                            epfEr:    noEps ? Math.round(pfBase * (er.epsPct + er.epfPct) / 100) : Math.round(pfBase * er.epfPct / 100),
                             edli:     Math.round(pfBase * er.edliPct / 100),
                             epfAdmin: Math.round(pfBase * er.adminPct / 100),
                         }

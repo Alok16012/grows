@@ -1,3 +1,4 @@
+import { statutoryFlagsFor } from "@/lib/employee-statutory"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -140,7 +141,9 @@ export async function PUT(
             // ESIC follows the engine: eligibility on FULL-MONTH structure
             // gross, wages exclude washing/conveyance/bonus per rules, CALL exempt.
             const esicLimit = employee?.isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
-            const esicEligible = rules.esic.enabled && !isCALL && existing.grossFullMonth <= esicLimit
+            // Same switch the wage run honours (Employee Master → ESIC Applicable).
+            const esicApplicable = (await statutoryFlagsFor([existing.employeeId])).get(existing.employeeId)?.esicApplicable ?? true
+            const esicEligible = rules.esic.enabled && !isCALL && esicApplicable && existing.grossFullMonth <= esicLimit
             const esicWages = Math.max(0,
                 grossSalary
                 - (rules.esic.excludeWashing ? existing.washing : 0)

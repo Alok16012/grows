@@ -14,6 +14,8 @@ export type EcrMember = {
     grossWages: number
     /** Capped Basic + DA. Filed as EPF, EPS and EDLI wages alike. */
     pfWages: number
+    /** EPS wages; 0 for a member outside the pension scheme. Defaults to pfWages. */
+    epsWages?: number
     epfEmployee: number
     epsContribution: number
     epfEmployer: number
@@ -40,7 +42,7 @@ export function ecrLine(m: EcrMember): string {
         name,
         Math.round(m.grossWages),
         wages,
-        wages,
+        m.epsWages !== undefined ? Math.round(m.epsWages) : wages,
         wages,
         Math.round(m.epfEmployee),
         Math.round(m.epsContribution),

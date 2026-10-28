@@ -1,3 +1,4 @@
+import { statutoryFlagsFor } from "@/lib/employee-statutory"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -72,7 +73,14 @@ export async function GET(req: Request) {
 
         // Bank and statutory numbers ride along only for roles allowed to see them.
         const access = accessFrom(session)
-        return NextResponse.json(payrolls.map(p => ({ ...p, employee: p.employee ? maskEmployee(p.employee, access) : p.employee })))
+        // PF Pension Applicability (Employee Master) for the EPS / EPF split on
+        // the compliance screens. Only false is meaningful; default true.
+        const statutory = await statutoryFlagsFor([...new Set(payrolls.map(p => p.employeeId))])
+        return NextResponse.json(payrolls.map(p => ({
+            ...p,
+            pensionApplicable: statutory.get(p.employeeId)?.pensionApplicable ?? true,
+            employee: p.employee ? maskEmployee(p.employee, access) : p.employee,
+        })))
     } catch (error) {
         console.error("[PAYROLL_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })

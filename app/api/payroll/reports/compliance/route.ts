@@ -1,3 +1,4 @@
+import { statutoryFlagsFor } from "@/lib/employee-statutory"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -9,6 +10,8 @@ import { buildEcrText, EcrMember } from "@/lib/ecr-format"
 import { accessFrom, has } from "@/lib/access"
 
 type PayrollRow = {
+    /** Employee Master → PF Pension Applicability. false = not an EPS member. Filled in after the query. */
+    pensionApplicable?: boolean
     id: string
     month: number
     year: number
@@ -79,7 +82,15 @@ function pfWages(p: PayrollRow, rules: PayrollRules) {
 const hasPf = (p: PayrollRow) => p.pfEmployee > 0
 
 function epsContrib(p: PayrollRow, rules: PayrollRules) {
+    // Outside the pension scheme: no EPS. epfEmployerContrib then files the
+    // whole 12% employer share as EPF, matching lib/payroll-calc.ts.
+    if (p.pensionApplicable === false) return 0
     return Math.round(pfWages(p, rules) * rules.pf.employer.epsPct / 100)
+}
+
+/** EPS wages: the PF wages, or 0 for a member outside the pension scheme. */
+function epsWages(p: PayrollRow, rules: PayrollRules) {
+    return p.pensionApplicable === false ? 0 : pfWages(p, rules)
 }
 
 /**
@@ -122,6 +133,7 @@ const ecrMember = (p: PayrollRow, rules: PayrollRules): EcrMember => ({
     name: `${p.employee.firstName} ${p.employee.lastName}`,
     grossWages: p.grossSalary,
     pfWages: pfWages(p, rules),
+    epsWages: epsWages(p, rules),
     epfEmployee: p.pfEmployee,
     epsContribution: epsContrib(p, rules),
     epfEmployer: epfEmployerContrib(p, rules),
@@ -183,6 +195,11 @@ export async function GET(req: Request) {
             },
             orderBy: { employee: { firstName: "asc" } }
         }) as PayrollRow[]
+
+        // PF Pension Applicability per member (Employee Master). Read at filing
+        // time; no row / no table = pension applicable, the old behaviour.
+        const statutory = await statutoryFlagsFor(payrolls.map(p => p.employee.id))
+        for (const p of payrolls) p.pensionApplicable = statutory.get(p.employee.id)?.pensionApplicable ?? true
 
         if (payrolls.length === 0) {
             // 409: the month may well exist as a DRAFT — it just isn't filable yet.
@@ -398,7 +415,7 @@ export async function GET(req: Request) {
                         "PF Number": p.employee.pfNumber ?? "",
                         "Gross Wages": p.grossSalary,
                         "EPF Wages": pfWages(p, rules),
-                        "EPS Wages": pfWages(p, rules),
+                        "EPS Wages": epsWages(p, rules),
                         "EDLI Wages": pfWages(p, rules),
                         "EPF Contribution (EE)": p.pfEmployee,
                         "EPS Contribution (ER)": epsContrib(p, rules),
@@ -414,7 +431,7 @@ export async function GET(req: Request) {
                         "Member Name": `${p.employee.firstName} ${p.employee.lastName}`,
                         "Gross Wages": p.grossSalary,
                         "EPF Wages": pfWages(p, rules),
-                        "EPS Wages": pfWages(p, rules),
+                        "EPS Wages": epsWages(p, rules),
                         "EDLI Wages": pfWages(p, rules),
                         "EPF Contribution (EE)": p.pfEmployee,
                         "EPS Contribution": epsContrib(p, rules),

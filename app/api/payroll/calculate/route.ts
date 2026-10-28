@@ -6,6 +6,7 @@ import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { checkAccess } from "@/lib/permissions"
 import { revisionsForMonth } from "@/lib/salary-revision"
+import { statutoryFlagsFor } from "@/lib/employee-statutory"
 
 // Zero is a legitimate value here (an employee who worked no days), so `||`
 // cannot be used to apply the default — it would silently pay a full month.
@@ -129,6 +130,9 @@ export async function POST(req: Request) {
         // employees without a revision fall back to EmployeeSalary below,
         // which is what every employee did before revisions existed.
         const revisions = await revisionsForMonth(employees.map(e => e.id), { month, year })
+        // PF / pension / ESIC switches per employee. No row (or the table not
+        // created yet) = all applicable, i.e. the old behaviour.
+        const statutory = await statutoryFlagsFor(employees.map(e => e.id))
         const defaultMonthDays = rules.defaults.monthDays
 
         // ── STEP 1: Calculate ALL payroll values in memory (pure JS, zero DB calls) ──
@@ -221,6 +225,7 @@ export async function POST(req: Request) {
                 canteenRatePerDay: salData?.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType:    salData?.complianceType   ?? "OR",
                 isHandicap:        emp.isHandicap            ?? false,
+                ...(statutory.get(emp.id) ?? {}),
             }, {
                 ...att,
                 gender: emp.gender ?? "Male",

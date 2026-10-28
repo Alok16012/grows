@@ -41,6 +41,11 @@ export function calcGrowusPayroll(sal: {
     bonus?: number             // per-employee bonus from salary structure (Payment of Bonus Act cap)
     complianceType?: string    // "CALL" | "OR" (default "OR")
     isHandicap?: boolean       // ESIC eligibility limit: ₹25,000 for handicap, ₹21,000 otherwise
+    // Per-employee switches (Employee Master → Basic Info, lib/employee-statutory).
+    // Absent = applicable, so every caller that doesn't pass them is unchanged.
+    pfApplicable?: boolean      // false → no PF at all (employee or employer)
+    pensionApplicable?: boolean // false → employer EPS 8.33% goes to EPF instead (same total)
+    esicApplicable?: boolean    // false → no ESIC (employee or employer)
 }, att: {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
@@ -57,6 +62,9 @@ export function calcGrowusPayroll(sal: {
         bonus: storedBonus,
         complianceType = "OR",
         isHandicap = false,
+        pfApplicable = true,
+        pensionApplicable = true,
+        esicApplicable = true,
     } = sal
 
     const {
@@ -106,7 +114,7 @@ export function calcGrowusPayroll(sal: {
     // PF base = min(EARNED Basic + DA, wage ceiling ₹15,000).
     // ≤ ₹15,000 → 12% of actual. > ₹15,000 → ₹1,800 fixed.
     // Default: full PF regardless of worked days; optional proration rule.
-    const pfApplies  = rules.pf.enabled && !isCALL
+    const pfApplies  = rules.pf.enabled && !isCALL && pfApplicable !== false
     const pfBase     = Math.min(basicEarned + daEarned, rules.pf.wageCeiling)
     const pfProrated = rules.pf.prorateEmployee && workedDays < rules.pf.prorationThresholdDays
     const pfEmployee = !pfApplies ? 0 : pfProrated
@@ -120,7 +128,7 @@ export function calcGrowusPayroll(sal: {
         - (rules.esic.excludeWashing ? washingEarned : 0)
         - (rules.esic.excludeConveyance ? convEarned : 0)
         - (rules.esic.excludeBonus ? bonusEarned : 0)
-    const esicEligible = rules.esic.enabled && !isCALL && grossFullMonth <= esicLimit
+    const esicEligible = rules.esic.enabled && !isCALL && esicApplicable !== false && grossFullMonth <= esicLimit
     const esiEmployee  = esicEligible ? pctCeil(esicWages, rules.esic.employeePct) : 0
 
     // PT: slab on EARNED gross, but the female limit on the full-month
@@ -150,7 +158,9 @@ export function calcGrowusPayroll(sal: {
 
     // ─── Employer Contributions ───────────────────────────────────────────────
     // Employer PF — 4 components on pfBase = Basic + DA (no ceiling)
-    const eps         = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.epsPct)
+    // Not in the pension scheme: no EPS, and the remainder line below then puts
+    // the whole employer share into EPF — the total employer PF is unchanged.
+    const eps         = !pfApplies || pensionApplicable === false ? 0 : pctOf(pfBase, rules.pf.employer.epsPct)
     // EPF employer is the REMAINDER of the combined EPS+EPF share, not an
     // independently rounded 3.67%. EPFO computes the 12% employer share and
     // subtracts EPS from it, so EPS + EPF must come to exactly ROUND(12%) —

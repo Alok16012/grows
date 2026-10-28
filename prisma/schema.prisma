@@ -787,6 +787,8 @@ model Employee {
   iltAttendances        ILTAttendance[]
   courseFeedbacks       CourseFeedback[]
   employeeSalary        EmployeeSalary?
+  // PF / pension / ESIC switches (scripts/employee-statutory.sql). No row = all applicable.
+  statutory             EmployeeStatutory?
   salaryRevisions       SalaryRevision[]
   advances              AdvanceAndReimbursement[]
   hrDocuments           HrDocument[]
@@ -850,6 +852,23 @@ model EmployeeSalary {
   employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([status])
+}
+
+/// Per-employee statutory switches, set from Employee Master → Edit → Basic Info.
+/// Its own table, not new Employee columns: production schema is applied by
+/// hand (scripts/employee-statutory.sql) and a new Employee column would break
+/// every Employee query until that SQL ran. No row = everything applicable,
+/// which is exactly how payroll behaved before these switches existed.
+model EmployeeStatutory {
+  employeeId        String   @id
+  pfApplicable      Boolean  @default(true)
+  // EPS: when false the employer's 8.33% pension share goes to EPF instead
+  // (same total employer PF, different split in the challan).
+  pensionApplicable Boolean  @default(true)
+  esicApplicable    Boolean  @default(true)
+  updatedBy         String?
+  updatedAt         DateTime @default(now()) @updatedAt
+  employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
 /// A dated salary structure. EmployeeSalary holds only ONE row per employee and

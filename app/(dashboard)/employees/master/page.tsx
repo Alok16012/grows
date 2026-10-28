@@ -354,6 +354,32 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
     const [form, setForm] = useState<EditForm>(() => empToForm(emp))
     const [saving, setSaving] = useState(false)
     const [section, setSection] = useState("basic")
+    // PF / Pension / ESIC switches (own API + table; see lib/employee-statutory).
+    // null while loading. installed=false until scripts/employee-statutory.sql runs.
+    const [statutory, setStatutory] = useState<{ installed: boolean; pfApplicable: boolean; pensionApplicable: boolean; esicApplicable: boolean } | null>(null)
+    const [statutoryDirty, setStatutoryDirty] = useState(false)
+    useEffect(() => {
+        let alive = true
+        fetch(`/api/employees/${emp.id}/statutory`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (!alive) return
+                const f = d?.flags ?? {}
+                setStatutory({ installed: d?.installed !== false && !!d, pfApplicable: f.pfApplicable ?? true, pensionApplicable: f.pensionApplicable ?? true, esicApplicable: f.esicApplicable ?? true })
+            })
+            .catch(() => { if (alive) setStatutory({ installed: false, pfApplicable: true, pensionApplicable: true, esicApplicable: true }) })
+        return () => { alive = false }
+    }, [emp.id])
+    const setFlag = (key: "pfApplicable" | "pensionApplicable" | "esicApplicable") => (v: boolean) => {
+        setStatutory(prev => {
+            if (!prev) return prev
+            const next = { ...prev, [key]: v }
+            // Pension (EPS) is part of PF: no PF means no pension.
+            if (key === "pfApplicable" && !v) next.pensionApplicable = false
+            return next
+        })
+        setStatutoryDirty(true)
+    }
 
     const set = (key: keyof EditForm) => (val: string | boolean) =>
         setForm(prev => ({ ...prev, [key]: val }))
@@ -361,16 +387,31 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
     const save = async () => {
         setSaving(true)
         try {
+            // Basic Salary is no longer edited here (the salary structure owns
+            // pay), so it is left out of the request — the API only changes
+            // basicSalary when one is sent, so the stored value is kept as is.
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { basicSalary: _keepBasic, ...rest } = form
             const res = await fetch(`/api/employees/${emp.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    ...form,
-                    basicSalary: parseFloat(form.basicSalary) || 0,
+                    ...rest,
                     contractPeriodDays: form.contractPeriodDays ? parseInt(form.contractPeriodDays) : null,
                 })
             })
             if (!res.ok) throw new Error(await res.text())
+            if (statutoryDirty && statutory?.installed) {
+                const sr = await fetch(`/api/employees/${emp.id}/statutory`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ pfApplicable: statutory.pfApplicable, pensionApplicable: statutory.pensionApplicable, esicApplicable: statutory.esicApplicable }),
+                })
+                if (!sr.ok) {
+                    const d = await sr.json().catch(() => ({}))
+                    throw new Error(`Employee saved, but PF / ESIC settings were not: ${d.error || sr.status}`)
+                }
+            }
             toast.success("Employee updated")
             onSaved()
             onClose()
@@ -445,9 +486,30 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
                                     options={["ACTIVE","INACTIVE","ON_LEAVE","TERMINATED","RESIGNED"]} />
                                 <Field label="Employment Type" type="select" value={form.employmentType} onChange={set("employmentType")}
                                     options={["Full-time","Part-time","Contract","Intern","Temporary"]} />
-                                <Field label="Basic Salary"   type="number" value={form.basicSalary}  onChange={set("basicSalary")} />
                                 <Field label="Date of Joining" type="date" value={form.dateOfJoining} onChange={set("dateOfJoining")} />
                                 <Field label="Date of Leaving" type="date" value={form.dateOfLeaving} onChange={set("dateOfLeaving")} />
+                            </div>
+                            {/* Statutory applicability — read by payroll when the month is processed. */}
+                            <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)" }}>
+                                <p style={{ ...labelStyle, marginBottom: 8 }}>Statutory applicability</p>
+                                {statutory === null ? (
+                                    <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Loading…</p>
+                                ) : (
+                                    <>
+                                        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", opacity: statutory.installed ? 1 : 0.55, pointerEvents: statutory.installed ? "auto" : "none" }}>
+                                            <CheckField label="PF Applicable" checked={statutory.pfApplicable} onChange={setFlag("pfApplicable")} />
+                                            <span title={statutory.pfApplicable ? undefined : "Needs PF Applicable"} style={{ opacity: statutory.pfApplicable ? 1 : 0.5, pointerEvents: statutory.pfApplicable ? "auto" : "none" }}>
+                                                <CheckField label="PF Pension Applicability" checked={statutory.pensionApplicable} onChange={setFlag("pensionApplicable")} />
+                                            </span>
+                                            <CheckField label="ESIC Applicable" checked={statutory.esicApplicable} onChange={setFlag("esicApplicable")} />
+                                        </div>
+                                        <p style={{ fontSize: 10.5, color: "var(--text3)", margin: "2px 0 0" }}>
+                                            {statutory.installed
+                                                ? "Applies the next time payroll is processed. Locked months are not recalculated. Unticking pension moves the employer's 8.33% EPS share to EPF (same total)."
+                                                : "Not set up yet — run scripts/employee-statutory.sql in Supabase. Until then everyone is PF, pension and ESIC applicable."}
+                                        </p>
+                                    </>
+                                )}
                             </div>
                             <Field label="Notes" type="textarea" value={form.notes} onChange={set("notes")} />
                         </>
