@@ -39,7 +39,7 @@ export async function GET(
                             id: true,
                             fieldId: true,
                             value: true,
-                            field: { select: { fieldLabel: true, fieldType: true, displayOrder: true } },
+                            field: { select: { fieldLabel: true, fieldType: true, displayOrder: true, isHidden: true } },
                         },
                     },
                 },

@@ -246,7 +246,9 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
                         .sort((a: any, b: any) => a.field.displayOrder - b.field.displayOrder)
                         .filter((resp: any) => {
                             const reportConfig = inspection.assignment?.project?.reportConfig
-                            if (!reportConfig?.fields || reportConfig.fields.length === 0) return true
+                            // No saved selection: every field still shown in the form
+                            // (fields hidden in the Form Builder are left out).
+                            if (!reportConfig?.fields || reportConfig.fields.length === 0) return !resp.field?.isHidden
                             return reportConfig.fields.includes(resp.fieldId)
                         })
                         .map((resp: any) => (

@@ -38,15 +38,22 @@ export default function ReportConfigPage() {
                 const alert = await alertRes.json()
 
                 setProject(proj)
-                setTemplates(Array.isArray(temps) ? temps.sort((a: any, b: any) => a.displayOrder - b.displayOrder) : [])
+                const list: any[] = Array.isArray(temps) ? temps.sort((a: any, b: any) => a.displayOrder - b.displayOrder) : []
+                setTemplates(list)
                 setAlertConfig({ defectThreshold: alert.defectThreshold || 5.0, notifyManager: alert.notifyManager ?? true, notifyAdmin: alert.notifyAdmin ?? true })
 
-                // Load existing report config
-                if (proj.reportConfig?.fields) {
-                    setSelectedFields(proj.reportConfig.fields)
+                // Fields hidden in the Form Builder are never selected by default:
+                // they are no longer asked, so they shouldn't fill the report.
+                // A saved config keeps a hidden field only if someone ticked it
+                // while it was hidden (remembered in includedHidden); one that
+                // was selected before it got hidden drops out.
+                const hiddenIds = new Set(list.filter(t => t.isHidden).map(t => t.id))
+                if (Array.isArray(proj.reportConfig?.fields)) {
+                    const optedIn = new Set<string>(Array.isArray(proj.reportConfig.includedHidden) ? proj.reportConfig.includedHidden : [])
+                    setSelectedFields(proj.reportConfig.fields.filter((id: string) => !hiddenIds.has(id) || optedIn.has(id)))
                 } else {
-                    // Default: all fields selected
-                    setSelectedFields(temps.map((t: any) => t.id))
+                    // Default: every visible field
+                    setSelectedFields(list.filter(t => !t.isHidden).map(t => t.id))
                 }
             } catch {
                 toast.error("Failed to load configuration")
@@ -70,7 +77,11 @@ export default function ReportConfigPage() {
                 fetch(`/api/projects/${projectId}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ reportConfig: { fields: selectedFields } })
+                    body: JSON.stringify({ reportConfig: {
+                        fields: selectedFields,
+                        // Hidden fields ticked on purpose, so they stay ticked on reload.
+                        includedHidden: selectedFields.filter(id => templates.some(t => t.id === id && t.isHidden)),
+                    } })
                 }),
                 fetch(`/api/projects/${projectId}/alert-config`, {
                     method: "PUT",
@@ -132,7 +143,7 @@ export default function ReportConfigPage() {
                 </p>
 
                 <div className="flex gap-2 mb-4">
-                    <button onClick={() => setSelectedFields(templates.map(t => t.id))} className="text-[11px] text-[var(--accent)] hover:underline">Select All</button>
+                    <button onClick={() => setSelectedFields(templates.filter(t => !t.isHidden).map(t => t.id))} className="text-[11px] text-[var(--accent)] hover:underline" title="All fields shown in the form; hidden fields can still be ticked one by one">Select All</button>
                     <span className="text-[var(--border)]">|</span>
                     <button onClick={() => setSelectedFields([])} className="text-[11px] text-[var(--text3)] hover:underline">Deselect All</button>
                 </div>
@@ -148,8 +159,9 @@ export default function ReportConfigPage() {
                             >
                                 {selectedFields.includes(t.id) && <Check className="h-3 w-3 text-white" />}
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <span className="text-[13px] font-medium text-[var(--text)]">{t.fieldLabel}</span>
+                            <div className={`flex-1 min-w-0 ${t.isHidden ? "opacity-60" : ""}`}>
+                                <span className={`text-[13px] font-medium text-[var(--text)] ${t.isHidden ? "line-through" : ""}`}>{t.fieldLabel}</span>
+                                {t.isHidden && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500" title="Hidden in the Form Builder — not selected unless you tick it">HIDDEN</span>}
                                 <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                                     t.category === "DEFECT" ? "bg-orange-100 text-orange-700" :
                                     t.category === "AUTO" ? "bg-blue-100 text-blue-700" :
