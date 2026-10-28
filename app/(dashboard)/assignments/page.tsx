@@ -569,6 +569,38 @@ export default function AssignmentsPage() {
 
     return (
         <div className="p-4 lg:p-0 pb-8">
+            {/* Stats strip — first thing on the page, above the heading */}
+            <div className="mb-4 bg-white border border-[var(--border)] rounded-[14px] p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 divide-x-0 sm:divide-x divide-[var(--border)]">
+                <div className="flex items-center gap-2.5 sm:pl-2">
+                    <span className="w-9 h-9 rounded-[9px] bg-[var(--accent-light)] flex items-center justify-center"><ClipboardList size={16} className="text-[var(--accent)]" /></span>
+                    <span>
+                        <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.total}</span>
+                        <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Total Assignments</span>
+                    </span>
+                </div>
+                <div className="flex items-center gap-2.5 sm:pl-4">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] shrink-0" />
+                    <span>
+                        <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.active}</span>
+                        <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Active</span>
+                    </span>
+                </div>
+                <div className="flex items-center gap-2.5 sm:pl-4">
+                    <span className="w-9 h-9 rounded-[9px] bg-[#eff6ff] flex items-center justify-center"><Calendar size={15} className="text-[#3b82f6]" /></span>
+                    <span>
+                        <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.oneTime}</span>
+                        <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">One-time</span>
+                    </span>
+                </div>
+                <div className="flex items-center gap-2.5 sm:pl-4">
+                    <span className="w-9 h-9 rounded-[9px] bg-[#f5f3ff] flex items-center justify-center"><RefreshCw size={15} className="text-[#7c3aed]" /></span>
+                    <span>
+                        <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.recurring}</span>
+                        <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Recurring</span>
+                    </span>
+                </div>
+            </div>
+
             {/* Header */}
             <div className="mb-4">
                 <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)] flex items-center gap-2">
@@ -863,40 +895,8 @@ export default function AssignmentsPage() {
                 </div>
                 )}
 
-                {/* ── RIGHT: stats + table ── */}
+                {/* ── RIGHT: table ── */}
                 <div className="space-y-4 min-w-0">
-                    {/* Stats strip */}
-                    <div className="bg-white border border-[var(--border)] rounded-[14px] p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 divide-x-0 sm:divide-x divide-[var(--border)]">
-                        <div className="flex items-center gap-2.5 sm:pl-2">
-                            <span className="w-9 h-9 rounded-[9px] bg-[var(--accent-light)] flex items-center justify-center"><ClipboardList size={16} className="text-[var(--accent)]" /></span>
-                            <span>
-                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.total}</span>
-                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Total Assignments</span>
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2.5 sm:pl-4">
-                            <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] shrink-0" />
-                            <span>
-                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.active}</span>
-                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Active</span>
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2.5 sm:pl-4">
-                            <span className="w-9 h-9 rounded-[9px] bg-[#eff6ff] flex items-center justify-center"><Calendar size={15} className="text-[#3b82f6]" /></span>
-                            <span>
-                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.oneTime}</span>
-                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">One-time</span>
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2.5 sm:pl-4">
-                            <span className="w-9 h-9 rounded-[9px] bg-[#f5f3ff] flex items-center justify-center"><RefreshCw size={15} className="text-[#7c3aed]" /></span>
-                            <span>
-                                <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.recurring}</span>
-                                <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Recurring</span>
-                            </span>
-                        </div>
-                    </div>
-
                     {/* Table card */}
                     <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden">
                         <div className="filter-bar p-3.5 border-b border-[var(--border)]">
