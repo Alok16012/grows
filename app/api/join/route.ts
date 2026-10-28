@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getHrContacts } from "@/lib/hr-contacts"
+import { designationOptions, onboardingPolicyMap } from "@/lib/policy-admin"
+import { designationKey } from "@/lib/policy-text"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
@@ -11,7 +13,10 @@ import {
 import crypto from "crypto"
 
 // Public route — returns site + HR lists so the /join form can render
-// the Work Site and Assigned HR dropdowns without needing a session.
+// the Work Site and Assigned HR dropdowns without needing a session, and the
+// designations for the Designation / Role dropdown. Designations come from the
+// same list the policy editor maps policies to, each with how many Onboarding
+// policies the joiner will sign for it (names only, never staff counts).
 export async function GET(req: Request) {
     try {
         // `ref` = the user id embedded in a personalized "Share Join Link". When
@@ -19,7 +24,7 @@ export async function GET(req: Request) {
         // the HR contact — the candidate (and HR) don't pick it manually.
         const ref = new URL(req.url).searchParams.get("ref")
 
-        const [sites, hrUsers, referrer] = await Promise.all([
+        const [sites, hrUsers, referrer, designations] = await Promise.all([
             prisma.site.findMany({
                 where: { isActive: true },
                 select: { id: true, name: true, code: true },
@@ -32,11 +37,18 @@ export async function GET(req: Request) {
                     select: { id: true, name: true, role: true, customRole: { select: { name: true } } },
                 }).catch(() => null)
                 : Promise.resolve(null),
+            // A failure here must not take the sites / HR dropdowns down with it.
+            Promise.all([designationOptions(), onboardingPolicyMap()])
+                .then(([opts, map]) => opts.map(o => ({
+                    designation: o.designation,
+                    onboardingPolicies: map.forAll + (map.byKey.get(designationKey(o.designation)) ?? 0),
+                })))
+                .catch(e => { console.error("[JOIN_GET designations]", e); return [] }),
         ])
-        return NextResponse.json({ sites, hrUsers, referrer })
+        return NextResponse.json({ sites, hrUsers, referrer, designations })
     } catch (error) {
         console.error("[JOIN_GET]", error)
-        return NextResponse.json({ sites: [], hrUsers: [], referrer: null }, { status: 200 })
+        return NextResponse.json({ sites: [], hrUsers: [], referrer: null, designations: [] }, { status: 200 })
     }
 }
 

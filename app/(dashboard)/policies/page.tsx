@@ -1,17 +1,18 @@
 "use client"
-// Policy Management — HR writes policies, maps them to designations and
-// publishes versions; joiners read and sign them on step 3 of joining.
+// Policy Management — HR writes policies, picks a category, maps them to
+// designations and publishes versions. Onboarding-category policies are signed
+// on the onboarding form / joining link; other categories from My Policies.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
     FileSignature, Plus, Search, Layers, Pencil, Archive, RotateCcw, Trash2, Users, Download, FileText,
-    CheckCircle2, Clock, History, Eye, Send, AlertTriangle, Loader2, ShieldCheck, Globe2, X,
+    CheckCircle2, Clock, History, Eye, Send, AlertTriangle, Loader2, ShieldCheck, Globe2, X, UserPlus,
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
-import { POLICY_CATEGORIES, SIGNOFF_MISSING_MESSAGE, policyBlocks } from "@/lib/policy-text"
+import { POLICY_CATEGORIES, SIGNOFF_MISSING_MESSAGE, policyBlocks, isOnboardingCategory, categorySignedOn } from "@/lib/policy-text"
 import {
     api, ApiError, qs, Card, Empty, Loading, Pill, Modal, Drawer, UploadButton, Label, inputCls,
     filterCls, btnPrimary, btnGhost, btnSmall, btnIcon, thCls, tdCls, fmtDate,
@@ -53,6 +54,18 @@ function usePolicyApi() {
 
 const key = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase()
 
+/** Category label, plus a tag on Onboarding policies saying where they are signed. */
+function CategoryTag({ category }: { category: string | null }) {
+    if (!category) return <span className="text-[11.5px] text-[var(--text3)]">No category</span>
+    const onboarding = isOnboardingCategory(category)
+    return (
+        <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <span className={`px-1.5 py-0.5 rounded-md text-[11px] font-medium border ${onboarding ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-[var(--surface2)] border-[var(--border)] text-[var(--text2)]"}`}>{category}</span>
+            {onboarding && <span className="inline-flex items-center gap-1 text-[11px] text-blue-700" title={categorySignedOn(category)}><UserPlus size={11} /> Onboarding form</span>}
+        </span>
+    )
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function PoliciesPage() {
@@ -67,6 +80,7 @@ export default function PoliciesPage() {
     const [q, setQ] = useState("")
     const [status, setStatus] = useState<"" | Status | "ALL">("")
     const [designation, setDesignation] = useState("")
+    const [category, setCategory] = useState("")
     const [designations, setDesignations] = useState<DesignationOpt[]>([])
     const [editing, setEditing] = useState<string | "new" | null>(null)
     const [report, setReport] = useState<Row | null>(null)
@@ -75,11 +89,11 @@ export default function PoliciesPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const d = await api<{ policies: Row[] }>(`/api/policies${qs({ q: q.trim(), status, designation })}`)
+            const d = await api<{ policies: Row[] }>(`/api/policies${qs({ q: q.trim(), status, designation, category })}`)
             setRows(d.policies)
         } catch (e) { fail(e, "Could not load policies") }
         finally { setLoading(false) }
-    }, [q, status, designation, fail])
+    }, [q, status, designation, category, fail])
 
     const loadDesignations = useCallback(async () => {
         try { setDesignations((await api<{ designations: DesignationOpt[] }>("/api/policies/designations")).designations) }
@@ -137,7 +151,7 @@ export default function PoliciesPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
                 <div>
                     <h1 className="text-[24px] sm:text-[26px] font-bold text-[var(--text)] tracking-[-0.5px] leading-tight">Policy Sign-off</h1>
-                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Policies joiners read and sign on step 3 of joining, mapped by designation.</p>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Mapped by designation. <b className="font-semibold text-[var(--text2)]">Onboarding</b> policies are signed on the employee onboarding form; other categories from each employee&apos;s My Policies.</p>
                 </div>
                 {canManage && !missing && (
                     <div className="page-actions flex gap-2 flex-wrap">
@@ -168,6 +182,11 @@ export default function PoliciesPage() {
                                 <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search title or category…" aria-label="Search policies"
                                     className={`${filterCls} w-full !pl-8`} />
                             </div>
+                            <select className={filterCls} value={category} onChange={e => setCategory(e.target.value)} aria-label="Category">
+                                <option value="">All categories</option>
+                                {POLICY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                <option value="NONE">No category</option>
+                            </select>
                             <select className={filterCls} value={designation} onChange={e => setDesignation(e.target.value)} aria-label="Designation">
                                 <option value="">All designations</option>
                                 {designations.map(d => <option key={d.designation} value={d.designation}>{d.designation}{d.employees ? ` (${d.employees})` : ""}</option>)}
@@ -202,7 +221,10 @@ export default function PoliciesPage() {
                                                 <tr key={r.id} className="border-t border-[var(--border)] hover:bg-[var(--surface2)]/50">
                                                     <td className={tdCls}>
                                                         <button className="text-left font-semibold text-[var(--text)] hover:text-[var(--accent)]" onClick={() => setEditing(r.id)}>{r.title}</button>
-                                                        <p className="text-[11.5px] text-[var(--text3)]">{r.category || "—"}{!r.requiresSignature ? " · read only, no signature" : ""}</p>
+                                                        <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                                            <CategoryTag category={r.category} />
+                                                            {!r.requiresSignature && <span className="text-[11px] text-[var(--text3)]">· read only, no signature</span>}
+                                                        </div>
                                                     </td>
                                                     <td className={`${tdCls} max-w-[260px]`}>
                                                         {r.appliesToAll ? (
@@ -438,8 +460,15 @@ function PolicyEditor({ id, canManage, designationOpts, fail, onClose, onChanged
                         </div>
                         <div>
                             <Label>Category</Label>
-                            <input className={inputCls()} list="policy-categories" value={f.category} onChange={e => set("category", e.target.value)} disabled={readOnly} placeholder="HR, Safety, IT & Data…" maxLength={60} />
-                            <datalist id="policy-categories">{POLICY_CATEGORIES.map(c => <option key={c} value={c} />)}</datalist>
+                            <select className={inputCls()} value={f.category} onChange={e => set("category", e.target.value)} disabled={readOnly}>
+                                <option value="">No category</option>
+                                {POLICY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                {/* A category typed before the list existed stays selectable. */}
+                                {f.category && !POLICY_CATEGORIES.some(c => c.toLowerCase() === f.category.toLowerCase()) && <option value={f.category}>{f.category}</option>}
+                            </select>
+                            <p className={`text-[11.5px] mt-1 flex items-center gap-1 ${isOnboardingCategory(f.category) ? "text-blue-700" : "text-[var(--text3)]"}`}>
+                                {isOnboardingCategory(f.category) && <UserPlus size={12} />} {categorySignedOn(f.category)}
+                            </p>
                         </div>
                         <div>
                             <Label>Effective from</Label>
@@ -447,7 +476,7 @@ function PolicyEditor({ id, canManage, designationOpts, fail, onClose, onChanged
                         </div>
                         <label className="sm:col-span-2 flex items-start gap-2 cursor-pointer">
                             <input type="checkbox" className="mt-0.5 w-4 h-4 accent-[var(--accent)]" checked={f.requiresSignature} disabled={readOnly} onChange={e => set("requiresSignature", e.target.checked)} />
-                            <span className="text-[12.5px] text-[var(--text2)]"><b className="text-[var(--text)]">Requires signature</b> — joiners must read it to the end and sign before submitting their joining form.</span>
+                            <span className="text-[12.5px] text-[var(--text2)]"><b className="text-[var(--text)]">Requires signature</b> — {isOnboardingCategory(f.category) ? "joiners must read it to the end and sign it before they can submit the onboarding form." : "employees must read it to the end and sign it from My Policies."}</span>
                         </label>
                     </div>
 

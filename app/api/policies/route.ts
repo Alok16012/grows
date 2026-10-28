@@ -6,7 +6,8 @@ import { adminCtx, requireManage, cleanDesignations, signoffCounts, POLICY_INCLU
 
 const STATUSES = ["DRAFT", "ACTIVE", "ARCHIVED"]
 
-// GET ?status=&designation=&q= — policy list with designations and sign-off counts.
+// GET ?status=&designation=&category=&q= — policy list with designations and
+// sign-off counts. category=NONE lists policies without a category.
 export async function GET(req: Request) {
     try {
         await adminCtx(req)
@@ -14,11 +15,18 @@ export async function GET(req: Request) {
         const status = sp.get("status")
         const q = sp.get("q")?.trim()
         const dKey = designationKey(sp.get("designation"))
+        const category = sp.get("category")?.trim()
         const policies = await prisma.signoffPolicy.findMany({
             where: {
                 ...(status === "ALL" ? {} : status && STATUSES.includes(status) ? { status } : { status: { not: "ARCHIVED" } }),
                 ...(q ? { OR: [{ title: { contains: q, mode: "insensitive" } }, { category: { contains: q, mode: "insensitive" } }] } : {}),
-                ...(dKey ? { OR: [{ appliesToAll: true }, { designations: { some: { designationKey: dKey } } }] } : {}),
+                // AND, not a second OR key: the search and designation filters
+                // each use OR and would otherwise overwrite one another.
+                AND: [
+                    ...(dKey ? [{ OR: [{ appliesToAll: true }, { designations: { some: { designationKey: dKey } } }] }] : []),
+                    ...(category === "NONE" ? [{ OR: [{ category: null }, { category: "" }] }]
+                        : category ? [{ category: { equals: category, mode: "insensitive" as const } }] : []),
+                ],
             },
             include: POLICY_INCLUDE,
             orderBy: [{ updatedAt: "desc" }],

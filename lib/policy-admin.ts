@@ -4,7 +4,8 @@ import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { canManagePolicies, canReportPolicies, canViewPolicies } from "@/lib/permissions"
 import { PolicyError } from "@/lib/policy-signoff"
-import { designationKey } from "@/lib/policy-text"
+import { designationKey, ONBOARDING_CATEGORY } from "@/lib/policy-text"
+import { isMissingTableErr } from "@/lib/asset-workflow"
 
 export type AdminCtx = { userId: string; canManage: boolean; canReport: boolean; canView: boolean }
 
@@ -19,6 +20,70 @@ export async function adminCtx(req: Request): Promise<AdminCtx> {
     }
     if (!ctx.canView) throw new PolicyError(403, "FORBIDDEN", "Forbidden")
     return ctx
+}
+
+/**
+ * Designations in use — from staff records and from policy mappings — with how
+ * many staff hold each. Designation is free text on the employee, so variants
+ * that differ only in case or spacing are merged under the most common spelling.
+ * Shared by the policy editor ("Applies to") and the public onboarding form, so
+ * the role a joiner picks is spelled exactly like the one policies are mapped to.
+ */
+export async function designationOptions(): Promise<{ designation: string; employees: number }[]> {
+    const [emps, mapped] = await Promise.all([
+        prisma.employee.groupBy({
+            by: ["designation"],
+            where: { designation: { not: null }, status: { in: ["ONBOARDING", "ACTIVE", "ON_LEAVE"] } },
+            _count: { _all: true },
+        }),
+        prisma.signoffPolicyDesignation.findMany({ select: { designationKey: true, designation: true }, distinct: ["designationKey"] })
+            .catch(e => { if (isMissingTableErr(e)) return []; throw e }),
+    ])
+    const byKey = new Map<string, { designation: string; employees: number; best: number }>()
+    for (const g of emps) {
+        const k = designationKey(g.designation)
+        if (!k) continue
+        const cur = byKey.get(k)
+        const n = g._count._all
+        const label = g.designation!.trim().replace(/\s+/g, " ")
+        if (!cur) byKey.set(k, { designation: label, employees: n, best: n })
+        else {
+            cur.employees += n
+            // Show the spelling most people have.
+            if (n > cur.best) { cur.best = n; cur.designation = label }
+        }
+    }
+    for (const m of mapped) if (!byKey.has(m.designationKey)) byKey.set(m.designationKey, { designation: m.designation, employees: 0, best: 0 })
+    return Array.from(byKey.values())
+        .map(({ designation, employees }) => ({ designation, employees }))
+        .sort((a, b) => a.designation.localeCompare(b.designation))
+}
+
+/**
+ * Active Onboarding-category policies needing a signature, as the joining form
+ * needs them: how many apply to every designation, and which designation keys
+ * each of the others is mapped to. Empty when sign-off isn't set up.
+ */
+export async function onboardingPolicyMap(): Promise<{ forAll: number; byKey: Map<string, number> }> {
+    const byKey = new Map<string, number>()
+    try {
+        const policies = await prisma.signoffPolicy.findMany({
+            where: {
+                status: "ACTIVE", requiresSignature: true, currentVersionId: { not: null },
+                category: { equals: ONBOARDING_CATEGORY, mode: "insensitive" },
+            },
+            select: { appliesToAll: true, designations: { select: { designationKey: true } } },
+        })
+        let forAll = 0
+        for (const p of policies) {
+            if (p.appliesToAll) { forAll++; continue }
+            for (const d of p.designations) byKey.set(d.designationKey, (byKey.get(d.designationKey) ?? 0) + 1)
+        }
+        return { forAll, byKey }
+    } catch (e) {
+        if (isMissingTableErr(e)) return { forAll: 0, byKey }
+        throw e
+    }
 }
 
 export function requireManage(ctx: AdminCtx) {

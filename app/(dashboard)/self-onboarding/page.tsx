@@ -497,7 +497,7 @@ export default function SelfOnboardingPage() {
 
                 {/* ── Step 3: Policies ─────────────────────────────────── */}
                 {step === POLICY_STEP && (
-                    <PolicySignStep source={{ kind: "self" }} theme="light" onProgress={onPolicyProgress} />
+                    <PolicySignStep source={{ kind: "self", scope: "onboarding" }} theme="light" onProgress={onPolicyProgress} />
                 )}
 
                 {/* ── Step 4: Documents / Statutory ─────────────────────── */}

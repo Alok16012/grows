@@ -130,9 +130,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
         // The onboarding form reads a failed response with res.text().
         if (errors) return new NextResponse(validationResponse(errors).message, { status: 400 })
 
-        // Every policy for the designation being saved must be signed (step 3
-        // of the form). Checked before anything is written, like the fields above.
-        const pendingPolicies = await pendingTitles(existing.id, designation || existing.designation)
+        // Every Onboarding policy for the designation being saved must be signed
+        // (step 3 of the form). Checked before anything is written, like the
+        // fields above. Other categories are signed later from My Policies.
+        const pendingPolicies = await pendingTitles(existing.id, designation || existing.designation, "onboarding")
         if (pendingPolicies.length > 0) {
             return NextResponse.json({
                 error: `Sign these policies before submitting: ${pendingPolicies.join(", ")}`,

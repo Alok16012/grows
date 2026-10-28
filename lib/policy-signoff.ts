@@ -12,8 +12,8 @@ import type { Prisma } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { isMissingTableErr, isUniqueErr } from "@/lib/asset-workflow"
 import {
-    SIGNOFF_MISSING_MESSAGE, designationKey, nameKey, normalizePolicyText,
-    type RequiredPolicy, type PolicyStatus,
+    SIGNOFF_MISSING_MESSAGE, ONBOARDING_CATEGORY, designationKey, nameKey, normalizePolicyText,
+    type RequiredPolicy, type PolicyStatus, type PolicyScope,
 } from "@/lib/policy-text"
 
 export { isUniqueErr }
@@ -112,14 +112,24 @@ export async function audit(db: Db, entry: { actorId: string | null; entity: str
 
 // ─── Who must sign what ──────────────────────────────────────────────────────
 
-/** Active, signature-required policies that apply to a designation, with their current version. */
-export async function applicablePolicies(designation: string | null | undefined) {
+/** Parses ?scope= from a request: "onboarding" or everything. */
+export function scopeFrom(v: unknown): PolicyScope {
+    return v === "onboarding" ? "onboarding" : "all"
+}
+
+/**
+ * Active, signature-required policies that apply to a designation, with their
+ * current version. `scope: "onboarding"` keeps only the Onboarding category —
+ * what the joining screens ask for; other categories are signed from the profile.
+ */
+export async function applicablePolicies(designation: string | null | undefined, scope: PolicyScope = "all") {
     const key = designationKey(designation)
     const policies = await prisma.signoffPolicy.findMany({
         where: {
             status: "ACTIVE",
             requiresSignature: true,
             currentVersionId: { not: null },
+            ...(scope === "onboarding" ? { category: { equals: ONBOARDING_CATEGORY, mode: "insensitive" as const } } : {}),
             OR: [
                 { appliesToAll: true },
                 ...(key ? [{ designations: { some: { designationKey: key } } }] : []),
@@ -143,8 +153,8 @@ export async function applicablePolicies(designation: string | null | undefined)
 }
 
 /** Required policies for one employee, with what they have read and signed. */
-export async function statusFor(employeeId: string, designation: string | null | undefined): Promise<RequiredPolicy[]> {
-    const apps = await applicablePolicies(designation)
+export async function statusFor(employeeId: string, designation: string | null | undefined, scope: PolicyScope = "all"): Promise<RequiredPolicy[]> {
+    const apps = await applicablePolicies(designation, scope)
     if (!apps.length) return []
     const [versions, acks] = await Promise.all([
         prisma.signoffPolicyVersion.findMany({
@@ -186,9 +196,9 @@ export async function statusFor(employeeId: string, designation: string | null |
 }
 
 /** Titles of required policies not yet signed (for the submit / approval gates). */
-export async function pendingTitles(employeeId: string, designation: string | null | undefined): Promise<string[]> {
+export async function pendingTitles(employeeId: string, designation: string | null | undefined, scope: PolicyScope = "all"): Promise<string[]> {
     if (!(await signoffReady())) return []
-    const list = await statusFor(employeeId, designation)
+    const list = await statusFor(employeeId, designation, scope)
     return list.filter(p => p.status !== "SIGNED").map(p => p.title)
 }
 

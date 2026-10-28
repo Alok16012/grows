@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server"
-import { policyErrorResponse, signoffReady, statusFor } from "@/lib/policy-signoff"
+import { policyErrorResponse, scopeFrom, signoffReady, statusFor } from "@/lib/policy-signoff"
 import { sessionSigner } from "./_signer"
 
-// GET — the policies I must sign for my designation, with progress.
+// GET ?scope=onboarding — the policies I must sign for my designation, with
+// progress. Self-onboarding asks for the Onboarding category only; My Policies
+// asks for everything.
 export async function GET(req: Request) {
     try {
         const { emp } = await sessionSigner(req)
         if (!(await signoffReady())) return NextResponse.json({ ready: false, policies: [] })
-        const policies = await statusFor(emp.id, emp.designation)
+        const policies = await statusFor(emp.id, emp.designation, scopeFrom(new URL(req.url).searchParams.get("scope")))
         return NextResponse.json({
             ready: true,
             designation: emp.designation,

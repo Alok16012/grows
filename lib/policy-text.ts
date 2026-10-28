@@ -17,7 +17,30 @@ export type PolicyBlock =
     | { kind: "numbered"; n: string; text: string }
     | { kind: "para"; text: string }
 
-export const POLICY_CATEGORIES = ["HR", "Code of Conduct", "Safety", "IT & Data", "Compliance", "Leave & Attendance", "Other"] as const
+// Categories follow the app's modules. The category also decides WHERE a policy
+// is signed: "Onboarding" policies are read and signed while joining (the
+// onboarding form, the joining link and self-onboarding); every other category
+// is signed afterwards from the employee's profile → My Policies.
+export const ONBOARDING_CATEGORY = "Onboarding"
+
+export const POLICY_CATEGORIES = [
+    ONBOARDING_CATEGORY, "HR", "Code of Conduct", "Safety", "IT & Data", "Compliance",
+    "Leave & Attendance", "Payroll & Expenses", "Exit", "Other",
+] as const
+
+/** Which policies a screen asks for: everything, or only the joining ones. */
+export type PolicyScope = "all" | "onboarding"
+
+export function isOnboardingCategory(category: string | null | undefined): boolean {
+    return (category ?? "").trim().toLowerCase() === ONBOARDING_CATEGORY.toLowerCase()
+}
+
+/** Where employees meet a policy of this category — shown to HR in the editor and list. */
+export function categorySignedOn(category: string | null | undefined): string {
+    return isOnboardingCategory(category)
+        ? "Signed while joining: onboarding form, joining link and self-onboarding"
+        : "Signed by employees from Profile → My Policies"
+}
 
 export const SIGNOFF_MISSING_MESSAGE =
     "Policy sign-off isn't set up yet — run scripts/policy-signoff.sql in the Supabase SQL editor."

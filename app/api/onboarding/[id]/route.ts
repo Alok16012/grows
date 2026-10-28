@@ -140,10 +140,11 @@ export async function PUT(
             // Types are stored inconsistently cased ("PHOTO" vs "Photo").
             const heldTypes = new Set(held.map(d => d.type.toUpperCase()))
             const missing = REQUIRED_DOCS.filter(t => !heldTypes.has(t))
-            // Policies for the employee's designation that are still unsigned —
-            // e.g. HR corrected the designation after the joiner submitted.
+            // Onboarding policies for the employee's designation that are still
+            // unsigned — e.g. HR corrected the designation after the joiner
+            // submitted. Other categories are signed later from My Policies.
             const emp = await prisma.employee.findUnique({ where: { id: onboardingRecord.employeeId }, select: { designation: true } })
-            const pendingPolicies = await pendingTitles(onboardingRecord.employeeId, emp?.designation)
+            const pendingPolicies = await pendingTitles(onboardingRecord.employeeId, emp?.designation, "onboarding")
             // `force` lets HR approve a record that predates this check, or one
             // whose documents were collected on paper, rather than being stuck.
             // Unsigned policies then stay pending on the employee's profile.

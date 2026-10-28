@@ -10,9 +10,11 @@ import { toast } from "sonner"
 import { CheckCircle2, Circle, Eye, FileSignature, Loader2, Paperclip, PenLine, RotateCcw, Download, ArrowDown } from "lucide-react"
 import { policyBlocks, type RequiredPolicy } from "@/lib/policy-text"
 
+// The token (joining) screens always get the Onboarding category. A logged-in
+// employee gets everything (My Policies) unless the screen asks for "onboarding".
 type Source =
     | { kind: "token"; token: string; designation: string }
-    | { kind: "self" }
+    | { kind: "self"; scope?: "onboarding" }
 
 type ListResponse = { ready: boolean; designation?: string | null; signerName?: string; policies: RequiredPolicy[] }
 
@@ -60,11 +62,13 @@ export function PolicySignStep({ source, theme = "light", onProgress, emptyDesig
     const [activeId, setActiveId] = useState<string | null>(null)
     const designation = source.kind === "token" ? source.designation : null
     const token = source.kind === "token" ? source.token : null
+    const scope = source.kind === "self" ? source.scope ?? null : null
 
     const load = useCallback(async (keepActive?: boolean) => {
         setLoading(true)
         try {
-            const qs = designation !== null ? `?designation=${encodeURIComponent(designation)}` : ""
+            const qs = designation !== null ? `?designation=${encodeURIComponent(designation)}`
+                : scope ? `?scope=${scope}` : ""
             const res = await fetch(api(source, qs), { cache: "no-store" })
             if (!res.ok) throw new Error((await readError(res)).message)
             const d: ListResponse = await res.json()
@@ -81,7 +85,7 @@ export function PolicySignStep({ source, theme = "light", onProgress, emptyDesig
         }
         // `source` is rebuilt by the parent each render; depend on its parts.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [designation, token, source.kind])
+    }, [designation, token, scope, source.kind])
 
     useEffect(() => { load() }, [load])
 

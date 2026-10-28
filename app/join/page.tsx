@@ -11,6 +11,8 @@ import {
     validateBankAccount, validateUAN, validateESIC, validateEmail,
     validatePincode, validateDateOfBirth, validateJoiningAge, validatePFNumber, type FieldError,
 } from "@/lib/validation"
+import { PolicySignStep, type PolicyProgress } from "@/components/PolicySignStep"
+import { designationKey } from "@/lib/policy-text"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,10 @@ const TABS = [
     { key: "employment", label: "Employment" },
     { key: "bank",       label: "Bank & Compliance" },
     { key: "documents",  label: "Documents" },
+    // Onboarding-category policies from Policy Sign-off (/policies). Reached
+    // after "Save & continue" on Documents, because a signature is recorded
+    // against the employee record that saving creates.
+    { key: "policies",   label: "Policies" },
 ]
 
 // `type` MUST be the system-wide enum key (Document Master / employee doc
@@ -119,6 +125,8 @@ export default function JoinPage() {
     // upload must reuse it, not create a second employee.
     const [created, setCreated] = useState<{ token: string; employeeId: string } | null>(null)
     const [copied, setCopied] = useState(false)
+    // Progress reported by the policy step; null until it has loaded.
+    const [policyProgress, setPolicyProgress] = useState<PolicyProgress | null>(null)
     // Site + HR dropdown options, loaded from /api/join (public GET)
     const [sites, setSites] = useState<{ id: string; name: string; code?: string | null }[]>([])
     const [hrUsers, setHrUsers] = useState<{ id: string; name: string; role?: string | null; customRole?: { name: string } | null }[]>([])
@@ -126,6 +134,11 @@ export default function JoinPage() {
     // (and optionally the role) are embedded in the URL. We pre-fill and lock the
     // HR contact + designation so the candidate/HR don't pick them manually.
     const [referrer, setReferrer] = useState<{ id: string; name: string } | null>(null)
+    // Designation / Role options — the same list HR maps policies to in Policy
+    // Sign-off, so the role picked here decides which onboarding policies apply.
+    // "Other" keeps a free-text fallback for a role nobody holds yet.
+    const [designationOpts, setDesignationOpts] = useState<{ designation: string; onboardingPolicies: number }[]>([])
+    const [designationOther, setDesignationOther] = useState(false)
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
@@ -146,9 +159,18 @@ export default function JoinPage() {
                     setReferrer({ id: ref, name: "Assigned HR" })
                     set("hrId", ref)
                 }
-                if (role) set("designation", role)
+                const opts: { designation: string; onboardingPolicies: number }[] = Array.isArray(d?.designations) ? d.designations : []
+                setDesignationOpts(opts)
+                // No list (e.g. it failed to load) → plain text box, as before.
+                if (!opts.length) setDesignationOther(true)
+                if (role) {
+                    // A role from a shared link uses the list's spelling when it matches.
+                    const match = opts.find(o => designationKey(o.designation) === designationKey(role))
+                    set("designation", match ? match.designation : role)
+                    if (!match) setDesignationOther(true)
+                }
             })
-            .catch(() => { /* dropdowns just stay empty */ })
+            .catch(() => { setDesignationOther(true) /* dropdowns stay empty; designation is typed */ })
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -199,6 +221,10 @@ export default function JoinPage() {
     const tabOrder = TABS.map(t => t.key)
     const tabIdx = tabOrder.indexOf(tab)
     const isLast = tabIdx === tabOrder.length - 1
+    // Once the record is saved, Personal / Employment / Bank are locked: edits
+    // there would no longer reach the server. Documents stays open so a failed
+    // upload can be retried.
+    const firstOpenIdx = created ? tabOrder.indexOf("documents") : 0
 
     // ── Validation ────────────────────────────────────────────────────────────
 
@@ -280,7 +306,7 @@ export default function JoinPage() {
      * from the last tab would otherwise skip the personal / bank checks entirely.
      */
     function validateAll(): boolean {
-        for (const t of tabOrder) {
+        for (const t of tabOrder.filter(k => k !== "policies")) {
             const e = errorsFor(t)
             if (Object.keys(e).length) { setErrors(e); setTab(t); showStepError(Object.keys(e).length); return false }
         }
@@ -296,7 +322,7 @@ export default function JoinPage() {
         setTab(tabOrder[tabIdx + 1])
         window.scrollTo({ top: 0, behavior: "smooth" })
     }
-    function goBack() { setStepError(""); setTab(tabOrder[tabIdx - 1]) }
+    function goBack() { if (tabIdx > firstOpenIdx) { setStepError(""); setTab(tabOrder[tabIdx - 1]) } }
 
     // ── File select & upload ──────────────────────────────────────────────────
 
@@ -337,8 +363,23 @@ export default function JoinPage() {
         }
     }
 
-    // ── Submit ────────────────────────────────────────────────────────────────
+    // ── Save (Documents) and Submit (Policies) ────────────────────────────────
 
+    /** Last step: every Onboarding policy must be signed (the server checked each signature). */
+    function finish() {
+        if (!result) return
+        if (policyProgress?.loading) return
+        if (policyProgress && !policyProgress.allSigned) {
+            const left = policyProgress.total - policyProgress.signed
+            setStepError(`Sign ${left} more polic${left === 1 ? "y" : "ies"} to submit — ${policyProgress.signed} of ${policyProgress.total} signed`)
+            return
+        }
+        setStepError("")
+        setSubmitted(true)
+        window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+
+    /** Documents → "Save & continue": creates the record, uploads files, opens the Policies step. */
     async function handleSubmit() {
         if (!validateAll()) return
 
@@ -421,7 +462,10 @@ export default function JoinPage() {
             }
 
             setResult({ employeeId, ...(failedUploads > 0 ? { uploadWarning: failedUploads } : {}) })
-            setSubmitted(true)
+            setDocError("")
+            setStepError("")
+            setTab("policies")
+            window.scrollTo({ top: 0, behavior: "smooth" })
         } catch {
             setErrors({ firstName: "Network error. Check your connection." })
         } finally {
@@ -463,7 +507,10 @@ export default function JoinPage() {
                             </span>
                         </div>
                     ) : null}
-                    {["HR will verify your documents and complete onboarding tasks", "You'll be contacted on your registered phone", "Keep your ID card and documents ready"].map((t, i) => (
+                    {[
+                        ...(policyProgress?.total ? [`You signed ${policyProgress.total} onboarding polic${policyProgress.total === 1 ? "y" : "ies"}`] : []),
+                        "HR will verify your documents and complete onboarding tasks", "You'll be contacted on your registered phone", "Keep your ID card and documents ready",
+                    ].map((t, i) => (
                         <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", textAlign: "left", marginBottom: 8 }}>
                             <CheckCircle2 size={14} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />
                             <span style={{ fontSize: 13, color: "var(--text2)" }}>{t}</span>
@@ -506,10 +553,12 @@ export default function JoinPage() {
                     <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--surface2)", overflowX: "auto" }}>
                         {TABS.map((t, i) => {
                             const done = tabIdx > i; const active = tab === t.key
+                            const reachable = i <= tabIdx && i >= firstOpenIdx
                             return (
                                 <button key={t.key}
-                                    onClick={() => { if (i <= tabIdx) setTab(t.key) }}
-                                    style={{ padding: "13px 18px", fontSize: 12, fontWeight: 600, cursor: i <= tabIdx ? "pointer" : "default", border: "none", background: "none", whiteSpace: "nowrap", borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent", color: active ? "var(--accent)" : done ? "var(--text2)" : "var(--text3)", display: "flex", alignItems: "center", gap: 5 }}>
+                                    onClick={() => { if (reachable) setTab(t.key) }}
+                                    title={created && i < firstOpenIdx ? "Already saved" : undefined}
+                                    style={{ padding: "13px 18px", fontSize: 12, fontWeight: 600, cursor: reachable ? "pointer" : "default", border: "none", background: "none", whiteSpace: "nowrap", borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent", color: active ? "var(--accent)" : done ? "var(--text2)" : "var(--text3)", display: "flex", alignItems: "center", gap: 5 }}>
                                     {done
                                         ? <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:15, height:15, borderRadius:"50%", background:"var(--accent)", flexShrink:0 }}><Check size={9} color="white" /></span>
                                         : <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:15, height:15, borderRadius:"50%", background: active ? "var(--accent)" : "var(--border2)", fontSize:8, fontWeight:800, color: active ? "white" : "var(--text3)", flexShrink:0 }}>{i+1}</span>
@@ -772,8 +821,36 @@ export default function JoinPage() {
                                     <div style={{ ...g2, marginTop: 14 }}>
                                         <div>
                                             <Lbl text="Designation / Role" required />
-                                            <input style={{ ...inp, borderColor: errors.designation ? "var(--red)" : undefined }} placeholder="e.g. Security Guard" value={form.designation} onChange={e => { set("designation", e.target.value); clrErr("designation") }} />
+                                            {designationOpts.length > 0 && (
+                                                <select aria-label="Designation / Role" style={{ ...sel, borderColor: errors.designation ? "var(--red)" : undefined }}
+                                                    value={designationOther ? "__other__" : form.designation}
+                                                    onChange={e => {
+                                                        const v = e.target.value
+                                                        if (v === "__other__") { setDesignationOther(true); set("designation", "") }
+                                                        else { setDesignationOther(false); set("designation", v) }
+                                                        clrErr("designation")
+                                                    }}>
+                                                    <option value="">Select your designation</option>
+                                                    {designationOpts.map(o => <option key={o.designation} value={o.designation}>{o.designation}</option>)}
+                                                    <option value="__other__">Other — not in the list</option>
+                                                </select>
+                                            )}
+                                            {designationOther && (
+                                                <input aria-label="Type your designation" style={{ ...inp, marginTop: designationOpts.length ? 8 : 0, borderColor: errors.designation ? "var(--red)" : undefined }}
+                                                    placeholder={designationOpts.length ? "Type your designation" : "e.g. Security Guard"}
+                                                    value={form.designation} onChange={e => { set("designation", e.target.value); clrErr("designation") }} />
+                                            )}
                                             <Err msg={errors.designation} />
+                                            {(() => {
+                                                // Which onboarding policies the Policies step will ask for.
+                                                if (!form.designation.trim() || designationOther) return null
+                                                const n = designationOpts.find(o => o.designation === form.designation)?.onboardingPolicies ?? 0
+                                                return (
+                                                    <div style={{ fontSize: 11, color: n ? "var(--accent)" : "var(--text3)", marginTop: 5 }}>
+                                                        {n ? `${n} onboarding polic${n === 1 ? "y" : "ies"} to read and sign for this role on the last step` : "No onboarding policies to sign for this role"}
+                                                    </div>
+                                                )
+                                            })()}
                                         </div>
                                         <div>
                                             <Lbl text="Date of Joining" required />
@@ -954,7 +1031,7 @@ export default function JoinPage() {
 
                                 {/* Review Summary */}
                                 <div>
-                                    <SecTitle>Review Before Submit</SecTitle>
+                                    <SecTitle>Review Before Saving</SecTitle>
                                     <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginTop: 14 }}>
                                         {[
                                             { label: "Name", val: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
@@ -973,9 +1050,24 @@ export default function JoinPage() {
                                         ))}
                                     </div>
                                     <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 8 }}>
-                                        By submitting, you confirm all information is accurate. Documents will be uploaded automatically on submit.
+                                        By saving, you confirm all information is accurate. Your details are saved and documents uploaded; the last step is reading and signing the onboarding policies.
                                     </p>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* ── POLICIES ────────────────────────────────────────── */}
+                        {tab === "policies" && created && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                                <div style={{ background: "var(--accent-light)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                                    <CheckCircle2 size={15} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />
+                                    <p style={{ fontSize: 12.5, color: "var(--text2)", margin: 0, lineHeight: 1.6 }}>
+                                        Your details{result?.employeeId ? <> (ID <b style={{ fontFamily: "monospace" }}>{result.employeeId}</b>)</> : null} and documents are saved.
+                                        Last step: read each onboarding policy to the end and sign it with your name as entered — <b>{[form.firstName, form.lastName].filter(Boolean).join(" ")}</b>.
+                                    </p>
+                                </div>
+                                <PolicySignStep theme="light" onProgress={setPolicyProgress}
+                                    source={{ kind: "token", token: created.token, designation: form.designation }} />
                             </div>
                         )}
 
@@ -989,8 +1081,8 @@ export default function JoinPage() {
 
                     {/* Footer */}
                     <div style={{ padding: "16px 28px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <button onClick={goBack} disabled={tabIdx === 0}
-                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: tabIdx===0 ? "var(--text3)" : "var(--text2)", fontSize: 13, fontWeight: 600, cursor: tabIdx===0 ? "not-allowed" : "pointer", opacity: tabIdx===0 ? 0.5 : 1 }}>
+                        <button onClick={goBack} disabled={tabIdx <= firstOpenIdx}
+                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: tabIdx <= firstOpenIdx ? "var(--text3)" : "var(--text2)", fontSize: 13, fontWeight: 600, cursor: tabIdx <= firstOpenIdx ? "not-allowed" : "pointer", opacity: tabIdx <= firstOpenIdx ? 0.5 : 1 }}>
                             <ChevronLeft size={15} /> Back
                         </button>
 
@@ -1000,15 +1092,21 @@ export default function JoinPage() {
                             ))}
                         </div>
 
-                        {!isLast ? (
+                        {tab === "documents" ? (
+                            <button onClick={handleSubmit} disabled={loading}
+                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1 }}>
+                                {loading ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <>Save &amp; continue <ChevronRight size={15} /></>}
+                            </button>
+                        ) : isLast ? (
+                            <button onClick={finish} disabled={!policyProgress || policyProgress.loading || !policyProgress.allSigned}
+                                title={policyProgress && !policyProgress.allSigned ? "Sign every policy first" : undefined}
+                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: policyProgress?.allSigned && !policyProgress.loading ? "pointer" : "not-allowed", opacity: policyProgress?.allSigned && !policyProgress.loading ? 1 : 0.5 }}>
+                                <CheckCircle2 size={14} /> Submit
+                            </button>
+                        ) : (
                             <button onClick={goNext}
                                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 20px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                                 Next <ChevronRight size={15} />
-                            </button>
-                        ) : (
-                            <button onClick={handleSubmit} disabled={loading}
-                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1 }}>
-                                {loading ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : <><CheckCircle2 size={14} /> Submit</>}
                             </button>
                         )}
                     </div>
