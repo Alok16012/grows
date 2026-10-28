@@ -5,6 +5,13 @@ import { useEffect, useRef } from "react"
 // Row of single-digit boxes for an MPIN or OTP. Typing advances, Backspace
 // goes back, and pasting (or SMS autofill) a whole code fills every box.
 // `onComplete` fires once all boxes are filled.
+//
+// Masked boxes are NOT type="password". Browsers and password managers treat
+// password fields as a login form and autofill the saved account password into
+// them; because a full row submits itself, that sent a wrong MPIN on every visit
+// to the MPIN tab and locked the account after five. Masking is done by showing
+// a dot instead of the digit, so no password manager ever sees a password field.
+const MASK = "\u2022"
 export function PinInput({
     length, value, onChange, onComplete, masked = false, autoFocus = false, disabled = false, invalid = false, label,
     autoComplete = "off",
@@ -47,19 +54,30 @@ export function PinInput({
                 <input
                     key={i}
                     ref={el => { refs.current[i] = el }}
-                    type={masked ? "password" : "text"}
+                    type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     autoComplete={i === 0 ? autoComplete : "off"}
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    // Opt out of password-manager extensions (1Password, LastPass, Bitwarden).
+                    data-1p-ignore=""
+                    data-lpignore="true"
+                    data-bwignore=""
+                    data-form-type="other"
                     aria-label={`${label} digit ${i + 1}`}
                     maxLength={length}
                     disabled={disabled}
-                    value={value[i] ?? ""}
+                    value={value[i] ? (masked ? MASK : value[i]) : ""}
                     onFocus={e => e.currentTarget.select()}
                     onChange={e => {
-                        const digits = e.target.value.replace(/\D/g, "")
+                        const raw = e.target.value
+                        const digits = raw.replace(/\D/g, "")
                         if (!digits) {
-                            onChange(value.slice(0, i) + value.slice(i + 1))
+                            // Only an emptied box clears its digit; a stray
+                            // non-digit keystroke leaves the box as it was.
+                            if (raw === "") onChange(value.slice(0, i) + value.slice(i + 1))
                             return
                         }
                         // Typing over a filled box gives "old+new" — keep the new

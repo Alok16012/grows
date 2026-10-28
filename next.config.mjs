@@ -28,13 +28,15 @@ const nextConfig = {
     },
     async headers() {
         return [
-            // Long-cache static assets
-            {
+            // Long-cache static assets. Production only: production chunk names
+            // carry a content hash, but dev chunks keep the same URL across
+            // edits, so caching them for a year makes the browser run stale code.
+            ...(process.env.NODE_ENV === "production" ? [{
                 source: "/_next/static/:path*",
                 headers: [
                     { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
                 ],
-            },
+            }] : []),
             // Auth endpoints must never be cached
             {
                 source: "/api/auth/:path*",
