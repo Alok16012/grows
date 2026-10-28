@@ -2,12 +2,13 @@
 
 import { sortSitesByName } from "@/lib/site-sort"
 import { useState, useEffect, useMemo, useRef } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
     Loader2, Check, ChevronLeft, ChevronRight, Search, Trash2, X,
     Users, Sparkles, Eye, MoreVertical, Calendar, RefreshCw,
-    ClipboardList, StopCircle, FileText, CheckCircle2, Layers, Plus,
+    ClipboardList, StopCircle, FileText, CheckCircle2, Layers, Plus, Pencil,
 } from "lucide-react"
 import { can, canAny } from "@/lib/can"
 import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
@@ -166,56 +167,205 @@ function PrefillNote() {
     )
 }
 
-function RowMenu({ assignment, onDelete, onStopRecurrence, onClose, onToggleMultiPart }: {
+function RowMenu({ assignment, onEdit, onDelete, onStopRecurrence, onClose, onToggleMultiPart }: {
     assignment: Assignment
+    onEdit: () => void
     onDelete: () => void
     onStopRecurrence: () => void
     onClose: () => void
     onToggleMultiPart: () => void
 }) {
-    const [open, setOpen] = useState(false)
-    const ref = useRef<HTMLDivElement>(null)
+    // The menu is drawn in a portal with fixed coordinates. Inside the table it
+    // was clipped by the scroll wrapper and the card's overflow, so its options
+    // (and anything added to it) could be cut off or hidden entirely.
+    const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null)
+    const btnRef = useRef<HTMLButtonElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
+    const open = pos !== null
+    const MENU_W = 200
+
+    const toggle = () => {
+        if (open) { setPos(null); return }
+        const r = btnRef.current?.getBoundingClientRect()
+        if (!r) return
+        // Open upwards when there isn't room below (rows near the bottom).
+        const up = window.innerHeight - r.bottom < 240
+        setPos({ top: up ? r.top - 4 : r.bottom + 4, left: Math.max(8, r.right - MENU_W), up })
+    }
+
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        if (!open) return
+        const onDown = (e: MouseEvent) => {
+            const t = e.target as Node
+            if (menuRef.current?.contains(t) || btnRef.current?.contains(t)) return
+            setPos(null)
         }
-        document.addEventListener("mousedown", handler)
-        return () => document.removeEventListener("mousedown", handler)
-    }, [])
+        // A fixed menu would drift away from its row on scroll — close it instead.
+        const close = () => setPos(null)
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPos(null) }
+        document.addEventListener("mousedown", onDown)
+        window.addEventListener("scroll", close, true)
+        window.addEventListener("resize", close)
+        document.addEventListener("keydown", onKey)
+        return () => {
+            document.removeEventListener("mousedown", onDown)
+            window.removeEventListener("scroll", close, true)
+            window.removeEventListener("resize", close)
+            document.removeEventListener("keydown", onKey)
+        }
+    }, [open])
+
     if (isVirtual(assignment)) return null
+    const item = "w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors text-left"
+    const pick = (fn: () => void) => () => { setPos(null); fn() }
     return (
-        <div className="relative inline-block" ref={ref}>
-            <button onClick={() => setOpen(o => !o)}
+        <div className="relative inline-block">
+            <button ref={btnRef} onClick={toggle} aria-haspopup="menu" aria-expanded={open} title="More actions"
                 className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                 <MoreVertical size={13} />
             </button>
-            {open && (
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-20 py-1 overflow-hidden">
+            {open && pos && createPortal(
+                <div ref={menuRef} role="menu"
+                    style={{ position: "fixed", top: pos.top, left: pos.left, width: MENU_W, transform: pos.up ? "translateY(-100%)" : undefined }}
+                    className="bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-[1000] py-1 overflow-hidden">
+                    <button role="menuitem" onClick={pick(onEdit)} className={item}>
+                        <Pencil size={13} /> Edit Assignment
+                    </button>
                     {assignment.status !== "completed" && (
-                        <button onClick={() => { onToggleMultiPart(); setOpen(false) }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                        <button role="menuitem" onClick={pick(onToggleMultiPart)} className={item}>
                             <Layers size={13} /> {assignment.isMultiPart ? "Make One-time" : "Convert to Multi-part"}
                         </button>
                     )}
                     {assignment.isMultiPart && assignment.status !== "completed" && (
-                        <button onClick={() => { onClose(); setOpen(false) }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                        <button role="menuitem" onClick={pick(onClose)} className={item}>
                             <CheckCircle2 size={13} /> Close Assignment
                         </button>
                     )}
                     {assignment.recurrenceActive && (
-                        <button onClick={() => { onStopRecurrence(); setOpen(false) }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
+                        <button role="menuitem" onClick={pick(onStopRecurrence)} className={item}>
                             <StopCircle size={13} /> Stop Recurrence
                         </button>
                     )}
-                    <button onClick={() => { onDelete(); setOpen(false) }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-red-50 transition-colors">
+                    <div className="my-1 border-t border-[var(--border)]" />
+                    <button role="menuitem" onClick={pick(onDelete)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-red-50 transition-colors text-left">
                         <Trash2 size={13} /> Delete Assignment
                     </button>
-                </div>
+                </div>,
+                document.body,
             )}
         </div>
+    )
+}
+
+/** Edit an issued assignment: inspector, start date, recurrence and notes. */
+function EditAssignmentModal({ assignment, inspectors, onClose, onSaved }: {
+    assignment: Assignment
+    inspectors: Person[]
+    onClose: () => void
+    onSaved: (a: Partial<Assignment> & { id: string }) => void
+}) {
+    const [inspectorId, setInspectorId] = useState(assignment.inspectionBoyId ?? "")
+    const [startDate, setStartDate] = useState((assignment.startDate ?? "").slice(0, 10))
+    const [recurrence, setRecurrence] = useState(assignment.recurrenceType && assignment.recurrenceType !== "none" ? assignment.recurrenceType : "none")
+    const [notes, setNotes] = useState(assignment.notes ?? "")
+    const [saving, setSaving] = useState(false)
+    const [error, setError] = useState("")
+
+    // The current inspector stays selectable even if they're no longer in the inspector list.
+    const options = useMemo(() => {
+        const list = [...inspectors]
+        if (assignment.inspectionBoyId && !list.some(p => p.id === assignment.inspectionBoyId)) {
+            list.unshift({ id: assignment.inspectionBoyId, name: assignment.inspectionBoy?.name ?? "Current inspector", email: assignment.inspectionBoy?.email ?? null })
+        }
+        return list.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
+    }, [inspectors, assignment])
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !saving) onClose() }
+        document.addEventListener("keydown", onKey)
+        return () => document.removeEventListener("keydown", onKey)
+    }, [onClose, saving])
+
+    const save = async () => {
+        if (!inspectorId) { setError("Pick an inspector"); return }
+        setSaving(true); setError("")
+        try {
+            const res = await fetch(`/api/assignments/${assignment.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ inspectionBoyId: inspectorId, startDate: startDate || null, recurrenceType: recurrence, notes }),
+            })
+            const d = await res.json().catch(() => ({}))
+            if (!res.ok) { setError(d.error || "Couldn't save the assignment"); return }
+            onSaved({
+                id: assignment.id,
+                inspectionBoyId: d.inspectionBoyId ?? inspectorId,
+                inspectionBoy: d.inspectionBoy ?? assignment.inspectionBoy,
+                startDate: d.startDate ?? null,
+                recurrenceType: d.recurrenceType ?? recurrence,
+                recurrenceActive: d.recurrenceActive ?? recurrence !== "none",
+                notes: d.notes ?? null,
+            })
+        } catch {
+            setError("Network error — please try again")
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    return createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40" onMouseDown={e => { if (e.target === e.currentTarget && !saving) onClose() }}>
+            <div role="dialog" aria-modal="true" aria-label="Edit assignment" className="w-full max-w-md bg-white rounded-[14px] border border-[var(--border)] shadow-xl">
+                <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-[var(--border)]">
+                    <div className="min-w-0">
+                        <h3 className="text-[15px] font-semibold text-[var(--text)] flex items-center gap-2"><Pencil size={14} className="text-[var(--accent)]" /> Edit Assignment</h3>
+                        <p className="text-[12px] text-[var(--text3)] mt-0.5 truncate">
+                            <span className="font-mono">{assignment.code || "Assignment"}</span> · {assignment.project?.name ?? "—"}{assignment.project?.site?.name ? ` · ${assignment.project.site.name}` : ""}
+                        </p>
+                    </div>
+                    <button onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-[6px] text-[var(--text3)] hover:bg-[var(--surface2)]"><X size={15} /></button>
+                </div>
+                <div className="px-5 py-4 space-y-3.5">
+                    <div>
+                        <label className="block text-[12px] font-medium text-[var(--text)] mb-1">Inspector <span className="text-[var(--red)]">*</span></label>
+                        <select value={inspectorId} onChange={e => setInspectorId(e.target.value)} className={selectCls}>
+                            <option value="">Select inspector</option>
+                            {options.map(p => <option key={p.id} value={p.id}>{p.name || p.email || "Unnamed"}</option>)}
+                        </select>
+                        <p className="text-[11px] text-[var(--text3)] mt-1">Can't be changed once inspections have been submitted on this assignment.</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[12px] font-medium text-[var(--text)] mb-1">Start Date</label>
+                            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
+                        </div>
+                        <div>
+                            <label className="block text-[12px] font-medium text-[var(--text)] mb-1">Recurrence</label>
+                            <select value={recurrence} onChange={e => setRecurrence(e.target.value)} className={selectCls}>
+                                <option value="none">One-time</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[12px] font-medium text-[var(--text)] mb-1">Notes / Summary <span className="text-[var(--text3)] font-normal">(Optional)</span></label>
+                        <textarea value={notes} onChange={e => setNotes(e.target.value.slice(0, 250))} rows={3}
+                            className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] resize-none" />
+                        <p className="text-[11px] text-[var(--text3)] text-right">{notes.length}/250</p>
+                    </div>
+                    {error && <p role="alert" className="text-[12px] text-[var(--red)] bg-red-50 border border-red-100 rounded-[8px] px-3 py-2">{error}</p>}
+                </div>
+                <div className="flex justify-end gap-2 px-5 pb-4">
+                    <button onClick={onClose} disabled={saving} className="h-9 px-4 rounded-[8px] border border-[var(--border)] text-[13px] text-[var(--text2)] hover:bg-[var(--surface2)]">Cancel</button>
+                    <button onClick={save} disabled={saving} className="h-9 px-4 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium inline-flex items-center gap-2 disabled:opacity-60">
+                        {saving && <Loader2 size={14} className="animate-spin" />} Save changes
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body,
     )
 }
 
@@ -281,6 +431,8 @@ export default function AssignmentsPage() {
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
     const [detail, setDetail] = useState<Assignment | null>(null)
+    // Row menu → Edit Assignment
+    const [editing, setEditing] = useState<Assignment | null>(null)
 
     useEffect(() => { setPage(1) }, [assignmentSearch, filterStatus, perPage])
 
@@ -1010,7 +1162,7 @@ export default function AssignmentsPage() {
                                                                 </button>
                                                             )}
                                                             {canManageAssignments && !virtual && (
-                                                                <RowMenu assignment={a} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
+                                                                <RowMenu assignment={a} onEdit={() => setEditing(a)} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
                                                             )}
                                                         </div>
                                                     </td>
@@ -1064,6 +1216,15 @@ export default function AssignmentsPage() {
             </div>
 
             {/* Detail modal */}
+            {editing && (
+                <EditAssignmentModal assignment={editing} inspectors={inspectors} onClose={() => setEditing(null)}
+                    onSaved={u => {
+                        setAssignments(prev => prev.map(x => x.id === u.id ? { ...x, ...u } : x))
+                        setDetail(d => d && d.id === u.id ? { ...d, ...u } : d)
+                        setEditing(null)
+                    }} />
+            )}
+
             {detail && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setDetail(null)}>
                     <div className="bg-white rounded-[16px] border border-[var(--border)] w-full max-w-md max-h-[90vh] flex flex-col shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>

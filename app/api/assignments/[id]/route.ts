@@ -88,9 +88,10 @@ export async function PATCH(
 
     try {
         const body = await req.json()
-        const { status, recurrenceActive, isMultiPart } = body
+        const { status, recurrenceActive, isMultiPart, inspectionBoyId, startDate, notes, recurrenceType } = body
 
-        if (!status && recurrenceActive === undefined && isMultiPart === undefined) {
+        const editing = inspectionBoyId !== undefined || startDate !== undefined || notes !== undefined || recurrenceType !== undefined
+        if (!status && recurrenceActive === undefined && isMultiPart === undefined && !editing) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 })
         }
 
@@ -101,9 +102,62 @@ export async function PATCH(
         if (recurrenceActive !== undefined) updateData.recurrenceActive = recurrenceActive
         if (isMultiPart !== undefined) updateData.isMultiPart = !!isMultiPart
 
+        // ── Edit (row menu → Edit Assignment) ────────────────────────────────
+        if (editing) {
+            const current = await prisma.assignment.findUnique({
+                where: { id: params.id },
+                select: { projectId: true, inspectionBoyId: true, _count: { select: { inspections: true } } },
+            })
+            if (!current) return NextResponse.json({ error: "Assignment not found" }, { status: 404 })
+
+            if (inspectionBoyId !== undefined && inspectionBoyId !== current.inspectionBoyId) {
+                if (typeof inspectionBoyId !== "string" || !inspectionBoyId) {
+                    return NextResponse.json({ error: "Pick an inspector" }, { status: 400 })
+                }
+                // Reports already filed belong to whoever filed them; moving the
+                // assignment would hand that history to someone else.
+                if (current._count.inspections > 0) {
+                    return NextResponse.json({ error: "This assignment already has inspections, so its inspector can't change. Create a new assignment for the other inspector instead." }, { status: 409 })
+                }
+                const inspector = await prisma.user.findUnique({ where: { id: inspectionBoyId }, select: { id: true } })
+                if (!inspector) return NextResponse.json({ error: "Inspector not found" }, { status: 400 })
+                // Same rule as create: one active assignment per project + inspector.
+                const clash = await prisma.assignment.findFirst({
+                    where: { projectId: current.projectId, inspectionBoyId, status: "active", id: { not: params.id } },
+                    select: { code: true },
+                })
+                if (clash) {
+                    return NextResponse.json({ error: `That inspector already has an active assignment on this project${clash.code ? ` (${clash.code})` : ""}` }, { status: 409 })
+                }
+                updateData.inspectionBoyId = inspectionBoyId
+            }
+
+            if (startDate !== undefined) {
+                if (startDate === null || startDate === "") {
+                    updateData.startDate = null
+                } else {
+                    const d = typeof startDate === "string" && /^\d{4}-\d{2}-\d{2}/.test(startDate) ? new Date(startDate.slice(0, 10) + "T00:00:00Z") : null
+                    if (!d || isNaN(d.getTime())) return NextResponse.json({ error: "Start date must be YYYY-MM-DD" }, { status: 400 })
+                    updateData.startDate = d
+                }
+            }
+
+            if (notes !== undefined) {
+                updateData.notes = typeof notes === "string" && notes.trim() ? notes.trim().slice(0, 250) : null
+            }
+
+            if (recurrenceType !== undefined) {
+                // Same values as create: one-time, daily or weekly.
+                const recur = ["daily", "weekly"].includes(recurrenceType) ? recurrenceType : "none"
+                updateData.recurrenceType = recur
+                updateData.recurrenceActive = recur !== "none"
+            }
+        }
+
         const assignment = await prisma.assignment.update({
             where: { id: params.id },
-            data: updateData
+            data: updateData,
+            include: { inspectionBoy: { select: { id: true, name: true, email: true } } },
         })
 
         return NextResponse.json(assignment)
