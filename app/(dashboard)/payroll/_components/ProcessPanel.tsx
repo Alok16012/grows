@@ -140,7 +140,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                     for (const p of payrolls) {
                         if (p.status) statuses[p.employeeId] = p.status
                         filled[p.employeeId] = {
-                            monthDays: p.workingDays ?? defaultDays, workedDays: p.presentDays ?? defaultDays,
+                            monthDays: p.workingDays ?? defaultDays, workedDays: p.presentDays ?? 0,
                             otDays: p.otDays ?? 0, canteenDays: p.canteenDays ?? 0, canteenAmount: p.canteenAmount ?? null,
                             penalty: p.penalty ?? 0, advance: p.advance ?? 0,
                             otherDeductions: p.otherDeductions ?? 0, productionIncentive: p.productionIncentive ?? 0,
@@ -212,7 +212,8 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                 const monthDaysRaw  = col(obj,"MONTH DAYS","MONTH WORKING DAYS","MONTHDAYS","WORKING DAYS IN MONTH","TOTAL DAYS")
                 updates[empId] = {
                     monthDays: monthDaysRaw !== undefined && monthDaysRaw !== "" ? Number(monthDaysRaw) : defaultDays,
-                    workedDays: workedDaysRaw !== undefined && workedDaysRaw !== "" ? Number(workedDaysRaw) : defaultDays,
+                    // Blank days = none worked: pay is for days actually worked only.
+                    workedDays: workedDaysRaw !== undefined && workedDaysRaw !== "" ? Number(workedDaysRaw) : 0,
                     otDays: Number(col(obj,"OT DAYS","OT HRS","OTDAYS","OTHOURS","OT","OVERTIME","OT HOURS","OVER TIME") ?? 0),
                     otherDeductions: Number(col(obj,"OTHER DEDUCTION","OTHER DED","OTHER DEDUCTIONS","OTHER","OTH DED") ?? 0),
                     // The attendance template has an LWF column — honor it like
@@ -235,15 +236,13 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
     const handleProcess = async () => {
         if (!selectedSiteId) { toast.error("Select a site"); return }
         if (!employees.length) { toast.error("No employees found for this site"); return }
-        // No attendance row means `workedDays ?? 26` — a full month's pay for
-        // someone who may not have been on the sheet at all. Say so first.
-        const missingAtt = employees.filter(e => !attRows[e.id]).length
-        if (missingAtt > 0 && !confirm(`${missingAtt} employee${missingAtt === 1 ? " has" : "s have"} no attendance in the sheet and will be paid a full month (${defaultDays} days). Continue?`)) return
+        // No attendance row = 0 days worked, so nobody is paid for days they
+        // didn't work and there is nothing to confirm.
         setProcessing(true)
         try {
             const attendance = employees.map(emp => {
                 const a = attRows[emp.id] ?? {}
-                return { employeeId: emp.id, monthDays: a.monthDays ?? defaultDays, workedDays: a.workedDays ?? defaultDays, otDays: a.otDays ?? 0, canteenDays: a.canteenDays ?? 0, canteenAmount: a.canteenAmount ?? null, penalty: a.penalty ?? 0, advance: a.advance ?? 0, otherDeductions: a.otherDeductions ?? 0, productionIncentive: a.productionIncentive ?? 0, lwf: a.lwf ?? 0 }
+                return { employeeId: emp.id, monthDays: a.monthDays ?? defaultDays, workedDays: a.workedDays ?? 0, otDays: a.otDays ?? 0, canteenDays: a.canteenDays ?? 0, canteenAmount: a.canteenAmount ?? null, penalty: a.penalty ?? 0, advance: a.advance ?? 0, otherDeductions: a.otherDeductions ?? 0, productionIncentive: a.productionIncentive ?? 0, lwf: a.lwf ?? 0 }
             })
             const res = await fetch("/api/payroll/calculate", {
                 method: "POST",
@@ -561,7 +560,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                 const bonus = sal && !isCALL ? ((sal as any).bonus ?? 0) : 0
                                                 const fullGross = sal ? sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance : 0
                                                 const approved = sal?.status === "APPROVED"
-                                                const monthDays = att.monthDays ?? defaultDays; const workedDays = att.workedDays ?? defaultDays
+                                                const monthDays = att.monthDays ?? defaultDays; const workedDays = att.workedDays ?? 0
                                                 // PROCESSED/PAID rows are locked — amounts can't change until Unlock.
                                                 const locked = rowStatus[emp.id] === "PROCESSED" || rowStatus[emp.id] === "PAID"
                                                 const inp: React.CSSProperties = locked ? { ...attInput, background: "var(--surface2)", color: "var(--text3)", cursor: "not-allowed" } : attInput
@@ -576,7 +575,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={1} max={31} value={att.monthDays ?? defaultDays} onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={inp} disabled={locked} /></td>
                                                         <td style={{ ...td, background: "#eff6ff", color: lop < 0 ? "#16a34a" : lop > 0 ? "#dc2626" : "var(--text3)", fontWeight: 700, fontSize: 10 }}>{lop}</td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} max={31} value={att.workedDays ?? defaultDays} onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} max={31} value={att.workedDays ?? 0} onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={inp} disabled={locked} /></td>
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} step="0.01" value={att.otDays ?? 0} onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={inp} disabled={locked} /></td>
                                                         <td style={{ ...td, background: "#eff6ff", color: "var(--text3)", fontSize: 10 }}>{otHrs}</td>
                                                         <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.canteenDays ?? 0} onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={inp} disabled={locked} /></td>
@@ -598,7 +597,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                         <td style={td}>
                                                             <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
                                                                 <span style={{ padding: "2px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: approved ? "#dcfce7" : "#fef9c3", color: approved ? "#15803d" : "#854d0e" }}>{approved ? "Approved" : sal ? "Pending" : "No Salary"}</span>
-                                                                <span style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: attRows[emp.id] ? "#dbeafe" : "#f3f4f6", color: attRows[emp.id] ? "#1d4ed8" : "#9ca3af" }}>{attRows[emp.id] ? "✓ Att" : "Default"}</span>
+                                                                <span style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: attRows[emp.id] ? "#dbeafe" : "#f3f4f6", color: attRows[emp.id] ? "#1d4ed8" : "#9ca3af" }}>{attRows[emp.id] ? "✓ Att" : "No att"}</span>
                                                                 {locked && <span title="Locked — unlock to edit" style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: "#dcfce7", color: "#15803d" }}>🔒 {rowStatus[emp.id] === "PAID" ? "Paid" : "Locked"}</span>}
                                                             </div>
                                                         </td>
@@ -611,8 +610,8 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                 <tr style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
                                                     <td colSpan={3} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({employees.length})</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.monthDays ?? defaultDays), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? defaultDays)), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.workedDays ?? defaultDays), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? 0)), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.workedDays ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0), 0) * 1000) / 1000}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0) * 8, 0) * 100) / 100}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>

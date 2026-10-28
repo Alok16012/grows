@@ -194,7 +194,7 @@ function ProcessPayrollPage() {
                         if (p.status) statuses[p.employeeId] = p.status
                         filled[p.employeeId] = {
                             monthDays:           p.workingDays ?? defaultDays,
-                            workedDays:          p.presentDays ?? defaultDays,
+                            workedDays:          p.presentDays ?? 0,
                             otDays:              p.otDays ?? 0,
                             canteenDays:         p.canteenDays ?? 0,
                             canteenAmount:       p.canteenAmount ?? null,
@@ -314,14 +314,16 @@ function ProcessPayrollPage() {
                     "DAYS WORKED", "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "ATTENDANCE",
                     "WORKING DAYS", "P", "ATT DAYS", "ATT", "PAID DAYS"
                 )
-                const workedDaysVal = workedDaysRaw !== undefined ? Number(workedDaysRaw) : defaultDays
+                // Blank / missing days = none worked: pay is for days actually worked only.
+                const workedDaysVal = workedDaysRaw !== undefined ? Number(workedDaysRaw) : 0
 
                 const monthDaysRaw = col(obj, "MONTH DAYS", "MONTH WORKING DAYS", "MONTHDAYS", "WORKING DAYS IN MONTH", "TOTAL DAYS")
                 const monthDaysVal = monthDaysRaw !== undefined ? Number(monthDaysRaw) : defaultDays
 
                 updates[empId] = {
                     monthDays:  monthDaysVal > 0 ? monthDaysVal : defaultDays,
-                    workedDays: workedDaysVal > 0 ? workedDaysVal : defaultDays,
+                    // 0 is a real value (absent all month), not "use the default".
+                    workedDays: Number.isFinite(workedDaysVal) && workedDaysVal >= 0 ? workedDaysVal : 0,
                     otDays:     Number(col(obj,
                         "OT DAYS", "OT HRS", "OTDAYS", "OTHOURS", "OT", "OVERTIME",
                         "OT HOURS", "OVER TIME"
@@ -369,10 +371,8 @@ function ProcessPayrollPage() {
     const handleProcess = async () => {
         if (!selectedSiteId) { toast.error("Select a site"); return }
         if (!employees.length) { toast.error("No employees found for this site"); return }
-        // No attendance row means `workedDays ?? 26` — a full month's pay for
-        // someone who may not have been on the sheet at all. Say so first.
-        const missingAtt = employees.filter(e => !attRows[e.id]).length
-        if (missingAtt > 0 && !confirm(`${missingAtt} employee${missingAtt === 1 ? " has" : "s have"} no attendance in the sheet and will be paid a full month (${defaultDays} days). Continue?`)) return
+        // No attendance row = 0 days worked, so nobody is paid for days they
+        // didn't work and there is nothing to confirm.
 
         setProcessing(true)
         try {
@@ -381,7 +381,7 @@ function ProcessPayrollPage() {
                 return {
                     employeeId:          emp.id,
                     monthDays:           a.monthDays           ?? defaultDays,
-                    workedDays:          a.workedDays          ?? defaultDays,
+                    workedDays:          a.workedDays          ?? 0,
                     otDays:              a.otDays              ?? 0,
                     canteenDays:         a.canteenDays         ?? 0,
                     canteenAmount:       a.canteenAmount       ?? null,
@@ -845,7 +845,7 @@ function ProcessPayrollPage() {
                                                 const fullGross = sal ? sal.basic + sal.da + hra + sal.washing + sal.conveyance + sal.leaveWithWages + bonus + sal.otherAllowance : 0
                                                 const approved = sal?.status === "APPROVED"
                                                 const monthDays  = att.monthDays  ?? defaultDays
-                                                const workedDays = att.workedDays ?? defaultDays
+                                                const workedDays = att.workedDays ?? 0
                                                 const lop        = monthDays - workedDays
                                                 const otDays     = att.otDays ?? 0
                                                 const otHrs      = Math.round(otDays * 8 * 100) / 100
@@ -867,7 +867,7 @@ function ProcessPayrollPage() {
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff", color: lop < 0 ? "#16a34a" : (lop > 0 ? "#dc2626" : "var(--text3)"), fontWeight: 700, fontSize: 10 }}>{lop}</td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
-                                                            <input type="number" min={0} max={31} value={att.workedDays ?? defaultDays}
+                                                            <input type="number" min={0} max={31} value={att.workedDays ?? 0}
                                                                 onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={inp} disabled={locked} />
                                                         </td>
                                                         <td style={{ ...td, background: "#eff6ff" }}>
@@ -925,7 +925,7 @@ function ProcessPayrollPage() {
                                                                 <span style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700,
                                                                     background: attRows[emp.id] ? "#dbeafe" : "#f3f4f6",
                                                                     color: attRows[emp.id] ? "#1d4ed8" : "#9ca3af" }}>
-                                                                    {attRows[emp.id] ? "✓ Att" : "Default"}
+                                                                    {attRows[emp.id] ? "✓ Att" : "No att"}
                                                                 </span>
                                                                 {locked && <span title="Locked — unlock to edit" style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: "#dcfce7", color: "#15803d" }}>🔒 {rowStatus[emp.id] === "PAID" ? "Paid" : "Locked"}</span>}
                                                             </div>
@@ -942,8 +942,8 @@ function ProcessPayrollPage() {
                                                     </td>
                                                     {/* Attendance totals (11 cols) */}
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays  ?? defaultDays)), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? defaultDays)), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.workedDays ?? defaultDays)), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? 0)), 0)}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.workedDays ?? 0)), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + ((attRows[e.id]?.otDays ?? 0)), 0) * 1000) / 1000}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + ((attRows[e.id]?.otDays ?? 0) * 8), 0) * 100) / 100}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>
@@ -992,7 +992,7 @@ function ProcessPayrollPage() {
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 8, background: "#dcfce7", border: "1px solid #86efac" }}>
                                     <CheckCircle2 size={13} style={{ color: "#15803d", flexShrink: 0 }} />
                                     <span style={{ fontSize: 11, color: "#15803d" }}>
-                                        {employees.length} employees ready. Attendance defaults to {defaultDays} days — edit inline above if needed, then click <b>Process Payroll</b>.
+                                        {employees.length} employees ready. Employees without attendance are paid for 0 days — enter days worked inline above, then click <b>Process Payroll</b>.
                                     </span>
                                 </div>
                             )}

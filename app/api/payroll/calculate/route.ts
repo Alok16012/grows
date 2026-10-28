@@ -157,25 +157,25 @@ export async function POST(req: Request) {
             return Number.isFinite(n) ? n : null
         }
 
-        // Attendance that cannot be real (negative days, more worked than the
-        // month has) must fail the whole batch, not quietly produce a negative
-        // LWP or an over-paid month. Checked up front so nothing is written.
-        // All bad rows are named at once, by employee rather than UUID, so a
-        // 300-row sheet is fixed in one pass instead of one upload per typo.
+        // Negative days are always a typo and fail the whole batch, checked up
+        // front so nothing is written. All bad rows are named at once, by
+        // employee rather than UUID, so a 300-row sheet is fixed in one pass.
+        // Days worked MAY exceed month days (e.g. 27 of 26 when someone works
+        // a weekly off or holiday): that is paid as entered, pro rata.
         const byId = new Map(employees.map(e => [e.id, e]))
         const badRows: string[] = []
         for (const a of (attendance as any[]) ?? []) {
             const emp = a?.employeeId ? byId.get(a.employeeId) : undefined
             if (!emp) continue
             const monthDays  = parseInt(String(a.monthDays ?? defaultMonthDays)) || defaultMonthDays
-            const workedDays = numOrDefault(a.workedDays, defaultMonthDays)
-            if (monthDays < 0 || workedDays < 0 || workedDays > monthDays) {
+            const workedDays = numOrDefault(a.workedDays, 0)
+            if (monthDays < 0 || workedDays < 0) {
                 badRows.push(`${emp.firstName} ${emp.lastName}: ${workedDays} worked of ${monthDays} days`)
             }
         }
         if (badRows.length) {
             return new NextResponse(
-                `Attendance has ${badRows.length} invalid row(s) — days worked must be between 0 and the month's days. `
+                `Attendance has ${badRows.length} invalid row(s) — month days and days worked can't be negative. `
                 + badRows.slice(0, 10).join("; ") + (badRows.length > 10 ? `; and ${badRows.length - 10} more` : ""),
                 { status: 400 }
             )
@@ -192,11 +192,10 @@ export async function POST(req: Request) {
             const monthDays = parseInt(String(attInput.monthDays  ?? defaultMonthDays)) || defaultMonthDays
             const att = {
                 monthDays,
-                // `|| defaultMonthDays` treated 0 as missing, so marking an
-                // employee as having worked zero days paid them a full month.
-                // Only fall back when the value is genuinely absent or unparseable.
-                // Clamped to 0..monthDays as a belt-and-braces after the check above.
-                workedDays:          Math.min(Math.max(numOrDefault(attInput.workedDays, defaultMonthDays), 0), monthDays),
+                // Paid for days actually worked only: absent / blank worked days
+                // count as 0, never as a full month. Never below 0. Not capped at
+                // monthDays: extra days are paid.
+                workedDays:          Math.max(numOrDefault(attInput.workedDays, 0), 0),
                 otDays:              Number(attInput.otDays)              || 0,
                 canteenDays:         Math.round(Number(attInput.canteenDays) || 0),
                 // Manual canteen amount. Blank / absent stays null so the
@@ -237,7 +236,8 @@ export async function POST(req: Request) {
                 canteenDays: att.canteenDays,
                 workingDays: att.monthDays,
                 presentDays: att.workedDays,
-                lwpDays:     att.monthDays - att.workedDays,
+                // Extra days worked are not "negative leave without pay".
+                lwpDays:     Math.max(att.monthDays - att.workedDays, 0),
                 // Actual OT hours: 1 OT day = rules.ot.hoursPerDay extra hours
                 // (was hardcoded ×8 while pay was computed at ×4).
                 overtimeHrs: Math.round(att.otDays * rules.ot.hoursPerDay),
