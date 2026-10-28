@@ -146,9 +146,12 @@ export function createDimensionAggregator() {
             const out: Dimension[] = []
             for (const [key, d] of dims) {
                 const buckets = [...d.buckets.values()]
-                // One value everywhere says nothing — a one-bar chart was
-                // exactly the complaint about the old Shift chart.
-                if (buckets.length < 2) continue
+                // A field the forms actually answered is shown even when every
+                // answer is the same (a single site often has one Location). The
+                // old one-bar complaint was about placeholder buckets ("Main",
+                // "Not specified") for fields a form didn't have — those never
+                // reach this aggregator, which only sees real answers.
+                if (buckets.length < 1) continue
                 if (!d.isChoice && !isUsefulText(buckets.length, d.answered)) continue
 
                 buckets.sort((a, b) => b.totalInspected - a.totalInspected || b.inspections - a.inspections)

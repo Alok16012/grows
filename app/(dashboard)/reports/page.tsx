@@ -500,7 +500,8 @@ export default function ReportsPage() {
                     "Shift": r.shift || "—",
                     "Site": r.site || "—",
                     "Project": r.project || "—",
-                    "Location": r.location || "—",
+                    // Blank when the inspection recorded no location.
+                    "Location": r.location || "",
                     "Part Name": r.partName || "—",
                     "Part Number": r.partNumber || "—",
                     "Inspected Qty": r.inspected || 0,

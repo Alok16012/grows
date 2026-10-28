@@ -175,7 +175,9 @@ export async function GET(req: Request) {
             if (dims.partNumber) present.partNumber = true
             const partName = dims.partName ?? "General"
             const partNumber = dims.partNumber ?? ""
-            const location = dims.location ?? "Main"
+            // Only a location the inspector actually entered. The old "Main"
+            // placeholder read like a real place in the chart and the export.
+            const location = dims.location ?? "Not specified"
             // Was declared "" and never assigned, so every inspection fell into
             // one blank bucket and Shift-Wise always showed a single bar.
             const shift = dims.shift ?? "Not specified"
@@ -320,7 +322,9 @@ export async function GET(req: Request) {
                     partName: "General",
                     partNumber: "",
                     shift: "",
-                    location: "Main",
+                    // Blank unless the form recorded a location — never a made-up
+                    // "Main". The Excel export shows exactly this value.
+                    location: "",
                     // Every answer keyed by its own label. The named keys above
                     // only cover the handful of labels this mapping knows; any
                     // other field the inspector filled — shift codes, dropdown
