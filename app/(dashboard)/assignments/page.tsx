@@ -1,7 +1,7 @@
 "use client"
 
 import { sortSitesByName } from "@/lib/site-sort"
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -433,6 +433,24 @@ export default function AssignmentsPage() {
     const [detail, setDetail] = useState<Assignment | null>(null)
     // Row menu → Edit Assignment
     const [editing, setEditing] = useState<Assignment | null>(null)
+    // Pin the Actions column only while the table actually scrolls sideways.
+    // Pinned all the time it drew a shaded, bordered block even when the whole
+    // table fitted. A callback ref, because the wrapper mounts and unmounts
+    // with the list (empty state, filters).
+    const [pinActions, setPinActions] = useState(false)
+    const tableResize = useRef<ResizeObserver | null>(null)
+    const tableWrapRef = useCallback((el: HTMLDivElement | null) => {
+        tableResize.current?.disconnect()
+        tableResize.current = null
+        if (!el) { setPinActions(false); return }
+        const check = () => setPinActions(el.scrollWidth > el.clientWidth + 1)
+        check()
+        if (typeof ResizeObserver !== "undefined") {
+            const ro = new ResizeObserver(check)
+            ro.observe(el)
+            tableResize.current = ro
+        }
+    }, [])
 
     useEffect(() => { setPage(1) }, [assignmentSearch, filterStatus, perPage])
 
@@ -705,6 +723,47 @@ export default function AssignmentsPage() {
     const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / perPage))
     const safePage = Math.min(page, totalPages)
     const pageRows = filteredAssignments.slice((safePage - 1) * perPage, safePage * perPage)
+
+    // What one row shows — shared by the desktop table and the phone cards so
+    // the two can't drift apart.
+    const rowView = (a: Assignment) => {
+        const virtual = isVirtual(a)
+        const teamInspectors = (a.project?.inspectors ?? []).map(i => i.name || "Unnamed")
+        return {
+            virtual,
+            st: displayStatus(a),
+            siteName: a.project?.site?.name || "—",
+            projectName: a.project?.name || "—",
+            // Virtual rows list the project's team inspectors: nothing is issued yet.
+            inspector: virtual ? (teamInspectors.length ? teamInspectors.join(", ") : "No inspectors on team") : (a.inspectionBoy?.name || "—"),
+            inspectorTitle: virtual ? (teamInspectors.join(", ") || undefined) : (a.inspectionBoy?.name || undefined),
+            inspectorMuted: virtual && teamInspectors.length === 0,
+            inspectorNote: virtual ? `Team inspector${teamInspectors.length === 1 ? "" : "s"} · not yet issued` : "Inspector",
+            typeLabel: virtual ? "—" : (a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring",
+            startLabel: virtual ? "—" : fmtDate(a.startDate ?? a.createdAt),
+        }
+    }
+
+    // Row actions: Create assignment for a not-yet-issued row, otherwise View
+    // and the ⋮ menu. Same buttons in the table and the phone cards.
+    const renderActions = (a: Assignment, virtual: boolean) => (
+        <div className="inline-flex items-center gap-1.5">
+            {virtual && canManageAssignments ? (
+                <button onClick={() => startAssignmentFor(a)} title="Open the New Assignment wizard for this project"
+                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-[6px] bg-[var(--accent)] text-white text-[11.5px] font-medium hover:opacity-90 transition-opacity">
+                    <Plus size={12} strokeWidth={2.5} /> Create assignment
+                </button>
+            ) : (
+                <button onClick={() => setDetail(a)} title="View details" aria-label="View details"
+                    className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
+                    <Eye size={13} />
+                </button>
+            )}
+            {canManageAssignments && !virtual && (
+                <RowMenu assignment={a} onEdit={() => setEditing(a)} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
+            )}
+        </div>
+    )
     const showFrom = filteredAssignments.length === 0 ? 0 : (safePage - 1) * perPage + 1
     const showTo = Math.min(safePage * perPage, filteredAssignments.length)
 
@@ -1068,12 +1127,62 @@ export default function AssignmentsPage() {
                         {filteredAssignments.length === 0 ? (
                             <p className="text-center text-[13px] text-[var(--text3)] py-12">No assignments found.</p>
                         ) : (
-                            <div className="overflow-x-auto">
+                            <>
+                                {/* ── Phones: one card per assignment ────────────────────
+                                    The 1080px table can't fit a phone; with Actions pinned it
+                                    covered half the screen and hid Inspector, Project and
+                                    Status. Same data, same buttons, stacked. */}
+                                <div className="md:hidden divide-y divide-[var(--border)]">
+                                    {pageRows.map(a => {
+                                        const r = rowView(a)
+                                        return (
+                                            <div key={a.id} role="button" tabIndex={0} onClick={() => setDetail(a)}
+                                                onKeyDown={e => { if (e.key === "Enter") setDetail(a) }}
+                                                className="px-4 py-3 active:bg-[var(--surface2)]/60 cursor-pointer">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        {r.virtual ? (
+                                                            <p className="font-mono text-[11.5px] font-semibold text-[var(--text3)]">Not yet issued</p>
+                                                        ) : (
+                                                            <p className="font-mono text-[12px] font-semibold text-[var(--accent)] truncate">{assignmentNo(a)}</p>
+                                                        )}
+                                                        <p className="text-[11px] text-[var(--text3)] truncate">{r.siteName}</p>
+                                                    </div>
+                                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10.5px] font-semibold whitespace-nowrap" style={{ background: r.st.bg, color: r.st.fg }}>
+                                                        {r.st.label}
+                                                    </span>
+                                                </div>
+                                                <p className={`mt-2 text-[13.5px] leading-tight truncate ${r.inspectorMuted ? "text-[var(--text3)] italic" : "font-semibold text-[var(--text)]"}`}>{r.inspector}</p>
+                                                <p className="text-[11px] text-[var(--text3)] truncate">{r.inspectorNote}</p>
+                                                <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
+                                                    <dt className="text-[var(--text3)]">Project</dt>
+                                                    <dd className="text-[var(--text2)] truncate min-w-0">{r.projectName}</dd>
+                                                    <dt className="text-[var(--text3)]">Type</dt>
+                                                    <dd className="text-[var(--text2)] min-w-0">
+                                                        {r.typeLabel}
+                                                        {a.isMultiPart && (
+                                                            <span className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#eef2ff] text-[#4338ca] text-[10px] font-semibold align-middle">
+                                                                <Layers size={9} /> Multi-part
+                                                            </span>
+                                                        )}
+                                                    </dd>
+                                                    <dt className="text-[var(--text3)]">Start</dt>
+                                                    <dd className="text-[var(--text2)] tabular-nums">{r.startLabel}</dd>
+                                                </dl>
+                                                <div className="mt-2.5 flex justify-end" onClick={e => e.stopPropagation()}>
+                                                    {renderActions(a, r.virtual)}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* ── Tablet / desktop: the table ──────────────────────────── */}
+                                <div ref={tableWrapRef} className="hidden md:block overflow-x-auto">
                                 {/* Fixed layout: long names ellipsize (full text in the title)
-                                    instead of pushing the row wide. The table always keeps a
-                                    floor width — it sits in a container, so a viewport breakpoint
-                                    can't tell how wide it really is — and the wrapper scrolls when
-                                    narrower; Actions stays pinned on the right. */}
+                                    instead of pushing the row wide. The table keeps a floor
+                                    width and the wrapper scrolls when narrower; Actions is
+                                    pinned on the right only while it scrolls. */}
                                 <table className="w-full table-fixed min-w-[1080px]" style={{ fontSize: 12.5 }}>
                                     <colgroup>
                                         <col style={{ width: 150 }} />
@@ -1092,53 +1201,39 @@ export default function AssignmentsPage() {
                                             <th className="text-left font-semibold px-3 py-2.5">Status</th>
                                             <th className="text-left font-semibold px-3 py-2.5">Type</th>
                                             <th className="text-left font-semibold px-3 py-2.5 whitespace-nowrap">Start Date</th>
-                                            <th className="text-right font-semibold px-4 py-2.5 sticky right-0 bg-[#f9fafe] shadow-[inset_1px_0_0_var(--border)]">Actions</th>
+                                            <th className={`text-right font-semibold px-4 py-2.5 ${pinActions ? "sticky right-0 bg-[#f9fafe] shadow-[inset_1px_0_0_var(--border)]" : ""}`}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[var(--border)]">
                                         {pageRows.map(a => {
-                                            const st = displayStatus(a)
-                                            const virtual = isVirtual(a)
-                                            const teamInspectors = (a.project?.inspectors ?? []).map(i => i.name || "Unnamed")
-                                            const projectName = a.project?.name || "—"
-                                            const siteName = a.project?.site?.name || "—"
+                                            const r = rowView(a)
                                             return (
                                                 <tr key={a.id} onClick={() => setDetail(a)}
                                                     className="group hover:bg-[var(--surface2)]/40 transition-colors cursor-pointer">
                                                     <td className="px-4 py-2.5">
-                                                        {virtual ? (
+                                                        {r.virtual ? (
                                                             <p className="font-mono text-[11.5px] font-semibold text-[var(--text3)] cursor-help"
                                                                 title="Created when you issue the assignment">—</p>
                                                         ) : (
                                                             <p className="font-mono text-[11.5px] font-semibold text-[var(--accent)] truncate">{assignmentNo(a)}</p>
                                                         )}
-                                                        <p className="text-[10.5px] text-[var(--text3)] truncate" title={siteName}>{siteName}</p>
+                                                        <p className="text-[10.5px] text-[var(--text3)] truncate" title={r.siteName}>{r.siteName}</p>
                                                     </td>
                                                     <td className="px-3 py-2.5">
-                                                        {virtual ? (
-                                                            // Team inspectors, not an assignee: nothing has been issued yet.
-                                                            <>
-                                                                <p className={`leading-tight truncate ${teamInspectors.length ? "font-semibold text-[var(--text)]" : "text-[var(--text3)] italic"}`}
-                                                                    title={teamInspectors.join(", ") || undefined}>
-                                                                    {teamInspectors.length ? teamInspectors.join(", ") : "No inspectors on team"}
-                                                                </p>
-                                                                <p className="text-[10.5px] text-[var(--text3)] truncate">Team inspector{teamInspectors.length === 1 ? "" : "s"} · not yet issued</p>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <p className="font-semibold text-[var(--text)] leading-tight truncate" title={a.inspectionBoy?.name || undefined}>{a.inspectionBoy?.name || "—"}</p>
-                                                                <p className="text-[10.5px] text-[var(--text3)]">Inspector</p>
-                                                            </>
-                                                        )}
+                                                        <p className={`leading-tight truncate ${r.inspectorMuted ? "text-[var(--text3)] italic" : "font-semibold text-[var(--text)]"}`}
+                                                            title={r.inspectorTitle}>
+                                                            {r.inspector}
+                                                        </p>
+                                                        <p className="text-[10.5px] text-[var(--text3)] truncate">{r.inspectorNote}</p>
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-[var(--text2)] truncate" title={projectName}>{projectName}</td>
+                                                    <td className="px-3 py-2.5 text-[var(--text2)] truncate" title={r.projectName}>{r.projectName}</td>
                                                     <td className="px-3 py-2.5">
-                                                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold whitespace-nowrap" style={{ background: st.bg, color: st.fg }}>
-                                                            {st.label}
+                                                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold whitespace-nowrap" style={{ background: r.st.bg, color: r.st.fg }}>
+                                                            {r.st.label}
                                                         </span>
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text2)] whitespace-nowrap">
-                                                        {virtual ? "—" : (a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring"}
+                                                        {r.typeLabel}
                                                         {a.isMultiPart && (
                                                             <span title="Inspected over several visits — stays open until closed"
                                                                 className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#eef2ff] text-[#4338ca] text-[10px] font-semibold align-middle">
@@ -1146,32 +1241,18 @@ export default function AssignmentsPage() {
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{virtual ? "—" : fmtDate(a.startDate ?? a.createdAt)}</td>
-                                                    <td className="px-4 py-2.5 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-[#f6f8fc] shadow-[inset_1px_0_0_var(--border)] transition-colors"
+                                                    <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{r.startLabel}</td>
+                                                    <td className={`px-4 py-2.5 text-right whitespace-nowrap ${pinActions ? "sticky right-0 bg-white group-hover:bg-[#f6f8fc] shadow-[inset_1px_0_0_var(--border)] transition-colors" : ""}`}
                                                         onClick={e => e.stopPropagation()}>
-                                                        <div className="inline-flex items-center gap-1.5">
-                                                            {virtual && canManageAssignments ? (
-                                                                <button onClick={() => startAssignmentFor(a)} title="Open the New Assignment wizard for this project"
-                                                                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-[6px] bg-[var(--accent)] text-white text-[11.5px] font-medium hover:opacity-90 transition-opacity">
-                                                                    <Plus size={12} strokeWidth={2.5} /> Create assignment
-                                                                </button>
-                                                            ) : (
-                                                                <button onClick={() => setDetail(a)} title="View details"
-                                                                    className="p-2 sm:p-1.5 rounded-[6px] border border-[var(--border)] bg-white text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
-                                                                    <Eye size={13} />
-                                                                </button>
-                                                            )}
-                                                            {canManageAssignments && !virtual && (
-                                                                <RowMenu assignment={a} onEdit={() => setEditing(a)} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
-                                                            )}
-                                                        </div>
+                                                        {renderActions(a, r.virtual)}
                                                     </td>
                                                 </tr>
                                             )
                                         })}
                                     </tbody>
                                 </table>
-                            </div>
+                                </div>
+                            </>
                         )}
 
                         {/* Pagination */}
