@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { monthEndKey } from "@/lib/employee-filter"
 import { can } from "@/lib/can"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -168,7 +169,8 @@ function ProcessPayrollPage() {
             // what tells /api/payroll/calculate who to pay, so anyone missing
             // here is simply never paid.
             const [empAll, payRes] = await Promise.all([
-                fetchAllEmployees<Employee>({ siteId, status: "ACTIVE" }),
+                // Only people who had joined by the end of this payroll month.
+                fetchAllEmployees<Employee>({ siteId, status: "ACTIVE", joinedBy: monthEndKey(Number(month), Number(year)) }),
                 fetch(`/api/payroll?siteId=${siteId}&month=${month}&year=${year}`),
             ])
             setEmployees(empAll.employees)

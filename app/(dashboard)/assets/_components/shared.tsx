@@ -197,6 +197,13 @@ export function employeesSummary(items: RequestItem[]) {
     return ids.length > 1 ? `${fullName(first)} +${ids.length - 1}` : fullName(first)
 }
 
+// Sites of the employees on a request (from their current posting).
+export function sitesSummary(items: RequestItem[]) {
+    const names = Array.from(new Set(items.map(i => i.employee.siteName).filter((s): s is string => !!s)))
+    if (names.length === 0) return "—"
+    return names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0]
+}
+
 export function assetsSummary(items: RequestItem[]) {
     const names = Array.from(new Set(items.map(i => i.asset.name)))
     if (names.length === 0) return "—"

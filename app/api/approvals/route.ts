@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
+import { withApproverNames } from "@/lib/inspection-approver"
 import { inspectionScopeForApprover } from "@/lib/approval-scope"
 import { unstable_cache } from "next/cache"
 import { dayWindow, istDateOnly } from "@/lib/attendance-policy"
@@ -72,7 +73,7 @@ export async function GET(req: Request) {
             }
         })
 
-        return NextResponse.json(pendingInspections)
+        return NextResponse.json(await withApproverNames(pendingInspections))
     } catch (error) {
         console.error("GET_APPROVALS_ERROR", error)
         return NextResponse.json({

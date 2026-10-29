@@ -30,8 +30,14 @@ export async function GET(req: Request) {
         ? { month: Number(qMonth), year: Number(qYear) }
         : null
 
+    // Listed from their joining month on: someone who joins in November does
+    // not appear while October is being viewed. No month = the current month.
+    const period = asOf ?? monthInIST()
     const employees = await prisma.employee.findMany({
-        where: { status: "ACTIVE" },
+        where: {
+            status: "ACTIVE",
+            OR: [{ dateOfJoining: null }, { dateOfJoining: { lt: new Date(Date.UTC(period.year, period.month, 1)) } }],
+        },
         orderBy: { firstName: "asc" },
         select: {
             id: true,

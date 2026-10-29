@@ -36,6 +36,9 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
     })
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
+    // Submitted-date range (YYYY-MM-DD); either end may be left open.
+    const [dateFrom, setDateFrom] = useState("")
+    const [dateTo, setDateTo] = useState("")
     // Paging: the queue used to request a single page of 100 and show nothing
     // past it, so on a long queue the older reports could never be reached.
     const PAGE_SIZE = 50
@@ -48,7 +51,19 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
         return () => clearTimeout(t)
     }, [searchQuery])
     const [activeTab, setActiveTab] = useState(dateParamToday ? "all" : "pending")
-    useEffect(() => { setPage(1) }, [activeTab, debouncedQuery, todayOnly])
+    useEffect(() => { setPage(1) }, [activeTab, debouncedQuery, todayOnly, dateFrom, dateTo])
+
+    // Picking dates replaces the dashboard's "Submitted today" shortcut.
+    const changeDate = (which: "from" | "to", value: string) => {
+        if (todayOnly) {
+            setTodayOnly(false)
+            router.replace("/approvals")
+        }
+        if (which === "from") setDateFrom(value)
+        else setDateTo(value)
+    }
+    const clearDates = () => { setDateFrom(""); setDateTo("") }
+    const showApprovedBy = activeTab === "approved" || activeTab === "all"
 
     // Client-side navigation to /approvals?date=today while already here.
     useEffect(() => {
@@ -95,6 +110,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
             }
             const params = new URLSearchParams({ status, page: String(pageNo), limit: String(PAGE_SIZE), withCounts: "true" })
             if (q) params.set("q", q)
+            if (dateFrom) params.set("from", dateFrom)
+            if (dateTo) params.set("to", dateTo)
             const res = await fetch(`/api/inspections/all?${params}`)
             const data = await res.json()
 
@@ -148,7 +165,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
             fetchData(activeTab, page, debouncedQuery)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [authStatus, activeTab, todayOnly, page, debouncedQuery])
+    }, [authStatus, activeTab, todayOnly, page, debouncedQuery, dateFrom, dateTo])
 
     // Today's list is fetched whole and filtered here; the full queue is
     // searched and paged by the server.
@@ -234,7 +251,24 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                     )}
                 </div>
 
-                <div className="relative w-full sm:w-[280px]">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-1.5 h-[38px] px-2.5 bg-white border border-[var(--border)] rounded-[9px] text-[12.5px] text-[var(--text2)]">
+                    <label htmlFor="appr-from" className="text-[var(--text3)]">From</label>
+                    <input id="appr-from" type="date" value={dateFrom} max={dateTo || undefined}
+                        onChange={e => changeDate("from", e.target.value)}
+                        className="bg-transparent text-[12.5px] text-[var(--text)] outline-none" />
+                    <label htmlFor="appr-to" className="text-[var(--text3)] ml-1">To</label>
+                    <input id="appr-to" type="date" value={dateTo} min={dateFrom || undefined}
+                        onChange={e => changeDate("to", e.target.value)}
+                        className="bg-transparent text-[12.5px] text-[var(--text)] outline-none" />
+                    {(dateFrom || dateTo) && (
+                        <button onClick={clearDates} aria-label="Clear dates" title="Clear dates"
+                            className="h-5 w-5 rounded-full flex items-center justify-center text-[var(--text3)] hover:bg-[var(--surface2)] hover:text-[var(--text)]">
+                            <X className="h-3 w-3" />
+                        </button>
+                    )}
+                </div>
+                <div className="relative w-full sm:w-[240px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <Input
                         placeholder="Search..."
@@ -242,6 +276,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
+                </div>
                 </div>
             </div>
 
@@ -258,7 +293,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                         </div>
                         <h3 className="text-[16px] font-semibold text-[var(--text)] mb-1.5">All caught up!</h3>
                         <p className="text-[13px] text-[var(--text2)] max-w-[250px] mx-auto leading-relaxed">
-                            No {activeTab !== "all" ? activeTab : ""} inspections {todayOnly ? "submitted today" : "found matching your criteria"}.
+                            No {activeTab !== "all" ? activeTab : ""} inspections {todayOnly ? "submitted today" : (dateFrom || dateTo) ? "in the selected dates" : "found matching your criteria"}.
                         </p>
                     </div>
                 ) : (
@@ -286,6 +321,9 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                     <div className="flex items-center justify-between">
                                         <p className="text-[12px] text-[var(--text3)]">
                                             {inspection.submittedAt ? new Date(inspection.submittedAt).toLocaleDateString('en-GB') : "—"}
+                                            {inspection.status === "approved" && inspection.approvedByName && (
+                                                <span className="block text-[11.5px] text-[var(--text2)]">Approved by {inspection.approvedByName}</span>
+                                            )}
                                         </p>
                                         <div className="flex items-center gap-2">
                                             {inspection.status === "pending" && (
@@ -328,6 +366,9 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Site</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Submitted</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Status</th>
+                                        {showApprovedBy && (
+                                            <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Approved By</th>
+                                        )}
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Actions</th>
                                     </tr>
                                 </thead>
@@ -357,6 +398,18 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                                     {inspection.status === "pending" ? "Pending" : inspection.status === "approved" ? "Approved" : inspection.status === "rejected" ? "Rejected" : inspection.status}
                                                 </span>
                                             </td>
+                                            {showApprovedBy && (
+                                                <td className="px-[18px] py-3.5 text-[13px] text-[var(--text)]">
+                                                    {inspection.status === "approved" ? (
+                                                        <>
+                                                            <p>{inspection.approvedByName ?? "—"}</p>
+                                                            {inspection.approvedAt && (
+                                                                <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{new Date(inspection.approvedAt).toLocaleDateString('en-GB')}</p>
+                                                            )}
+                                                        </>
+                                                    ) : <span className="text-[var(--text3)]">—</span>}
+                                                </td>
+                                            )}
                                             <td className="px-[18px] py-3.5">
                                                 <div className="flex items-center gap-1.5">
                                                     {inspection.status === "pending" && (

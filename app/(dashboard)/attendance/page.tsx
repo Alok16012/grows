@@ -824,10 +824,13 @@ function AdminView() {
         try {
             // Picker-shaped roster, cut to the caller's scope. The old call asked
             // /api/employees for 1000 rows, got at most 200 and dropped the rest.
-            const { employees } = await fetchEmployeeOptions({ status: "ACTIVE", siteId: siteFilter || undefined })
+            // Only people who had joined by the day being viewed.
+            const { employees } = await fetchEmployeeOptions({
+                status: "ACTIVE", siteId: siteFilter || undefined, joinedBy: format(selectedDate, "yyyy-MM-dd"),
+            })
             setEmployees(employees as any)
         } catch { setEmployees([]) } finally { setEmployeesLoading(false) }
-    }, [siteFilter])
+    }, [siteFilter, selectedDate])
 
     const fetchAttendances = useCallback(async () => {
         const requestId = ++latestAttendanceRequestRef.current

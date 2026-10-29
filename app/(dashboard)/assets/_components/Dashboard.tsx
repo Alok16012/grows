@@ -4,7 +4,7 @@ import { ClipboardList, Hourglass, PackageCheck, Boxes, Plus, Check, AlertTriang
 import { StatCard, statGridClass } from "@/components/StatCard"
 import {
     AssetRequest, REQUEST_STATUS, LOW_TONE, Pill, api, useApiError, Card, Loading, Empty,
-    btnPrimary, btnGhost, thCls, tdCls, fmtDate, employeesSummary, assetsSummary,
+    btnPrimary, btnGhost, thCls, tdCls, fmtDate, employeesSummary, sitesSummary, assetsSummary,
 } from "./shared"
 
 type DashboardData = {
@@ -57,10 +57,10 @@ export function DashboardTab({ refreshKey, canRequest, canApprove, canIssue, onR
                     </div>
                     {(d.recentRequests ?? []).length === 0 ? <Empty icon={<ClipboardList size={32} />} title="No requests yet" /> : (
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[560px] text-[13px]">
+                            <table className="w-full min-w-[680px] text-[13px]">
                                 <thead>
                                     <tr className="bg-[var(--surface2)]">
-                                        <th className={thCls}>Request ID</th><th className={thCls}>Employee(s)</th><th className={thCls}>Asset</th><th className={thCls}>Status</th>
+                                        <th className={thCls}>Request ID</th><th className={thCls}>Employee(s)</th><th className={thCls}>Site</th><th className={thCls}>Asset</th><th className={thCls}>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border)]">
@@ -71,6 +71,7 @@ export function DashboardTab({ refreshKey, canRequest, canApprove, canIssue, onR
                                                 <p className="text-[11px] text-[var(--text3)]">{fmtDate(r.createdAt)}</p>
                                             </td>
                                             <td className={`${tdCls} text-[var(--text)]`}>{employeesSummary(r.items ?? [])}</td>
+                                            <td className={`${tdCls} text-[var(--text2)]`}>{sitesSummary(r.items ?? [])}</td>
                                             <td className={`${tdCls} text-[var(--text2)]`}>{assetsSummary(r.items ?? [])}</td>
                                             <td className={tdCls}>{REQUEST_STATUS[r.status] ? <Pill tone={REQUEST_STATUS[r.status]} /> : r.status}</td>
                                         </tr>

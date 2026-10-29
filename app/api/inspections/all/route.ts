@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
 import { inspectionScopeForApprover } from "@/lib/approval-scope"
+import { withApproverNames, istDayStart, istDayEnd } from "@/lib/inspection-approver"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -24,7 +25,15 @@ export async function GET(req: Request) {
         // approvals permission showed the whole company's pending queue.
         const scope = await inspectionScopeForApprover(session)
 
-        const where: any = { ...(scope ?? {}) }
+        // Optional Submitted-date range (IST days, either end may be open). It
+        // also narrows the tab counts, so they describe the dates on screen.
+        const from = istDayStart(searchParams.get("from"))
+        const to = istDayEnd(searchParams.get("to"))
+        const dateWhere: any = from || to
+            ? { submittedAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+            : {}
+
+        const where: any = { ...(scope ?? {}), ...dateWhere }
         if (status && status !== "all") {
             where.status = status
         }
@@ -50,6 +59,7 @@ export async function GET(req: Request) {
                     createdAt: true,
                     submittedAt: true,
                     approvedAt: true,
+                    approvedBy: true,
                     submitter: { select: { name: true } },
                     assignment: {
                         select: {
@@ -79,17 +89,17 @@ export async function GET(req: Request) {
 
         if (withCounts) {
             queries.push(
-                prisma.inspection.count({ where: { ...(scope ?? {}), status: "pending" } }),
-                prisma.inspection.count({ where: { ...(scope ?? {}), status: "approved" } }),
-                prisma.inspection.count({ where: { ...(scope ?? {}), status: "rejected" } }),
-                prisma.inspection.count({ where: { ...(scope ?? {}) } })
+                prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere, status: "pending" } }),
+                prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere, status: "approved" } }),
+                prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere, status: "rejected" } }),
+                prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere } })
             )
         }
 
         const results = await Promise.all(queries)
         const [inspections, total] = results
 
-        const response: any = { inspections, total, page, limit }
+        const response: any = { inspections: await withApproverNames(inspections), total, page, limit }
         if (withCounts) {
             response.counts = {
                 pending: results[2],

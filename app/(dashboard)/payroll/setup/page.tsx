@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { monthEndKey } from "@/lib/employee-filter"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -272,7 +273,8 @@ export default function PayrollPage() {
                 // Only current staff. The default list also returns TERMINATED /
                 // RESIGNED / INACTIVE people, and processing posts every loaded
                 // row, so leavers were still being given payroll rows.
-                fetchAllEmployees({ status: "ACTIVE" }),
+                // …and only those who had joined by the end of this month.
+                fetchAllEmployees({ status: "ACTIVE", joinedBy: monthEndKey(month, year) }),
                 fetch(`/api/payroll?month=${month}&year=${year}&limit=1000`)
             ])
             const paysRaw = payRes.ok ? await payRes.json() : []

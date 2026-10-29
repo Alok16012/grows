@@ -2,6 +2,7 @@
 import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useRef, useCallback, useEffect } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
+import { monthEndKey } from "@/lib/employee-filter"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
@@ -86,11 +87,12 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
     const [siteEmployees, setSiteEmployees] = useState<Employee[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    // The template lists who had joined by the end of the chosen month.
     useEffect(() => {
         if (!siteId) { setSiteEmployees([]); return }
-        fetchAllEmployees<Employee>({ siteId, status: "ACTIVE" })
+        fetchAllEmployees<Employee>({ siteId, status: "ACTIVE", joinedBy: monthEndKey(month, year) })
             .then(d=>setSiteEmployees(d.employees)).catch(()=>setSiteEmployees([]))
-    }, [siteId])
+    }, [siteId, month, year])
 
     useEffect(() => {
         fetch("/api/sites?isActive=true").then(r=>r.json()).then(data=>{

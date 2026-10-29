@@ -11,7 +11,7 @@ import {
     REQUEST_STATUS, FULFILMENT_STATUS, ISSUE_STATUS, REASON_LABEL,
     Pill, api, qs, useApiError, Drawer, Modal, Card, Loading, Empty, Pager, Label, UploadField, Stat,
     inputCls, filterCls, btnPrimary, btnGhost, btnDanger, btnSmall, btnSmallAccent, thCls, tdCls,
-    fmtDate, fullName, employeesSummary, assetsSummary, sumBy, remainingOf, newKey,
+    fmtDate, fullName, employeesSummary, sitesSummary, assetsSummary, sumBy, remainingOf, newKey,
 } from "./shared"
 
 type StatusTab = RequestStatus | "ALL"
@@ -107,10 +107,10 @@ export function RequestsTab({ mineOnly, canApprove, canIssue, meId, refreshKey, 
                     <Empty icon={<ClipboardList size={40} />} title="No requests here" sub={status === "SUBMITTED" ? "Nothing is waiting for approval." : undefined} />
                 ) : (
                     <div className={`overflow-x-auto ${loading ? "opacity-60" : ""}`}>
-                        <table className="w-full min-w-[1080px] text-[13px]">
+                        <table className="w-full min-w-[1180px] text-[13px]">
                             <thead>
                                 <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
-                                    <th className={thCls}>Request ID</th><th className={thCls}>Employee(s)</th><th className={thCls}>Asset</th>
+                                    <th className={thCls}>Request ID</th><th className={thCls}>Employee(s)</th><th className={thCls}>Site</th><th className={thCls}>Asset</th>
                                     <th className={`${thCls} !text-right`}>Requested</th><th className={`${thCls} !text-right`}>Approved</th><th className={`${thCls} !text-right`}>Issued</th>
                                     <th className={thCls}>Status</th><th className={thCls}>Fulfilment</th><th className={`${thCls} !text-right`}>Actions</th>
                                 </tr>
@@ -131,6 +131,7 @@ export function RequestsTab({ mineOnly, canApprove, canIssue, meId, refreshKey, 
                                                 <p className="font-medium text-[var(--text)]">{employeesSummary(r.items)}</p>
                                                 <p className="text-[11px] text-[var(--text3)]">{r.requestType === "MULTIPLE" ? "Multiple" : "Individual"} · {REASON_LABEL[r.reason] ?? r.reason}</p>
                                             </td>
+                                            <td className={`${tdCls} text-[var(--text2)]`}>{sitesSummary(r.items)}</td>
                                             <td className={`${tdCls} text-[var(--text2)]`}>{assetsSummary(r.items)}</td>
                                             <td className={`${tdCls} text-right tabular-nums`}>{sumBy(r.items, i => i.requestedQty)}</td>
                                             <td className={`${tdCls} text-right tabular-nums`}>{approvedSum ?? "—"}</td>

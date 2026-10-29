@@ -18,6 +18,8 @@ export type EmployeeFilters = {
     status?: string | null
     search?: string | null
     employmentType?: string | null
+    /** "YYYY-MM-DD": only people who had joined by that day (no joining date counts as joined). */
+    joinedBy?: string | null
 }
 
 /** Reads the filter set off a request's query string. */
@@ -29,7 +31,14 @@ export function employeeFiltersFromParams(searchParams: URLSearchParams): Employ
         status:         searchParams.get("status"),
         search:         searchParams.get("search"),
         employmentType: searchParams.get("employmentType"),
+        joinedBy:       searchParams.get("joinedBy"),
     }
+}
+
+/** Last day of a month as "YYYY-MM-DD" (month is 1–12), for the joinedBy filter. */
+export function monthEndKey(month: number, year: number): string {
+    const last = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    return `${year}-${String(month).padStart(2, "0")}-${String(last).padStart(2, "0")}`
 }
 
 /** The same filters as a query string, for callers that build a URL. */
@@ -75,6 +84,14 @@ export function buildEmployeeWhere(f: EmployeeFilters): Record<string, any> {
 
     if (f.siteId) {
         where.deployments = { some: { siteId: f.siteId, isActive: true } }
+    }
+
+    // Month-based screens (salary structure, payroll, attendance, muster) list a
+    // person from their joining month on, not before they joined.
+    if (f.joinedBy && /^\d{4}-\d{2}-\d{2}$/.test(f.joinedBy)) {
+        where.AND = [...(where.AND ?? []), {
+            OR: [{ dateOfJoining: null }, { dateOfJoining: { lte: new Date(`${f.joinedBy}T23:59:59.999Z`) } }],
+        }]
     }
 
     // Each whitespace-separated word must hit at least one field, so "Rahul",
