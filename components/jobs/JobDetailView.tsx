@@ -5,7 +5,7 @@ import {
     Home, Clock, ExternalLink, Send, Layers, ShieldCheck,
     Languages as LanguagesIcon, Sparkles, CheckCircle2, CalendarClock, Phone,
 } from "lucide-react"
-import { JobPosting, JobContact, STATUS_META, formatExperience, formatSalary, priorityStyle } from "./constants"
+import { JobPosting, JobContact, STATUS_META, effectiveJobStatus, formatExperience, formatSalary, priorityStyle } from "./constants"
 import { COMPANY } from "@/lib/company"
 
 const yn = (v: boolean) => (v ? "Available" : "Not Available")
@@ -33,7 +33,7 @@ function coordsFromMapUrl(url: string): string | null {
 }
 
 export function JobDetailView({ job, onApply }: { job: JobPosting; onApply?: () => void }) {
-    const meta = STATUS_META[job.status]
+    const meta = STATUS_META[effectiveJobStatus(job)]
     const company = job.companyName || COMPANY.legalName
     const partLabel = job.partSectionLabel || "Inspection Part (Sample)"
     const mapQuery = job.plantAddress || job.plantLocation || ""

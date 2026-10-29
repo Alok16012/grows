@@ -26,7 +26,7 @@ const DEFAULT_MAX_PAGES = 20
 
 export async function fetchAllEmployees<T = any>(
     query: Record<string, string | number | boolean | undefined | null> = {},
-    opts: { pageSize?: number; maxPages?: number } = {},
+    opts: { pageSize?: number; maxPages?: number; signal?: AbortSignal } = {},
 ): Promise<FetchAllEmployeesResult<T>> {
     const pageSize = opts.pageSize ?? DEFAULT_PAGE_SIZE
     const maxPages = opts.maxPages ?? DEFAULT_MAX_PAGES
@@ -46,7 +46,7 @@ export async function fetchAllEmployees<T = any>(
         params.set("page", String(page))
         params.set("pageSize", String(pageSize))
 
-        const res = await fetch(`/api/employees?${params.toString()}`)
+        const res = await fetch(`/api/employees?${params.toString()}`, { signal: opts.signal })
         if (!res.ok) throw new Error(await res.text())
         const data = await res.json()
 

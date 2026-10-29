@@ -28,6 +28,16 @@ export async function GET(req: Request) {
         if (status && status !== "all") {
             where.status = status
         }
+        // Server-side search, so it covers every page and not just the rows on
+        // screen: inspector, project or site name.
+        const q = (searchParams.get("q") ?? "").trim().slice(0, 100)
+        if (q) {
+            where.OR = [
+                { submitter: { name: { contains: q, mode: "insensitive" } } },
+                { assignment: { project: { name: { contains: q, mode: "insensitive" } } } },
+                { assignment: { project: { site: { name: { contains: q, mode: "insensitive" } } } } },
+            ]
+        }
 
         const withCounts = searchParams.get("withCounts") === "true"
 
@@ -57,7 +67,10 @@ export async function GET(req: Request) {
                         }
                     }
                 },
-                orderBy: { createdAt: "desc" },
+                // Newest submission first (the date the queue shows); drafts,
+                // which have no submittedAt, go last. Was createdAt — the time
+                // the form was started — so the Submitted column looked shuffled.
+                orderBy: [{ submittedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
                 skip,
                 take: limit
             }),

@@ -709,6 +709,8 @@ export default function AssignmentsPage() {
             if (filterStatus !== "all" && displayStatus(a).key !== filterStatus) return false
             if (q) {
                 const hay = [
+                    // The number shown in the first column, so "ASG-…" finds its row.
+                    isVirtual(a) ? null : assignmentNo(a),
                     a.inspectionBoy?.name,
                     ...(a.project?.inspectors ?? []).map(i => i.name),
                     a.project?.name,
@@ -1115,7 +1117,7 @@ export default function AssignmentsPage() {
                             <div className="filter-search relative sm:min-w-[200px]">
                                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
                                 <input value={assignmentSearch} onChange={e => setAssignmentSearch(e.target.value)}
-                                    placeholder="Search by inspector, project, site..." className={inputCls + " pl-8 h-8"} />
+                                    placeholder="Search by number, inspector, project, site..." className={inputCls + " pl-8 h-8"} />
                             </div>
                             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                                 className="filter-full w-full sm:w-auto h-8 rounded-[8px] border border-[var(--border)] bg-white px-2.5 text-[12.5px] text-[var(--text2)] outline-none cursor-pointer">

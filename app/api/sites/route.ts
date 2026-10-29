@@ -93,7 +93,10 @@ export async function GET(req: Request) {
             include: {
                 _count: {
                     select: {
-                        deployments: { where: { isActive: true } },
+                        // Working staff only (lib: same rule as site details and
+                        // Analytics) — resigned employees and joiners awaiting
+                        // approval used to inflate Deployed and hide Understaffed.
+                        deployments: { where: { isActive: true, employee: { status: { in: ["ACTIVE", "ON_LEAVE"] } } } },
                         attendances: true,
                     },
                 },

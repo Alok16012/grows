@@ -36,7 +36,19 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
     })
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
+    // Paging: the queue used to request a single page of 100 and show nothing
+    // past it, so on a long queue the older reports could never be reached.
+    const PAGE_SIZE = 50
+    const [page, setPage] = useState(1)
+    const [total, setTotal] = useState(0)
+    // Search runs on the server (all pages); debounced so typing doesn't refetch per key.
+    const [debouncedQuery, setDebouncedQuery] = useState("")
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 350)
+        return () => clearTimeout(t)
+    }, [searchQuery])
     const [activeTab, setActiveTab] = useState(dateParamToday ? "all" : "pending")
+    useEffect(() => { setPage(1) }, [activeTab, debouncedQuery, todayOnly])
 
     // Client-side navigation to /approvals?date=today while already here.
     useEffect(() => {
@@ -62,7 +74,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
         }
     }, [authStatus, session, router])
 
-    const fetchData = async (status: string) => {
+    const fetchData = async (status: string, pageNo: number = page, q: string = debouncedQuery) => {
         setLoading(true)
         try {
             if (todayOnly) {
@@ -70,7 +82,9 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                 const res = await fetch("/api/approvals?date=today")
                 const data = await res.json()
                 const all: any[] = Array.isArray(data) ? data : []
-                setInspections(status === "all" ? all : all.filter(i => i.status === status))
+                const rows = status === "all" ? all : all.filter(i => i.status === status)
+                setInspections(rows)
+                setTotal(rows.length)
                 setCounts({
                     pending: all.filter(i => i.status === "pending").length,
                     approved: all.filter(i => i.status === "approved").length,
@@ -79,12 +93,14 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                 })
                 return
             }
-            const url = `/api/inspections/all?status=${status}&limit=100&withCounts=true`
-            const res = await fetch(url)
+            const params = new URLSearchParams({ status, page: String(pageNo), limit: String(PAGE_SIZE), withCounts: "true" })
+            if (q) params.set("q", q)
+            const res = await fetch(`/api/inspections/all?${params}`)
             const data = await res.json()
 
             const items = data?.inspections ?? (Array.isArray(data) ? data : [])
             setInspections(items)
+            setTotal(typeof data?.total === "number" ? data.total : items.length)
 
             if (data?.counts) {
                 setCounts({
@@ -119,7 +135,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action, reviewerNotes }),
             })
-            if (res.ok) fetchData(activeTab)
+            if (res.ok) fetchData(activeTab, page, debouncedQuery)
             else {
                 const err = await res.json().catch(() => null)
                 alert(err?.error || "Action failed")
@@ -129,15 +145,23 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
 
     useEffect(() => {
         if (authStatus === "authenticated") {
-            fetchData(activeTab)
+            fetchData(activeTab, page, debouncedQuery)
         }
-    }, [authStatus, activeTab, todayOnly])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authStatus, activeTab, todayOnly, page, debouncedQuery])
 
-    const filteredInspections = inspections.filter(i =>
-        i.assignment?.project?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        i.assignment?.project?.site?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        i.submitter?.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    // Today's list is fetched whole and filtered here; the full queue is
+    // searched and paged by the server.
+    const q = searchQuery.toLowerCase()
+    const filteredInspections = todayOnly
+        ? inspections.filter(i =>
+            (i.assignment?.project?.name ?? "").toLowerCase().includes(q) ||
+            (i.assignment?.project?.site?.name ?? "").toLowerCase().includes(q) ||
+            (i.submitter?.name ?? "").toLowerCase().includes(q))
+        : inspections
+    const pageCount = todayOnly ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE))
+    const showFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+    const showTo = todayOnly ? filteredInspections.length : Math.min(page * PAGE_SIZE, total)
 
     if (authStatus === "loading" || !session) {
         return (
@@ -301,7 +325,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                     <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Inspector</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Project</th>
-                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Company</th>
+                                        <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Site</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Submitted</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Status</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Actions</th>
@@ -367,6 +391,25 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                 </tbody>
                             </table>
                         </div>
+                        {/* Paging — every report in the queue can be reached. */}
+                        {!todayOnly && (
+                            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-[var(--border)]">
+                                <p className="text-[12.5px] text-[var(--text3)] tabular-nums">
+                                    Showing {showFrom}–{showTo} of {total}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
+                                        className="h-8 px-3 rounded-[8px] border border-[var(--border)] bg-white text-[12.5px] text-[var(--text2)] disabled:opacity-40">
+                                        Previous
+                                    </button>
+                                    <span className="text-[12.5px] text-[var(--text2)] tabular-nums">Page {page} of {pageCount}</span>
+                                    <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
+                                        className="h-8 px-3 rounded-[8px] border border-[var(--border)] bg-white text-[12.5px] text-[var(--text2)] disabled:opacity-40">
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -37,7 +37,8 @@ export async function GET(
             where: { id: params.id },
             include: {
                 deployments: {
-                    where: { isActive: true },
+                    // Working staff only — same rule as the site list's count.
+                    where: { isActive: true, employee: { status: { in: ["ACTIVE", "ON_LEAVE"] } } },
                     include: {
                         employee: {
                             select: {
@@ -55,7 +56,7 @@ export async function GET(
                 },
                 _count: {
                     select: {
-                        deployments: { where: { isActive: true } },
+                        deployments: { where: { isActive: true, employee: { status: { in: ["ACTIVE", "ON_LEAVE"] } } } },
                         attendances: true,
                     },
                 },

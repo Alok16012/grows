@@ -117,7 +117,8 @@ export default function ReportConfigPage() {
                 </Link>
                 <div>
                     <h1 className="text-[20px] font-semibold text-[var(--text)]">Report Configuration</h1>
-                    <p className="text-[12px] text-[var(--text3)]">{project?.name} — {project?.company?.name}</p>
+                    {/* Projects carry a site, not a company — the old company lookup was always empty and left a dangling "—". */}
+                    <p className="text-[12px] text-[var(--text3)]">{project?.name}{project?.site?.name ? ` — ${project.site.name}` : ""}</p>
                 </div>
                 <button
                     onClick={handleSave}

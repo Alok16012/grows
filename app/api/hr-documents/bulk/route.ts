@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
         const employees = await prisma.employee.findMany({
             where,
-            include: { branch: { include: { company: true } }, department: true },
+            include: { branch: { include: { company: true } }, department: true, employeeSalary: { select: { ctcMonthly: true } } },
         })
 
         if (employees.length === 0) {

@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess, canSendDocuments, canViewDocuments } from "@/lib/permissions"
 import { ensureHrDocRecallSchema, getUserSignature } from "@/lib/hr-doc-schema"
+import { docSalary } from "@/lib/hr-document"
 
 function generateDocNumber() {
     const y = new Date().getFullYear()
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
         const [employee, docType] = await Promise.all([
             prisma.employee.findUnique({
                 where: { id: employeeId },
-                include: { branch: { include: { company: true } }, department: true }
+                include: { branch: { include: { company: true } }, department: true, employeeSalary: { select: { ctcMonthly: true } } }
             }),
             prisma.hrDocumentType.findUnique({ where: { id: typeId } })
         ])
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
             designation: employee.designation || "",
             department: employee.department?.name || "",
             joining_date: employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString("en-IN") : "",
-            salary: employee.basicSalary?.toString() || "",
+            salary: docSalary(employee),
             company_name: employee.branch?.company?.name || "Company",
             effective_date: effectiveDate ? new Date(effectiveDate).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN"),
         }

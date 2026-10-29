@@ -159,6 +159,22 @@ export const STATUS_META: Record<JobStatus, { label: string; cls: string }> = {
     CLOSED: { label: "Closed", cls: "bg-gray-200 text-gray-600" },
 }
 
+// A published job whose "Open till" date has passed is closed in effect —
+// nothing ever flips the stored status, so jobs that closed months ago kept
+// showing as Published and the Closed count stayed 0. Shown, counted and
+// filtered as Closed; the stored status is left alone (re-opening is just
+// moving the deadline).
+export function isPastDeadline(job: Pick<JobPosting, "status" | "deadline">, now: Date = new Date()): boolean {
+    if (job.status !== "PUBLISHED" || !job.deadline) return false
+    const end = new Date(job.deadline)
+    end.setHours(23, 59, 59, 999) // open through the whole closing day
+    return end.getTime() < now.getTime()
+}
+
+export function effectiveJobStatus(job: Pick<JobPosting, "status" | "deadline">, now: Date = new Date()): JobStatus {
+    return isPastDeadline(job, now) ? "CLOSED" : job.status
+}
+
 export function formatExperience(min: number | null, max: number | null, freshers: boolean): string {
     if (min == null && max == null) return freshers ? "Freshers" : "Not specified"
     const fmt = (y: number | null) => (y == null ? "" : y === 1 ? "1 yr" : `${y} yrs`)

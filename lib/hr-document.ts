@@ -20,8 +20,20 @@ type DocEmployee = {
     designation: string | null
     dateOfJoining: Date | null
     basicSalary: number | null
+    employeeSalary?: { ctcMonthly: number } | null
     department?: { name: string | null } | null
     branch?: { company?: { name: string | null } | null } | null
+}
+
+// {{salary}} in letters: the monthly CTC from the Salary Structure Master —
+// the salary HR actually maintains. Employee.basicSalary is no longer edited
+// (Edit Employee dropped it), so for most staff it was 0 or stale and letters
+// went out with a blank or wrong amount. It stays only as the fallback for
+// someone with no structure yet.
+export function docSalary(employee: Pick<DocEmployee, "basicSalary" | "employeeSalary">): string {
+    const ctc = employee.employeeSalary?.ctcMonthly ?? 0
+    if (ctc > 0) return String(Math.round(ctc))
+    return employee.basicSalary ? employee.basicSalary.toString() : ""
 }
 
 export function buildDocVars(employee: DocEmployee, effectiveDate?: Date | null): Record<string, string> {
@@ -32,7 +44,7 @@ export function buildDocVars(employee: DocEmployee, effectiveDate?: Date | null)
         designation: employee.designation || "",
         department: employee.department?.name || "",
         joining_date: employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString("en-IN") : "",
-        salary: employee.basicSalary?.toString() || "",
+        salary: docSalary(employee),
         company_name: employee.branch?.company?.name || COMPANY.legalName,
         effective_date: d.toLocaleDateString("en-IN"),
         date: new Date().toLocaleDateString("en-IN"),

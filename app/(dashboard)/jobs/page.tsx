@@ -13,7 +13,7 @@ import {
     ChevronLeft, ChevronRight, SlidersHorizontal, Download, FileStack,
 } from "lucide-react"
 import {
-    JobPosting, STATUS_META, formatExperience, formatSalary, priorityStyle,
+    JobPosting, STATUS_META, effectiveJobStatus, isPastDeadline, formatExperience, formatSalary, priorityStyle,
 } from "@/components/jobs/constants"
 import { StatCard, statGridClass } from "@/components/StatCard"
 
@@ -92,14 +92,15 @@ export default function JobsPage() {
     // KPI counts + trends (over the full set).
     const kpis = useMemo(() => {
         const total = jobs.length
-        const published = jobs.filter(j => j.status === "PUBLISHED").length
-        const draft = jobs.filter(j => j.status === "DRAFT").length
-        const closed = jobs.filter(j => j.status === "CLOSED").length
+        // Past-deadline jobs count as Closed (effectiveJobStatus).
+        const published = jobs.filter(j => effectiveJobStatus(j) === "PUBLISHED").length
+        const draft = jobs.filter(j => effectiveJobStatus(j) === "DRAFT").length
+        const closed = jobs.filter(j => effectiveJobStatus(j) === "CLOSED").length
         return [
             { label: "Total Jobs", value: total,     icon: Briefcase, tone: "blue" as const, ...monthStats(jobs, () => true) },
-            { label: "Published",  value: published, icon: Send,      tone: "teal" as const, ...monthStats(jobs, j => j.status === "PUBLISHED") },
-            { label: "Draft",      value: draft,     icon: FileText,  tone: "amber" as const, ...monthStats(jobs, j => j.status === "DRAFT") },
-            { label: "Closed",     value: closed,    icon: Lock,      tone: "violet" as const, ...monthStats(jobs, j => j.status === "CLOSED") },
+            { label: "Published",  value: published, icon: Send,      tone: "teal" as const, ...monthStats(jobs, j => effectiveJobStatus(j) === "PUBLISHED") },
+            { label: "Draft",      value: draft,     icon: FileText,  tone: "amber" as const, ...monthStats(jobs, j => effectiveJobStatus(j) === "DRAFT") },
+            { label: "Closed",     value: closed,    icon: Lock,      tone: "violet" as const, ...monthStats(jobs, j => effectiveJobStatus(j) === "CLOSED") },
         ]
     }, [jobs])
 
@@ -109,7 +110,7 @@ export default function JobsPage() {
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase()
         return jobs.filter(j => {
-            if (status !== "ALL" && j.status !== status) return false
+            if (status !== "ALL" && effectiveJobStatus(j) !== status) return false
             if (deptFilter !== "ALL" && j.department !== deptFilter) return false
             if (locFilter !== "ALL" && j.jobLocation !== locFilter) return false
             if (prioFilter !== "ALL" && (j.priority || "MEDIUM").toUpperCase() !== prioFilter) return false
@@ -126,7 +127,7 @@ export default function JobsPage() {
         const rows = [["Title", "Department", "Location", "Site", "Priority", "Status", "Openings", "Closes"]]
         for (const j of filtered) rows.push([
             j.title, j.department || "", j.jobLocation || "", j.siteName || "",
-            (j.priority || "MEDIUM"), j.status, String(j.openings),
+            (j.priority || "MEDIUM"), effectiveJobStatus(j), String(j.openings),
             j.deadline ? new Date(j.deadline).toLocaleDateString("en-IN") : "",
         ])
         const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")
@@ -244,7 +245,8 @@ export default function JobsPage() {
             ) : (
                 <div className={view === "grid" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" : "flex flex-col gap-3"}>
                     {pageJobs.map(job => {
-                        const meta = STATUS_META[job.status]
+                        const meta = STATUS_META[effectiveJobStatus(job)]
+                        const expired = isPastDeadline(job)
                         const p = priorityStyle(job.priority)
                         const closes = job.deadline ? new Date(job.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null
                         return (
@@ -261,7 +263,8 @@ export default function JobsPage() {
                                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: p.bg, color: p.text }}>
                                             <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.dot }} /> {p.label}
                                         </span>
-                                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
+                                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${meta.cls}`}
+                                            title={expired ? "Closing date has passed" : undefined}>{meta.label}</span>
                                     </div>
                                 </div>
 
@@ -281,7 +284,7 @@ export default function JobsPage() {
 
                                 {/* Closes + openings */}
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-[12.5px]">
-                                    {closes && <span className="inline-flex items-center gap-1.5 font-semibold text-[#dc2626]"><CalendarClock size={13} />Closes {closes}</span>}
+                                    {closes && <span className="inline-flex items-center gap-1.5 font-semibold text-[#dc2626]"><CalendarClock size={13} />{expired ? "Closed" : "Closes"} {closes}</span>}
                                     <span className="inline-flex items-center gap-1.5 text-[var(--text2)]"><Users size={13} className="text-[var(--text3)]" />{job.openings} opening{job.openings === 1 ? "" : "s"}</span>
                                 </div>
 

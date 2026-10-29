@@ -248,17 +248,20 @@ function PeopleCard({ title, icon: Icon, items }: {
 
 // ─── Recruitment Pipeline ─────────────────────────────────────────────────────
 
+// Real LeadStatus values, grouped into the funnel's stages. The old keys
+// (APPLIED, SCREENING, ONBOARDED) don't exist, so those boxes always read 0.
 const PIPELINE_STAGES = [
-    { key: "APPLIED", label: "Applied", color: "#6366f1" },
-    { key: "SCREENING", label: "Screening", color: "#8b5cf6" },
-    { key: "INTERVIEW_SCHEDULED", label: "Interview", color: "#f59e0b" },
-    { key: "INTERVIEW_DONE", label: "Done", color: "#3b82f6" },
-    { key: "SELECTED", label: "Selected", color: "#16a34a" },
-    { key: "ONBOARDED", label: "Onboarded", color: "#059669" },
+    { key: "LEADS", statuses: ["NEW_LEAD", "CONTACTED", "INTERESTED"], label: "Leads", color: "#6366f1" },
+    { key: "INTERVIEW", statuses: ["INTERVIEW_SCHEDULED"], label: "Interview", color: "#f59e0b" },
+    { key: "DONE", statuses: ["INTERVIEW_DONE"], label: "Done", color: "#3b82f6" },
+    { key: "SELECTED", statuses: ["SELECTED", "OFFERED"], label: "Selected", color: "#16a34a" },
+    { key: "JOINED", statuses: ["JOINED", "ON_SITE_JOINED"], label: "Joined", color: "#059669" },
 ]
 
 function RecruitmentPipeline({ byStatus }: { byStatus: { status: string; count: number }[] }) {
-    const countMap = Object.fromEntries(byStatus.map(b => [b.status, b.count]))
+    const byLead = Object.fromEntries(byStatus.map(b => [b.status, b.count]))
+    const countMap: Record<string, number> = Object.fromEntries(
+        PIPELINE_STAGES.map(s => [s.key, s.statuses.reduce((n, st) => n + (byLead[st] || 0), 0)]))
     return (
         <div className="flex flex-wrap gap-2 items-center">
             {PIPELINE_STAGES.map((stage, i) => (
@@ -443,7 +446,9 @@ export default function AnalyticsPage() {
                                 <span className="text-[13px] font-semibold text-[var(--text)]">Attendance — This Month</span>
                                 <div className="text-[22px] font-bold text-[var(--accent)]">
                                     {attendance?.avgAttendancePercent ?? 0}%
-                                    <span className="text-[11px] font-normal text-[var(--text3)] ml-1">avg</span>
+                                    <span className="text-[11px] font-normal text-[var(--text3)] ml-1">
+                                        of {(attendance as { markedThisMonth?: number } | undefined)?.markedThisMonth ?? 0} marked
+                                    </span>
                                 </div>
                             </div>
                             {/* Today summary */}

@@ -32,8 +32,8 @@ export async function POST(req: Request) {
 
         // A sample employee to fill variables with.
         const employee = employeeId
-            ? await prisma.employee.findUnique({ where: { id: employeeId }, include: { branch: { include: { company: true } }, department: true } })
-            : await prisma.employee.findFirst({ include: { branch: { include: { company: true } }, department: true } })
+            ? await prisma.employee.findUnique({ where: { id: employeeId }, include: { branch: { include: { company: true } }, department: true, employeeSalary: { select: { ctcMonthly: true } } } })
+            : await prisma.employee.findFirst({ include: { branch: { include: { company: true } }, department: true, employeeSalary: { select: { ctcMonthly: true } } } })
 
         if (!employee) {
             return NextResponse.json({ content: template, sampleEmployee: null })

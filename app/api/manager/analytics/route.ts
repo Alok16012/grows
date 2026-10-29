@@ -192,18 +192,19 @@ export async function GET() {
             where: { isActive: true },
             select: {
                 manpowerRequired: true,
+                // Working staff only — same rule as the Sites page.
                 deployments: {
-                    where: { isActive: true },
+                    where: { isActive: true, employee: { status: { in: ["ACTIVE", "ON_LEAVE"] } } },
                     select: { id: true }
                 }
             }
         }),
-        prisma.deployment.count({ where: { isActive: true } }),
+        prisma.deployment.count({ where: { isActive: true, employee: { status: { in: ["ACTIVE", "ON_LEAVE"] } } } }),
 
-        // Helpdesk
-        prisma.ticket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
+        // Helpdesk — "open" means status OPEN, the same as the Helpdesk page's card.
+        prisma.ticket.count({ where: { status: "OPEN" } }),
         prisma.ticket.count({ where: { status: { in: ["RESOLVED", "CLOSED"] }, resolvedAt: { gte: monthStart, lte: monthEnd } } }),
-        prisma.ticket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] }, priority: "URGENT" } }),
+        prisma.ticket.count({ where: { status: "OPEN", priority: "URGENT" } }),
 
         // Inspection data (existing)
         prisma.user.findMany({
@@ -287,10 +288,11 @@ export async function GET() {
     const outstanding = invoicesThisMonth.reduce((s, i) => s + Math.max(0, i.totalAmount - i.paidAmount), 0)
 
     // ─── Process Sites ────────────────────────────────────────────────────────
-    const understaffed = allSites.filter(s => s.deployments.length < s.manpowerRequired).length
+    const understaffed = allSites.filter(s => s.manpowerRequired > 0 && s.deployments.length < s.manpowerRequired).length
 
     // ─── Process Recruitment ─────────────────────────────────────────────────
-    const activeLeadStatuses = ["APPLIED", "SCREENING", "INTERVIEW_SCHEDULED", "INTERVIEW_DONE"]
+    // The LeadStatus enum's open stages (there is no APPLIED / SCREENING).
+    const activeLeadStatuses = ["NEW_LEAD", "CONTACTED", "INTERESTED", "INTERVIEW_SCHEDULED", "INTERVIEW_DONE", "SELECTED", "OFFERED"]
     const activeLeads = leadsByStatus
         .filter(l => activeLeadStatuses.includes(l.status))
         .reduce((s, l) => s + l._count._all, 0)
@@ -367,6 +369,8 @@ export async function GET() {
         },
         attendance: {
             avgAttendancePercent,
+            // Attendance records marked this month — the base of the average.
+            markedThisMonth: monthlyTotal,
             presentToday,
             absentToday,
             lateToday,

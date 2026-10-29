@@ -11,8 +11,37 @@ export const maxDuration = 30
 
 // One guarded query: prod migrations are manual, so any table may be missing
 // there — a single failed count must not sink the whole dashboard.
-function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
-    return p.catch(() => fallback)
+//
+// It also throttles. This endpoint fans out ~24 queries; fired all at once
+// against a small connection pool the last ones waited out the pool timeout and
+// silently became 0 / [] — the dashboard then said "No projects yet" and
+// "No submissions yet" with nothing to show it was wrong. Prisma queries are
+// lazy (they start on .then), so the gate below holds each one until a slot
+// frees: at most MAX_PARALLEL run at a time. Failures are logged and counted so
+// the screen can say some figures didn't load instead of showing zeros as fact.
+const MAX_PARALLEL = 4
+let running = 0
+const waiting: (() => void)[] = []
+let failedQueries = 0
+function acquire(): Promise<void> {
+    if (running < MAX_PARALLEL) { running++; return Promise.resolve() }
+    return new Promise(resolve => waiting.push(() => { running++; resolve() }))
+}
+function release() {
+    running--
+    const next = waiting.shift()
+    if (next) next()
+}
+function safe<T>(p: PromiseLike<T>, fallback: T): Promise<T> {
+    return acquire().then(() => Promise.resolve(p).then(
+        v => { release(); return v },
+        err => {
+            release()
+            failedQueries++
+            console.error("[ADMIN_STATS] query failed, showing fallback:", err instanceof Error ? err.message.split("\n").slice(-1)[0] : err)
+            return fallback
+        },
+    ))
 }
 
 // IST day window expressed as UTC instants (server runs in UTC on Vercel).
@@ -30,6 +59,7 @@ function istDayRange(offsetDays = 0) {
 const getStats = unstable_cache(
     async () => {
         await ensureProjectSchema()
+        failedQueries = 0
 
         const now = new Date()
         const today = istDayRange(0)
@@ -240,9 +270,11 @@ const getStats = unstable_cache(
                 submittedAt: i.submittedAt,
                 status: i.status,
             })),
+            // How many figures fell back to 0 / empty because their query failed.
+            failedQueries,
         }
     },
-    ["admin-stats-v4"],
+    ["admin-stats-v5"],
     { revalidate: 30, tags: ["admin-stats"] },
 )
 

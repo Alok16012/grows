@@ -121,8 +121,10 @@ export async function GET(req: Request) {
         total: 0,
         items: {}
       }
-      for (const cat of CATS) {
-        const d = catData[cat] || { total: 0, items: [] }
+      // Every category the month holds, not only CATS. CATS is an old list
+      // (no Client/Project, Candidate Expense, Stationery…), and summing only
+      // it understated the month — ₹920 instead of ₹38,215 for one employee.
+      for (const [cat, d] of Object.entries(catData)) {
         row[cat] = d.total
         row.items[cat] = d.items
         row.total += d.total
@@ -130,19 +132,21 @@ export async function GET(req: Request) {
       return row
     })
 
+    // Categories with any amount this year, largest first.
+    const yearByCat: Record<string, number> = {}
+    for (const r of rows) for (const cat of Object.keys(r.items)) yearByCat[cat] = (yearByCat[cat] ?? 0) + (r[cat] || 0)
+    const categories = Object.keys(yearByCat).filter(c => yearByCat[c] !== 0).sort((a, b) => yearByCat[b] - yearByCat[a])
+
     // Column totals
-    const totals: any = { total: 0 }
-    for (const cat of CATS) {
-      totals[cat] = rows.reduce((s, r) => s + (r[cat] || 0), 0)
-      totals.total += totals[cat]
-    }
+    const totals: any = { total: rows.reduce((s, r) => s + r.total, 0) }
+    for (const cat of Object.keys(yearByCat)) totals[cat] = yearByCat[cat]
 
     return NextResponse.json({
       employee: { id: displayId, name: displayName },
       year,
       rows,
       totals,
-      categories: CATS
+      categories
     })
   } catch (error) {
     console.error("[EMP_SUMMARY_GET]", error)

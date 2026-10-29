@@ -515,6 +515,11 @@ export function AdminOverview({ stats }: { stats: any }) {
 
     return (
         <div className="p-4 lg:p-0 space-y-5">
+            {stats.failedQueries > 0 && (
+                <div role="alert" className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+                    {stats.failedQueries} figure{stats.failedQueries === 1 ? "" : "s"} on this page couldn&apos;t be loaded and show as 0 or empty. Refresh in a minute to try again.
+                </div>
+            )}
             {/* ── Header ── */}
             <div className="hidden md:flex flex-wrap items-end justify-between gap-4">
                 <div>

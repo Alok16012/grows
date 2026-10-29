@@ -318,13 +318,20 @@ export default function FormBuilderClient({
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     )
 
+    // A failed load used to leave the editor saying "No fields yet", which
+    // invited "Load Default Form" — replacing a form that was really there.
+    const [loadError, setLoadError] = useState(false)
     const fetchFields = useCallback(async () => {
         try {
             const res = await fetch(`/api/form-templates?projectId=${projectId}`)
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
+            if (!Array.isArray(data)) throw new Error("Unexpected response")
             setFields(data)
+            setLoadError(false)
         } catch {
             console.error("Failed to fetch fields")
+            setLoadError(true)
         } finally {
             setLoading(false)
         }
@@ -429,7 +436,9 @@ export default function FormBuilderClient({
             })
             if (!res.ok) throw new Error("Failed to load default form")
             await fetchFields()
-        } catch { /* ignore */ }
+        } catch {
+            toast.error("Could not load the default form")
+        }
         finally { setLoadingDefault(false) }
     }
 
@@ -540,8 +549,9 @@ export default function FormBuilderClient({
                         <div className="flex items-center gap-[8px]">
                             <button
                                 onClick={handleLoadDefaultForm}
-                                disabled={loadingDefault}
-                                className="inline-flex items-center justify-center bg-white border border-[var(--border)] rounded-[8px] text-[12px] font-[500] text-[var(--text)] px-[12px] h-[30px] hover:bg-[var(--surface2)] transition-colors"
+                                disabled={loadingDefault || loading || loadError}
+                                title={loadError ? "The current form didn't load — retry first" : undefined}
+                                className="inline-flex items-center justify-center bg-white border border-[var(--border)] rounded-[8px] text-[12px] font-[500] text-[var(--text)] px-[12px] h-[30px] hover:bg-[var(--surface2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loadingDefault ? <Loader2 className="h-[14px] w-[14px] mr-[6px] animate-spin" /> : <Copy className="h-[14px] w-[14px] mr-[6px]" />}
                                 Load Default Form
@@ -569,6 +579,14 @@ export default function FormBuilderClient({
                             <div className="flex items-center justify-center py-[40px]">
                                 <Loader2 className="h-6 w-6 animate-spin text-[var(--text3)]" />
                             </div>
+                        ) : loadError ? (
+                            <div role="alert" className="m-[18px] rounded-[10px] border border-rose-200 bg-rose-50 p-[16px] text-center">
+                                <p className="text-[12.5px] text-rose-800">This project&apos;s form couldn&apos;t be loaded.</p>
+                                <button onClick={() => { setLoading(true); fetchFields() }}
+                                    className="mt-[10px] h-[30px] px-[12px] rounded-[8px] border border-rose-300 bg-white text-[12px] font-[500] text-rose-700">
+                                    Retry
+                                </button>
+                            </div>
                         ) : (
                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                                 {renderSection("FIXED", "Fixed Fields")}
@@ -589,7 +607,7 @@ export default function FormBuilderClient({
                     <div className="flex-1 overflow-y-auto p-[16px_18px] max-h-[calc(100vh-200px)] bg-white">
                         {fields.length === 0 ? (
                             <div className="text-center py-[40px] text-[12px] text-[var(--text3)] border border-dashed border-[var(--border2)] rounded-[8px] bg-[var(--surface2)]">
-                                No fields yet. Add fields from the left panel.
+                                {loading ? "Loading…" : loadError ? "Form not loaded." : "No fields yet. Add fields from the left panel."}
                             </div>
                         ) : (
                             <div className="w-full">

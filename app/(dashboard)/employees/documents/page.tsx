@@ -47,6 +47,11 @@ const DOC_COLS = [
     { key: "OTHER",        label: "Other",        hint: "Any other document",             color: "#6b7280", bg: "#f3f4f6" },
 ]
 
+// What an employee file must hold to count as complete. Certificate, Resume,
+// Agreement and "Any other document" are optional — counting them made 966 of
+// 967 employees "missing docs", which hid the people who really lack KYC.
+const REQUIRED_DOCS = ["AADHAAR", "PAN", "PHOTO", "BANK_DETAILS"]
+
 // Sentinel id for a PHOTO cell synthesised from the employee's profile photo
 // (no real EmployeeDocument row). Delete is hidden for these.
 const PROFILE_PHOTO_ID = "__profile_photo__"
@@ -262,7 +267,8 @@ export default function MasterDocumentsPage() {
         finally { setLoading(false) }
     }
 
-    useEffect(() => { fetchAll() }, [])
+    // Load once the session is ready, not before (that started a second load).
+    useEffect(() => { if (status === "authenticated") fetchAll() }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleDeleteLocal = (empId: string, docId: string) => {
         setDocs(prev => prev.filter(d => d.id !== docId))
@@ -290,7 +296,8 @@ export default function MasterDocumentsPage() {
     // employee simply has a profile photo set (onboarding/modal upload path).
     const hasDoc = (emp: Employee, key: string) =>
         !!docMap.get(emp.id)?.has(key) || (key === "PHOTO" && !!emp.photo)
-    const allPresent = employees.filter(e => DOC_COLS.every(c => hasDoc(e, c.key))).length
+    const hasRequired = (emp: Employee) => REQUIRED_DOCS.every(k => hasDoc(emp, k))
+    const allPresent = employees.filter(hasRequired).length
     const missingAny = totalEmployees - allPresent
     // Employees with at least one uploaded document still awaiting verification.
     const verificationPending = employees.filter(e => {
@@ -310,10 +317,10 @@ export default function MasterDocumentsPage() {
                 !siteName.toLowerCase().includes(q)) return false
         }
         if (statusFilter === "COMPLETE") {
-            if (!DOC_COLS.every(c => hasDoc(emp, c.key))) return false
+            if (!hasRequired(emp)) return false
         }
         if (statusFilter === "MISSING") {
-            if (DOC_COLS.every(c => hasDoc(emp, c.key))) return false
+            if (hasRequired(emp)) return false
         }
         if (statusFilter === "PENDING") {
             const m = docMap.get(emp.id)
@@ -359,11 +366,12 @@ export default function MasterDocumentsPage() {
 
             {/* KPI cards */}
             <div className={statGridClass(5)}>
-                <StatCard label="Total Employees" value={totalEmployees} sub="100%" tone="blue" icon={<Users size={20} />} seed={0} />
-                <StatCard label="Total Documents" value={totalDocs} sub="100%" tone="violet" icon={<FileText size={20} />} seed={1} />
-                <StatCard label="All Docs Present" value={allPresent} sub={pctOf(allPresent)} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
-                <StatCard label="Missing Docs" value={missingAny} sub={pctOf(missingAny)} tone="rose" icon={<AlertCircle size={20} />} seed={3} />
-                <StatCard label="Verification Pending" value={verificationPending} sub={pctOf(verificationPending)} tone="amber" icon={<Clock size={20} />} seed={4} />
+                {/* "…" while loading — a slow load used to read as "0 employees". */}
+                <StatCard label="Total Employees" value={loading ? "…" : totalEmployees} sub="100%" tone="blue" icon={<Users size={20} />} seed={0} />
+                <StatCard label="Total Documents" value={loading ? "…" : totalDocs} sub="100%" tone="violet" icon={<FileText size={20} />} seed={1} />
+                <StatCard label="Required Docs Present" value={loading ? "…" : allPresent} sub={loading ? "Aadhaar, PAN, Photo, Bank" : pctOf(allPresent)} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
+                <StatCard label="Missing Required Docs" value={loading ? "…" : missingAny} sub={loading ? undefined : pctOf(missingAny)} tone="rose" icon={<AlertCircle size={20} />} seed={3} />
+                <StatCard label="Verification Pending" value={loading ? "…" : verificationPending} sub={loading ? undefined : pctOf(verificationPending)} tone="amber" icon={<Clock size={20} />} seed={4} />
             </div>
 
             {/* Filters */}
@@ -381,8 +389,8 @@ export default function MasterDocumentsPage() {
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                     className="w-full sm:w-auto h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
                     <option value="ALL">All Status</option>
-                    <option value="COMPLETE">All Docs Present</option>
-                    <option value="MISSING">Missing Docs</option>
+                    <option value="COMPLETE">Required Docs Present</option>
+                    <option value="MISSING">Missing Required Docs</option>
                     <option value="PENDING">Verification Pending</option>
                 </select>
                 <select value={docTypeFilter} onChange={e => setDocTypeFilter(e.target.value)}

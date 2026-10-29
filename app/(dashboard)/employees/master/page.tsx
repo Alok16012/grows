@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -701,8 +701,24 @@ export default function EmployeeMasterPage() {
         if (status === "unauthenticated") router.push("/login")
     }, [status, router])
 
+    // Search goes to the server, so wait for typing to pause — every keystroke
+    // used to start a full roster download of its own.
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search.trim()), 400)
+        return () => clearTimeout(t)
+    }, [search])
+    // Only the latest load may update the screen; an older one is cancelled.
+    // Overlapping loads used to race, and a late failure left "0 employees".
+    const loadRef = useRef<AbortController | null>(null)
+    const [loadError, setLoadError] = useState<string | null>(null)
+
     const fetchEmployees = useCallback(async () => {
+        loadRef.current?.abort()
+        const ctrl = new AbortController()
+        loadRef.current = ctrl
         setLoading(true)
+        setLoadError(null)
         try {
             // This grid filters, sorts and exports client-side, so it needs the
             // whole roster. It used to ask for a single page of 500 and ignore
@@ -715,9 +731,10 @@ export default function EmployeeMasterPage() {
             const { employees, total, truncated } = await fetchAllEmployees<Employee>({
                 status: statusFilter || undefined,
                 siteId: siteFilter || undefined,
-                search: search || undefined,
+                search: debouncedSearch || undefined,
                 lite: "1",
-            })
+            }, { signal: ctrl.signal })
+            if (ctrl.signal.aborted) return
             setEmployees(employees)
             // Never truncate silently — that is the bug being fixed here.
             if (truncated) {
@@ -726,17 +743,27 @@ export default function EmployeeMasterPage() {
                 )
             }
         } catch {
+            if (ctrl.signal.aborted) return
+            // Kept on screen (not just a toast) so an empty grid is never
+            // mistaken for "no employees".
+            setLoadError("Employees couldn't be loaded.")
             toast.error("Failed to load employees")
         } finally {
-            setLoading(false)
+            if (loadRef.current === ctrl) setLoading(false)
         }
-    }, [statusFilter, siteFilter, search])
+    }, [statusFilter, siteFilter, debouncedSearch])
 
+    // Wait for the session: loading → authenticated used to fire a second
+    // full download on top of the first.
     useEffect(() => {
-        if (status !== "unauthenticated") {
+        if (status === "authenticated") {
             fetchEmployees()
         }
     }, [status, fetchEmployees])
+    useEffect(() => () => loadRef.current?.abort(), [])
+
+    // Cards show "…" until the roster is in, never a provisional 0.
+    const kpi = (n: number) => (loading ? "…" : loadError ? "—" : n)
 
     useEffect(() => {
         const fetchSites = async () => {
@@ -993,12 +1020,20 @@ export default function EmployeeMasterPage() {
 
             {/* KPI cards */}
             <div className={statGridClass(5)}>
-                <StatCard label="Total Employees" value={filteredEmployees.length} tone="blue" icon={<Users size={20} />} seed={0} />
-                <StatCard label="Active" value={filteredEmployees.filter(e => e.status === "ACTIVE").length} tone="teal" icon={<UserCheck size={20} />} seed={1} />
-                <StatCard label="Inactive" value={filteredEmployees.filter(e => e.status === "INACTIVE").length} tone="slate" icon={<UserX size={20} />} seed={2} />
-                <StatCard label="On Leave" value={filteredEmployees.filter(e => e.status === "ON_LEAVE").length} tone="amber" icon={<CalendarOff size={20} />} seed={3} />
-                <StatCard label="Terminated" value={filteredEmployees.filter(e => e.status === "TERMINATED").length} tone="rose" icon={<UserMinus size={20} />} seed={4} />
+                <StatCard label="Total Employees" value={kpi(filteredEmployees.length)} tone="blue" icon={<Users size={20} />} seed={0} />
+                <StatCard label="Active" value={kpi(filteredEmployees.filter(e => e.status === "ACTIVE").length)} tone="teal" icon={<UserCheck size={20} />} seed={1} />
+                <StatCard label="Inactive" value={kpi(filteredEmployees.filter(e => e.status === "INACTIVE").length)} tone="slate" icon={<UserX size={20} />} seed={2} />
+                <StatCard label="On Leave" value={kpi(filteredEmployees.filter(e => e.status === "ON_LEAVE").length)} tone="amber" icon={<CalendarOff size={20} />} seed={3} />
+                <StatCard label="Terminated" value={kpi(filteredEmployees.filter(e => e.status === "TERMINATED").length)} tone="rose" icon={<UserMinus size={20} />} seed={4} />
             </div>
+            {loadError && !loading && (
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-800">
+                    <span>{loadError} The numbers below are not the real roster.</span>
+                    <button onClick={fetchEmployees} className="h-8 px-3 rounded-[8px] border border-rose-300 bg-white text-[12.5px] font-medium text-rose-700">
+                        Retry
+                    </button>
+                </div>
+            )}
 
             {/* Search + filters */}
             <div className="filter-bar sm:gap-[10px]">

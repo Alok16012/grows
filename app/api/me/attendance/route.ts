@@ -72,14 +72,22 @@ export async function POST(req: Request) {
         if (existing?.checkIn) {
             return new NextResponse("Already checked in today", { status: 409 })
         }
+        // Stamp the site they are posted to, so the punch shows under that
+        // site in attendance views instead of with no site.
+        const posting = existing?.siteId ? null : await prisma.deployment.findFirst({
+            where: { employeeId: emp.id, isActive: true },
+            orderBy: { startDate: "desc" },
+            select: { siteId: true },
+        })
+        const siteId = existing?.siteId ?? posting?.siteId ?? null
         const record = existing
             ? await prisma.attendance.update({
                 where: { id: existing.id },
-                data: { checkIn: now, status: "PRESENT", checkInLat: lat, checkInLng: lng, markedBy: session.user.id },
+                data: { checkIn: now, status: "PRESENT", checkInLat: lat, checkInLng: lng, markedBy: session.user.id, siteId },
             })
             : await prisma.attendance.create({
                 data: {
-                    employeeId: emp.id, date: day, checkIn: now, status: "PRESENT",
+                    employeeId: emp.id, siteId, date: day, checkIn: now, status: "PRESENT",
                     checkInLat: lat, checkInLng: lng, markedBy: session.user.id,
                 },
             })

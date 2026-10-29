@@ -1699,8 +1699,8 @@ function ExpenseRow({
 
 // ─── Employee Summary Tab ──────────────────────────────────────────────────────
 
-// Column config for the team summary table — top categories shown as columns.
-// All other categories contribute to the row total but aren't shown individually.
+// Column config for the team summary table — these categories always show;
+// any other category used in the period gets a column of its own (summaryCols).
 const TEAM_COLS = [
     { key: "TRAVEL",               label: "Travel",         color: "#3b82f6", bg: "#eff6ff" },
     { key: "TRANSPORTATION",       label: "Transport",      color: "#6366f1", bg: "#eef2ff" },
@@ -1715,11 +1715,37 @@ const TEAM_COLS = [
     { key: "MISCELLANEOUS",        label: "Misc",           color: "#6b7280", bg: "#f9fafb" },
 ]
 
+// The fixed columns plus one per extra category the API reports as used
+// (Stationery, Candidate Expense…), so every row's columns add up to its Total
+// — the same amounts, by category, as the employee's expense Excel.
+function summaryCols(categories: unknown): { key: string; label: string; color: string; bg: string }[] {
+    const fixed = new Set(TEAM_COLS.map(c => c.key))
+    const extras = (Array.isArray(categories) ? categories : [])
+        .filter((k): k is string => typeof k === "string" && !fixed.has(k))
+        .map(k => {
+            const s = categoryStyle(k as ExpenseCategory)
+            return { key: k, label: categoryLabel(k as ExpenseCategory), color: s.color, bg: s.bg }
+        })
+    return [...TEAM_COLS, ...extras]
+}
+
 // ─── Detail modal (shared) ────────────────────────────────────────────────────
 function ExpenseDetailModal({ title, subtitle, items, onClose }: {
     title: string; subtitle: string; items: any[]; onClose: () => void
 }) {
     const total = items.reduce((s: number, i: any) => s + (i.amount || 0), 0)
+    // The lines in this popup as an Excel sheet, with every detail it shows.
+    const [downloading, setDownloading] = useState(false)
+    const download = async () => {
+        setDownloading(true)
+        try {
+            await downloadExpenseDetails(`Expenses_${fileSafe(title)}_${fileSafe(subtitle)}.xlsx`, title, subtitle, items)
+        } catch {
+            toast.error("Download failed")
+        } finally {
+            setDownloading(false)
+        }
+    }
     return (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
             <div style={{ background: "white", borderRadius: 16, width: "100%", maxWidth: 600, maxHeight: "84vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
@@ -1728,15 +1754,23 @@ function ExpenseDetailModal({ title, subtitle, items, onClose }: {
                         <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{title}</p>
                         <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 1 }}>{subtitle}</p>
                     </div>
-                    <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4 }}><X size={17} /></button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <button onClick={download} disabled={items.length === 0 || downloading}
+                            title="Download these expenses as an Excel sheet"
+                            style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--text2)", fontSize: 12, fontWeight: 600, cursor: items.length && !downloading ? "pointer" : "not-allowed", opacity: items.length ? 1 : 0.5, display: "flex", alignItems: "center", gap: 5 }}>
+                            {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Excel
+                        </button>
+                        <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4 }}><X size={17} /></button>
+                    </div>
                 </div>
                 <div style={{ overflowY: "auto", flex: 1 }}>
                     {items.length === 0 ? (
                         <p style={{ textAlign: "center", padding: 32, color: "var(--text3)", fontSize: 13 }}>No expenses found</p>
-                    ) : items.map((item: any) => {
+                    ) : items.map((item: any, idx: number) => {
                         const journeys: TravelEntry[] = Array.isArray(item.travelEntries) ? item.travelEntries : []
                         return (
-                            <div key={item.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                            // One expense can contribute several lines (multi-category), so its id alone isn't unique.
+                            <div key={`${item.id}-${idx}`} style={{ borderBottom: "1px solid var(--border)" }}>
                                 {/* Expense header row */}
                                 <div style={{ display: "flex", gap: 12, padding: "11px 20px 8px" }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1854,6 +1888,92 @@ async function downloadExpenseStatement(fileName: string, heading: string, items
 
 const fileSafe = (s: string) => s.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")
 
+// The expense detail popup as a sheet: everything the popup shows, one table.
+// Each expense starts a row with its own details; a travel expense then has one
+// row per journey (date, vehicle, from, to, KMs, amount) and a subtotal row,
+// like the popup's blue journey box. Journey columns sit after the expense
+// columns, amounts last, and the final row totals KMs and both amount columns.
+async function downloadExpenseDetails(fileName: string, title: string, subtitle: string, items: any[]) {
+    const XLSX = await loadXLSX()
+    const sorted = [...items].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    const total = sorted.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+    const vehicle = (v: unknown) => (v === "2W" ? "2-Wheeler" : v === "4W" ? "4-Wheeler" : "")
+    const d = (v: unknown) => (v ? format(new Date(v as string), "dd-MM-yyyy") : "")
+
+    const header = [
+        "S.No", "Expense Date", "Expense No", "Title", "Description", "Category", "Status",
+        "Journey Date", "Vehicle", "From", "To", "KMs", "Journey Amount (₹)", "Expense Amount (₹)",
+    ]
+    const COL = { kms: 11, journeyAmt: 12, expenseAmt: 13 }
+    const aoa: any[][] = [
+        [title],
+        [subtitle],
+        [`${sorted.length} expense${sorted.length === 1 ? "" : "s"} · Total ₹${total.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`],
+        [],
+        header,
+    ]
+    const headerRow = aoa.length - 1
+    let totalKms = 0
+    let totalJourneyAmt = 0
+
+    sorted.forEach((item, n) => {
+        const journeys: any[] = Array.isArray(item.travelEntries) ? item.travelEntries : []
+        const expenseCells = [
+            n + 1, d(item.date), item.expenseNo ?? "", (item.title ?? "").trim(), item.description ?? "",
+            categoryLabel(item.category), statusStyle(item.status)?.label ?? item.status ?? "",
+        ]
+        const amount = Number(item.amount) || 0
+        if (journeys.length === 0) {
+            aoa.push([...expenseCells, "", "", "", "", "", "", amount])
+            return
+        }
+        journeys.forEach((j, ji) => {
+            const kms = Number(j.kms) || 0
+            const amt = Number(j.amount) || 0
+            totalKms += kms
+            totalJourneyAmt += amt
+            aoa.push([
+                ...(ji === 0 ? expenseCells : expenseCells.map(() => "")),
+                d(j.date), vehicle(j.vehicleType), j.from ?? "", j.to ?? "", kms, amt,
+                ji === 0 ? amount : "",
+            ])
+        })
+        if (journeys.length > 1) {
+            aoa.push([
+                "", "", "", "", "", "", "", `Subtotal (${journeys.length} journeys)`, "", "", "",
+                journeys.reduce((s, j) => s + (Number(j.kms) || 0), 0),
+                journeys.reduce((s, j) => s + (Number(j.amount) || 0), 0),
+                "",
+            ])
+        }
+    })
+
+    aoa.push([])
+    aoa.push(["", "", "", "", "", "", "", "Grand Total", "", "", "",
+        totalKms || "", totalJourneyAmt || "", total])
+
+    // Gaps are left truly empty (not empty text), so Excel's filters treat them as blanks.
+    const ws = XLSX.utils.aoa_to_sheet(aoa.map(row => row.map(v => (v === "" ? null : v))))
+    ws["!cols"] = [
+        { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 28 }, { wch: 32 }, { wch: 22 }, { wch: 11 },
+        { wch: 22 }, { wch: 11 }, { wch: 26 }, { wch: 26 }, { wch: 8 }, { wch: 18 }, { wch: 18 },
+    ]
+    // Title lines span the table; filters on the header row.
+    ws["!merges"] = [0, 1, 2].map(r => ({ s: { r, c: 0 }, e: { r, c: header.length - 1 } }))
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: headerRow, c: 0 }, e: { r: aoa.length - 3, c: header.length - 1 } }) }
+    // Amounts as numbers with thousand separators and two decimals.
+    for (let r = headerRow + 1; r < aoa.length; r++) {
+        for (const c of [COL.journeyAmt, COL.expenseAmt]) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })]
+            if (cell && cell.t === "n") cell.z = "#,##0.00"
+        }
+    }
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Expense Details")
+    XLSX.writeFile(wb, fileName)
+}
+
 // ─── Employee Summary Tab (team-wide table + per-employee drill-down) ─────────
 function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     const now = new Date()
@@ -1957,6 +2077,8 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     }
 
     const q = empSearch.trim().toLowerCase()
+    const teamCols = summaryCols(teamData?.columns)
+    const drillCols = summaryCols(drillData?.categories)
     const allRows: any[] = teamData?.rows ?? []
     const visibleRows = q
         ? allRows.filter(r => [r.name, r.employeeId, r.designation, r.department]
@@ -1965,7 +2087,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     // Footer follows the search: with a filter on, "Grand Total" is the total of
     // the rows you can see, not of everyone.
     const visibleTotals: Record<string, number> = q
-        ? Object.fromEntries([...TEAM_COLS.map(c => c.key), "total"].map(k => [k, visibleRows.reduce((s, r) => s + (r[k] || 0), 0)]))
+        ? Object.fromEntries([...teamCols.map(c => c.key), "total"].map(k => [k, visibleRows.reduce((s, r) => s + (r[k] || 0), 0)]))
         : (teamData?.totals ?? {})
 
     // Selected month, one employee: every expense line with journeys.
@@ -1995,9 +2117,9 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     // The table as it stands (search applied), one row per employee.
     const downloadTeamMonth = async () => {
         const XLSX = await loadXLSX()
-        const header = ["Employee", "Employee ID", "Designation", "Dept", ...TEAM_COLS.map(c => c.label), "Total (₹)"]
-        const body = visibleRows.map(r => [r.name, r.employeeId ?? "", r.designation ?? "", r.department ?? "", ...TEAM_COLS.map(c => r[c.key] || 0), r.total || 0])
-        const foot = ["Grand Total", "", "", "", ...TEAM_COLS.map(c => visibleTotals[c.key] || 0), visibleTotals.total || 0]
+        const header = ["Employee", "Employee ID", "Designation", "Dept", ...teamCols.map(c => c.label), "Total (₹)"]
+        const body = visibleRows.map(r => [r.name, r.employeeId ?? "", r.designation ?? "", r.department ?? "", ...teamCols.map(c => r[c.key] || 0), r.total || 0])
+        const foot = ["Grand Total", "", "", "", ...teamCols.map(c => visibleTotals[c.key] || 0), visibleTotals.total || 0]
         const ws = XLSX.utils.aoa_to_sheet([header, ...body, foot])
         ws["!cols"] = header.map((_, i) => ({ wch: i === 0 ? 26 : 13 }))
         const wb = XLSX.utils.book_new()
@@ -2116,7 +2238,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                     <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
                                         <th style={{ textAlign: "left", padding: "9px 16px", fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>Employee</th>
                                         <th style={{ textAlign: "left", padding: "9px 10px", fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap" }}>Dept</th>
-                                        {TEAM_COLS.map(c => (
+                                        {teamCols.map(c => (
                                             <th key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
                                         ))}
                                         <th style={{ textAlign: "right", padding: "9px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
@@ -2135,7 +2257,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                                 </button>
                                             </td>
                                             <td style={{ padding: "10px 10px", color: "var(--text2)", whiteSpace: "nowrap" }}>{row.department}</td>
-                                            {TEAM_COLS.map(c => {
+                                            {teamCols.map(c => {
                                                 const amt: number = row[c.key] || 0
                                                 return (
                                                     <td key={c.key} style={{ textAlign: "right", padding: "10px 10px" }}>
@@ -2188,7 +2310,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                         <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }} colSpan={2}>
                                             {q ? `Total (${visibleRows.length} of ${allRows.length})` : "Grand Total"}
                                         </td>
-                                        {TEAM_COLS.map(c => (
+                                        {teamCols.map(c => (
                                             <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: visibleTotals[c.key] > 0 ? c.color : "var(--text3)" }}>
                                                 {visibleTotals[c.key] > 0 ? formatINR(visibleTotals[c.key]) : "—"}
                                             </td>
@@ -2231,7 +2353,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                 <thead>
                                     <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
                                         <th style={{ textAlign: "left", padding: "8px 16px", fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>Month</th>
-                                        {TEAM_COLS.map(c => (
+                                        {drillCols.map(c => (
                                             <th key={c.key} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>{c.label}</th>
                                         ))}
                                         <th style={{ textAlign: "right", padding: "8px 16px", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" }}>Total</th>
@@ -2243,7 +2365,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                             <td style={{ padding: "9px 16px", fontWeight: row.total > 0 ? 600 : 400, color: row.total > 0 ? "var(--text)" : "var(--text3)", whiteSpace: "nowrap" }}>
                                                 {row.label}
                                             </td>
-                                            {TEAM_COLS.map(c => {
+                                            {drillCols.map(c => {
                                                 const amt: number = row[c.key] || 0
                                                 const items = row.items?.[c.key] || []
                                                 return (
@@ -2266,7 +2388,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                 <tfoot>
                                     <tr style={{ borderTop: "2px solid var(--border)", background: "var(--surface2)" }}>
                                         <td style={{ padding: "9px 16px", fontWeight: 700, color: "var(--text)" }}>Total</td>
-                                        {TEAM_COLS.map(c => (
+                                        {drillCols.map(c => (
                                             <td key={c.key} style={{ textAlign: "right", padding: "9px 10px", fontWeight: 700, color: drillData.totals[c.key] > 0 ? c.color : "var(--text3)" }}>
                                                 {drillData.totals[c.key] > 0 ? formatINR(drillData.totals[c.key]) : "—"}
                                             </td>

@@ -1356,7 +1356,8 @@ export default function SitesPage() {
     const totalSites = allSites.length
     const activeSites = allSites.filter(s => s.isActive).length
     const totalDeployed = allSites.reduce((acc, s) => acc + s._count.deployments, 0)
-    const understaffedSites = allSites.filter(s => s.manpowerRequired > 0 && s._count.deployments < s.manpowerRequired).length
+    // Active sites only — the same rule Analytics uses, so both say the same number.
+    const understaffedSites = allSites.filter(s => s.isActive && s.manpowerRequired > 0 && s._count.deployments < s.manpowerRequired).length
 
     // Client-side pagination over the filtered list.
     const totalPages = Math.max(1, Math.ceil(sites.length / perPage))

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { compareSiteNames } from "@/lib/site-sort"
 import {
     KeyRound, Search, Loader2, Copy, Pencil, Check, X, UserPlus, ShieldCheck, RefreshCw, RotateCcw, Lock,
 } from "lucide-react"
@@ -216,7 +217,9 @@ export default function EmployeeLoginsPage() {
     }
 
     // Filter option lists derived from the loaded rows.
-    const siteOptions = Array.from(new Set(rows.map(r => r.site).filter(Boolean) as string[])).sort()
+    // Same A–Z as every other site list (case-insensitive, Plant 2 before Plant 10).
+    const siteOptions = Array.from(new Set(rows.map(r => r.site).filter(Boolean) as string[]))
+        .sort((a, b) => compareSiteNames({ name: a }, { name: b }))
     const deptOptions = Array.from(new Set(rows.map(r => r.department).filter(Boolean) as string[])).sort()
 
     const filtered = rows.filter(r => {

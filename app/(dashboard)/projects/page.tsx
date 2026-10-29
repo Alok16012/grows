@@ -401,7 +401,9 @@ export default function ProjectsPage() {
 
             {/* List header: count + sort + view toggle */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-                <h2 className="text-[15px] font-semibold text-[var(--text)]">All Projects ({filtered.length})</h2>
+                <h2 className="text-[15px] font-semibold text-[var(--text)]">
+                    {statusFilter === "ALL" ? "All Projects" : `${STATUS_META[statusFilter].label} Projects`} ({filtered.length})
+                </h2>
                 <div className="flex items-center gap-2">
                     <label className="text-[12px] text-[var(--text3)]">Sort by:</label>
                     <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}

@@ -5,8 +5,9 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { Prisma } from "@prisma/client"
 
-// Key categories shown as columns in the dashboard summary table.
-// All categories still contribute to each employee's total.
+// Categories always shown as columns in the summary table. Any other category
+// used that month (Stationery, Candidate Expense…) is added as a column of its
+// own — see `columns` below — so a row's columns always add up to its total.
 const COLS = [
     "TRAVEL", "TRANSPORTATION", "FUEL", "FOOD",
     "ACCOMMODATION", "SALARY_WAGES", "LABOUR", "CLIENT_PROJECT",
@@ -155,7 +156,8 @@ export async function GET(req: Request) {
                     department:  emp.department?.name ?? "—",
                     total,
                 }
-                for (const col of COLS) row[col] = t[col] ?? 0
+                for (const col of COLS) row[col] = 0
+                Object.assign(row, t)
                 return row
             })
 
@@ -181,24 +183,37 @@ export async function GET(req: Request) {
                     department:  "—",
                     total,
                 }
-                for (const col of COLS) row[col] = t[col] ?? 0
+                for (const col of COLS) row[col] = 0
+                Object.assign(row, t)
                 return row
             })
         }
 
         const rows = [...employeeRows, ...userRows].sort((a, b) => b.total - a.total) // highest spender first
 
+        // Every category used this month: the fixed columns, then the others,
+        // largest first. Only the fixed ones used to be totalled, so the Grand
+        // Total left out every other category (Stationery, Candidate Expense…)
+        // while each row's Total included them.
+        const used: Record<string, number> = {}
+        for (const t of [...Object.values(totals), ...Object.values(userTotals)]) {
+            for (const [cat, amt] of Object.entries(t)) used[cat] = (used[cat] ?? 0) + amt
+        }
+        const extraCols = Object.keys(used)
+            .filter(cat => !(COLS as readonly string[]).includes(cat) && used[cat] !== 0)
+            .sort((a, b) => used[b] - used[a])
+        const columns = [...COLS, ...extraCols]
+
         // Column totals row
-        const colTotals: Record<string, number> = { total: 0 }
-        for (const col of COLS) {
+        const colTotals: Record<string, number> = { total: rows.reduce((s, r) => s + (r.total ?? 0), 0) }
+        for (const col of columns) {
             colTotals[col] = rows.reduce((s, r) => s + (r[col] ?? 0), 0)
-            colTotals.total += colTotals[col]
         }
 
         return NextResponse.json({
             month:     `${y}-${String(m).padStart(2, "0")}`,
             monthLabel: new Date(y, m - 1).toLocaleString("en-IN", { month: "long", year: "numeric" }),
-            columns:   COLS,
+            columns,
             rows,
             totals:    colTotals,
         }, {
