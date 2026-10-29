@@ -330,12 +330,13 @@ type PermSession = { user: { role: string; permissions?: string[] } } | null | u
 
 export const INSPECTION_PERMISSIONS = ["inspection.view", "inspection.submit", "inspection.history"]
 
-// Who may be picked as a PROJECT MANAGER. A project manager reviews and approves
-// what the inspectors submit and hands out their assignments, so the two "manage"
-// capabilities that describe that work are the test. `projects.manage` is
-// deliberately NOT here: being allowed to create a project does not make someone a
-// candidate to be supervised on one.
-export const PROJECT_MANAGER_PERMISSIONS = ["approvals.manage", "assignments.manage"]
+// Who may be picked as a PROJECT MANAGER (and gets the Manager badge on a site
+// team): roles with the "Project manager" switch in Roles. It is its own switch
+// because approval rights alone don't say it: a role can approve inspections
+// without being meant as anyone's project manager. Inferring it from
+// approvals.manage / assignments.manage also missed every role saved in the
+// current role editor, which stores approvals.approve instead.
+export const PROJECT_MANAGER_PERMISSIONS = ["projects.manager"]
 
 // Raw-array form, for callers that only hold a JWT token (e.g. middleware).
 export function hasInspectionPermission(permissions: readonly string[] | null | undefined): boolean {

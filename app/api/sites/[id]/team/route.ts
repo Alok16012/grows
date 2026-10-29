@@ -12,8 +12,9 @@ import { unassignableUserWhere, UNASSIGNABLE_USER_SELECT, unassignableMessage } 
 // project pickers read this table rather than deployments alone.
 //
 // Nothing here records "inspector" vs "manager". That is read off each member's
-// custom-role permissions at render time, so a person holding both appears under
-// both headings and there is no second thing to keep in sync.
+// custom-role permissions at render time (inspection permissions → Inspector, the
+// "Project manager" switch → Manager), so a person holding both appears under both
+// headings and there is no second thing to keep in sync.
 
 type Member = {
     id: string
@@ -118,7 +119,7 @@ export async function POST(
         })
         if (eligible.length === 0) {
             return new NextResponse(
-                "None of the selected people hold inspection or approval permissions",
+                "None of the selected people can submit inspections or are project managers",
                 { status: 400 }
             )
         }

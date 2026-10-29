@@ -68,6 +68,7 @@ export type SpecialDef = { key: string; label: string; hint: string; module: str
 // One-off switches that are not a plain view/create/edit… on a module.
 export const SPECIAL_ACTIONS: SpecialDef[] = [
     { key: "inspection.submit",    label: "Submit inspections",   hint: "Field inspection forms",                        module: "projects" },
+    { key: "projects.manager",     label: "Project manager",      hint: "Shown as Manager on site teams; can be picked as a project's manager", module: "projects" },
     { key: "assets.issue",         label: "Issue assets",         hint: "Hand approved items to employees",              module: "assets" },
     { key: "documents.send",       label: "Send letters",         hint: "Appointment, warning and other letters",        module: "documents" },
     { key: "jobs.publish",         label: "Publish job posts",    hint: "Make a draft job public",                       module: "jobs" },
@@ -353,7 +354,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
             jobs: "V", onboarding: "V", policies: "V", documents: "VX", attendance: "VCEXI", leaves: "VX", payroll: "VX",
             assets: "VX", expenses: "VX", performance: "V", lms: "VX", announcements: "VCE", helpdesk: "VCE", reports: "VX",
             departments: "V", users: "V", audit: "V",
-        }, ["employees.bulkUpdate", "assets.issue", "helpdesk.assign"]),
+        }, ["employees.bulkUpdate", "assets.issue", "helpdesk.assign", "projects.manager"]),
     },
     {
         name: "Operation Manager", color: "#3b82f6", scope: "ASSIGNED_SITES",
@@ -362,7 +363,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
             dashboard: "V", projects: "V", approvals: "VA", assignments: "V", employees: "V", attendance: "VCE",
             leaves: "VA", assets: "V", expenses: "VA", exit: "V", performance: "VCEA", lms: "V", announcements: "V",
             helpdesk: "V", reports: "VX",
-        }, ["assets.issue"]),
+        }, ["assets.issue", "projects.manager"]),
     },
     {
         name: "Quality Supervisor", color: "#0ea5e9", scope: "ASSIGNED_SITES",
@@ -370,7 +371,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
         permissions: fromGrid({
             dashboard: "V", projects: "VX", approvals: "VA", assignments: "V", employees: "V", attendance: "V",
             leaves: "VA", expenses: "V", performance: "VCE", lms: "V", announcements: "V", helpdesk: "V", reports: "VX",
-        }),
+        }, ["projects.manager"]),
     },
     {
         name: "Quality Engineer", color: "#22c55e", scope: "SELF",
