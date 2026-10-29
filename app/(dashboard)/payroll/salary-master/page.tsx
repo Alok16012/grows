@@ -531,7 +531,16 @@ function SalaryMasterInner() {
                 <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>
                     <CalendarRange size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
                     <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>Viewing</span>
-                    <select value={viewMonth} onChange={e => setViewMonth(e.target.value)} aria-label="Viewing month"
+                    {/* Picking a month with the year left at "—" used to change nothing:
+                        without both, the current structure (and today's staff list) loaded,
+                        so August still showed people who joined in October. A month now
+                        brings the current year with it. */}
+                    <select value={viewMonth} onChange={e => {
+                        const m = e.target.value
+                        setViewMonth(m)
+                        if (!m) setViewYear("")
+                        else if (!viewYear) setViewYear(String(new Date().getFullYear()))
+                    }} aria-label="Viewing month"
                         style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer" }}>
                         <option value="">Current structure</option>
                         {MONTHS_LONG.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
