@@ -5,7 +5,7 @@ import fs from "fs"
 import path from "path"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
-import { canReportPolicies } from "@/lib/permissions"
+import { canReportPolicies, checkAccess } from "@/lib/permissions"
 import { policyErrorResponse, PolicyError } from "@/lib/policy-signoff"
 import { PolicySignedPDF } from "@/components/PolicySignedPDF"
 
@@ -19,7 +19,12 @@ function logo(): string | null {
     return cachedLogo
 }
 
-// GET — the signed policy as a PDF. HR with policy.report, or the employee who signed.
+// GET — the signed policy as a PDF. Allowed for the employee who signed, and
+// for everyone who can see the sign-off in the first place: the same check as
+// GET /api/policies/employee/[employeeId], which lists these PDFs in the
+// onboarding review. It used to require policy.report only, so HR reviewing an
+// onboarding (onboarding / employees access, no Policies permission) saw the
+// PDF link and got "Forbidden".
 export async function GET(req: Request, { params }: { params: { ackId: string } }) {
     try {
         const session = await getApiSession(req)
@@ -32,7 +37,9 @@ export async function GET(req: Request, { params }: { params: { ackId: string } 
             },
         })
         if (!ack || !ack.signedAt || !ack.scrolledAt) throw new PolicyError(404, "NOT_FOUND", "Signed policy not found")
-        if (!canReportPolicies(session) && ack.employee.userId !== session.user.id) throw new PolicyError(403, "FORBIDDEN", "Forbidden")
+        const canSeeSignoffs = canReportPolicies(session)
+            || checkAccess(session, [], "onboarding.view") || checkAccess(session, [], "employees.view")
+        if (!canSeeSignoffs && ack.employee.userId !== session.user.id) throw new PolicyError(403, "FORBIDDEN", "Forbidden")
 
         const element = createElement(PolicySignedPDF, {
             logoDataUrl: logo(),
