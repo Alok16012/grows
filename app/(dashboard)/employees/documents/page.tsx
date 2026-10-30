@@ -10,7 +10,7 @@ import {
     ChevronLeft, ChevronRight, Info, X,
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
-import { can } from "@/lib/can"
+import { can, canAny } from "@/lib/can"
 import { StatCard, statGridClass } from "@/components/StatCard"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,6 +36,7 @@ type Employee = {
 }
 
 // ─── Document columns shown in the table ─────────────────────────────────────
+const POLICIES_COL = "POLICIES"
 const DOC_COLS = [
     { key: "AADHAAR",      label: "Aadhaar",      hint: "Aadhaar card (front & back)",   color: "#1d4ed8", bg: "#dbeafe" },
     { key: "PAN",          label: "PAN",          hint: "PAN card",                       color: "#b45309", bg: "#fef3c7" },
@@ -43,6 +44,9 @@ const DOC_COLS = [
     { key: "OFFER_LETTER", label: "Agreement",    hint: "Offer letter / agreement",       color: "#9333ea", bg: "#f3e8ff" },
     { key: "BANK_DETAILS", label: "Bank Proof",   hint: "Passbook / cancelled cheque",    color: "#0369a1", bg: "#e0f2fe" },
     { key: "CERTIFICATE",  label: "Certificate",  hint: "Educational certificate",        color: "#0f766e", bg: "#ccfbf1" },
+    // Not an upload: the employee's signed policies (Policies → sign-off),
+    // shown only to roles with the Policies report permission.
+    { key: POLICIES_COL,   label: "Policies",     hint: "Policies the employee must sign", color: "#be185d", bg: "#fce7f3" },
     { key: "RESUME",       label: "Resume",       hint: "Resume / CV",                    color: "#7c3aed", bg: "#ede9fe" },
     { key: "OTHER",        label: "Other",        hint: "Any other document",             color: "#6b7280", bg: "#f3f4f6" },
 ]
@@ -223,6 +227,57 @@ function DocCell({
     )
 }
 
+// ─── Policies cell ────────────────────────────────────────────────────────────
+type PolicySignoff = { title: string; versionNo: number; signed: boolean; ackId: string | null; signedAt: string | null }
+
+function PolicyCell({ list, loading }: { list: PolicySignoff[] | undefined; loading: boolean }) {
+    if (loading) {
+        return <div className="px-3 py-3 min-h-[60px] flex items-center"><Loader2 size={14} className="animate-spin text-[var(--text3)]" /></div>
+    }
+    if (!list?.length) {
+        return (
+            <div className="flex flex-col items-start gap-2 px-3 py-3 min-h-[60px]">
+                <span className="text-[11px] font-semibold text-[var(--text3)] bg-[var(--surface2)] px-2.5 py-1 rounded-full">No policies</span>
+            </div>
+        )
+    }
+    const signed = list.filter(p => p.signed).length
+    const badge = signed === list.length
+        ? { label: "Signed", color: "#15803d", bg: "#dcfce7" }
+        : signed === 0
+            ? { label: "Not Signed", color: "#dc2626", bg: "#fef2f2" }
+            : { label: `${signed} of ${list.length} Signed`, color: "#b45309", bg: "#fef3c7" }
+    return (
+        <div className="flex flex-col items-start gap-2 px-3 py-3 min-h-[60px] max-w-[240px]">
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap" style={{ color: badge.color, background: badge.bg }}>
+                {badge.label}
+            </span>
+            {list.map(p => (
+                <div key={p.title} className="flex flex-col gap-1 w-full">
+                    <span className="text-[11.5px] text-[var(--text2)] truncate" title={`${p.title} (v${p.versionNo})`}>
+                        {p.signed ? <CheckCircle2 size={11} className="inline mr-1 text-[#15803d]" /> : <Clock size={11} className="inline mr-1 text-[#b45309]" />}
+                        {p.title}
+                    </span>
+                    {p.signed && p.ackId ? (
+                        <div className="flex items-center gap-3">
+                            <a href={`/api/policies/acks/${p.ackId}/pdf`} target="_blank" rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#2563eb] hover:underline">
+                                <Eye size={12} /> View
+                            </a>
+                            <a href={`/api/policies/acks/${p.ackId}/pdf`} download
+                                className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#15803d] hover:underline">
+                                <Download size={12} /> Download
+                            </a>
+                        </div>
+                    ) : (
+                        <span className="text-[11px] text-[var(--text3)]">Not signed yet</span>
+                    )}
+                </div>
+            ))}
+        </div>
+    )
+}
+
 // ─── Pagination arrow button ─────────────────────────────────────────────────
 function PageBtn({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
@@ -249,10 +304,26 @@ export default function MasterDocumentsPage() {
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(25)
     const [viewer, setViewer]       = useState<{ url: string; name: string } | null>(null)
+    // employee.id → their policy sign-offs; loaded apart from the documents so a
+    // failure here never blanks the document grid.
+    const [policies, setPolicies]   = useState<Record<string, PolicySignoff[]>>({})
+    const [policiesLoading, setPoliciesLoading] = useState(false)
+    // Same rule as the sign-off API: the Policies report permission (or manage).
+    const canPolicies = canAny(session, ["policy.report", "policy.manage"])
 
     useEffect(() => { setPage(1) }, [search, siteFilter, statusFilter, docTypeFilter, perPage])
 
     useEffect(() => { if (status === "unauthenticated") router.push("/login") }, [status, router])
+
+    const fetchPolicies = async () => {
+        setPoliciesLoading(true)
+        try {
+            const r = await fetch("/api/policies/employee-status")
+            if (r.ok) setPolicies((await r.json()).employees ?? {})
+            else toast.error("Couldn't load policy sign-offs")
+        } catch { toast.error("Couldn't load policy sign-offs") }
+        finally { setPoliciesLoading(false) }
+    }
 
     const fetchAll = async () => {
         setLoading(true)
@@ -269,6 +340,7 @@ export default function MasterDocumentsPage() {
 
     // Load once the session is ready, not before (that started a second load).
     useEffect(() => { if (status === "authenticated") fetchAll() }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { if (status === "authenticated" && canPolicies) fetchPolicies() }, [status, canPolicies]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleDeleteLocal = (empId: string, docId: string) => {
         setDocs(prev => prev.filter(d => d.id !== docId))
@@ -330,7 +402,8 @@ export default function MasterDocumentsPage() {
     })
 
     // Which doc columns to show — "All" shows every type, else just the one.
-    const visibleCols = docTypeFilter === "ALL" ? DOC_COLS : DOC_COLS.filter(c => c.key === docTypeFilter)
+    const docCols = canPolicies ? DOC_COLS : DOC_COLS.filter(c => c.key !== POLICIES_COL)
+    const visibleCols = docTypeFilter === "ALL" ? docCols : docCols.filter(c => c.key === docTypeFilter)
 
     // Pagination
     const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
@@ -396,7 +469,7 @@ export default function MasterDocumentsPage() {
                 <select value={docTypeFilter} onChange={e => setDocTypeFilter(e.target.value)}
                     className="w-full sm:w-auto h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] text-[13px] text-[var(--text2)] outline-none cursor-pointer">
                     <option value="ALL">All Document Types</option>
-                    {DOC_COLS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    {docCols.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
                 {anyFilter && (
                     <button onClick={() => { setSearch(""); setSiteFilter("ALL"); setStatusFilter("ALL"); setDocTypeFilter("ALL") }}
@@ -473,6 +546,11 @@ export default function MasterDocumentsPage() {
                                                         employee: { id: emp.id, employeeId: emp.employeeId, firstName: emp.firstName, lastName: emp.lastName },
                                                     }
                                                 }
+                                                if (col.key === POLICIES_COL) return (
+                                                    <td key={col.key} className="align-middle border-l border-[var(--border)]">
+                                                        <PolicyCell list={policies[emp.id]} loading={policiesLoading} />
+                                                    </td>
+                                                )
                                                 return (
                                                     <td key={col.key} className="align-middle border-l border-[var(--border)]">
                                                         <DocCell

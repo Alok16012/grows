@@ -2,14 +2,18 @@ import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { checkAccess } from "@/lib/permissions"
 
 export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!["ADMIN", "MANAGER", "HR_MANAGER"].includes(session.user.role)) {
+    // Same check as the sidebar link and the per-employee document routes: the
+    // "View documents" permission. A base-role list here used to shut out
+    // custom roles on other base roles (an HR Executive on INSPECTION_BOY saw
+    // every document as "Not Uploaded").
+    if (session.user.role === "CLIENT" || !checkAccess(session, [], "documents.view")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
-
     try {
         // IMPORTANT: never select `fileUrl` here. Documents are stored as base64
         // data URLs, so shipping the blob for every document made this endpoint
