@@ -278,6 +278,170 @@ function PolicyCell({ list, loading }: { list: PolicySignoff[] | undefined; load
     )
 }
 
+// ─── Row menu (⋮) ────────────────────────────────────────────────────────────
+const MIME_EXT: Record<string, string> = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp" }
+const safeName = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "file"
+
+/** A stored file (data: URL or storage link) as bytes plus a file extension. */
+async function fileBytes(url: string, fallbackName: string): Promise<{ bytes: Uint8Array; ext: string }> {
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const type = (r.headers.get("content-type") || "").split(";")[0].trim()
+    const fromName = /\.([A-Za-z0-9]{2,5})$/.exec(fallbackName)?.[1]?.toLowerCase()
+    return { bytes: new Uint8Array(await r.arrayBuffer()), ext: MIME_EXT[type] ?? fromName ?? "bin" }
+}
+
+function RowMenu({
+    emp, docs, policies, canVerify, onChanged,
+}: {
+    emp: Employee
+    /** Latest document per type (as shown in the row); the photo cell may be the profile photo. */
+    docs: Doc[]
+    policies: PolicySignoff[]
+    canVerify: boolean
+    onChanged: () => void
+}) {
+    const router = useRouter()
+    const btnRef = useRef<HTMLButtonElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
+    const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+    const [busy, setBusy] = useState<"" | "zip" | "verify">("")
+
+    // The table scrolls sideways inside an overflow box, so the menu is fixed to
+    // the viewport (an absolute menu was clipped) and closes on scroll / resize.
+    useEffect(() => {
+        if (!pos) return
+        const close = (e: Event) => {
+            if (e.type === "mousedown" && (menuRef.current?.contains(e.target as Node) || btnRef.current?.contains(e.target as Node))) return
+            setPos(null)
+        }
+        const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setPos(null) }
+        document.addEventListener("mousedown", close)
+        window.addEventListener("scroll", close, true)
+        window.addEventListener("resize", close)
+        document.addEventListener("keydown", esc)
+        return () => {
+            document.removeEventListener("mousedown", close)
+            window.removeEventListener("scroll", close, true)
+            window.removeEventListener("resize", close)
+            document.removeEventListener("keydown", esc)
+        }
+    }, [pos])
+
+    const toggle = () => {
+        if (pos) { setPos(null); return }
+        const r = btnRef.current!.getBoundingClientRect()
+        const menuH = 150
+        const top = r.bottom + 4 + menuH > window.innerHeight ? Math.max(8, r.top - 4 - menuH) : r.bottom + 4
+        setPos({ top, right: window.innerWidth - r.right })
+    }
+
+    const signed = policies.filter(p => p.signed && p.ackId)
+    const pending = docs.filter(d => d.status === "PENDING" && d.id !== PROFILE_PHOTO_ID)
+    const fileCount = docs.length + signed.length
+    const label = (type: string) => DOC_COLS.find(c => c.key === type)?.label ?? type
+
+    // Every document in the row plus the signed policy PDFs, in one ZIP.
+    const downloadAll = async () => {
+        setPos(null)
+        setBusy("zip")
+        const t = toast.loading(`Preparing ${fileCount} file${fileCount === 1 ? "" : "s"}…`)
+        try {
+            const XLSX = await import("xlsx")
+            const zip = XLSX.CFB.utils.cfb_new()
+            const used = new Set<string>()
+            const add = (base: string, ext: string, bytes: Uint8Array) => {
+                let name = `${base}.${ext}`
+                for (let i = 2; used.has(name.toLowerCase()); i++) name = `${base}_${i}.${ext}`
+                used.add(name.toLowerCase())
+                XLSX.CFB.utils.cfb_add(zip, name, bytes)
+            }
+            const failed: string[] = []
+            for (const d of docs) {
+                try {
+                    let url = d.fileUrl
+                    if (!url) {
+                        const r = await fetch(`/api/employees/${emp.id}/documents/${d.id}`)
+                        url = r.ok ? (await r.json()).fileUrl : undefined
+                    }
+                    if (!url) throw new Error("no file")
+                    const f = await fileBytes(url, d.fileName)
+                    add(safeName(`${emp.employeeId}_${label(d.type)}`), f.ext, f.bytes)
+                } catch { failed.push(label(d.type)) }
+            }
+            for (const p of signed) {
+                try {
+                    const f = await fileBytes(`/api/policies/acks/${p.ackId}/pdf`, "policy.pdf")
+                    add(safeName(`${emp.employeeId}_Policy_${p.title}`), "pdf", f.bytes)
+                } catch { failed.push(p.title) }
+            }
+            if (!used.size) { toast.error("Couldn't download any file", { id: t }); return }
+            const out = new Uint8Array(XLSX.CFB.write(zip, { fileType: "zip", type: "array", compression: true }) as ArrayLike<number>)
+            const href = URL.createObjectURL(new Blob([out], { type: "application/zip" }))
+            const a = document.createElement("a")
+            a.href = href
+            a.download = `${safeName(`${emp.employeeId}_${emp.firstName}_${emp.lastName}`)}_documents.zip`
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            setTimeout(() => URL.revokeObjectURL(href), 10_000)
+            if (failed.length) toast.warning(`Downloaded ${used.size} file${used.size === 1 ? "" : "s"}; couldn't fetch ${failed.join(", ")}`, { id: t })
+            else toast.success(`Downloaded ${used.size} file${used.size === 1 ? "" : "s"}`, { id: t })
+        } catch {
+            toast.error("Download failed", { id: t })
+        } finally { setBusy("") }
+    }
+
+    const verifyPending = async () => {
+        setPos(null)
+        setBusy("verify")
+        let ok = 0
+        try {
+            for (const d of pending) {
+                const r = await fetch(`/api/employees/${emp.id}/documents/${d.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "VERIFIED" }),
+                }).catch(() => null)
+                if (r?.ok) ok++
+            }
+            if (ok === pending.length) toast.success(`${ok} document${ok === 1 ? "" : "s"} verified`)
+            else toast.error(`Verified ${ok} of ${pending.length} documents`)
+            if (ok) onChanged()
+        } finally { setBusy("") }
+    }
+
+    const item = "w-full flex items-center gap-2.5 px-3 py-2 text-left text-[12.5px] text-[var(--text)] hover:bg-[var(--surface2)] disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+    return (
+        <>
+            <button ref={btnRef} onClick={toggle} disabled={!!busy} title="More" aria-haspopup="menu" aria-expanded={!!pos}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text3)] hover:bg-[var(--surface2)]"
+                style={pos ? { background: "var(--surface2)", color: "var(--text)" } : undefined}>
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <MoreVertical size={16} />}
+            </button>
+            {pos && (
+                <div ref={menuRef} role="menu"
+                    className="fixed z-50 min-w-[230px] py-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-lg"
+                    style={{ top: pos.top, right: pos.right }}>
+                    <button role="menuitem" className={item} onClick={() => { setPos(null); router.push(`/employees?id=${emp.id}`) }}>
+                        <Users size={14} className="text-[var(--text3)]" /> View employee profile
+                    </button>
+                    <button role="menuitem" className={item} disabled={!fileCount} onClick={downloadAll}>
+                        <Download size={14} className="text-[var(--text3)]" />
+                        {fileCount ? `Download all (${fileCount}) as ZIP` : "No files to download"}
+                    </button>
+                    {canVerify && (
+                        <button role="menuitem" className={item} disabled={!pending.length} onClick={verifyPending}>
+                            <ShieldCheck size={14} className="text-[var(--text3)]" />
+                            {pending.length ? `Verify pending (${pending.length})` : "Nothing to verify"}
+                        </button>
+                    )}
+                </div>
+            )}
+        </>
+    )
+}
+
 // ─── Pagination arrow button ─────────────────────────────────────────────────
 function PageBtn({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
@@ -364,6 +528,19 @@ export default function MasterDocumentsPage() {
     // Summary
     const totalEmployees = employees.length
     const totalDocs = docs.length
+    // The PHOTO cell for an employee with a profile photo but no uploaded one.
+    const profilePhotoDoc = (emp: Employee): Doc => ({
+        id: PROFILE_PHOTO_ID, type: "PHOTO", fileName: "Profile photo",
+        fileUrl: emp.photo ?? undefined, status: "VERIFIED", uploadedAt: new Date().toISOString(),
+        employee: { id: emp.id, employeeId: emp.employeeId, firstName: emp.firstName, lastName: emp.lastName },
+    })
+    // What the row shows: the latest document of each type, plus the profile photo.
+    const rowDocs = (emp: Employee): Doc[] => {
+        const m = docMap.get(emp.id)
+        const list = m ? Array.from(m.values()) : []
+        if (!m?.has("PHOTO") && emp.photo) list.push(profilePhotoDoc(emp))
+        return list
+    }
     // A doc "exists" if there's an EmployeeDocument row — or, for PHOTO, if the
     // employee simply has a profile photo set (onboarding/modal upload path).
     const hasDoc = (emp: Employee, key: string) =>
@@ -539,13 +716,7 @@ export default function MasterDocumentsPage() {
                                             {/* Doc columns */}
                                             {visibleCols.map(col => {
                                                 let doc = empDocs?.get(col.key)
-                                                if (!doc && col.key === "PHOTO" && emp.photo) {
-                                                    doc = {
-                                                        id: PROFILE_PHOTO_ID, type: "PHOTO", fileName: "Profile photo",
-                                                        fileUrl: emp.photo, status: "VERIFIED", uploadedAt: new Date().toISOString(),
-                                                        employee: { id: emp.id, employeeId: emp.employeeId, firstName: emp.firstName, lastName: emp.lastName },
-                                                    }
-                                                }
+                                                if (!doc && col.key === "PHOTO" && emp.photo) doc = profilePhotoDoc(emp)
                                                 if (col.key === POLICIES_COL) return (
                                                     <td key={col.key} className="align-middle border-l border-[var(--border)]">
                                                         <PolicyCell list={policies[emp.id]} loading={policiesLoading} />
@@ -567,9 +738,13 @@ export default function MasterDocumentsPage() {
                                             })}
                                             {/* Kebab */}
                                             <td className="px-2 align-middle border-l border-[var(--border)]">
-                                                <button className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text3)] hover:bg-[var(--surface2)]" title="More">
-                                                    <MoreVertical size={16} />
-                                                </button>
+                                                <RowMenu
+                                                    emp={emp}
+                                                    docs={rowDocs(emp)}
+                                                    policies={canPolicies ? policies[emp.id] ?? [] : []}
+                                                    canVerify={can(session, "documents.verify")}
+                                                    onChanged={fetchAll}
+                                                />
                                             </td>
                                         </tr>
                                     )
