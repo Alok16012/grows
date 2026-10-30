@@ -211,12 +211,18 @@ export function classifyRow(r: ParsedRow, ctx: UploadContext, times: number, tar
     // A locked row can't change whatever else is true, so say that first.
     if (ctx.lockedIds.has(emp.id)) return { ...base, state: "skip", note: `${ctx.monthName} payroll is locked for this employee — unlock the month first` }
     const doj = emp.dateOfJoining ? new Date(emp.dateOfJoining) : null
-    const dol = emp.dateOfLeaving ? new Date(emp.dateOfLeaving) : null
+    // A leaving date only counts for someone whose status says they've left.
+    // Some Active employees still carry an old leaving date (rehired, or set by
+    // mistake); they were skipped as "left before" the month although they work.
+    const hasLeft = !!emp.status && ["RESIGNED","TERMINATED","INACTIVE"].includes(emp.status)
+    const staleDol = !hasLeft && emp.dateOfLeaving ? new Date(emp.dateOfLeaving) : null
+    const dol = hasLeft && emp.dateOfLeaving ? new Date(emp.dateOfLeaving) : null
     if (doj && doj >= ctx.nextMonth) return { ...base, state: "skip", note: `Joined ${fmtDay(doj)}, after ${ctx.monthName}` }
     if (dol && dol < ctx.monthStart) return { ...base, state: "skip", note: `Left ${fmtDay(dol)}, before ${ctx.monthName}` }
-    if (!dol && emp.status && ["RESIGNED","TERMINATED","INACTIVE"].includes(emp.status))
-        return { ...base, state: "skip", note: `Status is ${emp.status.toLowerCase()} with no leaving date` }
+    if (hasLeft && !dol)
+        return { ...base, state: "skip", note: `Status is ${emp.status!.toLowerCase()} with no leaving date` }
     const warnings: string[] = []
+    if (staleDol) warnings.push(`${emp.status === "ON_LEAVE" ? "On leave" : "Active"}, but the record still has a leaving date (${fmtDay(staleDol)}) — correct the employee record`)
     if (!r.rawName.trim()) warnings.push(`No name in the file to confirm this ID (${emp.firstName} ${emp.lastName})`)
     else if (!nameMatches(r.rawName, emp)) warnings.push(`Name in file "${r.rawName}" doesn't match this ID (${emp.firstName} ${emp.lastName}) — check the Employee ID`)
     if (dol && dol < ctx.nextMonth) warnings.push(`Left ${fmtDay(dol)} — final month`)
