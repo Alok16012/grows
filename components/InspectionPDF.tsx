@@ -168,8 +168,9 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
     const reportDate = inspection.submittedAt
         ? new Date(inspection.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
         : 'N/A'
-    const approvedDate = inspection.approvedAt
-        ? new Date(inspection.approvedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+    // approvedAt is also stamped on a rejection, so never call that "Approved On".
+    const approvedDate = inspection.approvedAt && inspection.status !== "rejected"
+        ?new Date(inspection.approvedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
         : 'N/A'
     const gps = parseGps(inspection.gpsLocation)
     const signature: string | null = typeof inspection.signature === 'string' && inspection.signature ? inspection.signature : null

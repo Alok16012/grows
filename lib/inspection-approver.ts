@@ -1,8 +1,9 @@
 import prisma from "./prisma"
 
-// Inspection.approvedBy holds the approver's user id with no relation to User,
-// so list screens resolve the names in one batch here. Rows without an approver
-// (pending, rejected, approved before this was recorded) get null.
+// Inspection.approvedBy holds the reviewer's user id — who approved it, or who
+// rejected it — with no relation to User, so screens resolve the names in one
+// batch here. Rows without one (pending, sent back, rejected before rejections
+// were recorded) get null.
 export async function withApproverNames<T extends { approvedBy?: string | null }>(
     rows: T[],
 ): Promise<(T & { approvedByName: string | null })[]> {

@@ -565,6 +565,14 @@ export default function ReviewInspectionPage() {
                                             }`}>
                                                 Inspection {inspection.status === "draft" ? "Sent Back" : inspection.status.charAt(0).toUpperCase() + inspection.status.slice(1)}
                                             </p>
+                                            {(inspection.status === "approved" || inspection.status === "rejected") && (
+                                                <p className="text-[12px] text-[var(--text2)]">
+                                                    {inspection.status === "approved" ? "Approved" : "Rejected"} by{" "}
+                                                    {inspection.approvedByName
+                                                        ? <span className="font-semibold text-[var(--text)]">{inspection.approvedByName}</span>
+                                                        : <span className="text-[var(--text3)]">— not recorded</span>}
+                                                </p>
+                                            )}
                                             <p className="text-[11px] text-[var(--text3)]">
                                                 {new Date(inspection.approvedAt || inspection.sentBackAt || inspection.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                                             </p>

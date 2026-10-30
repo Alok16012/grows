@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
 import { canApproveProject } from "@/lib/approval-scope"
+import { withApproverNames } from "@/lib/inspection-approver"
 
 export async function GET(
     req: Request,
@@ -51,7 +52,8 @@ export async function GET(
             return NextResponse.json({ error: "This inspection belongs to a project you don't manage" }, { status: 403 })
         }
 
-        return NextResponse.json(inspection)
+        const [named] = await withApproverNames([inspection])
+        return NextResponse.json(named)
     } catch (error) {
         console.error("GET_APPROVAL_DETAIL_ERROR", error)
         return NextResponse.json({ error: "Internal Error" }, { status: 500 })
@@ -140,10 +142,11 @@ export async function PATCH(
             reviewerNotes: reviewerNotes || null
         }
 
-        if (action === "approve") {
-            updateData.approvedAt = new Date()
-            updateData.approvedBy = session!.user.id
-        }
+        // approvedBy / approvedAt record whoever gave the verdict, approve or
+        // reject (Approvals shows them as "Approved By" / "Rejected By"); a
+        // resubmission after a rejection clears them again.
+        updateData.approvedAt = new Date()
+        updateData.approvedBy = session!.user.id
 
         const assignment = await prisma.assignment.findUnique({
             where: { id: inspection.assignmentId }

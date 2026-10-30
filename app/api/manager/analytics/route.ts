@@ -308,7 +308,8 @@ export async function GET() {
         const avgSentBack = total > 0
             ? inspections.reduce((sum, i) => sum + (i.sentBackCount || 0), 0) / total
             : 0
-        const completedWithTimes = inspections.filter(i => i.submittedAt && i.approvedAt)
+        // Approved only: approvedAt is also stamped when an inspection is rejected.
+        const completedWithTimes = inspections.filter(i => i.status === "approved" && i.submittedAt && i.approvedAt)
         const avgTurnaround = completedWithTimes.length > 0
             ? completedWithTimes.reduce((sum, i) => {
                 const diff = new Date(i.approvedAt!).getTime() - new Date(i.submittedAt!).getTime()
