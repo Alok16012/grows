@@ -12,59 +12,13 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
-
-type Site = { id: string; name: string; code?: string; city?: string }
-type ParsedRow = {
-    /** Row number as Excel shows it, for messages. */
-    excelRow: number; rawEmployeeId: string; rawName: string
-    monthDays: number; days: number; otDays: number; otherDeduction: number; lwf: number
-    canteenDays: number; penalty: number; advance: number; productionIncentive: number
-    /** Manual canteen amount. null = derive from days x rate. */
-    canteenAmount: number | null
-    /** Cells that aren't a usable number ("abc", negative…), described for the user. */
-    badCells: string[]
-}
-// ok: processed · warn: processed, with something to look at · skip: left out,
-// with the reason · error: the file needs fixing; nothing is processed until it is.
-type RowState = "ok" | "warn" | "skip" | "error"
-type MatchedRow = ParsedRow & { state: RowState; note?: string; employeeId?: string; dbName?: string; designation?: string }
-type Employee  = {
-    id: string; employeeId: string; firstName: string; lastName: string; designation?: string
-    status?: string; dateOfJoining?: string | null; dateOfLeaving?: string | null
-    deployments?: { siteId: string; site?: { name: string } | null }[]
-}
-
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-const TEMPLATE_COLS = ["Employee ID","Employee Name","MONTH DAYS","DAYS","OT DAYS","OTHER DEDUCTION","LWF","CANTEEN DAYS","CANTEEN AMOUNT","PENALTY","ADVANCE","PRODUCTION INCENTIVE"]
-const TEMPLATE_SAMPLE = [
-    ["EMP-0001","Rahul Kumar",   26,26,2,150,6,24,"",  50,1000,0],
-    ["EMP-0002","Priya Sharma",  26,25,0,0,  6,20,"",  0,0,  500],
-    // Canteen amount filled in: 1500 is charged and the 26 days are ignored.
-    ["EMP-0003","Amit Singh",    26,26,1,200,6,26,1500,100,500,0],
-]
-
-const isEmpty = (v: unknown) => v === null || v === undefined || String(v).trim() === ""
-
-/** Excel cell -> number; an empty cell takes the default. Text gives NaN, which validation reports. */
-function numCell(v: unknown, def: number): number {
-    return isEmpty(v) ? def : Number(String(v).trim())
-}
-
-/** Excel cell -> optional amount. An empty cell means "not set", not zero. Text gives NaN. */
-function optAmount(v: unknown): number | null {
-    return isEmpty(v) ? null : Number(String(v).trim())
-}
-
-const fmtDay = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
-
-// The template's employee rows, prefilled from the configured rules (Payroll →
-// Calculation Settings). Shared by the download and the on-screen preview,
-// which used to show its own hardcoded 26 days and ₹10 LWF.
-function templateRows(employees: Employee[], rules: PayrollRules): (string | number)[][] {
-    const md  = rules.defaults.monthDays
-    const lwf = rules.lwf.employeeDefault
-    return employees.map(e => [e.employeeId,`${e.firstName} ${e.lastName}`,md,md,0,0,lwf,0,"",0,0,0])
-}
+import {
+    type Site, type MatchedRow, type RowState, type Employee,
+    MONTHS, TEMPLATE_COLS, TEMPLATE_SAMPLE, templateRows,
+    parseAttendanceRows, readWorkbookRows, loadUploadContext, idCounts, classifyRow, missingStaff as findMissingStaff,
+    attendancePayload, isReady,
+} from "./attendance-sheet"
+import AllSitesUpload from "./AllSitesUpload"
 
 async function downloadTemplate(siteName: string, employees: Employee[], rules: PayrollRules) {
     const XLSX = await loadXLSX()
@@ -86,6 +40,7 @@ const btnPrimary: React.CSSProperties = { display:"flex", alignItems:"center", g
 const btnOutline: React.CSSProperties = { display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)", color:"var(--text2)", fontSize:13, fontWeight:500, cursor:"pointer" }
 
 export default function AttendancePanel({ onClose, onDone, initialMonth, initialYear }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number }) {
+    const [mode,     setMode]     = useState<"site" | "all">("site")
     const [month,    setMonth]    = useState(initialMonth ?? currentPayrollMonth())
     const [year,     setYear]     = useState(initialYear  ?? currentPayrollYear())
     const [siteId,   setSiteId]   = useState("")
@@ -142,118 +97,15 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
         if (!file)   { toast.error("Choose an Excel file first"); return }
         setParsing(true); resetResults()
         try {
-            const XLSX = await loadXLSX()
-            const buf = await file.arrayBuffer()
-            const wb  = XLSX.read(buf,{type:"array"})
-            const ws  = wb.Sheets[wb.SheetNames[0]]
-            const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws,{header:1,defval:""})
-            const norm = (v: unknown) => String(v).trim().toUpperCase().replace(/\s+/g," ")
-            const EMP_ID_VARIANTS = new Set(["EMPLOYEE ID","EMP ID","EMPLOYEEID","EMPID","EMPLOYEE CODE","EMP CODE","EMPCODE","EMPLOYEECODE","EMPLOYEE NO","EMP NO","EMPNO","EMPLOYEE NUMBER"])
-            const headerIdx = rawRows.findIndex(row=>Array.isArray(row)&&row.some(cell=>EMP_ID_VARIANTS.has(norm(cell))))
-            if (headerIdx===-1) { toast.error("Could not find header row with 'Employee ID' column"); setParsing(false); return }
-            const headers = (rawRows[headerIdx] as unknown[]).map(h=>norm(h))
-            // Keep each row's position in the sheet so messages can name the Excel row.
-            const dataRows = rawRows
-                .map((row, idx) => ({ row, excelRow: idx + 1 }))
-                .slice(headerIdx+1)
-                .filter(({ row })=>Array.isArray(row)&&row.some(cell=>String(cell).trim()!==""))
-            const rows = dataRows.map(({ row, excelRow })=>{
-                const obj: Record<string,unknown> = {}
-                headers.forEach((h,i)=>{obj[h]=(row as unknown[])[i]??""})
-                return { obj, excelRow }
-            })
-            if (rows.length===0) { toast.error("No data rows found"); setParsing(false); return }
-            const pick = (row: Record<string,unknown>,...aliases: string[]) => {
-                for (const a of aliases) { const v=row[a.toUpperCase().replace(/\s+/g," ")]; if(v!==undefined&&String(v).trim()!=="") return v }
-                return undefined
-            }
-            const md = rules.defaults.monthDays
-            const parsed: ParsedRow[] = rows.map(({ obj: row, excelRow })=>{
-                const r = {
-                    excelRow,
-                    rawEmployeeId: String(pick(row,"EMPLOYEE ID","EMP ID","EMP CODE","EMPLOYEE CODE","EMPLOYEE NO","EMP NO","EMPCODE","EMPLOYEEID")??"").trim(),
-                    rawName:       String(pick(row,"EMPLOYEE NAME","NAME","EMPLOYEE","EMP NAME")??"").trim(),
-                    monthDays:     numCell(pick(row,"MONTH DAYS","MONTHDAYS","TOTAL DAYS","WORKING DAYS IN MONTH"), md),
-                    days:          numCell(pick(row,"DAYS WORKED","DAYS","PRESENT DAYS","WORKED DAYS","PRESENT","PAID DAYS","ATT DAYS","ATTENDANCE"), md),
-                    otDays:        numCell(pick(row,"OT DAYS","OTDAYS","OVERTIME","OT"), 0),
-                    otherDeduction:numCell(pick(row,"OTHER DEDUCTION","OTHER DED","OTH DED"), 0),
-                    lwf:           numCell(pick(row,"LWF","LABOUR WELFARE FUND"), 0),
-                    canteenDays:   numCell(pick(row,"CANTEEN DAYS","CANTEEN","MESS DAYS"), 0),
-                    // Optional override. An empty cell means "work it out from
-                    // days x rate"; a 0 means "no canteen this month".
-                    canteenAmount: optAmount(pick(row,"CANTEEN AMOUNT","CANTEEN AMT","CANTEEN RS","MESS AMOUNT")),
-                    penalty:       numCell(pick(row,"PENALTY","FINE"), 0),
-                    advance:       numCell(pick(row,"ADVANCE","ADV","LOAN"), 0),
-                    productionIncentive: numCell(pick(row,"PRODUCTION INCENTIVE","PROD INCENTIVE","PROD INC","INCENTIVE","PI"), 0),
-                    badCells: [] as string[],
-                }
-                // Text in a number column used to become 0 days (or 0 deduction)
-                // without a word; negative values are always typos.
-                const checks: [string, number | null][] = [
-                    ["Month days", r.monthDays], ["Days", r.days], ["OT days", r.otDays], ["Other deduction", r.otherDeduction],
-                    ["LWF", r.lwf], ["Canteen days", r.canteenDays], ["Canteen amount", r.canteenAmount], ["Penalty", r.penalty],
-                    ["Advance", r.advance], ["Production incentive", r.productionIncentive],
-                ]
-                for (const [label, v] of checks) {
-                    if (v === null) continue
-                    if (!Number.isFinite(v)) r.badCells.push(`${label} is not a number`)
-                    else if (v < 0) r.badCells.push(`${label} can't be negative`)
-                }
-                return r
-            }).filter(r=>r.rawEmployeeId&&!/^(SR|TOTAL|GRAND TOTAL|—)$/i.test(r.rawEmployeeId))
-            if (!parsed.length) { toast.error("No valid Employee ID rows found"); setParsing(false); return }
+            const parsed = parseAttendanceRows(await readWorkbookRows(file), rules)
+            if (typeof parsed === "string") { toast.error(parsed); setParsing(false); return }
 
-            // Everyone except people still in onboarding, so a leaver's last month
-            // can be paid; who may actually be paid this month is decided below.
-            // Payroll rows already locked for the month are left alone by the
-            // server, so they're shown as skipped here instead of disappearing.
-            const [optsRes, payRes] = await Promise.all([
-                fetchEmployeeOptions<Employee>({}),
-                fetch(`/api/payroll?month=${month}&year=${year}`).then(r => r.ok ? r.json() : []).catch(() => []),
-            ])
-            const empMap = new Map<string,Employee>()
-            optsRes.employees.forEach(e=>empMap.set(e.employeeId.trim().toUpperCase(),e))
-            const payRows: { employeeId: string; status: string }[] = Array.isArray(payRes) ? payRes : (payRes?.payrolls ?? [])
-            const lockedIds = new Set(payRows.filter(p => p.status !== "DRAFT").map(p => p.employeeId))
-
-            const monthStart = new Date(Date.UTC(year, month - 1, 1))
-            const nextMonth  = new Date(Date.UTC(year, month, 1))
-            const monthName  = MONTHS[month - 1]
-            const key = (id: string) => id.trim().toUpperCase()
-            const seen = new Map<string, number>()
-            parsed.forEach(r => seen.set(key(r.rawEmployeeId), (seen.get(key(r.rawEmployeeId)) ?? 0) + 1))
-
-            const matchedRows: MatchedRow[] = parsed.map(r=>{
-                const emp = empMap.get(key(r.rawEmployeeId))
-                const base = { ...r, employeeId: emp?.id, dbName: emp ? `${emp.firstName} ${emp.lastName}` : undefined, designation: emp?.designation }
-                if (r.badCells.length) return { ...base, state: "error" as const, note: `Row ${r.excelRow}: ${r.badCells.join("; ")}` }
-                const times = seen.get(key(r.rawEmployeeId)) ?? 0
-                if (times > 1) return { ...base, state: "error" as const, note: `Row ${r.excelRow}: this Employee ID is in the file ${times} times — keep one row` }
-                if (!emp) return { ...base, state: "skip" as const, note: "Employee ID not found" }
-                // A locked row can't change whatever else is true, so say that first.
-                if (lockedIds.has(emp.id)) return { ...base, state: "skip" as const, note: `${MONTHS[month - 1]} payroll is locked for this employee — unlock the month first` }
-                const doj = emp.dateOfJoining ? new Date(emp.dateOfJoining) : null
-                const dol = emp.dateOfLeaving ? new Date(emp.dateOfLeaving) : null
-                if (doj && doj >= nextMonth) return { ...base, state: "skip" as const, note: `Joined ${fmtDay(doj)}, after ${monthName}` }
-                if (dol && dol < monthStart) return { ...base, state: "skip" as const, note: `Left ${fmtDay(dol)}, before ${monthName}` }
-                if (!dol && emp.status && ["RESIGNED","TERMINATED","INACTIVE"].includes(emp.status))
-                    return { ...base, state: "skip" as const, note: `Status is ${emp.status.toLowerCase()} with no leaving date` }
-                const warnings: string[] = []
-                if (dol && dol < nextMonth) warnings.push(`Left ${fmtDay(dol)} — final month`)
-                const posted = emp.deployments?.[0]
-                if (!posted) warnings.push("Not posted at any site")
-                else if (posted.siteId !== siteId) warnings.push(`Posted at ${posted.site?.name ?? "another site"}`)
-                return { ...base, state: warnings.length ? "warn" as const : "ok" as const, note: warnings.join(" · ") || undefined }
-            })
+            const ctx = await loadUploadContext(month, year)
+            const counts = idCounts(parsed)
+            const matchedRows: MatchedRow[] = parsed.map(r => classifyRow(r, ctx, counts.get(r.rawEmployeeId.trim().toUpperCase()) ?? 0, siteId))
 
             // Who works at this site and had joined by month end, but isn't in the file.
-            const inFile = new Set(parsed.map(r => key(r.rawEmployeeId)))
-            const missing = optsRes.employees
-                .filter(e => e.deployments?.[0]?.siteId === siteId)
-                .filter(e => e.status === "ACTIVE" || e.status === "ON_LEAVE")
-                .filter(e => !e.dateOfJoining || new Date(e.dateOfJoining) < nextMonth)
-                .filter(e => !inFile.has(key(e.employeeId)))
-                .map(e => `${e.firstName} ${e.lastName} (${e.employeeId})`)
+            const missing = findMissingStaff(ctx, parsed, siteId).map(m => m.label)
 
             setMatched(matchedRows)
             setMissingStaff(missing)
@@ -268,15 +120,11 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
     const handleProcess = async () => {
         if (!matched||!siteId) return
         if (matched.some(r => r.state === "error")) { toast.error("Fix the rows with errors and upload again"); return }
-        const valid = matched.filter(r=>(r.state === "ok" || r.state === "warn") && r.employeeId)
+        const valid = matched.filter(isReady)
         if (!valid.length) { toast.error("No employees to process"); return }
         setProcessing(true)
         try {
-            const attendance = valid.map(r=>({
-                employeeId: r.employeeId!, monthDays:r.monthDays, workedDays:r.days,
-                otDays:r.otDays, otherDeductions:r.otherDeduction, lwf:r.lwf,
-                canteenDays:r.canteenDays, canteenAmount:r.canteenAmount, penalty:r.penalty, advance:r.advance, productionIncentive:r.productionIncentive,
-            }))
+            const attendance = attendancePayload(valid)
             const res = await fetch("/api/payroll/calculate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({siteId,month,year,attendance})})
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()
@@ -303,15 +151,37 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
     return (
         <div style={{ display:"flex", flexDirection:"column", gap:18, paddingBottom:32 }}>
             {/* Panel Header */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
-                <div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, flexWrap:"wrap", padding:"14px 20px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
+                <div style={{ minWidth:0 }}>
                     <p style={{ fontSize:16, fontWeight:800, color:"var(--text)", margin:0 }}>Upload Attendance</p>
-                    <p style={{ fontSize:12, color:"var(--text3)", margin:"2px 0 0 0" }}>Upload attendance for one site and one month at a time.</p>
+                    <p style={{ fontSize:12, color:"var(--text3)", margin:"2px 0 0 0" }}>
+                        {mode === "site"
+                            ? "Upload attendance for one site and one month at a time."
+                            : "Upload attendance for all sites in one file for a month."}
+                    </p>
                 </div>
-                <button onClick={onClose} style={{ width:32, height:32, borderRadius:8, border:"1px solid var(--border)", background:"var(--surface2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--text3)" }}>
-                    <X size={16} />
-                </button>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    {/* Two ways in: one site's sheet (unchanged), or every site's staff in one file. */}
+                    <div role="tablist" aria-label="Upload for" style={{ display:"flex", padding:3, borderRadius:9, background:"var(--surface2)", border:"1px solid var(--border)" }}>
+                        {([["site","One site"],["all","All sites"]] as const).map(([m,label])=>(
+                            <button key={m} role="tab" aria-selected={mode===m} onClick={()=>setMode(m)}
+                                style={{ padding:"6px 14px", borderRadius:7, border:"none", fontSize:12.5, fontWeight:600, cursor:"pointer",
+                                    background: mode===m ? "var(--accent)" : "transparent", color: mode===m ? "#fff" : "var(--text2)" }}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={onClose} aria-label="Close" style={{ width:32, height:32, borderRadius:8, border:"1px solid var(--border)", background:"var(--surface2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--text3)" }}>
+                        <X size={16} />
+                    </button>
+                </div>
             </div>
+
+            {mode === "all" && (
+                <AllSitesUpload month={month} year={year} setMonth={setMonth} setYear={setYear} rules={rules} onDone={onDone} />
+            )}
+
+            {mode === "site" && (<>
 
             {/* Step 1: Select Site & Month */}
             <div style={card}>
@@ -470,7 +340,7 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
                     {warnCount>0 && (
                         <div style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", borderRadius:8, background:"#fffbeb", border:"1px solid #fde68a", marginBottom:10, fontSize:12, color:"#a16207" }}>
                             <AlertTriangle size={14} style={{ flexShrink:0 }} />
-                            {warnCount} row(s) will be processed but are worth a look (another site, or leaving this month).
+                            {warnCount} row(s) will be processed but are worth a look (name missing or not matching the ID, another site, or leaving this month).
                         </div>
                     )}
                     {missingStaff.length>0 && (
@@ -544,6 +414,7 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
                     </div>
                 </div>
             )}
+            </>)}
         </div>
     )
 }
