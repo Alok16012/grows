@@ -63,8 +63,11 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
         else setDateTo(value)
     }
     const clearDates = () => { setDateFrom(""); setDateTo("") }
-    const showApprovedBy = activeTab === "approved" || activeTab === "all"
-    const showRejectedBy = activeTab === "rejected" || activeTab === "all"
+    // Who gave the verdict. One column whatever the tab — on All, the Status
+    // badge says which verdict it was (two columns squeezed the table on laptops).
+    const reviewerHeader = activeTab === "approved" ? "Approved By"
+        : activeTab === "rejected" ? "Rejected By"
+        : activeTab === "all" ? "Approved / Rejected By" : null
 
     // Client-side navigation to /approvals?date=today while already here.
     useEffect(() => {
@@ -233,7 +236,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                             onClick={() => setActiveTab("all")}
                             className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                                 activeTab === "all"
-                                    ? "bg-[var(--text)] text-white"
+                                    ? "bg-[#e3ecff] text-[#1f5fff]"
                                     : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                             }`}
                         >
@@ -370,11 +373,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Site</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Submitted</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Status</th>
-                                        {showApprovedBy && (
-                                            <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Approved By</th>
-                                        )}
-                                        {showRejectedBy && (
-                                            <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Rejected By</th>
+                                        {reviewerHeader && (
+                                            <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">{reviewerHeader}</th>
                                         )}
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Actions</th>
                                     </tr>
@@ -392,11 +392,11 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                             <td className="px-[18px] py-3.5 text-[13px] text-[var(--text)]">
                                                 {inspection.assignment?.project?.site?.name}
                                             </td>
-                                            <td className="px-[18px] py-3.5 text-[13px] text-[var(--text2)]">
+                                            <td className="px-[18px] py-3.5 text-[13px] text-[var(--text2)] whitespace-nowrap">
                                                 {inspection.submittedAt ? new Date(inspection.submittedAt).toLocaleDateString('en-GB') : "—"}
                                             </td>
                                             <td className="px-[18px] py-3.5">
-                                                <span className={`inline-block px-3 py-1 rounded-[20px] text-[11.5px] font-medium ${
+                                                <span className={`inline-block whitespace-nowrap px-3 py-1 rounded-[20px] text-[11.5px] font-medium ${
                                                     inspection.status === "pending" ? "bg-[#fef3c7] text-[#d97706]" :
                                                     inspection.status === "approved" ? "bg-[var(--success-light)] text-[var(--success)]" :
                                                     inspection.status === "rejected" ? "bg-[#fef2f2] text-[#dc2626]" :
@@ -405,32 +405,18 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                                     {inspection.status === "pending" ? "Pending" : inspection.status === "approved" ? "Approved" : inspection.status === "rejected" ? "Rejected" : inspection.status}
                                                 </span>
                                             </td>
-                                            {showApprovedBy && (
+                                            {reviewerHeader && (
                                                 <td className="px-[18px] py-3.5 text-[13px] text-[var(--text)]">
-                                                    {inspection.status === "approved" ? (
+                                                    {(inspection.status === "approved" || inspection.status === "rejected") && inspection.approvedByName ? (
                                                         <>
-                                                            <p>{inspection.approvedByName ?? "—"}</p>
+                                                            <p>{inspection.approvedByName}</p>
                                                             {inspection.approvedAt && (
-                                                                <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{new Date(inspection.approvedAt).toLocaleDateString('en-GB')}</p>
+                                                                <p className="text-[11.5px] text-[var(--text3)] mt-0.5 whitespace-nowrap">{new Date(inspection.approvedAt).toLocaleDateString('en-GB')}</p>
                                                             )}
                                                         </>
-                                                    ) : <span className="text-[var(--text3)]">—</span>}
-                                                </td>
-                                            )}
-                                            {showRejectedBy && (
-                                                <td className="px-[18px] py-3.5 text-[13px] text-[var(--text)]">
-                                                    {inspection.status === "rejected" ? (
-                                                        inspection.approvedByName ? (
-                                                            <>
-                                                                <p>{inspection.approvedByName}</p>
-                                                                {inspection.approvedAt && (
-                                                                    <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{new Date(inspection.approvedAt).toLocaleDateString('en-GB')}</p>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            // Rejected before the reviewer was recorded.
-                                                            <span className="text-[var(--text3)]" title="Rejected before the reviewer was recorded">Not recorded</span>
-                                                        )
+                                                    ) : inspection.status === "rejected" ? (
+                                                        // Rejected before the reviewer was recorded.
+                                                        <span className="text-[var(--text3)] whitespace-nowrap" title="Rejected before the reviewer was recorded">Not recorded</span>
                                                     ) : <span className="text-[var(--text3)]">—</span>}
                                                 </td>
                                             )}
