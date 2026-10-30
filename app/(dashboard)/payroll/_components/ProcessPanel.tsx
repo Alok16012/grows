@@ -11,7 +11,7 @@ const loadXLSX = () => import("xlsx")
 import {
     Loader2, Play, RefreshCw, ChevronRight,
     AlertCircle, CheckCircle2, Users, MapPin, Building2, Search,
-    Unlock, Trash2, FileUp, X
+    Trash2, FileUp, X
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -90,7 +90,6 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
     const [loadingStatus,    setLoadingStatus]    = useState(false)
     const [loadingEmployees, setLoadingEmployees] = useState(false)
     const [processing,       setProcessing]       = useState(false)
-    const [resetting,        setResetting]        = useState(false)
     const [deleting,         setDeleting]         = useState(false)
     const [fetched,          setFetched]          = useState(false)
     const [search,           setSearch]           = useState("")
@@ -271,22 +270,6 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
         finally { setProcessing(false) }
     }
 
-    const handleUnlock = async () => {
-        if (!confirm(`Unlock payroll ${MONTHS[parseInt(month)-1]} ${year}? Status will reset to DRAFT.`)) return
-        setResetting(true)
-        try {
-            const res = await fetch(`/api/payroll/reset?month=${month}&year=${year}&action=unlock`, { method: "DELETE" })
-            if (!res.ok) throw new Error(await res.text())
-            const d = await res.json().catch(() => ({}))
-            const n = Number(d?.unlocked ?? 0)
-            if (n > 0) toast.success(`${n} payroll row(s) unlocked — back to DRAFT, you can now reprocess`)
-            else toast.warning("Nothing to unlock — no locked rows for this month")
-            await fetchSiteStatus()
-            if (selectedSiteId) await fetchEmployees(selectedSiteId)
-        } catch (e: any) { toast.error(e.message || "Unlock failed") }
-        finally { setResetting(false) }
-    }
-
     const handleDelete = async () => {
         if (!selectedSiteId) return
         const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "this site"
@@ -460,16 +443,11 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                         style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={11} className={loadingEmployees ? "animate-spin" : ""} /> Refresh
                                     </button>
-                                    {lockedOf(getStatus(selectedSiteId)) > 0 && (
-                                            <button onClick={handleUnlock} disabled={resetting || deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
-                                                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #f59e0b", background: "#fffbeb", fontSize: 11, color: "#b45309", fontWeight: 600, cursor: "pointer", opacity: (resetting||deleting) ? 0.6 : 1 }}>
-                                                {resetting ? <Loader2 size={11} className="animate-spin" /> : <Unlock size={11} />}
-                                                {resetting ? "Unlocking…" : "Unlock"}
-                                            </button>
-                                    )}
+                                    {/* No Unlock here: the month is locked and unlocked as a whole
+                                        from the Payroll header (Lock month / Unlock month). */}
                                     {draftOf(getStatus(selectedSiteId)) > 0 && (
-                                            <button onClick={handleDelete} disabled={resetting || deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
-                                                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 11, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: (resetting||deleting) ? 0.6 : 1 }}>
+                                            <button onClick={handleDelete} disabled={deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
+                                                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 11, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: deleting ? 0.6 : 1 }}>
                                                 {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                                                 {deleting ? "Deleting…" : "Delete"}
                                             </button>
