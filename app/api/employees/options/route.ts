@@ -19,6 +19,9 @@ const PICKER_PERMISSIONS = [
 const OPTION_SELECT = {
     id: true, employeeId: true, firstName: true, middleName: true, lastName: true,
     designation: true, status: true, photo: true, departmentId: true,
+    // Lets month-based screens (attendance upload) tell who was on the rolls
+    // that month — joined by its end, not left before its start.
+    dateOfJoining: true, dateOfLeaving: true,
     department: { select: { id: true, name: true } },
     branch: { select: { id: true, name: true } },
     deployments: {

@@ -1,7 +1,7 @@
 "use client"
 import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./_components/payroll-years"
 import type { PanelPeriod } from "./_components/WageSheetPanel"
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -140,12 +140,16 @@ export default function PayrollPage() {
     const refresh = useCallback(() => { fetchRuns(period.year); fetchSites(period) }, [fetchRuns, fetchSites, period])
 
     // First load: land on the month that still needs work (the newest run
-    // that isn't paid), else the newest run, else this month.
+    // that isn't paid), else the newest run, else this month. Not once a panel
+    // is open: the panels are keyed on the month, so switching it under an open
+    // Upload Attendance panel rebuilt it and silently dropped the site and month
+    // the user had just picked.
+    const panelOpenedRef = useRef(false)
     useEffect(() => {
         if (periodPicked) return
         fetchRuns(period.year).then(list => {
             const open = list.find(r => r.status !== "PAID") ?? list[0]
-            if (open) setPeriod({ month: open.month, year: open.year })
+            if (open && !panelOpenedRef.current) setPeriod({ month: open.month, year: open.year })
             setPeriodPicked(true)
         })
     }, [periodPicked, period.year, fetchRuns])
@@ -153,7 +157,7 @@ export default function PayrollPage() {
     useEffect(() => { if (periodPicked) { fetchRuns(period.year); fetchSites(period) } }, [period, periodPicked, fetchRuns, fetchSites])
 
     const choosePeriod = (p: PanelPeriod) => { setPeriod(p); setPeriodPicked(true); setActivePanel(null) }
-    const openPanel = (panel: Panel) => setActivePanel(panel)
+    const openPanel = (panel: Panel) => { panelOpenedRef.current = true; setActivePanel(panel) }
     const closePanel = () => { setActivePanel(null); refresh() }
 
     // ── Where the month stands, from the rows themselves ──

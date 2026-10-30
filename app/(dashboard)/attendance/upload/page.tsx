@@ -303,7 +303,7 @@ export default function AttendanceUploadPage() {
                     </div>
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Upload Attendance</h1>
                     <p style={{ fontSize: 12, color: "var(--text3)", margin: "3px 0 0 0" }}>
-                        Site-wise bulk attendance upload for payroll processing
+                        Upload attendance for one site and one month at a time.
                     </p>
                 </div>
             </div>
