@@ -6,10 +6,16 @@ import { checkAccess } from "@/lib/permissions"
 import { readDefectSettings, settingsChanges } from "@/lib/defect-import"
 
 // POST /api/form-templates/bulk-defects
-//   { projectId, items: { label, fieldType?, options?, reportRole?, defaultValue?, isRequired?, isHidden? }[] }
+//   { projectId, items: { label, fieldType?, options?, reportRole?, defaultValue?, isRequired?, isHidden? }[], replace? }
 //   (or { projectId, labels: string[] } — names only, default settings)
 //
-// Form Builder → Import Excel. For each row:
+// replace: true (Form Builder → Import Excel) makes the file the form's defect
+// list: every shown defect column whose name isn't in the file is hidden.
+// Hidden, never deleted: deleting a field cascades to its answers in every past
+// inspection, and a hidden one can be shown again from the Form Builder. A file
+// with no usable defect row hides nothing.
+//
+// For each row:
 //   - a new name is added as a defect column with the row's settings (blank
 //     settings take the defect default: Number, reports Auto, 0, not required,
 //     shown);
@@ -39,6 +45,7 @@ export async function POST(req: Request) {
 
         const body = await req.json().catch(() => null)
         const projectId: unknown = body?.projectId
+        const replace = body?.replace === true
         const rawItems: unknown[] | null = Array.isArray(body?.items) ? body.items
             : Array.isArray(body?.labels) ? body.labels.map((label: unknown) => ({ label })) : null
         if (typeof projectId !== "string" || !projectId) return new NextResponse("projectId is required", { status: 400 })
@@ -63,10 +70,16 @@ export async function POST(req: Request) {
         const toUpdate: { id: string; label: string; settings: Settings; changes: string[] }[] = []
         const skipped: { label: string; reason: string }[] = []
         const seen = new Set<string>()
+        // Every name in the file, valid row or not: a defect named in the file is
+        // never removed, even when its row is skipped.
+        const named = new Set<string>()
+        // Rows that are, or will be, a defect column of this form.
+        let defectRows = 0
         for (const raw of rawItems) {
             const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
             const label = typeof r.label === "string" ? clean(r.label) : ""
             if (!label) { skipped.push({ label: String(r.label ?? ""), reason: "Empty name" }); continue }
+            named.add(key(label))
             if (label.length > MAX_LABEL_LENGTH) { skipped.push({ label, reason: `Longer than ${MAX_LABEL_LENGTH} characters` }); continue }
             // Booleans may arrive as true/false (the Form Builder) or as sheet text.
             const { settings, problems } = readDefectSettings({
@@ -79,14 +92,21 @@ export async function POST(req: Request) {
             if (seen.has(k)) { skipped.push({ label, reason: "Repeated in the file" }); continue }
             seen.add(k)
             const matches = byKey.get(k) ?? []
-            if (matches.length === 0) { toAdd.push({ label, ...settings }); continue }
+            if (matches.length === 0) { toAdd.push({ label, ...settings }); defectRows++; continue }
             if (matches.length > 1) { skipped.push({ label, reason: `${matches.length} fields in the form have this name — change them in the editor` }); continue }
             const f = matches[0]
             if (f.category !== "DEFECT") { skipped.push({ label, reason: "Not a defect column — change it in the editor" }); continue }
+            defectRows++
             const changes = settingsChanges(f, settings)
             if (!changes.length) { skipped.push({ label, reason: "No change" }); continue }
             toUpdate.push({ id: f.id, label: f.fieldLabel, settings, changes })
         }
+
+        // Replace: shown defect columns the file doesn't name get hidden.
+        // Already-hidden ones are left as they are.
+        const toHide = replace && defectRows > 0
+            ? existing.filter(f => f.category === "DEFECT" && !f.isHidden && !named.has(key(f.fieldLabel)))
+            : []
 
         // New columns go after everything already in the form, in file order.
         const start = existing.reduce((m, f) => Math.max(m, f.displayOrder ?? 0), -1) + 1
@@ -106,6 +126,7 @@ export async function POST(req: Request) {
                     defaultValue: u.settings.defaultValue, isRequired: u.settings.isRequired, isHidden: u.settings.isHidden,
                 },
             })),
+            ...(toHide.length ? [prisma.formTemplate.updateMany({ where: { id: { in: toHide.map(f => f.id) } }, data: { isHidden: true } })] : []),
         ]
         if (writes.length) await prisma.$transaction(writes)
 
@@ -113,6 +134,7 @@ export async function POST(req: Request) {
             added: toAdd.map(i => i.label),
             updated: toUpdate.map(u => ({ label: u.label, changes: u.changes })),
             skipped,
+            hidden: toHide.map(f => f.fieldLabel),
         })
     } catch (error) {
         console.error("[FORM_TEMPLATES_BULK_DEFECTS]", error)

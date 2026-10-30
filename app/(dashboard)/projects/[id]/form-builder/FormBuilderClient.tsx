@@ -314,6 +314,9 @@ export default function FormBuilderClient({
     const [saving, setSaving] = useState(false)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [loadingDefault, setLoadingDefault] = useState(false)
+    // Hidden defect columns (replaced ones, kept for past reports) are folded
+    // away so the list shows the defects the form actually asks for.
+    const [showHiddenDefects, setShowHiddenDefects] = useState(false)
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -445,8 +448,10 @@ export default function FormBuilderClient({
     }
 
     const renderSection = (category: string, title: string) => {
-        const sectionFields = fields.filter(f => f.category === category)
         const isDefect = category === "DEFECT"
+        const allSectionFields = fields.filter(f => f.category === category)
+        const hiddenDefects = isDefect ? allSectionFields.filter(f => f.isHidden) : []
+        const sectionFields = isDefect && !showHiddenDefects ? allSectionFields.filter(f => !f.isHidden) : allSectionFields
 
         return (
             <div className="mb-0">
@@ -516,11 +521,27 @@ export default function FormBuilderClient({
                                 )}
                             </div>
                         ))}
+                        {hiddenDefects.length > 0 && (
+                            <button
+                                onClick={() => setShowHiddenDefects(v => !v)}
+                                className="w-full flex items-center gap-[6px] p-[8px_14px] border-b border-[var(--border)] bg-[var(--surface2)] text-left text-[11.5px] text-[var(--text2)] hover:text-[var(--text)]"
+                                title="Hidden defects aren't asked on the inspection form; their past answers stay in reports"
+                            >
+                                <EyeOff className="h-[13px] w-[13px] shrink-0" />
+                                {showHiddenDefects ? "Hide" : "Show"} {hiddenDefects.length} hidden defect{hiddenDefects.length === 1 ? "" : "s"}
+                                <span className="text-[var(--text3)]">· kept for past reports</span>
+                                <ChevronDown className={`h-[13px] w-[13px] ml-auto shrink-0 transition-transform ${showHiddenDefects ? "rotate-180" : ""}`} />
+                            </button>
+                        )}
                     </div>
                 </SortableContext>
             </div>
         )
     }
+
+    // The preview is "how inspectors will see the form", and the inspection form
+    // never shows hidden fields.
+    const previewFields = fields.filter(f => !f.isHidden)
 
     return (
         <div className="min-h-[calc(100vh-54px)] bg-[var(--bg)] p-[24px]">
@@ -619,17 +640,17 @@ export default function FormBuilderClient({
                                     Basic Info
                                 </div>
                                 {/* Same order the inspector sees (lib/form-field-order). */}
-                                {orderBasicFields(fields.filter(f => f.category === "FIXED")).map(field => (
+                                {orderBasicFields(previewFields.filter(f => f.category === "FIXED")).map(field => (
                                     <FieldPreview key={field.id} field={field} />
                                 ))}
 
-                                {fields.filter(f => f.category === "DEFECT").length > 0 && (
+                                {previewFields.filter(f => f.category === "DEFECT").length > 0 && (
                                     <>
                                         <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px] mt-[24px]">
                                             Defect Entry
                                         </div>
                                         <div className="grid grid-cols-3 gap-[8px]">
-                                            {fields.filter(f => f.category === "DEFECT").map(field => (
+                                            {previewFields.filter(f => f.category === "DEFECT").map(field => (
                                                 <div key={field.id} className="bg-white border border-[var(--border)] rounded-[9px] p-[9px_10px] opacity-70 cursor-not-allowed">
                                                     <div className="text-[10px] font-[500] text-[var(--text3)] uppercase leading-[1.3] mb-[5px] truncate" title={field.fieldLabel}>
                                                         {field.fieldLabel}
@@ -643,13 +664,13 @@ export default function FormBuilderClient({
                                     </>
                                 )}
 
-                                {fields.filter(f => f.category === "AUTO").length > 0 && (
+                                {previewFields.filter(f => f.category === "AUTO").length > 0 && (
                                     <>
                                         <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px] mt-[24px]">
                                             Calculated (Auto)
                                         </div>
                                         <div className="grid grid-cols-2 gap-[8px]">
-                                            {fields.filter(f => f.category === "AUTO").map(field => {
+                                            {previewFields.filter(f => f.category === "AUTO").map(field => {
                                                 if (field.fieldLabel.toUpperCase() === "INSPECTOR NAME") {
                                                     return (
                                                         <div key={field.id} className="col-span-2 bg-[#f0fdf4] border border-[rgba(26,158,110,0.2)] rounded-[9px] p-[11px_13px] flex items-center gap-[10px] opacity-70">
