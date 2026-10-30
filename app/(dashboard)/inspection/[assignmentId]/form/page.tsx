@@ -309,13 +309,17 @@ export default function InspectionFormPage() {
         }
     }
 
+    // Defect columns are never mandatory, whatever the form says: most defects
+    // don't occur, and a blank counts as 0 in the totals, reports and PDFs.
+    const mustFill = (t: { isRequired?: boolean; category?: string }) => !!t.isRequired && t.category !== "DEFECT"
+
     const validateForm = () => {
         const newErrors: Record<string, string> = {}
         templates.forEach(t => {
             // A hidden required field would make the form permanently
             // unsubmittable: the error has no input to attach to.
             if (t.isHidden) return
-            if (t.isRequired && !responses[t.id]) {
+            if (mustFill(t) && !responses[t.id]) {
                 newErrors[t.id] = "This field is required"
             }
         })
@@ -358,14 +362,14 @@ export default function InspectionFormPage() {
         let hasError = false
         const newErrors: Record<string, string> = {}
         currentFields.forEach(t => {
-            if (t.isRequired && !responses[t.id]) {
+            if (mustFill(t) && !responses[t.id]) {
                 newErrors[t.id] = "This field is required"
                 hasError = true
             }
         })
         if (hasError) {
             setErrors(prev => ({ ...prev, ...newErrors }))
-            const firstErrorId = currentFields.find(t => t.isRequired && !responses[t.id])?.id
+            const firstErrorId = currentFields.find(t => mustFill(t) && !responses[t.id])?.id
             if (firstErrorId) {
                 const el = document.getElementById(`field-${firstErrorId}`)
                 el?.scrollIntoView({ behavior: "smooth", block: "center" })

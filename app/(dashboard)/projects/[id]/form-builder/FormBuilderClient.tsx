@@ -157,6 +157,13 @@ function FieldEditorForm({ initialData, onSave, onCancel, saving }: FieldEditorF
                     />
                 )}
             </div>
+            {/* Defect columns are never mandatory on the inspection form (a blank
+                counts as 0), so there is no Required switch for them. */}
+            {initialData?.category === "DEFECT" ? (
+                <p className="text-[11.5px] text-[var(--text3)] pt-1">
+                    Defect columns are optional for inspectors — a blank counts as 0.
+                </p>
+            ) : (
             <div className="flex items-center gap-2 pt-1">
                 <label className="flex items-center gap-2 cursor-pointer text-[13px] font-medium text-[var(--text)] select-none">
                     <div
@@ -168,6 +175,7 @@ function FieldEditorForm({ initialData, onSave, onCancel, saving }: FieldEditorF
                     Required Field
                 </label>
             </div>
+            )}
             <div className="flex gap-[8px] pt-2 border-t border-[var(--border)] mt-4 items-center">
                 <button
                     type="submit"
@@ -224,7 +232,7 @@ function SortableFieldRow({ field, onEdit, onDelete, onToggleHidden, isDeleting 
 
             <div className="flex-1 min-w-0 flex items-center pr-[10px]">
                 <span className={`text-[12.5px] font-[500] truncate ${field.isHidden ? "text-[var(--text3)] line-through" : "text-[var(--text)]"}`}>{field.fieldLabel}</span>
-                {field.isRequired && !field.isHidden && <span className="text-[#dc2626] ml-[4px] text-[12px]">*</span>}
+                {field.isRequired && !field.isHidden && !isDefect && <span className="text-[#dc2626] ml-[4px] text-[12px]">*</span>}
                 {field.isHidden && (
                     <span className="ml-[6px] text-[10px] font-[700] rounded-[20px] px-[7px] py-[2px] bg-[#f3f4f6] text-[#6b7280] shrink-0">HIDDEN</span>
                 )}

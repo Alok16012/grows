@@ -129,7 +129,7 @@ async function downloadTemplate(fields: FieldLike[]) {
         ["Options", "Only for Dropdown: the choices, separated by commas. Required for Dropdown.", "e.g. Minor, Major, Critical"],
         ["Use in reports as", "Which report chart this field feeds. Blank = Auto.", [AUTO_REPORT_ROLE, ...REPORT_ROLES.map(r => r.label)].join(", ")],
         ["Default Value", "Shown before the inspector types. Blank = 0 for Number, empty otherwise. Must be a number for Number fields.", ""],
-        ["Required", "Must the inspector fill it in? Blank = No.", "Yes, No"],
+        ["Required", "Not used for defects: inspectors can always leave a defect blank (counts as 0).", "Yes, No"],
         ["Hidden", "Hidden columns aren't shown to inspectors. Blank = No.", "Yes, No"],
         ["Status", "For information only; ignored when importing.", ""],
         [""],
@@ -286,7 +286,6 @@ export default function DefectImport({ projectId, fields, onImported }: {
         s.fieldType !== "number" && fieldTypeLabel(s.fieldType) + (s.options ? ` (${s.options})` : ""),
         s.reportRole && `Reports: ${reportRoleLabel(s.reportRole)}`,
         s.defaultValue && !(s.fieldType === "number" && s.defaultValue === "0") && `Default ${s.defaultValue}`,
-        s.isRequired && "Required",
         s.isHidden && "Hidden",
     ].filter(Boolean).join(" · ")
 
