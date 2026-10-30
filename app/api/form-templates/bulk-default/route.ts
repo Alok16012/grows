@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { DEFAULT_DEFECTS } from "@/lib/default-defects"
 
 const FIXED_FIELDS = [
     { fieldLabel: "INSP. DATE", fieldType: "date", isRequired: true, category: "FIXED" },
@@ -13,16 +14,7 @@ const FIXED_FIELDS = [
     { fieldLabel: "REWORK QTY", fieldType: "number", isRequired: true, category: "FIXED", defaultValue: "0" },
 ]
 
-const DEFAULT_DEFECTS = [
-    "WRINKLES", "BIDING MARK", "CRACKED ISSUE", "TORN STICH", "STICHING ISSUE",
-    "EMBOSSING SHIFT", "STICHES OPEN", "BEADING OPEN", "PINING ISSUE", "PINING OPEN",
-    "PIN GAP", "CRACK", "FOAM SLACK", "COVER ISSUE", "CHOPPED", "WELPRO OPEN",
-    "BEADING NOT IN LINE", "SCREEN PRINTING TILT", "ZIGZAG STICHING", "ZIGZAG PVC LINING",
-    "SCREW PROBLEM", "WIRE PROBLEM", "PACKING ISSUE", "SCRATCH MARK", "FITMENT NOT OK",
-    "SEAT COVER STITCHES OPEN", "SEAT COVER BURNED", "BASE ISSUE", "WAVINESS",
-    "TREAD LOOSE", "SHADE VARIATION", "FOLD MARK", "ROLLING NOT OK", "HARD PART LINE",
-    "TRIM DAMAGE", "FOAM DAMAGE", "STAIN MARK", "PUNCH MARK", "OTHER"
-]
+// The standard defect list lives in lib/default-defects (also used by the defect template).
 
 const AUTO_FIELDS = [
     { fieldLabel: "TOTAL DEFECTS", fieldType: "number", isRequired: false, category: "AUTO", defaultValue: "0" },

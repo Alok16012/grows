@@ -45,6 +45,8 @@ type FormField = {
 
 // eslint-disable-next-line import/first
 import { REPORT_ROLES } from "@/lib/report-roles"
+// eslint-disable-next-line import/first
+import DefectImport from "./DefectImport"
 
 const FIELD_TYPES: { value: FieldType; label: string; icon: React.ReactNode }[] = [
     { value: "text", label: "Text", icon: <AlignLeft className="h-[12px] w-[12px]" /> },
@@ -448,16 +450,17 @@ export default function FormBuilderClient({
 
         return (
             <div className="mb-0">
-                <div className="bg-[var(--surface2)] border-y border-[var(--border)] p-[10px_14px_6px] flex items-center justify-between mt-[-1px]">
+                <div className="bg-[var(--surface2)] border-y border-[var(--border)] p-[10px_14px_6px] flex flex-wrap items-center justify-between gap-[8px] mt-[-1px]">
                     <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[0.8px]">{title}</div>
 
+                    {/* Wraps on narrow screens: name box, Add Defect, Template, Import Excel. */}
                     {isDefect && (
-                        <div className="flex items-center gap-[8px]">
+                        <div className="flex flex-wrap items-center gap-[8px]">
                             <input
                                 type="text"
                                 id="new-defect-input"
                                 placeholder="New defect name..."
-                                className="h-[26px] bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] px-[10px] text-[12.5px] outline-none focus:border-[var(--accent)] focus:bg-white"
+                                className="h-[26px] w-[130px] min-w-0 bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] px-[10px] text-[12.5px] outline-none focus:border-[var(--accent)] focus:bg-white"
                                 onKeyDown={async (e) => {
                                     if (e.key === 'Enter') {
                                         const val = (e.target as HTMLInputElement).value.trim()
@@ -481,6 +484,7 @@ export default function FormBuilderClient({
                             >
                                 <Plus className="h-[14px] w-[14px]" /> Add Defect
                             </button>
+                            <DefectImport projectId={projectId} fields={fields} onImported={fetchFields} />
                         </div>
                     )}
                 </div>

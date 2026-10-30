@@ -1,0 +1,13 @@
+// The standard defect columns. "Load Default Form" adds them to a project, and
+// the Form Builder's defect template lists the ones a form doesn't have yet.
+// Client-safe: no imports.
+export const DEFAULT_DEFECTS = [
+    "WRINKLES", "BIDING MARK", "CRACKED ISSUE", "TORN STICH", "STICHING ISSUE",
+    "EMBOSSING SHIFT", "STICHES OPEN", "BEADING OPEN", "PINING ISSUE", "PINING OPEN",
+    "PIN GAP", "CRACK", "FOAM SLACK", "COVER ISSUE", "CHOPPED", "WELPRO OPEN",
+    "BEADING NOT IN LINE", "SCREEN PRINTING TILT", "ZIGZAG STICHING", "ZIGZAG PVC LINING",
+    "SCREW PROBLEM", "WIRE PROBLEM", "PACKING ISSUE", "SCRATCH MARK", "FITMENT NOT OK",
+    "SEAT COVER STITCHES OPEN", "SEAT COVER BURNED", "BASE ISSUE", "WAVINESS",
+    "TREAD LOOSE", "SHADE VARIATION", "FOLD MARK", "ROLLING NOT OK", "HARD PART LINE",
+    "TRIM DAMAGE", "FOAM DAMAGE", "STAIN MARK", "PUNCH MARK", "OTHER"
+]
