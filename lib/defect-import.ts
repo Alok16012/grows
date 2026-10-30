@@ -86,4 +86,30 @@ export function readDefectSettings(cells: {
     }
 }
 
+export type ExistingField = {
+    fieldType?: string | null; options?: string | null; reportRole?: string | null
+    defaultValue?: string | null; isRequired?: boolean | null; isHidden?: boolean | null
+}
+
+/**
+ * What an import would change on a field already in the form, as readable
+ * lines ("Hidden: No → Yes"). Empty = the sheet matches the field. A blank
+ * and a 0 default count as the same for a Number field, and Options only
+ * matter for a Dropdown.
+ */
+export function settingsChanges(f: ExistingField, s: DefectSettings): string[] {
+    const out: string[] = []
+    const curType = f.fieldType || "number"
+    const curDefault = (v: string | null | undefined, type: string) => ((v ?? "") === "" && type === "number" ? "0" : (v ?? ""))
+    if (curType !== s.fieldType) out.push(`Field Type: ${fieldTypeLabel(curType)} → ${fieldTypeLabel(s.fieldType)}`)
+    if (s.fieldType === "dropdown" && tidyOptions(f.options) !== (s.options ?? ""))
+        out.push(`Options: ${tidyOptions(f.options) || "none"} → ${s.options}`)
+    if ((f.reportRole ?? null) !== s.reportRole) out.push(`Use in reports as: ${reportRoleLabel(f.reportRole)} → ${reportRoleLabel(s.reportRole)}`)
+    const before = curDefault(f.defaultValue, curType), after = curDefault(s.defaultValue, s.fieldType)
+    if (before !== after) out.push(`Default Value: ${before || "none"} → ${after || "none"}`)
+    if (!!f.isRequired !== s.isRequired) out.push(`Required: ${f.isRequired ? "Yes" : "No"} → ${s.isRequired ? "Yes" : "No"}`)
+    if (!!f.isHidden !== s.isHidden) out.push(`Hidden: ${f.isHidden ? "Yes" : "No"} → ${s.isHidden ? "Yes" : "No"}`)
+    return out
+}
+
 export { REPORT_ROLE_VALUES }

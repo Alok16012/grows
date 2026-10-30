@@ -3,19 +3,22 @@ import { NextResponse } from "next/server"
 import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { readDefectSettings } from "@/lib/defect-import"
+import { readDefectSettings, settingsChanges } from "@/lib/defect-import"
 
 // POST /api/form-templates/bulk-defects
 //   { projectId, items: { label, fieldType?, options?, reportRole?, defaultValue?, isRequired?, isHidden? }[] }
 //   (or { projectId, labels: string[] } — names only, default settings)
 //
-// Adds many defect columns at once (Form Builder → Import Excel), with the same
-// settings the field editor offers. A blank setting takes the defect default:
-// Number, reports Auto, default 0, not required, shown. Names already in the
-// form — hidden ones included — are left exactly as they are, and repeats
-// within the list are skipped; both are reported back, as are rows with an
-// invalid setting. The rest are added in one transaction, so a failure adds
-// nothing.
+// Form Builder → Import Excel. For each row:
+//   - a new name is added as a defect column with the row's settings (blank
+//     settings take the defect default: Number, reports Auto, 0, not required,
+//     shown);
+//   - a defect column already in the form is updated to the row's settings,
+//     or skipped when nothing differs. Its name is never changed. A name used
+//     by more than one field, or by a field that isn't a defect column, is
+//     skipped — the import can't tell which to change;
+//   - repeats within the list and rows with an invalid setting are skipped.
+// Everything is written in one transaction, so a failure changes nothing.
 
 const MAX_ITEMS = 300
 const MAX_LABEL_LENGTH = 100
@@ -24,6 +27,8 @@ const MAX_LABEL_LENGTH = 100
 const clean = (s: string) => s.trim().replace(/\s+/g, " ")
 /** Two names are the same defect when they match ignoring case and spacing. */
 const key = (s: string) => clean(s).toUpperCase()
+
+type Settings = ReturnType<typeof readDefectSettings>["settings"]
 
 export async function POST(req: Request) {
     try {
@@ -46,13 +51,16 @@ export async function POST(req: Request) {
         await ensureProjectSchema()
         const existing = await prisma.formTemplate.findMany({
             where: { projectId },
-            select: { fieldLabel: true, isHidden: true, displayOrder: true },
+            select: {
+                id: true, fieldLabel: true, category: true, fieldType: true, options: true, reportRole: true,
+                defaultValue: true, isRequired: true, isHidden: true, displayOrder: true,
+            },
         })
-        // Name → "every field with this name is hidden" (a form can hold a name twice).
-        const inForm = new Map<string, boolean>()
-        for (const f of existing) inForm.set(key(f.fieldLabel), (inForm.get(key(f.fieldLabel)) ?? true) && f.isHidden)
+        const byKey = new Map<string, typeof existing>()
+        for (const f of existing) byKey.set(key(f.fieldLabel), [...(byKey.get(key(f.fieldLabel)) ?? []), f])
 
-        const toAdd: ({ label: string } & ReturnType<typeof readDefectSettings>["settings"])[] = []
+        const toAdd: ({ label: string } & Settings)[] = []
+        const toUpdate: { id: string; label: string; settings: Settings; changes: string[] }[] = []
         const skipped: { label: string; reason: string }[] = []
         const seen = new Set<string>()
         for (const raw of rawItems) {
@@ -68,26 +76,44 @@ export async function POST(req: Request) {
             })
             if (problems.length) { skipped.push({ label, reason: problems.join("; ") }); continue }
             const k = key(label)
-            if (inForm.has(k)) { skipped.push({ label, reason: inForm.get(k) ? "Already in the form (hidden)" : "Already in the form" }); continue }
             if (seen.has(k)) { skipped.push({ label, reason: "Repeated in the file" }); continue }
             seen.add(k)
-            toAdd.push({ label, ...settings })
+            const matches = byKey.get(k) ?? []
+            if (matches.length === 0) { toAdd.push({ label, ...settings }); continue }
+            if (matches.length > 1) { skipped.push({ label, reason: `${matches.length} fields in the form have this name — change them in the editor` }); continue }
+            const f = matches[0]
+            if (f.category !== "DEFECT") { skipped.push({ label, reason: "Not a defect column — change it in the editor" }); continue }
+            const changes = settingsChanges(f, settings)
+            if (!changes.length) { skipped.push({ label, reason: "No change" }); continue }
+            toUpdate.push({ id: f.id, label: f.fieldLabel, settings, changes })
         }
 
         // New columns go after everything already in the form, in file order.
         const start = existing.reduce((m, f) => Math.max(m, f.displayOrder ?? 0), -1) + 1
-        if (toAdd.length) {
-            await prisma.$transaction(toAdd.map((it, i) => prisma.formTemplate.create({
+        const writes = [
+            ...toAdd.map((it, i) => prisma.formTemplate.create({
                 data: {
                     projectId, fieldLabel: it.label, category: "DEFECT",
                     fieldType: it.fieldType, options: it.options, reportRole: it.reportRole,
                     defaultValue: it.defaultValue, isRequired: it.isRequired, isHidden: it.isHidden,
                     displayOrder: start + i,
                 },
-            })))
-        }
+            })),
+            ...toUpdate.map(u => prisma.formTemplate.update({
+                where: { id: u.id },
+                data: {
+                    fieldType: u.settings.fieldType, options: u.settings.options, reportRole: u.settings.reportRole,
+                    defaultValue: u.settings.defaultValue, isRequired: u.settings.isRequired, isHidden: u.settings.isHidden,
+                },
+            })),
+        ]
+        if (writes.length) await prisma.$transaction(writes)
 
-        return NextResponse.json({ added: toAdd.map(i => i.label), skipped })
+        return NextResponse.json({
+            added: toAdd.map(i => i.label),
+            updated: toUpdate.map(u => ({ label: u.label, changes: u.changes })),
+            skipped,
+        })
     } catch (error) {
         console.error("[FORM_TEMPLATES_BULK_DEFECTS]", error)
         return new NextResponse("Internal Error", { status: 500 })

@@ -1,17 +1,19 @@
 "use client"
-// Form Builder → Defect Columns → Template / Import Excel: add many defects at
-// once from a sheet, each with the settings the field editor offers (Field
-// Type, Options, Use in reports as, Default Value, Required) plus Hidden.
-// Shows what will happen to every row before anything is added; the server
+// Form Builder → Defect Columns → Template / Import Excel: add or update many
+// defects at once from a sheet, each with the settings the field editor offers
+// (Field Type, Options, Use in reports as, Default Value, Required) plus Hidden.
+// New names are added; defects already in the form are updated to the sheet's
+// settings, or skipped when nothing differs. Every row's outcome, and each
+// change, is shown before anything is saved; the server
 // (/api/form-templates/bulk-defects) applies the same rules again.
 
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import { FileUp, Download, Loader2, X, CheckCircle2, MinusCircle, XCircle } from "lucide-react"
+import { FileUp, Download, Loader2, X, CheckCircle2, MinusCircle, XCircle, AlertTriangle } from "lucide-react"
 import { DEFAULT_DEFECTS } from "@/lib/default-defects"
 import { REPORT_ROLES } from "@/lib/report-roles"
 import {
-    DEFECT_FIELD_TYPES, AUTO_REPORT_ROLE, readDefectSettings, fieldTypeLabel, reportRoleLabel, type DefectSettings,
+    DEFECT_FIELD_TYPES, AUTO_REPORT_ROLE, readDefectSettings, settingsChanges, fieldTypeLabel, reportRoleLabel, type DefectSettings,
 } from "@/lib/defect-import"
 
 const MAX_DEFECTS = 300
@@ -36,7 +38,9 @@ type FieldLike = {
     fieldLabel: string; category?: string; fieldType?: string; options?: string | null; reportRole?: string | null
     isHidden?: boolean; isRequired?: boolean; defaultValue?: string | null; displayOrder?: number
 }
-type Row = { label: string; excelRow: number; settings: DefectSettings; status: "new" | "skip" | "error"; reason?: string }
+// new: added · update: a defect already in the form whose settings change (listed
+// in `changes`) · skip: left alone, with the reason · error: the file needs fixing.
+type Row = { label: string; excelRow: number; settings: DefectSettings; status: "new" | "update" | "skip" | "error"; reason?: string; changes?: string[] }
 type Raw = { label: string; excelRow: number; cells: Record<keyof typeof COLS, unknown> }
 
 /**
@@ -94,10 +98,10 @@ const fieldRow = (f: FieldLike, status: string) => [
     reportRoleLabel(f.reportRole), f.defaultValue ?? "", yn(f.isRequired), yn(f.isHidden), status,
 ]
 
-// The template: this form's defects with all their settings (left alone on
-// import), room for new ones, the standard defects not in the form on their
-// own sheet (copied across to be added, so importing the template as-is adds
-// nothing), and how to fill it in.
+// The template: this form's defects with all their settings (edit a row to
+// update that defect; unchanged rows are skipped), room for new ones, the
+// standard defects not in the form on their own sheet (copied across to be
+// added, so importing the template as-is changes nothing), and how to fill it in.
 async function downloadTemplate(fields: FieldLike[]) {
     const XLSX = await import("xlsx")
     const current = fields
@@ -126,7 +130,8 @@ async function downloadTemplate(fields: FieldLike[]) {
         ["Hidden", "Hidden columns aren't shown to inspectors. Blank = No.", "Yes, No"],
         ["Status", "For information only; ignored when importing.", ""],
         [""],
-        ["Rows already in this form are left exactly as they are; change those in the Form Builder."],
+        ["Rows already in this form are updated to the settings in the sheet (the name never changes); unchanged rows are skipped."],
+        ["The import lists every change before anything is saved."],
         ["Add new defects as new rows. Copy rows from the Standard defects sheet to add those."],
         ["Only the first sheet (Defects) is imported."],
     ])
@@ -163,17 +168,6 @@ async function downloadTemplate(fields: FieldLike[]) {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-/** Same settings as an existing field (blank and 0 treated alike for a Number default). */
-function sameSettings(f: FieldLike, s: DefectSettings): boolean {
-    const type = f.fieldType ?? "number"
-    const dv = (v: string | null | undefined) => (v ?? "") === "" && type === "number" ? "0" : (v ?? "")
-    return type === s.fieldType
-        && (type === "dropdown" ? (f.options ?? "").split(",").map(o => o.trim()).filter(Boolean).join(", ") === (s.options ?? "") : true)
-        && (f.reportRole ?? null) === s.reportRole
-        && dv(f.defaultValue) === dv(s.defaultValue)
-        && !!f.isRequired === s.isRequired && !!f.isHidden === s.isHidden
-}
-
 export default function DefectImport({ projectId, fields, onImported }: {
     projectId: string
     fields: FieldLike[]
@@ -207,15 +201,18 @@ export default function DefectImport({ projectId, fields, onImported }: {
                 if (problems.length) return { ...base, status: "error", reason: problems.join("; ") }
                 if (label.length > MAX_LENGTH) return { ...base, status: "skip", reason: `Longer than ${MAX_LENGTH} characters` }
                 const k = key(label)
-                const cur = byKey.get(k)
-                if (cur?.length) {
-                    // Existing fields are never changed by an import; say so if the sheet differs.
-                    return { ...base, status: "skip", reason: (cur.every(f => f.isHidden) ? "Already in the form (hidden)" : "Already in the form")
-                        + (cur.some(f => sameSettings(f, settings)) ? "" : " — settings in the file differ; change them in the editor") }
-                }
                 if (seen.has(k)) return { ...base, status: "skip", reason: "Repeated in the file" }
                 seen.add(k)
-                return { ...base, status: "new" }
+                const cur = byKey.get(k) ?? []
+                if (cur.length === 0) return { ...base, status: "new" }
+                // A defect already in the form is updated to the sheet's settings,
+                // or left alone when nothing differs. The name itself never changes.
+                if (cur.length > 1) return { ...base, status: "skip", reason: `${cur.length} fields in the form have this name — change them in the editor` }
+                if (cur[0].category && cur[0].category !== "DEFECT") return { ...base, status: "skip", reason: "Not a defect column — change it in the editor" }
+                const changes = settingsChanges(cur[0], settings)
+                return changes.length
+                    ? { ...base, status: "update", changes }
+                    : { ...base, status: "skip", reason: "No change" }
             }))
             setFileName(file.name)
         } catch (err) {
@@ -228,10 +225,12 @@ export default function DefectImport({ projectId, fields, onImported }: {
     }
 
     const newOnes = rows?.filter(r => r.status === "new") ?? []
+    const updates = rows?.filter(r => r.status === "update") ?? []
     const errorCount = rows?.filter(r => r.status === "error").length ?? 0
     const skipCount = rows?.filter(r => r.status === "skip").length ?? 0
-    const tooMany = newOnes.length > MAX_DEFECTS
-    const blocked = !newOnes.length || tooMany || errorCount > 0
+    const tooMany = newOnes.length + updates.length > MAX_DEFECTS
+    const blocked = (!newOnes.length && !updates.length) || tooMany || errorCount > 0
+    const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
     const add = async () => {
         if (blocked) return
@@ -240,13 +239,16 @@ export default function DefectImport({ projectId, fields, onImported }: {
             const res = await fetch("/api/form-templates/bulk-defects", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ projectId, items: newOnes.map(r => ({ label: r.label, ...r.settings })) }),
+                body: JSON.stringify({ projectId, items: [...newOnes, ...updates].map(r => ({ label: r.label, ...r.settings })) }),
             })
             if (!res.ok) throw new Error((await res.text()) || "Import failed")
-            const data: { added: string[]; skipped: { label: string }[] } = await res.json()
+            const data: { added: string[]; updated?: { label: string }[]; skipped: { label: string }[] } = await res.json()
             await onImported()
-            toast.success(`Added ${data.added.length} defect${data.added.length === 1 ? "" : "s"}`
-                + (data.skipped.length ? ` · ${data.skipped.length} skipped` : ""))
+            const done = [
+                data.added.length && `Added ${plural(data.added.length, "defect", "defects")}`,
+                data.updated?.length && `Updated ${plural(data.updated.length, "defect", "defects")}`,
+            ].filter(Boolean).join(" · ")
+            toast.success(done || "Nothing changed")
             close()
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Import failed")
@@ -278,7 +280,7 @@ export default function DefectImport({ projectId, fields, onImported }: {
             <button
                 onClick={() => inputRef.current?.click()}
                 disabled={reading}
-                title="Add many defects from an Excel sheet"
+                title="Add or update defects from an Excel sheet"
                 className="h-[26px] px-[10px] bg-white border border-[var(--border)] text-[var(--text)] rounded-[8px] text-[12px] font-[500] hover:bg-[var(--surface2)] flex items-center gap-1 transition-colors disabled:opacity-50"
             >
                 {reading ? <Loader2 className="h-[13px] w-[13px] animate-spin" /> : <FileUp className="h-[13px] w-[13px]" />} Import Excel
@@ -297,6 +299,7 @@ export default function DefectImport({ projectId, fields, onImported }: {
 
                         <div className="flex flex-wrap gap-2 p-[12px_20px] border-b border-[var(--border)] text-[12px]">
                             <span className="px-[10px] py-[4px] rounded-full bg-[#dcfce7] text-[#15803d] font-[600]">{newOnes.length} new</span>
+                            <span className="px-[10px] py-[4px] rounded-full bg-[#fef3c7] text-[#b45309] font-[600]">{updates.length} to update</span>
                             <span className="px-[10px] py-[4px] rounded-full bg-[var(--surface2)] text-[var(--text2)] font-[600]">{skipCount} skipped</span>
                             {errorCount > 0 && (
                                 <span className="px-[10px] py-[4px] rounded-full bg-[#fef2f2] text-[#dc2626] font-[600]">{errorCount} to fix</span>
@@ -307,7 +310,13 @@ export default function DefectImport({ projectId, fields, onImported }: {
                         </div>
                         {errorCount > 0 && (
                             <p role="alert" className="px-[20px] pt-[10px] text-[12px] text-[#b91c1c]">
-                                Fix the {errorCount} row{errorCount === 1 ? "" : "s"} marked in red in the file and import it again — nothing is added until then.
+                                Fix the {errorCount} row{errorCount === 1 ? "" : "s"} marked in red in the file and import it again — nothing is added or updated until then.
+                            </p>
+                        )}
+                        {updates.length > 0 && errorCount === 0 && (
+                            <p className="mx-[20px] mt-[10px] px-[12px] py-[8px] rounded-[8px] bg-[#fffbeb] border border-[#fde68a] text-[12px] text-[#92400e] flex items-start gap-1.5">
+                                <AlertTriangle className="h-[14px] w-[14px] shrink-0 mt-[1px]" />
+                                <span>{plural(updates.length, "defect already in the form", "defects already in the form")} will be changed as listed below. Check them before importing.</span>
                             </p>
                         )}
 
@@ -323,7 +332,7 @@ export default function DefectImport({ projectId, fields, onImported }: {
                                 </thead>
                                 <tbody>
                                     {rows.map((r, i) => (
-                                        <tr key={i} className={`border-t border-[var(--border)] ${r.status === "error" ? "bg-[#fff5f5]" : ""}`}>
+                                        <tr key={i} className={`border-t border-[var(--border)] ${r.status === "error" ? "bg-[#fff5f5]" : r.status === "update" ? "bg-[#fffbeb]" : ""}`}>
                                             <td className="pl-[20px] pr-[8px] py-[7px] text-[var(--text3)] tabular-nums align-top">{r.excelRow}</td>
                                             <td className="px-[8px] py-[7px] align-top">
                                                 <div className="text-[var(--text)] [overflow-wrap:anywhere]">{r.label}</div>
@@ -332,6 +341,13 @@ export default function DefectImport({ projectId, fields, onImported }: {
                                             <td className="px-[20px] py-[7px] align-top">
                                                 {r.status === "new"
                                                     ? <span className="inline-flex items-center gap-1 text-[#15803d]"><CheckCircle2 className="h-[13px] w-[13px] shrink-0" /> Will be added</span>
+                                                    : r.status === "update"
+                                                    ? <div className="text-[#b45309]">
+                                                        <span className="inline-flex items-center gap-1 font-[500]"><AlertTriangle className="h-[13px] w-[13px] shrink-0" /> Will be updated</span>
+                                                        <ul className="mt-[2px] ml-[18px] text-[11.5px] list-disc">
+                                                            {r.changes?.map(c => <li key={c} className="[overflow-wrap:anywhere]">{c}</li>)}
+                                                        </ul>
+                                                    </div>
                                                     : r.status === "error"
                                                     ? <span className="inline-flex items-start gap-1 text-[#dc2626]"><XCircle className="h-[13px] w-[13px] shrink-0 mt-[2px]" /> {r.reason}</span>
                                                     : <span className="inline-flex items-start gap-1 text-[var(--text3)]"><MinusCircle className="h-[13px] w-[13px] shrink-0 mt-[2px]" /> {r.reason}</span>}
@@ -348,7 +364,11 @@ export default function DefectImport({ projectId, fields, onImported }: {
                                 <button onClick={add} disabled={saving || blocked}
                                     className="h-[32px] px-[14px] rounded-[8px] bg-[var(--accent)] text-white text-[12.5px] font-[500] inline-flex items-center gap-1.5 disabled:opacity-50">
                                     {saving && <Loader2 className="h-[13px] w-[13px] animate-spin" />}
-                                    {newOnes.length ? `Add ${newOnes.length} defect${newOnes.length === 1 ? "" : "s"}` : "Nothing to add"}
+                                    {newOnes.length && updates.length
+                                        ? `Import: ${newOnes.length} new, ${plural(updates.length, "update", "updates")}`
+                                        : newOnes.length ? `Add ${plural(newOnes.length, "defect", "defects")}`
+                                        : updates.length ? `Update ${plural(updates.length, "defect", "defects")}`
+                                        : "Nothing to import"}
                                 </button>
                             </div>
                         </div>
