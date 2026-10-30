@@ -1,10 +1,8 @@
 "use client"
 import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useEffect, useCallback } from "react"
-import { useSession } from "next-auth/react"
 import { toast } from "sonner"
-import { can } from "@/lib/can"
-import { Loader2, RefreshCw, MapPin, Building2, Search, FileSpreadsheet, FileDown, Lock, X } from "lucide-react"
+import { Loader2, RefreshCw, MapPin, Building2, Search, FileSpreadsheet, FileDown, X } from "lucide-react"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
@@ -46,14 +44,12 @@ const td:  React.CSSProperties = { padding:"5px 9px", textAlign:"center", color:
 
 export type PanelPeriod = { month: number; year: number }
 
-export default function WageSheetPanel({ onClose, onDone, initialMonth, initialYear }: {
+// View, check and export the wage sheet site by site. Locking isn't done here:
+// the month is locked in one place, Lock month in the Payroll header.
+export default function WageSheetPanel({ onClose, initialMonth, initialYear }: {
     onClose: () => void
-    /** `period` is the month/year this panel was on, so the next panel opens on the same one. */
-    onDone?: (next?: string, period?: PanelPeriod) => void
     initialMonth?: number; initialYear?: number
 }) {
-    const { data: session } = useSession()
-    const canManage = can(session, "payroll.manage")
 
     const [month,   setMonth]   = useState(String(initialMonth ?? currentPayrollMonth()))
     const [year,    setYear]    = useState(String(initialYear  ?? currentPayrollYear()))
@@ -69,9 +65,7 @@ export default function WageSheetPanel({ onClose, onDone, initialMonth, initialY
     const [hdfcAccNo,  setHdfcAccNo]  = useState("")
     const [hdfcGenBy,  setHdfcGenBy]  = useState("")
     const [selectedIds,     setSelectedIds]     = useState<Set<string>>(new Set())
-    const [locking,         setLocking]         = useState(false)
     const [selectedSiteIds, setSelectedSiteIds] = useState<Set<string>>(new Set())
-    const [lockingSites,    setLockingSites]    = useState(false)
     const [dlCombined,      setDlCombined]      = useState(false)
 
     useEffect(()=>{ fetch("/api/sites?isActive=true").then(r=>r.json()).then(d=>{if(Array.isArray(d))setSites(d)}).finally(()=>setLdSites(false)) },[])
@@ -190,51 +184,10 @@ export default function WageSheetPanel({ onClose, onDone, initialMonth, initialY
         XLSX.writeFile(wb,`FormII_WageSheet_${site?.name??"All"}_${MONTHS[m-1]}_${y}.xlsx`)
     }
 
-    const periodLabel = () => `${MONTHS[parseInt(month)-1]} ${year}`
-    const period = (): PanelPeriod => ({ month: parseInt(month), year: parseInt(year) })
-
-    // Rows still open on the selected site — what "Lock all" locks.
-    const draftIds = data.filter(p=>p.status==="DRAFT").map(p=>p.id)
-
-    const lockRows = async (ids: string[])=>{
-        if (!ids.length) { toast.error("Select employees to lock"); return }
-        if (!confirm(`Lock ${ids.length} payroll(s) for ${periodLabel()}? Amounts can't be edited after locking.`)) return
-        setLocking(true)
-        try {
-            const res=await fetch("/api/payroll/final/lock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({month:parseInt(month),year:parseInt(year),payrollIds:ids})})
-            if (!res.ok) throw new Error(await res.text())
-            const d=await res.json()
-            const n=Number(d?.count??0)
-            setSelectedIds(new Set()); await fetchData(selId)
-            if (n===0) { toast.warning("Nothing to lock — these rows are already locked"); return }
-            toast.success(`${n} employee(s) locked — going to Compliance`)
-            onDone?.("compliance", period())
-        } catch(e: unknown) { toast.error(e instanceof Error?e.message:"Lock failed") }
-        finally { setLocking(false) }
-    }
-    const handleLock = () => lockRows([...selectedIds])
 
     const toggleSiteSelect = (id: string, e: React.MouseEvent)=>{
         e.stopPropagation()
         setSelectedSiteIds(prev=>{ const s=new Set(prev); s.has(id)?s.delete(id):s.add(id); return s })
-    }
-
-    const handleLockSites = async ()=>{
-        if (!selectedSiteIds.size) return
-        const rows=[...selectedSiteIds].reduce((n,id)=>n+(getSt(id)?.processedCount??0),0)
-        if (!confirm(`Lock ${rows} payroll(s) across ${selectedSiteIds.size} site(s) for ${periodLabel()}? Amounts can't be edited after locking.`)) return
-        setLockingSites(true)
-        try {
-            const res=await fetch("/api/payroll/final/lock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({month:parseInt(month),year:parseInt(year),siteIds:[...selectedSiteIds]})})
-            if (!res.ok) throw new Error(await res.text())
-            const d=await res.json()
-            const n=Number(d?.count??0)
-            setSelectedSiteIds(new Set()); if(selId) await fetchData(selId); await fetchStatus()
-            if (n===0) { toast.warning("Nothing to lock — these rows are already locked"); return }
-            toast.success(`${n} employee(s) locked from ${selectedSiteIds.size} site(s)`)
-            onDone?.("compliance", period())
-        } catch(e: unknown) { toast.error(e instanceof Error?e.message:"Lock failed") }
-        finally { setLockingSites(false) }
     }
 
     const selectedCount  = selectedIds.size
@@ -329,11 +282,6 @@ export default function WageSheetPanel({ onClose, onDone, initialMonth, initialY
                                 {dlCombined?<Loader2 size={13} className="animate-spin"/>:<FileSpreadsheet size={13}/>}
                                 {dlCombined?"Downloading…":"Download Form II (Combined)"}
                             </button>
-                            <button onClick={handleLockSites} disabled={lockingSites || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
-                                style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"none", background:lockingSites?"#a78bfa":"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:lockingSites?"not-allowed":"pointer" }}>
-                                {lockingSites?<Loader2 size={13} className="animate-spin"/>:<Lock size={13}/>}
-                                {lockingSites?"Locking…":"Lock & Go to Compliance"}
-                            </button>
                         </div>
                     )}
                 </div>
@@ -415,21 +363,8 @@ export default function WageSheetPanel({ onClose, onDone, initialMonth, initialY
                                             </button>
                                         </>
                                     )}
-                                    {/* The lock used to appear only once rows were ticked, so a new
-                                        user had no way to find it. With nothing ticked, lock everything
-                                        still open on this site in one click. */}
-                                    {selectedCount===0 && draftIds.length>0 && (
-                                        <button onClick={()=>lockRows(draftIds)} disabled={locking || !canManage} title={canManage ? "Lock every open row on this site" : "Requires payroll manage permission"} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:locking?0.6:1 }}>
-                                            {locking?<Loader2 size={13} className="animate-spin"/>:<Lock size={13}/>}
-                                            Lock all ({draftIds.length}) & go to Compliance
-                                        </button>
-                                    )}
-                                    {selectedCount>0 && (
-                                        <button onClick={handleLock} disabled={locking || !canManage} title={canManage ? undefined : "Requires payroll manage permission"} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#7c3aed", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:locking?0.6:1 }}>
-                                            {locking?<Loader2 size={13} className="animate-spin"/>:<Lock size={13}/>}
-                                            Lock & Compliance ({selectedCount})
-                                        </button>
-                                    )}
+                                    {/* No lock here: the month is locked in one place, Lock month in
+                                        the Payroll header (all sites at once). */}
                                 </div>
                             </div>
 

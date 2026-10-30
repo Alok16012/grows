@@ -129,12 +129,24 @@ export default function PayrollPage() {
         finally { setLoading(false) }
     }, [])
 
+    // Which month `sites` describes. Right after the month changes, `sites` still
+    // holds the previous month, so the Lock / Unlock month button would offer the
+    // old month's action for the new one. A reply for a month no longer picked
+    // is dropped, so a slow one can't overwrite the newer month either.
+    const [sitesKey, setSitesKey] = useState<number | null>(null)
+    const wantedSitesKey = useRef<number | null>(null)
     const fetchSites = useCallback(async (p: PanelPeriod) => {
+        const k = monthKey(p)
+        wantedSitesKey.current = k
+        let list: SiteStatus[] = []
         try {
             const res = await fetch(`/api/payroll/sites-status?month=${p.month}&year=${p.year}`)
             const data = res.ok ? await res.json() : []
-            setSites(Array.isArray(data) ? data : [])
-        } catch { setSites([]) }
+            list = Array.isArray(data) ? data : []
+        } catch { /* shown as no sites */ }
+        if (wantedSitesKey.current !== k) return
+        setSites(list)
+        setSitesKey(k)
     }, [])
 
     const refresh = useCallback(() => { fetchRuns(period.year); fetchSites(period) }, [fetchRuns, fetchSites, period])
@@ -235,7 +247,7 @@ export default function PayrollPage() {
     // with only month/year covers every DRAFT row of the month; unlock without
     // a site reopens every PROCESSED row (PAID stays PAID).
     const lockMonth = async () => {
-        if (!confirm(`Lock all ${counts.draft} open payroll rows for ${periodLabel}?\n\nAmounts can't be edited after locking. You can unlock the month later if something must change.`)) return
+        if (!confirm(`Lock ${periodLabel} for all sites?\n\nAmounts can't be edited after locking. You can unlock the month later if something must change.`)) return
         setLockingMonth("lock")
         try {
             const res = await fetch("/api/payroll/final/lock", {
@@ -251,7 +263,7 @@ export default function PayrollPage() {
     }
 
     const unlockMonth = async () => {
-        if (!confirm(`Unlock ${periodLabel}?\n\nAll ${counts.locked} locked rows go back to draft so days and amounts can be edited and re-processed. Paid rows stay paid.`)) return
+        if (!confirm(`Unlock ${periodLabel} for all sites?\n\nThe month goes back to draft so days and amounts can be edited and re-processed. Paid rows stay paid.`)) return
         setLockingMonth("unlock")
         try {
             const res = await fetch(`/api/payroll/reset?month=${period.month}&year=${period.year}&action=unlock`, { method: "DELETE" })
@@ -284,22 +296,23 @@ export default function PayrollPage() {
                     <p style={{ fontSize: 13.5, color: "var(--text3)", margin: "4px 0 0 0" }}>Pick a month, then follow the four steps.</p>
                 </div>
                 <div className="page-actions" style={{ flexWrap: "wrap" }}>
-                    {/* Month lock / unlock — beside the month it applies to. Lock covers
-                        every open (draft) row of the month, all sites; Unlock reopens
-                        locked rows (paid rows stay paid). A locked row can't be edited
-                        or re-processed until the month is unlocked (enforced server-side). */}
-                    {canLock && counts.draft > 0 && (
+                    {/* One month switch, beside the month it applies to: the month is
+                        locked and unlocked as a whole, all sites at once. While any row is
+                        still open it offers Lock month (which locks every open row); once
+                        the whole month is locked it offers Unlock month (paid rows stay
+                        paid). A locked row can't be edited or re-processed until the month
+                        is unlocked (enforced server-side). */}
+                    {sitesKey !== monthKey(period) ? null : counts.draft > 0 ? (canLock && (
                         <button onClick={lockMonth} disabled={lockingMonth !== null}
-                            title={`Lock all ${counts.draft} open rows of ${periodLabel}, all sites at once`}
+                            title={`Lock ${periodLabel} — every site at once`}
                             style={{ ...quietBtn, border: "none", background: "#7c3aed", color: "#fff" }}>
-                            {lockingMonth === "lock" ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />} Lock month ({counts.draft})
+                            {lockingMonth === "lock" ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />} Lock month
                         </button>
-                    )}
-                    {canUnlock && counts.locked > 0 && (
+                    )) : counts.locked > 0 && canUnlock && (
                         <button onClick={unlockMonth} disabled={lockingMonth !== null}
-                            title={`Reopen the ${counts.locked} locked rows of ${periodLabel} for editing (paid rows stay paid)`}
+                            title={`Reopen ${periodLabel} for editing — every site at once (paid rows stay paid)`}
                             style={{ ...quietBtn, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309" }}>
-                            {lockingMonth === "unlock" ? <Loader2 size={15} className="animate-spin" /> : <Unlock size={15} />} Unlock month ({counts.locked})
+                            {lockingMonth === "unlock" ? <Loader2 size={15} className="animate-spin" /> : <Unlock size={15} />} Unlock month
                         </button>
                     )}
                     <div style={{ display: "flex", alignItems: "center", height: 40, borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", overflow: "hidden" }}>
@@ -451,7 +464,6 @@ export default function PayrollPage() {
                 <WageSheetPanel key={`ws-${period.month}-${period.year}`}
                     initialMonth={period.month} initialYear={period.year}
                     onClose={closePanel}
-                    onDone={(next, p) => { if (p) choosePeriod(p); if (next === "compliance") openPanel("compliance"); else setActivePanel(null); refresh() }}
                 />
             )}
             {activePanel === "compliance" && (
