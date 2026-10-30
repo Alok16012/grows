@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
 import { inspectionScopeForApprover } from "@/lib/approval-scope"
-import { withApproverNames, istDayStart, istDayEnd } from "@/lib/inspection-approver"
+import { withApproverNames, istDayStart, istDayEnd, searchDate } from "@/lib/inspection-approver"
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
@@ -38,9 +38,13 @@ export async function GET(req: Request) {
             where.status = status
         }
         // Server-side search, so it covers every page and not just the rows on
-        // screen: inspector, project or site name.
+        // screen: inspector, project or site name — or, when the box holds a
+        // date (30/10/2026), the inspections submitted that day (IST).
         const q = (searchParams.get("q") ?? "").trim().slice(0, 100)
-        if (q) {
+        const qDate = q ? searchDate(q) : null
+        if (qDate) {
+            where.AND = [{ submittedAt: { gte: istDayStart(qDate), lte: istDayEnd(qDate) } }]
+        } else if (q) {
             where.OR = [
                 { submitter: { name: { contains: q, mode: "insensitive" } } },
                 { assignment: { project: { name: { contains: q, mode: "insensitive" } } } },

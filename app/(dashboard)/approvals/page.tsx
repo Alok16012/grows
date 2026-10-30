@@ -178,7 +178,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
         ? inspections.filter(i =>
             (i.assignment?.project?.name ?? "").toLowerCase().includes(q) ||
             (i.assignment?.project?.site?.name ?? "").toLowerCase().includes(q) ||
-            (i.submitter?.name ?? "").toLowerCase().includes(q))
+            (i.submitter?.name ?? "").toLowerCase().includes(q) ||
+            (i.submittedAt ? new Date(i.submittedAt).toLocaleDateString('en-GB') : "").includes(q))
         : inspections
     const pageCount = todayOnly ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE))
     const showFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
@@ -275,7 +276,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                 <div className="relative w-full sm:w-[240px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[14px] w-[14px] text-[var(--text3)]" />
                     <Input
-                        placeholder="Search..."
+                        placeholder="Name, site or date (dd/mm/yyyy)"
+                        title="Inspector, project or site name — or a date like 30/10/2026 for one day"
                         className="pl-9 pr-4 py-2 bg-white border border-[var(--border)] rounded-[9px] text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] focus:border-[var(--accent)] focus:ring-[3px] focus:ring-[rgba(26,158,110,0.08)] focus:outline-none transition-shadow"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
