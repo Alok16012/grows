@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
+import { AssignWorkSection, useAssignWork, assignWorkProblem, createAssignments } from "@/components/AssignWork"
 import {
     ScopePicker, SCOPE_ALL, scopeLabel, matchPeople, fetchStaff,
     toggleAllVisible, allVisibleSelected,
@@ -184,30 +185,11 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     // can never silently drop the team the project already has.
     const [pinned, setPinned] = useState<{ managers: string[]; inspectors: string[] }>({ managers: [], inspectors: [] })
 
-    // Optional "Also assign work" — off by default. The team on its own only says
-    // who MAY be given work; saving it never issues or withdraws a job (that used
-    // to happen silently and was removed). Ticking this creates assignments, after
-    // the team is saved, for the inspectors picked below — through the same
-    // POST /api/assignments the Assignments wizard uses (same ASG codes, the same
-    // "already assigned" and resigned-employee checks). Unticking someone from the
-    // team still never cancels their work.
+    // Optional "Also assign work" (components/AssignWork). People already on the
+    // team when the page opened aren't pre-picked for work; newly ticked ones are.
     const { data: session } = useSession()
     const canAssign = can(session, "assignments.manage")
-    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-    const [assignOn, setAssignOn] = useState(false)
-    const [assignIds, setAssignIds] = useState<string[]>([])
-    const [assignStart, setAssignStart] = useState(today)
-    const [assignRecur, setAssignRecur] = useState("none")
-    const [assignMultiPart, setAssignMultiPart] = useState(false)
-    const [assignNotes, setAssignNotes] = useState("")
-    // Inspectors ticked onto the team since the page opened are pre-picked for
-    // work; anyone unticked from the team drops out of the list.
-    const prevInspectorIds = useRef<string[]>([])
-    useEffect(() => {
-        const added = inspectorIds.filter(id => !prevInspectorIds.current.includes(id) && !pinned.inspectors.includes(id))
-        prevInspectorIds.current = inspectorIds
-        setAssignIds(prev => Array.from(new Set([...prev.filter(id => inspectorIds.includes(id)), ...added])))
-    }, [inspectorIds, pinned.inspectors])
+    const [assignWork, setAssignWork] = useAssignWork(inspectorIds, pinned.inspectors)
 
     useEffect(() => {
         const toDateInput = (s?: string | null) => (s ? new Date(s).toISOString().slice(0, 10) : "")
@@ -308,9 +290,9 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             toast.error(summarizeErrors(errs))
             return
         }
-        const assigning = assignAvailable && assignOn && mode === "save"
-        if (assigning && assignIds.length === 0) { toast.error("Pick at least one inspector to assign work to, or untick “Also assign work”"); return }
-        if (assigning && !assignStart) { toast.error("Pick a start date for the assignments"); return }
+        const assigning = assignAvailable && assignWork.on && mode === "save"
+        const assignProblem = assigning ? assignWorkProblem(assignWork) : null
+        if (assignProblem) { toast.error(assignProblem); return }
         setSaving(mode)
         try {
             const res = await fetch(`/api/projects/${params.id}`, {
@@ -328,38 +310,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             if (!res.ok) throw new Error(await res.text() || "Failed to update")
             toast.success(mode === "draft" ? "Draft saved" : isDraft ? "Project created!" : "Project updated!")
             // The team is saved first, so a refused assignment never loses it.
-            if (assigning) {
-                try {
-                    const ar = await fetch("/api/assignments", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            projectId: params.id,
-                            inspectorIds: assignIds,
-                            recurrenceType: assignRecur,
-                            isMultiPart: assignMultiPart,
-                            startDate: assignStart,
-                            notes: assignNotes || undefined,
-                        }),
-                    })
-                    const ad = await ar.json().catch(() => ({}))
-                    if (!ar.ok) throw new Error(ad.error || "Couldn't create the assignments")
-                    const made = Array.isArray(ad.created) ? ad.created.length : 0
-                    const failed: { error?: string }[] = Array.isArray(ad.failed) ? ad.failed : []
-                    const already = failed.filter(f => f.error === "Already assigned").length
-                    const other = failed.length - already
-                    const parts = [
-                        made && `${made} assignment${made === 1 ? "" : "s"} created`,
-                        already && `${already} already assigned (skipped)`,
-                        other && `${other} failed`,
-                    ].filter(Boolean).join(" · ")
-                    if (other) toast.warning(parts, { duration: 8000 })
-                    else if (made) toast.success(parts)
-                    else toast.info(parts || "No new assignments")
-                } catch (e) {
-                    toast.error(`Team saved, but no assignments were created: ${(e as Error).message}`, { duration: 8000 })
-                }
-            }
+            if (assigning) await createAssignments(params.id, assignWork)
             router.push("/projects")
             router.refresh()
         } catch (e) {
@@ -559,7 +510,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspectors</h2>
-                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission. This only sets the project team — work is handed out from the Assignments screen.</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission. This sets the project team. Work is handed out from the Assignments screen{assignAvailable ? <>, or with “Also assign work” below</> : null}.</p>
                                 </div>
                             </div>
                             <button type="button"
@@ -606,73 +557,10 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                         <FieldError msg={shown.inspectors} />
                     </div>
 
-                    {/* Optional: hand out work in the same save (see assignOn above) */}
+                    {/* Optional: hand out work in the same save (components/AssignWork) */}
                     {assignAvailable && (
-                        <div className={sectionCls}>
-                            <label className="flex items-start gap-2.5 cursor-pointer">
-                                <input type="checkbox" checked={assignOn} onChange={e => setAssignOn(e.target.checked)}
-                                    className="mt-[3px] h-4 w-4 accent-[var(--accent)]" />
-                                <span>
-                                    <span className="block text-[14px] font-semibold text-[var(--text)]">Also assign work</span>
-                                    <span className="block text-[12px] text-[var(--text3)] mt-0.5">
-                                        Create assignments for the inspectors you pick below when you {isDraft ? "create the project" : "save"} — the same as the Assignments screen.
-                                        Leaving this off only saves the team. Unticking someone from the team never cancels their work.
-                                    </span>
-                                </span>
-                            </label>
-
-                            {assignOn && (
-                                <div className="mt-4 space-y-4">
-                                    <div>
-                                        <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Assign to <span className="text-[var(--text3)] font-normal">(team inspectors · new ones are pre-ticked · anyone with an active assignment here is skipped)</span></p>
-                                        {inspectorIds.length === 0 ? (
-                                            <p className="text-[12px] text-[var(--text3)]">Tick inspectors in the team above first.</p>
-                                        ) : (
-                                            <div className="flex flex-wrap gap-2">
-                                                {inspectorIds.map(id => {
-                                                    const on = assignIds.includes(id)
-                                                    return (
-                                                        <button key={id} type="button" onClick={() => toggle(id, setAssignIds)} aria-pressed={on}
-                                                            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full border text-[12.5px] transition-colors ${on ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent-text,var(--accent))]" : "border-[var(--border)] bg-white text-[var(--text2)] hover:bg-[var(--surface2)]"}`}>
-                                                            {on ? <Check size={13} /> : <User size={13} />} {personName(id)}
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Start date <span className="text-[#dc2626]">*</span></label>
-                                            <input type="date" value={assignStart} onChange={e => setAssignStart(e.target.value)} className={inputCls} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Recurrence</label>
-                                            <select value={assignRecur} onChange={e => setAssignRecur(e.target.value)} className={inputCls}>
-                                                <option value="none">One-time</option>
-                                                <option value="daily">Daily</option>
-                                                <option value="weekly">Weekly</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <label className="flex items-start gap-2.5 cursor-pointer rounded-[10px] bg-[var(--surface2)] px-3 py-2.5">
-                                        <input type="checkbox" checked={assignMultiPart} onChange={e => setAssignMultiPart(e.target.checked)}
-                                            className="mt-[3px] h-4 w-4 accent-[var(--accent)]" />
-                                        <span>
-                                            <span className="block text-[13px] font-medium text-[var(--text)]">Multi-part inspection</span>
-                                            <span className="block text-[11.5px] text-[var(--text3)]">For work covered over several visits. The assignment stays on the inspector&apos;s list until you close it.</span>
-                                        </span>
-                                    </label>
-                                    <div>
-                                        <label className="block text-[12px] font-medium text-[var(--text2)] mb-1">Notes / Summary <span className="text-[var(--text3)] font-normal">(optional)</span></label>
-                                        <textarea value={assignNotes} onChange={e => setAssignNotes(e.target.value.slice(0, 250))} rows={2}
-                                            placeholder="e.g. Routine inspection for mechanical & safety compliance."
-                                            className="w-full rounded-[8px] border border-[var(--border)] bg-white px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] placeholder:text-[var(--text3)]" />
-                                        <p className="text-[11px] text-[var(--text3)] text-right">{assignNotes.length}/250</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <AssignWorkSection value={assignWork} onChange={setAssignWork} teamIds={inspectorIds}
+                            nameOf={personName} whenText={isDraft ? "create the project" : "save"} className={sectionCls} />
                     )}
 
                     {/* Footer actions */}

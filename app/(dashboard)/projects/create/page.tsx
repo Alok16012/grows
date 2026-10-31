@@ -3,8 +3,11 @@
 import { sortSitesByName } from "@/lib/site-sort"
 import { Suspense, useState, useEffect, useMemo, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { can } from "@/lib/can"
+import { AssignWorkSection, useAssignWork, assignWorkProblem, createAssignments } from "@/components/AssignWork"
 import {
     ScopePicker, SCOPE_ALL, scopeLabel, matchPeople, fetchStaff,
     toggleAllVisible, allVisibleSelected,
@@ -151,6 +154,11 @@ function CreateProjectForm() {
     })
     const [managerIds, setManagerIds] = useState<string[]>([])
     const [inspectorIds, setInspectorIds] = useState<string[]>([])
+    // Optional "Also assign work" (components/AssignWork): everyone ticked onto a
+    // new project's team is pre-picked for work. Applies on Create Project only —
+    // a draft can't take work (the API refuses it).
+    const { data: session } = useSession()
+    const [assignWork, setAssignWork] = useAssignWork(inspectorIds)
     // Errors are computed live but only shown after the first failed attempt, so
     // a fresh form isn't a wall of red; once shown they clear as fields are fixed.
     const [attempted, setAttempted] = useState<false | "create" | "draft">(false)
@@ -243,6 +251,9 @@ function CreateProjectForm() {
             toast.error(summarizeErrors(errors))
             return
         }
+        const assigning = assignAvailable && assignWork.on && mode === "create"
+        const assignProblem = assigning ? assignWorkProblem(assignWork) : null
+        if (assignProblem) { toast.error(assignProblem); return }
         setSaving(mode)
         try {
             const res = await fetch("/api/projects", {
@@ -261,6 +272,12 @@ function CreateProjectForm() {
             })
             if (!res.ok) throw new Error(await res.text() || "Failed to create project")
             toast.success(mode === "draft" ? "Project saved as draft" : "Project created!")
+            // The project and its team exist first, so a refused assignment never loses them.
+            if (assigning) {
+                const created = await res.json().catch(() => null)
+                if (created?.id) await createAssignments(created.id, assignWork)
+                else toast.error("Project created, but no assignments were made — assign them from the Assignments screen")
+            }
             router.push("/projects")
             router.refresh()
         } catch (e) {
@@ -271,6 +288,9 @@ function CreateProjectForm() {
     }
 
     const sectionCls = "bg-white border border-[var(--border)] rounded-[14px] p-5"
+    // Work can't be issued on an archived project (the API refuses it).
+    const assignAvailable = can(session, "assignments.manage") && form.status !== "ARCHIVED"
+    const personName = (id: string) => inspectors.find(p => p.id === id)?.name || "Inspector"
 
     return (
         <div className="p-4 lg:p-0 pb-8">
@@ -423,7 +443,7 @@ function CreateProjectForm() {
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspectors</h2>
-                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission. This only sets the project team — work is handed out from the Assignments screen.</p>
+                                    <p className="text-[11.5px] text-[var(--text3)]">Staff at this site who hold the Inspection (Inspector) permission. This sets the project team. Work is handed out from the Assignments screen{assignAvailable ? <>, or with “Also assign work” below</> : null}.</p>
                                 </div>
                             </div>
                             <button type="button"
@@ -469,6 +489,12 @@ function CreateProjectForm() {
                         )}
                         <FieldError msg={shown.inspectors} />
                     </div>
+
+                    {/* Optional: hand out work when the project is created (components/AssignWork) */}
+                    {assignAvailable && (
+                        <AssignWorkSection value={assignWork} onChange={setAssignWork} teamIds={inspectorIds}
+                            nameOf={personName} whenText="create the project (not on Save as Draft)" className={sectionCls} />
+                    )}
 
                     {/* Footer actions */}
                     <div className="flex items-center justify-end gap-2">
