@@ -49,6 +49,9 @@ export default function InspectionFormPage() {
     const [isDirty, setIsDirty] = useState(false)
     const [cameraFieldId, setCameraFieldId] = useState<string | null>(null)
     const [currentStep, setCurrentStep] = useState(0)
+    // Next / Submit was refused because the defects add up to less than the
+    // rework quantity — turns the defect total line red until it's fixed.
+    const [defectBlocked, setDefectBlocked] = useState(false)
     const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
     const [gpsStatus, setGpsStatus] = useState<"idle" | "loading" | "ok" | "denied">("idle")
     const [startedAt] = useState<Date>(new Date())
@@ -355,6 +358,26 @@ export default function InspectionFormPage() {
     const totalSteps = steps.length
     const stepIndex = Math.min(currentStep, totalSteps - 1)
     const currentStepDef = steps[stepIndex]
+    const defectStepIndex = steps.findIndex(s => s.key === "defect")
+
+    // Every reworked piece must be booked against a defect: the defects may add
+    // up to MORE than the rework quantity (the extra counts as rejected) but not
+    // less. With less, the report showed "Difference -2" and went through, and
+    // nobody noticed it was wrong. Same parsing as the auto-calculated totals.
+    const reworkField = visibleTemplates.find(t => t.fieldLabel.toUpperCase().trim() === "REWORK QTY")
+    const qty = (id: string) => parseFloat(responses[id] || "0") || 0
+    const reworkQty = reworkField ? qty(reworkField.id) : 0
+    const defectTotal = defectFields.reduce((sum, t) => sum + qty(t.id), 0)
+    const defectShortfall = reworkField && defectFields.length > 0 ? Math.max(0, reworkQty - defectTotal) : 0
+
+    /** False (and shows the Defect Entry step with the reason) when the defects fall short of the rework qty. */
+    const checkDefectTotal = () => {
+        if (!canEdit || defectShortfall <= 0) return true
+        setDefectBlocked(true)
+        if (defectStepIndex >= 0 && stepIndex !== defectStepIndex) setCurrentStep(defectStepIndex)
+        setTimeout(() => document.getElementById("defect-total-check")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50)
+        return false
+    }
 
     const validateCurrentStep = () => {
         const currentFields = steps[stepIndex]?.fields ?? []
@@ -376,6 +399,7 @@ export default function InspectionFormPage() {
             }
             return false
         }
+        if (currentStepDef?.key === "defect" && !checkDefectTotal()) return false
         return true
     }
 
@@ -401,7 +425,8 @@ export default function InspectionFormPage() {
             setCurrentStep(target)
             window.scrollTo({ top: 0, behavior: "smooth" })
             if (canEdit) saveForm("draft", true)
-        } else if (validateCurrentStep()) {
+        // Jumping past Defect Entry from an earlier step must not skip its check.
+        } else if (validateCurrentStep() && (defectStepIndex < 0 || target <= defectStepIndex || checkDefectTotal())) {
             setCurrentStep(target)
             window.scrollTo({ top: 0, behavior: "smooth" })
             if (canEdit) saveForm("draft", true)
@@ -458,7 +483,7 @@ export default function InspectionFormPage() {
     }
 
     const handleSubmit = () => {
-        if (validateForm()) {
+        if (validateForm() && checkDefectTotal()) {
             saveForm("pending")
         }
     }
@@ -926,6 +951,28 @@ export default function InspectionFormPage() {
                                 </div>
                             ))}
                         </div>
+                        {/* Live check against Rework Qty: the defects must cover every reworked
+                            piece before Next; more is fine (the extra is counted as rejected). */}
+                        {reworkField && reworkQty > 0 && (
+                            <div id="defect-total-check" role={defectShortfall > 0 && defectBlocked ? "alert" : undefined}
+                                className={cn(
+                                    "mt-[12px] rounded-[9px] border px-[12px] py-[9px] text-[12.5px] flex items-center gap-2",
+                                    defectShortfall === 0 ? "bg-[#f0fdf4] border-[#bbf7d0] text-[#15803d]"
+                                        : defectBlocked ? "bg-[#fef2f2] border-[#fecaca] text-[#b91c1c]"
+                                        : "bg-[#fffbeb] border-[#fde68a] text-[#92400e]",
+                                )}>
+                                <span className="font-[700] font-mono">{defectTotal}</span>
+                                <span>of rework qty</span>
+                                <span className="font-[700] font-mono">{reworkQty}</span>
+                                <span className="ml-auto text-right">
+                                    {defectShortfall > 0
+                                        ? `Enter ${defectShortfall} more defect${defectShortfall === 1 ? "" : "s"} to continue`
+                                        : defectTotal > reworkQty
+                                        ? `${defectTotal - reworkQty} extra counted as rejected`
+                                        : "All rework pieces covered"}
+                                </span>
+                            </div>
+                        )}
                     </>
                 )}
 
