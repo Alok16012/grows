@@ -60,14 +60,22 @@ export async function GET(req: Request) {
             const inspectorNames = Array.from(
                 new Map(p.projectInspectors.map((pi) => [pi.inspectorId, pi.inspector?.name ?? ""])).entries()
             )
+            // One entry per person with every role they hold: someone who is both
+            // manager and inspector used to be listed twice (a duplicate React key
+            // on the Projects list, and two of its three avatar slots).
+            const team = new Map<string, { id: string; name: string; roles: string[] }>()
+            const addMember = (id: string, name: string, role: string) => {
+                const m = team.get(id)
+                if (m) { if (!m.roles.includes(role)) m.roles.push(role) }
+                else team.set(id, { id, name, roles: [role] })
+            }
+            for (const m of p.projectManagers) addMember(m.managerId, m.manager?.name ?? "", "Manager")
+            for (const [id, name] of inspectorNames) addMember(id, name, "Inspector")
             return {
                 ...p,
                 managerIds: p.projectManagers.map((m) => m.managerId),
                 inspectorIds: inspectorNames.map(([id]) => id),
-                team: [
-                    ...p.projectManagers.map((m) => ({ id: m.managerId, name: m.manager?.name ?? "" })),
-                    ...inspectorNames.map(([id, name]) => ({ id, name })),
-                ],
+                team: Array.from(team.values()),
             }
         })
 

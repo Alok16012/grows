@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 
-type TeamMember = { id: string; name: string }
+type TeamMember = { id: string; name: string; roles?: string[] }
 
 type Project = {
     id: string
@@ -54,7 +54,15 @@ function StatusBadge({ status }: { status?: string | null }) {
 const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
 
 function TeamAvatars({ team }: { team?: TeamMember[] }) {
-    const members = (team ?? []).filter(m => m.name)
+    // One avatar per person even if a list still names them twice (manager and
+    // inspector); the tooltip says which roles they hold.
+    const byId = new Map<string, TeamMember>()
+    for (const m of team ?? []) {
+        if (!m.name) continue
+        const seen = byId.get(m.id)
+        byId.set(m.id, seen ? { ...seen, roles: Array.from(new Set([...(seen.roles ?? []), ...(m.roles ?? [])])) } : m)
+    }
+    const members = Array.from(byId.values())
     if (members.length === 0) return <span className="text-[11.5px] text-[var(--text3)]">—</span>
     const shown = members.slice(0, 3)
     return (
@@ -62,7 +70,7 @@ function TeamAvatars({ team }: { team?: TeamMember[] }) {
             {shown.map((m, i) => (
                 <span
                     key={m.id}
-                    title={m.name}
+                    title={m.roles?.length ? `${m.name} — ${m.roles.join(" & ")}` : m.name}
                     className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9.5px] font-bold border-2 border-white select-none"
                     style={{ background: AVATAR_COLORS[(m.name.charCodeAt(0) || 0) % AVATAR_COLORS.length], marginLeft: i > 0 ? -6 : 0 }}
                 >
@@ -70,7 +78,10 @@ function TeamAvatars({ team }: { team?: TeamMember[] }) {
                 </span>
             ))}
             {members.length > 3 && (
-                <span className="text-[10.5px] font-semibold text-[var(--text2)] ml-1">+{members.length - 3}</span>
+                <span className="text-[10.5px] font-semibold text-[var(--text2)] ml-1"
+                    title={members.slice(3).map(m => m.roles?.length ? `${m.name} — ${m.roles.join(" & ")}` : m.name).join("\n")}>
+                    +{members.length - 3}
+                </span>
             )}
         </span>
     )
