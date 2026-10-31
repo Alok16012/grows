@@ -20,6 +20,44 @@ export type EmployeeFilters = {
     employmentType?: string | null
     /** "YYYY-MM-DD": only people who had joined by that day (no joining date counts as joined). */
     joinedBy?: string | null
+    /**
+     * "YYYY-MM": only people on the rolls that month — see onRollsWhere. Leave
+     * `status` unset with it: it decides which statuses count. With `siteId`,
+     * someone who left during or after the month still counts at the site
+     * they were posted to when they left.
+     */
+    payrollMonth?: string | null
+}
+
+/** Statuses meaning the person has left; their leaving date then bounds the months they appear in. */
+export const LEFT_STATUSES = ["RESIGNED", "TERMINATED", "INACTIVE"] as const
+
+/** "YYYY-MM" → { month, year }, or null. */
+export function parsePayrollMonth(v: string | null | undefined): { month: number; year: number } | null {
+    const m = /^(\d{4})-(\d{2})$/.exec(v ?? "")
+    if (!m) return null
+    const year = Number(m[1]), month = Number(m[2])
+    return month >= 1 && month <= 12 ? { month, year } : null
+}
+
+/**
+ * Who is on the rolls for a month — the same rule as the attendance upload
+ * (attendance-sheet.ts classifyRow): from the joining month on (no joining date
+ * counts as joined), and for someone who has left, up to and including their
+ * leaving month. Active / On-leave staff ignore a leftover leaving date (some
+ * carry an old one from a rehire); a leaver with no leaving date is left out.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function onRollsWhere(month: number, year: number): Record<string, any>[] {
+    const monthStart = new Date(Date.UTC(year, month - 1, 1))
+    const monthEnd = new Date(`${monthEndKey(month, year)}T23:59:59.999Z`)
+    return [
+        { OR: [{ dateOfJoining: null }, { dateOfJoining: { lte: monthEnd } }] },
+        { OR: [
+            { status: { in: ["ACTIVE", "ON_LEAVE"] } },
+            { status: { in: [...LEFT_STATUSES] }, dateOfLeaving: { gte: monthStart } },
+        ] },
+    ]
 }
 
 /** Reads the filter set off a request's query string. */
@@ -32,6 +70,7 @@ export function employeeFiltersFromParams(searchParams: URLSearchParams): Employ
         search:         searchParams.get("search"),
         employmentType: searchParams.get("employmentType"),
         joinedBy:       searchParams.get("joinedBy"),
+        payrollMonth:   searchParams.get("payrollMonth"),
     }
 }
 
@@ -82,8 +121,26 @@ export function buildEmployeeWhere(f: EmployeeFilters): Record<string, any> {
         }]
     }
 
+    const rollsMonth = parsePayrollMonth(f.payrollMonth)
     if (f.siteId) {
-        where.deployments = { some: { siteId: f.siteId, isActive: true } }
+        if (rollsMonth) {
+            // A leaver's posting is closed on exit (isActive false, endDate =
+            // leaving date), so "posted here now" would drop them from the very
+            // months they still have to be paid for. They count at the site whose
+            // posting ended on or after the month started; everyone else only at
+            // their current site (a transfer doesn't list them at the old one).
+            const monthStart = new Date(Date.UTC(rollsMonth.year, rollsMonth.month - 1, 1))
+            where.AND = [...(where.AND ?? []), { OR: [
+                { deployments: { some: { siteId: f.siteId, isActive: true } } },
+                { status: { in: [...LEFT_STATUSES] }, deployments: { some: { siteId: f.siteId, endDate: { gte: monthStart } } } },
+            ] }]
+        } else {
+            where.deployments = { some: { siteId: f.siteId, isActive: true } }
+        }
+    }
+
+    if (rollsMonth) {
+        where.AND = [...(where.AND ?? []), ...onRollsWhere(rollsMonth.month, rollsMonth.year)]
     }
 
     // Month-based screens (salary structure, payroll, attendance, muster) list a

@@ -122,9 +122,13 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
         try {
             // Every employee on the site, not just the first page: this grid is
             // what tells /api/payroll/calculate who to pay, so anyone missing
-            // here is simply never paid.
+            // here is simply never paid. Only those on the rolls that month: from
+            // the joining month on, and up to the leaving month for someone who
+            // has left. It listed every ACTIVE employee — so August showed people
+            // who joined in October (and processing paid them), while someone who
+            // resigned in September was missing from August.
             const [empAll, payRes] = await Promise.all([
-                fetchAllEmployees<Employee>({ siteId, status: "ACTIVE" }),
+                fetchAllEmployees<Employee>({ siteId, payrollMonth: `${year}-${String(month).padStart(2, "0")}` }),
                 fetch(`/api/payroll?siteId=${siteId}&month=${month}&year=${year}`),
             ])
             setEmployees(empAll.employees)
@@ -262,6 +266,10 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                 onDone?.({ month: parseInt(month), year: parseInt(year) })
             } else {
                 toast.success(`${siteName}: All ${result.processedCount} employees processed ✓`)
+                // The grid already lists only people on the rolls, so this is rare
+                // (e.g. a joining date changed after the grid loaded).
+                const notOnRolls = Number(result.skippedNotOnRolls ?? 0)
+                if (notOnRolls > 0) toast.warning(`${notOnRolls} employee(s) skipped — not on the rolls this month (joined after it or left before it).`, { duration: 8000 })
                 await fetchSiteStatus()
                 selectSite("")
                 onDone?.({ month: parseInt(month), year: parseInt(year) })

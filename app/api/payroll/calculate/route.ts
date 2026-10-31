@@ -7,6 +7,7 @@ import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { checkAccess } from "@/lib/permissions"
 import { revisionsForMonth } from "@/lib/salary-revision"
 import { statutoryFlagsFor } from "@/lib/employee-statutory"
+import { onRollsWhere } from "@/lib/employee-filter"
 
 // Zero is a legitimate value here (an employee who worked no days), so `||`
 // cannot be used to apply the default — it would silently pay a full month.
@@ -90,12 +91,26 @@ export async function POST(req: Request) {
             if (branchId) whereClause.branchId = branchId
         }
 
+        // Only people on the rolls this month (joined by its end; a leaver up to
+        // their leaving month) — the same rule as the Process grid and the
+        // attendance upload. A sheet or a stale grid could otherwise create a
+        // row for a month before someone joined or after they left.
+        whereClause.AND = onRollsWhere(month, year)
+
         let employees = await prisma.employee.findMany({
             where: whereClause,
             include: { employeeSalary: true },
         })
+        const skippedNotOnRolls = employeeIds ? Math.max(0, new Set(employeeIds).size - employees.length) : 0
 
-        if (!employees.length) return new NextResponse("No active employees found", { status: 404 })
+        if (!employees.length) {
+            return new NextResponse(
+                skippedNotOnRolls
+                    ? `None of these employees is on the rolls for ${month}/${year} — they joined after it or left before it.`
+                    : "No active employees found",
+                { status: skippedNotOnRolls ? 400 : 404 },
+            )
+        }
 
         // Rows already locked (PROCESSED/PAID) are left completely alone: the step
         // below deletes and recreates rows, which would otherwise wipe figures a
@@ -310,6 +325,8 @@ export async function POST(req: Request) {
             // Locked rows left untouched, so the caller can say so rather than
             // silently reporting a lower processed count.
             skippedLocked,
+            // Sent but not on the rolls this month (joined after / left before).
+            skippedNotOnRolls,
         })
     } catch (error) {
         console.error("[PAYROLL_CALCULATE]", error)
