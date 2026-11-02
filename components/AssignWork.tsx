@@ -24,20 +24,20 @@ export type AssignWork = {
 const todayLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 
 /**
- * Form state for the section. Inspectors ticked onto the team are pre-picked for
- * work, except `existing` (already on the team when the page opened); anyone
- * unticked from the team drops out.
+ * Form state for the section. Everyone ticked onto the team is pre-picked for
+ * work, including those already on it when the page opened (anyone with an
+ * active assignment on the project is skipped by the API, so that can't
+ * duplicate work). Someone unpicked here stays unpicked; anyone unticked from
+ * the team drops out, and ticking them back onto the team picks them again.
  */
-export function useAssignWork(teamIds: string[], existing: string[] = []) {
+export function useAssignWork(teamIds: string[]) {
     const [value, setValue] = useState<AssignWork>(() => ({ on: false, ids: [], start: todayLocal(), recur: "none", multiPart: false, notes: "" }))
     const prevTeam = useRef<string[]>([])
-    const existingKey = existing.join(",")
     useEffect(() => {
-        const added = teamIds.filter(id => !prevTeam.current.includes(id) && !existing.includes(id))
+        const added = teamIds.filter(id => !prevTeam.current.includes(id))
         prevTeam.current = teamIds
         setValue(v => ({ ...v, ids: Array.from(new Set([...v.ids.filter(id => teamIds.includes(id)), ...added])) }))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [teamIds, existingKey])
+    }, [teamIds])
     return [value, setValue] as const
 }
 
@@ -114,7 +114,7 @@ export function AssignWorkSection({ value, onChange, teamIds, nameOf, whenText, 
             {value.on && (
                 <div className="mt-4 space-y-4">
                     <div>
-                        <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Assign to <span className="text-[var(--text3)] font-normal">(team inspectors · new ones are pre-ticked · anyone with an active assignment here is skipped)</span></p>
+                        <p className="text-[12px] font-medium text-[var(--text2)] mb-1.5">Assign to <span className="text-[var(--text3)] font-normal">(everyone ticked in the team above · untick anyone to leave them out · anyone with an active assignment here is skipped)</span></p>
                         {teamIds.length === 0 ? (
                             <p className="text-[12px] text-[var(--text3)]">Tick inspectors in the team above first.</p>
                         ) : (

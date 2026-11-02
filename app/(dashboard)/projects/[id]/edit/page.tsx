@@ -185,11 +185,11 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     // can never silently drop the team the project already has.
     const [pinned, setPinned] = useState<{ managers: string[]; inspectors: string[] }>({ managers: [], inspectors: [] })
 
-    // Optional "Also assign work" (components/AssignWork). People already on the
-    // team when the page opened aren't pre-picked for work; newly ticked ones are.
+    // Optional "Also assign work" (components/AssignWork). Everyone ticked in the
+    // team is pre-picked for work, including those already on it; untick to skip.
     const { data: session } = useSession()
     const canAssign = can(session, "assignments.manage")
-    const [assignWork, setAssignWork] = useAssignWork(inspectorIds, pinned.inspectors)
+    const [assignWork, setAssignWork] = useAssignWork(inspectorIds)
 
     useEffect(() => {
         const toDateInput = (s?: string | null) => (s ? new Date(s).toISOString().slice(0, 10) : "")
