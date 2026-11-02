@@ -46,8 +46,16 @@ export async function PATCH(
             return NextResponse.json({ reset: true })
         }
 
-        // Same rules as the Users screen: no role above the caller's own.
-        if (customRoleId !== undefined) await assertCanAssignRole(access, customRoleId || null)
+        // Same rules as the Users screen: no role above the caller's own —
+        // checked only when the role actually changes (or a login is being
+        // created with one). The Edit Login form sends the current role with
+        // every save, so a login-ID fix on a Quality Engineer was refused.
+        if (customRoleId !== undefined) {
+            const current = employee.userId
+                ? (await prisma.user.findUnique({ where: { id: employee.userId }, select: { customRoleId: true } }))?.customRoleId ?? null
+                : undefined
+            if (current === undefined || (customRoleId || null) !== current) await assertCanAssignRole(access, customRoleId || null)
+        }
         if (isActive === false && employee.userId) await assertKeepsAnAdmin([employee.userId])
 
         const normalizedEmail = loginEmail?.trim().toLowerCase()

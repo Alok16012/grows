@@ -355,7 +355,7 @@ export async function PUT(
         if (systemRole || customRoleId !== undefined || email !== undefined || status !== undefined) {
             const empWithUser = await prisma.employee.findUnique({
                 where: { id: params.id },
-                select: { userId: true },
+                select: { userId: true, user: { select: { customRoleId: true } } },
             })
             if (empWithUser?.userId) {
                 const userUpdate: Record<string, unknown> = {}
@@ -367,8 +367,12 @@ export async function PUT(
                     userUpdate.role = systemRole
                 }
                 // Same rules as the Users screen: needs the right to change
-                // roles, and the role may not hold more than the caller does.
-                if (customRoleId !== undefined) {
+                // roles, and the role may not hold more than the caller does —
+                // checked only when the role actually changes. The edit form
+                // sends the current role with every save, so checking it each
+                // time blocked unrelated edits (a site change by Payroll on a
+                // Quality Engineer failed with "holds 7 permissions you do not have").
+                if (customRoleId !== undefined && (customRoleId || null) !== (empWithUser.user?.customRoleId ?? null)) {
                     await assertCanAssignRole(access, customRoleId || null)
                     userUpdate.customRoleId = customRoleId || null
                 }
