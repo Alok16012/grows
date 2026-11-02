@@ -8,12 +8,10 @@
  * new year) and runs from the first year payroll was ever run here up to one
  * year ahead so next January can be set up in December.
  */
-const FIRST_PAYROLL_YEAR = 2024
-const IST_OFFSET_MS = 330 * 60000
+import { istNow, type Period } from "@/lib/payroll-period"
+export { istNow }
 
-export function istNow(): Date {
-    return new Date(Date.now() + IST_OFFSET_MS)
-}
+const FIRST_PAYROLL_YEAR = 2024
 
 /** Calendar year in IST. */
 export function currentPayrollYear(): number {
@@ -25,10 +23,25 @@ export function currentPayrollMonth(): number {
     return istNow().getUTCMonth() + 1
 }
 
-/** 2024 .. currentYear + 1, ascending. */
-export function payrollYears(): number[] {
-    const last = currentPayrollYear() + 1
+/**
+ * 2024 .. currentYear + 1, ascending. With `latest` (the newest created
+ * month), up to its year only: later years have no month that can be opened.
+ */
+export function payrollYears(latest?: Period): number[] {
+    const last = latest ? Math.max(latest.year, FIRST_PAYROLL_YEAR) : currentPayrollYear() + 1
     const years: number[] = []
     for (let y = FIRST_PAYROLL_YEAR; y <= last; y++) years.push(y)
     return years
+}
+
+/** Months 1-12 of `year` that can be picked: in `latest`'s year, up to it. */
+export function payrollMonths(year: number, latest?: Period): number[] {
+    const last = !latest || year < latest.year ? 12 : year === latest.year ? latest.month : 0
+    return Array.from({ length: last }, (_, i) => i + 1)
+}
+
+/** `p`, pulled back to `latest` if it is after it. */
+export function clampPeriod(p: Period, latest?: Period): Period {
+    if (!latest) return p
+    return p.year * 12 + p.month > latest.year * 12 + latest.month ? { month: latest.month, year: latest.year } : p
 }

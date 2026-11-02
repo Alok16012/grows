@@ -8,6 +8,7 @@ import { checkAccess } from "@/lib/permissions"
 import { revisionsForMonth } from "@/lib/salary-revision"
 import { statutoryFlagsFor } from "@/lib/employee-statutory"
 import { onRollsWhere } from "@/lib/employee-filter"
+import { istPeriod, latestPayrollPeriod, periodKey, periodLabel } from "@/lib/payroll-period"
 
 // Zero is a legitimate value here (an employee who worked no days), so `||`
 // cannot be used to apply the default — it would silently pay a full month.
@@ -55,6 +56,17 @@ export async function POST(req: Request) {
             }
             runId = existing.id
         } else {
+            // A month after the newest one is made with Create next month, not
+            // by uploading attendance for it. Older months without payroll
+            // (a gap, a back-dated month) can still be processed directly.
+            const runs = await prisma.payrollRun.findMany({ select: { month: true, year: true } })
+            const latest = latestPayrollPeriod(runs, istPeriod())
+            if (periodKey({ month, year }) > periodKey(latest)) {
+                return new NextResponse(
+                    `${periodLabel({ month, year })} hasn't been created yet. On the Payroll page, open ${periodLabel(latest)} and use Create next month first.`,
+                    { status: 400 },
+                )
+            }
             const created = await prisma.payrollRun.create({
                 data: { month, year, processedBy: session.user.id ?? "system", status: "DRAFT" }
             })

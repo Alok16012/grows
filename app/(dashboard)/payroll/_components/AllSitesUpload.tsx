@@ -10,7 +10,7 @@ import {
     AlertTriangle, MinusCircle, Users, RefreshCw, Building2,
 } from "lucide-react"
 import { toast } from "sonner"
-import { payrollYears } from "./payroll-years"
+import { payrollYears, payrollMonths } from "./payroll-years"
 import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import { monthEndKey } from "@/lib/employee-filter"
 import { compareSiteNames } from "@/lib/site-sort"
@@ -90,8 +90,9 @@ async function downloadAllSitesTemplate(employees: Employee[], rules: PayrollRul
     XLSX.writeFile(wb, `Attendance_All_Sites_${MONTHS[month - 1]}_${year}.xlsx`)
 }
 
-export default function AllSitesUpload({ month, year, setMonth, setYear, rules, onDone }: {
+export default function AllSitesUpload({ month, year, setMonth, setYear, rules, onDone, latest }: {
     month: number; year: number; setMonth: (m: number) => void; setYear: (y: number) => void
+    latest?: { month: number; year: number }
     rules: PayrollRules; onDone?: (period?: { month: number; year: number }) => void
 }) {
     const [staff, setStaff] = useState<Employee[]>([])
@@ -252,13 +253,13 @@ export default function AllSitesUpload({ month, year, setMonth, setYear, rules, 
                     <div>
                         <label htmlFor="all-month" style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:5 }}>Month *</label>
                         <select id="all-month" value={month} onChange={e => { setMonth(Number(e.target.value)); reset() }} disabled={processing} style={{ ...inputSt, width:"100%" }}>
-                            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                            {payrollMonths(year, latest).map(m => <option key={m} value={m}>{MONTHS[m - 1]}</option>)}
                         </select>
                     </div>
                     <div>
                         <label htmlFor="all-year" style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:5 }}>Year *</label>
-                        <select id="all-year" value={year} onChange={e => { setYear(Number(e.target.value)); reset() }} disabled={processing} style={{ ...inputSt, width:"100%" }}>
-                            {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
+                        <select id="all-year" value={year} onChange={e => { const y = Number(e.target.value); setYear(y); if (!payrollMonths(y, latest).includes(month)) setMonth(latest!.month); reset() }} disabled={processing} style={{ ...inputSt, width:"100%" }}>
+                            {payrollYears(latest).map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
                 </div>

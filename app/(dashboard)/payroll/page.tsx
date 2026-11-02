@@ -1,5 +1,6 @@
 "use client"
-import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./_components/payroll-years"
+import { payrollYears, payrollMonths, clampPeriod, currentPayrollMonth, currentPayrollYear } from "./_components/payroll-years"
+import { latestPayrollPeriod, canCreatePeriod, shiftPeriod, periodLabel as labelOf } from "@/lib/payroll-period"
 import type { PanelPeriod } from "./_components/WageSheetPanel"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
@@ -9,7 +10,7 @@ import dynamic from "next/dynamic"
 import {
     Loader2, RefreshCw, FileSpreadsheet, ShieldCheck, Upload, IndianRupee,
     Clock, Trash2, TrendingUp, Settings2, Lock, Unlock, CheckCircle2, ChevronRight,
-    ChevronLeft, SlidersHorizontal, CalendarRange, Users, Wallet, Pencil, BadgeCheck,
+    ChevronLeft, SlidersHorizontal, CalendarRange, CalendarPlus, Users, Wallet, Pencil, BadgeCheck,
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { StatCard, statGridClass } from "@/components/StatCard"
@@ -38,6 +39,8 @@ type PayrollRun = {
     totalEsiEmployer: number
     createdAt: string
     _count: { payrolls: number }
+    /** A created month with no rows yet: employees on its rolls. */
+    onRolls?: number
 }
 
 type SiteStatus = {
@@ -54,10 +57,6 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 const monthKey = (p: PanelPeriod) => p.year * 12 + p.month
-const shiftMonth = (p: PanelPeriod, by: number): PanelPeriod => {
-    const k = monthKey(p) - 1 + by
-    return { year: Math.floor(k / 12), month: (k % 12) + 1 }
-}
 
 type Panel = "attendance" | "process" | "wagesheet" | "compliance" | "payslips"
 
@@ -71,8 +70,8 @@ const STEPS = [
         color: "#0b5cff", bg: "#e8effe", border: "#c7dbff", gradient: "linear-gradient(135deg, #0b5cff 0%, #0847c7 100%)",
     },
     {
-        step: 2, label: "Check & lock", icon: FileSpreadsheet, panel: "wagesheet" as Panel,
-        desc: "Go through the wage sheet, fix anything, then lock it.",
+        step: 2, label: "Wage Sheet Review", icon: FileSpreadsheet, panel: "wagesheet" as Panel,
+        desc: "Go through the wage sheet, fix anything, then lock the month.",
         cta: "Open wage sheet",
         color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", gradient: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
     },
@@ -98,23 +97,28 @@ export default function PayrollPage() {
     // the history table all follow it — it used to be pinned to the calendar
     // month, so running September's payroll in October showed "Step 1" all
     // month long.
-    const [period, setPeriod] = useState<PanelPeriod>({ month: currentPayrollMonth(), year: currentPayrollYear() })
+    const [calendarMonth] = useState<PanelPeriod>(() => ({ month: currentPayrollMonth(), year: currentPayrollYear() }))
+    const [period, setPeriod] = useState<PanelPeriod>(calendarMonth)
     const [periodPicked, setPeriodPicked] = useState(false)
 
-    const [runs,        setRuns]       = useState<PayrollRun[]>([])
+    // Every created month, all years (a dozen a year). The history table shows
+    // the chosen year's; the newest one bounds the month picker.
+    const [allRuns,     setAllRuns]    = useState<PayrollRun[]>([])
+    const [runsLoaded,  setRunsLoaded] = useState(false)
     const [loading,     setLoading]    = useState(true)
+    const [creating,    setCreating]   = useState(false)
     const [sites,       setSites]      = useState<SiteStatus[]>([])
     const [deleting,    setDeleting]   = useState<string | null>(null)
     const [markingPaid, setMarkingPaid]= useState(false)
     const [lockingMonth, setLockingMonth] = useState<"lock" | "unlock" | null>(null)
     const [activePanel, setActivePanel]= useState<Panel | null>(null)
 
-    const fetchRuns = useCallback(async (year: number) => {
+    const fetchRuns = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch(`/api/payroll/runs?year=${year}`)
+            const res = await fetch("/api/payroll/runs")
             if (!res.ok) {
-                setRuns([])
+                setAllRuns([])
                 const detail = await res.text().catch(() => "")
                 if (res.status === 401) toast.error("Session expired — please sign in again")
                 else if (res.status === 403) toast.error("You don't have permission to view payroll")
@@ -123,11 +127,18 @@ export default function PayrollPage() {
             }
             const data = await res.json()
             const list: PayrollRun[] = Array.isArray(data) ? data : []
-            setRuns(list)
+            setAllRuns(list)
+            setRunsLoaded(true)
             return list
         } catch { toast.error("Failed to load payroll runs — check your connection"); return [] }
         finally { setLoading(false) }
     }, [])
+
+    const runs   = useMemo(() => allRuns.filter(r => r.year === period.year), [allRuns, period.year])
+    // The newest created month: the last one the picker offers. Nothing after
+    // it until it is made with Create next month.
+    const latest = useMemo(() => latestPayrollPeriod(allRuns, calendarMonth), [allRuns, calendarMonth])
+    const nextMonth = shiftPeriod(latest, 1)
 
     // Which month `sites` describes. Right after the month changes, `sites` still
     // holds the previous month, so the Lock / Unlock month button would offer the
@@ -149,26 +160,32 @@ export default function PayrollPage() {
         setSitesKey(k)
     }, [])
 
-    const refresh = useCallback(() => { fetchRuns(period.year); fetchSites(period) }, [fetchRuns, fetchSites, period])
+    const refresh = useCallback(() => { fetchRuns(); fetchSites(period) }, [fetchRuns, fetchSites, period])
 
-    // First load: land on the month that still needs work (the newest run
-    // that isn't paid), else the newest run, else this month. Not once a panel
-    // is open: the panels are keyed on the month, so switching it under an open
-    // Upload Attendance panel rebuilt it and silently dropped the site and month
-    // the user had just picked.
+    // First load: open the newest created month — the one being worked on, or,
+    // once it is paid, the one showing Create next month. A month not created
+    // is never opened. Not once a panel is open: the panels are keyed on the
+    // month, so switching it under an open Upload Attendance panel rebuilt it
+    // and silently dropped the site and month the user had just picked.
     const panelOpenedRef = useRef(false)
     useEffect(() => {
         if (periodPicked) return
-        fetchRuns(period.year).then(list => {
-            const open = list.find(r => r.status !== "PAID") ?? list[0]
-            if (open && !panelOpenedRef.current) setPeriod({ month: open.month, year: open.year })
+        fetchRuns().then(list => {
+            if (!panelOpenedRef.current) setPeriod(latestPayrollPeriod(list, calendarMonth))
             setPeriodPicked(true)
         })
-    }, [periodPicked, period.year, fetchRuns])
+    }, [periodPicked, fetchRuns, calendarMonth])
 
-    useEffect(() => { if (periodPicked) { fetchRuns(period.year); fetchSites(period) } }, [period, periodPicked, fetchRuns, fetchSites])
+    useEffect(() => { if (periodPicked) fetchSites(period) }, [period, periodPicked, fetchSites])
 
-    const choosePeriod = (p: PanelPeriod) => { setPeriod(p); setPeriodPicked(true); setActivePanel(null) }
+    // Removing the newest (empty) month leaves the page on a month that no
+    // longer exists: step back to the new newest.
+    useEffect(() => {
+        if (!runsLoaded || !periodPicked) return
+        if (monthKey(period) > monthKey(latest)) setPeriod(clampPeriod(period, latest))
+    }, [runsLoaded, periodPicked, period, latest])
+
+    const choosePeriod = (p: PanelPeriod) => { setPeriod(clampPeriod(p, latest)); setPeriodPicked(true); setActivePanel(null) }
     const openPanel = (panel: Panel) => { panelOpenedRef.current = true; setActivePanel(panel) }
     const closePanel = () => { setActivePanel(null); refresh() }
 
@@ -204,7 +221,7 @@ export default function PayrollPage() {
     const thisRun = runs.find(r => r.month === period.month && r.year === period.year)
     const totalGrossYTD = runs.reduce((s, r) => s + r.totalGross, 0)
     const totalNetYTD   = runs.reduce((s, r) => s + r.totalNet, 0)
-    const periodLabel   = `${MONTHS[period.month - 1]} ${period.year}`
+    const periodLabel   = periodPicked ? `${MONTHS[period.month - 1]} ${period.year}` : "Loading…"
     const canManage     = can(session, "payroll.manage")
     // Lock, reopen and mark paid are separate switches on a role.
     const canLock       = can(session, "payroll.lock")
@@ -212,13 +229,16 @@ export default function PayrollPage() {
     const canMarkPaid   = can(session, "payroll.markPaid")
 
     const deleteRun = async (run: PayrollRun) => {
-        if (!confirm(`Delete the ${MONTHS_SHORT[run.month - 1]} ${run.year} draft payroll? Locked and paid rows are kept. This cannot be undone.`)) return
+        const empty = run._count.payrolls === 0
+        if (!confirm(empty
+            ? `Remove ${labelOf(run)}? It has no payroll yet. You can create it again with Create next month.`
+            : `Delete the ${MONTHS_SHORT[run.month - 1]} ${run.year} draft payroll? Locked and paid rows are kept. This cannot be undone.`)) return
         setDeleting(run.id)
         try {
             const res = await fetch(`/api/payroll/reset?month=${run.month}&year=${run.year}&action=delete&confirm=MONTH`, { method: "DELETE" })
             if (res.ok) {
                 const d = await res.json().catch(() => ({}))
-                toast.success(d.skippedLocked ? `Draft rows deleted · ${d.skippedLocked} locked row(s) kept` : "Payroll run deleted")
+                toast.success(empty ? `${labelOf(run)} removed` : d.skippedLocked ? `Draft rows deleted · ${d.skippedLocked} locked row(s) kept` : "Payroll run deleted")
                 refresh()
             } else toast.error(await res.text())
         } catch { toast.error("Delete failed") }
@@ -275,6 +295,27 @@ export default function PayrollPage() {
         finally { setLockingMonth(null) }
     }
 
+    // Create next month: the month after the newest becomes a real (empty)
+    // month, then the page opens it. Its employees are whoever is on the rolls
+    // that month when attendance is uploaded, so later joiners are included.
+    const createNextMonth = async () => {
+        const next = nextMonth
+        if (!confirm(`Create ${labelOf(next)}?\n\nIt opens empty: upload its attendance to calculate pay. ${labelOf(latest)} stays as it is.`)) return
+        setCreating(true)
+        try {
+            const res = await fetch("/api/payroll/runs", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(next),
+            })
+            if (!res.ok) { toast.error(await res.text()); fetchRuns(); return }
+            const d = await res.json()
+            toast.success(`${labelOf(next)} created — ${d.onRolls} employees on the rolls`)
+            await fetchRuns()
+            setPeriod(next); setPeriodPicked(true); setActivePanel(null)
+        } catch { toast.error("Could not create the month") }
+        finally { setCreating(false) }
+    }
+
     const role = session?.user?.role
     if (role && !can(session, "payroll.view")) {
         return (
@@ -301,8 +342,15 @@ export default function PayrollPage() {
                         still open it offers Lock month (which locks every open row); once
                         the whole month is locked it offers Unlock month (paid rows stay
                         paid). A locked row can't be edited or re-processed until the month
-                        is unlocked (enforced server-side). */}
-                    {sitesKey !== monthKey(period) ? null : counts.draft > 0 ? (canLock && (
+                        is unlocked (enforced server-side). An empty month shows the switch
+                        greyed out, so it is clear where it will be once pay is calculated. */}
+                    {sitesKey !== monthKey(period) ? null : counts.rows === 0 ? (canLock && (
+                        <button disabled title={`Nothing to lock yet for ${periodLabel} — upload attendance first`}
+                            style={{ ...quietBtn, cursor: "not-allowed", opacity: 0.55 }}>
+                            <Lock size={15} /> Lock month
+                            <span style={{ fontSize: 11.5, fontWeight: 500, color: "var(--text3)" }}>· Upload attendance first</span>
+                        </button>
+                    )) : counts.draft > 0 ? (canLock && (
                         <button onClick={lockMonth} disabled={lockingMonth !== null}
                             title={`Lock ${periodLabel} — every site at once`}
                             style={{ ...quietBtn, border: "none", background: "#7c3aed", color: "#fff" }}>
@@ -315,24 +363,57 @@ export default function PayrollPage() {
                             {lockingMonth === "unlock" ? <Loader2 size={15} className="animate-spin" /> : <Unlock size={15} />} Unlock month
                         </button>
                     )}
+                    {/* Month switch. Only created months are offered: the picker
+                        and the next arrow stop at the newest one. Until the months
+                        are loaded it says so, rather than flashing this calendar
+                        month, which may not be created. */}
+                    {!periodPicked ? (
+                        <div style={{ ...quietBtn, cursor: "default", minWidth: 200, color: "var(--text3)" }}>
+                            <Loader2 size={15} className="animate-spin" /> Loading months…
+                        </div>
+                    ) : (
                     <div style={{ display: "flex", alignItems: "center", height: 40, borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", overflow: "hidden" }}>
-                        <button aria-label="Previous month" onClick={() => choosePeriod(shiftMonth(period, -1))}
+                        <button aria-label="Previous month" title={`Previous month — ${labelOf(shiftPeriod(period, -1))}`}
+                            onClick={() => choosePeriod(shiftPeriod(period, -1))}
                             style={{ width: 36, height: "100%", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <ChevronLeft size={16} />
                         </button>
-                        <select value={period.month} onChange={e => choosePeriod({ ...period, month: Number(e.target.value) })}
+                        <select aria-label="Month" value={period.month} onChange={e => choosePeriod({ ...period, month: Number(e.target.value) })}
                             style={{ height: "100%", border: "none", borderLeft: "1px solid var(--border)", background: "none", fontSize: 13.5, fontWeight: 700, color: "var(--text)", padding: "0 6px 0 10px", outline: "none", cursor: "pointer" }}>
-                            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                            {payrollMonths(period.year, latest).map(m => <option key={m} value={m}>{MONTHS[m - 1]}</option>)}
                         </select>
-                        <select value={period.year} onChange={e => choosePeriod({ ...period, year: Number(e.target.value) })}
+                        <select aria-label="Year" value={period.year} onChange={e => choosePeriod({ ...period, year: Number(e.target.value) })}
                             style={{ height: "100%", border: "none", background: "none", fontSize: 13.5, fontWeight: 700, color: "var(--text)", padding: "0 10px 0 4px", outline: "none", cursor: "pointer" }}>
-                            {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
+                            {payrollYears(latest).map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
-                        <button aria-label="Next month" onClick={() => choosePeriod(shiftMonth(period, 1))}
-                            style={{ width: 36, height: "100%", border: "none", borderLeft: "1px solid var(--border)", background: "none", cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <ChevronRight size={16} />
-                        </button>
+                        {(() => {
+                            const atLatest = monthKey(period) >= monthKey(latest)
+                            return (
+                                <button aria-label="Next month" disabled={atLatest}
+                                    title={atLatest ? `${labelOf(latest)} is the newest month — use Create next month` : `Next month — ${labelOf(shiftPeriod(period, 1))}`}
+                                    onClick={() => choosePeriod(shiftPeriod(period, 1))}
+                                    style={{ width: 36, height: "100%", border: "none", borderLeft: "1px solid var(--border)", background: "none", cursor: atLatest ? "not-allowed" : "pointer", color: "var(--text2)", opacity: atLatest ? 0.35 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <ChevronRight size={16} />
+                                </button>
+                            )
+                        })()}
                     </div>
+                    )}
+                    {/* On the newest month only: make the month after it. */}
+                    {canManage && runsLoaded && monthKey(period) === monthKey(latest) && (
+                        canCreatePeriod(nextMonth, calendarMonth) ? (
+                            <button onClick={createNextMonth} disabled={creating}
+                                title={`Create ${labelOf(nextMonth)} with the employees on its rolls`}
+                                style={{ ...quietBtn, border: "1px solid #c7dbff", background: "#e8effe", color: "#0b5cff" }}>
+                                {creating ? <Loader2 size={15} className="animate-spin" /> : <CalendarPlus size={15} />} Create next month
+                            </button>
+                        ) : (
+                            <button disabled title={`${labelOf(nextMonth)} can be created once ${labelOf(latest)} begins`}
+                                style={{ ...quietBtn, cursor: "not-allowed", opacity: 0.55 }}>
+                                <CalendarPlus size={15} /> Create next month
+                            </button>
+                        )
+                    )}
                     <button onClick={refresh} disabled={loading} style={quietBtn} title="Refresh">
                         <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
                     </button>
@@ -354,7 +435,9 @@ export default function PayrollPage() {
                         <TrendingUp size={15} style={{ color: "var(--accent)" }} />
                         <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{periodLabel}</span>
                         <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                            {counts.rows === 0 ? "· not started" : `· ${counts.rows} employees · ${sites.length} sites · net ${fmt(counts.net)}`}
+                            {!periodPicked ? "" : counts.rows > 0 ? `· ${counts.rows} employees · ${sites.length} sites · net ${fmt(counts.net)}`
+                                : thisRun?.onRolls != null ? `· created · ${thisRun.onRolls} employees on the rolls · upload attendance to start`
+                                : "· not started"}
                         </span>
                     </div>
                     {monthDone ? (
@@ -448,21 +531,21 @@ export default function PayrollPage() {
             {/* ── The open step ── */}
             {activePanel === "attendance" && (
                 <AttendancePanel key={`att-${period.month}-${period.year}`}
-                    initialMonth={period.month} initialYear={period.year}
+                    initialMonth={period.month} initialYear={period.year} latest={latest}
                     onClose={closePanel}
                     onDone={(p) => { if (p) choosePeriod(p); openPanel("wagesheet"); refresh() }}
                 />
             )}
             {activePanel === "process" && (
                 <ProcessPanel key={`proc-${period.month}-${period.year}`}
-                    initialMonth={period.month} initialYear={period.year}
+                    initialMonth={period.month} initialYear={period.year} latest={latest}
                     onClose={closePanel}
                     onDone={(p) => { if (p) choosePeriod(p); openPanel("wagesheet"); refresh() }}
                 />
             )}
             {activePanel === "wagesheet" && (
                 <WageSheetPanel key={`ws-${period.month}-${period.year}`}
-                    initialMonth={period.month} initialYear={period.year}
+                    initialMonth={period.month} initialYear={period.year} latest={latest}
                     onClose={closePanel}
                 />
             )}
@@ -474,7 +557,7 @@ export default function PayrollPage() {
             )}
             {activePanel === "payslips" && (
                 <PayslipsPanel key={`slips-${period.month}-${period.year}`}
-                    initialMonth={period.month} initialYear={period.year}
+                    initialMonth={period.month} initialYear={period.year} latest={latest}
                     onClose={closePanel}
                 />
             )}
@@ -482,7 +565,9 @@ export default function PayrollPage() {
             {/* ── Numbers for the chosen month and the year ── */}
             <div className={statGridClass(6)}>
                 {[
-                    { label: "Employees",      value: String(thisRun?._count.payrolls ?? counts.rows ?? "—"), tone: "violet" as const, sub: periodLabel,     icon: Users },
+                    thisRun?.onRolls != null && counts.rows === 0
+                        ? { label: "Employees",    value: String(thisRun.onRolls),                               tone: "violet" as const, sub: `on the rolls · ${periodLabel}`, icon: Users }
+                        : { label: "Employees",    value: String(thisRun?._count.payrolls ?? counts.rows ?? "—"), tone: "violet" as const, sub: periodLabel,     icon: Users },
                     { label: "Gross Pay",      value: thisRun ? fmt(thisRun.totalGross) : "—",               tone: "sky" as const,    sub: periodLabel,     icon: IndianRupee },
                     { label: "Net Pay",        value: thisRun ? fmt(thisRun.totalNet) : "—",                 tone: "teal" as const,   sub: periodLabel,     icon: Wallet },
                     { label: "Runs This Year", value: String(runs.length),                                   tone: "blue" as const,   sub: String(period.year), icon: CalendarRange },
@@ -533,8 +618,13 @@ export default function PayrollPage() {
                                         PROCESSED: { bg: "#dcfce7", color: "#15803d", label: "Locked" },
                                         PAID:      { bg: "#dbeafe", color: "#1d4ed8", label: "Paid" },
                                     }
-                                    const ss = statusMap[run.status] ?? { bg: "#f3f4f6", color: "#6b7280", label: run.status }
+                                    const empty = run._count.payrolls === 0
+                                    const ss = empty ? { bg: "#e8effe", color: "#0b5cff", label: "Created" }
+                                        : statusMap[run.status] ?? { bg: "#f3f4f6", color: "#6b7280", label: run.status }
                                     const isCurrent = run.month === period.month && run.year === period.year
+                                    // An empty month can only be removed while it is the newest,
+                                    // so the created months stay one after another.
+                                    const canRemove = run.status === "DRAFT" && (!empty || monthKey(run) === monthKey(latest))
                                     return (
                                         <tr key={run.id} style={{
                                             borderBottom: i < runs.length - 1 ? "1px solid var(--border)" : "none",
@@ -544,7 +634,9 @@ export default function PayrollPage() {
                                                 {MONTHS_SHORT[run.month - 1]} {run.year}
                                                 {isCurrent && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "var(--accent)" }}>● selected</span>}
                                             </td>
-                                            <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)", fontWeight: 600 }}>{run._count.payrolls}</td>
+                                            <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)", fontWeight: 600 }}>
+                                                {empty && run.onRolls != null ? <span style={{ fontWeight: 500, color: "var(--text3)" }}>{run.onRolls} on rolls</span> : run._count.payrolls}
+                                            </td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#0b5cff" }}>{fmt(run.totalGross)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#16a34a" }}>{fmt(run.totalNet)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)" }}>{fmt(run.totalPfEmployer)}</td>
@@ -558,8 +650,8 @@ export default function PayrollPage() {
                                                         style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)", background: isCurrent ? "var(--surface2)" : "none", fontSize: 11.5, fontWeight: 600, color: "var(--text)", cursor: "pointer" }}>
                                                         {isCurrent ? "Selected" : "Open"}
                                                     </button>
-                                                    {canManage && run.status === "DRAFT" && (
-                                                        <button onClick={() => deleteRun(run)} disabled={deleting === run.id} title="Delete the draft rows of this month"
+                                                    {canManage && canRemove && (
+                                                        <button onClick={() => deleteRun(run)} disabled={deleting === run.id} title={empty ? "Remove this month (it has no payroll yet)" : "Delete the draft rows of this month"}
                                                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #fca5a5", background: "none", fontSize: 11, color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center" }}>
                                                             {deleting === run.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                                                         </button>

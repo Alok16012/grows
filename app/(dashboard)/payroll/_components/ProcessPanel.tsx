@@ -1,5 +1,5 @@
 "use client"
-import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
+import { payrollYears, payrollMonths, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -69,7 +69,8 @@ const attInput: React.CSSProperties = { width: 50, padding: "3px 4px", borderRad
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ProcessPanel({ onClose, onDone, initialMonth, initialYear }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number }) {
+// `latest`: the newest created month; the pickers stop there (see lib/payroll-period).
+export default function ProcessPanel({ onClose, onDone, initialMonth, initialYear, latest }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number; latest?: { month: number; year: number } }) {
     const { data: session } = useSession()
     const canManage = can(session, "payroll.manage")
 
@@ -323,11 +324,11 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
                         <select value={month} onChange={e => { setMonth(e.target.value); selectSite("") }}
                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
-                            {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+                            {payrollMonths(parseInt(year), latest).map(m => <option key={m} value={m}>{MONTHS[m-1]}</option>)}
                         </select>
-                        <select value={year} onChange={e => { setYear(e.target.value); selectSite("") }}
+                        <select value={year} onChange={e => { setYear(e.target.value); if (!payrollMonths(parseInt(e.target.value), latest).includes(parseInt(month))) setMonth(String(latest!.month)); selectSite("") }}
                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, background: "var(--surface)", color: "var(--text)", outline: "none" }}>
-                            {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
+                            {payrollYears(latest).map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                         <button onClick={fetchSiteStatus}
                             style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", cursor: "pointer", display: "flex", alignItems: "center" }}>

@@ -1,5 +1,5 @@
 "use client"
-import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
+import { payrollYears, payrollMonths, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import { Loader2, RefreshCw, MapPin, Building2, Search, FileSpreadsheet, FileDown, X } from "lucide-react"
@@ -46,9 +46,11 @@ export type PanelPeriod = { month: number; year: number }
 
 // View, check and export the wage sheet site by site. Locking isn't done here:
 // the month is locked in one place, Lock month in the Payroll header.
-export default function WageSheetPanel({ onClose, initialMonth, initialYear }: {
+export default function WageSheetPanel({ onClose, initialMonth, initialYear, latest }: {
     onClose: () => void
     initialMonth?: number; initialYear?: number
+    /** The newest created month; the pickers stop there (see lib/payroll-period). */
+    latest?: { month: number; year: number }
 }) {
 
     const [month,   setMonth]   = useState(String(initialMonth ?? currentPayrollMonth()))
@@ -219,11 +221,11 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear }: {
             <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, padding:"11px 16px" }}>
                 <span style={lbl}>Month</span>
                 <select value={month} onChange={e=>{setMonth(e.target.value);setSelId("");setData([])}} style={sel}>
-                    {MONTHS.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+                    {payrollMonths(parseInt(year), latest).map(m=><option key={m} value={m}>{MONTHS[m-1]}</option>)}
                 </select>
                 <span style={lbl}>Year</span>
-                <select value={year} onChange={e=>{setYear(e.target.value);setSelId("");setData([])}} style={sel}>
-                    {payrollYears().map(y=><option key={y} value={y}>{y}</option>)}
+                <select value={year} onChange={e=>{setYear(e.target.value);if(!payrollMonths(parseInt(e.target.value),latest).includes(parseInt(month)))setMonth(String(latest!.month));setSelId("");setData([])}} style={sel}>
+                    {payrollYears(latest).map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
                 <button onClick={fetchStatus} style={{ marginLeft:"auto", display:"flex", padding:"4px 8px", borderRadius:6, border:"1px solid var(--border)", background:"none", cursor:"pointer" }}>
                     <RefreshCw size={12} style={{ color:"var(--text3)" }} />

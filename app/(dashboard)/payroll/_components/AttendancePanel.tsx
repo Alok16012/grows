@@ -1,5 +1,5 @@
 "use client"
-import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
+import { payrollYears, payrollMonths, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useRef, useCallback, useEffect } from "react"
 import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import { monthEndKey } from "@/lib/employee-filter"
@@ -39,7 +39,8 @@ const inputSt: React.CSSProperties = { padding:"7px 10px", borderRadius:8, borde
 const btnPrimary: React.CSSProperties = { display:"flex", alignItems:"center", gap:6, padding:"8px 16px", borderRadius:8, border:"none", background:"var(--accent)", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer" }
 const btnOutline: React.CSSProperties = { display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)", color:"var(--text2)", fontSize:13, fontWeight:500, cursor:"pointer" }
 
-export default function AttendancePanel({ onClose, onDone, initialMonth, initialYear }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number }) {
+// `latest`: the newest created month; the pickers stop there (see lib/payroll-period).
+export default function AttendancePanel({ onClose, onDone, initialMonth, initialYear, latest }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number; latest?: { month: number; year: number } }) {
     const [mode,     setMode]     = useState<"site" | "all">("site")
     const [month,    setMonth]    = useState(initialMonth ?? currentPayrollMonth())
     const [year,     setYear]     = useState(initialYear  ?? currentPayrollYear())
@@ -178,7 +179,7 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
             </div>
 
             {mode === "all" && (
-                <AllSitesUpload month={month} year={year} setMonth={setMonth} setYear={setYear} rules={rules} onDone={onDone} />
+                <AllSitesUpload month={month} year={year} setMonth={setMonth} setYear={setYear} rules={rules} onDone={onDone} latest={latest} />
             )}
 
             {mode === "site" && (<>
@@ -208,13 +209,13 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
                     <div>
                         <label style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:5 }}>Month *</label>
                         <select value={month} onChange={e=>{setMonth(Number(e.target.value));resetResults()}} style={{...inputSt,width:"100%"}}>
-                            {MONTHS.map((m,i)=><option key={m} value={i+1}>{m}</option>)}
+                            {payrollMonths(year, latest).map(m=><option key={m} value={m}>{MONTHS[m-1]}</option>)}
                         </select>
                     </div>
                     <div>
                         <label style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:5 }}>Year *</label>
-                        <select value={year} onChange={e=>{setYear(Number(e.target.value));resetResults()}} style={{...inputSt,width:"100%"}}>
-                            {payrollYears().map(y=><option key={y} value={y}>{y}</option>)}
+                        <select value={year} onChange={e=>{const y=Number(e.target.value);setYear(y);if(!payrollMonths(y,latest).includes(month))setMonth(latest!.month);resetResults()}} style={{...inputSt,width:"100%"}}>
+                            {payrollYears(latest).map(y=><option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
                 </div>

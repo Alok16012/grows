@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { ensurePayrollSchema } from "@/lib/payroll-schema"
+import { onRollsWhere } from "@/lib/employee-filter"
+import { auditLater, requestMeta } from "@/lib/access"
+import { canCreatePeriod, latestPayrollPeriod, periodKey, periodLabel, shiftPeriod, istPeriod } from "@/lib/payroll-period"
 
 export async function GET(req: Request) {
     try {
@@ -59,11 +62,20 @@ export async function GET(req: Request) {
         })
         const sumByRun = new Map(sums.map(s => [s.payrollRunId, s._sum]))
 
+        // A month made with Create next month has no rows until attendance is
+        // uploaded. Say how many employees are on its rolls (joined by its end,
+        // not left before it), counted live so people who join later count
+        // too. Usually one such month, so one count.
+        const onRolls = new Map<string, number>()
+        for (const run of runs.filter(r => r._count.payrolls === 0)) {
+            onRolls.set(run.id, await prisma.employee.count({ where: { AND: onRollsWhere(run.month, run.year) } }))
+        }
+
         return NextResponse.json(runs.map(run => {
             const s = sumByRun.get(run.id)
             // No rows yet (a run created but never processed): keep what's
             // stored rather than zeroing the row out.
-            if (!s) return run
+            if (!s) return onRolls.has(run.id) ? { ...run, onRolls: onRolls.get(run.id) } : run
             return {
                 ...run,
                 totalGross:       s.grossSalary ?? 0,
@@ -84,5 +96,66 @@ export async function GET(req: Request) {
         const raw = error instanceof Error ? error.message : ""
         const message = raw.split("\n").map(l => l.trim()).filter(Boolean).slice(0, 3).join(" ").slice(0, 300)
         return new NextResponse(message || "Internal Error", { status: 500 })
+    }
+}
+
+// POST /api/payroll/runs { month, year } — Create next month.
+// Creates the empty month (a DRAFT run, no rows) right after the newest one,
+// so it can be opened and its attendance uploaded. Only that next month: no
+// gaps, and not more than one month past today. Pay rows come later from the
+// usual attendance upload, for whoever is on the rolls that month then.
+export async function POST(req: Request) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session) return new NextResponse("Unauthorized", { status: 401 })
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
+            return new NextResponse("Forbidden", { status: 403 })
+        }
+
+        const body = await req.json().catch(() => ({}))
+        const month = Number(body?.month), year = Number(body?.year)
+        if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) {
+            return new NextResponse("A valid month and year are required", { status: 400 })
+        }
+        const wanted = { month, year }
+
+        await ensurePayrollSchema()
+        // Check and create under one lock. The (month, year) unique index is in
+        // schema.prisma but missing on prod, so two clicks at once both passed
+        // the "already created" check and made two Octobers. The advisory lock
+        // is held to the end of the transaction, so the second request waits,
+        // then sees the first one's month and is refused.
+        const outcome = await prisma.$transaction(async tx => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('payroll-run-create'))`
+            const runs = await tx.payrollRun.findMany({ select: { month: true, year: true } })
+            if (runs.some(r => r.month === month && r.year === year)) {
+                return { status: 409, message: `${periodLabel(wanted)} is already created` } as const
+            }
+            const next = shiftPeriod(latestPayrollPeriod(runs, istPeriod()), 1)
+            if (periodKey(wanted) !== periodKey(next)) {
+                return { status: 400, message: `The next month to create is ${periodLabel(next)}, not ${periodLabel(wanted)}` } as const
+            }
+            if (!canCreatePeriod(wanted)) {
+                return { status: 400, message: `${periodLabel(wanted)} is too far ahead — it can be created once ${periodLabel(shiftPeriod(wanted, -1))} begins` } as const
+            }
+            const run = await tx.payrollRun.create({
+                data: { month, year, status: "DRAFT", processedBy: session.user.id ?? "system" },
+            })
+            return { status: 201, run } as const
+        })
+        if (outcome.status !== 201) return new NextResponse(outcome.message, { status: outcome.status })
+        const run = outcome.run
+        const onRolls = await prisma.employee.count({ where: { AND: onRollsWhere(month, year) } })
+
+        auditLater({
+            actorId: session.user.id, actorName: session.user.name ?? null, action: "payroll.month.create", targetType: "PayrollRun",
+            targetId: run.id, targetName: `${month}/${year}`,
+            summary: `${periodLabel(wanted)} created · ${onRolls} employees on the rolls`,
+            after: { month, year, onRolls }, ...requestMeta(req),
+        })
+        return NextResponse.json({ ...run, _count: { payrolls: 0 }, onRolls }, { status: 201 })
+    } catch (error) {
+        console.error("[PAYROLL_RUNS_POST]", error)
+        return new NextResponse("Could not create the month", { status: 500 })
     }
 }

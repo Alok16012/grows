@@ -1,5 +1,5 @@
 "use client"
-import { payrollYears, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
+import { payrollYears, payrollMonths, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -49,7 +49,8 @@ type PayrollRecord = {
 const lbl: React.CSSProperties = { fontSize:11, fontWeight:700, color:"var(--text3)", whiteSpace:"nowrap" }
 const sel: React.CSSProperties = { padding:"6px 10px", borderRadius:7, border:"1px solid var(--border)", fontSize:12, background:"var(--surface)", color:"var(--text)", outline:"none" }
 
-export default function PayslipsPanel({ onClose, initialMonth, initialYear }: { onClose: () => void; initialMonth?: number; initialYear?: number }) {
+// `latest`: the newest created month; the pickers stop there (see lib/payroll-period).
+export default function PayslipsPanel({ onClose, initialMonth, initialYear, latest }: { onClose: () => void; initialMonth?: number; initialYear?: number; latest?: { month: number; year: number } }) {
     const { data: session } = useSession()
     const canManage = can(session, "payroll.manage")
 
@@ -219,11 +220,11 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
             <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, padding:"11px 16px" }}>
                 <span style={lbl}>Month</span>
                 <select value={month} onChange={e=>setMonth(Number(e.target.value))} style={sel}>
-                    {MONTHS_LONG.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+                    {payrollMonths(year, latest).map(m=><option key={m} value={m}>{MONTHS_LONG[m-1]}</option>)}
                 </select>
                 <span style={lbl}>Year</span>
-                <select value={year} onChange={e=>setYear(Number(e.target.value))} style={sel}>
-                    {payrollYears().map(y=><option key={y} value={y}>{y}</option>)}
+                <select value={year} onChange={e=>{const y=Number(e.target.value);setYear(y);if(!payrollMonths(y,latest).includes(month))setMonth(latest!.month)}} style={sel}>
+                    {payrollYears(latest).map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
                 <button onClick={()=>fetchSlips(selSiteId)} style={{ marginLeft:"auto", display:"flex", padding:"4px 8px", borderRadius:6, border:"1px solid var(--border)", background:"none", cursor:"pointer" }}>
                     <RefreshCw size={12} style={{ color:"var(--text3)" }} />
