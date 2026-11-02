@@ -1,0 +1,6 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals"],
+  "plugins": ["@typescript-eslint"],
+  "ignorePatterns": [".next/", ".next-*/", "out/", "build/", "next-env.d.ts"]
+}

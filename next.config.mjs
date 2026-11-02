@@ -5,6 +5,11 @@ const nextConfig = {
     distDir: process.env.NEXT_DIST_DIR || ".next",
     compress: true,
     poweredByHeader: false,
+    // Lint runs with `npm run lint` (.eslintrc.json), not as part of the build.
+    // The old eslint.config.mjs was never picked up by Next 14, so builds have
+    // never linted; older code still has lint errors that would now fail every
+    // Vercel deploy. Turn this off once `npm run lint` is clean.
+    eslint: { ignoreDuringBuilds: true },
     experimental: {
         optimizePackageImports: ["@radix-ui/react-icons", "recharts", "lucide-react", "date-fns"],
         // Client router cache: revisiting a page within 30s reuses the cached
