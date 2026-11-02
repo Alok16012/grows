@@ -11,6 +11,7 @@ import {
     ClipboardList, StopCircle, FileText, CheckCircle2, Layers, Plus, Pencil,
 } from "lucide-react"
 import { can, canAny } from "@/lib/can"
+import { SelectedPeopleChips } from "@/components/SelectedPeopleChips"
 import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -133,28 +134,6 @@ function PersonRow({ person, checked, onToggle }: { person: Person; checked: boo
             </span>
             {checked && <CheckCircle2 size={15} className="text-[var(--accent)] shrink-0" />}
         </button>
-    )
-}
-
-// "Selected: A, B, C" strip above a people list, each chip removable.
-function SelectedChips({ people, ids, onRemove }: { people: Person[]; ids: string[]; onRemove: (id: string) => void }) {
-    if (ids.length === 0) return null
-    return (
-        <div className="flex flex-wrap items-center gap-1.5 mb-2">
-            <span className="text-[11px] font-medium text-[var(--text3)]">Selected:</span>
-            {ids.map(id => {
-                const p = people.find(x => x.id === id)
-                return (
-                    <span key={id} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent)] text-[11px] font-semibold">
-                        {p?.name || "Unnamed"}
-                        <button type="button" onClick={() => onRemove(id)} aria-label={`Remove ${p?.name || "person"}`}
-                            className="p-0.5 rounded-full hover:bg-[var(--accent)]/15 transition-colors">
-                            <X size={10} strokeWidth={2.5} />
-                        </button>
-                    </span>
-                )
-            })}
-        </div>
     )
 }
 
@@ -333,7 +312,7 @@ function EditAssignmentModal({ assignment, inspectors, onClose, onSaved }: {
                             <option value="">Select inspector</option>
                             {options.map(p => <option key={p.id} value={p.id}>{p.name || p.email || "Unnamed"}</option>)}
                         </select>
-                        <p className="text-[11px] text-[var(--text3)] mt-1">Can't be changed once inspections have been submitted on this assignment.</p>
+                        <p className="text-[11px] text-[var(--text3)] mt-1">Can&apos;t be changed once inspections have been submitted on this assignment.</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -1004,7 +983,7 @@ export default function AssignmentsPage() {
                                 <input value={inspectorSearch} onChange={e => setInspectorSearch(e.target.value)}
                                     placeholder="Search inspectors by name or email..." className={inputCls + " pl-8"} />
                             </div>
-                            <SelectedChips people={inspectors} ids={selectedInspectorIds} onRemove={id => toggleId(id, setSelectedInspectorIds)} />
+                            <SelectedPeopleChips people={inspectors} ids={selectedInspectorIds} onRemove={id => toggleId(id, setSelectedInspectorIds)} />
                             <div className={listBox}>
                                 {filteredInspectors.length === 0 ? (
                                     <p className="p-4 text-center text-[12px] text-[var(--text3)]">No inspectors found.</p>
@@ -1032,7 +1011,7 @@ export default function AssignmentsPage() {
                                 <input value={managerSearch} onChange={e => setManagerSearch(e.target.value)}
                                     placeholder="Search managers by name or email..." className={inputCls + " pl-8"} />
                             </div>
-                            <SelectedChips people={managers} ids={selectedManagerIds} onRemove={id => toggleId(id, setSelectedManagerIds)} />
+                            <SelectedPeopleChips people={managers} ids={selectedManagerIds} onRemove={id => toggleId(id, setSelectedManagerIds)} />
                             <div className={listBox}>
                                 {filteredManagers.length === 0 ? (
                                     <p className="p-4 text-center text-[12px] text-[var(--text3)]">No managers found.</p>

@@ -8,6 +8,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 import { AssignWorkSection, useAssignWork, assignWorkProblem, createAssignments } from "@/components/AssignWork"
+import { SelectedPeopleChips } from "@/components/SelectedPeopleChips"
 import {
     ScopePicker, SCOPE_ALL, scopeLabel, matchPeople, fetchStaff,
     toggleAllVisible, allVisibleSelected,
@@ -409,6 +410,10 @@ function CreateProjectForm() {
                                     className={inputCls + " pl-8"} />
                             </div>
                         )}
+                        {/* Who is ticked, whatever the list is filtered to (components/SelectedPeopleChips) */}
+                        {form.siteId && (
+                            <SelectedPeopleChips people={managers} ids={managerIds} onRemove={id => toggle(id, setManagerIds)} fallback="Manager" />
+                        )}
                         {!form.siteId ? (
                             <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center mt-3">Select a site first to see who works there.</p>
                         ) : filteredManagers.length === 0 ? (
@@ -464,6 +469,9 @@ function CreateProjectForm() {
                                     placeholder="Search inspectors by name or phone..."
                                     className={inputCls + " pl-8"} />
                             </div>
+                        )}
+                        {form.siteId && (
+                            <SelectedPeopleChips people={inspectors} ids={inspectorIds} onRemove={id => toggle(id, setInspectorIds)} fallback="Inspector" />
                         )}
                         {!form.siteId ? (
                             <p className="text-[12.5px] text-[var(--text3)] border border-dashed border-[var(--border)] rounded-[10px] p-4 text-center">Select a site first to see who works there.</p>
