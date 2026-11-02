@@ -325,7 +325,7 @@ export default function PayrollPage() {
         )
     }
 
-    const quietBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 7, height: 40, padding: "0 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }
+    const quietBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 7, height: 40, padding: "0 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer", whiteSpace: "nowrap" }
 
     return (
         <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48 }}>
@@ -336,19 +336,21 @@ export default function PayrollPage() {
                     <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Payroll</h1>
                     <p style={{ fontSize: 13.5, color: "var(--text3)", margin: "4px 0 0 0" }}>Pick a month, then follow the four steps.</p>
                 </div>
-                <div className="page-actions" style={{ flexWrap: "wrap" }}>
+                {/* One line from xl up: the title gives way instead (its subtitle
+                    wraps). Narrower screens may still wrap rather than overflow. */}
+                <div className="page-actions xl:!flex-nowrap xl:shrink-0">
                     {/* One month switch, beside the month it applies to: the month is
                         locked and unlocked as a whole, all sites at once. While any row is
                         still open it offers Lock month (which locks every open row); once
                         the whole month is locked it offers Unlock month (paid rows stay
                         paid). A locked row can't be edited or re-processed until the month
                         is unlocked (enforced server-side). An empty month shows the switch
-                        greyed out, so it is clear where it will be once pay is calculated. */}
+                        greyed out, so it is clear where it will be once pay is calculated;
+                        why it is greyed is in its tooltip, so the row stays on one line. */}
                     {sitesKey !== monthKey(period) ? null : counts.rows === 0 ? (canLock && (
                         <button disabled title={`Nothing to lock yet for ${periodLabel} — upload attendance first`}
                             style={{ ...quietBtn, cursor: "not-allowed", opacity: 0.55 }}>
                             <Lock size={15} /> Lock month
-                            <span style={{ fontSize: 11.5, fontWeight: 500, color: "var(--text3)" }}>· Upload attendance first</span>
                         </button>
                     )) : counts.draft > 0 ? (canLock && (
                         <button onClick={lockMonth} disabled={lockingMonth !== null}
@@ -418,11 +420,12 @@ export default function PayrollPage() {
                         <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
                     </button>
                     <button onClick={() => router.push("/payroll/salary-master")} style={quietBtn} title="Each employee's salary structure">
-                        <Settings2 size={15} /> Salary structure
+                        {/* Icon only below 2xl, so the header stays one line on a laptop. */}
+                        <Settings2 size={15} /> <span className="hidden 2xl:inline">Salary structure</span>
                     </button>
                     {canManage && (
                         <button onClick={() => router.push("/payroll/settings")} style={quietBtn} title="PF / ESIC / PT rates, slabs and defaults">
-                            <SlidersHorizontal size={15} /> Rules
+                            <SlidersHorizontal size={15} /> <span className="hidden 2xl:inline">Rules</span>
                         </button>
                     )}
                 </div>
