@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { encode } from "next-auth/jwt"
 import prisma from "@/lib/prisma"
-import { resolveAccess, accessVersion } from "@/lib/access-session"
+import { resolveAccess, accessVersion, mustChangePasswordFor } from "@/lib/access-session"
 import { recordLogin, recordLoginFailure, requestMetaOf } from "@/lib/access-audit"
 import {
     verifyLogin, parseLoginMethod,
@@ -51,6 +51,17 @@ async function mintResponse(user: any, extra: { needsMpin?: boolean } = {}) {
     // locked out of the mobile app just like the web (see lib/auth.ts).
     if (employee && (employee.status === "TERMINATED" || employee.status === "INACTIVE" || employee.status === "RESIGNED")) {
         return NextResponse.json({ error: "Your account is inactive. Please contact HR." }, { status: 403 })
+    }
+
+    // An account still on its admin-set initial password replaces it on the
+    // web first. The app has no change-password step, and API calls aren't
+    // covered by the web's redirect to /profile, so a token minted here skipped
+    // the change entirely (QA audit F1). Only Users-screen accounts carry it.
+    if (!String(user.id).startsWith("demo-") && (await mustChangePasswordFor(user.id))) {
+        return NextResponse.json({
+            error: "Set a new password first: sign in on the website once, then use the app.",
+            code: "MUST_CHANGE_PASSWORD",
+        }, { status: 403 })
     }
 
     // Same resolution as the web session (lib/auth): catalogue permissions

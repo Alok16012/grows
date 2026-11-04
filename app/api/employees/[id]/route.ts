@@ -276,10 +276,20 @@ export async function PUT(
         // to change roles, the role may not hold more than the caller does, and
         // it is checked only when the role actually changes (the form sends the
         // current one with every save).
-        const linked = customRoleId !== undefined
-            ? await prisma.employee.findUnique({ where: { id: params.id }, select: { userId: true, user: { select: { customRoleId: true } } } })
+        const touchesLogin = customRoleId !== undefined || email !== undefined || status !== undefined || !!systemRole
+        const linked = touchesLogin
+            ? await prisma.employee.findUnique({ where: { id: params.id }, select: { userId: true, user: { select: { customRoleId: true, role: true, email: true, isActive: true } } } })
             : null
-        const roleChanges = !!linked?.userId && (customRoleId || null) !== (linked.user?.customRoleId ?? null)
+        const roleChanges = customRoleId !== undefined && !!linked?.userId && (customRoleId || null) !== (linked.user?.customRoleId ?? null)
+        // The linked login follows this save (role, login email, enabled), so an
+        // Admin's login is only changed this way by an Admin (QA audit F5).
+        if (linked?.user?.role === "ADMIN" && !access.isAdmin) {
+            const syncEmail = typeof email === "string" && email.trim() && !email.includes("@cims.local") ? email.trim() : null
+            const nextActive = status !== undefined ? !(status === "TERMINATED" || status === "INACTIVE" || status === "RESIGNED") : linked.user.isActive
+            if (roleChanges || !!systemRole || (syncEmail && syncEmail !== linked.user.email) || nextActive !== linked.user.isActive) {
+                throw new RuleError(403, "Nothing was saved — this employee's login is an Admin's, and only an Admin can change an Admin's role, login email or status.")
+            }
+        }
         // "Reports to", also checked before anything is written.
         if (managerId !== undefined) {
             const own = linked?.userId ?? (await prisma.employee.findUnique({ where: { id: params.id }, select: { userId: true } }))?.userId

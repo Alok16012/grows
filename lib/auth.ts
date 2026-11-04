@@ -133,8 +133,12 @@ export const authOptions: NextAuthOptions = {
                     }
                     const { user, employee, needsMpin } = result
                     recordLogin({ userId: user.id, name: user.name, method, ...loginMeta })
-                    // An account given an initial password must replace it first.
-                    const mustChangePassword = method === "password" && (await mustChangePasswordFor(user.id))
+                    // An account given an initial password must replace it first,
+                    // however it signs in. Only password sign-ins used to carry the
+                    // flag, so an OTP or MPIN sign-in skipped the change and the
+                    // admin-known password kept working (QA audit F1). The password
+                    // page doesn't ask an OTP/MPIN session for the old one.
+                    const mustChangePassword = await mustChangePasswordFor(user.id)
 
                     return {
                         id: user.id,

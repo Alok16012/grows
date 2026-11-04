@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { accessFrom } from "@/lib/access"
-import { assertCanAssignRole, RuleError } from "@/lib/role-rules"
+import { assertCanAssignRole, assertMayChangeLogin, RuleError } from "@/lib/role-rules"
 
 export async function POST(
     req: Request,
@@ -42,8 +42,16 @@ export async function POST(
         // permissions, so every provisioned login gets MANAGER regardless.
         const systemRole = "MANAGER"
 
+        const access = accessFrom(session!)
+        const refuse = (e: unknown) => e instanceof RuleError ? NextResponse.json({ error: e.message }, { status: e.status }) : null
+
         // If employee already has a linked user → update customRole + system role
         if (employee.userId) {
+            // Never on an Admin's login unless an Admin asks: this sets the role
+            // to MANAGER, which demoted an Admin (QA audit F5).
+            try {
+                assertMayChangeLogin(access, await prisma.user.findUnique({ where: { id: employee.userId }, select: { role: true } }))
+            } catch (e) { const r = refuse(e); if (r) return r; throw e }
             await prisma.user.update({
                 where: { id: employee.userId },
                 data: {
@@ -61,6 +69,16 @@ export async function POST(
         // Check if user with this email already exists
         let user = await prisma.user.findUnique({ where: { email: loginEmail } })
         if (user) {
+            // Setting an employee's email to someone else's login id must not
+            // hand that login over: refused for an Admin's login (QA audit F5)
+            // and for one that already belongs to another employee.
+            try {
+                assertMayChangeLogin(access, user)
+            } catch (e) { const r = refuse(e); if (r) return r; throw e }
+            const owner = await prisma.employee.findFirst({ where: { userId: user.id, NOT: { id: params.id } }, select: { employeeId: true } })
+            if (owner) {
+                return NextResponse.json({ error: `That login id already belongs to ${owner.employeeId}. Give this employee a different email or mobile.` }, { status: 409 })
+            }
             // Link existing user to employee & update role
             await prisma.employee.update({
                 where: { id: params.id },

@@ -63,6 +63,19 @@ export async function otherActiveAdmins(exceptUserIds: string[]): Promise<number
     return prisma.user.count({ where: { role: "ADMIN", isActive: true, id: { notIn: exceptUserIds } } })
 }
 
+/**
+ * Throws unless `access` may change this login at all. An Admin's login — its
+ * login id, mobile, email, role, password/MPIN or status — is changed by an
+ * Admin only. users.edit / users.manage holders could otherwise point an
+ * Admin's login at their own phone and take it over by OTP (QA audit F5), or
+ * attach it to an employee through Fix Login and demote it.
+ */
+export function assertMayChangeLogin(access: Access, target: { role: string } | null | undefined) {
+    if (target?.role === "ADMIN" && !access.isAdmin) {
+        throw new RuleError(403, "Only an Admin can change an Admin's login.")
+    }
+}
+
 /** Throws when demoting or disabling these users would leave no active Admin. */
 export async function assertKeepsAnAdmin(userIds: string[]) {
     const admins = await prisma.user.count({ where: { role: "ADMIN", isActive: true, id: { in: userIds } } })

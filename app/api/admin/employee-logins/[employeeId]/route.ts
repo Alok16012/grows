@@ -7,7 +7,7 @@ import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { checkAccess } from "@/lib/permissions"
 import { resetLogin } from "@/lib/login-security"
 import { accessFrom, auditLater, requestMeta, bumpAccessVersion } from "@/lib/access"
-import { assertCanAssignRole, assertKeepsAnAdmin, RuleError } from "@/lib/role-rules"
+import { assertCanAssignRole, assertKeepsAnAdmin, assertMayChangeLogin, RuleError } from "@/lib/role-rules"
 
 // Update (or create) the login for a single employee: login id, role, status.
 // Admins never set a password. `{ action: "reset-login" }` wipes the password
@@ -39,6 +39,12 @@ export async function PATCH(
 
         const access = accessFrom(session!)
         const meta = requestMeta(req)
+        // An Admin's login is changed by an Admin only — reset, login id, role
+        // and status alike. This route had no such check, and a role change here
+        // also quietly turned an Admin into MANAGER (QA audit F5).
+        if (employee.userId) {
+            assertMayChangeLogin(access, await prisma.user.findUnique({ where: { id: employee.userId }, select: { role: true } }))
+        }
         if (action === "reset-login") {
             if (!employee.userId) return NextResponse.json({ error: "This employee has no login yet" }, { status: 400 })
             await resetLogin([employee.userId])

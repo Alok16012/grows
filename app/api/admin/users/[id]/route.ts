@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import prisma from "@/lib/prisma"
 import { guard, has, accessTablesReady, audit, requestMeta, bumpAccessVersion } from "@/lib/access"
-import { assertCanAssignRole, assertKeepsAnAdmin, ADMIN_ROLE_ID, RuleError } from "@/lib/role-rules"
+import { assertCanAssignRole, assertKeepsAnAdmin, assertMayChangeLogin, ADMIN_ROLE_ID, RuleError } from "@/lib/role-rules"
 import { ruleResponse } from "@/lib/role-admin"
 import {
     isRealEmail, mobileOf, parseMobile, parseEmail, assertMobileFree, assertEmailFree,
@@ -80,6 +80,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
             },
         })
         if (!u) throw new RuleError(404, "User not found")
+        // Any change to an Admin — not just role and status, which were the only
+        // ones guarded: a users.edit holder could change an Admin's mobile and the
+        // login id followed it (QA audit F5).
+        assertMayChangeLogin(g.access, u)
         const acc = await prisma.userAccess.findUnique({ where: { userId: u.id } })
 
         const statusOnly = Object.keys(b).every(k => k === "isActive")
