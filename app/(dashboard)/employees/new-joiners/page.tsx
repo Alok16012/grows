@@ -284,7 +284,7 @@ function Register({ canExport, onHistory }: { canExport: boolean; onHistory: (w:
                 )}
             </div>
             <p className="text-[11px] text-[var(--text3)]">
-                &quot;Time to site&quot; runs from the day the person was added to the day their first site was saved. People added before records were kept show their postings only, without the &quot;Added from&quot; source. Change or end a posting on the <Link href="/sites" className="text-[var(--accent)] hover:underline">Sites</Link> screen.
+                &quot;Time to site&quot; runs from the day the person was added to the day their first site was saved. For people added before records were kept, how they were added is read from the data and marked &quot;(from data)&quot;; where the data leaves no trace it stays blank. Change or end a posting on the <Link href="/sites" className="text-[var(--accent)] hover:underline">Sites</Link> screen.
             </p>
         </section>
     )
