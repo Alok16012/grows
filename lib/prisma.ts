@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client"
 import { schemaSelfHealEnabled } from "@/lib/schema-selfheal"
+import { signedPhotoUrl } from "@/lib/photo-url"
 
 // Prisma reads DATABASE_URL automatically from prisma/schema.prisma's env()
 // declaration. Don't pass `datasources` explicitly here — doing so forces
@@ -13,7 +14,9 @@ const makePrismaClient = () =>
          * Result extension – transform the `photo` field for every Employee
          * record before it leaves the server.
          *
-         * • base64 data URI  → /api/photo/<id>   (keeps API response payload tiny)
+         * • base64 data URI  → /api/photo/<id>?e=…&s=…   (keeps API response
+         *   payload tiny; signed so the route can refuse a guessed id, see
+         *   lib/photo-url)
          * • HTTP/S URL       → pass through unchanged (Supabase public URL)
          * • null / undefined → null
          *
@@ -29,7 +32,7 @@ const makePrismaClient = () =>
                         // Already a proper URL (Supabase, CDN, etc.) – use as-is
                         if (data.photo.startsWith("http")) return data.photo
                         // Base64 data URI – replace with a slim API route URL
-                        if (data.photo.startsWith("data:")) return `/api/photo/${data.id}`
+                        if (data.photo.startsWith("data:")) return signedPhotoUrl(data.id)
                         return data.photo
                     },
                 },

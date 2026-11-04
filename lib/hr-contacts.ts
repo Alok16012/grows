@@ -25,10 +25,12 @@ export async function getHrContacts() {
                 },
             ],
         },
+        // No login id: both callers (/api/join, /api/external/onboarding/[token])
+        // are public, and `email` handed HR staff's login ids to anyone (QA
+        // audit F3). The dropdowns show only the name and role.
         select: {
             id: true,
             name: true,
-            email: true,
             role: true,
             customRole: { select: { name: true } },
         },

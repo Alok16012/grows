@@ -30,9 +30,13 @@ export async function GET(req: Request) {
             if (!ASSIGNERS.some(p => perms.includes(p))) {
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 })
             }
+            // Names and roles only. The login id (`email`, for most staff their
+            // mobile number) went out too, and helpdesk.view is held by every
+            // Quality Engineer, so the field force could pull all 789 logins
+            // (QA audit F2). The dropdowns only ever showed the name.
             const users = await prisma.user.findMany({
                 where: { isActive: true },
-                select: { id: true, name: true, email: true, role: true, customRole: { select: { id: true, name: true, color: true } } },
+                select: { id: true, name: true, role: true, customRole: { select: { id: true, name: true, color: true } } },
                 orderBy: { name: "asc" },
             })
             return NextResponse.json(users)

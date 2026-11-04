@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
 import prisma from "@/lib/prisma"
+import { photoSignatureValid } from "@/lib/photo-url"
+import { getApiSession } from "@/lib/apiSession"
 
 /**
  * GET /api/photo/:id
@@ -14,10 +16,23 @@ import prisma from "@/lib/prisma"
  * this very endpoint URL is bypassed — we always get the raw DB value here.
  */
 export async function GET(
-    _req: Request,
+    req: Request,
     { params }: { params: { id: string } }
 ) {
     try {
+        // A signed link (lib/photo-url, from any employee record the server
+        // returned) or a signed-in caller. It used to answer anyone with an id,
+        // signed out (QA audit F4).
+        const q = new URL(req.url).searchParams
+        const signed = photoSignatureValid(params.id, q.get("e"), q.get("s"))
+        if (!signed && !(await getApiSession(req))?.user?.id) {
+            return new NextResponse(null, { status: 401 })
+        }
+        // A shared cache may keep a signed link's image (the link itself is the
+        // permission); one served on a session must stay in that browser, or the
+        // CDN would hand it to the next caller of the same unsigned URL.
+        const cacheControl = signed ? "public, max-age=86400, stale-while-revalidate=604800" : "private, max-age=86400"
+
         const rows = await (prisma as any).$queryRaw(
             Prisma.sql`SELECT photo FROM "Employee" WHERE id = ${params.id} LIMIT 1`
         ) as Array<{ photo: string | null }>
@@ -46,7 +61,7 @@ export async function GET(
             return new NextResponse(buffer, {
                 headers: {
                     "Content-Type":  mimeType,
-                    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+                    "Cache-Control": cacheControl,
                     "Content-Length": String(buffer.byteLength),
                 },
             })

@@ -233,7 +233,8 @@ interface LeadFollowUp {
 interface AppUser {
     id: string
     name: string
-    email: string
+    /** Not in the assignee list (/api/admin/users sends names only). */
+    email?: string
     role: string
 }
 
