@@ -3,7 +3,7 @@
 // can use it without an import cycle.
 
 import prisma from "@/lib/prisma"
-import { type DataScope, isScope, expandPermissions } from "@/lib/permission-catalogue"
+import { type DataScope, isScope, expandPermissions, legacyImpliedPermissions } from "@/lib/permission-catalogue"
 
 /** Scope stored for a custom role; null = no RoleMeta row or table not installed. */
 export async function roleScope(roleId: string | null | undefined): Promise<DataScope | null> {
@@ -50,24 +50,10 @@ export async function resolveAccess(user: {
     // A role not yet saved in the role editor predates the sensitive-field
     // switches. Keep the fields its people already work with (HR editing an
     // employee, payroll building bank sheets) and mask them for view-only roles.
-    if (!stored) permissions.push(...legacySensitive(active.permissions))
+    // The role editor pre-ticks the same keys (legacyRoleToCatalogue), so saving
+    // the role keeps them.
+    if (!stored) permissions.push(...legacyImpliedPermissions(active.permissions))
     return { permissions: Array.from(new Set(permissions)), scope, siteIds }
-}
-
-function legacySensitive(perms: string[]): string[] {
-    const out: string[] = []
-    // Exporting was part of viewing before export became its own action.
-    if (perms.includes("employees.view")) out.push("employees.export")
-    if (["employees.create", "employees.edit", "onboarding.manage"].some(p => perms.includes(p))) {
-        out.push("employees.viewKyc", "employees.viewBank", "employees.viewPersonal")
-    }
-    if (["payroll.view", "payroll.manage"].some(p => perms.includes(p))) {
-        out.push("employees.viewKyc", "employees.viewBank")
-    }
-    // Locking, reopening and paying a month were all "process payroll" before
-    // they became separate switches.
-    if (perms.includes("payroll.manage")) out.push("payroll.lock", "payroll.unlock", "payroll.markPaid")
-    return out
 }
 
 /** Current access version; 0 when the user has no row or the table is missing. */

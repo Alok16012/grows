@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 import { type Access, accessTablesReady, ACCESS_NOT_SET_UP } from "@/lib/access"
 import { RuleError, missingGrants, unknownPermissions, ADMIN_ROLE_ID } from "@/lib/role-rules"
 import {
-    type DataScope, isScope, normalizePermissions, toCataloguePermissions, allCataloguePermissions,
+    type DataScope, isScope, normalizePermissions, toCataloguePermissions, allCataloguePermissions, legacyRoleToCatalogue,
 } from "@/lib/permission-catalogue"
 
 export type RoleInput = {
@@ -19,8 +19,14 @@ export type RoleInput = {
 
 const HEX = /^#[0-9a-f]{6}$/i
 
-/** Validate a create / edit body. Throws RuleError with a message for the form. */
-export function parseRoleInput(body: unknown, access: Access): RoleInput {
+/**
+ * Validate a create / edit body. Throws RuleError with a message for the form.
+ * `current`: the role's permissions before this edit (catalogue keys). Only
+ * permissions being added must be held by the editor — the same as the editor
+ * screen, which never blocks a box that is already ticked — so saving a role
+ * unchanged can't be refused for what it already had.
+ */
+export function parseRoleInput(body: unknown, access: Access, current: string[] = []): RoleInput {
     const b = (body ?? {}) as Record<string, unknown>
     const name = typeof b.name === "string" ? b.name.trim().replace(/\s+/g, " ") : ""
     const description = typeof b.description === "string" ? b.description.trim() : ""
@@ -37,7 +43,8 @@ export function parseRoleInput(body: unknown, access: Access): RoleInput {
     const unknown = unknownPermissions(raw)
     if (unknown.length) throw new RuleError(400, `Unknown permission${unknown.length === 1 ? "" : "s"}: ${unknown.slice(0, 5).join(", ")}`)
     const permissions = normalizePermissions(raw)
-    const missing = missingGrants(access, permissions)
+    const had = new Set(current)
+    const missing = missingGrants(access, permissions.filter(p => !had.has(p)))
     if (missing.length) {
         throw new RuleError(403, `You cannot grant permissions you do not hold: ${missing.slice(0, 5).join(", ")}${missing.length > 5 ? "…" : ""}`)
     }
@@ -124,7 +131,9 @@ export async function listRoleCards(): Promise<RoleCard[]> {
 
     return [adminCard, ...roles.map(r => {
         const meta = metaBy.get(r.id)
-        const catalogue = toCataloguePermissions(r.permissions)
+        // An unsaved role also shows what it gets implicitly (bank, KYC, export…),
+        // so the editor opens with exactly today's access and saving keeps it.
+        const catalogue = meta ? toCataloguePermissions(r.permissions) : legacyRoleToCatalogue(r.permissions)
         return {
             id: r.id, name: r.name, description: r.description, color: r.color, isActive: r.isActive,
             isSystem: !!meta?.isSystem, scope: isScope(meta?.scope) ? meta!.scope as DataScope : null, legacy: !meta,

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { guard, has, audit, requestMeta, bumpAccessVersion } from "@/lib/access"
 import { RuleError, ADMIN_ROLE_ID } from "@/lib/role-rules"
-import { isScope, toCataloguePermissions, type DataScope } from "@/lib/permission-catalogue"
+import { isScope, toCataloguePermissions, legacyRoleToCatalogue, type DataScope } from "@/lib/permission-catalogue"
 import {
     parseRoleInput, assertNameFree, requireAccessTables, ruleResponse, roleSnapshot, diffSummary, listRoleCards,
 } from "@/lib/role-admin"
@@ -33,15 +33,17 @@ async function save(req: Request, { params }: Ctx) {
         const meta = await prisma.roleMeta.findUnique({ where: { roleId: role.id } })
         if (meta?.isSystem) throw new RuleError(403, "System roles cannot be edited.")
 
-        const input = parseRoleInput(await req.json().catch(() => null), g.access)
+        // A role saved before the catalogue holds the earlier keys; compare it
+        // in catalogue terms, including what it gets implicitly (bank, KYC,
+        // export…), so renamed keys don't count as added / removed and saving
+        // it unchanged reads as no change.
+        const beforePerms = meta ? toCataloguePermissions(role.permissions) : legacyRoleToCatalogue(role.permissions)
+        const input = parseRoleInput(await req.json().catch(() => null), g.access, beforePerms)
         await assertNameFree(input.name, role.id)
 
         const users = await prisma.user.findMany({ where: { customRoleId: role.id }, select: { id: true } })
         const beforeScope: DataScope | null = isScope(meta?.scope) ? meta!.scope as DataScope : null
         const before = roleSnapshot(role, beforeScope)
-        // A role saved before the catalogue holds the earlier keys; compare it
-        // in catalogue terms so renamed keys don't count as added / removed.
-        const beforePerms = meta ? role.permissions : toCataloguePermissions(role.permissions)
         const summary = diffSummary({ permissions: beforePerms, scope: beforeScope ?? "ALL" }, { permissions: input.permissions, scope: input.scope }, users.length)
 
         await prisma.$transaction(async tx => {

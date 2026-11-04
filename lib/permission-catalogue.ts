@@ -296,6 +296,36 @@ export function toCataloguePermissions(stored: string[]): string[] {
     return normalizePermissions(out)
 }
 
+/**
+ * What a role saved before the catalogue gets on top of its own keys. The
+ * sensitive-field and export switches didn't exist then, so these came with
+ * other permissions (HR editing an employee, payroll building bank sheets).
+ * One rule for both places that need it: the session (lib/access-session)
+ * while the role stays unsaved, and the role editor, which pre-ticks them so
+ * saving the role keeps today's access. Without the second, saving Payroll
+ * Executive silently took its bank and KYC details away.
+ */
+export function legacyImpliedPermissions(stored: string[]): string[] {
+    const out: string[] = []
+    // Exporting was part of viewing before export became its own action.
+    if (stored.includes("employees.view")) out.push("employees.export")
+    if (["employees.create", "employees.edit", "onboarding.manage"].some(p => stored.includes(p))) {
+        out.push("employees.viewKyc", "employees.viewBank", "employees.viewPersonal")
+    }
+    if (["payroll.view", "payroll.manage"].some(p => stored.includes(p))) {
+        out.push("employees.viewKyc", "employees.viewBank")
+    }
+    // Locking, reopening and paying a month were all "process payroll" before
+    // they became separate switches.
+    if (stored.includes("payroll.manage")) out.push("payroll.lock", "payroll.unlock", "payroll.markPaid")
+    return out
+}
+
+/** A role not yet saved in the role editor, in catalogue terms, including what it gets implicitly. */
+export function legacyRoleToCatalogue(stored: string[]): string[] {
+    return toCataloguePermissions([...stored, ...legacyImpliedPermissions(stored)])
+}
+
 // ─── Default roles ───────────────────────────────────────────────────────────
 // The ten roles the spec ships (Admin is the built-in system role and is not
 // listed). Letters: V view · C create · E edit · D delete · A approve ·

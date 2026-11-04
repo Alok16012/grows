@@ -198,7 +198,7 @@ export default function RoleEditorPage() {
             {role?.legacy && editable && (
                 <div className="rounded-2xl border border-[#f6d9a8] bg-[#fff8ee] px-4 py-3 flex gap-2.5 text-[13px] text-[#7c4a03]">
                     <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                    <span>This role was saved before the permission catalogue. Its old permissions are shown converted below. Check them, <b>pick a data scope</b> and save to switch it over. Until then it keeps working as before.</span>
+                    <span>This role was saved before the permission catalogue. Its old permissions are shown converted below, including the bank, KYC, personal-detail and export switches it was getting automatically, so saving keeps today&apos;s access. Check them, untick anything it shouldn&apos;t have, <b>pick a data scope</b> and save to switch it over. Until then it keeps working as before.</span>
                 </div>
             )}
 
