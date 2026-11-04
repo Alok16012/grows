@@ -7,7 +7,7 @@ import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import {
     Search, Loader2, RefreshCw, FileSpreadsheet, Pencil, X, Save, Trash2, CheckSquare,
     Users, UserCheck, UserX, CalendarOff, UserMinus,
-    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CalendarRange,
+    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CalendarRange, ArrowUp, ArrowDown, ArrowUpDown,
 } from "lucide-react"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
@@ -293,6 +293,53 @@ const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
 ]
 
 const ALL_COLS = COLUMN_GROUPS.flatMap(g => g.cols)
+
+// ─── Sorting ──────────────────────────────────────────────────────────────────
+// Click a header: ascending → descending → back to the server's order (newest
+// added first). The grid used to have no sort at all, so Leaving Date read as
+// jumbled. Dates and amounts sort by value, not by their display text, where
+// "10/1/2026" < "9/1/2026"; blanks always go last whichever way it is sorted.
+type SortDir = "asc" | "desc"
+const time = (v?: string | null) => {
+    if (!v) return null
+    const t = new Date(v).getTime()
+    return Number.isNaN(t) ? null : t
+}
+const num = (v?: number | null) => (v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v))
+const SORT_VALUE: Record<string, (e: Employee) => number | null> = {
+    dateOfJoining: e => time(e.dateOfJoining),
+    dateOfLeaving: e => time(e.dateOfLeaving),
+    dob:           e => time(e.dateOfBirth),
+    labourExp:     e => time(e.labourCardExpDate),
+    workFrom:      e => time(e.workOrderFrom),
+    workTo:        e => time(e.workOrderTo),
+    contractFrom:  e => time(e.contractFrom),
+    basicSalary:   e => num(e.basicSalary) || null,
+    ctc:           e => num(e.employeeSalary?.ctcAnnual) || null,
+    contractDays:  e => num(e.contractPeriodDays) || null,
+}
+const collator = new Intl.Collator("en-IN", { numeric: true, sensitivity: "base" })
+
+function sortEmployees(rows: Employee[], sort: { key: string; dir: SortDir } | null): Employee[] {
+    if (!sort) return rows
+    const col = ALL_COLS.find(c => c.key === sort.key)
+    if (!col) return rows
+    const byValue = SORT_VALUE[sort.key]
+    const sign = sort.dir === "asc" ? 1 : -1
+    // Stable: equal values keep the server's order.
+    return [...rows].sort((a, b) => {
+        if (byValue) {
+            const x = byValue(a), y = byValue(b)
+            if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1
+            return (x - y) * sign
+        }
+        // Runs of spaces count as one, as on screen: "Abhishek  RAM" (two
+        // spaces, as some records were typed) sorted before "Abhishek Ashok".
+        const x = col.get(a).replace(/\s+/g, " ").trim(), y = col.get(b).replace(/\s+/g, " ").trim()
+        if (!x || !y) return x === y ? 0 : !x ? 1 : -1
+        return collator.compare(x, y) * sign
+    })
+}
 
 
 const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
@@ -696,6 +743,10 @@ export default function EmployeeMasterPage() {
     // separate download path. Month "" means the whole year; year "" means all.
     const [joinMonth, setJoinMonth] = useState("")
     const [joinYear,  setJoinYear]  = useState("")
+    // Which date the month/year applies to. "Joined: September" hid a
+    // resignation in September by someone who joined in August, and there was
+    // no way to ask for leavers by month.
+    const [monthBasis, setMonthBasis] = useState<"joined" | "left">("joined")
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")
@@ -795,13 +846,14 @@ export default function EmployeeMasterPage() {
     const filteredEmployees = useMemo(() => {
         const activeColFilters = Object.entries(colFilters).filter(([, v]) => v.trim())
 
-        // Joining month, applied before the column filters. An employee with no
-        // joining date on file can't satisfy a month, so they drop out rather
-        // than being counted into every month.
+        // Joining (or leaving) month, applied before the column filters. An
+        // employee with no such date on file can't satisfy a month, so they
+        // drop out rather than being counted into every month.
         const byJoining = (joinMonth || joinYear)
             ? employees.filter(emp => {
-                if (!emp.dateOfJoining) return false
-                const d = new Date(emp.dateOfJoining)
+                const on = monthBasis === "left" ? emp.dateOfLeaving : emp.dateOfJoining
+                if (!on) return false
+                const d = new Date(on)
                 if (Number.isNaN(d.getTime())) return false
                 if (joinYear  && d.getFullYear()  !== Number(joinYear))  return false
                 if (joinMonth && d.getMonth() + 1 !== Number(joinMonth)) return false
@@ -818,18 +870,25 @@ export default function EmployeeMasterPage() {
             }
             return true
         })
-    }, [employees, colFilters, joinMonth, joinYear])
+    }, [employees, colFilters, joinMonth, joinYear, monthBasis])
 
     const activeFilterCount = Object.values(colFilters).filter(v => v.trim()).length
+
+    // Header sort (see sortEmployees). The page, the Excel export and the
+    // selected-rows download all follow it.
+    const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null)
+    const cycleSort = (key: string) => setSort(s =>
+        !s || s.key !== key ? { key, dir: "asc" } : s.dir === "asc" ? { key, dir: "desc" } : null)
+    const sortedEmployees = useMemo(() => sortEmployees(filteredEmployees, sort), [filteredEmployees, sort])
 
     // ── Render pagination ─────────────────────────────────────────────────────
     // Only one page of rows is in the DOM at a time; export/selection still
     // operate on the full filtered set.
     const [rowsPerPage, setRowsPerPage] = useState(25)
     const [renderPage, setRenderPage] = useState(1)
-    useEffect(() => { setRenderPage(1) }, [statusFilter, siteFilter, search, colFilters, rowsPerPage])
-    const renderTotalPages = Math.max(1, Math.ceil(filteredEmployees.length / rowsPerPage))
-    const pagedEmployees = filteredEmployees.slice((renderPage - 1) * rowsPerPage, renderPage * rowsPerPage)
+    useEffect(() => { setRenderPage(1) }, [statusFilter, siteFilter, search, colFilters, rowsPerPage, sort, joinMonth, joinYear, monthBasis])
+    const renderTotalPages = Math.max(1, Math.ceil(sortedEmployees.length / rowsPerPage))
+    const pagedEmployees = sortedEmployees.slice((renderPage - 1) * rowsPerPage, renderPage * rowsPerPage)
 
     // ── Selection helpers ─────────────────────────────────────────────────────
     const allSelected = filteredEmployees.length > 0 && filteredEmployees.every(e => selectedIds.has(e.id))
@@ -859,16 +918,18 @@ export default function EmployeeMasterPage() {
         })
     }
 
-    // Names the joining period in the file name and the toast: a monthly
-    // joiners sheet is worth nothing if you can't tell which month it is.
+    // Names the joining (or leaving) period in the file name and the toast: a
+    // monthly joiners or leavers sheet is worth nothing if you can't tell which
+    // month it is, or which of the two it is.
     const joinLabel = joinMonth && joinYear ? `${JOIN_MONTHS[Number(joinMonth) - 1]}_${joinYear}`
         : joinMonth ? JOIN_MONTHS[Number(joinMonth) - 1]
         : joinYear  ? String(joinYear)
         : ""
+    const basisWord = monthBasis === "left" ? "Left" : "Joined"
 
     // ── Bulk download selected ────────────────────────────────────────────────
     const handleDownloadSelected = async () => {
-        const selected = filteredEmployees.filter(e => selectedIds.has(e.id))
+        const selected = sortedEmployees.filter(e => selectedIds.has(e.id))
         if (!selected.length) return
         if (visibleCols.length === 0) { toast.error("Pick at least one column to export"); return }
         try {
@@ -884,7 +945,7 @@ export default function EmployeeMasterPage() {
             }))
             const wb = XLSX.utils.book_new()
             XLSX.utils.book_append_sheet(wb, ws, "Selected Employees")
-            XLSX.writeFile(wb, `Selected_Employees${joinLabel ? `_Joined_${joinLabel}` : ""}_${new Date().toISOString().slice(0,10)}.xlsx`)
+            XLSX.writeFile(wb, `Selected_Employees${joinLabel ? `_${basisWord}_${joinLabel}` : ""}_${new Date().toISOString().slice(0,10)}.xlsx`)
             toast.success(`Downloaded ${selected.length} employees`)
         } catch {
             toast.error("Download failed")
@@ -926,7 +987,7 @@ export default function EmployeeMasterPage() {
             const XLSX = await loadXLSX()
             // Honor the column selection — export only the visible columns.
             const headers = visibleCols.map(c => c.label)
-            const rows = filteredEmployees.map(emp => visibleCols.map(c => c.get(emp)))
+            const rows = sortedEmployees.map(emp => visibleCols.map(c => c.get(emp)))
             const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
             ws["!cols"] = headers.map((h, i) => ({
                 wch: Math.max(h.length, ...rows.map(r => String(r[i] || "").length), 10)
@@ -941,10 +1002,10 @@ export default function EmployeeMasterPage() {
             // Removed branch summary
 
             const date = new Date().toISOString().slice(0, 10)
-            XLSX.writeFile(wb, `Employee_Master${joinLabel ? `_Joined_${joinLabel}` : ""}_${date}.xlsx`)
+            XLSX.writeFile(wb, `Employee_Master${joinLabel ? `_${basisWord}_${joinLabel}` : ""}_${date}.xlsx`)
             toast.success(
                 `Exported ${filteredEmployees.length} employees`,
-                joinLabel ? { description: `Joined ${joinLabel.replace("_", " ")}` } : undefined,
+                joinLabel ? { description: `${basisWord} ${joinLabel.replace("_", " ")}` } : undefined,
             )
         } catch {
             toast.error("Export failed")
@@ -1053,18 +1114,23 @@ export default function EmployeeMasterPage() {
                     {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
 
-                {/* Joining month. Labelled "Joined", not just a bare month, so
-                    it can't be mistaken for an attendance or payroll period —
-                    this grid has no month of its own. */}
+                {/* Joining or leaving month. Labelled "Joined" / "Left", not
+                    just a bare month, so it can't be mistaken for an attendance
+                    or payroll period — this grid has no month of its own. */}
                 <div className="filter-full" style={{ display: "flex", alignItems: "center", gap: 6, height: 38, padding: "0 10px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)" }}>
                     <CalendarRange size={14} style={{ color: "var(--text3)", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>Joined</span>
-                    <select value={joinMonth} onChange={e => setJoinMonth(e.target.value)} aria-label="Joining month" className="min-w-0 flex-1 sm:flex-none"
+                    <select value={monthBasis} onChange={e => setMonthBasis(e.target.value as "joined" | "left")} aria-label="Filter the month by joining or leaving date"
+                        title="Which date the month applies to"
+                        style={{ border: "none", background: "transparent", color: "var(--text3)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer", padding: 0 }}>
+                        <option value="joined">Joined</option>
+                        <option value="left">Left</option>
+                    </select>
+                    <select value={joinMonth} onChange={e => setJoinMonth(e.target.value)} aria-label={monthBasis === "left" ? "Leaving month" : "Joining month"} className="min-w-0 flex-1 sm:flex-none"
                         style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 13, outline: "none", cursor: "pointer" }}>
                         <option value="">Any month</option>
                         {JOIN_MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                     </select>
-                    <select value={joinYear} onChange={e => setJoinYear(e.target.value)} aria-label="Joining year" className="min-w-0 flex-1 sm:flex-none"
+                    <select value={joinYear} onChange={e => setJoinYear(e.target.value)} aria-label={monthBasis === "left" ? "Leaving year" : "Joining year"} className="min-w-0 flex-1 sm:flex-none"
                         style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 13, outline: "none", cursor: "pointer" }}>
                         <option value="">Any year</option>
                         {JOIN_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
@@ -1072,7 +1138,7 @@ export default function EmployeeMasterPage() {
                 </div>
 
                 {(statusFilter || siteFilter || search || joinMonth || joinYear) && (
-                    <button onClick={() => { setStatusFilter(""); setSiteFilter(""); setSearch(""); setJoinMonth(""); setJoinYear(""); }}
+                    <button onClick={() => { setStatusFilter(""); setSiteFilter(""); setSearch(""); setJoinMonth(""); setJoinYear(""); setMonthBasis("joined"); }}
                         style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                         <X size={13} /> Clear
                     </button>
@@ -1171,11 +1237,23 @@ export default function EmployeeMasterPage() {
                                 <th style={{ position: "sticky", left: 74, top: 0, zIndex: 3, background: "#f8fafc", padding: "10px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 46 }}>
                                     Edit
                                 </th>
-                                {tableCols.map(col => (
-                                    <th key={col.key} style={{ position: "sticky", top: 0, zIndex: 2, background: "#f8fafc", padding: "10px 12px", borderBottom: "1px solid var(--border)", textAlign: "left", fontSize: 11.5, fontWeight: 600, color: "var(--text2)", whiteSpace: "nowrap", minWidth: 110 }}>
-                                        {col.label}
-                                    </th>
-                                ))}
+                                {tableCols.map(col => {
+                                    const dir = sort?.key === col.key ? sort.dir : null
+                                    const SortIcon = dir === "asc" ? ArrowUp : dir === "desc" ? ArrowDown : ArrowUpDown
+                                    return (
+                                        <th key={col.key} aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none"}
+                                            style={{ position: "sticky", top: 0, zIndex: 2, background: "#f8fafc", padding: 0, borderBottom: "1px solid var(--border)", textAlign: "left", whiteSpace: "nowrap", minWidth: 110 }}>
+                                            <button type="button" onClick={() => cycleSort(col.key)}
+                                                title={dir === "asc" ? `Sorted by ${col.label}, ascending — click for descending`
+                                                    : dir === "desc" ? `Sorted by ${col.label}, descending — click to clear`
+                                                    : `Sort by ${col.label}`}
+                                                style={{ display: "flex", alignItems: "center", gap: 5, width: "100%", padding: "10px 12px", border: "none", background: "none", cursor: "pointer", fontSize: 11.5, fontWeight: 600, color: dir ? "var(--accent)" : "var(--text2)", textAlign: "left", whiteSpace: "nowrap" }}>
+                                                {col.label}
+                                                <SortIcon size={12} style={{ opacity: dir ? 1 : 0.35, flexShrink: 0 }} />
+                                            </button>
+                                        </th>
+                                    )
+                                })}
                             </tr>
                             {/* Column search row */}
                             <tr style={{ background: "#fff" }}>
