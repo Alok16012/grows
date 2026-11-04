@@ -138,6 +138,18 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
         }
     }
 
+    // Clicking anywhere on a report's row (or card, on a phone) opens it, not
+    // only the small arrow. Approve / Reject / the arrow keep their own click,
+    // selecting text to copy doesn't navigate, and Ctrl/⌘ or middle-click opens
+    // a new tab like a link. The arrow stays as the keyboard way in.
+    const openReport = (e: React.MouseEvent, id: string) => {
+        if ((e.target as HTMLElement).closest("button, a, input, select, textarea, label")) return
+        if (window.getSelection()?.toString()) return
+        const href = `/approvals/${id}`
+        if (e.ctrlKey || e.metaKey || e.button === 1) window.open(href, "_blank", "noopener")
+        else if (e.button === 0) router.push(href)
+    }
+
     // Quick approve/reject from the list. Goes through /api/approvals/[id]
     // (permission: approvals.manage) — NOT /api/inspections/[id], which only
     // the admin or the submitting inspector may PATCH.
@@ -307,7 +319,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                         {/* Mobile Card View */}
                         <div className="sm:hidden divide-y divide-[var(--border)]">
                             {filteredInspections.map((inspection) => (
-                                <div key={inspection.id} className="p-4 hover:bg-[var(--surface2)] transition-colors">
+                                <div key={inspection.id} onClick={e => openReport(e, inspection.id)} onAuxClick={e => openReport(e, inspection.id)}
+                                    title="Open report" className="p-4 hover:bg-[var(--surface2)] transition-colors cursor-pointer">
                                     <div className="flex items-start justify-between gap-2 mb-3">
                                         <div className="min-w-0 flex-1">
                                             <p className="text-[13.5px] font-semibold text-[var(--text)] truncate">{inspection.submitter?.name}</p>
@@ -383,7 +396,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border)]">
                                     {filteredInspections.map((inspection) => (
-                                        <tr key={inspection.id} className="hover:bg-[var(--surface2)] transition-colors">
+                                        <tr key={inspection.id} onClick={e => openReport(e, inspection.id)} onAuxClick={e => openReport(e, inspection.id)}
+                                            title="Open report" className="hover:bg-[var(--surface2)] transition-colors cursor-pointer">
                                             <td className="px-[18px] py-3.5">
                                                 <p className="text-[13px] font-medium text-[var(--text)]">{inspection.submitter?.name}</p>
                                                 <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{inspection.submitter?.email}</p>
