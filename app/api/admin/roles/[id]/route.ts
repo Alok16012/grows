@@ -63,7 +63,9 @@ async function save(req: Request, { params }: Ctx) {
                 targetId: role.id, targetName: updated.name, summary: `${updated.name}: ${summary.text}`,
                 before, after: roleSnapshot(updated, input.scope), ...requestMeta(req),
             })
-        })
+        // Headroom over Prisma's 5 s default for a role on hundreds of users,
+        // as the bulk user update already has. The bump itself is now set-based.
+        }, { timeout: 30_000 })
         return NextResponse.json({ ok: true, summary })
     } catch (e) {
         return ruleResponse(e, "[ROLE_SAVE]")

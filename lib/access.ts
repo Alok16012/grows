@@ -20,14 +20,20 @@ type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 /** The client or a transaction client — pass the transaction when recording an access change. */
 export type Db = Pick<Tx, "userAccess" | "auditLog">
 
-/** Make every live session of these users re-read their access on the next request. */
+/**
+ * Make every live session of these users re-read their access on the next request.
+ * Set-based: one update for users who have a row, one insert for those who
+ * don't — two statements per 5,000 users. It used to upsert one user at a time
+ * inside the caller's transaction, so saving Quality Engineer (953 users) ran
+ * past Prisma's 5-second transaction limit and failed with "Internal Error".
+ */
 export async function bumpAccessVersion(db: Db, userIds: string[]) {
-    for (const userId of Array.from(new Set(userIds))) {
-        await db.userAccess.upsert({
-            where: { userId },
-            create: { userId, permissionsVersion: 2 },
-            update: { permissionsVersion: { increment: 1 } },
-        })
+    const ids = Array.from(new Set(userIds))
+    for (let i = 0; i < ids.length; i += 5000) {
+        const chunk = ids.slice(i, i + 5000)
+        await db.userAccess.updateMany({ where: { userId: { in: chunk } }, data: { permissionsVersion: { increment: 1 } } })
+        // Same starting value the upsert used for a user with no row yet.
+        await db.userAccess.createMany({ data: chunk.map(userId => ({ userId, permissionsVersion: 2 })), skipDuplicates: true })
     }
 }
 
