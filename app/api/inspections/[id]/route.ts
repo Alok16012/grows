@@ -5,6 +5,10 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
+import {
+    OTHER_DEFECT_KEY, OTHER_DEFECT_NOTE_LABEL, OTHER_DEFECT_NOTE_CATEGORY, isOtherDefectLabel,
+    parseOtherDefects, serializeOtherDefects, otherDefectProblem,
+} from "@/lib/other-defect"
 
 export async function DELETE(
     req: Request,
@@ -145,6 +149,62 @@ export async function PATCH(
         if (paperFormResponseIndex !== -1) {
             updateData.paperFormPhoto = validResponses[paperFormResponseIndex].value
             validResponses.splice(paperFormResponseIndex, 1)
+        }
+
+        // "Other" defect descriptions (lib/other-defect): rows of description ×
+        // quantity, saved as one readable answer on a companion NOTE field added
+        // beside OTHER the first time someone describes one — so the review page
+        // and reports show it with no schema change.
+        const noteIndex = validResponses.findIndex((r: any) => r.fieldId === OTHER_DEFECT_KEY)
+        const projectId = inspection.assignment.projectId
+        const findNoteField = (db: typeof prisma | Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => db.formTemplate.findFirst({
+            where: { projectId, category: OTHER_DEFECT_NOTE_CATEGORY, fieldLabel: OTHER_DEFECT_NOTE_LABEL },
+            select: { id: true },
+            orderBy: { createdAt: "asc" },
+        })
+        const visibleOther = (await prisma.formTemplate.findMany({
+            where: { projectId, category: "DEFECT", isHidden: false }, select: { id: true, fieldLabel: true },
+        })).find(d => isOtherDefectLabel(d.fieldLabel))
+        const otherQty = visibleOther ? parseFloat(String(validResponses.find((r: any) => r.fieldId === visibleOther.id)?.value ?? "0")) || 0 : 0
+        let otherNote: string | null = null
+        if (noteIndex !== -1) {
+            // Re-built from its rows: cleaned, capped, and empty while OTHER is 0
+            // (the box is disabled then, so nothing it held should stay on record).
+            otherNote = otherQty > 0 ? serializeOtherDefects(parseOtherDefects(String(validResponses[noteIndex].value ?? ""))) : ""
+            validResponses.splice(noteIndex, 1)
+            let noteField = await findNoteField(prisma)
+            if (!noteField && otherNote) {
+                // Find-or-create under a per-project lock: two inspectors saving
+                // their first description at once each created a field, and the
+                // form then read only one of them.
+                noteField = await prisma.$transaction(async tx => {
+                    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"other-defect-note:" + projectId}))`
+                    const existing = await findNoteField(tx)
+                    if (existing) return existing
+                    const defects = await tx.formTemplate.findMany({ where: { projectId, category: "DEFECT" }, select: { fieldLabel: true, displayOrder: true } })
+                    const other = defects.find(d => isOtherDefectLabel(d.fieldLabel))
+                    return tx.formTemplate.create({
+                        data: {
+                            projectId, fieldLabel: OTHER_DEFECT_NOTE_LABEL, fieldType: "text",
+                            category: OTHER_DEFECT_NOTE_CATEGORY, isRequired: false,
+                            // Same position as OTHER, so the review page lists it right after.
+                            displayOrder: other?.displayOrder ?? 9999,
+                        },
+                        select: { id: true },
+                    })
+                })
+            }
+            if (noteField) validResponses.push({ fieldId: noteField.id, value: otherNote })
+        }
+
+        // Submitting with pieces under OTHER needs them described, rows adding up
+        // to the OTHER count — the same rule as the form, which an old open tab
+        // or a direct call would otherwise skip.
+        if (status === "pending" && responses !== undefined && visibleOther) {
+            const problem = otherDefectProblem(parseOtherDefects(otherNote ?? ""), otherQty, visibleOther.fieldLabel)
+            if (problem) {
+                return NextResponse.json({ error: `Nothing was submitted: ${problem}.` }, { status: 400 })
+            }
         }
 
         // Filter to only valid field IDs in one query (avoids FK violations)

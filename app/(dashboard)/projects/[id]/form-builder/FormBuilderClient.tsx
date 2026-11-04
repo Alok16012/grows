@@ -576,7 +576,9 @@ export default function FormBuilderClient({
                         <div className="flex items-center gap-[8px]">
                             <h2 className="text-[13.5px] font-[600] text-[var(--text)]">Field Editor</h2>
                             <span className="bg-[var(--accent-light)] text-[var(--accent-text)] rounded-[20px] text-[11px] font-[500] px-[8px] py-[2px]">
-                                {fields.length}
+                                {/* The sections below; the system's NOTE field (the "Other"
+                                    defect description, lib/other-defect) isn't one of them. */}
+                                {fields.filter(f => f.category !== "NOTE").length}
                             </span>
                         </div>
                         <div className="flex items-center gap-[8px]">

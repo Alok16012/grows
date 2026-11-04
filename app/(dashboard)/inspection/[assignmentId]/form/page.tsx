@@ -1,7 +1,12 @@
 "use client"
 
 import { orderBasicFields } from "@/lib/form-field-order"
-import { useState, useEffect, useCallback } from "react"
+import {
+    OTHER_DEFECT_KEY, OTHER_DEFECT_ROW_MAX, OTHER_DEFECT_MAX_ROWS, type OtherDefectRow,
+    isOtherDefectLabel, isOtherDefectNoteField, cleanRowText, otherDefectTextLength,
+    parseOtherDefects, serializeOtherDefects, otherDefectProblem,
+} from "@/lib/other-defect"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
@@ -52,6 +57,11 @@ export default function InspectionFormPage() {
     // Next / Submit was refused because the defects add up to less than the
     // rework quantity — turns the defect total line red until it's fixed.
     const [defectBlocked, setDefectBlocked] = useState(false)
+    // Set once Next was refused for a missing "Other" defect description.
+    const [otherNoteBlocked, setOtherNoteBlocked] = useState(false)
+    // The rows being edited ("Clip broken × 2", "Foam torn × 1"). Kept apart
+    // from the saved text so a blank row just added stays on screen.
+    const [otherRows, setOtherRows] = useState<OtherDefectRow[]>([{ text: "", qty: 0 }])
     const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
     const [gpsStatus, setGpsStatus] = useState<"idle" | "loading" | "ok" | "denied">("idle")
     const [startedAt] = useState<Date>(new Date())
@@ -198,6 +208,18 @@ export default function InspectionFormPage() {
             if (inspData.paperFormPhoto) {
                 initialResponses["paperFormPhoto"] = inspData.paperFormPhoto;
             }
+            // The "Other" defect description is stored on a companion field; the
+            // form edits it under one key and the server maps it back on save.
+            // Every companion field, in case a project ended up with two (two first
+            // saves at once, before the server locked that).
+            const noteFields = Array.isArray(tempData) ? tempData.filter((t: any) => isOtherDefectNoteField(t)) : []
+            for (const nf of noteFields) {
+                if (!(nf.id in initialResponses)) continue
+                if (initialResponses[nf.id] && !initialResponses[OTHER_DEFECT_KEY]) initialResponses[OTHER_DEFECT_KEY] = initialResponses[nf.id]
+                delete initialResponses[nf.id]
+            }
+            const rowsAtLoad = parseOtherDefects(initialResponses[OTHER_DEFECT_KEY])
+            setOtherRows(rowsAtLoad.length ? rowsAtLoad : [{ text: "", qty: 0 }])
 
             const todayStr = new Date().toISOString().split('T')[0]
             tempData.forEach((t: any) => {
@@ -370,12 +392,48 @@ export default function InspectionFormPage() {
     const defectTotal = defectFields.reduce((sum, t) => sum + qty(t.id), 0)
     const defectShortfall = reworkField && defectFields.length > 0 ? Math.max(0, reworkQty - defectTotal) : 0
 
-    /** False (and shows the Defect Entry step with the reason) when the defects fall short of the rework qty. */
+    // Pieces booked under OTHER need saying what the defects were
+    // (lib/other-defect): "Other: 3" tells a reviewer nothing. One row per
+    // different defect, each with its own quantity — typed by the inspector,
+    // never assumed — adding up to the OTHER count.
+    const otherField = defectFields.find(t => isOtherDefectLabel(t.fieldLabel))
+    const otherQty = otherField ? qty(otherField.id) : 0
+    const otherActive = otherQty > 0
+    const otherProblem = otherField ? otherDefectProblem(otherRows, otherQty, otherField.fieldLabel) : null
+    const otherCovered = otherRows.filter(r => r.text.trim()).reduce((s, r) => s + (r.qty || 0), 0)
+    // Whole pieces only: each row needs at least one, so no more rows than that.
+    const otherRowLimit = Math.min(OTHER_DEFECT_MAX_ROWS, Math.max(1, Math.floor(otherQty)))
+
+    const saveOtherRows = (rows: OtherDefectRow[], forQty = otherQty) => {
+        setOtherRows(rows)
+        // Nothing is kept while OTHER is 0: the box is disabled then.
+        handleFieldChange(OTHER_DEFECT_KEY, forQty > 0 ? serializeOtherDefects(rows) : "")
+        if (!otherDefectProblem(rows, forQty)) setOtherNoteBlocked(false)
+    }
+    // OTHER's count changed: re-save, so a 0 clears what was saved and a new
+    // count brings it back. Not on load, which would mark an untouched form
+    // as changed.
+    const prevOtherQty = useRef<number | null>(null)
+    useEffect(() => {
+        if (loading) return
+        if (prevOtherQty.current === null) { prevOtherQty.current = otherQty; return }
+        if (prevOtherQty.current === otherQty) return
+        prevOtherQty.current = otherQty
+        if (canEdit) saveOtherRows(otherRows, otherQty)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [otherQty, loading])
+
+    /**
+     * False (and shows the Defect Entry step with the reason) when the defects
+     * fall short of the rework qty, or OTHER's pieces aren't all described.
+     */
     const checkDefectTotal = () => {
-        if (!canEdit || defectShortfall <= 0) return true
-        setDefectBlocked(true)
+        if (!canEdit || (defectShortfall <= 0 && !otherProblem)) return true
+        const target = defectShortfall > 0 ? "defect-total-check" : `field-${OTHER_DEFECT_KEY}`
+        if (defectShortfall > 0) setDefectBlocked(true)
+        if (otherProblem) setOtherNoteBlocked(true)
         if (defectStepIndex >= 0 && stepIndex !== defectStepIndex) setCurrentStep(defectStepIndex)
-        setTimeout(() => document.getElementById("defect-total-check")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50)
+        setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50)
         return false
     }
 
@@ -836,7 +894,7 @@ export default function InspectionFormPage() {
                             <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 bg-orange-100 px-2 py-0.5 rounded">Sent Back for Corrections</span>
                             <span className="text-[11px] text-orange-500 ml-auto">{inspection.sentBackCount}x</span>
                         </div>
-                        <p className="text-[13px] text-orange-800 italic">"{inspection.reviewerNotes}"</p>
+                        <p className="text-[13px] text-orange-800 italic">&ldquo;{inspection.reviewerNotes}&rdquo;</p>
                     </div>
                 )}
 
@@ -951,6 +1009,103 @@ export default function InspectionFormPage() {
                                 </div>
                             ))}
                         </div>
+                        {/* What the OTHER defects were: one row per different defect, the
+                            quantities adding up to OTHER. Disabled while OTHER is 0. */}
+                        {otherField && (() => {
+                            const rowsEditable = canEdit && otherActive
+                            const shownRows = otherActive ? otherRows : [{ text: "", qty: 0 }]
+                            const multi = shownRows.length > 1
+                            const showError = !!otherProblem && otherNoteBlocked
+                            return (
+                                <fieldset id={`field-${OTHER_DEFECT_KEY}`}
+                                    disabled={!rowsEditable}
+                                    aria-describedby="other-defect-note-hint"
+                                    className={cn(
+                                        "mt-[12px] border rounded-[9px] p-[10px_12px] transition-all min-w-0",
+                                        otherActive ? "bg-white" : "bg-[var(--surface2)] opacity-60",
+                                        showError ? "border-[#fecaca]" : "border-[var(--border)]",
+                                    )}>
+                                    <legend className="sr-only">Other defect — describe it</legend>
+                                    <div aria-hidden="true" className="flex items-center justify-between gap-2 mb-[6px]">
+                                        <span className="text-[10px] font-[600] text-[var(--text3)] uppercase tracking-[0.4px]">
+                                            Other defect — describe it{otherActive && <span className="text-[#dc2626]"> *</span>}
+                                        </span>
+                                        <span className="text-[10px] font-[600] text-[var(--text3)] uppercase tracking-[0.4px] w-[64px] text-center shrink-0 mr-[30px]">Qty{otherActive && <span className="text-[#dc2626]"> *</span>}</span>
+                                    </div>
+                                    <div className="space-y-[6px]">
+                                        {/* Shown empty while OTHER is 0, as saved; the rows come back if
+                                            OTHER goes up again before leaving the page. */}
+                                        {shownRows.map((row, i) => (
+                                            <div key={i} className="flex items-center gap-[6px]">
+                                                <div className="relative flex-1 min-w-0">
+                                                    <input
+                                                        id={i === 0 ? "other-defect-note" : `other-defect-note-${i}`}
+                                                        type="text"
+                                                        value={row.text}
+                                                        onChange={(e) => {
+                                                            // Cut between whole characters: slicing UTF-16 split an
+                                                            // emoji at the limit and the save then failed.
+                                                            saveOtherRows(otherRows.map((r, j) => j === i ? { ...r, text: cleanRowText(e.target.value) } : r))
+                                                        }}
+                                                        placeholder={otherActive
+                                                            ? (i === 0 ? "What exactly is the defect? e.g. Clip broken" : "Another defect, e.g. Foam torn")
+                                                            : `Enter a count under ${otherField.fieldLabel} first`}
+                                                        aria-label={`Other defect ${i + 1} description`}
+                                                        aria-invalid={showError && !row.text.trim()}
+                                                        className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] p-[8px] pr-[52px] text-[13px] text-[var(--text)] outline-none focus:border-[#d97706] focus:bg-white transition-colors placeholder:text-[var(--text3)] disabled:cursor-not-allowed aria-[invalid=true]:!border-[#f87171]"
+                                                    />
+                                                    <span aria-hidden="true" className="absolute right-[8px] top-1/2 -translate-y-1/2 text-[9.5px] text-[var(--text3)] font-mono pointer-events-none">
+                                                        {otherDefectTextLength(row.text)}/{OTHER_DEFECT_ROW_MAX}
+                                                    </span>
+                                                </div>
+                                                <input
+                                                    type="number" inputMode="numeric" min={1} step={1}
+                                                    value={row.qty ? String(row.qty) : ""}
+                                                    onChange={(e) => {
+                                                        const n = Math.max(0, Math.floor(Number(e.target.value) || 0))
+                                                        saveOtherRows(otherRows.map((r, j) => j === i ? { ...r, qty: n } : r))
+                                                    }}
+                                                    placeholder="0"
+                                                    aria-label={`Other defect ${i + 1} quantity`}
+                                                    aria-invalid={showError && !!row.text.trim() && !(row.qty >= 1)}
+                                                    className="w-[64px] shrink-0 bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] p-[7px] text-[14px] font-[700] font-mono text-center outline-none focus:border-[#d97706] focus:bg-white transition-colors placeholder:text-[var(--text3)] placeholder:font-[400] disabled:cursor-not-allowed aria-[invalid=true]:!border-[#f87171]"
+                                                />
+                                                {/* The only row can't be removed, just cleared. */}
+                                                {multi ? (
+                                                    <button type="button"
+                                                        onClick={() => saveOtherRows(otherRows.filter((_, j) => j !== i))}
+                                                        aria-label={`Remove other defect ${i + 1}`}
+                                                        className="w-[24px] h-[24px] shrink-0 rounded-[6px] text-[var(--text3)] hover:text-[#dc2626] hover:bg-[#fef2f2] flex items-center justify-center text-[14px] leading-none">
+                                                        ✕
+                                                    </button>
+                                                ) : <span aria-hidden="true" className="w-[24px] shrink-0" />}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div id="other-defect-note-hint" className="flex items-center justify-between gap-2 mt-[6px] text-[10.5px]">
+                                        <span role={showError ? "alert" : undefined}
+                                            className={showError ? "text-[#b91c1c] font-[600]" : !otherProblem && otherActive ? "text-[#15803d] font-[600]" : "text-[var(--text3)]"}>
+                                            {!otherActive
+                                                ? `Opens when you book pieces under ${otherField.fieldLabel}`
+                                                : !otherProblem ? `✔ ${otherCovered} of ${otherQty} piece${otherQty === 1 ? "" : "s"} described`
+                                                : showError ? `${otherProblem} to continue`
+                                                : otherProblem}
+                                        </span>
+                                        {rowsEditable && otherRows.length < otherRowLimit && (
+                                            <button type="button"
+                                                onClick={() => {
+                                                    // A new row starts blank: its quantity is typed, not guessed.
+                                                    saveOtherRows([...otherRows, { text: "", qty: 0 }])
+                                                    setTimeout(() => document.getElementById(`other-defect-note-${otherRows.length}`)?.focus(), 30)
+                                                }}
+                                                className="shrink-0 text-[11.5px] font-[600] text-[#d97706] hover:underline">
+                                                + Add another
+                                            </button>
+                                        )}
+                                    </div>
+                                </fieldset>
+                            )
+                        })()}
                         {/* Live check against Rework Qty: the defects must cover every reworked
                             piece before Next; more is fine (the extra is counted as rejected). */}
                         {reworkField && reworkQty > 0 && (
