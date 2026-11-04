@@ -22,6 +22,38 @@ type Tab = "needs" | "recent" | "register"
 type Site = { id: string; name: string }
 
 const pad = (n: number) => String(n).padStart(2, "0")
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+
+/** The ways people type a date: "2 nov 2026", "02/11/2026", "2-11-2026", "2026-11-02", "nov 2026", "november 2026". */
+function dateWords(iso: string | null | undefined): string[] {
+    if (!iso) return []
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return []
+    const day = d.getDate(), m = d.getMonth() + 1, y = d.getFullYear()
+    const mon = MONTHS[m - 1], short = mon.slice(0, 3)
+    return [
+        `${day} ${short} ${y}`, `${pad(day)} ${short} ${y}`, `${day} ${mon} ${y}`, `${pad(day)} ${mon} ${y}`,
+        `${pad(day)}/${pad(m)}/${y}`, `${day}/${m}/${y}`, `${pad(day)}-${pad(m)}-${y}`, `${day}-${m}-${y}`,
+        `${pad(day)}.${pad(m)}.${y}`, `${y}-${pad(m)}-${pad(day)}`,
+        `${short} ${y}`, `${mon} ${y}`, `${pad(m)}/${y}`, `${m}/${y}`,
+    ]
+}
+
+/**
+ * Register search: name and code match anywhere, as before; dates and the
+ * other columns (site, added by, source, designation) must match from the
+ * start of a word, so "2 nov" finds 2 Nov but not 12 Nov.
+ */
+function registerMatches(r: RegisterRow, query: string): boolean {
+    const s = query.trim().toLowerCase().replace(/\s+/g, " ")
+    if (!s) return true
+    if (r.name.toLowerCase().includes(s) || r.code.toLowerCase().includes(s)) return true
+    const words = [
+        ...dateWords(r.joiningDate), ...dateWords(r.addedOn), ...dateWords(r.firstSiteFrom), ...dateWords(r.assignedOn),
+        r.firstSite, r.currentSite, r.addedBy, r.assignedBy, r.source, r.designation, r.department,
+    ].filter(Boolean).map(w => String(w).toLowerCase())
+    return (" " + words.join(" | ") + " ").includes(" " + s)
+}
 const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const monthStartKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01` }
 
@@ -206,8 +238,7 @@ function Register({ canExport, onHistory }: { canExport: boolean; onHistory: (w:
     useEffect(() => { window.addEventListener(NEW_JOINERS_CHANGED, load); return () => window.removeEventListener(NEW_JOINERS_CHANGED, load) }, [load])
 
     const shown = useMemo(() => {
-        const s = q.trim().toLowerCase()
-        return (rows ?? []).filter(r => !s || r.name.toLowerCase().includes(s) || r.code.toLowerCase().includes(s))
+        return (rows ?? []).filter(r => registerMatches(r, q))
     }, [rows, q])
     const placed = shown.filter(r => r.firstSite)
     const waiting = shown.filter(r => !r.firstSite)
@@ -240,9 +271,9 @@ function Register({ canExport, onHistory }: { canExport: boolean; onHistory: (w:
                         <option value="">All sites</option>
                         {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select></label>
-                <label className="block flex-1 min-w-[160px]"><span className="block text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-1">Search</span>
+                <label className="block flex-1 min-w-[260px]"><span className="block text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-1">Search</span>
                     <span className="relative block"><Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
-                        <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Name or code" className={cn(input, "w-full pl-8")} /></span></label>
+                        <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Name, code, site or date (e.g. 2 Nov, 02/11/2026)" className={cn(input, "w-full pl-8")} /></span></label>
                 {canExport && (
                     <button type="button" onClick={exportXlsx} disabled={exporting || !rows?.length} className="h-9 px-3 rounded-[9px] text-[12.5px] font-semibold text-white bg-[#16a34a] hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
                         {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Export Excel
