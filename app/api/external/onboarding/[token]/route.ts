@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getHrContacts } from "@/lib/hr-contacts"
 import { isPhotoDoc } from "@/lib/employee-photo"
 import { pendingTitles } from "@/lib/policy-signoff"
+import { recordSiteChanges, type SiteChange } from "@/lib/site-history"
 import {
     collectErrors, validationResponse,
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
@@ -192,6 +193,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
         // 2. NEW: If a site was selected, upsert active Deployment for this employee.
         // Deactivate any prior active deployments first so only one is active.
         if (siteId) {
+            const others = await prisma.deployment.findMany({
+                where: { employeeId: existing.id, isActive: true, NOT: { siteId } },
+                select: { siteId: true },
+            })
             await prisma.deployment.updateMany({
                 where: { employeeId: existing.id, isActive: true, NOT: { siteId } },
                 data: { isActive: false, endDate: new Date() },
@@ -201,7 +206,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
                 select: { id: true },
             })
             if (!activeMatching) {
-                await prisma.deployment.create({
+                const posted = await prisma.deployment.create({
                     data: {
                         employeeId: existing.id,
                         siteId,
@@ -209,6 +214,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
                         isActive: true,
                     },
                 })
+                const change: SiteChange = others.length
+                    ? { action: "deployment.move", employeeId: existing.id, siteId, fromSiteId: others[0].siteId, startDate: posted.startDate, source: "External onboarding", req }
+                    : { action: "deployment.assign", employeeId: existing.id, siteId, startDate: posted.startDate, source: "External onboarding", req }
+                recordSiteChanges([change, ...others.slice(1).map((o): SiteChange => ({ action: "deployment.relieve", employeeId: existing.id, siteId: o.siteId, startDate: new Date(), source: "External onboarding", req }))])
             }
         }
 

@@ -20,6 +20,7 @@ import { normalizeEmploymentType } from "@/lib/employment-type"
 import { resolveManagerId } from "@/lib/employee-manager"
 import { RuleError } from "@/lib/role-rules"
 import crypto from "crypto"
+import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 export async function GET(req: Request) {
     try {
@@ -392,6 +393,12 @@ export async function POST(req: Request) {
         // This keeps pending candidates out of the Employee Logins screen until
         // they're cleared.
         const _login: { email: string; password: string } | null = null
+
+        // The site, if any, follows as its own POST /api/deployments.
+        recordSiteChange({
+            action: "employee.create", employeeId: employee.id, source: "Employee form",
+            joiningDate: employee.dateOfJoining, ...actorOf(session), extra: { status: employee.status }, req,
+        })
 
         // The creator gets the joining link once, here; the token itself is not
         // echoed with the record (lib/access NEVER_RETURNED).

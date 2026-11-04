@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCachedFetch } from "@/lib/useCachedFetch"
+import { NeedsSiteBanner } from "@/components/new-joiners/NeedsSiteBanner"
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 // Each panel gets a soft tint with a matching hairline and icon chip. Local to
@@ -515,6 +516,7 @@ export function AdminOverview({ stats }: { stats: any }) {
 
     return (
         <div className="p-4 lg:p-0 space-y-5">
+            <NeedsSiteBanner />
             {stats.failedQueries > 0 && (
                 <div role="alert" className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
                     {stats.failedQueries} figure{stats.failedQueries === 1 ? "" : "s"} on this page couldn&apos;t be loaded and show as 0 or empty. Refresh in a minute to try again.

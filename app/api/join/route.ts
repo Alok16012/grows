@@ -11,6 +11,7 @@ import {
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import crypto from "crypto"
+import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // Public route — returns site + HR lists so the /join form can render
 // the Work Site and Assigned HR dropdowns without needing a session, and the
@@ -254,9 +255,14 @@ export async function POST(req: Request) {
             console.error("[JOIN_POST] lead-mirror failed:", leadErr)
         }
 
+        recordSiteChange({
+            action: "employee.create", employeeId: employee.id, source: "Join link",
+            joiningDate: employee.dateOfJoining, siteId: siteId || null, req,
+        })
+
         // If a site was selected, create an active Deployment for the new employee
         if (siteId) {
-            await prisma.deployment.create({
+            const posted = await prisma.deployment.create({
                 data: {
                     employeeId: employee.id,
                     siteId,
@@ -265,7 +271,9 @@ export async function POST(req: Request) {
                 },
             }).catch(err => {
                 console.error("[JOIN_POST_DEPLOYMENT]", err)
+                return null
             })
+            if (posted) recordSiteChange({ action: "deployment.assign", employeeId: employee.id, siteId, startDate: posted.startDate, source: "Join link", req })
         }
 
         // Create onboarding record with default tasks

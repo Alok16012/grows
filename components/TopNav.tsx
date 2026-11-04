@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { COMPANY } from "@/lib/company"
 import { formatDistanceToNow } from "date-fns"
+import { NewJoinersAlert } from "@/components/new-joiners/NewJoinersAlert"
 
 interface SearchResults {
     sites: any[]
@@ -256,6 +257,8 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                     <Search size={19} />
                 </button>
                 <div className="flex items-center gap-2">
+                    {/* New joiners without a site (blinks red) — hidden for anyone without employees.view. */}
+                    <NewJoinersAlert />
                     {/* Notification Bell */}
                     <div className="relative" ref={notifRef}>
                         <button

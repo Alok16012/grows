@@ -13,6 +13,7 @@ import {
 } from "@/lib/validation"
 import { generateEmployeeCode } from "@/lib/employee-code"
 import crypto from "crypto"
+import { recordSiteChange, actorOf } from "@/lib/site-history"
 import { accessFrom } from "@/lib/access"
 import { assertCanAssignRole, RuleError } from "@/lib/role-rules"
 
@@ -332,6 +333,12 @@ export async function POST(req: Request) {
             let warning: string | undefined
 
             // Site deployment
+            if (newEmp) {
+                recordSiteChange({
+                    action: "employee.create", employeeId: newEmp.id, source: "Bulk import",
+                    joiningDate: dt(row.dateOfJoining), siteId: siteId || null, ...actorOf(session), req,
+                })
+            }
             if (siteId && newEmp) {
                 await prisma.deployment.create({
                     data: {
@@ -339,7 +346,12 @@ export async function POST(req: Request) {
                         siteId,
                         startDate:  dt(row.dateOfJoining) ?? new Date(),
                         isActive:   true,
+                        createdBy:  session!.user.id,
                     },
+                })
+                recordSiteChange({
+                    action: "deployment.assign", employeeId: newEmp.id, siteId,
+                    startDate: dt(row.dateOfJoining) ?? new Date(), source: "Bulk import", ...actorOf(session), req,
                 })
             } else if (siteName && !siteId && newEmp) {
                 warning = `Site "${siteName}" not found — employee created without site assignment`

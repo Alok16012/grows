@@ -13,6 +13,7 @@ import { resolveManagerId } from "@/lib/employee-manager"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import { pickPhotoUrl } from "@/lib/employee-photo"
+import { recordSiteChange, recordSiteChanges, actorOf } from "@/lib/site-history"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
@@ -355,6 +356,11 @@ export async function PUT(
         if (isLeaving && leavingDate) {
             // Relieve them from every live posting so site rosters and the
             // deployment-based headcount stop counting someone who has left.
+            const live = await prisma.deployment.findMany({ where: { employeeId: params.id, isActive: true }, select: { siteId: true } })
+            recordSiteChanges(live.map(d => ({
+                action: "deployment.relieve" as const, employeeId: params.id, siteId: d.siteId, startDate: leavingDate,
+                source: "Employee leaving" as const, ...actorOf(session), extra: { status: employee.status }, req,
+            })))
             await prisma.deployment.updateMany({
                 where: { employeeId: params.id, isActive: true },
                 data: { isActive: false, endDate: leavingDate, relievedAt: new Date() },
@@ -373,13 +379,14 @@ export async function PUT(
                 const last = await prisma.deployment.findFirst({
                     where: { employeeId: params.id },
                     orderBy: [{ endDate: "desc" }, { startDate: "desc" }],
-                    select: { id: true },
+                    select: { id: true, siteId: true },
                 })
                 if (last) {
                     await prisma.deployment.update({
                         where: { id: last.id },
                         data: { isActive: true, endDate: null, relievedAt: null },
                     })
+                    recordSiteChange({ action: "deployment.restore", employeeId: params.id, siteId: last.siteId, source: "Rejoining", ...actorOf(session), req })
                 }
             }
             // A completed (or in-flight) exit must stop treating this person as

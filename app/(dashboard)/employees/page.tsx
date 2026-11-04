@@ -32,6 +32,7 @@ const EXPORT_COLUMNS = [
 ]
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import { NeedsSiteBanner } from "@/components/new-joiners/NeedsSiteBanner"
 
 // ─── Local Types ──────────────────────────────────────────────────────────────
 
@@ -1570,6 +1571,7 @@ function EmployeesPage() {
 
     return (
         <div className="p-4 lg:p-0 space-y-5">
+            <NeedsSiteBanner />
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-center gap-3 min-w-0">
@@ -1813,7 +1815,10 @@ function EmployeesPage() {
                     </div>
                 )}
                 <div ref={tableWrapRef} className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] overflow-hidden">
-                    <div className="overflow-x-auto">
+                    {/* relative: the header's sr-only "Actions" label is absolutely
+                        positioned; without a positioned box here it was placed against
+                        the page, ~935px across, and phones widened the whole page to fit. */}
+                    <div className="relative overflow-x-auto">
                         {/* Fixed layout with percentage widths: the columns share the
                             card's width, so the table fits the window instead of
                             spilling sideways. Short columns get fixed widths so phone

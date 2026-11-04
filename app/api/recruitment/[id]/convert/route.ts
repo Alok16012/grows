@@ -14,6 +14,7 @@ import {
 } from "@/lib/validation"
 import { Role } from "@prisma/client"
 import crypto from "crypto"
+import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // POST /api/recruitment/[id]/convert
 // Converts a SELECTED/JOINED lead into a full Employee with salary + deployment
@@ -258,17 +259,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
         // ── Site deployment ───────────────────────────────────────────────────
         const targetSiteId = siteId || lead.siteId
+        recordSiteChange({
+            action: "employee.create", employeeId: employee.id, source: "Recruitment",
+            joiningDate: employee.dateOfJoining, siteId: targetSiteId || null, ...actorOf(session), req,
+        })
         if (targetSiteId) {
+            const deployStart = deployStartDate ? new Date(deployStartDate) : (dateOfJoining ? new Date(dateOfJoining) : new Date())
             await prisma.deployment.create({
                 data: {
                     employeeId: employee.id,
                     siteId:     targetSiteId,
-                    startDate:  deployStartDate ? new Date(deployStartDate) : (dateOfJoining ? new Date(dateOfJoining) : new Date()),
+                    startDate:  deployStart,
                     isActive:   true,
+                    createdBy:  session.user.id,
                     ...(deployShift ? { shift: deployShift } : {}),
                     ...(deployRole  ? { role:  deployRole  } : {}),
                 },
             })
+            recordSiteChange({ action: "deployment.assign", employeeId: employee.id, siteId: targetSiteId, startDate: deployStart, source: "Recruitment", ...actorOf(session), req })
         }
 
         // ── Mark lead as converted ────────────────────────────────────────────

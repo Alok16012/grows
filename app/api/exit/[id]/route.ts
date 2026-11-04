@@ -6,6 +6,7 @@ import { checkAccess } from "@/lib/permissions"
 import { computeSettlement } from "@/lib/exit-settlement"
 import { notifyEmployee } from "@/lib/hr-notify"
 import { accessFrom, maskEmployee } from "@/lib/access"
+import { recordSiteChanges, actorOf, type SiteChange } from "@/lib/site-history"
 
 // Exit moves forward one stage at a time. Jumping straight to COMPLETED used to
 // be possible with clearance half-done and nothing paid, which then offboarded
@@ -131,6 +132,8 @@ export async function PUT(
     // meant a failure after the first write left the exit marked COMPLETED while
     // the employee was still active with a working login — and the UI hides the
     // action once an exit is complete, so it could not be retried.
+    // Postings ended by this exit, recorded once the transaction has committed.
+    const relieved: SiteChange[] = []
     const exit = await prisma.$transaction(async (tx) => {
       const updated = await tx.exitRequest.update({
         where: { id: params.id },
@@ -169,6 +172,8 @@ export async function PUT(
         })
 
         // Free the site slot so the leaver stops appearing under it.
+        const live = await tx.deployment.findMany({ where: { employeeId: updated.employeeId, isActive: true }, select: { siteId: true } })
+        for (const d of live) relieved.push({ action: "deployment.relieve", employeeId: updated.employeeId, siteId: d.siteId, startDate: leavingDate, source: "Exit", ...actorOf(session), extra: { status: leftAs }, req })
         await tx.deployment.updateMany({
           where: { employeeId: updated.employeeId, isActive: true },
           data: { isActive: false, endDate: leavingDate, relievedAt: leavingDate },
@@ -183,6 +188,7 @@ export async function PUT(
 
       return updated
     })
+    recordSiteChanges(relieved)
 
     // Moving into clearance: add a return task for every asset still held, so
     // nothing issued walks out of the door unnoticed.

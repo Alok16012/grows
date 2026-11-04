@@ -6,6 +6,7 @@ import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
 import { NO_PASSWORD } from "@/lib/credentials"
 import { validateDateOfBirth, validateJoiningAge } from "@/lib/validation"
+import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -228,6 +229,11 @@ export async function POST(req: Request) {
                     employeeId: employee.id,
                     status: "IN_PROGRESS",
                 },
+            })
+
+            recordSiteChange({
+                action: "employee.create", employeeId: employee.id, source: "CLMS import",
+                joiningDate: contractFromDate, ...actorOf(session), req,
             })
 
             imported++

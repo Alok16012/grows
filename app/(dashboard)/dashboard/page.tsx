@@ -18,6 +18,7 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { NeedsSiteBanner } from "@/components/new-joiners/NeedsSiteBanner"
 
 // ─── Small shared pieces (mirrors the admin dashboard) ───────────────────────
 
@@ -342,6 +343,8 @@ function DesktopDashboard() {
                     </p>
                 </div>
             </div>
+
+            <NeedsSiteBanner />
 
             {/* ── KPI ROW ── */}
             {kpiRow.length > 0 && (

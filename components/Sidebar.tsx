@@ -170,6 +170,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
             links: [
                 { name: "Employee Directory", href: "/employees", permission: "employees.view" },
                 { name: "Employee Master Data", href: "/employees/master", permission: "employees.view" },
+                { name: "New Joiners", href: "/employees/new-joiners", permission: "employees.view" },
                 { name: "Employee Documents", href: "/employees/documents", permission: "documents.view" },
                 { name: "Letters & Documents", href: "/documents/send", permissionAny: ["documents.send", "documents.view"] },
                 { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.manage", "policy.report"] },
