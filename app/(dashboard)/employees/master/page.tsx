@@ -1213,16 +1213,11 @@ export default function EmployeeMasterPage() {
                         <Loader2 size={22} className="animate-spin" style={{ color: "var(--accent)" }} />
                         <span style={{ fontSize: 13, color: "var(--text3)" }}>Loading employees…</span>
                     </div>
-                ) : filteredEmployees.length === 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, gap: 8 }}>
-                        <span style={{ fontSize: 13, color: "var(--text3)" }}>No employees found</span>
-                        {activeFilterCount > 0 && (
-                            <button onClick={() => setColFilters({})} style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-                                Clear column filters
-                            </button>
-                        )}
-                    </div>
                 ) : (
+                    // The table (and its search row) stays up when nothing
+                    // matches. It used to be swapped for a "No employees found"
+                    // panel, which took the search box being typed in away with
+                    // it: no Backspace, no fixing a typo, only "Clear column filters".
                     <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12.5 }}>
                         <thead>
                             {/* Column labels row */}
@@ -1271,6 +1266,23 @@ export default function EmployeeMasterPage() {
                             </tr>
                         </thead>
                         <tbody>
+                            {pagedEmployees.length === 0 && (
+                                <tr>
+                                    <td colSpan={3 + tableCols.length} style={{ padding: 0 }}>
+                                        {/* Pinned to the left edge so it stays in view when the grid is scrolled sideways. */}
+                                        <div style={{ position: "sticky", left: 0, width: "min(100%, 100vw - 120px)", display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 16px", gap: 8 }}>
+                                            <span style={{ fontSize: 13, color: "var(--text3)" }}>
+                                                {activeFilterCount > 0 ? "No employees match these column searches — edit them above" : "No employees found"}
+                                            </span>
+                                            {activeFilterCount > 0 && (
+                                                <button onClick={() => setColFilters({})} style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                                                    Clear column filters
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
                             {pagedEmployees.map((emp, idx) => {
                                 const sc = STATUS_COLOR[emp.status] || { bg: "#f3f4f6", color: "#6b7280" }
                                 const isChecked = selectedIds.has(emp.id)
