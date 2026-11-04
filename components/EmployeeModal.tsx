@@ -247,6 +247,7 @@ export function EmployeeModal({
     const [sameAsCurrent, setSameAsCurrent] = useState(false)
     const [departments, setDepartments] = useState<Department[]>([])
     const [customRoles, setCustomRoles] = useState<{ id: string; name: string; color: string }[]>([])
+    const [managerOptions, setManagerOptions] = useState<{ id: string; name: string; role: string; active: boolean }[]>([])
     const { data: session } = useSession()
     const canViewSalary = can(session, "employees.viewSalary")
     // Fix Login assigns system + custom roles, so it needs the same permission as
@@ -254,6 +255,11 @@ export function EmployeeModal({
     const canManageLogins = can(session, "users.manage")
     const sites = allSites
     const [activeTab, setActiveTab] = useState<"personal" | "employment" | "salary" | "bank" | "compliance" | "safety" | "documents" | "history">("personal")
+    // On a narrow screen the tab strip scrolls sideways (its scrollbar is
+    // hidden), so bring the selected tab into view whenever it changes — Next
+    // and the step dots used to select tabs that sat off the edge.
+    const activeTabRef = useRef<HTMLButtonElement | null>(null)
+    useEffect(() => { activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" }) }, [activeTab])
     type HistoryData = {
         employee: { name: string; status: string; createdAt: string; createdByName: string | null; dateOfJoining: string | null }
         recruitment: {
@@ -292,6 +298,16 @@ export function EmployeeModal({
     useEffect(() => {
         fetch("/api/admin/roles").then(r => r.ok ? r.json() : []).then(setCustomRoles).catch(() => {})
     }, [])
+
+    // Reports-to choices; the current manager is always included so the form
+    // names them even if they no longer qualify.
+    const currentManagerId = employee?.managerId ?? ""
+    useEffect(() => {
+        fetch(`/api/employees/manager-options${currentManagerId ? `?include=${encodeURIComponent(currentManagerId)}` : ""}`)
+            .then(r => r.ok ? r.json() : [])
+            .then(d => setManagerOptions(Array.isArray(d) ? d : []))
+            .catch(() => {})
+    }, [currentManagerId])
 
     useEffect(() => {
         if (activeTab === "documents" && employee) {
@@ -610,9 +626,10 @@ export function EmployeeModal({
                 </div>
 
                 {/* Tabs */}
-                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-4 py-3"><div className="z-tabs z-tabs--inset" role="tablist">
+                <div className="z-tabs-wrap shrink-0 border-b border-[var(--border)] px-4 py-3"><div className="z-tabs z-tabs--inset z-tabs--fill" role="tablist">
                     {(["personal", "employment", ...(canViewSalary ? ["salary"] as const : []), "bank", "compliance", "safety", "documents", ...(employee ? ["history"] as const : [])] as const).map(t => (
-                        <button type="button" key={t} role="tab" aria-selected={activeTab === t} onClick={() => setActiveTab(t)} className={tabCls(t)}>
+                        <button type="button" key={t} role="tab" aria-selected={activeTab === t} onClick={() => setActiveTab(t)} className={tabCls(t)}
+                            ref={activeTab === t ? activeTabRef : undefined}>
                             {t === "personal" ? "Personal" : t === "employment" ? "Employment" : t === "salary" ? "Salary" : t === "bank" ? "Bank" : t === "compliance" ? "Compliance" : t === "safety" ? "Safety" : t === "history" ? "History" : `Docs${pendingDocs.length ? ` (${pendingDocs.length})` : ""}`}
                         </button>
                     ))}
@@ -852,8 +869,19 @@ export function EmployeeModal({
                                     </select>
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Manager</label>
-                                    <input value={form.managerId} onChange={set("managerId")} className={inputCls} placeholder="Manager name or ID" />
+                                    {/* Reports to: a login, picked by name (lib/employee-manager).
+                                        Was a free-text box showing the raw id, and the save ignored it. */}
+                                    <label className={labelCls}>Reports to (Manager)</label>
+                                    <select value={form.managerId} onChange={set("managerId")} className={inputCls}>
+                                        <option value="">— No manager —</option>
+                                        {managerOptions.map(m => (
+                                            <option key={m.id} value={m.id}>{m.name} · {m.role}{m.active ? "" : " (inactive)"}</option>
+                                        ))}
+                                        {/* Until the list loads, keep the current value selectable rather than showing "No manager". */}
+                                        {form.managerId && !managerOptions.some(m => m.id === form.managerId) && (
+                                            <option value={form.managerId}>{managerOptions.length ? "Unknown person" : "Loading…"}</option>
+                                        )}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className={labelCls}>Date of Joining</label>

@@ -17,6 +17,8 @@ import {
 } from "@/lib/validation"
 import { buildEmployeeWhere, employeeFiltersFromParams } from "@/lib/employee-filter"
 import { normalizeEmploymentType } from "@/lib/employment-type"
+import { resolveManagerId } from "@/lib/employee-manager"
+import { RuleError } from "@/lib/role-rules"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
@@ -230,10 +232,21 @@ export async function POST(req: Request) {
             safetyHelmet, safetyHelmetDate, safetyMask, safetyMaskDate,
             safetyJacket, safetyJacketDate, safetyEarMuffs, safetyEarMuffsDate,
             safetyShoes, safetyShoesDate, bankBranch,
+            managerId,
         } = body
 
         if (!firstName) {
             return new NextResponse("firstName is required", { status: 400 })
+        }
+
+        // "Reports to" (a login id, lib/employee-manager). The form sent it but
+        // it was never stored, so a manager picked on Add Employee was lost.
+        let reportsTo: string | null | undefined
+        try {
+            reportsTo = await resolveManagerId(managerId)
+        } catch (e) {
+            if (e instanceof RuleError) return new NextResponse(e.message, { status: e.status })
+            throw e
         }
 
         // Server-side format checks. The form does the same checks for feedback,
@@ -286,6 +299,7 @@ export async function POST(req: Request) {
                 employeeId: finalId,
                 onboardingToken,
                 createdBy: session.user.id,
+                ...(reportsTo ? { managerId: reportsTo } : {}),
                 firstName,
                 lastName: lastName || "",
                 email,

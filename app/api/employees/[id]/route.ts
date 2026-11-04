@@ -9,6 +9,7 @@ import {
     accessTablesReady, bumpAccessVersion, audit, requestMeta,
 } from "@/lib/access"
 import { assertCanAssignRole, assertKeepsAnAdmin, RuleError } from "@/lib/role-rules"
+import { resolveManagerId } from "@/lib/employee-manager"
 import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import { pickPhotoUrl } from "@/lib/employee-photo"
@@ -126,6 +127,9 @@ export async function PUT(
             safetyJacket, safetyJacketDate, safetyEarMuffs, safetyEarMuffsDate,
             safetyShoes, safetyShoesDate, bankBranch,
             systemRole, customRoleId,
+            // "Reports to": a login id (lib/employee-manager). Was sent by the
+            // form but never saved.
+            managerId,
         } = body
 
         // Format checks before anything is written. This is a partial update, so
@@ -265,13 +269,6 @@ export async function PUT(
         if (safetyShoesDate !== undefined) updateData.safetyShoesDate = safetyShoesDate ? new Date(safetyShoesDate) : null
         if (bankBranch !== undefined) updateData.bankBranch = bankBranch || null
 
-        // ─── Leaving / rejoin ────────────────────────────────────────────────
-        // Marking someone TERMINATED / RESIGNED — or completing their exit —
-        // does three things: sets the status, ends their site deployment (below,
-        // after the update), and disables their login (further down). Flipping
-        // the status back to ACTIVE used to only undo the status and the login,
-        // so a rehired employee came back with no site posting, a stale leaving
-        // date, and an exit record that still counted them as gone.
         // A System Role change is checked before anything is written. It used to
         // be checked after the employee, their postings and any exit had been
         // saved, so a refused role change still saved everything else while the
@@ -283,6 +280,12 @@ export async function PUT(
             ? await prisma.employee.findUnique({ where: { id: params.id }, select: { userId: true, user: { select: { customRoleId: true } } } })
             : null
         const roleChanges = !!linked?.userId && (customRoleId || null) !== (linked.user?.customRoleId ?? null)
+        // "Reports to", also checked before anything is written.
+        if (managerId !== undefined) {
+            const own = linked?.userId ?? (await prisma.employee.findUnique({ where: { id: params.id }, select: { userId: true } }))?.userId
+            const resolved = await resolveManagerId(managerId, own)
+            if (resolved !== undefined) updateData.managerId = resolved
+        }
         if (roleChanges) {
             try {
                 await assertCanAssignRole(access, customRoleId || null)
@@ -297,6 +300,13 @@ export async function PUT(
             }
         }
 
+        // ─── Leaving / rejoin ────────────────────────────────────────────────
+        // Marking someone TERMINATED / RESIGNED — or completing their exit —
+        // does three things: sets the status, ends their site deployment (below,
+        // after the update), and disables their login (further down). Flipping
+        // the status back to ACTIVE used to only undo the status and the login,
+        // so a rehired employee came back with no site posting, a stale leaving
+        // date, and an exit record that still counted them as gone.
         const TERMINAL_STATUSES: string[] = ["TERMINATED", "RESIGNED", "INACTIVE"]
         const isLeaving = status === "TERMINATED" || status === "RESIGNED"
         let isRejoining = false

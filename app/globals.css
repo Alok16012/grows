@@ -350,6 +350,11 @@
   box-shadow: var(--shadow-card);
 }
 .z-tabs--inset { background: var(--surface2); box-shadow: none; }
+/* Fill the wrap and let the tabs share it, a little tighter. For a strip in a
+   dialog: the employee form's 8 tabs ran past its edge, so History sat hidden
+   behind the (invisible) scroll. It still scrolls if it truly can't fit. */
+.z-tabs--fill { display: flex; width: 100%; }
+.z-tabs--fill .z-tab { flex: 1 1 auto; justify-content: center; padding: 8px 10px; }
 .z-tab {
   display: inline-flex;
   align-items: center;
