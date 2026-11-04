@@ -248,6 +248,11 @@ export function expandPermissions(stored: string[], scope: DataScope | null): st
         for (const k of ALIASES[p] ?? []) out.add(k)
     }
     out.add(SELF_PERMISSION)
+    // Every signed-in user lands on the dashboard; nothing checks this switch.
+    // Holding it everywhere keeps "you can't grant what you don't hold" honest:
+    // a role whose box was left unticked was refused granting any role that
+    // has it ticked (Quality Engineer, …) over access it effectively has.
+    out.add("dashboard.view")
     return Array.from(out)
 }
 
@@ -306,7 +311,11 @@ export function toCataloguePermissions(stored: string[]): string[] {
  * Executive silently took its bank and KYC details away.
  */
 export function legacyImpliedPermissions(stored: string[]): string[] {
-    const out: string[] = []
+    // Everyone signed in lands on the dashboard; the earlier keys had no
+    // dashboard switch to hold. Without this an older role "lacked" a
+    // permission it effectively has, so it could never grant a role that
+    // includes it (MIS Executive was refused Quality Engineer over dashboard.view).
+    const out: string[] = ["dashboard.view"]
     // Exporting was part of viewing before export became its own action.
     if (stored.includes("employees.view")) out.push("employees.export")
     if (["employees.create", "employees.edit", "onboarding.manage"].some(p => stored.includes(p))) {

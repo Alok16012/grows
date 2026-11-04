@@ -272,6 +272,31 @@ export async function PUT(
         // the status back to ACTIVE used to only undo the status and the login,
         // so a rehired employee came back with no site posting, a stale leaving
         // date, and an exit record that still counted them as gone.
+        // A System Role change is checked before anything is written. It used to
+        // be checked after the employee, their postings and any exit had been
+        // saved, so a refused role change still saved everything else while the
+        // form showed an error. Same rules as the Users screen: needs the right
+        // to change roles, the role may not hold more than the caller does, and
+        // it is checked only when the role actually changes (the form sends the
+        // current one with every save).
+        const linked = customRoleId !== undefined
+            ? await prisma.employee.findUnique({ where: { id: params.id }, select: { userId: true, user: { select: { customRoleId: true } } } })
+            : null
+        const roleChanges = !!linked?.userId && (customRoleId || null) !== (linked.user?.customRoleId ?? null)
+        if (roleChanges) {
+            try {
+                await assertCanAssignRole(access, customRoleId || null)
+            } catch (e) {
+                if (!(e instanceof RuleError)) throw e
+                // Say which field it is about: the form has a dozen tabs and the
+                // bare rule message didn't point at System Role.
+                const target = customRoleId
+                    ? (await prisma.customRole.findUnique({ where: { id: customRoleId }, select: { name: true } }))?.name ?? "that role"
+                    : "no role"
+                throw new RuleError(e.status, `Nothing was saved — System Role can't be changed to ${target}. ${e.message} Set System Role back to the current one to save the other changes, or ask an Admin.`)
+            }
+        }
+
         const TERMINAL_STATUSES: string[] = ["TERMINATED", "RESIGNED", "INACTIVE"]
         const isLeaving = status === "TERMINATED" || status === "RESIGNED"
         let isRejoining = false
@@ -366,16 +391,12 @@ export async function PUT(
                     await assertKeepsAnAdmin([empWithUser.userId])
                     userUpdate.role = systemRole
                 }
-                // Same rules as the Users screen: needs the right to change
-                // roles, and the role may not hold more than the caller does —
-                // checked only when the role actually changes. The edit form
-                // sends the current role with every save, so checking it each
-                // time blocked unrelated edits (a site change by Payroll on a
-                // Quality Engineer failed with "holds 7 permissions you do not have").
-                if (customRoleId !== undefined && (customRoleId || null) !== (empWithUser.user?.customRoleId ?? null)) {
-                    await assertCanAssignRole(access, customRoleId || null)
-                    userUpdate.customRoleId = customRoleId || null
-                }
+                // Already allowed above, before anything was written. Only a
+                // real change is applied: the edit form sends the current role
+                // with every save, so checking it each time blocked unrelated
+                // edits (a site change by Payroll on a Quality Engineer failed
+                // with "holds 7 permissions you do not have").
+                if (roleChanges) userUpdate.customRoleId = customRoleId || null
                 // Sync login email when employee email is updated
                 if (email && email.trim() && !email.includes("@cims.local")) {
                     userUpdate.email = email.trim()
