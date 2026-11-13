@@ -8,6 +8,8 @@ import { MobileBottomNav } from "@/components/MobileBottomNav"
 import { cn } from "@/lib/utils"
 import { COMPANY } from "@/lib/company"
 
+const RAIL_KEY = "grows.sidebar.rail"
+
 export default function DashboardLayout({
     children,
 }: {
@@ -15,8 +17,20 @@ export default function DashboardLayout({
 }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
-    // Load sidebar state from localStorage on desktop if we wanted to
-    // But for mobile it should always be closed by default
+    // Desktop: full sidebar or icon-only rail. The choice is remembered; with
+    // none saved, narrow screens (tablets, small laptops) start on the rail so
+    // the page keeps its room. The phone drawer is always the full sidebar.
+    const [railCollapsed, setRailCollapsed] = useState(false)
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(RAIL_KEY)
+            setRailCollapsed(saved === null ? window.innerWidth < 1100 : saved === "1")
+        } catch { /* storage blocked: keep the full sidebar */ }
+    }, [])
+    const toggleRail = () => setRailCollapsed(c => {
+        try { localStorage.setItem(RAIL_KEY, c ? "0" : "1") } catch { /* not remembered */ }
+        return !c
+    })
 
     return (
         <div className="flex min-h-screen w-full bg-muted/10">
@@ -26,9 +40,9 @@ export default function DashboardLayout({
             </a>
 
             {/* Sidebar Desktop — a full-height deep-blue rail flush to the edge. */}
-            <div className="hidden md:block w-[264px] shrink-0">
+            <div className={cn("hidden md:block shrink-0 transition-[width] duration-200 ease-out", railCollapsed ? "w-[76px]" : "w-[308px]")}>
                 <div className="sticky top-0 h-screen">
-                    <Sidebar />
+                    <Sidebar collapsedRail={railCollapsed} onToggleRail={toggleRail} />
                 </div>
             </div>
 
@@ -41,7 +55,7 @@ export default function DashboardLayout({
             )}
 
             <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-in-out md:hidden",
+                "fixed inset-y-0 left-0 z-50 w-[308px] max-w-[85vw] transform transition-transform duration-300 ease-in-out md:hidden",
                 isSidebarOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <Sidebar onMobileClose={() => setIsSidebarOpen(false)} />
