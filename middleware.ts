@@ -125,8 +125,9 @@ export default withAuth(
 // session and must answer JSON, not a redirect), Next internals, files with an
 // extension (logo, manifest, uploads), and the public pages — login, job
 // applications (/apply), the candidate join form (/join), shared inspection
-// reports (/share) and candidate onboarding links (/onboarding/<token>; the
-// /onboarding list page itself is still protected).
+// reports (/share), candidate onboarding links (/onboarding/<token>; the
+// /onboarding list page itself is still protected) and the Terms of Use and
+// Privacy Notice (/terms, readable before signing in).
 export const config = {
-    matcher: ["/((?!api|_next|login|apply|join|share|onboarding/|.*\\..*).*)"],
+    matcher: ["/((?!api|_next|login|apply|join|share|onboarding/|terms$|.*\\..*).*)"],
 }

@@ -686,7 +686,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 )}
                 <div className="flex items-center justify-between gap-2 px-2 pt-1.5">
                     <p className="text-[10.5px] text-white/45">{`v${COMPANY.version}`}</p>
-                    <Link href="/terms" className="text-[10.5px] text-white/45 hover:text-white">Terms & Conditions</Link>
+                    <Link href="/terms" className="text-[10.5px] text-white/45 hover:text-white">Terms & Privacy</Link>
                 </div>
             </div>
         </div>

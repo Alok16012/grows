@@ -174,7 +174,7 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
         <AuthShell
             title="Welcome back"
             subtitle="Sign in to continue to your workspace"
-            footer={<span>Trouble signing in? Contact your HR or admin.</span>}
+            footer={<span>Trouble signing in? Contact your HR or admin. · <a href="/terms" className="underline underline-offset-2 hover:opacity-80">Terms of Use and Privacy</a></span>}
         >
             <form onSubmit={e => { e.preventDefault(); if (method === "otp" && !otpSentTo) sendOtp(); else submit() }} noValidate>
                 <label htmlFor="loginId" className="block text-[13px] font-semibold text-[var(--text)] mb-1.5">Mobile number / Employee ID</label>
