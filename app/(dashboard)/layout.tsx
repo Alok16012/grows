@@ -40,7 +40,7 @@ export default function DashboardLayout({
             </a>
 
             {/* Sidebar Desktop — a full-height deep-blue rail flush to the edge. */}
-            <div className={cn("hidden md:block shrink-0 transition-[width] duration-200 ease-out", railCollapsed ? "w-[76px]" : "w-[308px]")}>
+            <div className={cn("hidden md:block shrink-0 transition-[width] duration-200 ease-out", railCollapsed ? "w-[76px]" : "w-[280px]")}>
                 <div className="sticky top-0 h-screen">
                     <Sidebar collapsedRail={railCollapsed} onToggleRail={toggleRail} />
                 </div>
@@ -55,7 +55,7 @@ export default function DashboardLayout({
             )}
 
             <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-[308px] max-w-[85vw] transform transition-transform duration-300 ease-in-out md:hidden",
+                "fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] transform transition-transform duration-300 ease-in-out md:hidden",
                 isSidebarOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <Sidebar onMobileClose={() => setIsSidebarOpen(false)} />

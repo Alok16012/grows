@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useLayoutEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -352,17 +353,54 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
         saveCollapsed(visible.map(c => c.title))
     }
 
-    // Icon-only rail (desktop): one tile per category. A tile widens the rail
-    // with that category open; the search tile widens it with the box focused.
+    // Icon-only rail (desktop): one tile per category. A tile opens a pop-out
+    // with that category's pages beside the rail (a one-page category goes
+    // straight there); the search tile widens the rail with the box focused.
     const searchRef = useRef<HTMLInputElement>(null)
     const [focusSearch, setFocusSearch] = useState(false)
     useEffect(() => {
         if (!collapsedRail && focusSearch) { searchRef.current?.focus(); setFocusSearch(false) }
     }, [collapsedRail, focusSearch])
-    const expandTo = (title?: string) => {
-        if (title && !isOpen(title)) toggle(title)
-        onToggleRail?.()
+
+    const [flyout, setFlyout] = useState<{ title: string; top: number; left: number } | null>(null)
+    const flyoutRef = useRef<HTMLDivElement>(null)
+    // Close on a page change, on leaving the rail, on Escape or a click elsewhere.
+    useEffect(() => { setFlyout(null) }, [pathname, collapsedRail])
+    useEffect(() => {
+        if (!flyout) return
+        const onDown = (e: MouseEvent) => {
+            const t = e.target as Element
+            if (flyoutRef.current?.contains(t) || t.closest?.("[data-rail-tile]")) return
+            setFlyout(null)
+        }
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFlyout(null) }
+        const onScroll = () => setFlyout(null)
+        document.addEventListener("mousedown", onDown)
+        document.addEventListener("keydown", onKey)
+        window.addEventListener("resize", onScroll)
+        return () => {
+            document.removeEventListener("mousedown", onDown)
+            document.removeEventListener("keydown", onKey)
+            window.removeEventListener("resize", onScroll)
+        }
+    }, [flyout])
+    const openFlyout = (title: string, tile: HTMLElement) => {
+        if (flyout?.title === title) return setFlyout(null)
+        const r = tile.getBoundingClientRect()
+        const railRight = tile.closest("nav")?.getBoundingClientRect().right ?? r.right
+        const links = visible.find(c => c.title === title)?.links.length ?? 1
+        const height = 52 + links * 38 // header + rows, for keeping it on screen
+        setFlyout({ title, left: railRight + 8, top: Math.max(8, Math.min(r.top - 6, window.innerHeight - height - 8)) })
     }
+    const flyoutCategory = flyout ? visible.find(c => c.title === flyout.title) : null
+    // Once drawn, nudge it up if its real height (section headings included)
+    // would run past the bottom of the window.
+    useLayoutEffect(() => {
+        const el = flyoutRef.current
+        if (!flyout || !el) return
+        const fit = Math.max(8, Math.min(flyout.top, window.innerHeight - el.offsetHeight - 8))
+        if (fit !== flyout.top) setFlyout(f => f && { ...f, top: fit })
+    }, [flyout])
 
     if (collapsedRail) {
         return (
@@ -388,29 +426,95 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                         const Icon = category.icon
                         const holdsActive = category.links.some(isActive)
                         const waiting = category.links.reduce((n, l) => n + (l.badge ? badgeCounts[l.badge] ?? 0 : 0), 0)
+                        const shown = flyout?.title === category.title
+                        const tileCls = cn(
+                            "relative h-10 w-10 shrink-0 rounded-[10px] flex items-center justify-center transition-colors",
+                            holdsActive
+                                ? "bg-white text-[#0a1f4f] shadow-[0_6px_16px_rgba(2,8,32,0.35)]"
+                                : shown
+                                    ? "bg-white/[0.18] text-white ring-1 ring-white/30"
+                                    : "bg-white/[0.06] text-white/75 hover:bg-white/[0.12] hover:text-white"
+                        )
+                        const dot = waiting > 0 && (
+                            <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#ef4444] ring-2 ring-[#0a1f4f]" />
+                        )
+                        const label = waiting ? `${category.title} · ${waiting} waiting` : category.title
+                        // One page: the tile is that page.
+                        if (category.links.length === 1) {
+                            const only = category.links[0]
+                            return (
+                                <Link key={category.title} href={only.href} title={`${category.title}: ${only.name}`} aria-label={only.name}
+                                    aria-current={holdsActive ? "page" : undefined} className={tileCls}>
+                                    <Icon size={18} aria-hidden="true" />
+                                    {dot}
+                                </Link>
+                            )
+                        }
                         return (
                             <button
                                 key={category.title}
                                 type="button"
-                                onClick={() => expandTo(category.title)}
-                                title={waiting ? `${category.title} · ${waiting} waiting` : category.title}
+                                data-rail-tile
+                                onClick={e => openFlyout(category.title, e.currentTarget)}
+                                title={shown ? undefined : label}
                                 aria-label={category.title}
+                                aria-haspopup="menu"
+                                aria-expanded={shown}
                                 aria-current={holdsActive ? "page" : undefined}
-                                className={cn(
-                                    "relative h-10 w-10 shrink-0 rounded-[10px] flex items-center justify-center transition-colors",
-                                    holdsActive
-                                        ? "bg-white text-[#0a1f4f] shadow-[0_6px_16px_rgba(2,8,32,0.35)]"
-                                        : "bg-white/[0.06] text-white/75 hover:bg-white/[0.12] hover:text-white"
-                                )}
+                                className={tileCls}
                             >
                                 <Icon size={18} aria-hidden="true" />
-                                {waiting > 0 && (
-                                    <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#ef4444] ring-2 ring-[#0a1f4f]" />
-                                )}
+                                {dot}
                             </button>
                         )
                     })}
                 </nav>
+                {/* Pop-out beside the rail: the category's pages, same styling as the full sidebar. */}
+                {flyout && flyoutCategory && createPortal(
+                    <div
+                        ref={flyoutRef}
+                        role="menu"
+                        aria-label={flyoutCategory.title}
+                        style={{ top: flyout.top, left: flyout.left }}
+                        className="fixed z-[60] w-[240px] max-h-[calc(100vh-16px)] overflow-y-auto [scrollbar-width:thin] rounded-[14px] p-2 text-white bg-[#0c2459] ring-1 ring-white/10 shadow-[0_18px_40px_rgba(2,8,32,0.45)] animate-in fade-in slide-in-from-left-1 duration-150"
+                    >
+                        <p className="px-2.5 pt-1.5 pb-2 text-[10.5px] font-bold tracking-[1px] uppercase text-[#93b8ff]">{flyoutCategory.title}</p>
+                        <div className="flex flex-col gap-0.5">
+                            {flyoutCategory.links.map((link, i) => {
+                                const active = isActive(link)
+                                const heading = link.group && link.group !== flyoutCategory.links[i - 1]?.group ? link.group : null
+                                return (
+                                    <div key={`${link.href}-${link.name}`}>
+                                        {heading && <p className="px-2.5 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-white/45">{heading}</p>}
+                                        <Link
+                                            href={link.href}
+                                            role="menuitem"
+                                            onClick={() => setFlyout(null)}
+                                            aria-current={active ? "page" : undefined}
+                                            className={cn(
+                                                "flex items-center justify-between gap-2 rounded-[9px] px-2.5 py-2 min-h-[36px] text-[13px] transition-colors",
+                                                active ? "bg-white text-[#0a1f4f] font-semibold" : "text-white/80 hover:bg-white/[0.08] hover:text-white"
+                                            )}
+                                        >
+                                            <span className="leading-tight">{link.name}</span>
+                                            {link.badge && badgeCounts[link.badge] > 0 && (
+                                                <span title={BADGES[link.badge].title} className={cn(
+                                                    "h-[18px] min-w-[18px] shrink-0 rounded-full text-[10px] font-bold flex items-center justify-center px-1.5",
+                                                    active ? "bg-[#c81e1e] text-white" : "bg-white text-[#c81e1e]"
+                                                )}>
+                                                    {badgeCounts[link.badge]}
+                                                </span>
+                                            )}
+                                        </Link>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>,
+                    // At page level: the rail sits in a sticky box, which would
+                    // otherwise keep the pop-out underneath the page content.
+                    document.body
+                )}
                 <div className="py-3 shrink-0 w-full flex justify-center border-t border-white/[0.08]">
                     {session?.user && (
                         <Link href="/profile" title={`${session.user.name || "Signed in"} · ${roleLabel}`} aria-label="My Profile"
@@ -453,7 +557,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             </div>
 
             {/* ── Find a module ── */}
-            <div className="px-3 shrink-0">
+            <div className="px-2 shrink-0">
                 <div className="relative">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/55 pointer-events-none" aria-hidden="true" />
                     <input
@@ -486,7 +590,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             </div>
 
             {/* ── Navigation ── */}
-            <nav aria-label="Main" className="flex-1 overflow-y-auto pt-1 pb-3 px-3 [scrollbar-width:thin] [scrollbar-color:transparent_transparent] hover:[scrollbar-color:rgba(255,255,255,0.22)_transparent] focus-within:[scrollbar-color:rgba(255,255,255,0.22)_transparent]">
+            <nav aria-label="Main" className="flex-1 overflow-y-auto pt-1 pb-3 px-2 [scrollbar-width:thin] [scrollbar-color:transparent_transparent] hover:[scrollbar-color:rgba(255,255,255,0.22)_transparent] focus-within:[scrollbar-color:rgba(255,255,255,0.22)_transparent]">
                 {q && shown.length === 0 && (
                     <p className="px-3 py-6 text-[13px] text-white/60">No module matches “{query.trim()}”.</p>
                 )}
@@ -505,14 +609,14 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                                 aria-controls={listId}
                                 disabled={!!q}
                                 className={cn(
-                                    "w-full flex items-center gap-2 rounded-[10px] px-3 py-2 min-h-[42px] text-left text-[13.5px] font-semibold transition-colors",
+                                    "w-full flex items-center gap-2 rounded-[10px] px-2.5 py-2 min-h-[40px] text-left text-[13px] font-semibold transition-colors",
                                     holdsActive ? "text-white" : "text-white/80 hover:text-white",
                                     !q && "hover:bg-white/[0.06]"
                                 )}
                             >
                                 {/* Icon tile: brighter for the category holding the open page. */}
                                 <span className={cn(
-                                    "h-7 w-7 shrink-0 rounded-[8px] flex items-center justify-center transition-colors",
+                                    "h-[26px] w-[26px] shrink-0 rounded-[8px] flex items-center justify-center transition-colors",
                                     holdsActive ? "bg-white/[0.22] ring-1 ring-white/30 text-white" : "bg-white/[0.08] text-white/70"
                                 )}>
                                     <Icon size={15} aria-hidden="true" />
@@ -529,20 +633,20 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                                         return (
                                             <div key={`${link.href}-${link.name}`}>
                                                 {heading && (
-                                                    <p className="pl-[48px] pr-3 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-[#93b8ff]">{heading}</p>
+                                                    <p className="pl-[44px] pr-2.5 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-[#93b8ff]">{heading}</p>
                                                 )}
                                                 <Link
                                                     href={link.href}
                                                     onClick={onMobileClose}
                                                     aria-current={active ? "page" : undefined}
                                                     className={cn(
-                                                        "relative flex items-center justify-between gap-2 rounded-[10px] pl-[48px] pr-3 py-2 min-h-[38px] text-[13.5px] transition-colors",
+                                                        "relative flex items-center justify-between gap-2 rounded-[10px] pl-[44px] pr-2.5 py-2 min-h-[36px] text-[13px] transition-colors",
                                                         active
                                                             ? "bg-white text-[#0a1f4f] font-semibold shadow-[0_6px_16px_rgba(2,8,32,0.35)]"
                                                             : "text-white/75 hover:bg-white/[0.08] hover:text-white"
                                                     )}
                                                 >
-                                                    {active && <span aria-hidden="true" className="absolute left-[35px] top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-[#1f4fd8]" />}
+                                                    {active && <span aria-hidden="true" className="absolute left-[31px] top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-[#1f4fd8]" />}
                                                     <span className="leading-tight">{link.name}</span>
                                                     {link.badge && badgeCounts[link.badge] > 0 && (
                                                         <span title={BADGES[link.badge].title} className={cn(
@@ -564,7 +668,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             </nav>
 
             {/* ── Footer: who is signed in, then version and terms ── */}
-            <div className="px-3 pt-2 pb-3 mt-auto shrink-0 border-t border-white/[0.08]">
+            <div className="px-2 pt-2 pb-3 mt-auto shrink-0 border-t border-white/[0.08]">
                 {session?.user && (
                     <Link
                         href="/profile"
