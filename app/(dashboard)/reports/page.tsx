@@ -8,7 +8,7 @@ import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
-    ComposedChart, Line, AreaChart, Area, Legend
+    ComposedChart, Line, AreaChart, Area, Legend, LabelList
 } from "recharts"
 import {
     LayoutDashboard,
@@ -45,12 +45,17 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
+// Charts use one colour per quantity, on screen and in the exported PDF
+// (client request, Nov 2026): green = inspected / accepted quantity,
+// orange = rework, red = rejected. `cumulative` is the Pareto line, kept off
+// those three so it can't be read as a quantity.
 const THEME = {
     primary: "#3b82f6",
     success: "#16a34a",
     warning: "#d97706",
     danger: "#dc2626",
-    info: "#06b6d4"
+    info: "#06b6d4",
+    cumulative: "#1e3a8a",
 }
 
 const MONTHS = [
@@ -149,21 +154,7 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
                     </div>
                     {active && (
                         <>
-                            <div style={{ height: Math.max(240, active.buckets.length * 34 + 60) }} className="w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={active.buckets} layout="vertical" margin={{ left: 20, right: 16 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                                        <YAxis dataKey="value" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} width={120}
-                                            tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 18) + "…" : v} />
-                                        <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
-                                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                                        <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
-                                        <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
-                                        <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 4, 4, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <QuantityColumnsLive rows={active.buckets} nameKey="value" max={INSPECTOR_CHART_MAX} what="values" height={340} />
                             <p className="text-[11px] text-[var(--text3)] mt-[6px]">{active.answered} inspections answered “{active.label}”</p>
                         </>
                     )}
@@ -182,8 +173,128 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
                     style={{ width: `${Math.min(value, 100)}%`, backgroundColor: color }}
                 />
             </div>
-            <span className="text-[11px] font-[700] w-[36px] text-right" style={{ color }}>{value.toFixed(1)}%</span>
+            <span className="text-[11px] font-[700] w-[48px] text-right tabular-nums" style={{ color }}>{value.toFixed(2)}%</span>
         </div>
+    )
+}
+
+/** Pixels per chart unit when a chart is captured for the PDF. */
+const CAPTURE_SCALE = 3
+/** Parts / inspectors drawn in the PDF's charts. Keep equal to the same names in ReportPDF.tsx. */
+const PART_CHART_MAX = 12
+const INSPECTOR_CHART_MAX = 15
+/** Height of the PDF's part / inspector column charts (700 wide). Keep in step with ReportPDF.tsx. */
+const PDF_COLUMNS_HEIGHT = 340
+/** Axis text in the PDF charts: larger and darker than on screen, since the image is scaled down on the page. */
+const PDF_TICK = { fontSize: 14, fill: "#1f2937", fontWeight: 500 } as const
+const PDF_TICK_SOFT = { fontSize: 13, fill: "#374151" } as const
+const ratePct = (part: unknown, total: unknown): string => {
+    const p = Number(part) || 0, t = Number(total) || 0
+    if (!p || !t) return "0.00%"
+    const v = (p / t) * 100
+    return v >= 0.01 ? `${v.toFixed(2)}%` : `${v.toFixed(4).replace(/0+$/, "")}%`
+}
+const shortLabel = (max: number) => (v: string) => (typeof v === "string" && v.length > max ? v.slice(0, max - 1) + "…" : v)
+
+/**
+ * A slanted axis name for the PDF charts: one line, ending at its tick. Recharts'
+ * own slanted ticks wrap long names onto several lines, which then run into
+ * the bars and off the edge of the image.
+ */
+function SlantTick({ x, y, payload, max = 18, fontSize = PDF_TICK.fontSize, fill = PDF_TICK.fill }: { x?: number; y?: number; payload?: { value?: unknown }; max?: number; fontSize?: number; fill?: string }) {
+    return (
+        <text x={x} y={y} dy={fontSize} dx={-2} textAnchor="end" transform={`rotate(-32, ${x}, ${y})`} fontSize={fontSize} fontWeight={PDF_TICK.fontWeight} fill={fill}>
+            {shortLabel(max)(String(payload?.value ?? ""))}
+        </text>
+    )
+}
+
+/**
+ * The value printed above a bar in the export charts (the client's own
+ * workbook labels every bar). Turned upright when bars are narrow so
+ * neighbours don't collide; a zero prints nothing.
+ */
+function BarValue({ x = 0, y = 0, width = 0, value, upright }: { x?: number; y?: number; width?: number; value?: unknown; upright?: boolean }) {
+    const v = Number(value) || 0
+    if (!v) return null
+    const cx = Number(x) + Number(width) / 2
+    const text = v.toLocaleString("en-IN")
+    return upright
+        ? <text x={cx} y={Number(y) - 5} transform={`rotate(-90, ${cx}, ${Number(y) - 5})`} textAnchor="start" dominantBaseline="central" fontSize={11} fontWeight={600} fill="#1f2937">{text}</text>
+        : <text x={cx} y={Number(y) - 6} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1f2937">{text}</text>
+}
+/** Head-room above the tallest bar for its label. */
+const labelRoom = (upright: boolean) => [0, (max: number) => niceCeil((max || 1) * (upright ? 1.3 : 1.14))] as [number, (max: number) => number]
+/** Next round scale top at or above v (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8 x a power of ten), so the axis reads 0 / 30,000 / 60,000 … */
+function niceCeil(v: number): number {
+    if (v <= 4) return 4
+    const p = Math.pow(10, Math.floor(Math.log10(v)))
+    const m = v / p
+    return ([1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(step => m <= step) ?? 10) * p
+}
+
+/**
+ * Export chart (PDF and Excel): one group of upright bars per item — Total
+ * Inspected (green), Total Rework (orange), Total Rejected (red) — the layout,
+ * series and bar labels of the client's own MIS workbook (Nov 2026; these were
+ * sideways stacked bars of accepted / rework / rejected). Bars narrow as items
+ * are added, and names slant once there are too many to sit flat.
+ */
+function QuantityColumns({ rows, nameKey, height = PDF_COLUMNS_HEIGHT }: { rows: any[]; nameKey: string; height?: number }) {
+    const count = rows.length
+    const slant = count > 5
+    const barSize = Math.max(7, Math.min(40, Math.floor(600 / Math.max(count, 1) / 4)))
+    const upright = barSize < 34
+    return (
+        <BarChart width={700} height={height} data={rows} margin={{ top: 14, left: slant ? 36 : 0, right: 10, bottom: 4 }} barGap={2}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            {slant
+                ? <XAxis dataKey={nameKey} axisLine={false} tickLine={false} tick={<SlantTick />} interval={0} height={104} />
+                : <XAxis dataKey={nameKey} axisLine={false} tickLine={false} tick={PDF_TICK} interval={0} height={34} tickFormatter={shortLabel(28)} />}
+            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} domain={labelRoom(upright)} />
+            <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
+                <LabelList dataKey="totalInspected" content={<BarValue upright={upright} />} />
+            </Bar>
+            <Bar dataKey="totalRework" name="Total Rework" fill={THEME.warning} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
+                <LabelList dataKey="totalRework" content={<BarValue upright={upright} />} />
+            </Bar>
+            <Bar dataKey="totalRejected" name="Total Rejected" fill={THEME.danger} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
+                <LabelList dataKey="totalRejected" content={<BarValue upright={upright} />} />
+            </Bar>
+        </BarChart>
+    )
+}
+
+/**
+ * The same chart on screen: upright bars side by side — total inspected,
+ * rework, rejected — with a tooltip and a legend. Shows the first `max` rows (the lists
+ * arrive busiest-first) and says so when it leaves some out.
+ */
+function QuantityColumnsLive({ rows, nameKey, max, what, height = 380 }: { rows: any[]; nameKey: string; max: number; what: string; height?: number }) {
+    const shown = rows.slice(0, max)
+    const slant = shown.length > 4
+    return (
+        <>
+            <div style={{ height }} className="w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={shown} margin={{ top: 6, left: slant ? 20 : 0, right: 10, bottom: 4 }} barGap={2}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        {slant
+                            ? <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} height={92} tick={<SlantTick fontSize={11} fill="#5b6478" />} />
+                            : <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} tick={{ fontSize: 11, fill: "#5b6478" }} tickFormatter={shortLabel(28)} />}
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
+                        <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 10 }} />
+                        <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        <Bar dataKey="totalRework" name="Total Rework" fill={THEME.warning} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        <Bar dataKey="totalRejected" name="Total Rejected" fill={THEME.danger} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+            {rows.length > max && (
+                <p className="text-[11px] text-[var(--text3)] mt-[6px]">Top {max} of {rows.length} {what} by inspected quantity.</p>
+            )}
+        </>
     )
 }
 
@@ -197,6 +308,9 @@ async function captureChartToImage(el: HTMLDivElement | null): Promise<string | 
     const clone = svg.cloneNode(true) as SVGSVGElement
     clone.setAttribute('width', String(w))
     clone.setAttribute('height', String(h))
+    if (!clone.getAttribute('viewBox')) clone.setAttribute('viewBox', `0 0 ${w} ${h}`)
+    clone.setAttribute('font-family', 'Arial, Helvetica, sans-serif')
+    clone.style.fontFamily = 'Arial, Helvetica, sans-serif'
     const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
     bg.setAttribute('width', String(w)); bg.setAttribute('height', String(h)); bg.setAttribute('fill', 'white')
     clone.insertBefore(bg, clone.firstChild)
@@ -206,11 +320,12 @@ async function captureChartToImage(el: HTMLDivElement | null): Promise<string | 
         const img = new Image()
         img.onload = () => {
             const c = document.createElement('canvas')
-            c.width = w; c.height = h
+            c.width = w * CAPTURE_SCALE; c.height = h * CAPTURE_SCALE
             const ctx = c.getContext('2d')
             if (!ctx) { URL.revokeObjectURL(url); resolve(null); return }
-            ctx.fillStyle = 'white'; ctx.fillRect(0, 0, w, h)
-            ctx.drawImage(img, 0, 0, w, h)
+            ctx.fillStyle = 'white'; ctx.fillRect(0, 0, c.width, c.height)
+            ctx.imageSmoothingQuality = 'high'
+            ctx.drawImage(img, 0, 0, c.width, c.height)
             URL.revokeObjectURL(url)
             resolve(c.toDataURL('image/png'))
         }
@@ -260,6 +375,7 @@ export default function ReportsPage() {
     const [activeTab, setActiveTab] = useState("Dashboard")
     const [searchTerm, setSearchTerm] = useState("")
     const [exportingPdf, setExportingPdf] = useState(false)
+    const [exportingExcel, setExportingExcel] = useState(false)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const [deleting, setDeleting] = useState(false)
 
@@ -271,6 +387,8 @@ export default function ReportsPage() {
     const inspectorBarRef = useRef<HTMLDivElement>(null)
     const shiftBarRef = useRef<HTMLDivElement>(null)
     const paretoRef = useRef<HTMLDivElement>(null)
+    const weekRef = useRef<HTMLDivElement>(null)
+    const dayDefectsRef = useRef<HTMLDivElement>(null)
 
     // Table features — sorting
     const [sortKey, setSortKey] = useState<string>("date")
@@ -475,7 +593,7 @@ export default function ReportsPage() {
                 "Accepted": d.totalAccepted,
                 "Rework": d.totalRework,
                 "Rejected": d.totalRejected,
-                "Quality Rate": d.qualityRate.toFixed(1) + "%"
+                "Quality Rate": d.qualityRate.toFixed(2) + "%"
             }))
             sheetName = "Day Wise"
             fileNamePrefix = "DayWiseReport"
@@ -488,7 +606,7 @@ export default function ReportsPage() {
                 "Accepted": p.totalAccepted,
                 "Rework": p.totalRework,
                 "Rejected": p.totalRejected,
-                "Quality Rate": p.qualityRate.toFixed(1) + "%"
+                "Quality Rate": p.qualityRate.toFixed(2) + "%"
             }))
             sheetName = "Part Wise"
             fileNamePrefix = "PartWiseReport"
@@ -547,30 +665,77 @@ export default function ReportsPage() {
         XLSX.writeFile(workbook, fileName)
     }
 
+    /**
+     * Pictures of the hidden capture-zone charts, for the PDF and the combined
+     * Excel report. Location and Shift are included only when the forms actually
+     * record them — the same rule the screen uses. Otherwise the report printed
+     * a one-bar "Main" location chart and a "Not specified" shift chart for
+     * sites that have neither field.
+     */
+    const captureCharts = async () => {
+        // Wait briefly for hidden charts to render
+        await new Promise(r => setTimeout(r, 400))
+        const present = (data as any)?.dimensionsPresent ?? {}
+        const wantLocation = present.location !== false && (data?.locationWise?.length ?? 0) > 1
+        const wantShift = present.shift !== false
+        const [pie, trend, partWise, location, inspector, shift, pareto, week, dayDefects] = await Promise.all([
+            captureChartToImage(pieRef.current),
+            captureChartToImage(trendRef.current),
+            captureChartToImage(partWiseBarRef.current),
+            wantLocation ? captureChartToImage(locationBarRef.current) : Promise.resolve(null),
+            captureChartToImage(inspectorBarRef.current),
+            wantShift ? captureChartToImage(shiftBarRef.current) : Promise.resolve(null),
+            captureChartToImage(paretoRef.current),
+            captureChartToImage(weekRef.current),
+            captureChartToImage(dayDefectsRef.current),
+        ])
+        return { pie, trend, partWise, location, inspector, shift, pareto, week, dayDefects }
+    }
+
+    /**
+     * The whole report as one Excel workbook: Dashboard, Summary, Pareto
+     * Analysis, Inspector-Wise Comparison, Shift-Wise Comparison, Top 5 Defects
+     * and Detailed Inspection Data (ReportExcel.ts). Covers everything the
+     * site / project / inspector / date filters select; the table's own search
+     * and column filters don't narrow it.
+     */
+    const handleExportExcelFull = async () => {
+        if (!data) return
+        setExportingExcel(true)
+        try {
+            const chartImages = await captureCharts()
+            const { buildReportWorkbook } = await import("./ReportExcel")
+            const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global View"
+            const buffer = await buildReportWorkbook({
+                data,
+                siteName,
+                project: projects.find(p => p.id === selectedProjectId)?.name || "All Projects",
+                inspector: inspectors.find(i => i.id === selectedInspectorId)?.name || "All Inspectors",
+                period: periodLabel,
+                chartImages,
+            })
+            const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
+            const a = document.createElement("a")
+            a.href = url
+            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${periodSlug}.xlsx`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            toast.success("Excel report downloaded", { description: "7 sheets: Dashboard, Summary, Pareto, Inspector-wise, Shift-wise, Top 5 Defects, Detailed data" })
+        } catch (err) {
+            console.error("Excel report generation failed", err)
+            toast.error("Excel report generation failed. Please try again.")
+        } finally {
+            setExportingExcel(false)
+        }
+    }
+
     const handleExportPdf = async () => {
         if (!data) return
         setExportingPdf(true)
         try {
-            // Wait briefly for hidden charts to render
-            await new Promise(r => setTimeout(r, 400))
-
-            // Capture all chart images from hidden capture zone
-            // Location and Shift go into the PDF only when the forms actually
-            // record them — the same rule the screen uses. Otherwise the PDF
-            // printed a one-bar "Main" location chart and a "Not specified"
-            // shift chart for sites that have neither field.
-            const present = (data as any)?.dimensionsPresent ?? {}
-            const wantLocation = present.location !== false && (data?.locationWise?.length ?? 0) > 1
-            const wantShift = present.shift !== false
-            const [pieImg, trendImg, partWiseImg, locationImg, inspectorImg, shiftImg, paretoImg] = await Promise.all([
-                captureChartToImage(pieRef.current),
-                captureChartToImage(trendRef.current),
-                captureChartToImage(partWiseBarRef.current),
-                wantLocation ? captureChartToImage(locationBarRef.current) : Promise.resolve(null),
-                captureChartToImage(inspectorBarRef.current),
-                wantShift ? captureChartToImage(shiftBarRef.current) : Promise.resolve(null),
-                captureChartToImage(paretoRef.current),
-            ])
+            const { pie: pieImg, trend: trendImg, partWise: partWiseImg, location: locationImg, inspector: inspectorImg, shift: shiftImg, pareto: paretoImg } = await captureCharts()
 
             const [{ pdf }, { ReportDocument }] = await Promise.all([
                 import("@react-pdf/renderer"),
@@ -636,6 +801,18 @@ export default function ReportsPage() {
         { name: "Rejected", value: s.totalRejected, color: THEME.danger },
     ] : [], [s])
 
+    // Week of the month (days 1-7, 8-14, …), as in the client's own workbook.
+    const weekData = useMemo(() => {
+        const weeks = new Map<number, any>()
+        for (const d of (data?.dayWise || []) as any[]) {
+            const w = Math.ceil((Number(String(d.date).slice(8, 10)) || 1) / 7)
+            const a = weeks.get(w) ?? { week: `Week ${w}`, totalInspected: 0, totalAccepted: 0, totalRework: 0, totalRejected: 0 }
+            a.totalInspected += d.totalInspected; a.totalAccepted += d.totalAccepted; a.totalRework += d.totalRework; a.totalRejected += d.totalRejected
+            weeks.set(w, a)
+        }
+        return [...weeks.entries()].sort((x, y) => x[0] - y[0]).map(([, a]) => a)
+    }, [data?.dayWise])
+
     const areaData = useMemo(() => (data?.dayWise || []).map((d: any) => ({
         ...d,
         label: (() => { try { return format(parseISO(d.date), "MMM dd") } catch { return d.date } })(),
@@ -644,7 +821,8 @@ export default function ReportsPage() {
     const paretoData = useMemo(() => (data?.topDefects || []).map((d: any, i: number, arr: any[]) => {
         const cumSum = arr.slice(0, i + 1).reduce((a, b: any) => a + b.count, 0)
         const totalD = arr.reduce((a, b: any) => a + b.count, 0)
-        return { ...d, cumulative: totalD > 0 ? parseFloat(((cumSum / totalD) * 100).toFixed(1)) : 0 }
+        const rejected = d.rejected ?? 0, unclassified = d.unclassified ?? 0
+        return { ...d, rework: d.rework ?? Math.max(0, d.count - rejected - unclassified), rejected, unclassified, cumulative: totalD > 0 ? parseFloat(((cumSum / totalD) * 100).toFixed(1)) : 0 }
     }), [data?.topDefects])
 
     return (
@@ -803,7 +981,7 @@ export default function ReportsPage() {
             </div>
 
             {/* TABS ROW */}
-            <div className="no-print bg-white border-b border-[var(--border)] p-3 md:p-[10px_24px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="no-print report-toolbar bg-white border-b border-[var(--border)] p-3 md:p-[12px_24px]"><div className="report-toolbar__row">
                 <div className="z-tabs-wrap"><div className="z-tabs z-tabs--inset" role="tablist">
                     {["Dashboard", "Graphical", "Pareto Chart", "Day Wise", "Part Wise", "Inspection Report"].map(tab => (
                         <button
@@ -818,7 +996,7 @@ export default function ReportsPage() {
                     ))}
                 </div></div>
 
-                <div className="page-actions">
+                <div className="report-toolbar__actions">
                     {!["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab) && (
                         <button
                             onClick={handleExportPdf}
@@ -826,18 +1004,29 @@ export default function ReportsPage() {
                             className="flex items-center justify-center gap-[6px] bg-[#dc2626] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[#b91c1c] transition-colors disabled:opacity-50"
                         >
                             <FileText className="h-[14px] w-[14px]" />
-                            <span className="hidden sm:inline">{exportingPdf ? "Generating PDF..." : "Export Full Report PDF"}</span>
-                            <span className="sm:hidden">PDF</span>
+                            <span className="rt-long">{exportingPdf ? "Generating PDF..." : "Export Full Report PDF"}</span>
+                            <span className="rt-short">PDF</span>
                         </button>
                     )}
+                    <button
+                        onClick={handleExportExcelFull}
+                        disabled={loading || exportingExcel || !data}
+                        title="Complete report as one Excel workbook: Dashboard, Summary, Pareto, Inspector-wise, Shift-wise, Top 5 Defects and Detailed Inspection Data"
+                        className="flex items-center justify-center gap-[6px] bg-[#15803d] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[#166534] transition-colors disabled:opacity-50"
+                    >
+                        <FileSpreadsheet className="h-[14px] w-[14px]" />
+                        <span className="rt-long">{exportingExcel ? "Generating Excel..." : "Export Full Report Excel"}</span>
+                        <span className="rt-short">{exportingExcel ? "..." : "Full Excel"}</span>
+                    </button>
                     {(["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab)) && (
                         <button
                             onClick={handleExportExcel}
+                            title="Only the table on this tab"
                             disabled={loading || (activeTab === "Day Wise" ? !data?.dayWise?.length : activeTab === "Part Wise" ? !data?.partWise?.length : !filteredRecords?.length)}
                             className="flex items-center justify-center gap-[6px] bg-[var(--accent)] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] focus:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
                         >
                             <FileSpreadsheet className="h-[14px] w-[14px]" />
-                            Excel
+                            Excel (this tab)
                         </button>
                     )}
                     <button
@@ -846,11 +1035,11 @@ export default function ReportsPage() {
                         className="flex items-center justify-center gap-[6px] bg-[var(--accent)] text-white border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 shadow-sm"
                     >
                         {loading ? <div className="h-[14px] w-[14px] rounded-full border-2 border-white border-t-transparent animate-spin" /> : <ExternalLink className="h-[14px] w-[14px]" />}
-                        <span className="hidden sm:inline">Update Dashboard</span>
-                        <span className="sm:hidden">Update</span>
+                        <span className="rt-long">Update Dashboard</span>
+                        <span className="rt-short">Update</span>
                     </button>
                 </div>
-            </div>
+            </div></div>
 
             {/* MAIN CONTENT AREA */}
             <div className="p-3 md:p-[20px_24px]">
@@ -866,8 +1055,12 @@ export default function ReportsPage() {
                 </div>
 
                 {loading ? (
-                    <div className={statGridClass(6)}>
-                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-[128px] sm:h-[148px] rounded-[16px] w-full bg-white border border-[var(--border)]" />)}
+                    <div className="space-y-[12px]">
+                        {[0, 1, 2].map(row => (
+                            <div key={row} className={statGridClass(3)}>
+                                {[1, 2, 3].map(i => <Skeleton key={i} className="h-[112px] sm:h-[148px] rounded-[16px] w-full bg-white border border-[var(--border)]" />)}
+                            </div>
+                        ))}
                     </div>
                 ) : !data ? (
                     <div className="flex flex-col items-center justify-center p-[60px] bg-white border border-[var(--border)] rounded-[14px]">
@@ -880,13 +1073,27 @@ export default function ReportsPage() {
 
                         {/* DASHBOARD STAT CARDS */}
                         {activeTab === "Dashboard" && (
-                            <div className={statGridClass(6)}>
-                                <StatCard label="Total Inspected" value={s?.totalInspected || 0} tone="blue" icon={<Terminal size={20} />} seed={0} />
-                                <StatCard label="Total Accepted" value={s?.totalAccepted || 0} tone="teal" icon={<CheckCircle2 size={20} />} seed={1} />
-                                <StatCard label="Total Rework" value={s?.totalRework || 0} tone="amber" icon={<TrendingDown size={20} />} seed={2} />
-                                <StatCard label="Total Rejected" value={s?.totalRejected || 0} tone="rose" icon={<AlertCircle size={20} />} seed={3} />
-                                <StatCard label="Rework PPM" value={s?.reworkPPM || 0} tone="violet" icon={<Target size={20} />} seed={4} />
-                                <StatCard label="Rejection PPM" value={s?.rejectionPPM || 0} tone="sky" icon={<AlertCircle size={20} />} seed={5} />
+                            // Same three rows as the exported report: one colour per
+                            // quantity, each as quantity, rate and PPM.
+                            <div className="space-y-[12px]">
+                                <div className={statGridClass(3)}>
+                                    <StatCard label="Total Inspected" value={s?.totalInspected || 0} tone="green" icon={<Terminal size={20} />} seed={0} sub="Quantity checked (units)" />
+                                    <StatCard label="Total Accepted" value={s?.totalAccepted || 0} tone="green" icon={<CheckCircle2 size={20} />} seed={1} sub="Quantity passed (units)" />
+                                    <StatCard label="Acceptance Rate (%)" value={ratePct(s?.totalAccepted, s?.totalInspected)} tone="green" icon={<Target size={20} />} seed={2} sub="Accepted ÷ Inspected × 100" />
+                                </div>
+                                <div className={statGridClass(3)}>
+                                    <StatCard label="Total Rework" value={s?.totalRework || 0} tone="amber" icon={<TrendingDown size={20} />} seed={3} sub="Quantity sent for rework (units)" />
+                                    <StatCard label="Rework Rate (%)" value={ratePct(s?.totalRework, s?.totalInspected)} tone="amber" icon={<Target size={20} />} seed={4} sub="Rework ÷ Inspected × 100" />
+                                    <StatCard label="Rework PPM" value={s?.reworkPPM || 0} tone="amber" icon={<Target size={20} />} seed={5} sub="Rework per million inspected" />
+                                </div>
+                                <div className={statGridClass(3)}>
+                                    <StatCard label="Total Rejected" value={s?.totalRejected || 0} tone="rose" icon={<AlertCircle size={20} />} seed={6} sub="Quantity rejected (units)" />
+                                    <StatCard label="Rejected Rate (%)" value={ratePct(s?.totalRejected, s?.totalInspected)} tone="rose" icon={<Target size={20} />} seed={7} sub="Rejected ÷ Inspected × 100" />
+                                    <StatCard label="Rejected PPM" value={s?.rejectionPPM || 0} tone="rose" icon={<AlertCircle size={20} />} seed={8} sub="Rejected per million inspected" />
+                                </div>
+                                <p className="text-[12.5px] font-[600] text-[var(--text2)] px-[2px]">
+                                    Overall PPM (rework + rejected, per million inspected): <span className="text-[var(--text)]">{(s?.overallPPM || 0).toLocaleString("en-IN")}</span>
+                                </p>
                             </div>
                         )}
 
@@ -909,7 +1116,7 @@ export default function ReportsPage() {
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                                    <span className="text-[40px] font-[700] text-[var(--text)] font-mono tracking-[-1px] leading-none">{s?.acceptanceRate.toFixed(1)}%</span>
+                                                    <span className="text-[32px] font-[700] text-[var(--text)] font-mono tracking-[-1px] leading-none">{(s?.acceptanceRate ?? 0).toFixed(2)}%</span>
                                                     <span className="text-[10px] font-[600] text-[var(--text3)] uppercase tracking-[1px] mt-[6px]">Quality Rate</span>
                                                 </div>
                                             </div>
@@ -936,15 +1143,16 @@ export default function ReportsPage() {
                                                 <AreaChart data={areaData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                                     <defs>
                                                         <linearGradient id="colorAccepted" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.1} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
-                                                        <linearGradient id="colorInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.primary} stopOpacity={0.1} /><stop offset="95%" stopColor={THEME.primary} stopOpacity={0} /></linearGradient>
+                                                        <linearGradient id="colorInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                                     </defs>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                                     <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#98a1b5" }} dy={10} />
                                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#98a1b5" }} />
                                                     <Tooltip content={<CustomTooltip />} />
-                                                    <Area type="monotone" dataKey="totalInspected" name="Inspected" stroke={THEME.primary} strokeWidth={2} fillOpacity={1} fill="url(#colorInspected)" />
-                                                    <Area type="monotone" dataKey="totalAccepted" name="Accepted" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#colorAccepted)" />
-                                                    <Line type="monotone" dataKey="totalRejected" name="Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, strokeWidth: 2, stroke: "white" }} />
+                                                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                                                    <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#colorInspected)" />
+                                                    <Line type="monotone" dataKey="totalRework" name="Total Rework" stroke={THEME.warning} strokeWidth={2} dot={{ r: 3, fill: THEME.warning, strokeWidth: 2, stroke: "white" }} />
+                                                    <Line type="monotone" dataKey="totalRejected" name="Total Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, strokeWidth: 2, stroke: "white" }} />
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         </div>
@@ -974,10 +1182,16 @@ export default function ReportsPage() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between mb-[4px]">
                                                         <span className="text-[13px] font-[600] text-[var(--text)] truncate">{d.defectName}</span>
-                                                        <span className="text-[12px] font-[700] text-[#dc2626] ml-[8px] flex-shrink-0">{d.count} <span className="text-[10px] font-[500] text-[var(--text3)]">({d.percentage.toFixed(1)}%)</span></span>
+                                                        <span className="text-[12px] font-[700] ml-[8px] flex-shrink-0 flex items-center gap-[8px]">
+                                                            <span className="text-[#d97706]" title="Rework defects">Rework {(d.rework ?? d.count).toLocaleString()}</span>
+                                                            <span className="text-[#dc2626]" title="Rejected defects">Rejected {(d.rejected ?? 0).toLocaleString()}</span>
+                                                            <span className="text-[var(--text)]">{d.count.toLocaleString()} <span className="text-[10px] font-[500] text-[var(--text3)]">({d.percentage.toFixed(2)}%)</span></span>
+                                                        </span>
                                                     </div>
-                                                    <div className="h-[5px] rounded-full bg-[var(--bg)] overflow-hidden">
-                                                        <div className="h-full rounded-full bg-[#dc2626] transition-all duration-700" style={{ width: `${d.percentage}%` }} />
+                                                    {/* Bar length = share of all defects; orange = rework, red = rejected. */}
+                                                    <div className="h-[6px] rounded-full bg-[var(--bg)] overflow-hidden flex">
+                                                        <div className="h-full bg-[#d97706] transition-all duration-700" style={{ width: `${d.count > 0 ? ((d.rework ?? d.count) / d.count) * d.percentage : 0}%` }} />
+                                                        <div className="h-full bg-[#dc2626] transition-all duration-700" style={{ width: `${d.count > 0 && (d.rejected ?? 0) > 0 ? Math.max(((d.rejected ?? 0) / d.count) * d.percentage, 1) : 0}%` }} />
                                                     </div>
                                                 </div>
                                             </div>
@@ -992,28 +1206,10 @@ export default function ReportsPage() {
                         {activeTab === "Graphical" && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
                                 <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
-                                    <h3 className="text-[14px] font-[600] text-[var(--text)] mb-[20px]">Part-Wise Quality Split</h3>
-                                    {data.partWise.length > 0 ? (
-                                        <div className="h-[400px] w-full">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={data.partWise} layout="vertical" margin={{ left: 20 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                                                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                                                    <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} width={120}
-                                                        tickFormatter={(val: string) => {
-                                                            const row = data.partWise.find((p: any) => p.partName === val)
-                                                            const pn = row?.partNumber ? ` [${row.partNumber}]` : ""
-                                                            return val.length > 18 ? val.slice(0, 18) + "…" + pn : val + pn
-                                                        }}
-                                                    />
-                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
-                                                    <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} radius={0} />
-                                                    <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
-                                                    <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 4, 4, 0]} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    ) : <div className="h-[400px] flex items-center justify-center text-[13px] text-[var(--text3)]">No parts data</div>}
+                                    <h3 className="text-[14px] font-[600] text-[var(--text)] mb-[12px]">Part Wise Comparison</h3>
+                                    {data.partWise.length > 0
+                                        ? <QuantityColumnsLive rows={data.partWise} nameKey="partName" max={PART_CHART_MAX} what="parts" height={360} />
+                                        : <div className="h-[360px] flex items-center justify-center text-[13px] text-[var(--text3)]">No parts data</div>}
                                 </div>
                                 <BreakdownCard dimensions={(data as any).dimensions ?? []} />
                                 {/* Inspector-wise comparison. The API has always aggregated this
@@ -1022,25 +1218,12 @@ export default function ReportsPage() {
                                     charts. Spans both columns so long names stay readable. */}
                                 <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card md:col-span-2">
                                     <div className="flex items-center justify-between mb-[20px]">
-                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Inspector-Wise Comparison</h3>
+                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Inspector-Wise Analysis</h3>
                                         <span className="text-[11px] font-[500] text-[var(--text3)]">{data.inspectorWise?.length ?? 0} inspectors</span>
                                     </div>
-                                    {(data.inspectorWise?.length ?? 0) > 0 ? (
-                                        <div style={{ height: Math.max(240, (data.inspectorWise.length * 34) + 60) }} className="w-full">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={data.inspectorWise} layout="vertical" margin={{ left: 20, right: 16 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                                                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                                                    <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} width={140} />
-                                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
-                                                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                                                    <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
-                                                    <Bar dataKey="totalRework"   name="Rework"   stackId="a" fill={THEME.warning} />
-                                                    <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 4, 4, 0]} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    ) : <div className="h-[240px] flex items-center justify-center text-[13px] text-[var(--text3)]">No inspector data</div>}
+                                    {(data.inspectorWise?.length ?? 0) > 0
+                                        ? <QuantityColumnsLive rows={data.inspectorWise} nameKey="inspectorName" max={INSPECTOR_CHART_MAX} what="inspectors" height={380} />
+                                        : <div className="h-[240px] flex items-center justify-center text-[13px] text-[var(--text3)]">No inspector data</div>}
                                 </div>
                             </div>
                         )}
@@ -1049,7 +1232,7 @@ export default function ReportsPage() {
                             <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
                                 <div className="flex items-center justify-between mb-[24px]">
                                     <div>
-                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Top Defect Analysis</h3>
+                                        <h3 className="text-[14px] font-[600] text-[var(--text)]">Pareto Analysis — Defect Frequency</h3>
                                         <p className="text-[11px] font-[500] text-[var(--text3)] mt-[2px]">Defect frequency vs cumulative impact</p>
                                     </div>
                                     <Badge variant="outline" className="bg-[#fef3c7] text-[#d97706] border-transparent font-[600] px-[10px] py-[2px] text-[11px]">
@@ -1065,8 +1248,11 @@ export default function ReportsPage() {
                                                 <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
                                                 <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} unit="%" />
                                                 <Tooltip content={<CustomTooltip />} />
-                                                <Bar yAxisId="left" dataKey="count" name="Frequency" fill={THEME.danger} radius={[4, 4, 0, 0]} barSize={50} />
-                                                <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.warning} strokeWidth={3} dot={{ r: 4, fill: THEME.warning, strokeWidth: 2, stroke: "white" }} />
+                                                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                                                <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} barSize={50} />
+                                                <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} barSize={50} />
+                                                <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" barSize={50} legendType="none" />
+                                                <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, strokeWidth: 2, stroke: "white" }} />
                                             </ComposedChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -1077,7 +1263,7 @@ export default function ReportsPage() {
                         {activeTab === "Day Wise" && (
                             <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden print-card">
                                 <div className="p-[16px_20px] border-b border-[var(--border)]">
-                                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Daily Inspection Log</h3>
+                                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Day-Wise Inspection Log</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
@@ -1111,7 +1297,7 @@ export default function ReportsPage() {
                         {activeTab === "Part Wise" && (
                             <div className="bg-white border border-[var(--border)] rounded-[14px] overflow-hidden print-card">
                                 <div className="p-[16px_20px] border-b border-[var(--border)]">
-                                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Performance by Component</h3>
+                                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Part-Wise Summary</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
@@ -1395,70 +1581,69 @@ export default function ReportsPage() {
                     </div>
                     {/* Trend Area Chart */}
                     <div ref={trendRef} style={{ width: 700, height: 260, backgroundColor: 'white' }}>
-                        <AreaChart width={700} height={260} data={areaData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                        <AreaChart width={700} height={260} data={areaData} margin={{ top: 10, right: 14, left: 6, bottom: 4 }}>
                             <defs>
                                 <linearGradient id="capAccepted" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
-                                <linearGradient id="capInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.primary} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.primary} stopOpacity={0} /></linearGradient>
+                                <linearGradient id="capInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.18} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} dy={6} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                            <Area type="monotone" dataKey="totalInspected" name="Inspected" stroke={THEME.primary} strokeWidth={2} fillOpacity={1} fill="url(#capInspected)" />
-                            <Area type="monotone" dataKey="totalAccepted" name="Accepted" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#capAccepted)" />
-                            <Line type="monotone" dataKey="totalRejected" name="Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, stroke: 'white', strokeWidth: 2 }} />
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} dy={6} />
+                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} />
+                            <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#capInspected)" />
+                            <Line type="monotone" dataKey="totalRework" name="Total Rework" stroke={THEME.warning} strokeWidth={2} dot={{ r: 3, fill: THEME.warning, stroke: 'white', strokeWidth: 2 }} />
+                            <Line type="monotone" dataKey="totalRejected" name="Total Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, stroke: 'white', strokeWidth: 2 }} />
                         </AreaChart>
                     </div>
-                    {/* Part-wise Bar Chart */}
-                    <div ref={partWiseBarRef} style={{ width: 700, height: 320, backgroundColor: 'white' }}>
-                        <BarChart width={700} height={320} data={data.partWise} layout="vertical" margin={{ left: 10, right: 10 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                            <YAxis dataKey="partName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#5b6478" }} width={100} />
-                            <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
-                            <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
-                            <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 3, 3, 0]} />
-                        </BarChart>
+                    {/* Part-wise chart (PDF capture): upright bars, like the shift chart */}
+                    <div ref={partWiseBarRef} style={{ width: 700, height: PDF_COLUMNS_HEIGHT, backgroundColor: 'white' }}>
+                        <QuantityColumns rows={(data.partWise ?? []).slice(0, PART_CHART_MAX)} nameKey="partName" />
                     </div>
                     {/* Location Bar Chart */}
                     <div ref={locationBarRef} style={{ width: 700, height: 260, backgroundColor: 'white' }}>
                         <BarChart width={700} height={260} data={data.locationWise} margin={{ left: 0, right: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="location" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} dy={8} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                            <Bar dataKey="totalInspected" name="Inspected" fill={THEME.info} radius={[4, 4, 0, 0]} barSize={40} />
+                            <XAxis dataKey="location" axisLine={false} tickLine={false} tick={PDF_TICK} dy={8} />
+                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} />
+                            <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={40} />
                         </BarChart>
                     </div>
-                    {/* Inspector-wise Bar Chart (PDF capture) */}
-                    <div ref={inspectorBarRef} style={{ width: 700, height: Math.max(260, ((data.inspectorWise?.length ?? 0) * 34) + 60) }} className="bg-white">
-                        <BarChart width={700} height={Math.max(260, ((data.inspectorWise?.length ?? 0) * 34) + 60)} data={data.inspectorWise} layout="vertical" margin={{ left: 10, right: 10 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                            <YAxis dataKey="inspectorName" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#5b6478" }} width={140} />
-                            <Bar dataKey="totalAccepted" name="Accepted" stackId="a" fill={THEME.success} />
-                            <Bar dataKey="totalRework" name="Rework" stackId="a" fill={THEME.warning} />
-                            <Bar dataKey="totalRejected" name="Rejected" stackId="a" fill={THEME.danger} radius={[0, 3, 3, 0]} />
-                        </BarChart>
+                    {/* Inspector-wise chart (PDF capture): upright bars, like the shift chart */}
+                    <div ref={inspectorBarRef} style={{ width: 700, height: PDF_COLUMNS_HEIGHT }} className="bg-white">
+                        <QuantityColumns rows={(data.inspectorWise ?? []).slice(0, INSPECTOR_CHART_MAX)} nameKey="inspectorName" />
                     </div>
-                    {/* Shift-wise Bar Chart (PDF capture) */}
+                    {/* Shift-wise chart (PDF / Excel capture) */}
                     <div ref={shiftBarRef} style={{ width: 700, height: 300 }} className="bg-white">
-                        <BarChart width={700} height={300} data={(data as any).shiftWise} margin={{ left: 0, right: 10 }}>
+                        <QuantityColumns rows={(data as any).shiftWise ?? []} nameKey="shiftName" height={300} />
+                    </div>
+                    {/* Week-wise chart (Excel dashboard) */}
+                    <div ref={weekRef} style={{ width: 700, height: 300 }} className="bg-white">
+                        <QuantityColumns rows={weekData} nameKey="week" height={300} />
+                    </div>
+                    {/* Day-wise rework / rejection quantity (Excel dashboard) */}
+                    <div ref={dayDefectsRef} style={{ width: 700, height: 300 }} className="bg-white">
+                        <BarChart width={700} height={300} data={areaData} margin={{ top: 14, left: 0, right: 10, bottom: 4 }} barGap={2}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="shiftName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                            <Bar dataKey="totalAccepted" name="Accepted" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={40} />
-                            <Bar dataKey="totalRework" name="Rework" fill={THEME.warning} barSize={40} />
-                            <Bar dataKey="totalRejected" name="Rejected" fill={THEME.danger} radius={[0, 4, 4, 0]} barSize={40} />
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={<SlantTick />} interval={0} height={64} />
+                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} domain={labelRoom(areaData.length > 8)} />
+                            <Bar dataKey="totalRework" name="Total Rework" fill={THEME.warning} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false}>
+                                <LabelList dataKey="totalRework" content={<BarValue upright={areaData.length > 8} />} />
+                            </Bar>
+                            <Bar dataKey="totalRejected" name="Total Rejected" fill={THEME.danger} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false}>
+                                <LabelList dataKey="totalRejected" content={<BarValue upright={areaData.length > 8} />} />
+                            </Bar>
                         </BarChart>
                     </div>
                     {/* Pareto Chart */}
-                    <div ref={paretoRef} style={{ width: 700, height: 340, backgroundColor: 'white' }}>
-                        <ComposedChart width={700} height={340} data={paretoData} margin={{ top: 10, right: 40, left: 0, bottom: 60 }}>
+                    <div ref={paretoRef} style={{ width: 700, height: 320, backgroundColor: 'white' }}>
+                        <ComposedChart width={700} height={320} data={paretoData} margin={{ top: 14, right: 24, left: 30, bottom: 8 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#5b6478" }} angle={-35} textAnchor="end" height={80} dy={16} />
-                            <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} unit="%" />
-                            <Bar yAxisId="left" dataKey="count" name="Frequency" fill={THEME.danger} radius={[4, 4, 0, 0]} barSize={40} />
-                            <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.warning} strokeWidth={3} dot={{ r: 4, fill: THEME.warning, stroke: 'white', strokeWidth: 2 }} />
+                            <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={<SlantTick />} interval={0} height={104} />
+                            <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} />
+                            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} unit="%" />
+                            <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} barSize={40} />
+                            <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} barSize={40} />
+                            <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" barSize={40} />
+                            <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, stroke: 'white', strokeWidth: 2 }} />
                         </ComposedChart>
                     </div>
                 </div>

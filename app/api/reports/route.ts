@@ -147,6 +147,8 @@ export async function GET(req: Request) {
         const formFields = new Map<string, { label: string; fieldType: string; category: string; fixedColumn: string | null }>()
         const siteMap: Record<string, any> = {}
         const defectMap: Record<string, number> = {}
+        const defectSplit: Record<string, { rework: number; rejected: number; unclassified: number }> = {}
+        const splitQty = { exact: 0, estimated: 0, unclassified: 0 }
         const partModels = new Set<string>()
         const partNumberMap = new Map<string, string>()
         let resolvedSiteName: string | null = null
@@ -184,6 +186,8 @@ export async function GET(req: Request) {
             let { inspected, accepted } = dims
             const { rework, rejected } = dims
 
+            // This inspection's defects, split below into rework and rejected.
+            const ownDefects: [name: string, qty: number][] = []
             for (const r of responses) {
                 const label = r.field.fieldLabel
                 const val = r.value || ""
@@ -197,12 +201,33 @@ export async function GET(req: Request) {
                         // Strip trailing "qty"/"count"/"no" suffixes for cleaner names
                         const cleanName = label.replace(/\s*(qty|count|no\.?|quantity)\s*$/i, "").trim() || label
                         defectMap[cleanName] = (defectMap[cleanName] || 0) + qty
+                        ownDefects.push([cleanName, qty])
                     }
                 } else if (labelHas(label, ["defect type", "defect name", "defect reason"])) {
                     // Fallback: text fields where user types the defect name
                     if (val && val.trim()) {
                         defectMap[val.trim()] = (defectMap[val.trim()] || 0) + 1
+                        ownDefects.push([val.trim(), 1])
                     }
+                }
+            }
+
+            // Rework vs rejected per defect. The form records a quantity per
+            // defect and the inspection's rework and rejected totals, not which
+            // pieces of a defect went which way — so a defect's quantity is split
+            // in the inspection's own rework : rejected ratio. With only rework
+            // or only rejections (the usual case) that is exact; with both it is
+            // an estimate, and with neither it is left unclassified. The three
+            // totals are reported so the PDF can say how much was estimated.
+            if (ownDefects.length) {
+                const disposed = rework + rejected
+                for (const [name, qty] of ownDefects) {
+                    const d = (defectSplit[name] ??= { rework: 0, rejected: 0, unclassified: 0 })
+                    if (disposed <= 0) { d.unclassified += qty; splitQty.unclassified += qty; continue }
+                    d.rework += qty * (rework / disposed)
+                    d.rejected += qty * (rejected / disposed)
+                    if (rework > 0 && rejected > 0) splitQty.estimated += qty
+                    else splitQty.exact += qty
                 }
             }
 
@@ -286,11 +311,20 @@ export async function GET(req: Request) {
         const topDefects = Object.entries(defectMap)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 15)
-            .map(([defectName, count]) => ({
-                defectName,
-                count,
-                percentage: totalDefects > 0 ? parseFloat(((count / totalDefects) * 100).toFixed(2)) : 0,
-            }))
+            .map(([defectName, count]) => {
+                // Whole numbers that still add up to the defect's count.
+                const sp = defectSplit[defectName] ?? { rework: 0, rejected: 0, unclassified: 0 }
+                const rejected = Math.min(count, Math.round(sp.rejected))
+                const unclassified = Math.min(count - rejected, Math.round(sp.unclassified))
+                return {
+                    defectName,
+                    count,
+                    rework: count - rejected - unclassified,
+                    rejected,
+                    unclassified,
+                    percentage: totalDefects > 0 ? parseFloat(((count / totalDefects) * 100).toFixed(2)) : 0,
+                }
+            })
 
         const shiftWise = mapToArray(shiftMap, (a, b) => b.totalInspected - a.totalInspected)
 
@@ -308,6 +342,12 @@ export async function GET(req: Request) {
             formFields: [...formFields.values()],
             siteWise,
             topDefects,
+            // How much defect quantity was split exactly, by estimate, or not at all.
+            defectSplit: {
+                exact: Math.round(splitQty.exact),
+                estimated: Math.round(splitQty.estimated),
+                unclassified: Math.round(splitQty.unclassified),
+            },
             records: inspections.map(i => {
                 const r: any = {
                     id: i.id,

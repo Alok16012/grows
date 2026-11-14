@@ -216,6 +216,49 @@
   .page-actions { justify-content: flex-end; }
   .page-actions > * { flex: 0 0 auto; min-height: 0; }
 }
+/* Reports toolbar: the tab strip and the export / update buttons. When the card
+   is wide enough for both they share one line; otherwise the tabs take the
+   first line and the buttons sit right-aligned on the second. The buttons never
+   wrap among themselves (one used to drop alone onto its own line) and the tab
+   strip is never squeezed until a tab is cut off. Sized by the card, not the
+   window, so it stays right with the sidebar open or collapsed. */
+.report-toolbar { container-type: inline-size; }
+.report-toolbar__row { display: flex; flex-direction: column; gap: 10px; }
+.report-toolbar__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.report-toolbar__actions > * { flex: 1 1 auto; justify-content: center; min-height: 40px; white-space: nowrap; }
+/* Short button labels ("PDF", "Full Excel", "Update") until the card can hold the
+   full ones side by side. */
+.report-toolbar .rt-long { display: none; }
+@container (min-width: 600px) {
+  .report-toolbar__actions { flex-wrap: nowrap; justify-content: flex-end; }
+  .report-toolbar__actions > * { flex: 0 0 auto; min-height: 38px; }
+  .report-toolbar .rt-long { display: inline; }
+  .report-toolbar .rt-short { display: none; }
+}
+/* A narrow card: the six tabs share the full width, a little tighter, so the
+   last one is not cut off. */
+@container (max-width: 759.98px) {
+  .report-toolbar .z-tabs { display: flex; width: 100%; }
+  .report-toolbar .z-tab { flex: 1 1 auto; justify-content: center; padding: 8px 8px; }
+}
+/* Too narrow for six tabs in a line (phones): two tidy rows of three instead
+   of a strip that hides the last tabs behind a sideways scroll. */
+@container (max-width: 599.98px) {
+  .report-toolbar .z-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    min-width: 0;
+    border-radius: 18px;
+  }
+  .report-toolbar .z-tab { padding: 8px 6px; }
+}
+@container (max-width: 330px) {
+  .report-toolbar .z-tabs { gap: 2px; }
+  .report-toolbar .z-tab { padding: 8px 3px; font-size: 12px; }
+}
+@container (min-width: 1250px) {
+  .report-toolbar__row { flex-direction: row; align-items: center; justify-content: space-between; }
+}
 /* Filter rows: on phones the search box takes a full line and the dropdowns
    pair up two per line at equal width; from 640px they flow in one row. */
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
