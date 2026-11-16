@@ -154,12 +154,29 @@ function table(ws: Worksheet, top: number, left: number, cols: Col[], rows: Reco
     return r + 1
 }
 
-/** Places a captured chart; `width` in pixels, height from the capture's own shape. */
+/** Width / height of a PNG data URL, read from its header; `fallback` if it can't be read. */
+function pngShape(dataUrl: string | null | undefined, fallback: number): number {
+    try {
+        const b64 = String(dataUrl ?? "").split(",")[1]?.slice(0, 44)
+        if (!b64) return fallback
+        const bin = atob(b64)
+        const u32 = (o: number) => ((bin.charCodeAt(o) << 24) | (bin.charCodeAt(o + 1) << 16) | (bin.charCodeAt(o + 2) << 8) | bin.charCodeAt(o + 3)) >>> 0
+        const w = u32(16), h = u32(20)
+        return w > 0 && h > 0 ? w / h : fallback
+    } catch {
+        return fallback
+    }
+}
+
+/**
+ * Places a captured chart; `width` in pixels, height from the picture's own
+ * shape (charts grow taller to fit long names), `shape` only as a fallback.
+ */
 function picture(wb: Workbook, ws: Worksheet, dataUrl: string | null | undefined, col: number, row: number, width: number, shape: number) {
     if (!dataUrl || !dataUrl.startsWith("data:image/png")) return false
     const id = wb.addImage({ base64: dataUrl, extension: "png" })
     // tl is zero-based; keep the chart's proportions so text isn't squashed.
-    ws.addImage(id, { tl: { col: col - 1, row: row - 1 }, ext: { width, height: Math.round(width / shape) } })
+    ws.addImage(id, { tl: { col: col - 1, row: row - 1 }, ext: { width, height: Math.round(width / pngShape(dataUrl, shape)) } })
     return true
 }
 
@@ -252,23 +269,25 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
 
         // The charts of the client's own dashboard, two across and in its order,
         // then the two it doesn't have. A missing chart leaves no gap.
-        const BARS = "Green = total inspected, orange = total rework, red = total rejected."
+        // Each picture carries its own key and data labels (drawn when the chart
+        // is captured on the reports page); the line under it only adds what the
+        // picture can't say. Shapes are the capture sizes there, key included.
         const charts: [title: string, url: string | null | undefined, shape: number, caption: string][] = [
-            ["Defect Wise (Pareto)", img.pareto, 700 / 320, "Bars: orange = rework defects, red = rejected defects. Line: cumulative %."],
-            ["Week Wise", img.week, 700 / 300, BARS],
-            ["Shift Wise", shiftRecorded ? img.shift : null, 700 / 300, BARS],
-            ["Inspector Wise", img.inspector, 700 / 340, BARS + " Busiest 15."],
-            ["Overall Status", img.pie, 500 / 280, "Green = accepted, orange = rework, red = rejected. Whole ring = total inspected."],
-            ["Part Wise", img.partWise, 700 / 340, BARS + " Busiest 12; all parts are on the Summary sheet."],
-            ["Rework / Rejection Qty (day wise)", img.dayDefects, 700 / 300, "Orange = total rework, red = total rejected, per day."],
-            ["Daily Performance Trend", img.trend, 700 / 260, BARS + " Quantity per day."],
-            ["Location Wise", img.location, 700 / 260, "Green = total inspected quantity."],
+            ["Defect Wise (Pareto)", img.pareto, 700 / 340, "Bars: quantity of each defect. Line: running share of all defects."],
+            ["Week Wise", img.week, 700 / 330, "Week 1 = days 1-7, Week 2 = days 8-14, and so on."],
+            ["Shift Wise", shiftRecorded ? img.shift : null, 700 / 330, ""],
+            ["Inspector Wise", img.inspector, 700 / 370, "Busiest 15; everyone is on the Inspector-Wise Comparison sheet."],
+            ["Overall Status", img.pie, 700 / 180, "Whole ring = total inspected."],
+            ["Part Wise", img.partWise, 700 / 370, "Busiest 12; all parts are on the Summary sheet."],
+            ["Rework / Rejection Qty (day wise)", img.dayDefects, 700 / 285, "Quantity per day."],
+            ["Daily Performance Trend", img.trend, 700 / 262, "Quantity per day. Rework and rejected are labelled in the day-wise chart."],
+            ["Location Wise", img.location, 700 / 300, ""],
         ]
         const shown = charts.filter(c => !!c[1])
         const WIDTH = 520 // just under 6 columns
         for (let i = 0; i < shown.length; i += 2) {
             const pair = shown.slice(i, i + 2)
-            const rowsUsed = Math.max(...pair.map(([, , shape]) => Math.ceil(WIDTH / shape / 20))) + 1
+            const rowsUsed = Math.max(...pair.map(([, url, shape]) => Math.ceil(WIDTH / pngShape(url, shape) / 20))) + 1
             pair.forEach(([title, url, shape, caption], k) => {
                 const c = 2 + k * 6
                 label(ws, r, c, title, 6)
@@ -351,11 +370,11 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
             { header: "CUMM%", key: "cumPct", width: 11, fmt: PCT },
         ], rows, { totalLabel: "TOTAL", empty: "No defects recorded for this period" })
         for (let c = 9; c <= 16; c++) ws.getColumn(c).width = 13
-        if (picture(wb, ws, img.pareto, 9, r + 1, 720, 700 / 320)) {
-            const below = r + 2 + Math.ceil(720 / (700 / 320) / 20)
+        if (picture(wb, ws, img.pareto, 9, r + 1, 720, 700 / 340)) {
+            const below = r + 2 + Math.ceil(720 / pngShape(img.pareto, 700 / 340) / 20)
             ws.mergeCells(below, 9, below, 16)
             const l = ws.getCell(below, 9)
-            l.value = "Bars: orange = rework defects, red = rejected defects (left scale). Line: cumulative % (right scale)."
+            l.value = "Bars: quantity of each defect. Line: running share of all defects."
             l.font = { size: 9, color: { argb: K.muted } }
         }
 
@@ -366,11 +385,11 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
         const ws = wb.addWorksheet(sheet, { views: [{ showGridLines: false }] })
         const r = heading(ws, title, input, 10)
         const next = table(ws, r, 1, qtyCols({ header: first, key: "name", width: 30 }), list.map(x => qtyRow({ name: x[nameKey] }, x)), { totalLabel: "Grand Total", empty })
-        if (picture(wb, ws, url, 1, next + 1, 760, 700 / (sheet.startsWith("Shift") ? 300 : 340))) {
-            const below = next + 2 + Math.ceil(760 / (700 / 340) / 20)
+        if (picture(wb, ws, url, 1, next + 1, 760, 700 / (sheet.startsWith("Shift") ? 330 : 370))) {
+            const below = next + 2 + Math.ceil(760 / pngShape(url, 700 / 370) / 20)
             ws.mergeCells(below, 1, below, 10)
             const l = ws.getCell(below, 1)
-            l.value = `Green = total inspected, orange = total rework, red = total rejected.${!sheet.startsWith("Shift") && list.length > 15 ? " Chart shows the 15 busiest; the table lists everyone." : ""}`
+            l.value = !sheet.startsWith("Shift") && list.length > 15 ? "Chart shows the 15 busiest; the table lists everyone." : ""
             l.font = { size: 9, color: { argb: K.muted } }
         }
     }

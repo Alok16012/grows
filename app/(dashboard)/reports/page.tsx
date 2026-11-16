@@ -8,7 +8,7 @@ import { INSPECTION_PERMISSIONS } from "@/lib/permissions"
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
-    ComposedChart, Line, AreaChart, Area, Legend, LabelList
+    ComposedChart, Line, AreaChart, Area, Legend, LabelList, usePlotArea
 } from "recharts"
 import {
     LayoutDashboard,
@@ -96,7 +96,7 @@ function CustomTooltip({ active, payload, label, payload: _payload }: any) {
                             <div className="w-[8px] h-[8px] rounded-full" style={{ backgroundColor: p.color || p.fill }} />
                             <span className="text-[12px] text-white font-[500]">{p.name}:</span>
                         </div>
-                        <span className="text-[12.5px] font-[700] text-white font-mono">{typeof p.value === "number" ? p.value.toLocaleString() : p.value}</span>
+                        <span className="text-[12.5px] font-[700] text-white font-mono">{p.dataKey === "cumulative" ? `${(Number(p.value) || 0).toFixed(2)}%` : typeof p.value === "number" ? p.value.toLocaleString() : p.value}</span>
                     </div>
                 ))}
             </div>
@@ -183,87 +183,416 @@ const CAPTURE_SCALE = 3
 /** Parts / inspectors drawn in the PDF's charts. Keep equal to the same names in ReportPDF.tsx. */
 const PART_CHART_MAX = 12
 const INSPECTOR_CHART_MAX = 15
-/** Height of the PDF's part / inspector column charts (700 wide). Keep in step with ReportPDF.tsx. */
-const PDF_COLUMNS_HEIGHT = 340
-/** Axis text in the PDF charts: larger and darker than on screen, since the image is scaled down on the page. */
-const PDF_TICK = { fontSize: 14, fill: "#1f2937", fontWeight: 500 } as const
-const PDF_TICK_SOFT = { fontSize: 13, fill: "#374151" } as const
+/**
+ * Axis text: one style for every axis of every chart, names and numbers alike.
+ * The exported pictures (PDF and Excel) use a larger, darker size, since they
+ * are scaled down on the page; the screen uses the smaller one.
+ */
+const PDF_TICK = { fontSize: 13, fill: "#1f2937", fontWeight: 500 } as const
+const SCREEN_TICK = { fontSize: 11, fill: "#5b6478", fontWeight: 500 } as const
+/** A scale's name, written along it in the axis style (bold). */
+const axisTitle = (value: string, side: "left" | "right", t: { fontSize: number; fill: string }) => ({
+    value, angle: side === "left" ? -90 : 90, position: side === "left" ? "insideLeft" : "insideRight",
+    style: { textAnchor: "middle", fontSize: t.fontSize, fill: t.fill, fontWeight: 700 },
+}) as const
 const ratePct = (part: unknown, total: unknown): string => {
     const p = Number(part) || 0, t = Number(total) || 0
     if (!p || !t) return "0.00%"
     const v = (p / t) * 100
     return v >= 0.01 ? `${v.toFixed(2)}%` : `${v.toFixed(4).replace(/0+$/, "")}%`
 }
-const shortLabel = (max: number) => (v: string) => (typeof v === "string" && v.length > max ? v.slice(0, max - 1) + "…" : v)
+
+type AxisText = { fontSize: number; fill: string }
+/** Width of a piece of axis text, measured in the page's own font (an estimate before the page exists). */
+let measureCtx: CanvasRenderingContext2D | null | undefined
+function textWidth(t: string, size: number): number {
+    if (measureCtx === undefined) measureCtx = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d")
+    if (!measureCtx) return t.length * size * 0.62
+    measureCtx.font = `500 ${size}px ${getComputedStyle(document.body).fontFamily}`
+    return measureCtx.measureText(t).width
+}
+/** Words packed into lines no wider than maxW (a single longer word keeps its own line). */
+function wrapWords(name: string, size: number, maxW: number): string[] {
+    const lines: string[] = []
+    let cur = ""
+    for (const w of name.trim().split(/\s+/)) {
+        const next = cur ? `${cur} ${w}` : w
+        if (cur && textWidth(next, size) > maxW) { lines.push(cur); cur = w } else cur = next
+    }
+    if (cur) lines.push(cur)
+    return lines.length ? lines : [""]
+}
+/** Fewest lines no wider than maxW, then evened out so the lines are about the same length. */
+function balancedWrap(name: string, size: number, maxW: number): string[] {
+    const base = wrapWords(name, size, maxW)
+    if (base.length <= 1) return base
+    let lo = 10, hi = maxW, best = base
+    for (let k = 0; k < 9; k++) {
+        const mid = (lo + hi) / 2
+        const t = wrapWords(name, size, mid)
+        if (t.length <= base.length) { best = t; hi = mid } else lo = mid
+    }
+    return best
+}
+/** One line, cut with "…" only when it can't fit maxW. */
+function clipText(t: string, size: number, maxW: number): string {
+    if (textWidth(t, size) <= maxW) return t
+    let n = t.length
+    while (n > 3 && textWidth(t.slice(0, n) + "…", size) > maxW) n--
+    return t.slice(0, n).trimEnd() + "…"
+}
 
 /**
- * A slanted axis name for the PDF charts: one line, ending at its tick. Recharts'
- * own slanted ticks wrap long names onto several lines, which then run into
- * the bars and off the edge of the image.
+ * How a chart writes the names under its columns, worked out once for all of
+ * them so every name is complete and none touches another:
+ *  - flat, centred under the column, on up to two lines, when they fit;
+ *  - otherwise slanted (35, 50, 65 or 90 degrees, the gentlest that works),
+ *    a long name wrapped onto a few short lines, so the names lie side by side
+ *    without overlapping;
+ *  - only when the columns are too close for any of that (a phone) is each
+ *    name a single upright line, cut with "…" if very long, and if needed only
+ *    every second name written. The tooltip always has the full name.
+ * `height` is what the axis needs; `left` how far the first name reaches left
+ * of the plot area.
  */
-function SlantTick({ x, y, payload, max = 18, fontSize = PDF_TICK.fontSize, fill = PDF_TICK.fill }: { x?: number; y?: number; payload?: { value?: unknown }; max?: number; fontSize?: number; fill?: string }) {
+type NameLayout = { angle: number; lines: Map<string, string[]>; height: number; left: number; every: number; size: number; color: string }
+function nameLayout(names: string[], plotWidth: number, t: AxisText, maxW: number): NameLayout {
+    const size = t.fontSize, lh = Math.round(size * 1.2)
+    const pitch = Math.max(plotWidth, 1) / Math.max(names.length, 1)
+    const make = (angle: number, lines: string[][], every = 1): NameLayout => {
+        const rad = (angle * Math.PI) / 180, sin = Math.sin(rad), cos = Math.cos(rad)
+        let height = 0, left = 0
+        lines.forEach((ls, i) => {
+            const w = Math.max(0, ...ls.map(l => textWidth(l, size)))
+            const block = ls.length * lh
+            height = Math.max(height, angle === 0 ? block : w * sin + block * cos)
+            const reach = angle === 0 ? w / 2 : w * cos + ((ls.length - 1) * lh * sin) / 2
+            left = Math.max(left, reach - (i + 0.5) * pitch)
+        })
+        // + the gap Recharts leaves between the axis and its names, and a little air below.
+        return { angle, lines: new Map(names.map((n, i) => [n, lines[i]])), height: Math.ceil(height + size * 0.6 + 16), left: Math.ceil(left), every, size, color: t.fill }
+    }
+    /** A name on at most `most` lines no wider than `cap`, as even as possible; null if it can't. */
+    const intoLines = (name: string, most: number, cap: number): string[] | null => {
+        // Start from an even split and widen a little at a time: word breaks rarely fall evenly.
+        for (let w = textWidth(name, size) / most + size; w < cap + size; w += size) {
+            const ls = balancedWrap(name, size, Math.min(w, cap))
+            if (ls.length <= most) return ls
+        }
+        return null
+    }
+    const flat = names.map(n => balancedWrap(n, size, pitch - 10))
+    if (flat.every(ls => ls.length <= 2 && ls.every(l => textWidth(l, size) <= pitch - 6))) return make(0, flat)
+    // First with lines no wider than maxW, gentlest slant first; only if nothing fits that
+    // way, lines up to twice as wide, steepest first (keeps the names from reaching far left).
+    const passes: [number[], number][] = [[[35, 50, 65, 90], maxW], [[90, 65, 50, 35], maxW * 2]]
+    for (const [angles, cap] of passes) {
+        for (const angle of angles) {
+            // As many lines as fit between a name and its neighbours at this slant.
+            const most = Math.floor((pitch * Math.sin((angle * Math.PI) / 180) - 3) / lh)
+            if (most < 1) continue
+            const lines = names.map(n => intoLines(n, Math.min(most, 3), cap))
+            if (lines.every(Boolean)) return make(angle, lines as string[][])
+        }
+    }
+    const every = Math.max(1, Math.ceil((lh + 2) / Math.max(pitch, 1)))
+    return make(90, names.map(n => [clipText(n, size, maxW * 2)]), every)
+}
+/**
+ * The name layout for a chart, and the left margin it needs. `room` is the
+ * chart's width less its right margin and all its y-axis widths; `yLeft` the
+ * width of the left y-axis.
+ */
+function fitNames(names: string[], room: number, yLeft: number, baseLeft: number, t: AxisText, maxW: number) {
+    let left = baseLeft
+    let layout = nameLayout(names, room - left, t, maxW)
+    for (let k = 0; k < 4; k++) {
+        const need = Math.max(baseLeft, Math.ceil(layout.left - yLeft + 4))
+        if (need <= left) break
+        left = need
+        layout = nameLayout(names, room - left, t, maxW)
+    }
+    // Whatever the last layout needs, the first name is never cut at the left edge.
+    return { layout, left: Math.max(left, Math.ceil(layout.left - yLeft + 4)) }
+}
+/**
+ * One name under the axis, as `nameLayout` planned it, in the axis style.
+ * Recharts hands every custom tick its own grey `fill`; it is ignored here so
+ * names and numbers share one colour.
+ */
+function NameTick({ x = 0, y = 0, payload, index = 0, layout }: { x?: number; y?: number; payload?: { value?: unknown }; index?: number; layout: NameLayout }) {
+    if (index % layout.every !== 0) return null
+    const name = String(payload?.value ?? "")
+    const lines = layout.lines.get(name) ?? [name]
+    const { size, angle } = layout
+    const lh = Math.round(size * 1.2)
+    const style = { fontSize: size, fontWeight: PDF_TICK.fontWeight, fill: layout.color }
+    if (angle === 0) {
+        return (
+            <text x={x} y={y + 4} textAnchor="middle" {...style}>
+                {lines.map((l, i) => <tspan key={i} x={x} dy={i === 0 ? size : lh}>{l}</tspan>)}
+            </text>
+        )
+    }
+    // Lines of a wrapped name are centred on the tick.
+    const shift = ((lines.length - 1) * lh * Math.sin((angle * Math.PI) / 180)) / 2
+    const ty = y + 3
     return (
-        <text x={x} y={y} dy={fontSize} dx={-2} textAnchor="end" transform={`rotate(-32, ${x}, ${y})`} fontSize={fontSize} fontWeight={PDF_TICK.fontWeight} fill={fill}>
-            {shortLabel(max)(String(payload?.value ?? ""))}
-        </text>
+        <g transform={`translate(${-shift}, 0)`}>
+            <text x={x} y={ty} textAnchor="end" transform={`rotate(-${angle}, ${x}, ${ty})`} {...style}>
+                {lines.map((l, i) => <tspan key={i} x={x - 2} dy={i === 0 ? size * 0.8 : lh}>{l}</tspan>)}
+            </text>
+        </g>
+    )
+}
+/** Width of an element, kept up to date as it resizes. */
+function useElementWidth() {
+    const [width, setWidth] = useState(0)
+    const observer = useRef<ResizeObserver | null>(null)
+    const ref = useCallback((el: HTMLElement | null) => {
+        observer.current?.disconnect()
+        if (!el) return
+        setWidth(Math.round(el.clientWidth))
+        observer.current = new ResizeObserver(e => setWidth(Math.round(e[0].contentRect.width)))
+        observer.current.observe(el)
+    }, [])
+    return [ref, width] as const
+}
+/** Percent scale ticks with two decimals, as every % in the report. */
+const pct2 = (v: unknown) => `${(Number(v) || 0).toFixed(2)}%`
+
+/** Quantities as the report writes them: 1,04,476. */
+const fmtQty = (v: unknown) => (Number(v) || 0).toLocaleString("en-IN")
+
+/** One entry of a chart's key: a colour square (or a short line) and its name, both in the series colour. */
+type KeyItem = { label: string; color: string; line?: boolean }
+const KEY_QTY: KeyItem[] = [
+    { label: "Total Inspected", color: THEME.success },
+    { label: "Total Rework", color: THEME.warning },
+    { label: "Total Rejected", color: THEME.danger },
+]
+const KEY_STATUS: KeyItem[] = [
+    { label: "Accepted", color: THEME.success },
+    { label: "Rework", color: THEME.warning },
+    { label: "Rejected", color: THEME.danger },
+]
+const KEY_DEFECTS: KeyItem[] = [
+    { label: "Rework Defects", color: THEME.warning },
+    { label: "Rejected Defects", color: THEME.danger },
+    { label: "Cumulative %", color: THEME.cumulative, line: true },
+]
+/** Height the key adds under a captured chart, in chart units. Keep in step with ReportPDF.tsx and ReportExcel.ts. */
+const KEY_HEIGHT = 30
+/** A white edge round label text, so it stays readable where a line or bar passes behind it. */
+const HALO = { stroke: "#fff", strokeWidth: 3, paintOrder: "stroke", strokeLinejoin: "round" } as const
+
+/**
+ * The value printed above a bar (the client's own workbook labels every bar).
+ * Turned upright when bars are narrow so neighbours don't collide; a zero
+ * prints nothing. With `minBar`, a bar thinner than that goes unlabelled — on
+ * a phone the rework and rejected bars are a few pixels wide and their labels
+ * would print over each other.
+ */
+function BarValue({ x = 0, y = 0, width = 0, value, upright, size, minBar = 0 }: { x?: number; y?: number; width?: number; value?: unknown; upright?: boolean; size?: number; minBar?: number }) {
+    const v = Number(value) || 0
+    if (!v || Number(width) < minBar) return null
+    const cx = Number(x) + Number(width) / 2
+    const text = fmtQty(v)
+    return upright
+        ? <text x={cx} y={Number(y) - 5} transform={`rotate(-90, ${cx}, ${Number(y) - 5})`} textAnchor="start" dominantBaseline="central" fontSize={size ?? 11} fontWeight={600} fill="#1f2937">{text}</text>
+        : <text x={cx} y={Number(y) - 6} textAnchor="middle" fontSize={size ?? 12} fontWeight={600} fill="#1f2937">{text}</text>
+}
+
+/**
+ * The value beside a point on a line or area. Upright when the points are close
+ * together; when they are closer than the text is tall, every second point is
+ * labelled so the numbers don't print on top of each other.
+ */
+function PointValue({ x = 0, y = 0, value, index = 0, count = 1, size = 11, fill = "#1f2937" }: { x?: number; y?: number; value?: unknown; index?: number; count?: number; size?: number; fill?: string }) {
+    const plot = usePlotArea()
+    const v = Number(value) || 0
+    if (!v) return null
+    const pitch = plot && count > 1 ? plot.width / (count - 1) : 999
+    if (pitch < size + 1 && index % 2 === 1) return null
+    const px = Number(x), py = Number(y)
+    return pitch < size * 4.2
+        ? <text x={px} y={py - 8} transform={`rotate(-90, ${px}, ${py - 8})`} textAnchor="start" dominantBaseline="central" fontSize={size} fontWeight={600} fill={fill} {...HALO}>{fmtQty(v)}</text>
+        : <text x={px} y={py - 9} textAnchor="middle" fontSize={size} fontWeight={600} fill={fill} {...HALO}>{fmtQty(v)}</text>
+}
+
+/** Round top for the Pareto's quantity scale, set here so the labels can be placed against it. */
+const paretoTop = (rows: any[]) => niceCeil(Math.max(1, ...rows.map(r => Number(r.count) || 0)) * 1.04)
+
+/**
+ * Both labels of one Pareto column: the defect quantity on its bar and the
+ * cumulative % on the line. The quantity sits inside the top of the bar (above
+ * it when the bar is too short) and moves below the line's point when the two
+ * would touch.
+ */
+/** Which Pareto % labels go under their point: worked out left to right so no two touch. */
+function paretoPctUnder(rows: any[], plot: { x: number; y: number; width: number; height: number }, size: number): boolean[] {
+    const pitch = plot.width / Math.max(rows.length, 1)
+    const bottom = plot.y + plot.height
+    const placed: { x: number; w: number; y0: number; y1: number }[] = []
+    return rows.map((r, i) => {
+        const x = plot.x + (i + 0.5) * pitch
+        const w = textWidth(pct2(r.cumulative), size) + 4
+        const yLine = bottom - ((Number(r.cumulative) || 0) / 100) * plot.height
+        const boxes = [{ x, w, y0: yLine - 9 - size, y1: yLine - 7 }, { x, w, y0: yLine + 6, y1: yLine + size + 8 }]
+        const clear = (b: typeof boxes[0]) => placed.slice(-3).every(p => Math.abs(p.x - b.x) >= (p.w + b.w) / 2 || b.y1 <= p.y0 || b.y0 >= p.y1)
+        const pick = clear(boxes[0]) || !clear(boxes[1]) ? 0 : 1
+        placed.push(boxes[pick])
+        return pick === 1
+    })
+}
+
+function ParetoLabels({ x = 0, index = 0, rows, top, barWidth, size = 11 }: { x?: number; index?: number; rows: any[]; top: number; barWidth: number; size?: number }) {
+    const plot = usePlotArea()
+    const row = rows[index]
+    if (!plot || !row) return null
+    const pitch = plot.width / Math.max(rows.length, 1)
+    const pctW = textWidth("100.00%", size) + 6
+    // On a phone the columns are a few pixels apart; labels would only overprint.
+    if (pitch < pctW * 0.55) return null
+    const bw = Math.min(barWidth, pitch * 0.8)
+    const bottom = plot.y + plot.height
+    const count = Number(row.count) || 0
+    const yBar = bottom - (count / top) * plot.height
+    const yLine = bottom - ((Number(row.cumulative) || 0) / 100) * plot.height
+    const text = fmtQty(count)
+    const fits = textWidth(text, size) <= bw - 4
+    // Each % sits above its point unless it would touch one of the labels before it; then under.
+    const under = paretoPctUnder(rows, plot, size)[index]
+    const pctY = under ? yLine + size + 6 : yLine - 9
+    const busyTop = under ? yLine - 6 : yLine - 22
+    const busyBottom = under ? yLine + size + 9 : yLine + 8
+    let inside = fits && bottom - yBar >= size + 12
+    let barY = inside ? yBar + size + 3 : yBar - 5
+    if (barY > busyTop && barY - size < busyBottom) {
+        const lower = Math.max(busyBottom + size + 1, yBar + size + 3)
+        if (fits && lower <= bottom - 3) { barY = lower; inside = true }
+    }
+    return (
+        <g>
+            {count > 0 && (inside
+                ? <text x={x} y={barY} textAnchor="middle" fontSize={size} fontWeight={700} fill="#fff">{text}</text>
+                : <text x={x} y={barY} textAnchor="middle" fontSize={size} fontWeight={700} fill="#1f2937" {...HALO}>{text}</text>)}
+            <text x={x} y={pctY} textAnchor="middle" fontSize={size} fontWeight={700} fill={THEME.cumulative} {...HALO}>{pct2(row.cumulative)}</text>
+        </g>
     )
 }
 
 /**
- * The value printed above a bar in the export charts (the client's own
- * workbook labels every bar). Turned upright when bars are narrow so
- * neighbours don't collide; a zero prints nothing.
+ * Labels for a donut's slices: quantity and share beside each slice, joined to
+ * it by a line in the slice's colour. Thin neighbouring slices (rework and
+ * rejected usually are) get their labels spread apart instead of overprinted.
+ * `whole` is what the shares are a part of (total inspected). With `names` the
+ * slice's name leads the label; where there isn't room for the full text the
+ * share alone is shown.
  */
-function BarValue({ x = 0, y = 0, width = 0, value, upright }: { x?: number; y?: number; width?: number; value?: unknown; upright?: boolean }) {
-    const v = Number(value) || 0
-    if (!v) return null
-    const cx = Number(x) + Number(width) / 2
-    const text = v.toLocaleString("en-IN")
-    return upright
-        ? <text x={cx} y={Number(y) - 5} transform={`rotate(-90, ${cx}, ${Number(y) - 5})`} textAnchor="start" dominantBaseline="central" fontSize={11} fontWeight={600} fill="#1f2937">{text}</text>
-        : <text x={cx} y={Number(y) - 6} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1f2937">{text}</text>
-}
-/** Head-room above the tallest bar for its label. */
-const labelRoom = (upright: boolean) => [0, (max: number) => niceCeil((max || 1) * (upright ? 1.3 : 1.14))] as [number, (max: number) => number]
-/** Next round scale top at or above v (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8 x a power of ten), so the axis reads 0 / 30,000 / 60,000 … */
-function niceCeil(v: number): number {
-    if (v <= 4) return 4
-    const p = Math.pow(10, Math.floor(Math.log10(v)))
-    const m = v / p
-    return ([1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(step => m <= step) ?? 10) * p
+function sliceLabels(rows: { name: string; value: number; color: string }[], whole: number, pad: number, opts: { names?: boolean; size?: number } = {}) {
+    const size = opts.size ?? 13
+    const sum = rows.reduce((a, r) => a + (Number(r.value) || 0), 0)
+    const SliceLabel = (p: any) => {
+        const cx = Number(p.cx), cy = Number(p.cy), R = Number(p.outerRadius), index = Number(p.index)
+        const row = rows[index]
+        if (!row || !(row.value > 0) || !sum) return null
+        const live = rows.filter(r => r.value > 0).length
+        const gap = live > 1 ? pad : 0
+        const sweep = 360 - live * gap
+        let a = 0
+        const pts = rows.map((r, i) => {
+            const ang = r.value > 0 ? (r.value / sum) * sweep : 0
+            const mid = a + ang / 2
+            a += ang + (r.value > 0 ? gap : 0)
+            const cos = Math.cos(-mid * Math.PI / 180), sin = Math.sin(-mid * Math.PI / 180)
+            return { i, on: r.value > 0, right: cos >= 0, ax: cx + R * cos, ay: cy + R * sin, bx: cx + (R + 12) * cos, y: cy + (R + 12) * sin }
+        }).filter(q => q.on)
+        for (const side of [true, false]) {
+            const list = pts.filter(q => q.right === side).sort((m, n) => m.y - n.y)
+            for (let k = 1; k < list.length; k++) if (list[k].y - list[k - 1].y < size + 6) list[k].y = list[k - 1].y + size + 6
+            const over = list.length ? list[list.length - 1].y - (cy + R + 10) : 0
+            if (over > 0) list.forEach(q => { q.y -= over })
+        }
+        const me = pts.find(q => q.i === index)
+        if (!me) return null
+        const dir = me.right ? 1 : -1
+        const tx = cx + dir * (R + 26)
+        const room = cx - R - 30
+        const share = ratePct(row.value, whole)
+        const full = `${fmtQty(row.value)} (${share})`
+        const wide = (t: string) => t.length * size * 0.58
+        const lead = opts.names && wide(`${row.name} ${full}`) <= room ? row.name : ""
+        const rest = wide(full) <= room || lead ? full : share
+        return (
+            <g>
+                <path d={`M${me.ax},${me.ay} L${me.bx},${me.y} L${tx - dir * 4},${me.y}`} stroke={row.color} strokeWidth={1.2} fill="none" />
+                <text x={tx} y={me.y} textAnchor={me.right ? "start" : "end"} dominantBaseline="central" fontSize={size}>
+                    {lead && <tspan fill={row.color} fontWeight={700}>{lead} </tspan>}
+                    <tspan fill={lead ? "#1f2937" : row.color} fontWeight={lead ? 600 : 700}>{rest}</tspan>
+                </text>
+            </g>
+        )
+    }
+    return SliceLabel
 }
 
 /**
- * Export chart (PDF and Excel): one group of upright bars per item — Total
- * Inspected (green), Total Rework (orange), Total Rejected (red) — the layout,
- * series and bar labels of the client's own MIS workbook (Nov 2026; these were
- * sideways stacked bars of accepted / rework / rejected). Bars narrow as items
- * are added, and names slant once there are too many to sit flat.
+ * Next round scale top at or above v whose quarters are round too (1.2, 1.6,
+ * 2, 2.4, 3.2, 4, 6, 8, 10 x a power of ten), so an axis reads
+ * 0 / 30,000 / 60,000 / 90,000 / 1,20,000 and never ends on an odd step.
  */
-function QuantityColumns({ rows, nameKey, height = PDF_COLUMNS_HEIGHT }: { rows: any[]; nameKey: string; height?: number }) {
-    const count = rows.length
-    const slant = count > 5
-    const barSize = Math.max(7, Math.min(40, Math.floor(600 / Math.max(count, 1) / 4)))
+function niceCeil(v: number): number {
+    if (v <= 12) return v <= 4 ? 4 : v <= 8 ? 8 : 12
+    const p = Math.pow(10, Math.floor(Math.log10(v)))
+    const m = v / p
+    return ([1, 1.2, 1.6, 2, 2.4, 3.2, 4, 6, 8, 10].find(step => m <= step) ?? 10) * p
+}
+const quarters = (top: number) => [0, top / 4, top / 2, (top * 3) / 4, top]
+/** Largest of the given quantities across the rows. */
+const maxOf = (rows: any[], ...keys: string[]) => Math.max(0, ...rows.flatMap(r => keys.map(k => Number(r?.[k]) || 0)))
+/** A quantity scale: 0 to a round top with head-room for the labels (more when they stand upright), five round ticks. */
+function qtyAxis(max: number, upright: boolean) {
+    const top = niceCeil((max || 1) * (upright ? 1.3 : 1.14))
+    return { domain: [0, top] as [number, number], ticks: quarters(top), tickFormatter: fmtQty }
+}
+const QTY = ["totalInspected", "totalRework", "totalRejected"] as const
+
+const SERIES: Record<string, [name: string, color: string]> = {
+    totalInspected: ["Total Inspected", THEME.success],
+    totalRework: ["Total Rework", THEME.warning],
+    totalRejected: ["Total Rejected", THEME.danger],
+}
+const EXPORT_W = 700
+const EXPORT_YAXIS = 60
+/**
+ * Export chart (PDF and Excel): one group of upright bars per item — Total
+ * Inspected (green), Total Rework (orange), Total Rejected (red), or the given
+ * subset — the layout, series and bar labels of the client's own MIS workbook.
+ * Every name is written in full under its column; the picture grows taller to
+ * make room for long ones, so the bars keep `plotHeight`.
+ */
+function ExportColumns({ rows, nameKey, keys = QTY, plotHeight = 230 }: { rows: any[]; nameKey: string; keys?: readonly string[]; plotHeight?: number }) {
+    const right = 10
+    const { layout, left } = fitNames(rows.map(r => String(r?.[nameKey] ?? "")), EXPORT_W - right - EXPORT_YAXIS, EXPORT_YAXIS, 8, PDF_TICK, 150)
+    const plotW = EXPORT_W - left - right - EXPORT_YAXIS
+    const barSize = Math.max(7, Math.min(40, Math.floor(plotW / Math.max(rows.length, 1) / (keys.length + 1))))
     const upright = barSize < 34
+    const top = 14
     return (
-        <BarChart width={700} height={height} data={rows} margin={{ top: 14, left: slant ? 36 : 0, right: 10, bottom: 4 }} barGap={2}>
+        <BarChart width={EXPORT_W} height={top + plotHeight + layout.height + 4} data={rows} margin={{ top, left, right, bottom: 4 }} barGap={2}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            {slant
-                ? <XAxis dataKey={nameKey} axisLine={false} tickLine={false} tick={<SlantTick />} interval={0} height={104} />
-                : <XAxis dataKey={nameKey} axisLine={false} tickLine={false} tick={PDF_TICK} interval={0} height={34} tickFormatter={shortLabel(28)} />}
-            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} domain={labelRoom(upright)} />
-            <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
-                <LabelList dataKey="totalInspected" content={<BarValue upright={upright} />} />
-            </Bar>
-            <Bar dataKey="totalRework" name="Total Rework" fill={THEME.warning} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
-                <LabelList dataKey="totalRework" content={<BarValue upright={upright} />} />
-            </Bar>
-            <Bar dataKey="totalRejected" name="Total Rejected" fill={THEME.danger} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
-                <LabelList dataKey="totalRejected" content={<BarValue upright={upright} />} />
-            </Bar>
+            <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} height={layout.height} tick={<NameTick layout={layout} />} />
+            <YAxis width={EXPORT_YAXIS} axisLine={false} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(rows, ...keys), upright)} />
+            {keys.map(k => (
+                <Bar key={k} dataKey={k} name={SERIES[k][0]} fill={SERIES[k][1]} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
+                    <LabelList dataKey={k} content={<BarValue upright={upright} />} />
+                </Bar>
+            ))}
         </BarChart>
     )
 }
+const QuantityColumns = ExportColumns
 
 /**
  * The same chart on screen: upright bars side by side — total inspected,
@@ -272,22 +601,31 @@ function QuantityColumns({ rows, nameKey, height = PDF_COLUMNS_HEIGHT }: { rows:
  */
 function QuantityColumnsLive({ rows, nameKey, max, what, height = 380 }: { rows: any[]; nameKey: string; max: number; what: string; height?: number }) {
     const shown = rows.slice(0, max)
-    const slant = shown.length > 4
+    const upright = shown.length > 3
+    const [boxRef, boxW] = useElementWidth()
+    const nameList = shown.map(r => String(r?.[nameKey] ?? "")).join("\n")
+    const { layout, left } = useMemo(() => fitNames(nameList.split("\n"), (boxW || 900) - 10 - 60, 60, 8, SCREEN_TICK, 140), [nameList, boxW])
+    // `height` was the whole chart; the bars keep that less the room names and key used to take.
+    const plotHeight = height - 130
     return (
         <>
-            <div style={{ height }} className="w-full">
+            <div ref={boxRef} style={{ height: 6 + 32 + plotHeight + layout.height + 4 }} className="w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={shown} margin={{ top: 6, left: slant ? 20 : 0, right: 10, bottom: 4 }} barGap={2}>
+                    <BarChart data={shown} margin={{ top: 6, left, right: 10, bottom: 4 }} barGap={2}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        {slant
-                            ? <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} height={92} tick={<SlantTick fontSize={11} fill="#5b6478" />} />
-                            : <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} tick={{ fontSize: 11, fill: "#5b6478" }} tickFormatter={shortLabel(28)} />}
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
+                        <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} height={layout.height} tick={<NameTick layout={layout} />} />
+                        <YAxis width={60} axisLine={false} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(shown, ...QTY), upright)} />
                         <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
-                        <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 10 }} />
-                        <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} maxBarSize={40} />
-                        <Bar dataKey="totalRework" name="Total Rework" fill={THEME.warning} radius={[4, 4, 0, 0]} maxBarSize={40} />
-                        <Bar dataKey="totalRejected" name="Total Rejected" fill={THEME.danger} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        <Legend verticalAlign="top" align="right" iconType="square" itemSorter={null} wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: 10 }} />
+                        <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                            <LabelList dataKey="totalInspected" content={<BarValue upright={upright} size={10} />} />
+                        </Bar>
+                        <Bar dataKey="totalRework" name="Total Rework" fill={THEME.warning} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                            <LabelList dataKey="totalRework" content={<BarValue upright={upright} size={10} minBar={9} />} />
+                        </Bar>
+                        <Bar dataKey="totalRejected" name="Total Rejected" fill={THEME.danger} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                            <LabelList dataKey="totalRejected" content={<BarValue upright={upright} size={10} minBar={9} />} />
+                        </Bar>
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -298,22 +636,51 @@ function QuantityColumnsLive({ rows, nameKey, max, what, height = 380 }: { rows:
     )
 }
 
-async function captureChartToImage(el: HTMLDivElement | null): Promise<string | null> {
+/**
+ * A picture of one capture-zone chart. With `key`, the chart's key is drawn
+ * under it — a colour square and the name in the same colour — so the picture
+ * explains itself wherever it lands (PDF page or Excel sheet).
+ */
+async function captureChartToImage(el: HTMLDivElement | null, key?: KeyItem[]): Promise<string | null> {
     if (!el) return null
     const svg = el.querySelector('svg')
     if (!svg) return null
     const w = parseInt(svg.getAttribute('width') || '0') || svg.clientWidth
-    const h = parseInt(svg.getAttribute('height') || '0') || svg.clientHeight
-    if (!w || !h) return null
+    const chartH = parseInt(svg.getAttribute('height') || '0') || svg.clientHeight
+    if (!w || !chartH) return null
+    const h = chartH + (key?.length ? KEY_HEIGHT : 0)
+    const NS = 'http://www.w3.org/2000/svg'
     const clone = svg.cloneNode(true) as SVGSVGElement
     clone.setAttribute('width', String(w))
     clone.setAttribute('height', String(h))
-    if (!clone.getAttribute('viewBox')) clone.setAttribute('viewBox', `0 0 ${w} ${h}`)
+    clone.setAttribute('viewBox', `0 0 ${w} ${h}`)
     clone.setAttribute('font-family', 'Arial, Helvetica, sans-serif')
     clone.style.fontFamily = 'Arial, Helvetica, sans-serif'
-    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    const bg = document.createElementNS(NS, 'rect')
     bg.setAttribute('width', String(w)); bg.setAttribute('height', String(h)); bg.setAttribute('fill', 'white')
     clone.insertBefore(bg, clone.firstChild)
+    if (key?.length) {
+        const SIZE = 14, MARK = 12, GAP = 6, BETWEEN = 24
+        const ruler = document.createElement('canvas').getContext('2d')
+        if (ruler) ruler.font = `600 ${SIZE}px Arial, Helvetica, sans-serif`
+        const widths = key.map(k => (k.line ? 20 : MARK) + GAP + (ruler ? ruler.measureText(k.label).width : k.label.length * SIZE * 0.56))
+        let x = Math.max(4, (w - widths.reduce((a, b) => a + b, 0) - BETWEEN * (key.length - 1)) / 2)
+        const y = chartH + KEY_HEIGHT / 2
+        key.forEach((k, i) => {
+            const mark = document.createElementNS(NS, 'rect')
+            const mw = k.line ? 20 : MARK, mh = k.line ? 4 : MARK
+            mark.setAttribute('x', String(x)); mark.setAttribute('y', String(y - mh / 2))
+            mark.setAttribute('width', String(mw)); mark.setAttribute('height', String(mh))
+            mark.setAttribute('rx', '2'); mark.setAttribute('fill', k.color)
+            const text = document.createElementNS(NS, 'text')
+            text.setAttribute('x', String(x + mw + GAP)); text.setAttribute('y', String(y))
+            text.setAttribute('dominant-baseline', 'central'); text.setAttribute('font-size', String(SIZE))
+            text.setAttribute('font-weight', '600'); text.setAttribute('fill', k.color)
+            text.textContent = k.label
+            clone.appendChild(mark); clone.appendChild(text)
+            x += widths[i] + BETWEEN
+        })
+    }
     const svgStr = new XMLSerializer().serializeToString(clone)
     const url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }))
     return new Promise(resolve => {
@@ -679,15 +1046,15 @@ export default function ReportsPage() {
         const wantLocation = present.location !== false && (data?.locationWise?.length ?? 0) > 1
         const wantShift = present.shift !== false
         const [pie, trend, partWise, location, inspector, shift, pareto, week, dayDefects] = await Promise.all([
-            captureChartToImage(pieRef.current),
-            captureChartToImage(trendRef.current),
-            captureChartToImage(partWiseBarRef.current),
-            wantLocation ? captureChartToImage(locationBarRef.current) : Promise.resolve(null),
-            captureChartToImage(inspectorBarRef.current),
-            wantShift ? captureChartToImage(shiftBarRef.current) : Promise.resolve(null),
-            captureChartToImage(paretoRef.current),
-            captureChartToImage(weekRef.current),
-            captureChartToImage(dayDefectsRef.current),
+            captureChartToImage(pieRef.current, KEY_STATUS),
+            captureChartToImage(trendRef.current, KEY_QTY),
+            captureChartToImage(partWiseBarRef.current, KEY_QTY),
+            wantLocation ? captureChartToImage(locationBarRef.current, KEY_QTY.slice(0, 1)) : Promise.resolve(null),
+            captureChartToImage(inspectorBarRef.current, KEY_QTY),
+            wantShift ? captureChartToImage(shiftBarRef.current, KEY_QTY) : Promise.resolve(null),
+            captureChartToImage(paretoRef.current, KEY_DEFECTS),
+            captureChartToImage(weekRef.current, KEY_QTY),
+            captureChartToImage(dayDefectsRef.current, KEY_QTY.slice(1)),
         ])
         return { pie, trend, partWise, location, inspector, shift, pareto, week, dayDefects }
     }
@@ -735,7 +1102,7 @@ export default function ReportsPage() {
         if (!data) return
         setExportingPdf(true)
         try {
-            const { pie: pieImg, trend: trendImg, partWise: partWiseImg, location: locationImg, inspector: inspectorImg, shift: shiftImg, pareto: paretoImg } = await captureCharts()
+            const chartImages = await captureCharts()
 
             const [{ pdf }, { ReportDocument }] = await Promise.all([
                 import("@react-pdf/renderer"),
@@ -755,7 +1122,7 @@ export default function ReportsPage() {
                     project={project}
                     inspector={inspector}
                     logoUrl={logoUrl}
-                    chartImages={{ pie: pieImg, trend: trendImg, partWise: partWiseImg, location: locationImg, inspector: inspectorImg, shift: shiftImg, pareto: paretoImg }}
+                    chartImages={chartImages}
                 />
             ).toBlob()
 
@@ -822,8 +1189,13 @@ export default function ReportsPage() {
         const cumSum = arr.slice(0, i + 1).reduce((a, b: any) => a + b.count, 0)
         const totalD = arr.reduce((a, b: any) => a + b.count, 0)
         const rejected = d.rejected ?? 0, unclassified = d.unclassified ?? 0
-        return { ...d, rework: d.rework ?? Math.max(0, d.count - rejected - unclassified), rejected, unclassified, cumulative: totalD > 0 ? parseFloat(((cumSum / totalD) * 100).toFixed(1)) : 0 }
+        return { ...d, rework: d.rework ?? Math.max(0, d.count - rejected - unclassified), rejected, unclassified, cumulative: totalD > 0 ? parseFloat(((cumSum / totalD) * 100).toFixed(2)) : 0 }
     }), [data?.topDefects])
+
+    // Pareto names on screen: in full, fitted to the chart's current width.
+    const [paretoBoxRef, paretoBoxW] = useElementWidth()
+    const paretoNames = paretoData.map((d: any) => String(d.defectName ?? "")).join("\n")
+    const paretoAxis = useMemo(() => fitNames(paretoNames.split("\n"), (paretoBoxW || 1000) - 8 - 64 - 78, 64, 24, SCREEN_TICK, 140), [paretoNames, paretoBoxW])
 
     return (
         <div className="flex flex-col min-h-[100vh] bg-[var(--bg)] pb-[40px]" id="reports-print-area">
@@ -1107,24 +1479,26 @@ export default function ReportsPage() {
                                     {(s?.totalInspected || 0) > 0 ? (
                                         <div className="flex flex-col items-center">
                                             <div className="w-full h-[280px] relative">
+                                                {/* Under the chart, so the hover box covers it instead of printing through it. */}
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                    <span className="text-[22px] font-[700] text-[var(--text)] font-mono tracking-[-1px] leading-none">{(s?.acceptanceRate ?? 0).toFixed(2)}%</span>
+                                                    <span className="text-[9px] font-[600] text-[var(--text3)] uppercase tracking-[1px] mt-[5px]">Quality Rate</span>
+                                                </div>
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <PieChart>
-                                                        <Pie data={pieData} innerRadius={85} outerRadius={115} paddingAngle={4} dataKey="value" stroke="none">
+                                                        <Pie data={pieData} innerRadius={62} outerRadius={88} paddingAngle={4} dataKey="value" stroke="none"
+                                                            label={sliceLabels(pieData, s?.totalInspected || 0, 4, { size: 12 })} labelLine={false}>
                                                             {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
                                                         </Pie>
                                                         <Tooltip content={<CustomTooltip />} />
                                                     </PieChart>
                                                 </ResponsiveContainer>
-                                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                                    <span className="text-[32px] font-[700] text-[var(--text)] font-mono tracking-[-1px] leading-none">{(s?.acceptanceRate ?? 0).toFixed(2)}%</span>
-                                                    <span className="text-[10px] font-[600] text-[var(--text3)] uppercase tracking-[1px] mt-[6px]">Quality Rate</span>
-                                                </div>
                                             </div>
                                             <div className="flex flex-wrap justify-center gap-[16px] mt-[16px]">
                                                 {pieData.map(e => (
                                                     <div key={e.name} className="flex items-center gap-[6px]">
-                                                        <div className="w-[10px] h-[10px] rounded-[3px]" style={{ backgroundColor: e.color }} />
-                                                        <span className="text-[12px] font-[500] text-[var(--text2)]">{e.name}</span>
+                                                        <div className="w-[11px] h-[11px] rounded-[2px]" style={{ backgroundColor: e.color }} />
+                                                        <span className="text-[12px] font-[600]" style={{ color: e.color }}>{e.name}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1140,17 +1514,19 @@ export default function ReportsPage() {
                                     {areaData.length > 0 ? (
                                         <div className="h-[320px] w-full">
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <AreaChart data={areaData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                <AreaChart data={areaData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                                                     <defs>
                                                         <linearGradient id="colorAccepted" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.1} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                                         <linearGradient id="colorInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                                     </defs>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#98a1b5" }} dy={10} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 500, fill: "#98a1b5" }} />
+                                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={SCREEN_TICK} dy={10} padding={{ left: 12, right: 6 }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} />
                                                     <Tooltip content={<CustomTooltip />} />
-                                                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                                                    <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#colorInspected)" />
+                                                    <Legend verticalAlign="top" iconType="square" itemSorter={null} wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: 10 }} />
+                                                    <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#colorInspected)">
+                                                        <LabelList dataKey="totalInspected" content={<PointValue count={areaData.length} size={10} />} />
+                                                    </Area>
                                                     <Line type="monotone" dataKey="totalRework" name="Total Rework" stroke={THEME.warning} strokeWidth={2} dot={{ r: 3, fill: THEME.warning, strokeWidth: 2, stroke: "white" }} />
                                                     <Line type="monotone" dataKey="totalRejected" name="Total Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, strokeWidth: 2, stroke: "white" }} />
                                                 </AreaChart>
@@ -1240,19 +1616,21 @@ export default function ReportsPage() {
                                     </Badge>
                                 </div>
                                 {paretoData.length > 0 ? (
-                                    <div className="h-[450px] w-full">
+                                    <div ref={paretoBoxRef} className="w-full" style={{ height: 26 + 300 + paretoAxis.layout.height + 4 + 34 }}>
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={paretoData} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+                                            <ComposedChart data={paretoData} margin={{ top: 26, right: 8, left: paretoAxis.left, bottom: 4 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6478" }} angle={-45} textAnchor="end" height={80} dy={20} />
-                                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} />
-                                                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#98a1b5" }} unit="%" />
+                                                <XAxis dataKey="defectName" axisLine={false} tickLine={false} interval={0} height={paretoAxis.layout.height} tick={<NameTick layout={paretoAxis.layout} />} />
+                                                <YAxis yAxisId="left" width={64} axisLine={false} tickLine={false} tick={SCREEN_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", SCREEN_TICK)} />
+                                                <YAxis yAxisId="right" width={78} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={false} tickLine={false} tick={SCREEN_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", SCREEN_TICK)} />
                                                 <Tooltip content={<CustomTooltip />} />
-                                                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                                                <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} barSize={50} />
-                                                <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} barSize={50} />
-                                                <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" barSize={50} legendType="none" />
-                                                <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, strokeWidth: 2, stroke: "white" }} />
+                                                <Legend itemSorter={null} wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingTop: 8 }} />
+                                                <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} maxBarSize={50} />
+                                                <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} maxBarSize={50} />
+                                                <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" maxBarSize={50} legendType="none" />
+                                                <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, strokeWidth: 2, stroke: "white" }}>
+                                                    <LabelList dataKey="cumulative" content={<ParetoLabels rows={paretoData} top={paretoTop(paretoData)} barWidth={50} />} />
+                                                </Line>
                                             </ComposedChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -1571,80 +1949,78 @@ export default function ReportsPage() {
             {/* Hidden Chart Capture Zone — always in DOM for PDF export */}
             {data && (
                 <div style={{ position: 'fixed', left: -3000, top: 0, pointerEvents: 'none', zIndex: -1 }}>
-                    {/* Pie Chart */}
-                    <div ref={pieRef} style={{ width: 500, height: 280, backgroundColor: 'white' }}>
-                        <PieChart width={500} height={280}>
-                            <Pie data={pieData} cx={250} cy={130} innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value" stroke="none">
+                    {/* Overall status donut: every slice labelled with its quantity and share */}
+                    <div ref={pieRef} style={{ width: 700, height: 150, backgroundColor: 'white' }}>
+                        <PieChart width={700} height={150}>
+                            <Pie data={pieData} cx={350} cy={75} innerRadius={39} outerRadius={60} paddingAngle={3} dataKey="value" stroke="none" isAnimationActive={false}
+                                label={sliceLabels(pieData, s?.totalInspected || 0, 3, { names: true })} labelLine={false}>
                                 {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
                             </Pie>
+                            <text x={350} y={73} textAnchor="middle" fontSize={15} fontWeight={700} fill="#111827">{ratePct(s?.totalAccepted, s?.totalInspected)}</text>
+                            <text x={350} y={88} textAnchor="middle" fontSize={9} fontWeight={600} fill="#4b5563">ACCEPTED</text>
                         </PieChart>
                     </div>
-                    {/* Trend Area Chart */}
-                    <div ref={trendRef} style={{ width: 700, height: 260, backgroundColor: 'white' }}>
-                        <AreaChart width={700} height={260} data={areaData} margin={{ top: 10, right: 14, left: 6, bottom: 4 }}>
+                    {/* Daily trend: inspected quantity labelled at each day; the rework / rejected
+                        values, too small to read on this scale, are labelled in the day-wise chart below */}
+                    <div ref={trendRef} style={{ width: 700, height: 232, backgroundColor: 'white' }}>
+                        <AreaChart width={700} height={232} data={areaData} margin={{ top: 10, right: 16, left: 14, bottom: 4 }}>
                             <defs>
                                 <linearGradient id="capAccepted" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                 <linearGradient id="capInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.18} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} dy={6} />
-                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} />
-                            <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#capInspected)" />
-                            <Line type="monotone" dataKey="totalRework" name="Total Rework" stroke={THEME.warning} strokeWidth={2} dot={{ r: 3, fill: THEME.warning, stroke: 'white', strokeWidth: 2 }} />
-                            <Line type="monotone" dataKey="totalRejected" name="Total Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, stroke: 'white', strokeWidth: 2 }} />
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={PDF_TICK} dy={6} padding={{ left: 14, right: 6 }} />
+                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} />
+                            <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#capInspected)" dot={{ r: 2.5, fill: THEME.success, stroke: 'white', strokeWidth: 1 }} isAnimationActive={false}>
+                                <LabelList dataKey="totalInspected" content={<PointValue count={areaData.length} />} />
+                            </Area>
+                            <Line type="monotone" dataKey="totalRework" name="Total Rework" stroke={THEME.warning} strokeWidth={2} dot={{ r: 3, fill: THEME.warning, stroke: 'white', strokeWidth: 2 }} isAnimationActive={false} />
+                            <Line type="monotone" dataKey="totalRejected" name="Total Rejected" stroke={THEME.danger} strokeWidth={2} dot={{ r: 3, fill: THEME.danger, stroke: 'white', strokeWidth: 2 }} isAnimationActive={false} />
                         </AreaChart>
                     </div>
                     {/* Part-wise chart (PDF capture): upright bars, like the shift chart */}
-                    <div ref={partWiseBarRef} style={{ width: 700, height: PDF_COLUMNS_HEIGHT, backgroundColor: 'white' }}>
+                    <div ref={partWiseBarRef} style={{ width: 700, backgroundColor: 'white' }}>
                         <QuantityColumns rows={(data.partWise ?? []).slice(0, PART_CHART_MAX)} nameKey="partName" />
                     </div>
-                    {/* Location Bar Chart */}
-                    <div ref={locationBarRef} style={{ width: 700, height: 260, backgroundColor: 'white' }}>
-                        <BarChart width={700} height={260} data={data.locationWise} margin={{ left: 0, right: 10 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="location" axisLine={false} tickLine={false} tick={PDF_TICK} dy={8} />
-                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} />
-                            <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} barSize={40} />
-                        </BarChart>
+                    {/* Location-wise chart: every location named, every bar labelled */}
+                    <div ref={locationBarRef} style={{ width: 700, height: 270, backgroundColor: 'white' }}>
+                        <ExportColumns rows={data.locationWise ?? []} nameKey="location" keys={["totalInspected"]} plotHeight={200} />
                     </div>
                     {/* Inspector-wise chart (PDF capture): upright bars, like the shift chart */}
-                    <div ref={inspectorBarRef} style={{ width: 700, height: PDF_COLUMNS_HEIGHT }} className="bg-white">
+                    <div ref={inspectorBarRef} style={{ width: 700 }} className="bg-white">
                         <QuantityColumns rows={(data.inspectorWise ?? []).slice(0, INSPECTOR_CHART_MAX)} nameKey="inspectorName" />
                     </div>
                     {/* Shift-wise chart (PDF / Excel capture) */}
                     <div ref={shiftBarRef} style={{ width: 700, height: 300 }} className="bg-white">
-                        <QuantityColumns rows={(data as any).shiftWise ?? []} nameKey="shiftName" height={300} />
+                        <QuantityColumns rows={(data as any).shiftWise ?? []} nameKey="shiftName" plotHeight={220} />
                     </div>
                     {/* Week-wise chart (Excel dashboard) */}
                     <div ref={weekRef} style={{ width: 700, height: 300 }} className="bg-white">
-                        <QuantityColumns rows={weekData} nameKey="week" height={300} />
+                        <QuantityColumns rows={weekData} nameKey="week" plotHeight={220} />
                     </div>
                     {/* Day-wise rework / rejection quantity (Excel dashboard) */}
-                    <div ref={dayDefectsRef} style={{ width: 700, height: 300 }} className="bg-white">
-                        <BarChart width={700} height={300} data={areaData} margin={{ top: 14, left: 0, right: 10, bottom: 4 }} barGap={2}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={<SlantTick />} interval={0} height={64} />
-                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} domain={labelRoom(areaData.length > 8)} />
-                            <Bar dataKey="totalRework" name="Total Rework" fill={THEME.warning} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false}>
-                                <LabelList dataKey="totalRework" content={<BarValue upright={areaData.length > 8} />} />
-                            </Bar>
-                            <Bar dataKey="totalRejected" name="Total Rejected" fill={THEME.danger} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false}>
-                                <LabelList dataKey="totalRejected" content={<BarValue upright={areaData.length > 8} />} />
-                            </Bar>
-                        </BarChart>
+                    <div ref={dayDefectsRef} style={{ width: 700, height: 255 }} className="bg-white">
+                        <ExportColumns rows={areaData} nameKey="label" keys={["totalRework", "totalRejected"]} plotHeight={190} />
                     </div>
-                    {/* Pareto Chart */}
-                    <div ref={paretoRef} style={{ width: 700, height: 320, backgroundColor: 'white' }}>
-                        <ComposedChart width={700} height={320} data={paretoData} margin={{ top: 14, right: 24, left: 30, bottom: 8 }}>
+                    {/* Pareto: quantity on every bar, cumulative % on every point of the line */}
+                    <div ref={paretoRef} style={{ width: 700, height: 310, backgroundColor: 'white' }}>
+                        {(() => {
+                            const ax = fitNames(paretoData.map((d: any) => String(d.defectName ?? "")), EXPORT_W - 4 - 70 - 86, 70, 26, PDF_TICK, 150)
+                            return (
+                        <ComposedChart width={EXPORT_W} height={26 + 210 + ax.layout.height + 4} data={paretoData} margin={{ top: 26, right: 4, left: ax.left, bottom: 4 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="defectName" axisLine={false} tickLine={false} tick={<SlantTick />} interval={0} height={104} />
-                            <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} />
-                            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} axisLine={false} tickLine={false} tick={PDF_TICK_SOFT} unit="%" />
-                            <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} barSize={40} />
-                            <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} barSize={40} />
-                            <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" barSize={40} />
-                            <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, stroke: 'white', strokeWidth: 2 }} />
+                            <XAxis dataKey="defectName" axisLine={false} tickLine={false} interval={0} height={ax.layout.height} tick={<NameTick layout={ax.layout} />} />
+                            <YAxis yAxisId="left" width={70} axisLine={false} tickLine={false} tick={PDF_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", PDF_TICK)} />
+                            <YAxis yAxisId="right" width={86} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={false} tickLine={false} tick={PDF_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", PDF_TICK)} />
+                            <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} maxBarSize={40} isAnimationActive={false} />
+                            <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} maxBarSize={40} isAnimationActive={false} />
+                            <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" maxBarSize={40} isAnimationActive={false} />
+                            <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, stroke: 'white', strokeWidth: 2 }} isAnimationActive={false}>
+                                <LabelList dataKey="cumulative" content={<ParetoLabels rows={paretoData} top={paretoTop(paretoData)} barWidth={40} />} />
+                            </Line>
                         </ComposedChart>
+                            )
+                        })()}
                     </div>
                 </div>
             )}
