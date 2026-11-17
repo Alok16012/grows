@@ -44,6 +44,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { REPORT_SHEETS, ALL_REPORT_SHEETS, type ReportSheetKey } from "./reportSheets"
 
 // Charts use one colour per quantity, on screen and in the exported PDF
 // (client request, Nov 2026): green = inspected / accepted quantity,
@@ -69,6 +70,14 @@ const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030]
 // letters and digits alone so a form label doesn't duplicate a named column in
 // the exported sheet.
 const normalizeHeader = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "")
+
+/** The period a report covers, as written in its exports ("November 2026", "2026-11-09", …). */
+function periodLabelOf(mode: string, month: number, year: number, weekAnchor: string, from: string, to: string): string {
+    if (mode === "month") return `${MONTHS[month - 1]} ${year}`
+    if (mode === "week") { const w = weekBoundsOf(weekAnchor); return `Week ${w.start} to ${w.end}` }
+    if (mode === "single") return from
+    return `${from} to ${to}`
+}
 
 // Monday–Sunday bounds of the week containing the given local date.
 function weekBoundsOf(isoDate: string): { start: string; end: string } {
@@ -738,11 +747,63 @@ export default function ReportsPage() {
     const [inspectors, setInspectors] = useState<{ id: string; name: string }[]>([])
 
     const [data, setData] = useState<any>(null)
+    // Which filters the report on screen was loaded with (exports are named from these).
+    const [dataFor, setDataFor] = useState<{ siteId: string; projectId: string; inspectorId: string; period: string } | null>(null)
+    // Each load gets a number; an answer that arrives after a newer load started is
+    // dropped. Otherwise a slow "all sites" answer could land after a quick
+    // one-site answer and replace it, under that one site's name.
+    const reportSeq = useRef(0)
+    const reportAbort = useRef<AbortController | null>(null)
     const [loading, setLoading] = useState(false)
     const [activeTab, setActiveTab] = useState("Dashboard")
     const [searchTerm, setSearchTerm] = useState("")
     const [exportingPdf, setExportingPdf] = useState(false)
     const [exportingExcel, setExportingExcel] = useState(false)
+    // Excel sheet chooser: which sheets the next export includes, remembered on this device.
+    const [excelPickerOpen, setExcelPickerOpen] = useState(false)
+    const [excelSheets, setExcelSheets] = useState<ReportSheetKey[]>(ALL_REPORT_SHEETS)
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem("grows.reports.excelSheets") || "null")
+            if (Array.isArray(saved)) {
+                const valid = ALL_REPORT_SHEETS.filter(k => saved.includes(k))
+                if (valid.length) setExcelSheets(valid)
+            }
+        } catch { /* no saved choice */ }
+    }, [])
+    // Ticks in the open chooser are a draft: Export keeps them, Cancel / Esc / × discard them.
+    const [excelDraft, setExcelDraft] = useState<ReportSheetKey[]>(ALL_REPORT_SHEETS)
+    const excelBtnRef = useRef<HTMLButtonElement>(null)
+    const excelDialogRef = useRef<HTMLDivElement>(null)
+    const openExcelPicker = () => { setExcelDraft(excelSheets); setExcelPickerOpen(true) }
+    // While open: keyboard focus starts on the first sheet and stays inside (Tab wraps),
+    // Esc closes, the page behind doesn't scroll; on close, focus goes back to the button.
+    useEffect(() => {
+        if (!excelPickerOpen) return
+        const box = excelDialogRef.current
+        box?.querySelector<HTMLElement>("input[type=checkbox]")?.focus()
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") { setExcelPickerOpen(false); return }
+            if (e.key !== "Tab" || !box) return
+            const items = [...box.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled])")]
+            if (!items.length) return
+            const first = items[0], last = items[items.length - 1]
+            const active = document.activeElement as HTMLElement | null
+            if (e.shiftKey && (active === first || !box.contains(active))) { e.preventDefault(); last.focus() }
+            else if (!e.shiftKey && (active === last || !box.contains(active))) { e.preventDefault(); first.focus() }
+        }
+        window.addEventListener("keydown", onKey)
+        const overflow = document.body.style.overflow
+        document.body.style.overflow = "hidden"
+        const opener = excelBtnRef.current
+        return () => {
+            window.removeEventListener("keydown", onKey)
+            document.body.style.overflow = overflow
+            opener?.focus()
+        }
+    }, [excelPickerOpen])
+    const toggleExcelSheet = (k: ReportSheetKey) =>
+        setExcelDraft(cur => ALL_REPORT_SHEETS.filter(x => (x === k ? !cur.includes(k) : cur.includes(x))))
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const [deleting, setDeleting] = useState(false)
 
@@ -840,6 +901,11 @@ export default function ReportsPage() {
     }, [selectedSiteId])
 
     const fetchReport = useCallback(async () => {
+        const seq = ++reportSeq.current
+        reportAbort.current?.abort()
+        const ac = new AbortController()
+        reportAbort.current = ac
+        const isLatest = () => seq === reportSeq.current
         setLoading(true)
         try {
             const params = new URLSearchParams()
@@ -861,22 +927,28 @@ export default function ReportsPage() {
             if (selectedProjectId !== "all") params.set("projectId", selectedProjectId)
             if (selectedInspectorId !== "all") params.set("inspectorId", selectedInspectorId)
 
-            const res = await fetch(`/api/reports?${params.toString()}`)
+            const res = await fetch(`/api/reports?${params.toString()}`, { signal: ac.signal })
+            if (!isLatest()) return
             if (!res.ok) {
                 setData(null)
+                setDataFor(null)
                 toast.error("Failed to load report")
                 return
             }
             const d = await res.json()
+            if (!isLatest()) return
             // The tabs below index into d.dayWise / d.partWise / d.locationWise
             // unguarded, so anything that isn't a well-formed report must become
             // null and fall through to the "No data loaded" branch instead.
             setData(d && Array.isArray(d.records) ? d : null)
+            setDataFor({ siteId: selectedSiteId, projectId: selectedProjectId, inspectorId: selectedInspectorId, period: periodLabelOf(dateFilterMode, selectedMonth, selectedYear, weekAnchor, dateFrom, dateTo) })
         } catch {
+            if (!isLatest()) return // replaced by a newer load (or aborted for it)
             setData(null)
+            setDataFor(null)
             toast.error("Failed to load report")
         } finally {
-            setLoading(false)
+            if (isLatest()) setLoading(false)
         }
     }, [selectedMonth, selectedYear, dateFilterMode, dateFrom, dateTo, weekAnchor, selectedSiteId, selectedProjectId, selectedInspectorId])
 
@@ -937,16 +1009,28 @@ export default function ReportsPage() {
     // Period label that follows the active date mode. Export filenames and the
     // PDF header used to hardcode the month/year even when the report was
     // actually filtered to a single day or a custom range.
-    const periodLabel = dateFilterMode === "month"
-        ? `${MONTHS[selectedMonth - 1]} ${selectedYear}`
-        : dateFilterMode === "week"
-            ? `Week ${weekBoundsOf(weekAnchor).start} to ${weekBoundsOf(weekAnchor).end}`
-            : dateFilterMode === "single"
-                ? dateFrom
-                : `${dateFrom} to ${dateTo}`
-    const periodSlug = periodLabel.replace(/\s+/g, "")
+    const periodLabel = periodLabelOf(dateFilterMode, selectedMonth, selectedYear, weekAnchor, dateFrom, dateTo)
+
+    /**
+     * Names for an export, taken from the filters the report on screen was
+     * loaded with, not from the dropdowns as they are now, so a file is never
+     * named for one site while holding another's numbers.
+     */
+    const exportLabels = (fallbackSite = "Global View") => {
+        const f = dataFor ?? { siteId: selectedSiteId, projectId: selectedProjectId, inspectorId: selectedInspectorId, period: periodLabel }
+        return {
+            siteName: sites.find(c => c.id === f.siteId)?.name || fallbackSite,
+            project: projects.find(p => p.id === f.projectId)?.name || "All Projects",
+            inspector: inspectors.find(i => i.id === f.inspectorId)?.name || "All Inspectors",
+            period: f.period,
+            slug: f.period.replace(/\s+/g, ""),
+        }
+    }
+    // 2. Only roles with "Export Reports" get the PDF / Excel exports (Admin always).
+    const canExport = can(session, "reports.export")
 
     const handleExportExcel = async () => {
+        if (!canExport) return
         const XLSX = await loadXLSX()
         let formattedData: any = []
         let sheetName = ""
@@ -1027,8 +1111,8 @@ export default function ReportsPage() {
         const workbook = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
 
-        const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global"
-        const fileName = `${fileNamePrefix}_${siteName.replace(/\s+/g, '')}_${periodSlug}.xlsx`
+        const { siteName, slug } = exportLabels("Global")
+        const fileName = `${fileNamePrefix}_${siteName.replace(/\s+/g, '')}_${slug}.xlsx`
         XLSX.writeFile(workbook, fileName)
     }
 
@@ -1039,57 +1123,73 @@ export default function ReportsPage() {
      * a one-bar "Main" location chart and a "Not specified" shift chart for
      * sites that have neither field.
      */
-    const captureCharts = async () => {
+    type ChartKey = "pie" | "trend" | "partWise" | "location" | "inspector" | "shift" | "pareto" | "week" | "dayDefects"
+    const captureCharts = async (only?: ChartKey[]) => {
         // Wait briefly for hidden charts to render
         await new Promise(r => setTimeout(r, 400))
         const present = (data as any)?.dimensionsPresent ?? {}
-        const wantLocation = present.location !== false && (data?.locationWise?.length ?? 0) > 1
-        const wantShift = present.shift !== false
+        const need = (k: ChartKey) => !only || only.includes(k)
+        const wantLocation = need("location") && present.location !== false && (data?.locationWise?.length ?? 0) > 1
+        const wantShift = need("shift") && present.shift !== false
+        const shot = (k: ChartKey, el: HTMLDivElement | null, key: KeyItem[]) => need(k) ? captureChartToImage(el, key) : Promise.resolve(null)
         const [pie, trend, partWise, location, inspector, shift, pareto, week, dayDefects] = await Promise.all([
-            captureChartToImage(pieRef.current, KEY_STATUS),
-            captureChartToImage(trendRef.current, KEY_QTY),
-            captureChartToImage(partWiseBarRef.current, KEY_QTY),
+            shot("pie", pieRef.current, KEY_STATUS),
+            shot("trend", trendRef.current, KEY_QTY),
+            shot("partWise", partWiseBarRef.current, KEY_QTY),
             wantLocation ? captureChartToImage(locationBarRef.current, KEY_QTY.slice(0, 1)) : Promise.resolve(null),
-            captureChartToImage(inspectorBarRef.current, KEY_QTY),
+            shot("inspector", inspectorBarRef.current, KEY_QTY),
             wantShift ? captureChartToImage(shiftBarRef.current, KEY_QTY) : Promise.resolve(null),
-            captureChartToImage(paretoRef.current, KEY_DEFECTS),
-            captureChartToImage(weekRef.current, KEY_QTY),
-            captureChartToImage(dayDefectsRef.current, KEY_QTY.slice(1)),
+            shot("pareto", paretoRef.current, KEY_DEFECTS),
+            shot("week", weekRef.current, KEY_QTY),
+            shot("dayDefects", dayDefectsRef.current, KEY_QTY.slice(1)),
         ])
         return { pie, trend, partWise, location, inspector, shift, pareto, week, dayDefects }
     }
 
     /**
-     * The whole report as one Excel workbook: Dashboard, Summary, Pareto
-     * Analysis, Inspector-Wise Comparison, Shift-Wise Comparison, Top 5 Defects
-     * and Detailed Inspection Data (ReportExcel.ts). Covers everything the
-     * site / project / inspector / date filters select; the table's own search
-     * and column filters don't narrow it.
+     * The report as one Excel workbook, with the sheets the user picked (all
+     * seven by default): Dashboard, Summary, Pareto Analysis, Inspector-Wise
+     * Comparison, Shift-Wise Comparison, Top 5 Defects and Detailed Inspection
+     * Data (ReportExcel.ts). Covers everything the site / project / inspector /
+     * date filters select; the table's own search and column filters don't
+     * narrow it. Only the charts the chosen sheets show are captured.
      */
-    const handleExportExcelFull = async () => {
-        if (!data) return
+    const handleExportExcelFull = async (sheets: ReportSheetKey[] = ALL_REPORT_SHEETS) => {
+        if (!data || !sheets.length || !canExport) return
         setExportingExcel(true)
+        try { localStorage.setItem("grows.reports.excelSheets", JSON.stringify(sheets)) } catch { /* not saved */ }
         try {
-            const chartImages = await captureCharts()
+            const charts: ChartKey[] = sheets.includes("dashboard")
+                ? ["pie", "trend", "partWise", "location", "inspector", "shift", "pareto", "week", "dayDefects"]
+                : [
+                    ...(sheets.includes("pareto") ? ["pareto" as const] : []),
+                    ...(sheets.includes("inspector") ? ["inspector" as const] : []),
+                    ...(sheets.includes("shift") ? ["shift" as const] : []),
+                ]
+            const chartImages = charts.length ? await captureCharts(charts) : {}
             const { buildReportWorkbook } = await import("./ReportExcel")
-            const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global View"
+            const { siteName, project, inspector, period, slug } = exportLabels()
             const buffer = await buildReportWorkbook({
                 data,
                 siteName,
-                project: projects.find(p => p.id === selectedProjectId)?.name || "All Projects",
-                inspector: inspectors.find(i => i.id === selectedInspectorId)?.name || "All Inspectors",
-                period: periodLabel,
+                project,
+                inspector,
+                period,
                 chartImages,
+                sheets,
             })
             const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
             const a = document.createElement("a")
             a.href = url
-            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${periodSlug}.xlsx`
+            // All sheets: the plain name. One sheet: its name added. Some: how many.
+            const chosen = REPORT_SHEETS.filter(x => sheets.includes(x.key))
+            const part = chosen.length === REPORT_SHEETS.length ? "" : chosen.length === 1 ? `_${chosen[0].file}` : `_${chosen.length}Sheets`
+            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${slug}${part}.xlsx`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
             URL.revokeObjectURL(url)
-            toast.success("Excel report downloaded", { description: "7 sheets: Dashboard, Summary, Pareto, Inspector-wise, Shift-wise, Top 5 Defects, Detailed data" })
+            toast.success("Excel report downloaded", { description: `${chosen.length} sheet${chosen.length === 1 ? "" : "s"}: ${chosen.map(x => x.label).join(", ")}` })
         } catch (err) {
             console.error("Excel report generation failed", err)
             toast.error("Excel report generation failed. Please try again.")
@@ -1099,7 +1199,7 @@ export default function ReportsPage() {
     }
 
     const handleExportPdf = async () => {
-        if (!data) return
+        if (!data || !canExport) return
         setExportingPdf(true)
         try {
             const chartImages = await captureCharts()
@@ -1108,10 +1208,7 @@ export default function ReportsPage() {
                 import("@react-pdf/renderer"),
                 import("./ReportPDF")
             ])
-            const siteName = sites.find(c => c.id === selectedSiteId)?.name || "Global View"
-            const period = periodLabel
-            const project = projects.find(p => p.id === selectedProjectId)?.name || "All Projects"
-            const inspector = inspectors.find(i => i.id === selectedInspectorId)?.name || "All Inspectors"
+            const { siteName, period, project, inspector, slug } = exportLabels()
             const logoUrl = `${window.location.origin}/logo.png`
 
             const blob = await pdf(
@@ -1129,7 +1226,7 @@ export default function ReportsPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement("a")
             a.href = url
-            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${periodSlug}.pdf`
+            a.download = `QualityReport_${siteName.replace(/\s+/g, "")}_${slug}.pdf`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
@@ -1369,7 +1466,7 @@ export default function ReportsPage() {
                 </div></div>
 
                 <div className="report-toolbar__actions">
-                    {!["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab) && (
+                    {canExport && !["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab) && (
                         <button
                             onClick={handleExportPdf}
                             disabled={loading || exportingPdf}
@@ -1380,17 +1477,20 @@ export default function ReportsPage() {
                             <span className="rt-short">PDF</span>
                         </button>
                     )}
-                    <button
-                        onClick={handleExportExcelFull}
+                    {canExport && <button
+                        ref={excelBtnRef}
+                        onClick={openExcelPicker}
                         disabled={loading || exportingExcel || !data}
-                        title="Complete report as one Excel workbook: Dashboard, Summary, Pareto, Inspector-wise, Shift-wise, Top 5 Defects and Detailed Inspection Data"
+                        aria-haspopup="dialog"
+                        title="Export the report to Excel: choose which sheets to include"
                         className="flex items-center justify-center gap-[6px] bg-[#15803d] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[#166534] transition-colors disabled:opacity-50"
                     >
                         <FileSpreadsheet className="h-[14px] w-[14px]" />
-                        <span className="rt-long">{exportingExcel ? "Generating Excel..." : "Export Full Report Excel"}</span>
-                        <span className="rt-short">{exportingExcel ? "..." : "Full Excel"}</span>
-                    </button>
-                    {(["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab)) && (
+                        <span className="rt-long">{exportingExcel ? "Generating Excel..." : "Export Report Excel"}</span>
+                        {/* Beside the "this tab" button a bare "Excel" was ambiguous. */}
+                        <span className="rt-short">{exportingExcel ? "..." : ["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab) ? "Report" : "Excel"}</span>
+                    </button>}
+                    {canExport && (["Day Wise", "Part Wise", "Inspection Report"].includes(activeTab)) && (
                         <button
                             onClick={handleExportExcel}
                             title="Only the table on this tab"
@@ -1398,7 +1498,8 @@ export default function ReportsPage() {
                             className="flex items-center justify-center gap-[6px] bg-[var(--accent)] text-white shadow-sm border-none rounded-[9px] text-[13px] font-[600] px-[12px] py-[8px] hover:bg-[var(--accent-hover)] focus:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
                         >
                             <FileSpreadsheet className="h-[14px] w-[14px]" />
-                            Excel (this tab)
+                            <span className="rt-long">Excel (this tab)</span>
+                            <span className="rt-short">This tab</span>
                         </button>
                     )}
                     <button
@@ -2021,6 +2122,63 @@ export default function ReportsPage() {
                         </ComposedChart>
                             )
                         })()}
+                    </div>
+                </div>
+            )}
+
+            {/* Excel sheet chooser */}
+            {excelPickerOpen && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm sm:p-4" onClick={() => setExcelPickerOpen(false)}>
+                    <div ref={excelDialogRef} role="dialog" aria-modal="true" aria-labelledby="excel-sheets-title" onClick={e => e.stopPropagation()}
+                        className="bg-white w-full sm:w-[460px] max-h-[92vh] overflow-y-auto rounded-t-[16px] sm:rounded-[16px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-[36px] h-[36px] bg-[#f0fdf4] rounded-full flex items-center justify-center flex-shrink-0">
+                                    <FileSpreadsheet className="h-[18px] w-[18px] text-[#15803d]" />
+                                </div>
+                                <h3 id="excel-sheets-title" className="text-[16px] font-semibold text-[var(--text)]">Export to Excel</h3>
+                            </div>
+                            <button type="button" onClick={() => setExcelPickerOpen(false)} aria-label="Close" className="p-1 rounded-md text-[var(--text3)] hover:bg-[var(--surface2)]">
+                                <X className="h-[18px] w-[18px]" />
+                            </button>
+                        </div>
+                        <p className="text-[12.5px] text-[var(--text2)] mt-2 mb-3 leading-relaxed">
+                            Choose the sheets to include. Each covers the site, project, inspector and period selected above.
+                        </p>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[12px] font-semibold text-[var(--text2)]" aria-live="polite">{excelDraft.length} of {REPORT_SHEETS.length} selected</span>
+                            <div className="flex items-center gap-3 text-[12px] font-semibold">
+                                <button type="button" onClick={() => setExcelDraft(ALL_REPORT_SHEETS)} className="text-[#15803d] hover:underline disabled:opacity-40 disabled:no-underline" disabled={excelDraft.length === REPORT_SHEETS.length}>Select all</button>
+                                <button type="button" onClick={() => setExcelDraft([])} className="text-[var(--text2)] hover:underline disabled:opacity-40 disabled:no-underline" disabled={!excelDraft.length}>Clear</button>
+                            </div>
+                        </div>
+                        <div className="space-y-[6px]">
+                            {REPORT_SHEETS.map(sh => {
+                                const on = excelDraft.includes(sh.key)
+                                return (
+                                    <label key={sh.key} className={`flex items-start gap-3 rounded-[10px] border px-3 py-2.5 cursor-pointer transition-colors ${on ? "border-[#15803d] bg-[#f0fdf4]" : "border-[var(--border)] hover:bg-[var(--surface2)]"}`}>
+                                        <input type="checkbox" checked={on} onChange={() => toggleExcelSheet(sh.key)} className="mt-[3px] h-4 w-4 flex-shrink-0 accent-[#15803d]" />
+                                        <span className="min-w-0">
+                                            <span className="block text-[13px] font-semibold text-[var(--text)]">{sh.label}</span>
+                                            <span className="block text-[11.5px] text-[var(--text3)] mt-[1px]">{sh.note}</span>
+                                        </span>
+                                    </label>
+                                )
+                            })}
+                        </div>
+                        {!excelDraft.length && <p className="text-[12px] text-[#dc2626] mt-2" role="alert">Choose at least one sheet.</p>}
+                        <div className="flex gap-2.5 mt-4">
+                            <button type="button" onClick={() => setExcelPickerOpen(false)}
+                                className="flex-1 py-2.5 bg-white border border-[var(--border)] text-[var(--text2)] rounded-[9px] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors">
+                                Cancel
+                            </button>
+                            <button type="button" disabled={!excelDraft.length || exportingExcel}
+                                onClick={() => { setExcelSheets(excelDraft); setExcelPickerOpen(false); handleExportExcelFull(excelDraft) }}
+                                className="flex-1 py-2.5 bg-[#15803d] text-white rounded-[9px] text-[13px] font-semibold hover:bg-[#166534] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                                <FileSpreadsheet className="h-[14px] w-[14px]" />
+                                {excelDraft.length === REPORT_SHEETS.length ? "Export all sheets" : excelDraft.length === 0 ? "Export" : `Export ${excelDraft.length} sheet${excelDraft.length === 1 ? "" : "s"}`}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

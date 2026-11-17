@@ -13,6 +13,7 @@
 // No DOM access here: the page captures the charts and saves the result.
 
 import type { Workbook, Worksheet, Cell } from "exceljs"
+import type { ReportSheetKey } from "./reportSheets"
 
 export type ReportExcelInput = {
     data: any
@@ -23,6 +24,8 @@ export type ReportExcelInput = {
     generatedOn?: Date
     /** PNG data URLs, captured from the page's chart zone. Any may be missing. */
     chartImages?: Partial<Record<"pie" | "trend" | "partWise" | "location" | "inspector" | "shift" | "pareto" | "week" | "dayDefects", string | null>>
+    /** The sheets to include, in any order (the workbook keeps its own order). Empty or missing = all seven. */
+    sheets?: ReportSheetKey[]
 }
 
 // Same three quantity colours as the charts and the PDF.
@@ -219,9 +222,14 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
     const total = num(s.totalInspected)
     const defects: any[] = data?.topDefects ?? []
     const shiftRecorded = data?.dimensionsPresent?.shift !== false
+    // Unknown names are ignored, and if none are left the whole workbook is built:
+    // a workbook with no sheets can't be opened in Excel.
+    const known: ReportSheetKey[] = ["dashboard", "summary", "pareto", "inspector", "shift", "top5", "detailed"]
+    const chosen = (input.sheets ?? []).filter(k => known.includes(k))
+    const want = (k: ReportSheetKey) => !chosen.length || chosen.includes(k)
 
     // ── 1. Dashboard ────────────────────────────────────────────────────────
-    {
+    if (want("dashboard")) {
         const ws = wb.addWorksheet("Dashboard", { views: [{ showGridLines: false }] })
         // A margin, then 12 equal columns (~89px each): a tile spans 4, a chart 6.
         const SPAN = 13
@@ -304,7 +312,7 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
     }
 
     // ── 2. Summary ──────────────────────────────────────────────────────────
-    {
+    if (want("summary")) {
         const ws = wb.addWorksheet("Summary", { views: [{ showGridLines: false }] })
         let r = heading(ws, `FINAL INSPECTION SUMMARY — ${input.period}`, input, 11)
         label(ws, r, 1, "Site-wise summary")
@@ -350,7 +358,7 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
     }
 
     // ── 3. Pareto Analysis ──────────────────────────────────────────────────
-    {
+    if (want("pareto")) {
         const ws = wb.addWorksheet("Pareto Analysis", { views: [{ showGridLines: false }] })
         let r = heading(ws, "PARETO ANALYSIS — Defect Frequency", input, 16)
         const allQty = defects.reduce((a, d) => a + num(d.count), 0)
@@ -393,12 +401,12 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
             l.font = { size: 9, color: { argb: K.muted } }
         }
     }
-    comparison("Inspector-Wise Comparison", "INSPECTOR-WISE COMPARISON", "Inspector Name", data?.inspectorWise ?? [], "inspectorName", img.inspector, "No inspections for this period")
-    comparison("Shift-Wise Comparison", "SHIFT-WISE COMPARISON", "Shift", shiftRecorded ? data?.shiftWise ?? [] : [], "shiftName", shiftRecorded ? img.shift : null,
+    if (want("inspector")) comparison("Inspector-Wise Comparison", "INSPECTOR-WISE COMPARISON", "Inspector Name", data?.inspectorWise ?? [], "inspectorName", img.inspector, "No inspections for this period")
+    if (want("shift")) comparison("Shift-Wise Comparison", "SHIFT-WISE COMPARISON", "Shift", shiftRecorded ? data?.shiftWise ?? [] : [], "shiftName", shiftRecorded ? img.shift : null,
         "These inspection forms do not record a shift")
 
     // ── 6. Top 5 Defects ────────────────────────────────────────────────────
-    {
+    if (want("top5")) {
         const ws = wb.addWorksheet("Top 5 Defects", { views: [{ showGridLines: false }] })
         const r = heading(ws, "TOP 5 DEFECTS", input, 6)
         const next = table(ws, r, 1, [
@@ -422,7 +430,7 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
     }
 
     // ── 7. Detailed Inspection Data ─────────────────────────────────────────
-    {
+    if (want("detailed")) {
         const ws = wb.addWorksheet("Detailed Inspection Data")
         const records: any[] = data?.records ?? []
         const fields: any[] = data?.formFields ?? []
