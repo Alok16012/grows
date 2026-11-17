@@ -26,6 +26,8 @@ export type ReportExcelInput = {
     chartImages?: Partial<Record<"pie" | "trend" | "partWise" | "location" | "inspector" | "shift" | "pareto" | "week" | "dayDefects", string | null>>
     /** The sheets to include, in any order (the workbook keeps its own order). Empty or missing = all seven. */
     sheets?: ReportSheetKey[]
+    /** The company logo as a PNG data URL, shown at the top right of every sheet as in the PDF. */
+    logo?: string | null
 }
 
 // Same three quantity colours as the charts and the PDF.
@@ -34,6 +36,8 @@ const K = {
     green: "FF16A34A", orange: "FFD97706", red: "FFDC2626",
     greenBg: "FFEAF7EE", orangeBg: "FFFDF3E3", redBg: "FFFDECEC",
     band: "FFF4F6FB", border: "FFD5DAE4", total: "FFE8ECF5",
+    // Letterhead colours of the PDF report.
+    brandText: "FF1A1A18", brandGreen: "FF1A9E6E",
 }
 const INT = "#,##0"
 const PCT = "0.00%"
@@ -71,23 +75,62 @@ function istDay(value: unknown): Date | null {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
-/** Title band, then one line saying what the report covers. Returns the next free row. */
-function heading(ws: Worksheet, title: string, input: ReportExcelInput, span: number): number {
-    ws.mergeCells(1, 1, 1, span)
-    const t = ws.getCell(1, 1)
-    t.value = title
-    t.font = { bold: true, size: 14, color: { argb: K.white } }
-    t.fill = fill(K.navy)
-    t.alignment = { vertical: "middle", horizontal: "left", indent: 1 }
-    ws.getRow(1).height = 28
-    ws.mergeCells(2, 1, 2, span)
-    const m = ws.getCell(2, 1)
+/** The logo's workbook image id, added once and reused on every sheet. */
+const logoIds = new WeakMap<Workbook, number>()
+
+/**
+ * A sheet's heading. Returns the next free row.
+ * - Normally: a navy title band, then one line saying what the report covers.
+ * - With `letterhead` (the Dashboard only): the PDF's letterhead instead — the
+ *   site name large, the project in green, the sheet's title, then a line with
+ *   the inspector, period and date over a green rule, and the company logo at
+ *   the top right.
+ */
+function heading(ws: Worksheet, title: string, input: ReportExcelInput, span: number, letterhead = false): number {
     const on = (input.generatedOn ?? new Date()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-    m.value = `Site: ${input.siteName}   |   Project: ${input.project}   |   Inspector: ${input.inspector}   |   Period: ${input.period}   |   Generated: ${on}`
-    m.font = { size: 10, color: { argb: K.muted } }
-    m.alignment = { vertical: "middle", horizontal: "left", indent: 1 }
-    ws.getRow(2).height = 20
-    return 4
+    if (!letterhead) {
+        ws.mergeCells(1, 1, 1, span)
+        const t = ws.getCell(1, 1)
+        t.value = title
+        t.font = { bold: true, size: 14, color: { argb: K.white } }
+        t.fill = fill(K.navy)
+        t.alignment = { vertical: "middle", horizontal: "left", indent: 1 }
+        ws.getRow(1).height = 28
+        ws.mergeCells(2, 1, 2, span)
+        const m = ws.getCell(2, 1)
+        m.value = `Site: ${input.siteName}   |   Project: ${input.project}   |   Inspector: ${input.inspector}   |   Period: ${input.period}   |   Generated: ${on}`
+        m.font = { size: 10, color: { argb: K.muted } }
+        m.alignment = { vertical: "middle", horizontal: "left", indent: 1 }
+        ws.getRow(2).height = 20
+        return 4
+    }
+    // Text stops one column short of the end, which is kept for the logo.
+    const textSpan = Math.max(1, span - 1)
+    const line = (row: number, value: string, font: Record<string, unknown>, height: number) => {
+        ws.mergeCells(row, 1, row, textSpan)
+        const c = ws.getCell(row, 1)
+        c.value = value
+        c.font = font as any
+        c.alignment = { vertical: "middle", horizontal: "left", indent: 1 }
+        ws.getRow(row).height = height
+    }
+    line(1, input.siteName, { bold: true, size: 18, color: { argb: K.brandText } }, 30)
+    line(2, input.project, { bold: true, size: 12, color: { argb: K.brandGreen } }, 19)
+    line(3, title, { bold: true, size: 12, color: { argb: K.navy } }, 19)
+    line(4, `Inspector: ${input.inspector}   |   Period: ${input.period}   |   Generated: ${on}`, { size: 10, color: { argb: K.muted } }, 18)
+    // A green rule under the letterhead, as in the PDF.
+    for (let c = 1; c <= span; c++) ws.getCell(4, c).border = { bottom: { style: "medium", color: { argb: K.brandGreen } } }
+
+    const logo = input.logo
+    if (isPng(logo)) {
+        const wb = (ws as any).workbook as Workbook
+        let id = logoIds.get(wb)
+        if (id === undefined) { id = wb.addImage({ base64: logo as string, extension: "png" }); logoIds.set(wb, id) }
+        // 396 x 421 artwork, kept in proportion; the four letterhead rows are ~114 px tall.
+        const h = 92, w = Math.round(h * pngShape(logo, 396 / 421))
+        ws.addImage(id, { tl: { col: span - 1, row: 0.12 } as any, ext: { width: w, height: h }, editAs: "absolute" } as any)
+    }
+    return 6
 }
 
 /** A small section label above a table. */
@@ -155,6 +198,25 @@ function table(ws: Worksheet, top: number, left: number, cols: Col[], rows: Reco
         r++
     }
     return r + 1
+}
+
+/**
+ * True when a data URL holds a real PNG: the PNG signature, an IHDR header and a
+ * non-zero size. A damaged file would otherwise be placed and show in Excel as
+ * a broken picture.
+ */
+function isPng(dataUrl: string | null | undefined): boolean {
+    try {
+        const b64 = String(dataUrl ?? "").split(",")[1]?.slice(0, 44)
+        if (!b64 || !String(dataUrl).startsWith("data:image/png")) return false
+        const bin = atob(b64)
+        const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+        if (bin.length < 24 || !sig.every((v, i) => bin.charCodeAt(i) === v) || bin.slice(12, 16) !== "IHDR") return false
+        const u32 = (o: number) => ((bin.charCodeAt(o) << 24) | (bin.charCodeAt(o + 1) << 16) | (bin.charCodeAt(o + 2) << 8) | bin.charCodeAt(o + 3)) >>> 0
+        return u32(16) > 0 && u32(20) > 0
+    } catch {
+        return false
+    }
 }
 
 /** Width / height of a PNG data URL, read from its header; `fallback` if it can't be read. */
@@ -234,7 +296,7 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
         // A margin, then 12 equal columns (~89px each): a tile spans 4, a chart 6.
         const SPAN = 13
         for (let c = 1; c <= SPAN; c++) ws.getColumn(c).width = c === 1 ? 3 : 12
-        heading(ws, "DASHBOARD — Quality Inspection Report", input, SPAN)
+        const top = heading(ws, "DASHBOARD — Quality Inspection Report", input, SPAN, true)
         // Three rows of three tiles: quantity, rate, PPM for each colour.
         const tiles: [string, number | string, string, string, Tone][][] = [
             [["Total Inspected", total, INT, "Quantity checked (units)", "green"],
@@ -247,7 +309,7 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
              ["Rejected Rate (%)", share(num(s.totalRejected), total), PCT, "Rejected / Inspected x 100", "red"],
              ["Rejected PPM", num(s.rejectionPPM), INT, "Rejected per million inspected", "red"]],
         ]
-        let r = 4
+        let r = top
         for (const rowTiles of tiles) {
             rowTiles.forEach(([name, value, fmt, hint, tone], i) => {
                 const c = 2 + i * 4

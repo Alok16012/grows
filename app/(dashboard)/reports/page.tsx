@@ -1154,6 +1154,23 @@ export default function ReportsPage() {
      * date filters select; the table's own search and column filters don't
      * narrow it. Only the charts the chosen sheets show are captured.
      */
+    /** The company logo as a data URL for the Excel letterhead (the PDF loads the same file); null if it can't be read. */
+    const loadLogo = async (): Promise<string | null> => {
+        try {
+            const res = await fetch("/logo.png")
+            if (!res.ok) return null
+            const blob = await res.blob()
+            return await new Promise<string | null>(resolve => {
+                const r = new FileReader()
+                r.onload = () => resolve(typeof r.result === "string" ? r.result : null)
+                r.onerror = () => resolve(null)
+                r.readAsDataURL(blob)
+            })
+        } catch {
+            return null
+        }
+    }
+
     const handleExportExcelFull = async (sheets: ReportSheetKey[] = ALL_REPORT_SHEETS) => {
         if (!data || !sheets.length || !canExport) return
         setExportingExcel(true)
@@ -1166,7 +1183,8 @@ export default function ReportsPage() {
                     ...(sheets.includes("inspector") ? ["inspector" as const] : []),
                     ...(sheets.includes("shift") ? ["shift" as const] : []),
                 ]
-            const chartImages = charts.length ? await captureCharts(charts) : {}
+            // The logo is only drawn on the Dashboard sheet, so it is only fetched for it.
+            const [chartImages, logo] = await Promise.all([charts.length ? captureCharts(charts) : Promise.resolve({}), sheets.includes("dashboard") ? loadLogo() : Promise.resolve(null)])
             const { buildReportWorkbook } = await import("./ReportExcel")
             const { siteName, project, inspector, period, slug } = exportLabels()
             const buffer = await buildReportWorkbook({
@@ -1177,6 +1195,7 @@ export default function ReportsPage() {
                 period,
                 chartImages,
                 sheets,
+                logo,
             })
             const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
             const a = document.createElement("a")
