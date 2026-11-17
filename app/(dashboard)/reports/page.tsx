@@ -759,23 +759,15 @@ export default function ReportsPage() {
     const [searchTerm, setSearchTerm] = useState("")
     const [exportingPdf, setExportingPdf] = useState(false)
     const [exportingExcel, setExportingExcel] = useState(false)
-    // Excel sheet chooser: which sheets the next export includes, remembered on this device.
+    // Excel sheet chooser. It always opens with every sheet ticked (client request,
+    // Nov 2026); the user unticks what they don't need for this export.
     const [excelPickerOpen, setExcelPickerOpen] = useState(false)
-    const [excelSheets, setExcelSheets] = useState<ReportSheetKey[]>(ALL_REPORT_SHEETS)
-    useEffect(() => {
-        try {
-            const saved = JSON.parse(localStorage.getItem("grows.reports.excelSheets") || "null")
-            if (Array.isArray(saved)) {
-                const valid = ALL_REPORT_SHEETS.filter(k => saved.includes(k))
-                if (valid.length) setExcelSheets(valid)
-            }
-        } catch { /* no saved choice */ }
-    }, [])
-    // Ticks in the open chooser are a draft: Export keeps them, Cancel / Esc / × discard them.
+    // An earlier version remembered the last choice on the device; clear it.
+    useEffect(() => { try { localStorage.removeItem("grows.reports.excelSheets") } catch { /* nothing stored */ } }, [])
     const [excelDraft, setExcelDraft] = useState<ReportSheetKey[]>(ALL_REPORT_SHEETS)
     const excelBtnRef = useRef<HTMLButtonElement>(null)
     const excelDialogRef = useRef<HTMLDivElement>(null)
-    const openExcelPicker = () => { setExcelDraft(excelSheets); setExcelPickerOpen(true) }
+    const openExcelPicker = () => { setExcelDraft(ALL_REPORT_SHEETS); setExcelPickerOpen(true) }
     // While open: keyboard focus starts on the first sheet and stays inside (Tab wraps),
     // Esc closes, the page behind doesn't scroll; on close, focus goes back to the button.
     useEffect(() => {
@@ -1174,7 +1166,6 @@ export default function ReportsPage() {
     const handleExportExcelFull = async (sheets: ReportSheetKey[] = ALL_REPORT_SHEETS) => {
         if (!data || !sheets.length || !canExport) return
         setExportingExcel(true)
-        try { localStorage.setItem("grows.reports.excelSheets", JSON.stringify(sheets)) } catch { /* not saved */ }
         try {
             const charts: ChartKey[] = sheets.includes("dashboard")
                 ? ["pie", "trend", "partWise", "location", "inspector", "shift", "pareto", "week", "dayDefects"]
@@ -2192,7 +2183,7 @@ export default function ReportsPage() {
                                 Cancel
                             </button>
                             <button type="button" disabled={!excelDraft.length || exportingExcel}
-                                onClick={() => { setExcelSheets(excelDraft); setExcelPickerOpen(false); handleExportExcelFull(excelDraft) }}
+                                onClick={() => { setExcelPickerOpen(false); handleExportExcelFull(excelDraft) }}
                                 className="flex-1 py-2.5 bg-[#15803d] text-white rounded-[9px] text-[13px] font-semibold hover:bg-[#166534] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                                 <FileSpreadsheet className="h-[14px] w-[14px]" />
                                 {excelDraft.length === REPORT_SHEETS.length ? "Export all sheets" : excelDraft.length === 0 ? "Export" : `Export ${excelDraft.length} sheet${excelDraft.length === 1 ? "" : "s"}`}
