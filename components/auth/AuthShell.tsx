@@ -72,11 +72,8 @@ export function AuthShell({ title, subtitle, children, footer }: {
 function Logo() {
     return (
         <div className="relative flex items-center gap-3">
-            <div className="w-11 h-11 rounded-[13px] bg-white/15 border border-white/20 flex items-center justify-center">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="14" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" />
-                </svg>
+            <div className="w-11 h-11 rounded-[13px] bg-white shadow-[0_6px_16px_rgba(2,8,32,0.35)] flex items-center justify-center">
+                <img src="/logo-mark.png" alt="" aria-hidden="true" className="w-7 h-7 object-contain" />
             </div>
             <span className="text-[22px] font-bold tracking-[-0.02em]">{COMPANY.shortName} <span className="text-[#7fb0ff]">{COMPANY.nameSuffix}</span></span>
         </div>

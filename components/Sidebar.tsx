@@ -407,10 +407,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             <div className="flex h-full w-full flex-col items-center overflow-hidden text-white bg-[linear-gradient(180deg,#0c2459_0%,#0a1f4f_45%,#081a42_100%)]">
                 <div className="flex h-[72px] items-center shrink-0">
                     <Link href="/" title={COMPANY.name} className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[#0a1f4f] bg-white shadow-[0_6px_16px_rgba(2,8,32,0.35)]">
-                        <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 3h18v18H3z" />
-                            <path d="M18 9h-6v6h6v-3h-3" />
-                        </svg>
+                        <img src="/logo-mark.png" alt="" aria-hidden="true" className="w-[26px] h-[26px] object-contain" />
                     </Link>
                 </div>
                 <button type="button" onClick={() => onToggleRail?.()} title="Expand sidebar" aria-label="Expand sidebar"
@@ -537,10 +534,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             <div className="flex h-[72px] items-center justify-between px-5 shrink-0">
                 <Link href="/" className="flex items-center gap-2.5">
                     <div className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[#0a1f4f] bg-white shadow-[0_6px_16px_rgba(2,8,32,0.35)]">
-                        <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 3h18v18H3z" />
-                            <path d="M18 9h-6v6h6v-3h-3" />
-                        </svg>
+                        <img src="/logo-mark.png" alt="" aria-hidden="true" className="w-[26px] h-[26px] object-contain" />
                     </div>
                     <span className="text-[19px] font-bold tracking-[-0.02em] text-white leading-none">{COMPANY.shortName} <span className="text-[#93b8ff]">{COMPANY.nameSuffix}</span></span>
                 </Link>

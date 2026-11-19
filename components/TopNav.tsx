@@ -157,11 +157,8 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                 the full menu lives behind "More" in the bottom bar now. */}
             <div className="flex items-center gap-2 shrink-0">
                 <Link href={homeHref} className="flex md:hidden items-center gap-2.5" aria-label={`${COMPANY.name} home`}>
-                    <span className="h-9 w-9 rounded-[11px] flex items-center justify-center text-white shadow-sm" style={{ background: "var(--accent-gradient)" }}>
-                        <svg viewBox="0 0 24 24" className="w-[19px] h-[19px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M3 3h18v18H3z" />
-                            <path d="M18 9h-6v6h6v-3h-3" />
-                        </svg>
+                    <span className="h-9 w-9 rounded-[11px] flex items-center justify-center bg-white border border-[var(--border)] shadow-sm">
+                        <img src="/logo-mark.png" alt="" aria-hidden="true" className="w-6 h-6 object-contain" />
                     </span>
                     <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-none">{COMPANY.shortName} <span className="text-[var(--accent)]">{COMPANY.nameSuffix}</span></span>
                 </Link>

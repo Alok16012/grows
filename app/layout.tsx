@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description: `Inspections, people and payroll in one place — ${COMPANY.name} by ${COMPANY.legalName}`,
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.svg",
+    icon: "/favicon.png",
     apple: "/apple-touch-icon.png",
   },
   appleWebApp: {
