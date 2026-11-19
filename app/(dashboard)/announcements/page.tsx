@@ -12,6 +12,19 @@ import {
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import dynamic from "next/dynamic"
+import { Drawer, AudiencePicker, Field, FormFooter, type Site, type Role } from "./_components/ui"
+
+// Loaded only when their tab opens, so the notices view stays as light as before.
+const PollsPanel = dynamic(() => import("./_components/PollsPanel"), { ssr: false })
+const SurveysPanel = dynamic(() => import("./_components/SurveysPanel"), { ssr: false })
+
+type Tab = "notices" | "polls" | "surveys"
+const TABS: { key: Tab; label: string }[] = [
+    { key: "notices", label: "Notices & holidays" },
+    { key: "polls", label: "Polls" },
+    { key: "surveys", label: "Surveys" },
+]
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -65,8 +78,6 @@ type Anniversary = {
     inDays: number
 }
 
-type Site = { id: string; name: string }
-type Role = { id: string; name: string }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -126,6 +137,20 @@ export default function AnnouncementsPage() {
     const [loading, setLoading] = useState(true)
 
     const [showAnnForm, setShowAnnForm] = useState(false)
+    const [tab, setTab] = useState<Tab>("notices")
+    const [pending, setPending] = useState<{ polls: number; surveys: number }>({ polls: 0, surveys: 0 })
+    const setPendingPolls = useCallback((n: number) => setPending(p => (p.polls === n ? p : { ...p, polls: n })), [])
+    const setPendingSurveys = useCallback((n: number) => setPending(p => (p.surveys === n ? p : { ...p, surveys: n })), [])
+    useEffect(() => {
+        const t = new URLSearchParams(window.location.search).get("tab")
+        if (t === "polls" || t === "surveys") setTab(t)
+    }, [])
+    const switchTab = (t: Tab) => {
+        setTab(t)
+        const url = new URL(window.location.href)
+        if (t === "notices") url.searchParams.delete("tab"); else url.searchParams.set("tab", t)
+        window.history.replaceState(null, "", url.toString())
+    }
     const [showHolForm, setShowHolForm] = useState(false)
 
     const load = useCallback(async () => {
@@ -189,9 +214,9 @@ export default function AnnouncementsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
                 <div className="min-w-0">
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Announcements</h1>
-                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Company notices &amp; holiday calendar.</p>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1">Company notices, holidays, polls and surveys.</p>
                 </div>
-                {canManage && (
+                {canManage && tab === "notices" && (
                     <div className="page-actions">
                         <button onClick={() => setShowHolForm(true)}
                             className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
@@ -206,6 +231,24 @@ export default function AnnouncementsPage() {
                 )}
             </div>
 
+            {/* ── Tabs ── */}
+            <div className="z-tabs-wrap mb-5"><div className="z-tabs" role="tablist" aria-label="Announcements sections">
+                {TABS.map(t => {
+                    const n = t.key === "polls" ? pending.polls : t.key === "surveys" ? pending.surveys : 0
+                    return (
+                        <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => switchTab(t.key)}
+                            className={`z-tab ${tab === t.key ? "is-active" : ""}`}>
+                            {t.label}
+                            {n > 0 && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--red)] text-white text-[10.5px] font-bold" aria-label={`${n} waiting for you`}>{n}</span>}
+                        </button>
+                    )
+                })}
+            </div></div>
+
+            {tab === "polls" && <PollsPanel canManage={canManage} sites={sites} roles={roles} audienceLabel={audienceLabel} onPending={setPendingPolls} />}
+            {tab === "surveys" && <SurveysPanel canManage={canManage} sites={sites} roles={roles} audienceLabel={audienceLabel} onPending={setPendingSurveys} />}
+
+            {tab === "notices" && <>
             {/* ── Stat cards ── */}
             <div className={`${statGridClass(4)} mb-5`}>
                 <StatCard icon={<Megaphone size={20} />} tone="blue" value={announcements.length} label="Total Announcements" sub="All notices" seed={0} />
@@ -421,6 +464,7 @@ export default function AnnouncementsPage() {
                 </div>
                 </div>{/* /right column */}
             </div>
+            </>}
 
             {showAnnForm && <AnnouncementForm sites={sites} roles={roles} onClose={() => setShowAnnForm(false)} onSaved={() => { setShowAnnForm(false); load() }} />}
             {showHolForm && <HolidayForm sites={sites} roles={roles} onClose={() => setShowHolForm(false)} onSaved={() => { setShowHolForm(false); load() }} />}
@@ -582,86 +626,5 @@ function HolidayForm({ sites, roles, onClose, onSaved }: { sites: Site[]; roles:
             </div>
             <FormFooter saving={saving} onClose={onClose} onSubmit={submit} label="Add Holiday" />
         </Drawer>
-    )
-}
-
-// ─── Shared form primitives ───────────────────────────────────────────────────
-
-function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-    return (
-        <>
-            <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-            <div className="fixed top-0 right-0 h-full w-[420px] max-w-full z-50 bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl flex flex-col">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
-                    <h2 className="text-[15px] font-semibold text-[var(--text)]">{title}</h2>
-                    <button onClick={onClose} className="p-2 md:p-1 text-[var(--text3)] hover:text-[var(--text)] rounded-md hover:bg-[var(--surface2)]"><X size={18} /></button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-5">{children}</div>
-            </div>
-        </>
-    )
-}
-
-// Audience targeting picker — choose which sites/roles a notice or holiday is
-// limited to. Nothing selected on a dimension = visible to everyone there.
-function AudiencePicker({
-    sites, roles, siteIds, roleIds, setSiteIds, setRoleIds,
-}: {
-    sites: Site[]; roles: Role[]
-    siteIds: string[]; roleIds: string[]
-    setSiteIds: (v: string[]) => void; setRoleIds: (v: string[]) => void
-}) {
-    const toggle = (arr: string[], id: string, set: (v: string[]) => void) =>
-        set(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id])
-
-    const Group = ({ label, items, selected, set }: { label: string; items: { id: string; name: string }[]; selected: string[]; set: (v: string[]) => void }) => (
-        <Field label={`${label} ${selected.length ? `(${selected.length})` : "— Everyone"}`}>
-            {items.length === 0 ? (
-                <p className="text-[12px] text-[var(--text3)]">None available</p>
-            ) : (
-                <div className="max-h-[140px] overflow-y-auto rounded-[8px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
-                    {items.map(it => (
-                        <label key={it.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface2)]">
-                            <input type="checkbox" checked={selected.includes(it.id)} onChange={() => toggle(selected, it.id, set)} className="accent-[var(--accent)]" />
-                            <span className="text-[13px] text-[var(--text2)]">{it.name}</span>
-                        </label>
-                    ))}
-                </div>
-            )}
-        </Field>
-    )
-
-    return (
-        <div className="space-y-4 pt-2 mt-2 border-t border-[var(--border)]">
-            <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text2)]">
-                <Users size={13} /> Audience <span className="font-normal text-[var(--text3)]">— leave blank for everyone</span>
-            </div>
-            <Group label="Sites" items={sites} selected={siteIds} set={setSiteIds} />
-            <Group label="Roles" items={roles} selected={roleIds} set={setRoleIds} />
-        </div>
-    )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="space-y-1.5">
-            <label className="block text-[12px] text-[var(--text2)]">{label}</label>
-            {children}
-        </div>
-    )
-}
-
-function FormFooter({ saving, onClose, onSubmit, label }: { saving: boolean; onClose: () => void; onSubmit: () => void; label: string }) {
-    return (
-        <div className="flex gap-2 mt-6">
-            <button onClick={onClose} disabled={saving}
-                className="flex-1 py-2.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-[13px] font-medium hover:bg-[var(--surface2)] transition-colors">
-                Cancel
-            </button>
-            <button onClick={onSubmit} disabled={saving}
-                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-60">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : null} {label}
-            </button>
-        </div>
     )
 }

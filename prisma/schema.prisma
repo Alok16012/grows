@@ -2438,6 +2438,76 @@ model Announcement {
   @@index([publishedAt])
 }
 
+// ─── Polls & surveys (Announcements → Polls / Surveys) ───────────────────────
+// Same audience targeting as Announcement (empty = everyone). Created by
+// holders of announcements.manage; answered by anyone in the audience.
+// New tables only — see prisma/migrations/20261119120000_polls_surveys.
+
+model Poll {
+  id                String     @id @default(uuid())
+  question          String
+  description       String?
+  options           Json       // [{ id, label }]
+  allowMultiple     Boolean    @default(false)
+  anonymous         Boolean    @default(false) // hide who voted, even from managers
+  resultsVisibility String     @default("AFTER_VOTE") // AFTER_VOTE | AFTER_CLOSE | MANAGERS
+  status            String     @default("ACTIVE") // ACTIVE | CLOSED
+  closesAt          DateTime?
+  targetSiteIds     String[]   @default([])
+  targetRoleIds     String[]   @default([])
+  createdBy         String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  votes             PollVote[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PollVote {
+  id        String   @id @default(uuid())
+  pollId    String
+  userId    String
+  optionIds String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+}
+
+model Survey {
+  id            String           @id @default(uuid())
+  title         String
+  description   String?
+  questions     Json             // [{ id, type, label, required, options? }]
+  anonymous     Boolean          @default(false) // hide who answered, even from managers
+  status        String           @default("DRAFT") // DRAFT | ACTIVE | CLOSED
+  closesAt      DateTime?
+  targetSiteIds String[]         @default([])
+  targetRoleIds String[]         @default([])
+  createdBy     String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  responses     SurveyResponse[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SurveyResponse {
+  id          String   @id @default(uuid())
+  surveyId    String
+  userId      String
+  answers     Json     // { [questionId]: string | string[] | number }
+  submittedAt DateTime @default(now())
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, userId])
+  @@index([surveyId])
+}
+
 // ─── Holiday calendar (employee self-service) ────────────────────────────────
 model Holiday {
   id          String   @id @default(uuid())
