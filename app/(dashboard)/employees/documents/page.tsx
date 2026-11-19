@@ -593,7 +593,7 @@ export default function MasterDocumentsPage() {
     const isAdmin = can(session, "documents.upload")
 
     return (
-        <div className="p-4 lg:p-6 max-w-full mx-auto flex flex-col gap-5">
+        <div className="p-4 lg:p-0 max-w-full mx-auto flex flex-col gap-5">
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
@@ -616,12 +616,12 @@ export default function MasterDocumentsPage() {
 
             {/* KPI cards */}
             <div className={statGridClass(5)}>
-                {/* "…" while loading — a slow load used to read as "0 employees". */}
-                <StatCard label="Total Employees" value={loading ? "…" : totalEmployees} sub="100%" tone="blue" icon={<Users size={20} />} seed={0} />
-                <StatCard label="Total Documents" value={loading ? "…" : totalDocs} sub="100%" tone="violet" icon={<FileText size={20} />} seed={1} />
-                <StatCard label="Required Docs Present" value={loading ? "…" : allPresent} sub={loading ? "Aadhaar, PAN, Photo, Bank" : pctOf(allPresent)} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
-                <StatCard label="Missing Required Docs" value={loading ? "…" : missingAny} sub={loading ? undefined : pctOf(missingAny)} tone="rose" icon={<AlertCircle size={20} />} seed={3} />
-                <StatCard label="Verification Pending" value={loading ? "…" : verificationPending} sub={loading ? undefined : pctOf(verificationPending)} tone="amber" icon={<Clock size={20} />} seed={4} />
+                {/* Pulsing bar while loading — a slow load used to read as "0 employees". */}
+                <StatCard label="Total Employees" value={totalEmployees} loading={loading} sub="100%" tone="blue" icon={<Users size={20} />} seed={0} />
+                <StatCard label="Total Documents" value={totalDocs} loading={loading} sub="100%" tone="violet" icon={<FileText size={20} />} seed={1} />
+                <StatCard label="Required Docs Present" value={allPresent} loading={loading} sub={loading ? "Aadhaar, PAN, Photo, Bank" : pctOf(allPresent)} tone="teal" icon={<CheckCircle2 size={20} />} seed={2} />
+                <StatCard label="Missing Required Docs" value={missingAny} loading={loading} sub={loading ? undefined : pctOf(missingAny)} tone="rose" icon={<AlertCircle size={20} />} seed={3} />
+                <StatCard label="Verification Pending" value={verificationPending} loading={loading} sub={loading ? undefined : pctOf(verificationPending)} tone="amber" icon={<Clock size={20} />} seed={4} />
             </div>
 
             {/* Filters */}

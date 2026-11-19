@@ -964,7 +964,7 @@ function AdminView() {
                     {/* Stats */}
                     <div className={statGridClass(statsCards.length)}>
                         {statsCards.map((s, i) => (
-                            <StatCard key={s.label} label={s.label} value={s.value} sub={s.sub} tone={s.tone} icon={s.icon} seed={i} />
+                            <StatCard key={s.label} label={s.label} value={s.value} sub={s.sub} tone={s.tone} icon={s.icon} seed={i} loading={loading || employeesLoading} />
                         ))}
                     </div>
 

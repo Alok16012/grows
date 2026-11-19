@@ -98,7 +98,7 @@ export default function InspectionDashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[var(--bg)] p-4 md:p-6 lg:p-7">
+            <div className="min-h-screen bg-[var(--bg)] p-4 md:p-6 lg:p-0">
                 <div className="space-y-5 animate-pulse">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {[1, 2, 3, 4].map((i) => (
@@ -136,7 +136,7 @@ export default function InspectionDashboard() {
     const rejectedCount = recentSubmissions.filter(s => s.status === "rejected").length
 
     return (
-        <div className="min-h-screen bg-[var(--bg)] p-4 md:p-6 lg:p-7">
+        <div className="min-h-screen bg-[var(--bg)] p-4 md:p-6 lg:p-0">
             {/* Mobile Welcome Banner */}
             <div className="md:hidden bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] rounded-[16px] p-4 text-white shadow-sm mb-4">
                 <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>

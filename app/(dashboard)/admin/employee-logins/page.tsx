@@ -256,7 +256,7 @@ export default function EmployeeLoginsPage() {
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-7">
+        <div className="p-4 sm:p-6 lg:p-0">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
                 <div className="min-w-0">
                     <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">Employee Logins</h1>

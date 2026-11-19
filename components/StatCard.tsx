@@ -35,7 +35,9 @@ export type StatTone = keyof typeof STAT_GRADIENTS
  * 2-column grid; from 640px they lay out as a grid, all in one row on xl.
  */
 export function statGridClass(count: number) {
-    const xl = count >= 6 ? "xl:grid-cols-6" : count === 5 ? "xl:grid-cols-5" : count === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"
+    // Six across only on wide screens: beside the sidebar a 1280px laptop
+    // leaves ~140px per tile and labels truncate ("Employe…"), so 3 × 2 there.
+    const xl = count >= 6 ? "xl:grid-cols-3 2xl:grid-cols-6" : count === 5 ? "xl:grid-cols-5" : count === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"
     const lg = count >= 5 ? "lg:grid-cols-3" : count === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"
     const sm = count === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
     return [
@@ -52,10 +54,13 @@ export function statGridClass(count: number) {
  * Phones get a compact tile (icon, value, one-line label, one-line footer) so
  * every card in the strip is the same height whatever its text.
  */
-export function StatCard({ label, value, icon, tone, trend, sub, seed = 0, onClick, active }: {
+export function StatCard({ label, value, icon, tone, trend, sub, seed = 0, onClick, active, loading }: {
     label: string; value: number | string; icon: React.ReactNode; tone: StatTone
     trend?: { dir: "up" | "down" | "flat"; text: string }; sub?: string; seed?: number
     onClick?: () => void; active?: boolean
+    /** Data still on its way: shows a pulsing bar instead of the value and
+     *  hides the footer, so a slow load never reads as a real "0". */
+    loading?: boolean
 }) {
     const dark = tone === "amber"
     const Tag = onClick ? "button" : "div"
@@ -80,17 +85,22 @@ export function StatCard({ label, value, icon, tone, trend, sub, seed = 0, onCli
                 {/* A six-across row on a laptop leaves ~170px per tile: at 34px a
                     ₹1,23,85,086 was cut to "₹..". The sparkline gives way first
                     (stat-spark, see globals.css) and the figure steps down a size. */}
-                <p className="stat-value-fit min-w-0 text-[24px] sm:text-[30px] xl:text-[32px] font-bold leading-none tabular-nums tracking-[-0.02em] truncate">{shown}</p>
+                {loading ? (
+                    <span role="status" aria-label={`${label}: loading`}
+                        className={`block h-[24px] sm:h-[30px] w-16 sm:w-20 rounded-[8px] animate-pulse ${dark ? "bg-black/10" : "bg-white/30"}`} />
+                ) : (
+                    <p className="stat-value-fit min-w-0 text-[24px] sm:text-[30px] xl:text-[32px] font-bold leading-none tabular-nums tracking-[-0.02em] truncate">{shown}</p>
+                )}
                 <div className="stat-spark hidden sm:block opacity-90 mb-0.5"><Sparkline color={dark ? "#b45309" : ink} seed={seed} /></div>
             </div>
             <p className="sm:hidden relative mt-1.5 text-[12.5px] font-semibold leading-tight truncate">{label}</p>
-            {trend && (
+            {trend && !loading && (
                 <p className="relative mt-auto pt-1 sm:pt-2.5 text-[11.5px] sm:text-[13.5px] font-medium flex items-center gap-1 sm:gap-1.5 opacity-90 sm:opacity-100 min-w-0">
                     {trend.dir === "up" ? <TrendingUp size={14} className="shrink-0" /> : trend.dir === "down" ? <TrendingDown size={14} className="shrink-0" /> : <Minus size={14} className="shrink-0" />}
                     <span className="truncate">{trend.text}</span>
                 </p>
             )}
-            {!trend && sub && (
+            {!trend && sub && !loading && (
                 <p className="relative mt-auto pt-1 sm:pt-2.5 text-[11.5px] sm:text-[13.5px] font-medium opacity-85 sm:opacity-90 truncate">{sub}</p>
             )}
         </Tag>

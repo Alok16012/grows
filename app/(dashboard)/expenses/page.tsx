@@ -2701,7 +2701,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
     }
 
     return (
-        <div className="min-h-screen p-4 md:p-6">
+        <div className="min-h-screen p-4 md:p-6 lg:p-0">
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
                 <div className="min-w-0">

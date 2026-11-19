@@ -972,6 +972,7 @@ export default function RecruitmentPage() {
                             key={s.label} label={s.label} value={s.value} tone={s.tone} seed={i}
                             icon={<s.icon size={20} />}
                             trend={s.month > 0 ? { dir: "up", text: `${s.month} this month` } : { dir: "flat", text: "No change" }}
+                            loading={loading}
                         />
                     ))}
                 </div>

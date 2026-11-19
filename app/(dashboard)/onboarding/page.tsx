@@ -908,7 +908,7 @@ export default function OnboardingPage() {
             <div className={statGridClass(kpis.length)}>
                 {kpis.map((s, i) => (
                     <StatCard key={s.label} label={s.label} value={s.count} tone={s.tone} icon={<s.icon size={20} />}
-                        sub={s.isTotal ? "100% of total" : pct(s.count)} seed={i} />
+                        sub={s.isTotal ? "100% of total" : pct(s.count)} seed={i} loading={loading} />
                 ))}
             </div>
 

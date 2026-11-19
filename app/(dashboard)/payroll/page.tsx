@@ -577,7 +577,7 @@ export default function PayrollPage() {
                     { label: "Gross YTD",      value: totalGrossYTD > 0 ? fmt(totalGrossYTD) : "—",          tone: "slate" as const,  sub: String(period.year), icon: TrendingUp },
                     { label: "Net YTD",        value: totalNetYTD > 0 ? fmt(totalNetYTD) : "—",              tone: "green" as const,  sub: String(period.year), icon: TrendingUp },
                 ].map((s, i) => (
-                    <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={<s.icon size={20} />} sub={s.sub} seed={i} />
+                    <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={<s.icon size={20} />} sub={s.sub} seed={i} loading={loading && !thisRun} />
                 ))}
             </div>
 

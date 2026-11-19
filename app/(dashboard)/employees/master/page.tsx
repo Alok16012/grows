@@ -814,7 +814,7 @@ export default function EmployeeMasterPage() {
     useEffect(() => () => loadRef.current?.abort(), [])
 
     // Cards show "…" until the roster is in, never a provisional 0.
-    const kpi = (n: number) => (loading ? "…" : loadError ? "—" : n)
+    const kpi = (n: number) => (loadError ? "—" : n)
 
     useEffect(() => {
         const fetchSites = async () => {
@@ -1081,11 +1081,11 @@ export default function EmployeeMasterPage() {
 
             {/* KPI cards */}
             <div className={statGridClass(5)}>
-                <StatCard label="Total Employees" value={kpi(filteredEmployees.length)} tone="blue" icon={<Users size={20} />} seed={0} />
-                <StatCard label="Active" value={kpi(filteredEmployees.filter(e => e.status === "ACTIVE").length)} tone="teal" icon={<UserCheck size={20} />} seed={1} />
-                <StatCard label="Inactive" value={kpi(filteredEmployees.filter(e => e.status === "INACTIVE").length)} tone="slate" icon={<UserX size={20} />} seed={2} />
-                <StatCard label="On Leave" value={kpi(filteredEmployees.filter(e => e.status === "ON_LEAVE").length)} tone="amber" icon={<CalendarOff size={20} />} seed={3} />
-                <StatCard label="Terminated" value={kpi(filteredEmployees.filter(e => e.status === "TERMINATED").length)} tone="rose" icon={<UserMinus size={20} />} seed={4} />
+                <StatCard label="Total Employees" value={kpi(filteredEmployees.length)} tone="blue" icon={<Users size={20} />} seed={0} loading={loading} />
+                <StatCard label="Active" value={kpi(filteredEmployees.filter(e => e.status === "ACTIVE").length)} tone="teal" icon={<UserCheck size={20} />} seed={1} loading={loading} />
+                <StatCard label="Inactive" value={kpi(filteredEmployees.filter(e => e.status === "INACTIVE").length)} tone="slate" icon={<UserX size={20} />} seed={2} loading={loading} />
+                <StatCard label="On Leave" value={kpi(filteredEmployees.filter(e => e.status === "ON_LEAVE").length)} tone="amber" icon={<CalendarOff size={20} />} seed={3} loading={loading} />
+                <StatCard label="Terminated" value={kpi(filteredEmployees.filter(e => e.status === "TERMINATED").length)} tone="rose" icon={<UserMinus size={20} />} seed={4} loading={loading} />
             </div>
             {loadError && !loading && (
                 <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-800">

@@ -53,6 +53,11 @@
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
+    /* Light values for the shadcn "muted" pair. They used to exist only in the
+       dark blocks, so in light mode bg-muted resolved to nothing and every
+       <Skeleton> was invisible — the dashboard looked blank while loading. */
+    --muted: 226 45% 91%;
+    --muted-foreground: 222 13% 45%;
     /* Rounder shadcn primitives (rounded-lg = 12px), closer to Zavtoo. */
     --radius: 0.75rem;
   }

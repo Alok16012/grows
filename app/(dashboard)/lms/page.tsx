@@ -1685,7 +1685,7 @@ export default function LMSPage() {
     return (
         <div className="flex flex-col h-full bg-[var(--surface2)] min-h-0">
             {/* Page Header */}
-            <div className="px-6 pt-6 pb-3 shrink-0">
+            <div className="px-6 pt-6 pb-3 lg:px-0 lg:pt-0 shrink-0">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                         <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Training (LMS)</h1>

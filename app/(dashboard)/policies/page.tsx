@@ -146,7 +146,7 @@ export default function PoliciesPage() {
     }
 
     return (
-        <div className="px-4 py-5 sm:px-7 sm:py-6 min-h-screen">
+        <div className="p-4 lg:p-0 min-h-screen">
             <OpenFromQuery ready={authStatus === "authenticated"} onOpen={id => setEditing(id)} />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
                 <div>
