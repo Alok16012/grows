@@ -208,8 +208,12 @@ const ALIASES: Record<string, string[]> = {
     "payroll.edit":         ["payroll.manage"],
     "payroll.import":       ["payroll.manage"],
     "assets.create":        ["assets.request"],
-    "assets.edit":          ["assets.issue"],
-    "assets.delete":        ["assets.issue"],
+    // Adding, editing, assigning and returning asset records is checked as
+    // assets.manage (11 places). No catalogue key produced it, so the Assets
+    // module's Edit / Delete boxes did nothing and only Admin could run the
+    // asset register.
+    "assets.edit":          ["assets.issue", "assets.manage"],
+    "assets.delete":        ["assets.issue", "assets.manage"],
     "expenses.approve":     ["expenses.manage"],
     "expenses.markPaid":    ["expenses.manage"],
     "exit.create":          ["exit.manage"],
