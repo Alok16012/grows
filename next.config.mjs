@@ -11,6 +11,11 @@ const nextConfig = {
     // Vercel deploy. Turn this off once `npm run lint` is clean.
     eslint: { ignoreDuringBuilds: true },
     experimental: {
+        // @react-pdf/renderer ships ESM only. From Next 14.2.4+ the strict
+        // default refuses it ("ESM packages need to be imported") when a page
+        // dynamic-imports it (app/share/[token]); "loose" restores the 14.2.3
+        // behaviour.
+        esmExternals: "loose",
         optimizePackageImports: ["@radix-ui/react-icons", "recharts", "lucide-react", "date-fns"],
         // Client router cache: revisiting a page within 30s reuses the cached
         // RSC payload instead of re-rendering on the server — makes back/forward
