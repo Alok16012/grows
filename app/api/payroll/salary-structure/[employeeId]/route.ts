@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
+import { rulesForToday } from "@/lib/payroll-rules"
 import { monthKey, monthInIST } from "@/lib/salary-revision"
 
 // Reading needs a salary permission — this returns an individual's full pay
@@ -48,13 +49,15 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     // CTC preview must match what the wage engine will actually produce, so
     // compute it with the shared engine + the company's configured rules
     // (the old inline math used a flat ₹1,950 employer PF regardless of basic).
-    const [{ rules }, emp] = await Promise.all([
+    const [{ rules: baseRules }, emp] = await Promise.all([
         getPayrollRules(),
         prisma.employee.findUnique({
             where: { id: params.employeeId },
             select: { gender: true, isHandicap: true, dateOfJoining: true },
         }),
     ])
+    // Structure previews show the rules in force this month (Oct 2026 revision).
+    const rules = rulesForToday(baseRules)
     const costs = calcFullMonthCosts({
         basic: Number(basic) || 0,
         da: Number(da) || 0,

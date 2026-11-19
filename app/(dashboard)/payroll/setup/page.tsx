@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { monthEndKey } from "@/lib/employee-filter"
 import { useSession } from "next-auth/react"
@@ -15,7 +15,7 @@ import {
 const loadXLSX = () => import("xlsx")
 import { can } from "@/lib/can"
 import { calcFullMonthCosts, calcGrowusPayroll } from "@/lib/payroll-calc"
-import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, rulesForPeriod } from "@/lib/payroll-rules"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SalarySalary = {
@@ -209,7 +209,7 @@ function SalaryModal({ emp, rules, onClose, onSaved }: {
                             {form.complianceType === "OR" ? (
                                 <>
                                     <div className="flex justify-between"><span className="text-[var(--text3)]">PF (Employee {rules.pf.employeePct}%)</span><span className="text-red-600">-₹{costs.pfEmployee.toLocaleString()}</span></div>
-                                    <div className="flex justify-between"><span className="text-[var(--text3)]">ESIC {costs.esiEmployee === 0 ? `(gross > ₹${Math.round(rules.esic.eligibilityLimit / 1000)}k, N/A)` : `(${rules.esic.employeePct}%)`}</span><span className="text-red-600">{costs.esiEmployee === 0 ? "₹0" : `-₹${costs.esiEmployee.toLocaleString()}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text3)]">ESIC {costs.esiEmployee === 0 ? `(${rules.esic.eligibilityBasis === "basicDa" ? "Basic + DA" : "gross"} > ₹${Math.round(rules.esic.eligibilityLimit / 1000)}k, N/A)` : `(${rules.esic.employeePct}%)`}</span><span className="text-red-600">{costs.esiEmployee === 0 ? "₹0" : `-₹${costs.esiEmployee.toLocaleString()}`}</span></div>
                                 </>
                             ) : (
                                 <div className="flex justify-between text-amber-700"><span>PF & ESIC</span><span className="font-semibold">Not Applicable</span></div>
@@ -245,13 +245,15 @@ export default function PayrollPage() {
     const [processing, setProcessing] = useState(false)
     const [salaryModal, setSalaryModal] = useState<EmpRow | null>(null)
     // Company calculation rules — previews must match what Process will save
-    const [rules, setRules] = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
+    const [baseRules, setRules] = useState<PayrollRules>(DEFAULT_PAYROLL_RULES)
     useEffect(() => {
         fetch("/api/payroll/rules")
             .then(r => r.ok ? r.json() : null)
             .then(d => { if (d?.rules) setRules(d.rules) })
             .catch(() => { /* previews fall back to defaults */ })
     }, [])
+    // As Process will apply them to the selected month (Oct 2026 PF/ESIC revision).
+    const rules = useMemo(() => rulesForPeriod(baseRules, month, year), [baseRules, month, year])
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [tab, setTab] = useState<"payroll"|"setup">("payroll")
     // Attendance inputs per employee

@@ -19,7 +19,7 @@ import { calcFullMonthCosts } from "@/lib/payroll-calc"
 
 const MONTHS_LONG  = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, rulesForToday } from "@/lib/payroll-rules"
 
 const fmt  = (n: number) => n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—"
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
@@ -78,11 +78,11 @@ function formulaLegend(r: PayrollRules) {
     const base = esicBaseLabel(r)
     const coPf = r.pf.employer.epsPct + r.pf.employer.epfPct + r.pf.employer.edliPct + r.pf.employer.adminPct
     return [
-        `Emp.PF = ${pct(r.pf.employeePct)} of (Basic + DA)`,
+        `Emp.PF = ${pct(r.pf.employeePct)} of (Basic + DA) up to ${thousands(r.pf.wageCeiling)}`,
         `Emp.ESI = ${base}×${pct(r.esic.employeePct)}`,
         `Co.PF = ${pct(coPf)} of (Basic + DA)`,
         `Co.ESIC = ${base}×${pct(r.esic.employerPct)}`,
-        `ESIC limit ${thousands(r.esic.eligibilityLimit)} (${thousands(r.esic.handicapLimit)} for Handicap)`,
+        `ESIC limit ${thousands(r.esic.eligibilityLimit)} on ${r.esic.eligibilityBasis === "basicDa" ? "Basic + DA" : "gross"} (${thousands(r.esic.handicapLimit)} for Handicap)`,
     ].join(" · ")
 }
 
@@ -177,7 +177,8 @@ function SalaryMasterInner() {
     useEffect(() => {
         fetch("/api/payroll/rules")
             .then(r => r.ok ? r.json() : null)
-            .then(d => { if (d?.rules) setRules(d.rules) })
+            // Rules in force this month, so PF/ESIC match the Oct 2026 revision.
+            .then(d => { if (d?.rules) setRules(rulesForToday(d.rules)) })
             .catch(() => { /* previews fall back to defaults */ })
     }, [])
 

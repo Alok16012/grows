@@ -9,7 +9,7 @@ const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
 import { Loader2, Download, Printer, RefreshCw, ChevronRight, ShieldCheck, FileSpreadsheet } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
-import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, rulesForPeriod } from "@/lib/payroll-rules"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -274,7 +274,8 @@ function ComplianceMasterInner() {
                     ...(() => {
                         // Same multiply-first math as lib/payroll-calc.ts, driven
                         // by the configured rules instead of hardcoded rates.
-                        const pfBase = Math.min(Number(p.basicSalary ?? 0) + Number(p.da ?? 0), rules.pf.wageCeiling)
+                        // Ceiling for the month shown (₹25,000 from Oct 2026).
+                        const pfBase = Math.min(Number(p.basicSalary ?? 0) + Number(p.da ?? 0), rulesForPeriod(rules, month, year).pf.wageCeiling)
                         const er = rules.pf.employer
                         // Outside the pension scheme (Employee Master): no EPS,
                         // the whole employer share is EPF — same as the engine.

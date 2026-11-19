@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { PayrollRules } from "@/lib/payroll-rules"
+import { PayrollRules, esicEligibilityBase, rulesForPeriod } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { buildEcrText, EcrMember } from "@/lib/ecr-format"
 import { accessFrom, has } from "@/lib/access"
@@ -49,6 +49,7 @@ type PayrollRow = {
     lwwFull: number
     bonusFull: number
     otherFull: number
+    grossFullMonth: number
     employee: {
         id: string
         employeeId: string
@@ -118,6 +119,19 @@ function esiWages(p: PayrollRow, rules: PayrollRules) {
         - (rules.esic.excludeConveyance ? (p.conveyance ?? 0) : 0)
         - (rules.esic.excludeBonus ? (p.bonus ?? 0) : 0))
 }
+/**
+ * Out of ESIC because the member is above the eligibility limit (as opposed to
+ * CALL or switched off). Tested on the same full-month figure as the engine.
+ * Rows saved before grossFullMonth existed (0) fall back to earned gross.
+ */
+function esicExemptByLimit(p: PayrollRow, rules: PayrollRules) {
+    const base = esicEligibilityBase(rules.esic, {
+        basic: p.basicFull ?? 0,
+        da: p.daFull ?? 0,
+        gross: p.grossFullMonth || p.grossSalary,
+    })
+    return base > rules.esic.eligibilityLimit
+}
 function ncpDays(p: PayrollRow) {
     // Clamp at 0 — present > working (OT-padded zero-day months) was producing
     // negative NCP days, which EPFO ECR rejects.
@@ -164,7 +178,9 @@ export async function GET(req: Request) {
 
         // Company-configured rates/ceilings — report columns must mirror the
         // rules the amounts were computed with.
-        const { rules } = await getPayrollRules()
+        // ...as they applied to the month being filed (Oct 2026 revision).
+        const { rules: baseRules } = await getPayrollRules()
+        const rules = rulesForPeriod(baseRules, month, year)
         const fmtPct = (n: number) => `${parseFloat(n.toFixed(2))}%`
         const pfErTotalPct = rules.pf.employer.epsPct + rules.pf.employer.epfPct +
             rules.pf.employer.edliPct + rules.pf.employer.adminPct
@@ -314,7 +330,7 @@ export async function GET(req: Request) {
             for (const [sid, rows] of siteMap) {
                 const siteName   = sid === "NO_SITE" ? "Unassigned" : (nameMap.get(sid) ?? sid)
                 const esiRows    = rows.filter(p => p.esiEmployee > 0)
-                const exemptRows = rows.filter(p => p.esiEmployee === 0 && p.grossSalary > rules.esic.eligibilityLimit)
+                const exemptRows = rows.filter(p => p.esiEmployee === 0 && esicExemptByLimit(p, rules))
                 const totWages   = esiRows.reduce((s, p) => s + esiWages(p, rules), 0)
                 const totEmpCont = esiRows.reduce((s, p) => s + p.esiEmployee, 0)
                 const totErCont  = esiRows.reduce((s, p) => s + p.esiEmployer, 0)
@@ -334,7 +350,7 @@ export async function GET(req: Request) {
             if (siteMap.size > 1) {
                 const all        = filtered
                 const esiAll     = all.filter(p => p.esiEmployee > 0)
-                const exAll      = all.filter(p => p.esiEmployee === 0 && p.grossSalary > rules.esic.eligibilityLimit)
+                const exAll      = all.filter(p => p.esiEmployee === 0 && esicExemptByLimit(p, rules))
                 const totW       = esiAll.reduce((s, p) => s + esiWages(p, rules), 0)
                 const tEmp       = esiAll.reduce((s, p) => s + p.esiEmployee, 0)
                 const tEr        = esiAll.reduce((s, p) => s + p.esiEmployer, 0)

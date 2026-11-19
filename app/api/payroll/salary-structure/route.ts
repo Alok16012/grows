@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
+import { rulesForToday } from "@/lib/payroll-rules"
 import { isValidEffectiveMonth, monthKey, monthInIST, revisionsForMonth } from "@/lib/salary-revision"
 
 // GET /api/payroll/salary-structure[?month=&year=]
@@ -125,13 +126,15 @@ export async function POST(req: Request) {
 
     // Rules drive default rates and the CTC preview; employee gender/handicap
     // feed the same engine the wage run uses, so stored CTC matches reality.
-    const [{ rules }, empDetails] = await Promise.all([
+    const [{ rules: baseRules }, empDetails] = await Promise.all([
         getPayrollRules(),
         prisma.employee.findMany({
             where: { id: { in: rows.map(r => r.employeeId) } },
             select: { id: true, gender: true, isHandicap: true, dateOfJoining: true },
         }),
     ])
+    // Structure previews show the rules in force this month (Oct 2026 revision).
+    const rules = rulesForToday(baseRules)
     const empById = new Map(empDetails.map(e => [e.id, e]))
 
     // EmployeeSalary is the snapshot the rest of the app shows, so it must hold

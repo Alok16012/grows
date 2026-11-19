@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { computePt } from "@/lib/payroll-rules"
+import { computePt, esicEligibilityBase, rulesForPeriod } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { revisionsForMonth } from "@/lib/salary-revision"
 
@@ -111,7 +111,7 @@ export async function PUT(
                 return new NextResponse("Amounts on a locked payroll cannot be edited. Unlock the run first.", { status: 409 })
             }
 
-            const [{ rules }, employee, revisions] = await Promise.all([
+            const [{ rules: baseRules }, employee, revisions] = await Promise.all([
                 getPayrollRules(),
                 prisma.employee.findUnique({
                     where: { id: existing.employeeId },
@@ -122,6 +122,8 @@ export async function PUT(
                 // an old draft while keeping PF.
                 revisionsForMonth([existing.employeeId], { month: existing.month, year: existing.year }),
             ])
+            // The rules for this row's month (PF/ESIC revision from Oct 2026).
+            const rules = rulesForPeriod(baseRules, existing.month, existing.year)
             const complianceType = revisions.get(existing.employeeId)?.complianceType ?? employee?.employeeSalary?.complianceType
             const isCALL = complianceType === "CALL"
             const isFemale = (employee?.gender ?? "").toLowerCase() === "female"
@@ -138,12 +140,13 @@ export async function PUT(
                 existing.conveyance + existing.lwwEarned + existing.bonus +
                 newAllowances + newOvertimePay + existing.productionIncentive
 
-            // ESIC follows the engine: eligibility on FULL-MONTH structure
-            // gross, wages exclude washing/conveyance/bonus per rules, CALL exempt.
+            // ESIC follows the engine: eligibility on a FULL-MONTH figure (structure
+            // gross, or Basic + DA from Oct 2026), wages exclude washing/conveyance/
+            // bonus per rules, CALL exempt.
             const esicLimit = employee?.isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
             // Same switch the wage run honours (Employee Master → ESIC Applicable).
             const esicApplicable = (await statutoryFlagsFor([existing.employeeId])).get(existing.employeeId)?.esicApplicable ?? true
-            const esicEligible = rules.esic.enabled && !isCALL && esicApplicable && existing.grossFullMonth <= esicLimit
+            const esicEligible = rules.esic.enabled && !isCALL && esicApplicable && esicEligibilityBase(rules.esic, { basic: existing.basicFull, da: existing.daFull, gross: existing.grossFullMonth }) <= esicLimit
             const esicWages = Math.max(0,
                 grossSalary
                 - (rules.esic.excludeWashing ? existing.washing : 0)

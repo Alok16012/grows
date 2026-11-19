@@ -9,7 +9,9 @@ import {
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
-import { DEFAULT_PAYROLL_RULES, PayrollRules, PtSlab, sanitizePayrollRules } from "@/lib/payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, PtSlab, rulesForPeriod, sanitizePayrollRules } from "@/lib/payroll-rules"
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
 
@@ -90,6 +92,8 @@ export default function PayrollSettingsPage() {
         complianceType: "OR", isHandicap: false, gender: "Male",
         monthDays: 26, workedDays: 26, otDays: 0, canteenDays: 0, lwf: 0,
         month: 1,
+        // Preview with the dated PF/ESIC revision applied (true) or the rules before it.
+        newRule: true,
     })
 
     useEffect(() => {
@@ -156,7 +160,12 @@ export default function PayrollSettingsPage() {
         finally { setResetting(false) }
     }
 
-    // Live preview — computed with the CURRENT edits (sanitized like the server will)
+    // Live preview — computed with the CURRENT edits (sanitized like the server will),
+    // for a month before or after the revision's effective date.
+    const sanitized = sanitizePayrollRules(rules)
+    const previewRules = sample.newRule
+        ? rulesForPeriod(sanitized, sanitized.revision.effectiveMonth, sanitized.revision.effectiveYear)
+        : sanitized
     const preview = calcGrowusPayroll(
         {
             basic: sample.basic, da: sample.da, washing: sample.washing,
@@ -171,7 +180,7 @@ export default function PayrollSettingsPage() {
             penalty: 0, advance: 0, otherDeductions: 0, productionIncentive: 0,
             lwf: sample.lwf, gender: sample.gender, month: sample.month,
         },
-        sanitizePayrollRules(rules)
+        previewRules
     )
     const upSample = (patch: Partial<typeof sample>) => setSample(prev => ({ ...prev, ...patch }))
 
@@ -241,6 +250,53 @@ export default function PayrollSettingsPage() {
                 </span>
             </div>
 
+            {/* ── Dated statutory revision (govt. rule from 1 Oct 2026) ── */}
+            <div style={{ ...cardStyle, borderColor: "#bfdbfe" }}>
+                <div>
+                    <h2 style={cardTitle}>
+                        New PF &amp; ESIC rule — from {MONTHS[rules.revision.effectiveMonth - 1]} {rules.revision.effectiveYear}
+                    </h2>
+                    <p style={cardHint}>
+                        From the effective month onward these figures replace the PF wage ceiling and ESIC limit below.
+                        Earlier months keep the old rule, so re-processing or re-filing them gives the same figures.
+                    </p>
+                </div>
+                <Toggle label="Apply this rule" checked={rules.revision.enabled} onChange={b => up("revision", { enabled: b })}
+                    hint="Off = every month uses the PF / ESIC settings below." />
+                {rules.revision.enabled && (
+                    <>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={fieldLabel}>Effective month</span>
+                                <select value={rules.revision.effectiveMonth} onChange={e => up("revision", { effectiveMonth: Number(e.target.value) })} style={inputStyle}>
+                                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                                </select>
+                            </label>
+                            <NumField label="Effective year" value={rules.revision.effectiveYear} onChange={n => up("revision", { effectiveYear: n })} />
+                            <NumField label="PF wage ceiling" suffix="₹" value={rules.revision.pfWageCeiling} onChange={n => up("revision", { pfWageCeiling: n })} />
+                            <NumField label="ESIC limit" suffix="₹" value={rules.revision.esicEligibilityLimit} onChange={n => up("revision", { esicEligibilityLimit: n })} />
+                            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={fieldLabel}>ESIC limit checked on</span>
+                                <select value={rules.revision.esicEligibilityBasis} onChange={e => up("revision", { esicEligibilityBasis: e.target.value as PayrollRules["revision"]["esicEligibilityBasis"] })} style={inputStyle}>
+                                    <option value="basicDa">Basic + DA</option>
+                                    <option value="structureGross">Structure gross</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.6 }}>
+                            <div>
+                                <b>PF:</b> Basic + DA ≥ ₹{Math.round(rules.revision.pfWageCeiling).toLocaleString("en-IN")} → ₹{Math.round(rules.revision.pfWageCeiling * rules.pf.employeePct / 100).toLocaleString("en-IN")} ({rules.pf.employeePct}%);
+                                {" "}below that → {rules.pf.employeePct}% of actual Basic + DA.
+                            </div>
+                            <div>
+                                <b>ESIC:</b> {rules.revision.esicEligibilityBasis === "basicDa" ? "Basic + DA" : "Structure gross"} ≤ ₹{Math.round(rules.revision.esicEligibilityLimit).toLocaleString("en-IN")} → {rules.esic.employeePct}%;
+                                {" "}₹{Math.round(rules.revision.esicEligibilityLimit + 1).toLocaleString("en-IN")} and above → no ESIC.
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 14 }}>
 
                 {/* ── PF ── */}
@@ -284,7 +340,7 @@ export default function PayrollSettingsPage() {
                 <div style={cardStyle}>
                     <div>
                         <h2 style={cardTitle}>ESIC</h2>
-                        <p style={cardHint}>Eligibility is checked on the full-month structure gross. Contribution base = earned gross minus the excluded components (OT stays included).</p>
+                        <p style={cardHint}>Before the new rule above, eligibility is checked on the full-month structure gross. Contribution base = earned gross minus the excluded components (OT stays included).</p>
                     </div>
                     <Toggle label="ESIC enabled" checked={rules.esic.enabled} onChange={b => up("esic", { enabled: b })} />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -432,6 +488,13 @@ export default function PayrollSettingsPage() {
                                 <option value={2}>February</option>
                             </select>
                         </label>
+                        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <span style={fieldLabel}>PF / ESIC rule</span>
+                            <select value={sample.newRule ? "new" : "old"} onChange={e => upSample({ newRule: e.target.value === "new" })} style={inputStyle}>
+                                <option value="new">From {MONTHS[rules.revision.effectiveMonth - 1]} {rules.revision.effectiveYear}</option>
+                                <option value="old">Before {MONTHS[rules.revision.effectiveMonth - 1]} {rules.revision.effectiveYear}</option>
+                            </select>
+                        </label>
                     </div>
                     <div style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
@@ -444,7 +507,7 @@ export default function PayrollSettingsPage() {
                             </thead>
                             <tbody>
                                 {(() => {
-                                    const pfBase = Math.min(sample.basic + sample.da, rules.pf.wageCeiling)
+                                    const pfBase = Math.min(sample.basic + sample.da, previewRules.pf.wageCeiling)
                                     return (
                                         <tr>
                                             {[sample.basic + sample.da, pfBase, preview.pfEmployee, preview.esiEmployee, preview.pt, preview.lwf,

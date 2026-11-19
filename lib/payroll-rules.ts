@@ -19,11 +19,31 @@ export type PtSlab = {
     amount: number
 }
 
+// What the ESIC eligibility limit is compared against:
+//   "structureGross" → full-month structure gross (the rule up to Sep 2026)
+//   "basicDa"        → full-month Basic + DA (the rule from 1 Oct 2026)
+export type EsicEligibilityBasis = "structureGross" | "basicDa"
+
+// A dated change to the statutory rules. From the effective month onward,
+// payroll uses these figures instead of the base pf/esic values; months
+// before it keep the old ones, so re-running or re-filing an old month never
+// picks up the new rule. See rulesForPeriod().
+export type StatutoryRevision = {
+    enabled: boolean
+    effectiveMonth: number   // 1–12
+    effectiveYear: number
+    // PF wage ceiling: Basic + DA up to this is charged at 12% of actual,
+    // above it PF is fixed at 12% of the ceiling (₹25,000 → ₹3,000).
+    pfWageCeiling: number
+    esicEligibilityBasis: EsicEligibilityBasis
+    // Basic + DA up to this (inclusive) pays ESIC; above it, none.
+    esicEligibilityLimit: number
+}
+
 export type PayrollRules = {
     pf: {
         enabled: boolean
-        // PF base = Basic + DA (no ceiling). wageCeiling kept in type for
-        // backward compat with stored settings but not used in calculation.
+        // PF base = min(earned Basic + DA, wageCeiling).
         wageCeiling: number
         employeePct: number
         // When true, employees who worked fewer than prorationThresholdDays
@@ -40,7 +60,9 @@ export type PayrollRules = {
     }
     esic: {
         enabled: boolean
-        // Eligibility is checked on the FULL-MONTH structure gross.
+        // Eligibility is checked on a FULL-MONTH figure — which one is set by
+        // eligibilityBasis (structure gross unless a revision says otherwise).
+        eligibilityBasis: EsicEligibilityBasis
         eligibilityLimit: number
         handicapLimit: number
         employeePct: number
@@ -88,6 +110,7 @@ export type PayrollRules = {
         pfEstablishment: string
         esicEstablishment: string
     }
+    revision: StatutoryRevision
 }
 
 export const DEFAULT_PAYROLL_RULES: PayrollRules = {
@@ -106,6 +129,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
     },
     esic: {
         enabled: true,
+        eligibilityBasis: "structureGross",
         eligibilityLimit: 21000,
         handicapLimit: 25000,
         employeePct: 0.75,
@@ -145,6 +169,55 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         pfEstablishment: "PUPUN2450654000",
         esicEstablishment: "33000891430000999",
     },
+    // Govt. rule effective 1 Oct 2026:
+    //   PF:   Basic + DA ≥ ₹25,000 → ₹3,000 (12% of 25,000); below → 12% of actual
+    //   ESIC: Basic + DA ≤ ₹21,000 → 0.75%; ₹21,001 and above → no ESIC
+    revision: {
+        enabled: true,
+        effectiveMonth: 10,
+        effectiveYear: 2026,
+        pfWageCeiling: 25000,
+        esicEligibilityBasis: "basicDa",
+        esicEligibilityLimit: 21000,
+    },
+}
+
+// ─── Period-specific rules ───────────────────────────────────────────────────
+// The rules that apply to payroll for month/year: the base rules, with the
+// statutory revision laid over them from its effective month onward. Every
+// place that computes or files a month's PF/ESIC must go through this, so a
+// September re-run keeps the old ceiling while October uses the new one.
+
+export function revisionApplies(rules: PayrollRules, month: number, year: number): boolean {
+    const r = rules.revision
+    if (!r?.enabled) return false
+    return year * 12 + month >= r.effectiveYear * 12 + r.effectiveMonth
+}
+
+export function rulesForPeriod(rules: PayrollRules, month: number, year: number): PayrollRules {
+    if (!revisionApplies(rules, month, year)) return rules
+    const r = rules.revision
+    return {
+        ...rules,
+        pf: { ...rules.pf, wageCeiling: r.pfWageCeiling },
+        esic: { ...rules.esic, eligibilityBasis: r.esicEligibilityBasis, eligibilityLimit: r.esicEligibilityLimit },
+    }
+}
+
+/** Rules for the current calendar month — for salary-structure previews. */
+export function rulesForToday(rules: PayrollRules, now: Date = new Date()): PayrollRules {
+    return rulesForPeriod(rules, now.getMonth() + 1, now.getFullYear())
+}
+
+/**
+ * The full-month figure ESIC eligibility is tested against, per the rules'
+ * basis. Shared by the engine, the single-row edit route and the reports.
+ */
+export function esicEligibilityBase(
+    esic: PayrollRules["esic"],
+    full: { basic: number; da: number; gross: number }
+): number {
+    return esic.eligibilityBasis === "basicDa" ? full.basic + full.da : full.gross
 }
 
 // ─── Sanitizer ───────────────────────────────────────────────────────────────
@@ -207,6 +280,9 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
     const ot = o.ot ?? {}
     const defaults = o.defaults ?? {}
     const codes = o.codes ?? {}
+    const revision = o.revision ?? {}
+    const basis = (v: unknown, fallback: EsicEligibilityBasis): EsicEligibilityBasis =>
+        v === "basicDa" || v === "structureGross" ? v : fallback
 
     return {
         pf: {
@@ -224,6 +300,7 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
         },
         esic: {
             enabled: bool(esic.enabled, d.esic.enabled),
+            eligibilityBasis: basis(esic.eligibilityBasis, d.esic.eligibilityBasis),
             eligibilityLimit: num(esic.eligibilityLimit, d.esic.eligibilityLimit),
             handicapLimit: num(esic.handicapLimit, d.esic.handicapLimit),
             employeePct: num(esic.employeePct, d.esic.employeePct, { max: 100 }),
@@ -256,6 +333,16 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
         codes: {
             pfEstablishment: str(codes.pfEstablishment, d.codes.pfEstablishment),
             esicEstablishment: str(codes.esicEstablishment, d.codes.esicEstablishment),
+        },
+        // Stored settings saved before revisions existed have no `revision`
+        // key, so they pick up the default (the Oct 2026 rule) automatically.
+        revision: {
+            enabled: bool(revision.enabled, d.revision.enabled),
+            effectiveMonth: num(revision.effectiveMonth, d.revision.effectiveMonth, { min: 1, max: 12 }),
+            effectiveYear: num(revision.effectiveYear, d.revision.effectiveYear, { min: 2000, max: 2100 }),
+            pfWageCeiling: num(revision.pfWageCeiling, d.revision.pfWageCeiling),
+            esicEligibilityBasis: basis(revision.esicEligibilityBasis, d.revision.esicEligibilityBasis),
+            esicEligibilityLimit: num(revision.esicEligibilityLimit, d.revision.esicEligibilityLimit),
         },
     }
 }

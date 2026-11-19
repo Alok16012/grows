@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
+import { rulesForPeriod } from "@/lib/payroll-rules"
 import { checkAccess } from "@/lib/permissions"
 import { revisionsForMonth } from "@/lib/salary-revision"
 import { statutoryFlagsFor } from "@/lib/employee-statutory"
@@ -148,8 +149,11 @@ export async function POST(req: Request) {
             }
         }
 
-        // Company-configurable calculation rules (Payroll → Calculation Settings)
-        const { rules } = await getPayrollRules()
+        // Company-configurable calculation rules (Payroll → Calculation Settings),
+        // as they apply to THIS month — the Oct 2026 PF/ESIC revision only
+        // from its effective month, so re-running September is unchanged.
+        const { rules: baseRules } = await getPayrollRules()
+        const rules = rulesForPeriod(baseRules, month, year)
 
         // The structure in force for THIS month, not whatever EmployeeSalary
         // happens to hold today. An increment effective from October must not

@@ -18,20 +18,26 @@
 // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
 //   Default hoursPerDay = 4 (e.g. ₹170/hr × 4 = ₹680/day)
 //
-// PF Employee:  pfBase = min(Basic + DA, wage ceiling ₹15,000)
-//               ≤ ₹15,000 → 12% of actual. > ₹15,000 → ₹1,800 fixed.
+// The rules passed in must be the ones for the payroll month — callers use
+// rulesForPeriod(rules, month, year), which applies the 1 Oct 2026 revision.
+//
+// PF Employee:  pfBase = min(Basic + DA, wage ceiling)
+//               Up to Sep 2026: ceiling ₹15,000 → max ₹1,800.
+//               From Oct 2026:  ceiling ₹25,000 → max ₹3,000; below it 12% of actual.
 //               Default: full PF regardless of worked days; optional proration rule.
 // PF Employer (all on pfBase):
 //   EPS 8.33% + EPF diff 3.67% + EDLI 0.50% + admin 0.50%  (≈ 13%)
 //
-// ESIC eligibility: Structure Gross ≤ ₹21,000  [₹25,000 for Handicap]
+// ESIC eligibility (full month)  [₹25,000 for Handicap]:
+//   Up to Sep 2026: Structure Gross ≤ ₹21,000
+//   From Oct 2026:  Basic + DA ≤ ₹21,000 (₹21,001 and above → no ESIC)
 //   ESIC wages = EarnedGross − Washing − Conveyance  (OT and Bonus included)
 //   Employee CEIL(0.75%), Employer CEIL(3.25%)
 //
 // PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
 //   200 (300 in February). Female employees exempt up to ₹25,000.
 //
-import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt } from "./payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase } from "./payroll-rules"
 
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
@@ -111,8 +117,9 @@ export function calcGrowusPayroll(sal: {
     const pctOf  = (x: number, pct: number) => Math.round(x * pct / 100)
     const pctCeil = (x: number, pct: number) => Math.ceil(x * pct / 100)
 
-    // PF base = min(EARNED Basic + DA, wage ceiling ₹15,000).
-    // ≤ ₹15,000 → 12% of actual. > ₹15,000 → ₹1,800 fixed.
+    // PF base = min(EARNED Basic + DA, wage ceiling).
+    // Below the ceiling → 12% of actual; at or above → 12% of the ceiling
+    // (₹1,800 on ₹15,000; ₹3,000 on ₹25,000 from Oct 2026).
     // Default: full PF regardless of worked days; optional proration rule.
     const pfApplies  = rules.pf.enabled && !isCALL && pfApplicable !== false
     const pfBase     = Math.min(basicEarned + daEarned, rules.pf.wageCeiling)
@@ -121,14 +128,16 @@ export function calcGrowusPayroll(sal: {
         ? Math.round(pfBase / rules.pf.prorationThresholdDays * workedDays * rules.pf.employeePct / 100)
         : pctOf(pfBase, rules.pf.employeePct)
 
-    // ESIC eligibility: full-month structure gross ≤ limit
+    // ESIC eligibility: a full-month figure ≤ limit — structure gross, or
+    // Basic + DA from Oct 2026 (rules.esic.eligibilityBasis).
     // Contribution base = EarnedGross minus excluded components (OT included)
     const esicLimit    = isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
     const esicWages    = grossEarned
         - (rules.esic.excludeWashing ? washingEarned : 0)
         - (rules.esic.excludeConveyance ? convEarned : 0)
         - (rules.esic.excludeBonus ? bonusEarned : 0)
-    const esicEligible = rules.esic.enabled && !isCALL && esicApplicable !== false && grossFullMonth <= esicLimit
+    const esicBase     = esicEligibilityBase(rules.esic, { basic, da, gross: grossFullMonth })
+    const esicEligible = rules.esic.enabled && !isCALL && esicApplicable !== false && esicBase <= esicLimit
     const esiEmployee  = esicEligible ? pctCeil(esicWages, rules.esic.employeePct) : 0
 
     // PT: slab on EARNED gross, but the female limit on the full-month
@@ -157,7 +166,7 @@ export function calcGrowusPayroll(sal: {
     const netSalary = grossEarned - totalDeductions
 
     // ─── Employer Contributions ───────────────────────────────────────────────
-    // Employer PF — 4 components on pfBase = Basic + DA (no ceiling)
+    // Employer PF — 4 components on the same capped pfBase as the employee share
     // Not in the pension scheme: no EPS, and the remainder line below then puts
     // the whole employer share into EPF — the total employer PF is unchanged.
     const eps         = !pfApplies || pensionApplicable === false ? 0 : pctOf(pfBase, rules.pf.employer.epsPct)
