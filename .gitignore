@@ -44,3 +44,6 @@ next-env.d.ts
 .netlify
 .next-build
 .next-test
+
+# Private security review: keep out of the public repo
+REVIEW.md
