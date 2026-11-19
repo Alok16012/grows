@@ -54,7 +54,11 @@ export async function GET(req: Request) {
             checkAccess(session, [], "attendance.view") ||
             // Inspection setup (Site → Project → Assignment) also needs to list
             // sites when picking one for a project / assignment.
-            checkAccess(session, [], "projects.view")
+            checkAccess(session, [], "projects.view") ||
+            // Announcements, polls and surveys are targeted at sites.
+            checkAccess(session, [], "announcements.manage") ||
+            checkAccess(session, [], "polls.create") ||
+            checkAccess(session, [], "surveys.create")
         if (!canListSites) {
             return NextResponse.json({
                 error: "Forbidden - missing sites.view permission",

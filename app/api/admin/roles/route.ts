@@ -10,6 +10,8 @@ import {
 const NAME_READERS = [
     "roles.view", "users.view", "users.edit", "users.manage", "employees.create", "employees.edit",
     "announcements.create", "announcements.manage", "documents.send", "documents.view",
+    // Poll / survey creators target them at roles.
+    "polls.create", "polls.edit", "surveys.create", "surveys.edit",
 ]
 
 // GET            → [{ id, name, color, isActive, description, _count }] for pickers

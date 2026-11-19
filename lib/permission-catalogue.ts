@@ -53,6 +53,12 @@ export const MODULES: ModuleDef[] = [
     { key: "lms",           label: "Training (LMS)",          group: "Talent and growth", actions: ["view", "create", "edit", "delete", "export"] },
 
     { key: "announcements", label: "Announcements",           group: "Operations and analytics", actions: ["view", "create", "edit", "delete"] },
+    // Answering a poll or survey needs no permission (everyone in its audience
+    // can). These govern running them: view = see every poll / survey and its
+    // results, create, edit = close / reopen / publish / change, delete, and
+    // export = download survey responses.
+    { key: "polls",         label: "Polls",                   group: "Operations and analytics", actions: ["view", "create", "edit", "delete"] },
+    { key: "surveys",       label: "Surveys",                 group: "Operations and analytics", actions: ["view", "create", "edit", "delete", "export"] },
     { key: "helpdesk",      label: "Helpdesk",                group: "Operations and analytics", actions: ["view", "create", "edit"] },
     { key: "reports",       label: "Analytics and reports",   group: "Operations and analytics", actions: ["view", "export"] },
 
@@ -368,6 +374,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
             dashboard: "V", projects: "V", approvals: "V", assignments: "VCE", employees: "VCEXI", recruitment: "VCEDXI",
             jobs: "VCEDX", onboarding: "VEA", policies: "VCED", documents: "VCDAX", attendance: "VCEXI", leaves: "VCEAX",
             assets: "VCEDAX", expenses: "V", exit: "VCEA", performance: "VCEA", lms: "VCEDX", announcements: "VCED",
+            polls: "VCED", surveys: "VCEDX",
             helpdesk: "VCE", reports: "VX", departments: "VCED", users: "V", audit: "V",
         }, ["jobs.publish", "policies.publish", "documents.send", "attendance.rules", "leaves.policy", "exit.settleFnF",
             "lms.enroll", "helpdesk.assign", "employees.viewKyc", "employees.viewPersonal"]),

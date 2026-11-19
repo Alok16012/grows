@@ -132,6 +132,14 @@ function HolidayTypeBadge({ type }: { type: string }) {
 export default function AnnouncementsPage() {
     const { data: session } = useSession()
     const canManage = can(session, "announcements.manage")
+    const permsFor = (m: "polls" | "surveys") => ({
+        view: can(session, `${m}.view`), create: can(session, `${m}.create`), edit: can(session, `${m}.edit`),
+        delete: can(session, `${m}.delete`), export: can(session, `${m}.export`),
+    })
+    const pollPerms = permsFor("polls")
+    const surveyPerms = permsFor("surveys")
+    // Anyone who targets notices, polls or surveys needs the site / role lists.
+    const canTarget = canManage || pollPerms.create || pollPerms.edit || surveyPerms.create || surveyPerms.edit
 
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [holidays, setHolidays] = useState<Holiday[]>([])
@@ -184,12 +192,12 @@ export default function AnnouncementsPage() {
 
     useEffect(() => { load() }, [load])
 
-    // Managers need the site/role lists to target notices & holidays.
+    // Managers need the site/role lists to target notices, holidays, polls and surveys.
     useEffect(() => {
-        if (!canManage) return
+        if (!canTarget) return
         fetch("/api/sites").then(r => r.ok ? r.json() : []).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {})
         fetch("/api/admin/roles").then(r => r.ok ? r.json() : []).then(d => setRoles(Array.isArray(d) ? d : [])).catch(() => {})
-    }, [canManage])
+    }, [canTarget])
 
     const siteName = (id: string) => sites.find(s => s.id === id)?.name || "site"
     const roleName = (id: string) => roles.find(r => r.id === id)?.name || "role"
@@ -250,8 +258,8 @@ export default function AnnouncementsPage() {
                 })}
             </div></div>
 
-            {tab === "polls" && <PollsPanel canManage={canManage} sites={sites} roles={roles} audienceLabel={audienceLabel} onPending={setPendingPolls} />}
-            {tab === "surveys" && <SurveysPanel canManage={canManage} sites={sites} roles={roles} audienceLabel={audienceLabel} onPending={setPendingSurveys} />}
+            {tab === "polls" && <PollsPanel perms={pollPerms} sites={sites} roles={roles} audienceLabel={audienceLabel} onPending={setPendingPolls} />}
+            {tab === "surveys" && <SurveysPanel perms={surveyPerms} sites={sites} roles={roles} audienceLabel={audienceLabel} onPending={setPendingSurveys} />}
 
             {tab === "notices" && <>
             {/* ── Stat cards ── */}

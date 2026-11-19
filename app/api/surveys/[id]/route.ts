@@ -4,7 +4,7 @@ import { getApiSession } from "@/lib/apiSession"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { audienceWhere } from "@/lib/audience"
 import {
-    isEngagementManager, parseSurveyInput, surveyQuestions, isOpen, effectiveStatus, namesFor,
+    isEngagementManager, canDo, forbidden, parseSurveyInput, surveyQuestions, isOpen, effectiveStatus, namesFor,
     errorResponse, InputError, type SurveyQuestion,
 } from "@/lib/engagement"
 
@@ -37,8 +37,8 @@ export async function GET(req: Request, { params }: Ctx) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     try {
-        const manager = isEngagementManager(session)
-        const [aud, uid] = await Promise.all([audienceWhere(session), resolveUserId(session)])
+        const manager = isEngagementManager(session, "surveys")
+        const [aud, uid] = await Promise.all([manager ? null : audienceWhere(session), resolveUserId(session)])
         const survey = await prisma.survey.findFirst({
             where: manager ? { id: params.id } : { id: params.id, ...(aud ?? {}), status: { in: ["ACTIVE", "CLOSED"] } },
             include: manager ? { responses: { orderBy: { submittedAt: "asc" } } } : undefined,
@@ -55,6 +55,7 @@ export async function GET(req: Request, { params }: Ctx) {
             myAnswers: mine?.answers ?? null, respondedAt: mine?.submittedAt ?? null,
         }
         if (manager) {
+            out.canExport = canDo(session, "surveys", "export")
             const responses = survey.responses as { userId: string; answers: Record<string, unknown>; submittedAt: Date }[]
             const names = survey.anonymous ? new Map<string, string>() : await namesFor(responses.map(r => r.userId))
             out.responseCount = responses.length
@@ -76,7 +77,7 @@ export async function GET(req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    if (!isEngagementManager(session)) return NextResponse.json({ error: "You cannot change surveys." }, { status: 403 })
+    if (!canDo(session, "surveys", "edit")) return forbidden("change surveys")
     try {
         const body = await req.json().catch(() => ({}))
         const survey = await prisma.survey.findUnique({ where: { id: params.id }, include: { _count: { select: { responses: true } } } })
@@ -107,7 +108,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 export async function DELETE(req: Request, { params }: Ctx) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    if (!isEngagementManager(session)) return NextResponse.json({ error: "You cannot delete surveys." }, { status: 403 })
+    if (!canDo(session, "surveys", "delete")) return forbidden("delete surveys")
     try {
         await prisma.survey.delete({ where: { id: params.id } })
         return NextResponse.json({ ok: true })

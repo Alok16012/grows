@@ -4,18 +4,18 @@ import { getApiSession } from "@/lib/apiSession"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { audienceWhere } from "@/lib/audience"
 import {
-    isEngagementManager, parsePollInput, pollOptions, canSeePollResults, isOpen, effectiveStatus,
+    isEngagementManager, canDo, forbidden, parsePollInput, pollOptions, canSeePollResults, isOpen, effectiveStatus,
     namesFor, errorResponse,
 } from "@/lib/engagement"
 
-// GET — polls targeted at the viewer (managers see all), newest first, with
+// GET — polls targeted at the viewer (polls.view sees all), newest first, with
 // the viewer's own vote and, where allowed, the counts per option.
 export async function GET(req: Request) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     try {
-        const manager = isEngagementManager(session)
-        const [aud, uid] = await Promise.all([audienceWhere(session), resolveUserId(session)])
+        const manager = isEngagementManager(session, "polls")
+        const [aud, uid] = await Promise.all([manager ? null : audienceWhere(session), resolveUserId(session)])
         const polls = await prisma.poll.findMany({
             where: aud ?? {},
             orderBy: { createdAt: "desc" },
@@ -34,6 +34,7 @@ export async function GET(req: Request) {
             for (const v of p.votes) for (const o of v.optionIds) counts.set(o, (counts.get(o) ?? 0) + 1)
             return {
                 id: p.id, question: p.question, description: p.description,
+                canEdit: canDo(session, "polls", "edit"), canDelete: canDo(session, "polls", "delete"),
                 allowMultiple: p.allowMultiple, anonymous: p.anonymous, resultsVisibility: p.resultsVisibility,
                 status: effectiveStatus(p), open: isOpen(p), closesAt: p.closesAt, createdAt: p.createdAt,
                 targetSiteIds: p.targetSiteIds, targetRoleIds: p.targetRoleIds,
@@ -54,11 +55,11 @@ export async function GET(req: Request) {
     }
 }
 
-// POST — create a poll (announcements.manage). Polls open as soon as they're created.
+// POST — create a poll (polls.create). Polls open as soon as they're created.
 export async function POST(req: Request) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    if (!isEngagementManager(session)) return NextResponse.json({ error: "You cannot create polls." }, { status: 403 })
+    if (!canDo(session, "polls", "create")) return forbidden("create polls")
     try {
         const input = parsePollInput(await req.json().catch(() => null))
         const createdBy = await resolveUserId(session)

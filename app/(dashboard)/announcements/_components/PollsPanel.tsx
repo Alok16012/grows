@@ -8,6 +8,8 @@ import {
     type Site, type Role,
 } from "./ui"
 
+export type EngagementPerms = { view: boolean; create: boolean; edit: boolean; delete: boolean; export?: boolean }
+
 type PollOption = { id: string; label: string; votes: number | null; voters?: string[] }
 type Poll = {
     id: string; question: string; description: string | null
@@ -24,8 +26,9 @@ const VISIBILITY_LABEL: Record<string, string> = {
     MANAGERS: "Only HR / managers see results",
 }
 
-export default function PollsPanel({ canManage, sites, roles, audienceLabel, onPending }: {
-    canManage: boolean; sites: Site[]; roles: Role[]
+export default function PollsPanel({ perms, sites, roles, audienceLabel, onPending }: {
+    /** From Settings → Roles → Polls. Voting needs none of these. */
+    perms: EngagementPerms; sites: Site[]; roles: Role[]
     audienceLabel: (siteIds?: string[], roleIds?: string[]) => string
     /** Number of open polls the viewer hasn't voted on, for the tab badge. */
     onPending?: (n: number) => void
@@ -66,7 +69,7 @@ export default function PollsPanel({ canManage, sites, roles, audienceLabel, onP
                         </button>
                     ))}
                 </div></div>
-                {canManage && (
+                {perms.create && (
                     <button onClick={() => setShowForm(true)}
                         className="inline-flex items-center gap-2 h-[40px] px-4 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90">
                         <Plus size={16} /> New poll
@@ -81,10 +84,10 @@ export default function PollsPanel({ canManage, sites, roles, audienceLabel, onP
             ) : shown.length === 0 ? (
                 <EmptyState icon={<BarChart3 size={28} />}
                     title={filter === "open" ? "No open polls right now" : filter === "closed" ? "No closed polls yet" : "No polls yet"}
-                    hint={canManage ? "Create a poll to get a quick answer from your team." : "Polls from HR will appear here."} />
+                    hint={perms.create ? "Create a poll to get a quick answer from your team." : "Polls from HR will appear here."} />
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                    {shown.map(p => <PollCard key={p.id} poll={p} canManage={canManage} audience={audienceLabel(p.targetSiteIds, p.targetRoleIds)} onChanged={load} />)}
+                    {shown.map(p => <PollCard key={p.id} poll={p} perms={perms} audience={audienceLabel(p.targetSiteIds, p.targetRoleIds)} onChanged={load} />)}
                 </div>
             )}
 
@@ -93,7 +96,7 @@ export default function PollsPanel({ canManage, sites, roles, audienceLabel, onP
     )
 }
 
-function PollCard({ poll, canManage, audience, onChanged }: { poll: Poll; canManage: boolean; audience: string; onChanged: () => void }) {
+function PollCard({ poll, perms, audience, onChanged }: { poll: Poll; perms: EngagementPerms; audience: string; onChanged: () => void }) {
     const [picked, setPicked] = useState<string[]>(poll.myVote ?? [])
     const [changing, setChanging] = useState(false)
     const [busy, setBusy] = useState(false)
@@ -155,16 +158,16 @@ function PollCard({ poll, canManage, audience, onChanged }: { poll: Poll; canMan
                     <h3 className="text-[15px] font-semibold text-[var(--text)] leading-snug break-words">{poll.question}</h3>
                     {poll.description && <p className="text-[13px] text-[var(--text2)] mt-1 whitespace-pre-line break-words">{poll.description}</p>}
                 </div>
-                {canManage && (
+                {(perms.edit || perms.delete) && (
                     <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => setStatus(poll.open ? "CLOSED" : "ACTIVE")} disabled={busy} title={poll.open ? "Close poll" : "Reopen poll"} aria-label={poll.open ? "Close poll" : "Reopen poll"}
+                        {perms.edit && <button onClick={() => setStatus(poll.open ? "CLOSED" : "ACTIVE")} disabled={busy} title={poll.open ? "Close poll" : "Reopen poll"} aria-label={poll.open ? "Close poll" : "Reopen poll"}
                             className="p-1.5 rounded-md text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)]">
                             {poll.open ? <Lock size={15} /> : <Unlock size={15} />}
-                        </button>
-                        <button onClick={() => setConfirmDelete(true)} disabled={busy} title="Delete poll" aria-label="Delete poll"
+                        </button>}
+                        {perms.delete && <button onClick={() => setConfirmDelete(true)} disabled={busy} title="Delete poll" aria-label="Delete poll"
                             className="p-1.5 rounded-md text-[var(--text3)] hover:text-[var(--red)] hover:bg-[var(--red-light)]">
                             <Trash2 size={15} />
-                        </button>
+                        </button>}
                     </div>
                 )}
             </div>
@@ -227,7 +230,7 @@ function PollCard({ poll, canManage, audience, onChanged }: { poll: Poll; canMan
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--border)] text-[12px] text-[var(--text3)]">
                 <span>
                     {poll.totalVoters != null ? `${poll.totalVoters} ${poll.totalVoters === 1 ? "person" : "people"} voted` : "Results hidden"}
-                    {canManage && <> · {audience}</>}
+                    {perms.view && <> · {audience}</>}
                 </span>
                 {poll.open && poll.myVote && !changing && (
                     <button onClick={() => setChanging(true)} className="text-[var(--accent)] font-medium">Change vote</button>

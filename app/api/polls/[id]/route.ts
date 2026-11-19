@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
-import { isEngagementManager, errorResponse, InputError } from "@/lib/engagement"
+import { canDo, forbidden, errorResponse, InputError } from "@/lib/engagement"
 
 type Ctx = { params: { id: string } }
 
@@ -9,7 +9,7 @@ type Ctx = { params: { id: string } }
 export async function PATCH(req: Request, { params }: Ctx) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    if (!isEngagementManager(session)) return NextResponse.json({ error: "You cannot change polls." }, { status: 403 })
+    if (!canDo(session, "polls", "edit")) return forbidden("close or reopen polls")
     try {
         const body = await req.json().catch(() => ({}))
         if (body?.status !== "CLOSED" && body?.status !== "ACTIVE") throw new InputError("Status must be ACTIVE or CLOSED.")
@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 export async function DELETE(req: Request, { params }: Ctx) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    if (!isEngagementManager(session)) return NextResponse.json({ error: "You cannot delete polls." }, { status: 403 })
+    if (!canDo(session, "polls", "delete")) return forbidden("delete polls")
     try {
         await prisma.poll.delete({ where: { id: params.id } })
         return NextResponse.json({ ok: true })

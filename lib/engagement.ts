@@ -1,11 +1,13 @@
 // Shared rules for Announcements → Polls and Surveys.
 //
-// Who does what:
-//   • announcements.manage (and Admin) create, close and delete polls/surveys,
-//     and see every result.
-//   • Everyone else answers what is targeted at them (same site / role
-//     targeting as notices, see lib/audience) and sees poll results only as
-//     the poll's resultsVisibility allows. Survey results are managers-only.
+// Who does what (Settings → Roles → Polls / Surveys; Admin holds all):
+//   • polls.view / surveys.view — see every poll / survey (drafts too) and
+//     all results, regardless of audience.
+//   • .create / .edit (close, reopen, publish, change) / .delete; surveys.export
+//     downloads responses.
+//   • Answering needs no permission: everyone answers what is targeted at them
+//     (same site / role targeting as notices, see lib/audience) and sees poll
+//     results only as the poll's resultsVisibility allows.
 //   • "Anonymous" hides who voted / answered from managers too; the user id is
 //     still stored, only so a person can't vote twice.
 
@@ -16,10 +18,22 @@ import prisma from "@/lib/prisma"
 import { checkAccess } from "@/lib/permissions"
 import { cleanIdArray } from "@/lib/audience"
 
-export const MANAGE_PERMISSION = "announcements.manage"
+export type EngagementModule = "polls" | "surveys"
+export type EngagementAction = "view" | "create" | "edit" | "delete" | "export"
 
-export function isEngagementManager(session: Session | null): boolean {
-    return checkAccess(session as any, ["MANAGER", "HR_MANAGER"], MANAGE_PERMISSION)
+/** Holds module.action (Admin always does). */
+export function canDo(session: Session | null, module: EngagementModule, action: EngagementAction): boolean {
+    return checkAccess(session as any, [], `${module}.${action}`)
+}
+
+/** Sees everything in the module: all items, drafts, results and who answered. */
+export function isEngagementManager(session: Session | null, module: EngagementModule): boolean {
+    return canDo(session, module, "view")
+}
+
+/** 403 body for a missing module.action. */
+export function forbidden(what: string) {
+    return NextResponse.json({ error: `You don't have permission to ${what}. Ask an admin to add it to your role (Settings → Roles).` }, { status: 403 })
 }
 
 /** The tables don't exist yet (scripts/polls-surveys.sql not run). */

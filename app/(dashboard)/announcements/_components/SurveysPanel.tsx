@@ -6,6 +6,7 @@ import {
     ClipboardList, Plus, Trash2, Lock, Unlock, Loader2, CheckCircle2, EyeOff, ArrowUp, ArrowDown, X,
     BarChart3, Pencil, Send, Download, Star,
 } from "lucide-react"
+import type { EngagementPerms } from "./PollsPanel"
 import {
     Drawer, Field, FormFooter, AudiencePicker, inputClass, deadlineLabel, StatusPill, EmptyState,
     type Site, type Role,
@@ -22,6 +23,7 @@ type SurveyRow = {
 type Summary = { questionId: string; answered: number; counts?: Record<string, number>; average?: number | null; texts?: string[] }
 type SurveyDetail = SurveyRow & {
     questions: Question[]; rawStatus: string; myAnswers: Record<string, unknown> | null
+    canExport?: boolean
     summary?: Summary[]; responses?: { respondent: string; submittedAt: string; answers: Record<string, unknown> }[]
 }
 
@@ -31,8 +33,9 @@ const TYPE_LABEL: Record<QType, string> = {
 
 const newId = () => Math.random().toString(36).slice(2, 10)
 
-export default function SurveysPanel({ canManage, sites, roles, audienceLabel, onPending }: {
-    canManage: boolean; sites: Site[]; roles: Role[]
+export default function SurveysPanel({ perms, sites, roles, audienceLabel, onPending }: {
+    /** From Settings → Roles → Surveys. Answering needs none of these. */
+    perms: EngagementPerms; sites: Site[]; roles: Role[]
     audienceLabel: (siteIds?: string[], roleIds?: string[]) => string
     /** Open surveys the viewer hasn't answered, for the tab badge. */
     onPending?: (n: number) => void
@@ -63,7 +66,7 @@ export default function SurveysPanel({ canManage, sites, roles, audienceLabel, o
 
     const match = (s: SurveyRow) => filter === "all" || (filter === "open" ? s.open : filter === "draft" ? s.status === "DRAFT" : s.status === "CLOSED")
     const shown = surveys.filter(match)
-    const filters = (canManage ? ["open", "draft", "closed", "all"] : ["open", "closed", "all"]) as typeof filter[]
+    const filters = (perms.view ? ["open", "draft", "closed", "all"] : ["open", "closed", "all"]) as typeof filter[]
     const count = (f: typeof filter) => surveys.filter(s => f === "all" || (f === "open" ? s.open : f === "draft" ? s.status === "DRAFT" : s.status === "CLOSED")).length
 
     async function openEditor(id: string) {
@@ -83,7 +86,7 @@ export default function SurveysPanel({ canManage, sites, roles, audienceLabel, o
                         </button>
                     ))}
                 </div></div>
-                {canManage && (
+                {perms.create && (
                     <button onClick={() => setBuilder({})}
                         className="inline-flex items-center gap-2 h-[40px] px-4 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold hover:opacity-90">
                         <Plus size={16} /> New survey
@@ -98,11 +101,11 @@ export default function SurveysPanel({ canManage, sites, roles, audienceLabel, o
             ) : shown.length === 0 ? (
                 <EmptyState icon={<ClipboardList size={28} />}
                     title={filter === "open" ? "No open surveys right now" : filter === "draft" ? "No drafts" : filter === "closed" ? "No closed surveys yet" : "No surveys yet"}
-                    hint={canManage ? "Build a survey to collect feedback with several questions." : "Surveys from HR will appear here."} />
+                    hint={perms.create ? "Build a survey to collect feedback with several questions." : "Surveys from HR will appear here."} />
             ) : (
                 <div className="space-y-3">
                     {shown.map(s => (
-                        <SurveyCard key={s.id} survey={s} canManage={canManage} audience={audienceLabel(s.targetSiteIds, s.targetRoleIds)}
+                        <SurveyCard key={s.id} survey={s} perms={perms} audience={audienceLabel(s.targetSiteIds, s.targetRoleIds)}
                             onTake={() => setTaking(s.id)} onResults={() => setResults(s.id)} onEdit={() => openEditor(s.id)} onChanged={load} />
                     ))}
                 </div>
@@ -115,8 +118,8 @@ export default function SurveysPanel({ canManage, sites, roles, audienceLabel, o
     )
 }
 
-function SurveyCard({ survey: s, canManage, audience, onTake, onResults, onEdit, onChanged }: {
-    survey: SurveyRow; canManage: boolean; audience: string
+function SurveyCard({ survey: s, perms, audience, onTake, onResults, onEdit, onChanged }: {
+    survey: SurveyRow; perms: EngagementPerms; audience: string
     onTake: () => void; onResults: () => void; onEdit: () => void; onChanged: () => void
 }) {
     const [busy, setBusy] = useState(false)
@@ -156,7 +159,7 @@ function SurveyCard({ survey: s, canManage, audience, onTake, onResults, onEdit,
                     </div>
                     <h3 className="text-[15px] font-semibold text-[var(--text)] break-words">{s.title}</h3>
                     {s.description && <p className="text-[13px] text-[var(--text2)] mt-1 line-clamp-2 break-words">{s.description}</p>}
-                    {canManage && (
+                    {perms.view && (
                         <p className="text-[12px] text-[var(--text3)] mt-1.5">
                             {s.responseCount ?? 0} response{s.responseCount === 1 ? "" : "s"} · {audience}
                         </p>
@@ -172,11 +175,13 @@ function SurveyCard({ survey: s, canManage, audience, onTake, onResults, onEdit,
                             Start survey
                         </button>
                     ) : null}
-                    {canManage && (
-                        <>
+                    {perms.view && (
                             <button onClick={onResults} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[9px] border border-[var(--border)] text-[13px] font-medium text-[var(--text)] hover:bg-[var(--surface2)]">
                                 <BarChart3 size={14} /> Results
                             </button>
+                    )}
+                    {perms.edit && (
+                        <>
                             {s.status === "DRAFT" && (
                                 <button onClick={() => setStatus("ACTIVE", "Survey published")} disabled={busy}
                                     className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[9px] border border-[var(--accent)] text-[13px] font-semibold text-[var(--accent)]">
@@ -192,9 +197,11 @@ function SurveyCard({ survey: s, canManage, audience, onTake, onResults, onEdit,
                                     {s.open ? <Lock size={15} /> : <Unlock size={15} />}
                                 </button>
                             )}
-                            <button onClick={() => setConfirmDelete(true)} disabled={busy} title="Delete survey" aria-label="Delete survey"
-                                className="p-1.5 rounded-md text-[var(--text3)] hover:text-[var(--red)] hover:bg-[var(--red-light)]"><Trash2 size={15} /></button>
                         </>
+                    )}
+                    {perms.delete && (
+                        <button onClick={() => setConfirmDelete(true)} disabled={busy} title="Delete survey" aria-label="Delete survey"
+                            className="p-1.5 rounded-md text-[var(--text3)] hover:text-[var(--red)] hover:bg-[var(--red-light)]"><Trash2 size={15} /></button>
                     )}
                 </div>
             </div>
@@ -451,10 +458,10 @@ function SurveyResults({ id, onClose }: { id: string; onClose: () => void }) {
                 <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-[13px] text-[var(--text2)]"><b className="text-[var(--text)]">{survey.responseCount ?? 0}</b> response{survey.responseCount === 1 ? "" : "s"} · <StatusPill status={survey.status} /></p>
-                        <button onClick={downloadCsv} disabled={!survey.responses?.length}
+                        {survey.canExport && <button onClick={downloadCsv} disabled={!survey.responses?.length}
                             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] border border-[var(--border)] text-[12.5px] font-medium text-[var(--text)] hover:bg-[var(--surface2)] disabled:opacity-50">
                             <Download size={13} /> Download CSV
-                        </button>
+                        </button>}
                     </div>
                     <div className="z-tabs-wrap"><div className="z-tabs z-tabs--inset" role="tablist">
                         <button role="tab" aria-selected={tab === "summary"} onClick={() => setTab("summary")} className={`z-tab ${tab === "summary" ? "is-active" : ""}`}>Summary</button>

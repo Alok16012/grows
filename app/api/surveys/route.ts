@@ -3,16 +3,16 @@ import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { audienceWhere } from "@/lib/audience"
-import { isEngagementManager, parseSurveyInput, surveyQuestions, isOpen, effectiveStatus, errorResponse } from "@/lib/engagement"
+import { isEngagementManager, canDo, forbidden, parseSurveyInput, surveyQuestions, isOpen, effectiveStatus, errorResponse } from "@/lib/engagement"
 
-// GET — surveys for the viewer. Managers see every survey (drafts included)
+// GET — surveys for the viewer. surveys.view sees every survey (drafts included)
 // with response counts; everyone else sees published surveys targeted at them.
 export async function GET(req: Request) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     try {
-        const manager = isEngagementManager(session)
-        const [aud, uid] = await Promise.all([audienceWhere(session), resolveUserId(session)])
+        const manager = isEngagementManager(session, "surveys")
+        const [aud, uid] = await Promise.all([manager ? null : audienceWhere(session), resolveUserId(session)])
         const surveys = await prisma.survey.findMany({
             where: manager ? {} : { ...(aud ?? {}), status: { in: ["ACTIVE", "CLOSED"] } },
             orderBy: { createdAt: "desc" },
@@ -36,11 +36,11 @@ export async function GET(req: Request) {
     }
 }
 
-// POST — create a survey (announcements.manage), as a draft or published.
+// POST — create a survey (surveys.create), as a draft or published.
 export async function POST(req: Request) {
     const session = await getApiSession(req)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    if (!isEngagementManager(session)) return NextResponse.json({ error: "You cannot create surveys." }, { status: 403 })
+    if (!canDo(session, "surveys", "create")) return forbidden("create surveys")
     try {
         const input = parseSurveyInput(await req.json().catch(() => null))
         const createdBy = await resolveUserId(session)
