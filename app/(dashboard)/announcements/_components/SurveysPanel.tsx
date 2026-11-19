@@ -480,7 +480,12 @@ function SurveyResults({ id, onClose }: { id: string; onClose: () => void }) {
                                                 <Star size={20} className="fill-[var(--gold)] text-[var(--gold)]" /> {s.average} <span className="text-[13px] font-normal text-[var(--text3)]">/ 5 average</span>
                                             </p>
                                         )}
-                                        {s?.counts && <Bars counts={s.counts} order={q.type === "rating" ? ["5", "4", "3", "2", "1"] : undefined} suffix={q.type === "rating" ? " ★" : ""} />}
+                                        {s?.counts && <Bars counts={s.counts}
+                                            order={q.type === "rating" ? ["5", "4", "3", "2", "1"] : q.type === "yesno" ? ["Yes", "No"] : q.options}
+                                            suffix={q.type === "rating" ? " ★" : ""}
+                                            // "Pick several": share of people who ticked each choice.
+                                            base={q.type === "multi" ? s.answered : undefined} />}
+                                        {q.type === "multi" && <p className="text-[11.5px] text-[var(--text3)]">Percent of people who answered; people could pick more than one.</p>}
                                         {s?.texts && (
                                             s.texts.length ? (
                                                 <ul className="max-h-[220px] overflow-y-auto space-y-1.5">
@@ -521,9 +526,13 @@ function SurveyResults({ id, onClose }: { id: string; onClose: () => void }) {
     )
 }
 
-function Bars({ counts, order, suffix = "" }: { counts: Record<string, number>; order?: string[]; suffix?: string }) {
+function Bars({ counts, order, suffix = "", base }: {
+    counts: Record<string, number>; order?: string[]; suffix?: string
+    /** Divide by this instead of the sum, e.g. respondents for a pick-several question. */
+    base?: number
+}) {
     const keys = order ?? Object.keys(counts)
-    const total = keys.reduce((s, k) => s + (counts[k] ?? 0), 0)
+    const total = base ?? keys.reduce((s, k) => s + (counts[k] ?? 0), 0)
     return (
         <div className="space-y-2">
             {keys.map(k => {

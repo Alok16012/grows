@@ -16,8 +16,13 @@ import dynamic from "next/dynamic"
 import { Drawer, AudiencePicker, Field, FormFooter, type Site, type Role } from "./_components/ui"
 
 // Loaded only when their tab opens, so the notices view stays as light as before.
-const PollsPanel = dynamic(() => import("./_components/PollsPanel"), { ssr: false })
-const SurveysPanel = dynamic(() => import("./_components/SurveysPanel"), { ssr: false })
+const panelLoading = () => (
+    <div className="space-y-3" role="status" aria-label="Loading">
+        {[0, 1].map(i => <div key={i} className="h-32 rounded-[12px] bg-muted animate-pulse" />)}
+    </div>
+)
+const PollsPanel = dynamic(() => import("./_components/PollsPanel"), { ssr: false, loading: panelLoading })
+const SurveysPanel = dynamic(() => import("./_components/SurveysPanel"), { ssr: false, loading: panelLoading })
 
 type Tab = "notices" | "polls" | "surveys"
 const TABS: { key: Tab; label: string }[] = [
