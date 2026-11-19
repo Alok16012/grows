@@ -12,15 +12,12 @@ import {
     ClipboardCheck,
     UserPlus,
     UsersRound,
-    Clock,
+    FileText,
     Wallet,
     TrendingUp,
-    Package,
     Megaphone,
-    BarChart3,
     SlidersHorizontal,
     CircleUser,
-    HardHat,
     ChevronDown,
     Search,
     X,
@@ -67,9 +64,12 @@ type NavCategory = {
     links: NavLink[]
 }
 
-// Which categories the user folded away. Per-browser convenience only.
-const COLLAPSED_KEY = "grows.sidebar.collapsed"
-const COLLAPSED_EVENT = "grows:sidebar-collapsed"
+// Which categories the user opened by hand. Groups start closed and only the
+// one holding the current page opens by itself, so the menu stays a short list
+// of ten headings instead of 40 links. Per-browser convenience only. (New key:
+// the old "collapsed" list meant the opposite and is simply ignored.)
+const EXPANDED_KEY = "grows.sidebar.expanded"
+const EXPANDED_EVENT = "grows:sidebar-expanded"
 
 /** "Pooja Sharma" → "PS", "admin" → "A". */
 function initials(name?: string | null): string {
@@ -95,7 +95,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
         || (role ? SYSTEM_ROLE_LABELS[role] ?? role.replace(/_/g, " ").toLowerCase().replace(/^./, c => c.toUpperCase()) : "")
 
     const [badgeCounts, setBadgeCounts] = useState<Record<BadgeKey, number>>({ approvals: 0, leaves: 0, expenses: 0 })
-    const [collapsed, setCollapsed] = useState<string[]>([])
+    const [expanded, setExpanded] = useState<string[]>([])
     // The category holding the current page, held open without touching the
     // saved folds (so visiting a page doesn't undo the user's choice).
     const [revealed, setRevealed] = useState<string | null>(null)
@@ -133,17 +133,17 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
     // keeps their folds in step so neither saves over the other.
     useEffect(() => {
         try {
-            const saved = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "[]")
-            if (Array.isArray(saved)) setCollapsed(saved.filter((s): s is string => typeof s === "string"))
-        } catch { /* storage blocked — start expanded */ }
-        const onChange = (e: Event) => setCollapsed((e as CustomEvent<string[]>).detail)
-        window.addEventListener(COLLAPSED_EVENT, onChange)
-        return () => window.removeEventListener(COLLAPSED_EVENT, onChange)
+            const saved = JSON.parse(localStorage.getItem(EXPANDED_KEY) || "[]")
+            if (Array.isArray(saved)) setExpanded(saved.filter((s): s is string => typeof s === "string"))
+        } catch { /* storage blocked — only the current group opens */ }
+        const onChange = (e: Event) => setExpanded((e as CustomEvent<string[]>).detail)
+        window.addEventListener(EXPANDED_EVENT, onChange)
+        return () => window.removeEventListener(EXPANDED_EVENT, onChange)
     }, [])
 
-    const saveCollapsed = (next: string[]) => {
-        try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next)) } catch { /* ignore */ }
-        window.dispatchEvent(new CustomEvent(COLLAPSED_EVENT, { detail: next }))
+    const saveExpanded = (next: string[]) => {
+        try { localStorage.setItem(EXPANDED_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+        window.dispatchEvent(new CustomEvent(EXPANDED_EVENT, { detail: next }))
     }
 
     const userPermissions: string[] = (session?.user as any)?.permissions || []
@@ -153,9 +153,11 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
     const dashboardHref = role === "ADMIN" ? "/admin" : "/dashboard"
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NAVIGATION CONFIG — category → module, per the admin navigation review.
-    // The management categories come first; "My Work" / "My Account" hold the
-    // self-service copies an employee without management rights sees.
+    // NAVIGATION CONFIG — ten groups in the order a working day runs:
+    // overview → operations → people lifecycle → time & pay → growth →
+    // workplace → settings, then "My Space" for self-service. No group holds a
+    // single page (that read as clutter), names are short nouns, and every
+    // link keeps its original route and permission — only the grouping moved.
     // ─────────────────────────────────────────────────────────────────────────
     const navigation: NavCategory[] = [
         {
@@ -164,55 +166,59 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             links: [
                 { name: "Dashboard", href: dashboardHref },
                 { name: "Approvals Inbox", href: "/approvals", permission: "approvals.view", badge: "approvals" },
+                { name: "Analytics", href: "/manager/analytics", permission: "reports.view" },
             ],
         },
         {
-            title: "Inspections & Projects",
+            title: "Operations",
             icon: ClipboardCheck,
             links: [
                 // Opens the guided stepper flow (starts on the HR Sites list =
                 // /sites); Sites, Projects and Field Tasks are reached via its rail.
                 { name: "Projects & Sites", href: "/sites", permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/field"] },
                 { name: "Inspection Assignments", href: "/assignments", permission: "assignments.view" },
+                // /reports is the inspection report builder (site, project,
+                // inspector, Pareto), so it sits with the work it reports on.
+                { name: "Inspection Reports", href: "/reports", permission: "reports.view" },
             ],
         },
         {
-            title: "Talent Acquisition",
+            title: "Recruitment",
             icon: UserPlus,
             links: [
                 { name: "Job Openings", href: "/jobs", permission: "jobs.view" },
-                { name: "Candidates & Recruitment", href: "/recruitment", permission: "recruitment.view" },
+                { name: "Candidates", href: "/recruitment", permission: "recruitment.view" },
                 { name: "Onboarding", href: "/onboarding", permissionAny: ["onboarding.view", "recruitment.view"] },
             ],
         },
         {
-            title: "Employee Management",
+            title: "People",
             icon: UsersRound,
             links: [
                 { name: "Employee Directory", href: "/employees", permission: "employees.view" },
                 { name: "Employee Master Data", href: "/employees/master", permission: "employees.view" },
                 { name: "New Joiners", href: "/employees/new-joiners", permission: "employees.view" },
-                { name: "Employee Documents", href: "/employees/documents", permission: "documents.view" },
-                { name: "Letters & Documents", href: "/documents/send", permissionAny: ["documents.send", "documents.view"] },
-                { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.manage", "policy.report"] },
                 // An employee leaving is an HR process (clearance, F&F), not growth.
                 { name: "Exit Management", href: "/exit", permission: "exit.view" },
             ],
         },
         {
-            title: "Time & Attendance",
-            icon: Clock,
+            title: "Documents & Policies",
+            icon: FileText,
             links: [
-                { name: "Attendance", href: "/attendance", permission: "attendance.view" },
-                { name: "Leave", href: "/leaves", permission: "leaves.view", badge: "leaves" },
+                { name: "Employee Documents", href: "/employees/documents", permission: "documents.view" },
+                { name: "Letters & Documents", href: "/documents/send", permissionAny: ["documents.send", "documents.view"] },
+                { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.manage", "policy.report"] },
             ],
         },
         {
-            title: "Payroll & Expenses",
+            title: "Time & Pay",
             icon: Wallet,
             links: [
-                { name: "Payroll", href: "/payroll", permission: "payroll.view" },
-                { name: "Expense Claims", href: "/expenses", permission: "expenses.view", badge: "expenses" },
+                { name: "Attendance", href: "/attendance", permission: "attendance.view", group: "Time" },
+                { name: "Leave", href: "/leaves", permission: "leaves.view", badge: "leaves", group: "Time" },
+                { name: "Payroll", href: "/payroll", permission: "payroll.view", group: "Pay" },
+                { name: "Expense Claims", href: "/expenses", permission: "expenses.view", badge: "expenses", group: "Pay" },
             ],
         },
         {
@@ -224,27 +230,13 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             ],
         },
         {
-            title: "Assets",
-            icon: Package,
-            links: [
-                // Requesters / approvers / store staff work here without assets.view.
-                { name: "Asset Register", href: "/assets", permissionAny: ["assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue"] },
-            ],
-        },
-        {
-            title: "Communication & Support",
+            title: "Workplace",
             icon: Megaphone,
             links: [
                 { name: "Announcements", href: "/announcements", permission: "announcements.view" },
                 { name: "Helpdesk", href: "/helpdesk", permission: "helpdesk.view" },
-            ],
-        },
-        {
-            title: "Reports & Analytics",
-            icon: BarChart3,
-            links: [
-                { name: "Analytics", href: "/manager/analytics", permission: "reports.view" },
-                { name: "Reports", href: "/reports", permission: "reports.view" },
+                // Requesters / approvers / store staff work here without assets.view.
+                { name: "Asset Register", href: "/assets", permissionAny: ["assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue"] },
             ],
         },
         {
@@ -254,36 +246,32 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             icon: SlidersHorizontal,
             links: [
                 { name: "Departments", href: "/departments", group: "Organisation" },
+                { name: "Document Types", href: "/documents/types", permission: "documents.view", group: "Organisation" },
+                { name: "Wage Rule Book", href: "/admin/rule-book", group: "Organisation" },
                 { name: "System Users", href: "/admin/users", permissionAny: ["users.view", "users.manage"], group: "Users & Access" },
                 { name: "Employee Logins", href: "/admin/employee-logins", permission: "users.manage", group: "Users & Access" },
                 { name: "Roles", href: "/admin/roles", permission: "roles.view", group: "Users & Access" },
-                { name: "Audit log", href: "/admin/audit", permission: "audit.view", group: "Users & Access" },
-                { name: "Wage Rule Book", href: "/admin/rule-book", group: "HR & Payroll Rules" },
-                { name: "Document Types", href: "/documents/types", permission: "documents.view", group: "HR & Payroll Rules" },
+                { name: "Audit Log", href: "/admin/audit", permission: "audit.view", group: "Users & Access" },
             ],
         },
         {
-            title: "My Work",
-            icon: HardHat,
-            links: [
-                // Points at the Inspector Workspace (/inspection) — the only screen
-                // that can open and submit an inspection form. /assignments is the
-                // manager-side wizard and just bounces inspectors back here.
-                { name: "My Assignments", href: "/inspection", permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"], hideForAdmin: true },
-                { name: "My Attendance", href: "/attendance", permission: "self.view", hideIfHas: "attendance.view" },
-                { name: "My Leaves", href: "/leaves", permission: "self.view", hideIfHas: "leaves.view" },
-                { name: "My Performance", href: "/performance", permission: "self.view", hideIfHas: "performance.view", matchPrefixes: ["/performance/hub"] },
-                { name: "My Learning", href: "/lms/learn", permission: "lms.view", hideForAdmin: true },
-            ],
-        },
-        {
-            title: "My Account",
+            // Self-service. Copies of a page the user already manages are
+            // hidden (hideIfHas), so a manager doesn't see "My Leaves" beside "Leave".
+            title: "My Space",
             icon: CircleUser,
             links: [
-                { name: "My Profile", href: "/profile", permission: "self.view" },
-                { name: "My Onboarding", href: "/self-onboarding", permission: "self.view", hideForAdmin: true },
-                { name: "Announcements", href: "/announcements", permission: "self.view", hideIfHas: "announcements.view" },
-                { name: "Help & Support", href: "/helpdesk", permission: "self.view", hideIfHas: "helpdesk.view" },
+                // Points at the Inspector Workspace (/inspection), the only screen
+                // that can open and submit an inspection form. /assignments is the
+                // manager-side wizard and just bounces inspectors back here.
+                { name: "My Assignments", href: "/inspection", permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"], hideForAdmin: true, group: "My work" },
+                { name: "My Attendance", href: "/attendance", permission: "self.view", hideIfHas: "attendance.view", group: "My work" },
+                { name: "My Leaves", href: "/leaves", permission: "self.view", hideIfHas: "leaves.view", group: "My work" },
+                { name: "My Performance", href: "/performance", permission: "self.view", hideIfHas: "performance.view", matchPrefixes: ["/performance/hub"], group: "My work" },
+                { name: "My Learning", href: "/lms/learn", permission: "lms.view", hideForAdmin: true, group: "My work" },
+                { name: "My Profile", href: "/profile", permission: "self.view", group: "My account" },
+                { name: "My Onboarding", href: "/self-onboarding", permission: "self.view", hideForAdmin: true, group: "My account" },
+                { name: "Announcements", href: "/announcements", permission: "self.view", hideIfHas: "announcements.view", group: "My account" },
+                { name: "Help & Support", href: "/helpdesk", permission: "self.view", hideIfHas: "helpdesk.view", group: "My account" },
             ],
         },
     ]
@@ -336,21 +324,22 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
     const activeCategory = visible.find(c => c.links.some(isActive))?.title ?? null
     useEffect(() => { setRevealed(activeCategory) }, [pathname, activeCategory])
 
-    // A search shows every match; otherwise honour the fold.
-    const isOpen = (title: string) => !!q || title === revealed || !collapsed.includes(title)
+    // A search shows every match; otherwise the current group plus any the
+    // user opened by hand.
+    const isOpen = (title: string) => !!q || title === revealed || expanded.includes(title)
     const allCollapsed = visible.length > 0 && visible.every(c => !isOpen(c.title))
     const toggle = (title: string) => {
         if (isOpen(title)) {
             if (title === revealed) setRevealed(null)
-            if (!collapsed.includes(title)) saveCollapsed([...collapsed, title])
+            saveExpanded(expanded.filter(t => t !== title))
         } else {
-            saveCollapsed(collapsed.filter(t => t !== title))
+            saveExpanded([...expanded, title])
         }
     }
     const toggleAll = () => {
-        if (allCollapsed) return saveCollapsed([])
+        if (allCollapsed) return saveExpanded(visible.map(c => c.title))
         setRevealed(null)
-        saveCollapsed(visible.map(c => c.title))
+        saveExpanded([])
     }
 
     // Icon-only rail (desktop): one tile per category. A tile opens a pop-out
