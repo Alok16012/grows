@@ -101,11 +101,23 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // The release key and its passwords never live in the repo. Put them in
+        // ~/.gradle/gradle.properties (or pass -P… / set env vars on the build
+        // machine):
+        //   GROWUS_RELEASE_STORE_FILE=C:/path/to/growus-release.keystore
+        //   GROWUS_RELEASE_STORE_PASSWORD=…
+        //   GROWUS_RELEASE_KEY_ALIAS=growus
+        //   GROWUS_RELEASE_KEY_PASSWORD=…
+        // Without them a release build stops with a clear error instead of
+        // silently signing with something else.
         release {
-            storeFile file('growus-release.keystore')
-            storePassword 'growus2026'
-            keyAlias 'growus'
-            keyPassword 'growus2026'
+            def prop = { String k -> findProperty(k) ?: System.getenv(k) }
+            if (prop('GROWUS_RELEASE_STORE_FILE')) {
+                storeFile file(prop('GROWUS_RELEASE_STORE_FILE'))
+                storePassword prop('GROWUS_RELEASE_STORE_PASSWORD')
+                keyAlias prop('GROWUS_RELEASE_KEY_ALIAS') ?: 'growus'
+                keyPassword prop('GROWUS_RELEASE_KEY_PASSWORD')
+            }
         }
     }
     buildTypes {
