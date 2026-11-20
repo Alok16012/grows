@@ -48,11 +48,17 @@ export async function DELETE(req: Request) {
         if (action === "unlock") {
             // Rows must go back to DRAFT too, not just the run — calculate
             // refuses locked rows, so a run-only unlock left the month stuck.
-            // PAID rows stay PAID: money has left the account.
+            // PAID rows stay PAID unless the caller asks (includePaid=1): a
+            // month marked paid by mistake has to be correctable, and the
+            // page warns that those salaries become unpaid.
+            const includePaid = searchParams.get("includePaid") === "1"
             const [unlocked] = await prisma.$transaction([
                 prisma.payroll.updateMany({
-                    where: { ...scope, status: "PROCESSED" },
-                    data: { status: "DRAFT", processedAt: null, processedBy: null },
+                    where: { ...scope, status: includePaid ? { in: ["PROCESSED", "PAID"] } : "PROCESSED" },
+                    data: {
+                        status: "DRAFT", processedAt: null, processedBy: null,
+                        ...(includePaid ? { paidAt: null, paidBy: null } : {}),
+                    },
                 }),
                 prisma.payrollRun.update({
                     where: { id: run.id },
@@ -62,8 +68,8 @@ export async function DELETE(req: Request) {
             auditLater({
                 actorId: session.user.id, actorName: session.user.name ?? null, action: "payroll.unlock", targetType: "Payroll",
                 targetId: `${year}-${String(month).padStart(2, "0")}`, targetName: `${month}/${year}`,
-                summary: `${month}/${year} reopened · ${unlocked.count} rows${siteId ? " · 1 site" : " · all sites"}`,
-                after: { month, year, rows: unlocked.count, siteId }, ...requestMeta(req),
+                summary: `${month}/${year} reopened · ${unlocked.count} rows${includePaid ? " · paid rows marked unpaid" : ""}${siteId ? " · 1 site" : " · all sites"}`,
+                after: { month, year, rows: unlocked.count, siteId, includePaid }, ...requestMeta(req),
             })
             return NextResponse.json({ success: true, action: "unlocked", unlocked: unlocked.count })
         }

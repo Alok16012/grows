@@ -288,13 +288,14 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
         if (!selectedSiteId) return
         const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "this site"
         const label = `${MONTHS[parseInt(month) - 1]} ${year}`
+        // Paid rows reopen too (marked unpaid), so a site marked paid by
+        // mistake can be corrected — that case gets its own warning.
+        const sitePaid = getStatus(selectedSiteId)?.paid ?? 0
         const msg = action === "lock"
-            ? `Lock ${siteName} for ${label}?
-
-Amounts for this site can't be edited or re-processed after locking. It can be unlocked later.`
-            : `Unlock ${siteName} for ${label}?
-
-Its rows go back to draft so days and amounts can be edited and re-processed. Paid rows stay paid.`
+            ? `Lock ${siteName} for ${label}?\n\nAmounts for this site can't be edited or re-processed after locking. It can be unlocked later.`
+            : sitePaid > 0
+                ? `Unlock ${siteName} for ${label}?\n\n${sitePaid} salar${sitePaid === 1 ? "y is" : "ies are"} marked PAID and will become UNPAID. Its rows go back to draft so days and amounts can be edited and re-processed.\n\nOnly do this to correct a mistake.`
+                : `Unlock ${siteName} for ${label}?\n\nIts rows go back to draft so days and amounts can be edited and re-processed.`
         if (!confirm(msg)) return
         setSiteLocking(action)
         try {
@@ -303,7 +304,7 @@ Its rows go back to draft so days and amounts can be edited and re-processed. Pa
                     method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ month: parseInt(month), year: parseInt(year), siteIds: [selectedSiteId] }),
                 })
-                : await fetch(`/api/payroll/reset?month=${month}&year=${year}&siteId=${selectedSiteId}&action=unlock`, { method: "DELETE" })
+                : await fetch(`/api/payroll/reset?month=${month}&year=${year}&siteId=${selectedSiteId}&action=unlock${sitePaid > 0 ? "&includePaid=1" : ""}`, { method: "DELETE" })
             if (!res.ok) throw new Error((await res.text()) || "Failed")
             const d = await res.json().catch(() => ({}))
             const n = action === "lock" ? Number(d?.count ?? 0) : Number(d?.unlocked ?? 0)
@@ -493,9 +494,9 @@ Its rows go back to draft so days and amounts can be edited and re-processed. Pa
                                             {siteLocking === "lock" ? <Loader2 size={11} className="animate-spin" /> : <Lock size={11} />} Lock site
                                         </button>
                                     )}
-                                    {lockedOf(getStatus(selectedSiteId)) > 0 && canUnlock && (
+                                    {lockedOf(getStatus(selectedSiteId)) + (getStatus(selectedSiteId)?.paid ?? 0) > 0 && canUnlock && (
                                         <button onClick={() => handleSiteLock("unlock")} disabled={siteLocking !== null}
-                                            title="Reopen this site's locked rows (paid rows stay paid)"
+                                            title="Reopen this site's locked rows (paid salaries become unpaid)"
                                             style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #fde68a", background: "#fffbeb", fontSize: 11, color: "#b45309", fontWeight: 700, cursor: "pointer", opacity: siteLocking ? 0.6 : 1 }}>
                                             {siteLocking === "unlock" ? <Loader2 size={11} className="animate-spin" /> : <Unlock size={11} />} Unlock site
                                         </button>

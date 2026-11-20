@@ -284,10 +284,16 @@ export default function PayrollPage() {
     }
 
     const unlockMonth = async () => {
-        if (!confirm(`Unlock ${periodLabel} for all sites?\n\nThe month goes back to draft so days and amounts can be edited and re-processed. Paid rows stay paid.`)) return
+        // Paid rows reopen too (marked unpaid) — a month marked paid by
+        // mistake must be correctable — so that case gets its own warning.
+        const paid = counts.paid
+        const msg = paid > 0
+            ? `Unlock ${periodLabel} for all sites?\n\n${paid} salar${paid === 1 ? "y is" : "ies are"} marked PAID. Unlocking marks ${paid === 1 ? "it" : "them"} UNPAID and the whole month goes back to draft, so days and amounts can be edited and re-processed.\n\nOnly do this to correct a mistake. After fixing, lock and mark paid again.`
+            : `Unlock ${periodLabel} for all sites?\n\nThe month goes back to draft so days and amounts can be edited and re-processed.`
+        if (!confirm(msg)) return
         setLockingMonth("unlock")
         try {
-            const res = await fetch(`/api/payroll/reset?month=${period.month}&year=${period.year}&action=unlock`, { method: "DELETE" })
+            const res = await fetch(`/api/payroll/reset?month=${period.month}&year=${period.year}&action=unlock${paid > 0 ? "&includePaid=1" : ""}`, { method: "DELETE" })
             if (!res.ok) { toast.error(await res.text()); return }
             const d = await res.json()
             toast.success(d.unlocked ? `${periodLabel} unlocked — ${d.unlocked} rows editable again` : "Nothing to unlock")
@@ -365,16 +371,16 @@ export default function PayrollPage() {
                                     {counts.locked + counts.paid > 0 ? `Lock remaining (${counts.draft})` : "Lock month"}
                                 </button>
                             )}
-                            {counts.locked > 0 && canUnlock && (
+                            {counts.locked + counts.paid > 0 && canUnlock && (
                                 <button onClick={unlockMonth} disabled={lockingMonth !== null}
-                                    title={`Reopen ${periodLabel} for editing — every site at once (paid rows stay paid)`}
+                                    title={`Reopen ${periodLabel} for editing — every site at once${counts.paid ? " (paid salaries become unpaid)" : ""}`}
                                     style={{ ...quietBtn, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309" }}>
                                     {lockingMonth === "unlock" ? <Loader2 size={15} className="animate-spin" /> : <Unlock size={15} />} Unlock month
                                 </button>
                             )}
                             {/* Shown, not hidden, for roles without the switch — a
                                 missing button read as "unlock is broken". */}
-                            {counts.locked > 0 && !canUnlock && (
+                            {counts.locked + counts.paid > 0 && !canUnlock && (
                                 <button disabled title={`Your role can't reopen a locked month. Ask an Admin, or give your role "Unlock a locked month" in Roles & Permissions.`}
                                     style={{ ...quietBtn, cursor: "not-allowed", opacity: 0.55 }}>
                                     <Unlock size={15} /> Unlock month
@@ -557,7 +563,7 @@ export default function PayrollPage() {
                 <div style={{ padding: "10px 20px 12px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", gap: 8 }}>
                     <Lock size={11} style={{ color: "var(--text3)", flexShrink: 0 }} />
                     <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>
-                        Reports and payslips are open as soon as attendance is uploaded — they show <b>draft</b> figures (files marked DRAFT) until you use <b>Lock month</b> at the top. A locked month can&apos;t be edited or re-processed — <b>Unlock month</b> reopens it (paid rows stay paid).
+                        Reports and payslips are open as soon as attendance is uploaded — they show <b>draft</b> figures (files marked DRAFT) until you use <b>Lock month</b> at the top. A locked month can&apos;t be edited or re-processed — <b>Unlock month</b> reopens it to fix a mistake, even after salaries are marked paid (they become unpaid until marked paid again).
                     </p>
                 </div>
             </div>
