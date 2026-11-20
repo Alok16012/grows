@@ -7,13 +7,14 @@ import { Textarea } from "@/components/ui/textarea"
 import {
     ChevronLeft, CheckCircle2, XCircle, Loader2, Calendar,
     User as UserIcon, Building2, FileText, ExternalLink,
-    Check, X, Clock, CornerUpLeft, Share2, Copy, PenTool,
+    Check, X, Clock, CornerUpLeft, Share2, Copy, PenTool, Send,
     Trash2, MapPin, AlertCircle, Inbox
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { DocumentViewer } from "@/components/DocumentViewer"
-import { can } from "@/lib/can"
+import { can, canAny } from "@/lib/can"
+import SendToCustomerModal from "@/components/SendToCustomerModal"
 
 export default function ReviewInspectionPage() {
     const { data: session, status: authStatus } = useSession()
@@ -27,6 +28,7 @@ export default function ReviewInspectionPage() {
     const [actionLoading, setActionLoading] = useState(false)
     const [reviewerNotes, setReviewerNotes] = useState("")
     const [shareToken, setShareToken] = useState<string | null>(null)
+    const [sendOpen, setSendOpen] = useState(false)
     const [sharing, setSharing] = useState(false)
     const [showSignature, setShowSignature] = useState(false)
     const [hasSig, setHasSig] = useState(false)
@@ -327,6 +329,12 @@ export default function ReviewInspectionPage() {
                                     {sharing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
                                     {shareToken ? "Copy Link" : "Share Report"}
                                 </button>
+                                {canAny(session, ["approvals.manage", "assignments.manage"]) && (
+                                    <button onClick={() => setSendOpen(true)}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0b5cff] border border-[#0b5cff] rounded-[9px] text-[12.5px] text-white font-medium hover:bg-[#0847c7] transition-colors shadow-sm">
+                                        <Send className="h-3.5 w-3.5" /> Send to customer
+                                    </button>
+                                )}
                                 <button onClick={() => setShowSignature(true)}
                                     className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[var(--border)] rounded-[9px] text-[12.5px] text-[var(--text2)] font-medium hover:bg-[var(--bg)] transition-colors shadow-sm">
                                     <PenTool className="h-3.5 w-3.5" />
@@ -603,6 +611,7 @@ export default function ReviewInspectionPage() {
                 fileName={previewName} 
                 onClose={() => setPreviewUrl(null)} 
             />
+            {sendOpen && <SendToCustomerModal inspectionId={inspectionId as string} onClose={() => setSendOpen(false)} />}
         </div>
     )
 }

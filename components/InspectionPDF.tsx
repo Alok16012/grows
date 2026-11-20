@@ -147,6 +147,8 @@ const styles = StyleSheet.create({
 
 interface InspectionPDFProps {
     inspection: any;
+    /** Logo as a data URL — needed when rendered on the server, where /logo.png has no origin. */
+    logo?: string | null;
 }
 
 // @react-pdf/renderer's <Image> decodes JPEG and PNG only — not GIF, WebP or
@@ -162,7 +164,7 @@ function parseGps(raw: unknown): { lat: number; lng: number } | null {
     return null
 }
 
-export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
+export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection, logo }) => {
     const companyName = inspection.assignment?.project?.site?.name || 'Growus Auto India'
     const projectName = inspection.assignment?.project?.name || 'Project'
     const reportDate = inspection.submittedAt
@@ -175,7 +177,7 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection }) => {
     const gps = parseGps(inspection.gpsLocation)
     const signature: string | null = typeof inspection.signature === 'string' && inspection.signature ? inspection.signature : null
 
-    const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png'
+    const logoUrl = logo || (typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png')
 
     const renderFileValue = (value: string | null | undefined) => {
         if (!value) return <Text style={styles.fieldValue}>No file attached</Text>

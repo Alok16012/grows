@@ -2756,3 +2756,23 @@ model CommOptOut {
 
   @@unique([channel, address])
 }
+
+// A person at a customer site who receives reports and alerts (Communication
+// Center). projectIds empty = every project at the site. Prod table:
+// scripts/customer-contacts.sql.
+model CustomerContact {
+  id             String   @id @default(uuid())
+  siteId         String
+  name           String
+  designation    String?
+  phone          String?
+  email          String?
+  projectIds     String[] @default([])
+  receiveReports Boolean  @default(true)
+  active         Boolean  @default(true)
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([siteId])
+}
