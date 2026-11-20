@@ -1,16 +1,18 @@
 "use client"
 // Performance Hub navigation + page shell used by every hub page.
 //
-//   My work         → My DWM Reports · Registers · My Performance  (everyone)
-//   Team            → Review Queue · Team Dashboard                (performance.view, or anyone who reviews)
-//   Administration  → KPI Designer · Register Designer · People & Roles (performance.manage)
+//   My work         → My Reports · Registers · My Scorecard · My Appraisal   (everyone)
+//   Team            → Review Queue · Team Dashboard · Appraisals             (performance.view, or anyone who reviews)
+//   Setup           → KPI Designer · Register Designer · People & Roles      (performance.manage)
+// One menu for the whole module: appraisals (the former /performance page)
+// live here too, so there is no second row of tabs.
 import { useEffect, useState } from "react"
 import type React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
-    ArrowLeft, ClipboardList, Database, Gauge, Inbox, LayoutDashboard, Target, TableProperties, UserCog,
+    ArrowLeft, Award, ClipboardList, Database, Gauge, Inbox, LayoutDashboard, Target, TableProperties, UserCog,
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { api, SetupNotice, type ReportRow } from "./shared"
@@ -50,9 +52,11 @@ export function HubNav() {
         {
             title: "My work",
             items: [
-                { href: "/performance/hub/reports", label: "My DWM Reports", icon: <ClipboardList size={14} /> },
+                { href: "/performance/hub/reports", label: "My Reports", icon: <ClipboardList size={14} /> },
                 { href: "/performance/hub/registers", label: "Registers", icon: <Database size={14} /> },
-                { href: "/performance/hub/me", label: "My Performance", icon: <Gauge size={14} /> },
+                { href: "/performance/hub/me", label: "My Scorecard", icon: <Gauge size={14} /> },
+                // Managers reach appraisals under Team; everyone else sees their own here.
+                ...(canView ? [] : [{ href: "/performance/hub/appraisals", label: "My Appraisal", icon: <Award size={14} /> }]),
             ],
         },
     ]
@@ -62,12 +66,13 @@ export function HubNav() {
             items: [
                 { href: "/performance/hub/review", label: "Review Queue", icon: <Inbox size={14} />, badge: queue ?? undefined },
                 { href: "/performance/hub/team", label: "Team Dashboard", icon: <LayoutDashboard size={14} /> },
+                ...(canView ? [{ href: "/performance/hub/appraisals", label: "Appraisals", icon: <Award size={14} /> }] : []),
             ],
         })
     }
     if (canManage) {
         groups.push({
-            title: "Administration",
+            title: "Setup",
             items: [
                 { href: "/performance/hub/designer", label: "KPI Designer", icon: <Target size={14} /> },
                 { href: "/performance/hub/registers-designer", label: "Register Designer", icon: <TableProperties size={14} /> },
@@ -111,10 +116,13 @@ export function HubShell({ title, subtitle, actions, missing, children, back }: 
     back?: { href: string; label: string }
 }) {
     return (
-        <div className="px-4 py-5 sm:px-7 sm:py-6 min-h-screen">
-            <Link href={back?.href ?? "/performance"} className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text3)] hover:text-[var(--accent)] mb-2">
-                <ArrowLeft size={13} /> {back?.label ?? "Performance reviews"}
-            </Link>
+        <div className="p-4 lg:p-0 min-h-screen">
+            {/* Back link only on drill-down pages (a report, a template). */}
+            {back && (
+                <Link href={back.href} className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text3)] hover:text-[var(--accent)] mb-2">
+                    <ArrowLeft size={13} /> {back.label}
+                </Link>
+            )}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
                 <div className="min-w-0">
                     <h1 className="text-[24px] sm:text-[26px] font-bold text-[var(--text)] tracking-[-0.5px] leading-tight">{title}</h1>
