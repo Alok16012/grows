@@ -21,6 +21,7 @@ import { resolveManagerId } from "@/lib/employee-manager"
 import { RuleError } from "@/lib/role-rules"
 import crypto from "crypto"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
+import { revisionsForMonth } from "@/lib/salary-revision"
 
 export async function GET(req: Request) {
     try {
@@ -168,6 +169,37 @@ export async function GET(req: Request) {
         // depth: the UI also hides these columns, but the server must never ship
         // salary data to a client that isn't allowed to see it.
         const canViewSalary = checkAccess(session, [], "employees.viewSalary")
+
+        // `salaryMonth=YYYY-MM` (or `payrollMonth`, which Process Payroll sends):
+        // show the structure IN FORCE that month, not today's EmployeeSalary.
+        // An increment filed for December otherwise showed up in November's
+        // preview, and an October re-run showed November's figures. Same rule
+        // as /api/payroll/calculate: a revision on or before the month wins,
+        // no revision falls back to the live row. Approval status stays the
+        // live row's.
+        const salaryMonthRaw = searchParams.get("salaryMonth") ?? searchParams.get("payrollMonth")
+        const sm = salaryMonthRaw?.match(/^(\d{4})-(\d{2})$/)
+        if (canViewSalary && sm) {
+            const forMonth = { year: Number(sm[1]), month: Number(sm[2]) }
+            const withSal = (employees as any[]).filter(e => e.employeeSalary)
+            if (forMonth.month >= 1 && forMonth.month <= 12 && withSal.length) {
+                const revs = await revisionsForMonth(withSal.map(e => e.id), forMonth)
+                for (const e of withSal) {
+                    const r = revs.get(e.id) as any
+                    if (!r) continue
+                    const live = e.employeeSalary
+                    e.employeeSalary = {
+                        ...live,
+                        basic: r.basic, da: r.da, hra: r.hra, washing: r.washing, conveyance: r.conveyance,
+                        leaveWithWages: r.leaveWithWages, otherAllowance: r.otherAllowance, bonus: r.bonus,
+                        otRatePerHour: r.otRatePerHour, canteenRatePerDay: r.canteenRatePerDay,
+                        complianceType: r.complianceType,
+                        ctcMonthly: r.ctcMonthly ?? live.ctcMonthly,
+                    }
+                }
+            }
+        }
+
         if (!canViewSalary) {
             for (const e of employees as any[]) {
                 e.basicSalary = null

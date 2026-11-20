@@ -97,6 +97,20 @@ function SalaryModal({ emp, rules, onClose, onSaved }: {
         status: "APPROVED", complianceType: "OR"
     })
     const [saving, setSaving] = useState(false)
+    // The list shows the structure in force for the month being viewed; this
+    // form edits TODAY's structure. Start from the live row so an earlier
+    // month's figures are never saved over the current ones.
+    const [loadingLive, setLoadingLive] = useState(!!emp.salary)
+    useEffect(() => {
+        if (!emp.salary) return
+        let off = false
+        fetch(`/api/payroll/salary-structure/${emp.id}`)
+            .then(r => (r.ok ? r.json() : null))
+            .then(live => { if (!off && live) setForm(f => ({ ...f, ...live })) })
+            .catch(() => {})
+            .finally(() => { if (!off) setLoadingLive(false) })
+        return () => { off = true }
+    }, [emp.id, emp.salary])
 
     // Preview through the shared engine with the company's configured rules —
     // the same figures Process will save (the old panel hardcoded ₹1,800 PF
@@ -224,7 +238,7 @@ function SalaryModal({ emp, rules, onClose, onSaved }: {
                 </div>
                 <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end gap-3">
                     <button onClick={onClose} className="px-4 py-2 text-[13px] border border-[var(--border)] rounded-lg">Cancel</button>
-                    <button onClick={save} disabled={saving}
+                    <button onClick={save} disabled={saving || loadingLive}
                         className="px-4 py-2 text-[13px] bg-[var(--accent)] text-white rounded-lg flex items-center gap-2 disabled:opacity-60">
                         {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
                     </button>
@@ -276,7 +290,7 @@ export default function PayrollPage() {
                 // RESIGNED / INACTIVE people, and processing posts every loaded
                 // row, so leavers were still being given payroll rows.
                 // …and only those who had joined by the end of this month.
-                fetchAllEmployees({ status: "ACTIVE", joinedBy: monthEndKey(month, year) }),
+                fetchAllEmployees({ status: "ACTIVE", joinedBy: monthEndKey(month, year), salaryMonth: `${year}-${String(month).padStart(2, "0")}` }),
                 fetch(`/api/payroll?month=${month}&year=${year}&limit=1000`)
             ])
             const paysRaw = payRes.ok ? await payRes.json() : []
