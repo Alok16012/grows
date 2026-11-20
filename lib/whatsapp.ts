@@ -195,7 +195,6 @@ export async function phoneInfo() {
 // ─── Which events send on WhatsApp, with which template ─────────────────────
 
 export const WA_EVENTS = [
-    { key: "payslip", label: "Salary slip ready", hint: "To the employee. Body {{1}} name, {{2}} month. Header: Document (the slip PDF)." },
     { key: "inspection_report", label: "Inspection report to customer", hint: "To customer contacts after approval. Body {{1}} contact name, {{2}} project, {{3}} date. Header: Document (report PDF)." },
     { key: "leave_decision", label: "Leave approved / rejected", hint: "To the employee. Body {{1}} name, {{2}} leave dates, {{3}} Approved / Rejected." },
     { key: "announcement", label: "Important announcement", hint: "To employees in the audience. Body {{1}} title. Usually a Marketing template — costs more." },
