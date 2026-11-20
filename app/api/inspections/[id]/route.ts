@@ -145,6 +145,21 @@ export async function PATCH(
         let validResponses = (responses || []).filter((r: any) => r.fieldId && r.fieldId !== "undefined")
 
         // Handle paperFormPhoto if sent inside responses
+        // Photos per defect: { formTemplateId: url[] } kept on the inspection.
+        const photoIdx = validResponses.findIndex((r: any) => r.fieldId === "defectPhotos")
+        if (photoIdx !== -1) {
+            let map: Record<string, string[]> = {}
+            try {
+                const raw = JSON.parse(String(validResponses[photoIdx].value || "{}"))
+                for (const [k, v] of Object.entries(raw ?? {})) {
+                    const urls = (Array.isArray(v) ? v : []).filter((u: unknown): u is string => typeof u === "string" && /^https?:\/\//.test(u)).slice(0, 5)
+                    if (urls.length && /^[\w-]{1,64}$/.test(k)) map[k] = urls
+                }
+            } catch { map = {} }
+            updateData.defectPhotos = Object.keys(map).length ? map : null
+            validResponses.splice(photoIdx, 1)
+        }
+
         const paperFormResponseIndex = validResponses.findIndex((r: any) => r.fieldId === "paperFormPhoto")
         if (paperFormResponseIndex !== -1) {
             updateData.paperFormPhoto = validResponses[paperFormResponseIndex].value

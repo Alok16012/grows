@@ -22,6 +22,11 @@ export async function GET(
                     approvedAt: true,
                     gpsLocation: true,
                     signature: true,
+                    approvedBy: true,
+                    defectPhotos: true,
+                    customerSignature: true,
+                    customerSignedName: true,
+                    customerSignedAt: true,
                     submitter: { select: { name: true } },
                     assignment: {
                         select: {
@@ -65,8 +70,13 @@ export async function GET(
         data: { viewCount: { increment: 1 } }
     })
 
+    // The approver's name for the report's approval signature (never their id).
+    const approver = link.inspection.approvedBy
+        ? await prisma.user.findUnique({ where: { id: link.inspection.approvedBy }, select: { name: true } })
+        : null
+    const { approvedBy: _drop, ...inspectionOut } = link.inspection
     return NextResponse.json({
-        inspection: link.inspection,
+        inspection: { ...inspectionOut, approverName: approver?.name ?? null },
         viewCount: link.viewCount + 1,
         createdAt: link.createdAt
     })

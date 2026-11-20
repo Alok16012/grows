@@ -270,12 +270,42 @@ export const InspectionPDF: React.FC<InspectionPDFProps> = ({ inspection, logo }
                         ))}
                 </View>
 
-                {/* Signature */}
+                {/* Photos the inspector attached to defects (JPEG / PNG only — react-pdf) */}
+                {(() => {
+                    const map = (inspection.defectPhotos && typeof inspection.defectPhotos === 'object') ? inspection.defectPhotos as Record<string, string[]> : {}
+                    const items = Object.entries(map).flatMap(([fid, urls]) => (urls ?? []).filter(u => PDF_IMAGE_RE.test(u)).map(u => ({ fid, u })))
+                    if (!items.length) return null
+                    const labelOf = (fid: string) => (inspection.responses ?? []).find((r: any) => r.fieldId === fid)?.field?.fieldLabel ?? 'Defect'
+                    return (
+                        <View style={styles.signatureBlock}>
+                            <Text style={styles.fieldLabel}>Defect Photos</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+                                {items.slice(0, 12).map(({ fid, u }) => (
+                                    <View key={u} style={{ width: 120, marginRight: 8, marginBottom: 8 }} wrap={false}>
+                                        <Image src={u} style={{ width: 120, height: 90, objectFit: 'cover', border: '0.5pt solid #e8e6e1' }} />
+                                        <Text style={styles.fieldNote}>{labelOf(fid)}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    )
+                })()}
+
+                {/* Approval signature */}
                 {signature && (
                     <View style={styles.signatureBlock} wrap={false}>
-                        <Text style={styles.fieldLabel}>Digital Signature</Text>
+                        <Text style={styles.fieldLabel}>Approval Signature</Text>
                         <Image src={signature} style={styles.signatureImg} />
-                        <Text style={styles.fieldNote}>Signed by {inspection.submitter?.name || 'the inspector'}</Text>
+                        <Text style={styles.fieldNote}>{inspection.approverName ? `Approved by ${inspection.approverName}` : 'Approved'}{approvedDate !== 'N/A' ? ` on ${approvedDate}` : ''}</Text>
+                    </View>
+                )}
+
+                {/* Customer acknowledgement (signed on the shared report) */}
+                {inspection.customerSignedAt && (
+                    <View style={styles.signatureBlock} wrap={false}>
+                        <Text style={styles.fieldLabel}>Customer Acknowledgement</Text>
+                        {typeof inspection.customerSignature === 'string' && inspection.customerSignature ? <Image src={inspection.customerSignature} style={styles.signatureImg} /> : null}
+                        <Text style={styles.fieldNote}>Acknowledged by {inspection.customerSignedName || 'the customer'} on {new Date(inspection.customerSignedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</Text>
                     </View>
                 )}
 

@@ -1,5 +1,6 @@
 
 import { NextResponse } from "next/server"
+import { getInspectionSettings } from "@/lib/inspection-settings"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -37,6 +38,15 @@ export async function GET(req: Request) {
         if (status && status !== "all") {
             where.status = status
         }
+        // Overdue = pending longer than the approval target (Approvals → Settings).
+        const settings = await getInspectionSettings()
+        const overdueBefore = new Date(Date.now() - settings.approval.targetHours * 3_600_000)
+        if (searchParams.get("overdue") === "1") {
+            where.status = "pending"
+            where.submittedAt = { ...(where.submittedAt ?? {}), lt: overdueBefore }
+        }
+        // The pending queue is worked oldest first.
+        const oldestFirst = searchParams.get("oldest") === "1"
         // Server-side search, so it covers every page and not just the rows on
         // screen: inspector, project or site name — or, when the box holds a
         // date (30/10/2026), the inspections submitted that day (IST).
@@ -84,7 +94,7 @@ export async function GET(req: Request) {
                 // Newest submission first (the date the queue shows); drafts,
                 // which have no submittedAt, go last. Was createdAt — the time
                 // the form was started — so the Submitted column looked shuffled.
-                orderBy: [{ submittedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
+                orderBy: [{ submittedAt: { sort: oldestFirst ? "asc" : "desc", nulls: "last" } }, { createdAt: oldestFirst ? "asc" : "desc" }],
                 skip,
                 take: limit
             }),
@@ -96,17 +106,19 @@ export async function GET(req: Request) {
                 prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere, status: "pending" } }),
                 prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere, status: "approved" } }),
                 prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere, status: "rejected" } }),
-                prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere } })
+                prisma.inspection.count({ where: { ...(scope ?? {}), ...dateWhere } }),
+                prisma.inspection.count({ where: { ...(scope ?? {}), status: "pending", submittedAt: { lt: overdueBefore } } }),
             )
         }
 
         const results = await Promise.all(queries)
         const [inspections, total] = results
 
-        const response: any = { inspections: await withApproverNames(inspections), total, page, limit }
+        const response: any = { inspections: await withApproverNames(inspections), total, page, limit, targetHours: settings.approval.targetHours }
         if (withCounts) {
             response.counts = {
                 pending: results[2],
+                overdue: results[6],
                 approved: results[3],
                 rejected: results[4],
                 all: results[5]

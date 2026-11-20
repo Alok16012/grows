@@ -124,7 +124,7 @@ export const COMM_EVENTS: CommEvent[] = [
     },
     {
         key: "inspection_rework", label: "Rework / rejection alert", audience: "customer",
-        description: "When an inspection finds parts for rework or rejection.",
+        description: "Sent automatically when an approved report crosses the rework / rejection limits set in Approvals → Settings.",
         vars: [NAME, { key: "project", label: "Project", sample: "Bumper inspection – Line 2" }, { key: "date", label: "Date", sample: "19 Nov 2026" }, { key: "summary", label: "Summary", sample: "12 rework, 3 rejected of 1,200 inspected" }, COMPANY_VAR],
         waParams: ["name", "project", "summary"],
         respectQuietHours: false,
@@ -151,6 +151,21 @@ COMM_EVENTS.push({
     respectQuietHours: true,
     defaultSubject: "{title}",
     defaultBody: "Hi {name},\n\n{message}\n\n— {company}",
+})
+
+// ── Customer report summary (daily / weekly, Approvals → Settings) ──
+COMM_EVENTS.push({
+    key: "customer_summary", label: "Inspection summary (daily / weekly)", audience: "customer",
+    description: "A summary of approved inspections for the period, to each customer's contacts. How often is set in Approvals → Settings.",
+    vars: [NAME, { key: "site", label: "Customer / site", sample: "TTRC" }, { key: "period", label: "Period", sample: "19 Nov 2026" },
+        { key: "reports", label: "Reports approved", sample: "12" }, { key: "inspected", label: "Inspected", sample: "4,250" },
+        { key: "rework", label: "Rework", sample: "61" }, { key: "rejected", label: "Rejected", sample: "3" },
+        { key: "ppm", label: "Rejection PPM", sample: "706" }, { key: "topDefects", label: "Top defects", sample: "Wrinkles 22, Torn stitch 14, Beading open 9" },
+        { key: "summary", label: "One-line summary", sample: "4,250 inspected · 61 rework · 3 rejected" }, COMPANY_VAR],
+    waParams: ["name", "period", "summary"],
+    respectQuietHours: false,
+    defaultSubject: "Inspection summary – {site} – {period}",
+    defaultBody: "Dear {name},\n\nInspection summary for {site}, {period}:\n\nReports approved: {reports}\nInspected: {inspected}\nRework: {rework}\nRejected: {rejected} ({ppm} PPM)\nTop defects: {topDefects}\n\nRegards,\n{company}",
 })
 
 export const COMM_EVENT_MAP = new Map(COMM_EVENTS.map(e => [e.key, e]))

@@ -4,18 +4,25 @@ import { useEffect, useState } from "react"
 import { COMPANY } from "@/lib/company"
 import { useParams } from "next/navigation"
 import { Loader2, CheckCircle2, AlertCircle, Building2, Calendar, User, Eye, Download } from "lucide-react"
-import dynamic from "next/dynamic"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import CustomerSignOff from "./CustomerSignOff"
 
-const PDFDownloadLink = dynamic(
-    () => import("@react-pdf/renderer").then(mod => mod.PDFDownloadLink),
-    { ssr: false }
-)
-
-const InspectionPDF = dynamic(
-    () => import("@/components/InspectionPDF").then(mod => mod.InspectionPDF),
-    { ssr: false }
-)
+// "Download PDF": the PDF is built in the browser only when clicked. (Passing a
+// next/dynamic wrapper to react-pdf's PDFDownloadLink crashed the whole page.)
+async function downloadReportPdf(inspection: any) {
+    const [{ pdf }, { InspectionPDF }, React] = await Promise.all([
+        import("@react-pdf/renderer"), import("@/components/InspectionPDF"), import("react"),
+    ])
+    const logo = await fetch("/logo.png").then(r => r.ok ? r.blob() : null).then(b => b && new Promise<string>(res => {
+        const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.readAsDataURL(b)
+    })).catch(() => null)
+    const blob = await pdf(React.createElement(InspectionPDF, { inspection, logo }) as any).toBlob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = `inspection-report-${String(inspection.id).substring(0, 8)}.pdf`
+    document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
 
 export default function SharePage() {
     const { token } = useParams()
@@ -24,6 +31,7 @@ export default function SharePage() {
     const [error, setError] = useState<string | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState<string>("")
+    const [pdfBusy, setPdfBusy] = useState(false)
 
     useEffect(() => {
         fetch(`/api/share/${token}`)
@@ -95,21 +103,20 @@ export default function SharePage() {
 
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
                 {/* Download Button */}
-                {typeof window !== "undefined" && (
-                    <div className="flex justify-end">
-                        <PDFDownloadLink
-                            document={<InspectionPDF inspection={inspection} />}
-                            fileName={`inspection-report-${inspection.id.substring(0, 8)}.pdf`}
-                        >
-                            {({ loading: pdfLoading }: { loading: boolean }) => (
-                                <button className="flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2.5 rounded-[10px] text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors" disabled={pdfLoading}>
-                                    {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                                    {pdfLoading ? "Preparing PDF..." : "Download PDF"}
-                                </button>
-                            )}
-                        </PDFDownloadLink>
-                    </div>
-                )}
+                <div className="flex justify-end">
+                    <button
+                        onClick={async () => {
+                            setPdfBusy(true)
+                            try { await downloadReportPdf(inspection) }
+                            catch (e) { console.error(e); alert("Could not prepare the PDF. Please try again.") }
+                            finally { setPdfBusy(false) }
+                        }}
+                        disabled={pdfBusy}
+                        className="flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2.5 rounded-[10px] text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-70">
+                        {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                        {pdfBusy ? "Preparing PDF..." : "Download PDF"}
+                    </button>
+                </div>
 
                 {/* GPS Location */}
                 {inspection.gpsLocation && (() => {
@@ -183,10 +190,14 @@ export default function SharePage() {
                 {/* Signature */}
                 {inspection.signature && (
                     <div className="bg-white border border-[var(--border)] rounded-[14px] p-5">
-                        <p className="text-[12px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-3">Digital Signature</p>
+                        <p className="text-[12px] font-semibold text-[var(--text3)] uppercase tracking-wider mb-3">Approval Signature{inspection.approverName ? ` — ${inspection.approverName}` : ""}</p>
                         <img src={inspection.signature} alt="signature" className="max-h-24 border rounded" />
                     </div>
                 )}
+
+                {/* Customer acknowledgement */}
+                <CustomerSignOff token={String(token)} signed={{ name: inspection.customerSignedName ?? null, at: inspection.customerSignedAt ?? null, signature: inspection.customerSignature ?? null }}
+                    onSigned={() => fetch(`/api/share/${token}`).then(r => r.json()).then(d => { if (!d.error) setData(d) })} />
 
                 {/* Footer */}
                 <div className="text-center py-4 text-[11px] text-[var(--text3)]">

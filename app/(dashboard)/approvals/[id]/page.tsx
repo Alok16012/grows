@@ -478,6 +478,38 @@ export default function ReviewInspectionPage() {
                         </div>
                     </div>
 
+                    {/* Customer acknowledgement (signed on the shared report) */}
+                    {inspection.customerSignedAt && (
+                        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4">
+                            <p className="text-[12px] font-semibold text-[var(--text)] mb-1">Acknowledged by customer</p>
+                            <p className="text-[12px] text-[var(--text2)]">{inspection.customerSignedName} · {new Date(inspection.customerSignedAt).toLocaleString("en-IN")}</p>
+                            {inspection.customerSignature && <img src={inspection.customerSignature} alt="Customer signature" className="mt-2 h-[60px] w-auto rounded-[8px] border border-[var(--border)] bg-[var(--surface2)]" />}
+                        </div>
+                    )}
+
+                    {/* Photos the inspector attached to defects */}
+                    {inspection.defectPhotos && Object.keys(inspection.defectPhotos).length > 0 && (
+                        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4">
+                            <p className="text-[12px] font-semibold text-[var(--text)] mb-2">Defect photos</p>
+                            <div className="space-y-2.5">
+                                {Object.entries(inspection.defectPhotos as Record<string, string[]>).map(([fid, urls]) => {
+                                    const r = inspection.responses.find((x: any) => x.fieldId === fid)
+                                    return (
+                                        <div key={fid}>
+                                            <p className="text-[11px] text-[var(--text3)] mb-1">{r?.field?.fieldLabel ?? "Defect"}{r?.value ? ` · ${r.value}` : ""}</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {(urls ?? []).map(u => (
+                                                    <img key={u} src={u} alt="" onClick={() => { setPreviewUrl(u); setPreviewName(r?.field?.fieldLabel ?? "Defect photo") }}
+                                                        className="h-[56px] w-[56px] rounded-[7px] object-cover cursor-pointer border border-[var(--border)]" />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Share Link Active */}
                     {shareToken && (
                         <div className="bg-[#f0faf6] border border-[#b6e8d5] rounded-[14px] p-4">

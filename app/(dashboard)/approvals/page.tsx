@@ -15,7 +15,8 @@ import {
     X
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { can } from "@/lib/can"
+import { can, canAny } from "@/lib/can"
+import { toast } from "sonner"
 import Link from "next/link"
 
 export default function ApprovalsPage({ searchParams }: { searchParams?: { date?: string } }) {
@@ -35,6 +36,33 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
         all: 0
     })
     const [loading, setLoading] = useState(true)
+    // Approval target (Approvals → Settings), overdue filter and bulk approve.
+    const [targetHours, setTargetHours] = useState(24)
+    const [overdueOnly, setOverdueOnly] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("overdue") === "1")
+    const [picked, setPicked] = useState<Set<string>>(new Set())
+    const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null)
+    const canDecide = canAny(session, ["approvals.manage"])
+    const waited = (iso?: string | null) => {
+        if (!iso) return null
+        const h = (Date.now() - new Date(iso).getTime()) / 3_600_000
+        return { h, label: h < 1 ? "< 1 h" : h < 48 ? `${Math.floor(h)} h` : `${Math.floor(h / 24)} d ${Math.floor(h % 24)} h`, overdue: h > targetHours }
+    }
+    const bulkApprove = async () => {
+        const ids = Array.from(picked)
+        if (!ids.length || !confirm(`Approve ${ids.length} inspection report${ids.length === 1 ? "" : "s"}?`)) return
+        let ok = 0
+        setBulk({ done: 0, total: ids.length })
+        for (let i = 0; i < ids.length; i++) {
+            try {
+                const res = await fetch(`/api/approvals/${ids[i]}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve" }) })
+                if (res.ok) ok++
+            } catch { /* counted as not approved */ }
+            setBulk({ done: i + 1, total: ids.length })
+        }
+        setBulk(null)
+        toast.success(`${ok} of ${ids.length} approved`)
+        fetchData(activeTab, page, debouncedQuery)
+    }
     const [searchQuery, setSearchQuery] = useState("")
     // Submitted-date range (YYYY-MM-DD); either end may be left open.
     const [dateFrom, setDateFrom] = useState("")
@@ -113,6 +141,8 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                 return
             }
             const params = new URLSearchParams({ status, page: String(pageNo), limit: String(PAGE_SIZE), withCounts: "true" })
+            if (status === "pending") params.set("oldest", "1")
+            if (overdueOnly && status === "pending") params.set("overdue", "1")
             if (q) params.set("q", q)
             if (dateFrom) params.set("from", dateFrom)
             if (dateTo) params.set("to", dateTo)
@@ -121,11 +151,14 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
 
             const items = data?.inspections ?? (Array.isArray(data) ? data : [])
             setInspections(items)
+            if (typeof data?.targetHours === "number") setTargetHours(data.targetHours)
+            setPicked(new Set())
             setTotal(typeof data?.total === "number" ? data.total : items.length)
 
             if (data?.counts) {
                 setCounts({
                     pending: data.counts.pending ?? 0,
+                    overdue: data.counts.overdue ?? 0,
                     approved: data.counts.approved ?? 0,
                     rejected: data.counts.rejected ?? 0,
                     all: data.counts.all ?? 0
@@ -181,7 +214,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
             fetchData(activeTab, page, debouncedQuery)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [authStatus, activeTab, todayOnly, page, debouncedQuery, dateFrom, dateTo])
+    }, [authStatus, activeTab, todayOnly, page, debouncedQuery, dateFrom, dateTo, overdueOnly])
 
     // Today's list is fetched whole and filtered here; the full queue is
     // searched and paged by the server.
@@ -208,8 +241,17 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
     return (
         <div className="p-4 lg:p-7">
             <div className="mb-5">
-                <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Approvals</h1>
-                <p className="text-[13.5px] text-[var(--text3)] mt-1">Review and approve submitted inspections to finalize reports.</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Approvals</h1>
+                        <p className="text-[13.5px] text-[var(--text3)] mt-1">Review and approve submitted inspections to finalize reports. Target: within {targetHours} h.</p>
+                    </div>
+                    {canAny(session, ["approvals.manage", "projects.manage"]) && (
+                        <Link href="/approvals/settings" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[9px] border border-[var(--border)] bg-white text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]">
+                            Settings
+                        </Link>
+                    )}
+                </div>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -257,6 +299,18 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                         </button>
                     </div>
 
+                    {activeTab === "pending" && !todayOnly && (
+                        <button onClick={() => { setOverdueOnly(o => !o); setPage(1) }}
+                            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12.5px] font-medium border transition-colors ${overdueOnly ? "bg-[#fef2f2] border-[#fecaca] text-[#dc2626]" : "bg-white border-[var(--border)] text-[var(--text2)]"}`}>
+                            Overdue{(counts.overdue ?? 0) > 0 ? ` (${counts.overdue})` : ""}
+                        </button>
+                    )}
+                    {canDecide && activeTab === "pending" && picked.size > 0 && (
+                        <button onClick={bulkApprove} disabled={!!bulk}
+                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-[var(--accent)] text-white text-[12.5px] font-medium disabled:opacity-60">
+                            {bulk ? `Approving ${bulk.done}/${bulk.total}…` : `Approve selected (${picked.size})`}
+                        </button>
+                    )}
                     {todayOnly && (
                         <span className="inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full bg-[#e3ecff] text-[#1f5fff] text-[12.5px] font-medium">
                             Submitted today
@@ -383,6 +437,13 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                                        {canDecide && activeTab === "pending" && (
+                                            <th className="pl-[18px] py-2.5 w-8">
+                                                <input type="checkbox" aria-label="Tick all" className="accent-[var(--accent)]"
+                                                    checked={filteredInspections.length > 0 && filteredInspections.every((i: any) => picked.has(i.id))}
+                                                    onChange={e => setPicked(e.target.checked ? new Set(filteredInspections.filter((i: any) => i.status === "pending").map((i: any) => i.id)) : new Set())} />
+                                            </th>
+                                        )}
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Inspector</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Project</th>
                                         <th className="px-[18px] py-2.5 text-left text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide">Site</th>
@@ -398,6 +459,14 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                     {filteredInspections.map((inspection) => (
                                         <tr key={inspection.id} onClick={e => openReport(e, inspection.id)} onAuxClick={e => openReport(e, inspection.id)}
                                             title="Open report" className="hover:bg-[var(--surface2)] transition-colors cursor-pointer">
+                                            {canDecide && activeTab === "pending" && (
+                                                <td className="pl-[18px] py-3.5" onClick={e => e.stopPropagation()}>
+                                                    {inspection.status === "pending" && (
+                                                        <input type="checkbox" aria-label="Tick" className="accent-[var(--accent)]" checked={picked.has(inspection.id)}
+                                                            onChange={() => setPicked(p => { const n = new Set(p); if (n.has(inspection.id)) n.delete(inspection.id); else n.add(inspection.id); return n })} />
+                                                    )}
+                                                </td>
+                                            )}
                                             <td className="px-[18px] py-3.5">
                                                 <p className="text-[13px] font-medium text-[var(--text)]">{inspection.submitter?.name}</p>
                                                 <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{inspection.submitter?.email}</p>
@@ -410,6 +479,14 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                                             </td>
                                             <td className="px-[18px] py-3.5 text-[13px] text-[var(--text2)] whitespace-nowrap">
                                                 {inspection.submittedAt ? new Date(inspection.submittedAt).toLocaleDateString('en-GB') : "—"}
+                                                {inspection.status === "pending" && (() => {
+                                                    const w = waited(inspection.submittedAt)
+                                                    return w && (
+                                                        <p className={`text-[11px] mt-0.5 ${w.overdue ? "text-[#dc2626] font-semibold" : "text-[var(--text3)]"}`}>
+                                                            waiting {w.label}{w.overdue ? " · overdue" : ""}
+                                                        </p>
+                                                    )
+                                                })()}
                                             </td>
                                             <td className="px-[18px] py-3.5">
                                                 <span className={`inline-block whitespace-nowrap px-3 py-1 rounded-[20px] text-[11.5px] font-medium ${

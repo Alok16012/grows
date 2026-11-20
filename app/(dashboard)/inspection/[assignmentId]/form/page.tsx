@@ -53,6 +53,9 @@ export default function InspectionFormPage() {
     const [lastSaved, setLastSaved] = useState<Date | null>(null)
     const [isDirty, setIsDirty] = useState(false)
     const [cameraFieldId, setCameraFieldId] = useState<string | null>(null)
+    // Defect Entry: find a defect by name, or show only the ones entered.
+    const [defectSearch, setDefectSearch] = useState("")
+    const [enteredOnly, setEnteredOnly] = useState(false)
     const [currentStep, setCurrentStep] = useState(0)
     // Next / Submit was refused because the defects add up to less than the
     // rework quantity — turns the defect total line red until it's fixed.
@@ -207,6 +210,9 @@ export default function InspectionFormPage() {
             }
             if (inspData.paperFormPhoto) {
                 initialResponses["paperFormPhoto"] = inspData.paperFormPhoto;
+            }
+            if (inspData.defectPhotos && typeof inspData.defectPhotos === "object") {
+                initialResponses["defectPhotos"] = JSON.stringify(inspData.defectPhotos)
             }
             // The "Other" defect description is stored on a companion field; the
             // form edits it under one key and the server maps it back on save.
@@ -564,6 +570,23 @@ export default function InspectionFormPage() {
         }
     }
 
+    // Photos per defect, kept under one response key as JSON { fieldId: url[] }.
+    const defectPhotos: Record<string, string[]> = (() => { try { return JSON.parse(responses["defectPhotos"] || "{}") } catch { return {} } })()
+    const addDefectPhoto = (fieldId: string, url: string) => {
+        const next = { ...defectPhotos, [fieldId]: [...(defectPhotos[fieldId] ?? []), url].slice(0, 5) }
+        handleFieldChange("defectPhotos", JSON.stringify(next))
+    }
+    const removeDefectPhoto = (fieldId: string, url: string) => {
+        const list = (defectPhotos[fieldId] ?? []).filter(u => u !== url)
+        const next = { ...defectPhotos }
+        if (list.length) next[fieldId] = list; else delete next[fieldId]
+        handleFieldChange("defectPhotos", JSON.stringify(next))
+    }
+    const stepDefect = (fieldId: string, by: number) => {
+        const cur = parseFloat(responses[fieldId] || "0") || 0
+        handleFieldChange(fieldId, String(Math.max(0, cur + by)))
+    }
+
     const handleFileUpload = async (fieldId: string, file: File) => {
         if (!canEdit) return
 
@@ -578,7 +601,8 @@ export default function InspectionFormPage() {
             })
             const data = await res.json()
             if (data.url) {
-                handleFieldChange(fieldId, data.url)
+                if (fieldId.startsWith("defect:")) addDefectPhoto(fieldId.slice(7), data.url)
+                else handleFieldChange(fieldId, data.url)
             } else {
                 alert("Upload failed")
             }
@@ -1014,24 +1038,73 @@ export default function InspectionFormPage() {
                         <div className="text-[10.5px] font-[600] text-[var(--text3)] uppercase tracking-[1px] border-b-[1.5px] border-[var(--border)] pb-[8px] mb-[14px] mt-[24px]">
                             Defect Entry
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-[8px]">
-                            {defectFields.map(t => (
-                                <div key={t.id} id={`field-${t.id}`} className="bg-white border border-[var(--border)] rounded-[9px] p-[9px_10px] focus-within:border-[#d97706] focus-within:shadow-[0_0_0_3px_rgba(217,119,6,0.06)] transition-all">
-                                    <div className="text-[10px] font-[500] text-[var(--text3)] uppercase leading-[1.3] mb-[5px] truncate" title={t.fieldLabel}>
-                                        {t.fieldLabel}
+                        {/* Found so far — tap one to jump to it. */}
+                        {(() => {
+                            const found = defectFields.filter(t => (parseFloat(responses[t.id] || "0") || 0) > 0)
+                            return found.length > 0 && (
+                                <div className="mb-[10px] flex flex-wrap gap-[6px]">
+                                    <span className="text-[11px] font-[600] text-[var(--text3)] self-center mr-1">Found:</span>
+                                    {found.map(t => (
+                                        <button key={t.id} type="button" onClick={() => { setDefectSearch(""); setEnteredOnly(false); setTimeout(() => document.getElementById(`field-${t.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 30) }}
+                                            className="inline-flex items-center gap-1 rounded-full border border-[#fde68a] bg-[#fffbeb] px-2.5 py-1 text-[11.5px] font-[600] text-[#92400e]">
+                                            {t.fieldLabel} <span className="font-mono">{responses[t.id]}</span>{(defectPhotos[t.id]?.length ?? 0) > 0 && <span title="Photo attached">📷</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            )
+                        })()}
+                        {/* Search + "entered only": no scrolling through 100+ defects. */}
+                        <div className="mb-[10px] flex flex-wrap items-center gap-[8px]">
+                            <input type="search" value={defectSearch} onChange={e => setDefectSearch(e.target.value)} placeholder={`Search ${defectFields.length} defects…`}
+                                className="min-w-[180px] flex-1 bg-white border border-[var(--border)] rounded-[8px] px-[10px] py-[8px] text-[13px] outline-none focus:border-[#d97706]" />
+                            <label className="inline-flex items-center gap-1.5 text-[12px] font-[500] text-[var(--text2)] cursor-pointer select-none">
+                                <input type="checkbox" checked={enteredOnly} onChange={e => setEnteredOnly(e.target.checked)} className="accent-[#d97706]" /> Entered only
+                            </label>
+                        </div>
+                        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 gap-[8px]">
+                            {defectFields.filter(t => {
+                                if (enteredOnly && !((parseFloat(responses[t.id] || "0") || 0) > 0)) return false
+                                const q = defectSearch.trim().toLowerCase()
+                                return !q || t.fieldLabel.toLowerCase().includes(q)
+                            }).map(t => {
+                                const qty = parseFloat(responses[t.id] || "0") || 0
+                                const photos = defectPhotos[t.id] ?? []
+                                return (
+                                <div key={t.id} id={`field-${t.id}`} className={cn("bg-white border rounded-[9px] p-[9px_10px] focus-within:border-[#d97706] focus-within:shadow-[0_0_0_3px_rgba(217,119,6,0.06)] transition-all", qty > 0 ? "border-[#fbbf24]" : "border-[var(--border)]")}>
+                                    <div className="flex items-start justify-between gap-1 mb-[5px]">
+                                        <div className="text-[10px] font-[500] text-[var(--text3)] uppercase leading-[1.3] truncate" title={t.fieldLabel}>{t.fieldLabel}</div>
+                                        {canEdit && qty > 0 && (
+                                            <button type="button" onClick={() => setCameraFieldId(`defect:${t.id}`)} title="Add a photo of this defect"
+                                                className="shrink-0 text-[13px] leading-none text-[var(--text3)] hover:text-[#d97706]">📷</button>
+                                        )}
                                     </div>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={responses[t.id] || ""}
-                                        onChange={(e) => handleFieldChange(t.id, e.target.value)}
-                                        disabled={!canEdit}
-                                        placeholder="0"
-                                        className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] p-[7px] text-[15px] font-[700] font-mono text-center outline-none focus:border-[#d97706] focus:bg-white transition-colors"
-                                    />
+                                    <div className="flex items-center gap-[4px]">
+                                        {canEdit && <button type="button" onClick={() => stepDefect(t.id, -1)} aria-label={`Less ${t.fieldLabel}`} className="h-[34px] w-[34px] shrink-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface2)] text-[16px] font-[700] text-[var(--text2)] active:scale-95">−</button>}
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            inputMode="numeric"
+                                            value={responses[t.id] || ""}
+                                            onChange={(e) => handleFieldChange(t.id, e.target.value)}
+                                            disabled={!canEdit}
+                                            placeholder="0"
+                                            className="min-w-0 flex-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[6px] p-[7px] text-[15px] font-[700] font-mono text-center outline-none focus:border-[#d97706] focus:bg-white transition-colors"
+                                        />
+                                        {canEdit && <button type="button" onClick={() => stepDefect(t.id, 1)} aria-label={`More ${t.fieldLabel}`} className="h-[34px] w-[34px] shrink-0 rounded-[6px] border border-[#fbbf24] bg-[#fffbeb] text-[16px] font-[700] text-[#92400e] active:scale-95">+</button>}
+                                    </div>
+                                    {photos.length > 0 && (
+                                        <div className="mt-[6px] flex flex-wrap gap-[4px]">
+                                            {photos.map(u => (
+                                                <span key={u} className="relative">
+                                                    <img src={u} alt="" onClick={() => setPreviewUrl(u)} className="h-[38px] w-[38px] rounded-[5px] object-cover cursor-pointer border border-[var(--border)]" />
+                                                    {canEdit && <button type="button" onClick={() => removeDefectPhoto(t.id, u)} aria-label="Remove photo" className="absolute -right-1 -top-1 h-[16px] w-[16px] rounded-full bg-[#dc2626] text-[10px] leading-[16px] text-white">×</button>}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                     {errors[t.id] && <div className="text-[10px] text-[#dc2626] text-center mt-1">Required</div>}
                                 </div>
-                            ))}
+                            )})}
                         </div>
                         {/* What the OTHER defects were: one row per different defect, the
                             quantities adding up to OTHER. Disabled while OTHER is 0. */}

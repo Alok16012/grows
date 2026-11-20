@@ -21,6 +21,7 @@ export async function loadInspectionForReport(id: string) {
         where: { id },
         select: {
             id: true, status: true, submittedAt: true, approvedAt: true, gpsLocation: true, signature: true,
+            approvedBy: true, defectPhotos: true, customerSignature: true, customerSignedName: true, customerSignedAt: true,
             submitter: { select: { name: true } },
             assignment: { select: { project: { select: { id: true, name: true, reportConfig: true, site: { select: { id: true, name: true } } } } } },
             responses: { select: { id: true, fieldId: true, value: true, field: { select: { fieldLabel: true, fieldType: true, displayOrder: true, isHidden: true } } } },
@@ -37,6 +38,7 @@ export function reportFilename(i: { id: string; submittedAt: Date | null; assign
 export async function renderInspectionReport(id: string): Promise<{ filename: string; content: Buffer } | null> {
     const i = await loadInspectionForReport(id)
     if (!i || i.status !== "approved") return null
-    const el = createElement(InspectionPDF, { inspection: i, logo: logoDataUrl() }) as unknown as ReactElement<DocumentProps>
+    const approver = i.approvedBy ? await prisma.user.findUnique({ where: { id: i.approvedBy }, select: { name: true } }) : null
+    const el = createElement(InspectionPDF, { inspection: { ...i, approverName: approver?.name ?? null }, logo: logoDataUrl() }) as unknown as ReactElement<DocumentProps>
     return { filename: reportFilename(i), content: await renderToBuffer(el) }
 }

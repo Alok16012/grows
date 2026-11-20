@@ -1,7 +1,9 @@
 {
   "framework": "nextjs",
   "buildCommand": "prisma generate && next build",
-  "regions": ["hnd1"],
+  "regions": [
+    "hnd1"
+  ],
   "functions": {
     "app/api/**": {
       "maxDuration": 30
@@ -11,6 +13,10 @@
     {
       "path": "/api/cron/sync-leave-status",
       "schedule": "45 18 * * *"
+    },
+    {
+      "path": "/api/cron/inspection-daily",
+      "schedule": "30 3 * * *"
     }
   ]
 }

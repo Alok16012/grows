@@ -1,5 +1,8 @@
 
 import { NextResponse } from "next/server"
+import { getInspectionSettings } from "@/lib/inspection-settings"
+import { maybeSendReworkAlert } from "@/lib/inspection-customers"
+import { getUserSignature } from "@/lib/hr-doc-schema"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -230,6 +233,19 @@ export async function PATCH(
                 // Link failure should NOT fail the approval
                 console.error("SHARE_LINK_ERROR", linkErr)
             }
+        }
+
+        // Approvals → Settings: the approver's saved signature on the report, and
+        // the customer's rework / rejection alert when the report crosses a limit.
+        if (action === "approve") {
+            try {
+                const settings = await getInspectionSettings()
+                if (settings.approval.autoSignature && !inspection.signature) {
+                    const sig = await getUserSignature(session!.user.id)
+                    if (sig) await prisma.inspection.update({ where: { id: inspectionId }, data: { signature: sig } })
+                }
+                if (settings.alerts.enabled) await maybeSendReworkAlert(inspectionId, settings.alerts, session!.user.id)
+            } catch (e) { console.error("APPROVAL_FOLLOWUPS", e) }
         }
 
         return NextResponse.json({ message: `Inspection ${updatedStatus} successfully` })

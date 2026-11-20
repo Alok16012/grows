@@ -209,6 +209,12 @@ model Inspection {
   gpsLocation    String?
   startedAt      DateTime?
   signature      String?
+  /// Photos per defect: { [formTemplateId]: url[] } (inspector form, Defect Entry).
+  defectPhotos   Json?
+  /// Customer acknowledgement on the public report (share link).
+  customerSignature  String?
+  customerSignedName String?
+  customerSignedAt   DateTime?
   assignment     Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   submitter      User             @relation(fields: [submittedBy], references: [id])
   responses      InspectionData[]
