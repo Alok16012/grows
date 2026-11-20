@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { notifyApprovers, notifyEmployee } from "@/lib/hr-notify"
-import { periodLabel } from "@/lib/perf-hub"
+import { periodLabel, istDay } from "@/lib/perf-hub"
+import { getDwmSettings, dueDay } from "@/lib/dwm-settings"
 import {
     perfCtx, perfErrorResponse, jsonError, reportDetail, refreshAutoValues, recomputeReport,
     logActivity, notifyUser, PerfHubError, type PerfCtx,
@@ -37,6 +38,18 @@ async function loadForAction(ctx: PerfCtx, id: string) {
 function assertEditable(ctx: PerfCtx, status: string, isOwner: boolean) {
     if (!isOwner && !ctx.isManager) throw new PerfHubError(403, "Only the employee can fill this report")
     if (!EDITABLE.includes(status)) throw new PerfHubError(409, `This report is ${status.toLowerCase()} and can't be changed`)
+}
+
+/** DWM Settings → "Lock after the deadline": a draft past its deadline is closed
+ *  to the employee (HR can still fill it). Returned reports stay open to fix. */
+async function assertNotLocked(ctx: PerfCtx, r: { status: string; frequency: string; periodEnd: Date }) {
+    if (ctx.isManager || r.status !== "DRAFT") return
+    const s = await getDwmSettings()
+    if (!s.deadlines.lockAfterDue) return
+    const due = dueDay(s, r.frequency, r.periodEnd)
+    if (istDay().getTime() > due.getTime()) {
+        throw new PerfHubError(409, `The deadline for this report was ${due.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" })}. It's locked — ask HR if it still needs to be filed.`)
+    }
 }
 
 /** A typed-in actual: blank → null; yes/no → 1/0; counts and % can't go negative. */
@@ -127,6 +140,7 @@ export async function PATCH(req: Request, { params }: Params) {
         switch (action) {
             case "SAVE": {
                 assertEditable(ctx, r.status, isOwner)
+                await assertNotLocked(ctx, r)
                 const values: ValueInput[] = Array.isArray(body?.values) ? body.values : []
                 await saveValues(r.id, r.templateId, r.frequency, values)
                 await recomputeReport(r.id)
@@ -135,6 +149,7 @@ export async function PATCH(req: Request, { params }: Params) {
             }
             case "REFRESH_AUTO": {
                 assertEditable(ctx, r.status, isOwner)
+                await assertNotLocked(ctx, r)
                 await refreshAutoValues(r.id)
                 await recomputeReport(r.id)
                 await logActivity(r.id, "AUTO_REFRESHED", ctx.userId)
@@ -142,6 +157,7 @@ export async function PATCH(req: Request, { params }: Params) {
             }
             case "SUBMIT": {
                 assertEditable(ctx, r.status, isOwner)
+                await assertNotLocked(ctx, r)
                 // Values sent with the submit are saved first, and AUTO values
                 // are re-read so the reviewer sees current system numbers.
                 if (Array.isArray(body?.values) && body.values.length) await saveValues(r.id, r.templateId, r.frequency, body.values)

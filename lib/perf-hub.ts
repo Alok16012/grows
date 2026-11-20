@@ -28,6 +28,12 @@ export const SYSTEM_METRICS = [
     { key: "inspections.submitted", label: "Inspections submitted", unit: "count" },
     { key: "inspections.approved", label: "Inspections approved", unit: "count" },
     { key: "fieldtasks.completed", label: "Field tasks completed", unit: "count" },
+    { key: "inspections.inspected_qty", label: "Pieces inspected (approved reports)", unit: "count" },
+    { key: "inspections.rejected_qty", label: "Pieces rejected (approved reports)", unit: "count" },
+    { key: "inspections.rework_qty", label: "Pieces sent for rework (approved reports)", unit: "count" },
+    { key: "inspections.rejection_pct", label: "Rejection % (rejected ÷ inspected)", unit: "percent" },
+    { key: "inspections.sent_back", label: "Reports rejected by the approver (submitted in the period)", unit: "count" },
+    { key: "attendance.present_days", label: "Days present (attendance)", unit: "count" },
 ] as const
 export const SYSTEM_METRIC_KEYS: readonly string[] = SYSTEM_METRICS.map(m => m.key)
 

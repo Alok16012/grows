@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { reportFigures } from "@/lib/inspection-customers"
 import type { Prisma } from "@prisma/client"
 import type { Session } from "next-auth"
 import prisma from "@/lib/prisma"
@@ -271,6 +272,23 @@ async function leadMoves(userId: string, moves: string[], window: { gte: Date; l
     return rows.length
 }
 
+/** Inspected / rework / rejected pieces on an inspector's approved reports submitted in the window. */
+async function inspectionFigures(userId: string, window: { gte: Date; lt: Date }) {
+    const rows = await prisma.inspection.findMany({
+        where: { submittedBy: userId, status: "approved", submittedAt: window },
+        select: { responses: { select: { value: true, field: { select: { fieldLabel: true, category: true, reportRole: true } } } } },
+        take: 2000,
+    })
+    const out = { inspected: 0, rejected: 0, rework: 0 }
+    for (const r of rows) {
+        const f = reportFigures(r.responses)
+        out.inspected += f.inspected || 0
+        out.rejected += f.rejected || 0
+        out.rework += f.rework || 0
+    }
+    return out
+}
+
 /** A SYSTEM metric for one employee over a period; null when it can't be measured. */
 export async function systemMetricValue(metric: string, emp: { id: string; userId: string | null }, period: Period): Promise<number | null> {
     const window = periodWindow(period)
@@ -286,6 +304,26 @@ export async function systemMetricValue(metric: string, emp: { id: string; userI
             return uid ? prisma.inspection.count({ where: { submittedBy: uid, submittedAt: window, status: { in: ["pending", "approved"] } } }) : null
         case "inspections.approved":
             return uid ? prisma.inspection.count({ where: { submittedBy: uid, status: "approved", approvedAt: window } }) : null
+        case "inspections.inspected_qty":
+        case "inspections.rejected_qty":
+        case "inspections.rework_qty":
+        case "inspections.rejection_pct": {
+            if (!uid) return null
+            const f = await inspectionFigures(uid, window)
+            if (metric === "inspections.inspected_qty") return f.inspected
+            if (metric === "inspections.rejected_qty") return f.rejected
+            if (metric === "inspections.rework_qty") return f.rework
+            return f.inspected > 0 ? Math.round((f.rejected / f.inspected) * 10000) / 100 : null
+        }
+        case "inspections.sent_back":
+            return uid ? prisma.inspection.count({ where: { submittedBy: uid, status: "rejected", submittedAt: window } }) : null
+        case "attendance.present_days": {
+            const rows = await prisma.attendance.findMany({
+                where: { employeeId: emp.id, date: { gte: period.start, lt: addDays(period.end, 1) }, status: { in: ["PRESENT", "HALF_DAY", "LATE", "WFH", "ON_DUTY"] } },
+                select: { status: true },
+            })
+            return rows.reduce((n, r) => n + (r.status === "HALF_DAY" ? 0.5 : 1), 0)
+        }
         case "fieldtasks.completed":
             // Older completions have no completedAt; their last update stands in.
             return prisma.fieldTask.count({

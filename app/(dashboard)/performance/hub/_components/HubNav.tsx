@@ -3,7 +3,7 @@
 //
 //   My work         → My Reports · Registers · My Scorecard · My Appraisal   (everyone)
 //   Team            → Review Queue · Team Dashboard · Appraisals             (performance.view, or anyone who reviews)
-//   Setup           → KPI Designer · Register Designer · People & Roles      (performance.manage)
+//   Setup           → KPI Designer · Register Designer · People & Roles · DWM Settings (performance.manage)
 // One menu for the whole module: appraisals (the former /performance page)
 // live here too, so there is no second row of tabs.
 import { useEffect, useState } from "react"
@@ -12,7 +12,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
-    ArrowLeft, Award, ClipboardList, Database, Gauge, Inbox, LayoutDashboard, Target, TableProperties, UserCog,
+    ArrowLeft, Award, ClipboardList, Database, Gauge, Inbox, LayoutDashboard, Target, TableProperties, UserCog, Settings2,
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { api, SetupNotice, type ReportRow } from "./shared"
@@ -77,6 +77,7 @@ export function HubNav() {
                 { href: "/performance/hub/designer", label: "KPI Designer", icon: <Target size={14} /> },
                 { href: "/performance/hub/registers-designer", label: "Register Designer", icon: <TableProperties size={14} /> },
                 { href: "/performance/hub/people", label: "People & Roles", icon: <UserCog size={14} /> },
+                { href: "/performance/hub/settings", label: "DWM Settings", icon: <Settings2 size={14} /> },
             ],
         })
     }

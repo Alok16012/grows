@@ -20,6 +20,15 @@ export default function ReviewQueuePage() {
     const [loading, setLoading] = useState(true)
     const [freq, setFreq] = useState<"" | Frequency>("")
     const [busy, setBusy] = useState<string | null>(null)
+    // Review target from DWM Settings — older reports show as overdue.
+    const [targetDays, setTargetDays] = useState(2)
+    useEffect(() => {
+        if (status !== "authenticated") return
+        api<{ settings: { review: { targetDays: number } } }>("/settings").then(d => setTargetDays(d.settings.review.targetDays)).catch(() => {})
+    }, [status])
+    const waitedDays = (iso?: string | null) => iso ? (Date.now() - new Date(iso).getTime()) / 86_400_000 : 0
+    const clean = rows.filter(r => r.redCount === 0 && r.kpiWithValues >= r.kpiTotal)
+    const overdue = targetDays > 0 ? rows.filter(r => waitedDays(r.submittedAt) >= targetDays).length : 0
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -58,12 +67,21 @@ export default function ReviewQueuePage() {
 
     return (
         <HubShell title="Review Queue" subtitle="Daily, weekly and monthly reports waiting for your approval." missing={missing}
-            actions={
+            actions={<>
+                {clean.length > 1 && (
+                    <button className={btnSuccess + " !py-1.5 !px-3 !text-[12px]"} onClick={() => approve(clean.map(r => r.id))} disabled={!!busy}
+                        title="Approve every report in the queue that has all KPIs filled and no RED KPI">
+                        <CheckCircle2 size={12} /> Approve all without RED ({clean.length})
+                    </button>
+                )}
                 <select className={filterCls} value={freq} onChange={e => setFreq(e.target.value as Frequency | "")} aria-label="Frequency">
                     <option value="">All frequencies</option>
                     {(Object.keys(FREQ_LABEL) as Frequency[]).map(f => <option key={f} value={f}>{FREQ_LABEL[f]}</option>)}
                 </select>
-            }>
+            </>}>
+            {overdue > 0 && (
+                <p className="mb-3 text-[12.5px] text-[var(--amber)] font-medium">{overdue} report{overdue === 1 ? " has" : "s have"} waited more than {targetDays} day{targetDays === 1 ? "" : "s"} (DWM Settings).</p>
+            )}
             <OpenFromQuery ready={status === "authenticated"} onOpen={open} />
             {loading ? <Card><Loading /></Card> : groups.length === 0 ? (
                 <Card><Empty icon={<Inbox size={40} />} title="Nothing to review" sub="Submitted reports from the people you review will appear here." /></Card>
@@ -102,7 +120,12 @@ export default function ReviewQueuePage() {
                                                     <td className={`${tdCls} text-right font-mono`}>{r.kpiWithValues}/{r.kpiTotal}</td>
                                                     <td className={`${tdCls} text-right font-mono ${r.redCount ? "text-red-600 font-semibold" : "text-[var(--text3)]"}`}>{r.redCount}</td>
                                                     <td className={`${tdCls} text-right`}><PctText value={r.score} /></td>
-                                                    <td className={`${tdCls} text-[12px] text-[var(--text2)]`}>{fmtDate(r.submittedAt, "dd MMM, HH:mm")}</td>
+                                                    <td className={`${tdCls} text-[12px] text-[var(--text2)]`}>
+                                                        {fmtDate(r.submittedAt, "dd MMM, HH:mm")}
+                                                        {targetDays > 0 && waitedDays(r.submittedAt) >= targetDays && (
+                                                            <span className="block text-[11px] font-semibold text-red-600">waiting {Math.floor(waitedDays(r.submittedAt))} d · overdue</span>
+                                                        )}
+                                                    </td>
                                                     <td className={`${tdCls} text-right whitespace-nowrap`}>
                                                         <button className={btnSmall} onClick={() => open(r.id)}>Open <ArrowRight size={12} /></button>
                                                         <button className={`${btnSmall} ml-1.5 hover:!text-[var(--success)] hover:!border-[var(--success-border)]`} disabled={!!busy}

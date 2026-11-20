@@ -17,6 +17,10 @@
     {
       "path": "/api/cron/inspection-daily",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/dwm-daily",
+      "schedule": "35 3 * * *"
     }
   ]
 }

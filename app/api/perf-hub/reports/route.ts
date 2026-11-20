@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { FREQUENCIES, REPORT_STATUSES, isOneOf, parseDay, istDay, periodFor } from "@/lib/perf-hub"
+import { getDwmSettings, dueDay } from "@/lib/dwm-settings"
 import {
     perfCtx, perfErrorResponse, jsonError, myEmployeeId, revieweeIds, publishedByFamily,
     refreshAutoValues, recomputeReport, logActivity, reportDetail, isUniqueErr, EMPLOYEE_SELECT,
@@ -121,6 +122,15 @@ export async function POST(req: Request) {
         const key = { employeeId_frequency_periodStart: { employeeId, frequency, periodStart: period.start } }
         const existing = await prisma.perfReport.findUnique({ where: key, select: { id: true } })
         if (existing) return NextResponse.json({ report: await reportDetail(existing.id, ctx), created: false })
+
+        // DWM Settings → "Lock after the deadline": an employee can't start a
+        // report whose deadline has passed (HR still can).
+        if (!ctx.isManager) {
+            const s = await getDwmSettings()
+            if (s.deadlines.lockAfterDue && istDay().getTime() > dueDay(s, frequency, period.end).getTime()) {
+                return jsonError(409, "The deadline for this report has passed — ask HR if it still needs to be filed")
+            }
+        }
 
         const assignment = await prisma.perfAssignment.findUnique({ where: { employeeId } })
         if (!assignment) return jsonError(400, "No KPI template assigned — ask HR to assign one in People & Roles")
