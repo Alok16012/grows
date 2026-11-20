@@ -67,8 +67,8 @@ export const MODULES: ModuleDef[] = [
     { key: "roles",         label: "Roles",                   group: "Configuration",  actions: ["view", "create", "edit", "delete"] },
     { key: "rulebook",      label: "Rule book and doc types", group: "Configuration",  actions: ["view", "edit"] },
     { key: "audit",         label: "Audit log",               group: "Configuration",  actions: ["view", "export"] },
-    // view = connection status and the message log; edit = event settings and test sends.
-    { key: "whatsapp",      label: "WhatsApp messaging",      group: "Configuration",  actions: ["view", "edit"] },
+    // Communication Center (key kept as "whatsapp"): view = log and status; edit = settings, tests, resend.
+    { key: "whatsapp",      label: "Communication Center",    group: "Configuration",  actions: ["view", "edit"] },
 ]
 
 export type SpecialDef = { key: string; label: string; hint: string; module: string; warn?: boolean }

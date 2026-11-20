@@ -2706,3 +2706,53 @@ model WhatsAppMessage {
   @@index([refType, refId])
   @@index([createdAt])
 }
+
+// Communication Center — one row per outgoing message on any channel
+// (whatsapp / email / inapp), queued by lib/comm/engine.ts notify() and sent
+// by its queue. WhatsApp receipts update it by providerId (wamid).
+// Prod table: scripts/comm.sql.
+model CommMessage {
+  id            String    @id @default(uuid())
+  channel       String
+  event         String
+  recipientType String
+  recipientId   String?
+  recipientName String?
+  toAddress     String
+  subject       String?
+  template      String?
+  data          Json?
+  refType       String?
+  refId         String?
+  status        String    @default("queued")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  providerId    String?   @unique
+  error         String?
+  createdBy     String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([event])
+  @@index([channel])
+  @@index([recipientType, recipientId])
+  @@index([refType, refId])
+  @@index([createdAt])
+}
+
+// Someone who asked not to get messages on a channel. Keyed on the address
+// (91XXXXXXXXXX or an email) so it covers employees and customers alike.
+model CommOptOut {
+  id        String   @id @default(uuid())
+  channel   String
+  address   String
+  reason    String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@unique([channel, address])
+}

@@ -252,7 +252,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Employee Logins", href: "/admin/employee-logins", permission: "users.manage", group: "Users & Access" },
                 { name: "Roles", href: "/admin/roles", permission: "roles.view", group: "Users & Access" },
                 { name: "Audit Log", href: "/admin/audit", permission: "audit.view", group: "Users & Access" },
-                { name: "WhatsApp", href: "/admin/whatsapp", permissionAny: ["whatsapp.view", "whatsapp.edit"], group: "Messaging" },
+                { name: "Communication", href: "/admin/communication", permissionAny: ["whatsapp.view", "whatsapp.edit"], matchPrefixes: ["/admin/communication", "/admin/whatsapp"], group: "Messaging" },
             ],
         },
         {

@@ -49,7 +49,7 @@ export async function POST(req: Request) {
             const wamid = typeof st?.id === "string" ? st.id : null
             const status = typeof st?.status === "string" ? st.status : null
             if (!wamid || !status || !(status in RANK)) continue
-            const row = await prisma.whatsAppMessage.findUnique({ where: { wamid }, select: { id: true, status: true, deliveredAt: true } })
+            const row = await prisma.commMessage.findUnique({ where: { providerId: wamid }, select: { id: true, status: true, deliveredAt: true } })
             if (!row) continue
             const at = st.timestamp ? new Date(Number(st.timestamp) * 1000) : new Date()
             const data: Record<string, unknown> = {}
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
             if (status === "delivered") data.deliveredAt = at
             if (status === "read") { data.readAt = at; if (!row.deliveredAt) data.deliveredAt = at }
             if (status === "failed") data.error = [st.errors?.[0]?.title, st.errors?.[0]?.error_data?.details].filter(Boolean).join(" — ").slice(0, 500) || "Failed"
-            if (Object.keys(data).length) await prisma.whatsAppMessage.update({ where: { id: row.id }, data })
+            if (Object.keys(data).length) await prisma.commMessage.update({ where: { id: row.id }, data })
         }
     } catch (e) {
         if (!isMissingTableErr(e)) console.error("[WA_WEBHOOK]", e)

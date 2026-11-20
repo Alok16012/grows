@@ -74,6 +74,7 @@ export default withAuth(
                 ["/admin/roles", ["roles.view"]],
                 ["/admin/audit", ["audit.view"]],
                 ["/admin/whatsapp", ["whatsapp.view", "whatsapp.edit"]],
+                ["/admin/communication", ["whatsapp.view", "whatsapp.edit"]],
             ]
             const allowed = ADMIN_SCREENS.some(([prefix, perms]) =>
                 (path === prefix || path.startsWith(prefix + "/")) && perms.some(p => permissions.includes(p)))
