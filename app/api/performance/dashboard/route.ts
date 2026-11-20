@@ -36,12 +36,36 @@ export async function GET(req: Request) {
             ? allRated.reduce((s, r) => s + (r.overallRating ?? 0), 0) / allRated.length
             : 0
 
-        // Ranking distribution
-        const rankDistribRaw = await prisma.performanceReview.groupBy({
-            by: ["performanceRank"],
-            where: { ...whereBase, performanceRank: { not: null } },
-            _count: { performanceRank: true },
-        })
+        // The remaining reads in parallel — they were awaited one by one
+        // (six of them for the trend alone), ~10 round trips per dashboard load.
+        const now = new Date()
+        const trendStart = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+        const [rankDistribRaw, topPerformers, allReviews, trendReviews] = await Promise.all([
+            prisma.performanceReview.groupBy({
+                by: ["performanceRank"],
+                where: { ...whereBase, performanceRank: { not: null } },
+                _count: { performanceRank: true },
+            }),
+            prisma.performanceReview.findMany({
+                where: { ...whereBase, overallRating: { not: null } },
+                orderBy: { overallRating: "desc" },
+                take: 5,
+                select: {
+                    id: true, overallRating: true, performanceRank: true,
+                    employee: { select: { firstName: true, lastName: true, designation: true, employeeId: true } },
+                },
+            }),
+            prisma.performanceReview.findMany({
+                where: { ...whereBase, overallRating: { not: null } },
+                select: { overallRating: true, employee: { select: { designation: true } } },
+            }),
+            // Same scope as everything else here (it used to ignore whereBase,
+            // so a manager's trend counted everyone's reviews).
+            prisma.performanceReview.findMany({
+                where: { ...whereBase, createdAt: { gte: trendStart }, overallRating: { not: null } },
+                select: { overallRating: true, createdAt: true },
+            }),
+        ])
         const rankDistrib: Record<string, number> = {
             TOP_PERFORMER: 0,
             HIGH_PERFORMER: 0,
@@ -54,34 +78,7 @@ export async function GET(req: Request) {
             }
         }
 
-        // Top 5 performers
-        const topPerformers = await prisma.performanceReview.findMany({
-            where: { ...whereBase, overallRating: { not: null } },
-            orderBy: { overallRating: "desc" },
-            take: 5,
-            select: {
-                id: true,
-                overallRating: true,
-                performanceRank: true,
-                employee: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        designation: true,
-                        employeeId: true,
-                    },
-                },
-            },
-        })
-
         // Dept/role-wise avg scores
-        const allReviews = await prisma.performanceReview.findMany({
-            where: { ...whereBase, overallRating: { not: null } },
-            select: {
-                overallRating: true,
-                employee: { select: { designation: true } },
-            },
-        })
         const roleMap: Record<string, number[]> = {}
         for (const r of allReviews) {
             const role = r.employee.designation || "Unknown"
@@ -94,20 +91,12 @@ export async function GET(req: Request) {
             count: scores.length,
         }))
 
-        // Monthly trend: last 6 months
-        const now = new Date()
+        // Monthly trend: last 6 months, bucketed from the one query above
         const monthlyTrend: { month: string; avgScore: number; count: number }[] = []
         for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-            const start = new Date(d.getFullYear(), d.getMonth(), 1)
-            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
-            const monthReviews = await prisma.performanceReview.findMany({
-                where: {
-                    createdAt: { gte: start, lte: end },
-                    overallRating: { not: null },
-                },
-                select: { overallRating: true },
-            })
+            const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59)
+            const monthReviews = trendReviews.filter(r => r.createdAt >= start && r.createdAt <= end)
             const avg = monthReviews.length
                 ? monthReviews.reduce((s, r) => s + (r.overallRating ?? 0), 0) / monthReviews.length
                 : 0
