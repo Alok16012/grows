@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react"
 const TABS = [
     { href: "/payroll/reports/writer", label: "Report Writer" },
     { href: "/payroll/reports/fnf", label: "FNF Settlement" },
+    { href: "/payroll/reports/advance", label: "Advance Report" },
 ]
 
 export default function ReportsNav({ title, subtitle }: { title: string; subtitle: string }) {
