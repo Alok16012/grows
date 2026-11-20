@@ -97,7 +97,9 @@ export async function sendTemplate(m: WaSend): Promise<WaResult> {
                 : { type: "image", image: { link: m.header.link } }],
         })
     }
-    if (m.body?.length) components.push({ type: "body", parameters: m.body.map(text => ({ type: "text", text: String(text || "-").slice(0, 1000) })) })
+    // Template values may not contain line breaks, tabs or runs of 4+ spaces.
+    const clean = (t: string) => String(t || "-").replace(/[\r\n\t]+/g, " · ").replace(/ {4,}/g, "   ").trim().slice(0, 1000) || "-"
+    if (m.body?.length) components.push({ type: "body", parameters: m.body.map(text => ({ type: "text", text: clean(text) })) })
     const r = await graph(cfg, `${cfg.phoneId}/messages`, {
         method: "POST",
         body: {

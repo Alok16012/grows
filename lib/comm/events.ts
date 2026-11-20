@@ -11,7 +11,8 @@ export const CHANNELS: { key: Channel; label: string }[] = [
     { key: "inapp", label: "In-app" },
 ]
 
-export type Audience = "employee" | "customer"
+// "all" = sent to whoever a broadcast picks (employees or customers).
+export type Audience = "employee" | "customer" | "all"
 export type CommVar = { key: string; label: string; sample: string }
 export type CommEvent = {
     key: string
@@ -140,6 +141,17 @@ export const COMM_EVENTS: CommEvent[] = [
         defaultBody: "Dear {name},\n\nAn inspection for {project} is scheduled from {date}. Inspector: {inspector}.\n\nRegards,\n{company}",
     },
 ]
+
+// ── Broadcasts (Settings → Communication → Broadcasts) ─────────
+COMM_EVENTS.push({
+    key: "broadcast", label: "Broadcast message", audience: "all", connected: true,
+    description: "A message written on the Broadcasts tab and sent to chosen employees or customers. WhatsApp uses one general template that carries the text.",
+    vars: [NAME, { key: "title", label: "Title", sample: "Plant closed on Saturday" }, { key: "message", label: "Message", sample: "Due to maintenance the plant stays closed this Saturday. Regular shifts resume Monday." }, COMPANY_VAR],
+    waParams: ["name", "message"],
+    respectQuietHours: true,
+    defaultSubject: "{title}",
+    defaultBody: "Hi {name},\n\n{message}\n\n— {company}",
+})
 
 export const COMM_EVENT_MAP = new Map(COMM_EVENTS.map(e => [e.key, e]))
 

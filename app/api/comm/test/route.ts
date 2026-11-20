@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const me = channel === "inapp" ? await prisma.user.findUnique({ where: { id: g.access.userId }, select: { id: true, name: true } }) : null
     try {
         const r = await notify(ev.key, [{
-            type: ev.audience, name: me?.name ?? name,
+            type: ev.audience === "customer" ? "customer" : "employee", name: me?.name ?? name,
             phone: channel === "whatsapp" ? to : null, email: channel === "email" ? to : null, userId: me?.id ?? null,
         }], { ...sampleData(ev), name: me?.name?.split(" ")[0] ?? name }, { channels: [channel], force: true, createdBy: g.access.userId, refType: "Test", budgetMs: 15_000 })
         const row = r.ids[0] ? await prisma.commMessage.findUnique({ where: { id: r.ids[0] }, select: { status: true, error: true } }) : null

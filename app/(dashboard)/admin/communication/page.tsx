@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { can, canAny } from "@/lib/can"
 import { fillTemplate, sampleData, type Channel, type CommEvent } from "@/lib/comm/events"
+import BroadcastTab from "./BroadcastTab"
 
 type EventChannels = {
     whatsapp: { enabled: boolean; template: string; language: string }
@@ -28,7 +29,7 @@ type Info = {
 }
 type Msg = { id: string; channel: string; event: string; recipientType: string; recipientName: string | null; toAddress: string; subject: string | null; status: string; error: string | null; attempts: number; nextAttemptAt: string; createdAt: string; deliveredAt: string | null; readAt: string | null }
 type OptOut = { id: string; channel: string; address: string; reason: string | null; createdAt: string }
-type Tab = "events" | "channels" | "log" | "optouts"
+type Tab = "events" | "broadcasts" | "channels" | "log" | "optouts"
 
 const CH_ICON: Record<Channel, typeof Mail> = { whatsapp: MessageCircle, email: Mail, inapp: Bell }
 const CH_LABEL: Record<Channel, string> = { whatsapp: "WhatsApp", email: "Email", inapp: "In-app" }
@@ -83,7 +84,7 @@ export default function CommunicationCenterPage() {
 
     if (session && !canAny(session, ["whatsapp.view", "whatsapp.edit"])) return <div className="p-8 text-center text-sm text-[var(--text3)]">Access denied</div>
 
-    const tabs: [Tab, string][] = [["events", "Events"], ["channels", "Channels"], ["log", "Message log"], ["optouts", "Opt-outs"]]
+    const tabs: [Tab, string][] = [["events", "Events"], ["broadcasts", "Broadcasts"], ["channels", "Channels"], ["log", "Message log"], ["optouts", "Opt-outs"]]
     return (
         <div className="flex flex-col gap-5 p-4 pb-24 lg:p-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -115,6 +116,7 @@ export default function CommunicationCenterPage() {
                 <>
                     {!info.installed && <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-[13px] text-[#92400e]">The message tables aren&apos;t created on the database yet (scripts/comm.sql) — nothing can be sent until they are.</div>}
                     {tab === "events" && <EventsTab info={info} settings={settings} canEdit={canEdit} patch={patchEvent} />}
+                    {tab === "broadcasts" && <BroadcastTab canEdit={canEdit} waReady={info.whatsapp.connected && !!settings.events.broadcast?.whatsapp.template} emailReady={info.email.configured} waTemplate={settings.events.broadcast?.whatsapp.template ?? ""} />}
                     {tab === "channels" && <ChannelsTab info={info} settings={settings} canEdit={canEdit} set={(p) => { setSettings(s => s ? { ...s, ...p } : s); setDirty(true) }} />}
                     {tab === "log" && <LogTab info={info} canEdit={canEdit} onChanged={load} />}
                     {tab === "optouts" && <OptOutsTab canEdit={canEdit} />}
@@ -144,9 +146,10 @@ const input = "h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] 
 // ─── Events ──────────────────────────────────────────────────────────────────
 function EventsTab({ info, settings, canEdit, patch }: { info: Info; settings: Settings; canEdit: boolean; patch: (k: string, c: Channel, p: Record<string, unknown>) => void }) {
     const [open, setOpen] = useState<string | null>(null)
-    const groups: { key: "employee" | "customer"; label: string; icon: typeof Users }[] = [
+    const groups: { key: "employee" | "customer" | "all"; label: string; icon: typeof Users }[] = [
         { key: "employee", label: "To employees", icon: Users },
         { key: "customer", label: "To customers", icon: Building2 },
+        { key: "all", label: "Broadcasts (sent from the Broadcasts tab)", icon: Megaphone },
     ]
     return (
         <div className="flex flex-col gap-4">
