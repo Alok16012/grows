@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
-import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X } from "lucide-react"
+import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X, MessageCircle } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
 import PayslipViewerModal from "./PayslipViewerModal"
+import PayslipWhatsAppModal from "./PayslipWhatsAppModal"
 
 const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
@@ -53,6 +54,8 @@ const sel: React.CSSProperties = { padding:"6px 10px", borderRadius:7, border:"1
 export default function PayslipsPanel({ onClose, initialMonth, initialYear, latest }: { onClose: () => void; initialMonth?: number; initialYear?: number; latest?: { month: number; year: number } }) {
     const { data: session } = useSession()
     const canManage = can(session, "payroll.manage")
+    const canSendSlips = canManage || can(session, "payroll.markPaid")
+    const [waOpen, setWaOpen] = useState(false)
 
     // The hub passes the history row's month/year so "Slips" on August opens August.
     const [month,    setMonth]    = useState(initialMonth ?? currentPayrollMonth())
@@ -283,6 +286,12 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                                     <Printer size={11} /> Print All ({filtered.length})
                                 </button>
                             )}
+                            {canSendSlips && (
+                                <button onClick={()=>setWaOpen(true)} title="Send salary slips as PDF on WhatsApp"
+                                    style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:6, border:"none", background:"#16a34a", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
+                                    <MessageCircle size={11} /> WhatsApp
+                                </button>
+                            )}
                         </div>
                         {/* Narrower fixed columns on phones so the employee
                             name still gets usable width. */}
@@ -407,6 +416,9 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                 </div>
             </div>
 
+            {waOpen && (
+                <PayslipWhatsAppModal month={month} year={year} siteId={selSiteId} siteName={sites.find(x=>x.id===selSiteId)?.name ?? ""} onClose={()=>setWaOpen(false)} />
+            )}
             {viewing && (
                 <PayslipViewerModal
                     title={`${viewing.employee.firstName} ${viewing.employee.lastName} — ${MONTHS_LONG[viewing.month-1]} ${viewing.year}`}

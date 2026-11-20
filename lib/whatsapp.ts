@@ -70,7 +70,9 @@ async function graph<T = any>(cfg: WaConfig, path: string, init?: { method?: str
     }
 }
 
-export type WaHeader = { type: "document"; link: string; filename?: string } | { type: "image"; link: string }
+// A document goes either by public link or by a media id from uploadMedia()
+// (preferred for private files such as salary slips: no URL ever exists).
+export type WaHeader = { type: "document"; link: string; filename?: string } | { type: "document"; id: string; filename?: string } | { type: "image"; link: string }
 export type WaSend = {
     to: string
     template: string
@@ -112,7 +114,7 @@ export async function sendTemplate(m: WaSend): Promise<WaResult> {
         components.push({
             type: "header",
             parameters: [m.header.type === "document"
-                ? { type: "document", document: { link: m.header.link, ...(m.header.filename ? { filename: m.header.filename } : {}) } }
+                ? { type: "document", document: { ...("id" in m.header ? { id: m.header.id } : { link: m.header.link }), ...(m.header.filename ? { filename: m.header.filename } : {}) } }
                 : { type: "image", image: { link: m.header.link } }],
         })
     }
@@ -144,6 +146,24 @@ export async function sendTemplate(m: WaSend): Promise<WaResult> {
     if (!r.ok || !wamid) return fail(r.error || "WhatsApp did not accept the message")
     await logUpdate(id, { status: "sent", wamid, sentAt: new Date() })
     return { ok: true, id, wamid }
+}
+
+/** Uploads a file to WhatsApp (kept by Meta ~30 days) and returns its media id. */
+export async function uploadMedia(data: Buffer, filename: string, mime = "application/pdf"): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+    const cfg = waConfig()
+    if (!cfg) return { ok: false, error: "WhatsApp is not connected" }
+    try {
+        const form = new FormData()
+        form.append("messaging_product", "whatsapp")
+        form.append("type", mime)
+        form.append("file", new Blob([new Uint8Array(data)], { type: mime }), filename)
+        const res = await fetch(`https://graph.facebook.com/${cfg.version}/${cfg.phoneId}/media`, { method: "POST", headers: { Authorization: `Bearer ${cfg.token}` }, body: form })
+        const d = await res.json().catch(() => null) as any
+        if (!res.ok || !d?.id) return { ok: false, error: d?.error?.message ? `${d.error.message}${d.error.code ? ` (code ${d.error.code})` : ""}` : `Upload failed (HTTP ${res.status})` }
+        return { ok: true, id: String(d.id) }
+    } catch (e: any) {
+        return { ok: false, error: e?.message || "Upload failed" }
+    }
 }
 
 export type WaTemplate = { name: string; language: string; status: string; category: string; body: string; params: number; header: string | null }
