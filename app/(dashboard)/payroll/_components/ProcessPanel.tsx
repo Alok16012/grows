@@ -11,7 +11,7 @@ const loadXLSX = () => import("xlsx")
 import {
     Loader2, Play, RefreshCw, ChevronRight,
     AlertCircle, CheckCircle2, Users, MapPin, Building2, Search,
-    Trash2, FileUp, X
+    Trash2, FileUp, X, Lock, Unlock
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,6 +73,8 @@ const attInput: React.CSSProperties = { width: 50, padding: "3px 4px", borderRad
 export default function ProcessPanel({ onClose, onDone, initialMonth, initialYear, latest }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number; latest?: { month: number; year: number } }) {
     const { data: session } = useSession()
     const canManage = can(session, "payroll.manage")
+    const canLock   = can(session, "payroll.lock")
+    const canUnlock = can(session, "payroll.unlock")
 
     // The hub passes the month/year of the history row (or its own picker) so
     // "View" on August opens August, not the calendar month.
@@ -92,6 +94,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
     const [loadingEmployees, setLoadingEmployees] = useState(false)
     const [processing,       setProcessing]       = useState(false)
     const [deleting,         setDeleting]         = useState(false)
+    const [siteLocking,      setSiteLocking]      = useState<"lock" | "unlock" | null>(null)
     const [fetched,          setFetched]          = useState(false)
     const [search,           setSearch]           = useState("")
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -279,6 +282,37 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
         finally { setProcessing(false) }
     }
 
+    // One site at a time, for a month that is finished site by site. The
+    // Payroll header still locks / unlocks the whole month in one go.
+    const handleSiteLock = async (action: "lock" | "unlock") => {
+        if (!selectedSiteId) return
+        const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "this site"
+        const label = `${MONTHS[parseInt(month) - 1]} ${year}`
+        const msg = action === "lock"
+            ? `Lock ${siteName} for ${label}?
+
+Amounts for this site can't be edited or re-processed after locking. It can be unlocked later.`
+            : `Unlock ${siteName} for ${label}?
+
+Its rows go back to draft so days and amounts can be edited and re-processed. Paid rows stay paid.`
+        if (!confirm(msg)) return
+        setSiteLocking(action)
+        try {
+            const res = action === "lock"
+                ? await fetch("/api/payroll/final/lock", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ month: parseInt(month), year: parseInt(year), siteIds: [selectedSiteId] }),
+                })
+                : await fetch(`/api/payroll/reset?month=${month}&year=${year}&siteId=${selectedSiteId}&action=unlock`, { method: "DELETE" })
+            if (!res.ok) throw new Error((await res.text()) || "Failed")
+            const d = await res.json().catch(() => ({}))
+            const n = action === "lock" ? Number(d?.count ?? 0) : Number(d?.unlocked ?? 0)
+            toast.success(n ? `${siteName}: ${n} row(s) ${action === "lock" ? "locked" : "unlocked"}` : `Nothing to ${action} for ${siteName}`)
+            await Promise.all([fetchSiteStatus(), fetchEmployees(selectedSiteId)])
+        } catch (e: any) { toast.error(e.message || `Could not ${action} the site`) }
+        finally { setSiteLocking(null) }
+    }
+
     const handleDelete = async () => {
         if (!selectedSiteId) return
         const siteName = sites.find(s => s.id === selectedSiteId)?.name ?? "this site"
@@ -452,8 +486,20 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                         style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "none", fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
                                         <RefreshCw size={11} className={loadingEmployees ? "animate-spin" : ""} /> Refresh
                                     </button>
-                                    {/* No Unlock here: the month is locked and unlocked as a whole
-                                        from the Payroll header (Lock month / Unlock month). */}
+                                    {draftOf(getStatus(selectedSiteId)) > 0 && canLock && (
+                                        <button onClick={() => handleSiteLock("lock")} disabled={siteLocking !== null}
+                                            title="Lock this site's open rows for the month"
+                                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #ddd6fe", background: "#f5f3ff", fontSize: 11, color: "#7c3aed", fontWeight: 700, cursor: "pointer", opacity: siteLocking ? 0.6 : 1 }}>
+                                            {siteLocking === "lock" ? <Loader2 size={11} className="animate-spin" /> : <Lock size={11} />} Lock site
+                                        </button>
+                                    )}
+                                    {lockedOf(getStatus(selectedSiteId)) > 0 && canUnlock && (
+                                        <button onClick={() => handleSiteLock("unlock")} disabled={siteLocking !== null}
+                                            title="Reopen this site's locked rows (paid rows stay paid)"
+                                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #fde68a", background: "#fffbeb", fontSize: 11, color: "#b45309", fontWeight: 700, cursor: "pointer", opacity: siteLocking ? 0.6 : 1 }}>
+                                            {siteLocking === "unlock" ? <Loader2 size={11} className="animate-spin" /> : <Unlock size={11} />} Unlock site
+                                        </button>
+                                    )}
                                     {draftOf(getStatus(selectedSiteId)) > 0 && (
                                             <button onClick={handleDelete} disabled={deleting || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", fontSize: 11, color: "#dc2626", fontWeight: 600, cursor: "pointer", opacity: deleting ? 0.6 : 1 }}>
@@ -468,6 +514,24 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Why the grid is read-only, and who can reopen it. */}
+                            {(() => {
+                                const st = getStatus(selectedSiteId)
+                                const shut = lockedOf(st) + (st?.paid ?? 0)
+                                if (!st || shut === 0) return null
+                                const all = draftOf(st) === 0
+                                return (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 9, border: "1px solid #bbf7d0", background: "#f0fdf4", fontSize: 12, color: "#166534" }}>
+                                        <Lock size={13} />
+                                        <span>
+                                            {all ? <><b>Locked</b> for {MONTHS[parseInt(month) - 1]} {year}</> : <><b>{shut} of {st.processedCount}</b> rows locked</>}
+                                            {" — locked rows can't be edited or re-processed. "}
+                                            {canUnlock ? "Use Unlock site (or Unlock month on the Payroll page) to change them." : "Ask someone with Unlock a locked month to reopen it."}
+                                        </span>
+                                    </div>
+                                )
+                            })()}
 
                             {/* Mini stats */}
                             {fetched && (

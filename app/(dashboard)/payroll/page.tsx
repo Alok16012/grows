@@ -38,6 +38,7 @@ type PayrollRun = {
     totalPfEmployer: number
     totalEsiEmployer: number
     createdAt: string
+    lockedAt?: string | null
     _count: { payrolls: number }
     /** A created month with no rows yet: employees on its rolls. */
     onRolls?: number
@@ -352,18 +353,40 @@ export default function PayrollPage() {
                             style={{ ...quietBtn, cursor: "not-allowed", opacity: 0.55 }}>
                             <Lock size={15} /> Lock month
                         </button>
-                    )) : counts.draft > 0 ? (canLock && (
-                        <button onClick={lockMonth} disabled={lockingMonth !== null}
-                            title={`Lock ${periodLabel} — every site at once`}
-                            style={{ ...quietBtn, border: "none", background: "#7c3aed", color: "#fff" }}>
-                            {lockingMonth === "lock" ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />} Lock month
-                        </button>
-                    )) : counts.locked > 0 && canUnlock && (
-                        <button onClick={unlockMonth} disabled={lockingMonth !== null}
-                            title={`Reopen ${periodLabel} for editing — every site at once (paid rows stay paid)`}
-                            style={{ ...quietBtn, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309" }}>
-                            {lockingMonth === "unlock" ? <Loader2 size={15} className="animate-spin" /> : <Unlock size={15} />} Unlock month
-                        </button>
+                    )) : (
+                        <>
+                            {/* A partly locked month offers both: lock what is still
+                                open, or reopen what is locked. */}
+                            {counts.draft > 0 && canLock && (
+                                <button onClick={lockMonth} disabled={lockingMonth !== null}
+                                    title={`Lock ${periodLabel} — every open row, all sites`}
+                                    style={{ ...quietBtn, border: "none", background: "#7c3aed", color: "#fff" }}>
+                                    {lockingMonth === "lock" ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}
+                                    {counts.locked + counts.paid > 0 ? `Lock remaining (${counts.draft})` : "Lock month"}
+                                </button>
+                            )}
+                            {counts.locked > 0 && canUnlock && (
+                                <button onClick={unlockMonth} disabled={lockingMonth !== null}
+                                    title={`Reopen ${periodLabel} for editing — every site at once (paid rows stay paid)`}
+                                    style={{ ...quietBtn, border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309" }}>
+                                    {lockingMonth === "unlock" ? <Loader2 size={15} className="animate-spin" /> : <Unlock size={15} />} Unlock month
+                                </button>
+                            )}
+                            {/* Shown, not hidden, for roles without the switch — a
+                                missing button read as "unlock is broken". */}
+                            {counts.locked > 0 && !canUnlock && (
+                                <button disabled title={`Your role can't reopen a locked month. Ask an Admin, or give your role "Unlock a locked month" in Roles & Permissions.`}
+                                    style={{ ...quietBtn, cursor: "not-allowed", opacity: 0.55 }}>
+                                    <Unlock size={15} /> Unlock month
+                                </button>
+                            )}
+                            {counts.draft > 0 && !canLock && (
+                                <button disabled title={`Your role can't lock payroll. Ask an Admin, or give your role "Lock payroll month" in Roles & Permissions.`}
+                                    style={{ ...quietBtn, cursor: "not-allowed", opacity: 0.55 }}>
+                                    <Lock size={15} /> Lock month
+                                </button>
+                            )}
+                        </>
                     )}
                     {/* Month switch. Only created months are offered: the picker
                         and the next arrow stop at the newest one. Until the months
@@ -437,6 +460,7 @@ export default function PayrollPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                         <TrendingUp size={15} style={{ color: "var(--accent)" }} />
                         <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{periodLabel}</span>
+                        {periodPicked && sitesKey === monthKey(period) && counts.rows > 0 && <LockChip counts={counts} lockedAt={thisRun?.lockedAt ?? null} />}
                         <span style={{ fontSize: 12, color: "var(--text3)" }}>
                             {!periodPicked ? "" : counts.rows > 0 ? `· ${counts.rows} employees · ${sites.length} sites · net ${fmt(counts.net)}`
                                 : thisRun?.onRolls != null ? `· created · ${thisRun.onRolls} employees on the rolls · upload attendance to start`
@@ -671,4 +695,21 @@ export default function PayrollPage() {
             </div>
         </div>
     )
+}
+
+// Where the month stands on locking, for everyone who can see payroll (the
+// buttons are only for roles that may lock / unlock).
+function LockChip({ counts, lockedAt }: { counts: { rows: number; draft: number; locked: number; paid: number }; lockedAt: string | null }) {
+    const base: React.CSSProperties = { fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }
+    const when = lockedAt ? new Date(lockedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null
+    if (counts.draft === counts.rows) {
+        return <span title="Days and amounts can still be edited and re-processed" style={{ ...base, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a" }}><Unlock size={11} /> Open · not locked</span>
+    }
+    if (counts.draft > 0) {
+        return <span title={`${counts.draft} row(s) can still be edited; ${counts.locked + counts.paid} are locked`} style={{ ...base, color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe" }}><Lock size={11} /> Partly locked · {counts.locked + counts.paid} of {counts.rows}</span>
+    }
+    if (counts.paid === counts.rows) {
+        return <span title="Every salary is locked and marked paid" style={{ ...base, color: "#15803d", background: "#dcfce7", border: "1px solid #bbf7d0" }}><CheckCircle2 size={11} /> Locked · paid</span>
+    }
+    return <span title="Amounts can't be edited or re-processed until the month is unlocked" style={{ ...base, color: "#15803d", background: "#dcfce7", border: "1px solid #bbf7d0" }}><Lock size={11} /> Locked{when ? ` · ${when}` : ""}</span>
 }
