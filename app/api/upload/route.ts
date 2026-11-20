@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { v4 as uuidv4 } from "uuid"
 import { supabaseAdmin, PHOTO_BUCKET } from "@/lib/supabase"
 import prisma from "@/lib/prisma"
+import { uploadSecure, SENSITIVE_KINDS } from "@/lib/secure-files"
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
@@ -63,6 +64,17 @@ export async function POST(req: Request) {
             process.env.NEXT_PUBLIC_SUPABASE_URL &&
             process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://xxxxx.supabase.co" &&
             process.env.SUPABASE_SERVICE_ROLE_KEY
+
+        // Documents, receipts, evidence and attachments ("kind" form field) go
+        // to the private bucket; the response carries a short-lived signed
+        // link for preview, which is stored as an sb:// reference on save
+        // (lib/secure-files). Photos stay in the public bucket.
+        const kind = String(formData.get("kind") ?? "")
+        if (supabaseConfigured && SENSITIVE_KINDS.has(kind)) {
+            const secure = await uploadSecure(`${kind}/${filename}`, buffer, mimeType)
+            if (secure) return NextResponse.json({ url: secure.url, private: true })
+            // Private bucket not set up yet: fall through to the old public upload.
+        }
 
         if (supabaseConfigured) {
             const { data, error } = await supabaseAdmin.storage

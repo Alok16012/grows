@@ -404,6 +404,7 @@ export function UploadField({ value, onChange, label = "Attachment" }: {
         try {
             const fd = new FormData()
             fd.append("file", file)
+            fd.append("kind", "attachment") // private storage (lib/secure-files)
             const res = await fetch("/api/upload", { method: "POST", body: fd })
             const data = await res.json().catch(() => ({}))
             if (res.ok && data.url) { onChange(data.url); toast.success("File attached") }

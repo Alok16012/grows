@@ -34,6 +34,12 @@ const nextConfig = {
                 hostname: "xpopbdukjhgorfzhmuzd.supabase.co",
                 pathname: "/storage/v1/object/public/**",
             },
+            {
+                // Short-lived links to private files (lib/secure-files).
+                protocol: "https",
+                hostname: "xpopbdukjhgorfzhmuzd.supabase.co",
+                pathname: "/storage/v1/object/sign/**",
+            },
         ],
     },
     async headers() {

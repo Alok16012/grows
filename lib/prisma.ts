@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client"
 import { schemaSelfHealEnabled } from "@/lib/schema-selfheal"
 import { signedPhotoUrl } from "@/lib/photo-url"
+import { normalizeRefs, signRefs } from "@/lib/secure-files"
+
+// Prisma operations that write data; their args get signed private-file
+// links turned back into sb:// references before they're stored.
+const WRITE_OPS = new Set(["create", "createMany", "createManyAndReturn", "update", "updateMany", "upsert"])
 
 // Prisma reads DATABASE_URL automatically from prisma/schema.prisma's env()
 // declaration. Don't pass `datasources` explicitly here — doing so forces
@@ -35,6 +40,23 @@ const makePrismaClient = () =>
                         if (data.photo.startsWith("data:")) return signedPhotoUrl(data.id)
                         return data.photo
                     },
+                },
+            },
+        },
+    }).$extends({
+        /**
+         * Private files (lib/secure-files): reads sign every sb:// reference
+         * in the result, nested includes too; writes store references, never
+         * expiring signed links. One place, so every route, PDF and the
+         * mobile app get working, short-lived links.
+         */
+        query: {
+            $allModels: {
+                // Typed loosely: the generic union over every model is too big
+                // for TypeScript, and this layer doesn't change any shapes.
+                async $allOperations({ operation, args, query }: { operation: string; args: any; query: (a: any) => Promise<any> }) {
+                    const result = await query(WRITE_OPS.has(operation) && args ? normalizeRefs(args) : args)
+                    return signRefs(result)
                 },
             },
         },

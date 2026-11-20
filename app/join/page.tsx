@@ -339,6 +339,7 @@ export default function JoinPage() {
             // 1. Upload file to get URL
             const fd = new FormData()
             fd.append("file", doc.file)
+            fd.append("kind", "document") // private storage (lib/secure-files)
             const upRes = await fetch("/api/upload", {
                 method: "POST",
                 headers: { "x-onboarding-token": token },

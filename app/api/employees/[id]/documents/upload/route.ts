@@ -1,3 +1,4 @@
+import { uploadSecure } from "@/lib/secure-files"
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -58,6 +59,12 @@ export async function POST(
 
         const bytes = await file.arrayBuffer()
         const buffer = Buffer.from(bytes)
+
+        // KYC files go to the private bucket (lib/secure-files). The signed
+        // link is turned into an sb:// reference when the document is saved.
+        const secure = await uploadSecure(path, buffer, file.type || "application/octet-stream")
+        if (secure) return NextResponse.json({ url: secure.url, fileName: file.name, private: true })
+        // Private bucket not set up yet: old behaviour below.
 
         const { error } = await getSupabase().storage
             .from("documents")

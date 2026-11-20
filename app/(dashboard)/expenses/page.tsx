@@ -348,6 +348,7 @@ function CategoryLine({
         try {
             const fd = new FormData()
             fd.append("file", file)
+            fd.append("kind", "receipt") // private storage (lib/secure-files)
             const res = await fetch("/api/upload", { method: "POST", body: fd })
             const data = await res.json()
             if (data.url) onPatch({ receiptUrl: data.url })

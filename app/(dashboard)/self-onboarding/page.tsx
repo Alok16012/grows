@@ -228,6 +228,7 @@ export default function SelfOnboardingPage() {
         try {
             const fd = new FormData()
             fd.append("file", file)
+            fd.append("kind", "document") // private storage (lib/secure-files)
             const uploadRes = await fetch("/api/upload", { method: "POST", body: fd })
             if (!uploadRes.ok) throw new Error(await uploadRes.text())
             const { url } = await uploadRes.json()

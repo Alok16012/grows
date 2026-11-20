@@ -243,6 +243,7 @@ export default function OnboardingPortal() {
         try {
             const fd = new FormData()
             fd.append("file", file)
+            fd.append("kind", "document") // private storage (lib/secure-files)
             const res = await fetch("/api/upload", { method: "POST", headers: { "x-onboarding-token": token }, body: fd })
             if (!res.ok) throw new Error(await res.text())
             const data = await res.json()

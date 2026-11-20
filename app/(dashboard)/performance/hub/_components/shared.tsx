@@ -453,6 +453,7 @@ export function UploadButton({ onUploaded, label = "Upload file" }: { onUploaded
         try {
             const fd = new FormData()
             fd.append("file", file)
+            fd.append("kind", "evidence") // private storage (lib/secure-files)
             const res = await fetch("/api/upload", { method: "POST", body: fd })
             const data = await res.json().catch(() => ({}))
             if (res.ok && data.url) { onUploaded(data.url); toast.success("File attached") }
