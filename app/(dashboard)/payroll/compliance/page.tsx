@@ -219,6 +219,11 @@ function ComplianceInner() {
                         style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", fontSize: 12, fontWeight: 700, color: "var(--text2)", cursor: "pointer" }}>
                         <TableProperties size={13} /> Document Master
                     </button>
+                    <button
+                        onClick={() => router.push("/payroll/compliance/statutory")}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--accent)", background: "var(--accent-light)", fontSize: 12, fontWeight: 700, color: "var(--accent-text)", cursor: "pointer" }}>
+                        <ShieldCheck size={13} /> Statutory Applicability
+                    </button>
                 </div>
             </div>
 
