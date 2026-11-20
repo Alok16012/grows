@@ -177,7 +177,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 // Assignments are a step of that flow, so the separate link only
                 // shows for people who don't get the flow (no projects.manage).
                 { name: "Projects & Sites", href: "/sites", permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/field", "/assignments"] },
-                { name: "Inspection Assignments", href: "/assignments", permission: "assignments.view", hideIfHas: "projects.manage" },
+                { name: "Inspection Assignments", href: "/assignments", permission: "assignments.view", hideIfHas: "projects.view" },
                 // Reviewing submitted inspections is operations work.
                 { name: "Approvals Inbox", href: "/approvals", permission: "approvals.view", badge: "approvals" },
                 // /reports is the inspection report builder (site, project,

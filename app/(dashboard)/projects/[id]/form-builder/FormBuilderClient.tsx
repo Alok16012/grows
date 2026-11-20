@@ -457,7 +457,10 @@ export default function FormBuilderClient({
 
     const renderSection = (category: string, title: string) => {
         const isDefect = category === "DEFECT"
-        const allSectionFields = fields.filter(f => f.category === category)
+        // Fixed fields in the order the inspector sees them (… Inspected, Rework, Rejected).
+        const allSectionFields = category === "FIXED"
+            ? orderBasicFields(fields.filter(f => f.category === category))
+            : fields.filter(f => f.category === category)
         const hiddenDefects = isDefect ? allSectionFields.filter(f => f.isHidden) : []
         const sectionFields = isDefect && !showHiddenDefects ? allSectionFields.filter(f => !f.isHidden) : allSectionFields
 

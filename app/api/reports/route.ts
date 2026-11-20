@@ -326,7 +326,8 @@ export async function GET(req: Request) {
                 }
             })
 
-        const shiftWise = mapToArray(shiftMap, (a, b) => b.totalInspected - a.totalInspected)
+        // Shifts read A → Z (A, B, C, G…) on the chart and in the table — client request.
+        const shiftWise = mapToArray(shiftMap, (a, b) => String(a.shiftName ?? "").localeCompare(String(b.shiftName ?? ""), "en", { numeric: true, sensitivity: "base" }))
 
         return NextResponse.json({
             summary,
