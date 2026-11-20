@@ -10,6 +10,28 @@ import { PinInput } from "@/components/auth/PinInput"
 type Method = "mpin" | "otp" | "password"
 
 const LAST_ID_KEY = "growus.lastLoginId"
+// What the last person on this device has set up, so the right tab shows
+// first on the very first paint: { id, mpin, password }. Never a secret.
+const METHODS_KEY = "growus.lastLoginMethods"
+
+type SetUp = { mpin: boolean; password: boolean }
+
+/**
+ * Tab order. Nothing set up yet → OTP first (it's the only way in).
+ * MPIN or password set → MPIN, then Password, then OTP last.
+ */
+function orderFor(setUp: SetUp | null, otpEnabled: boolean): Method[] {
+    const usesOwn = !!setUp && (setUp.mpin || setUp.password)
+    const order: Method[] = usesOwn ? ["mpin", "password", "otp"] : ["otp", "mpin", "password"]
+    return order.filter(m => m !== "otp" || otpEnabled)
+}
+
+/** The tab to open on: the first method this person can actually use. */
+function defaultFor(setUp: SetUp | null, otpEnabled: boolean): Method {
+    if (setUp?.mpin) return "mpin"
+    if (setUp?.password) return "password"
+    return otpEnabled ? "otp" : "mpin"
+}
 
 // Only same-site paths may be used as the post-login destination.
 function safeCallback(raw: string | null): string {
@@ -78,8 +100,39 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
         try {
             const last = localStorage.getItem(LAST_ID_KEY)
             if (last) setLoginId(last)
+            const saved = JSON.parse(localStorage.getItem(METHODS_KEY) || "null")
+            if (last && saved && saved.id === last) {
+                const s = { mpin: !!saved.mpin, password: !!saved.password }
+                setSetUp(s)
+                setMethod(defaultFor(s, otpEnabled))
+            }
         } catch { /* private mode */ }
-    }, [])
+    }, [otpEnabled])
+
+    // What this person has set up, looked up shortly after they stop typing,
+    // so the tab order follows them (see orderFor). Only moves the selected
+    // tab if they haven't picked one themselves.
+    const [setUp, setSetUp] = useState<SetUp | null>(null)
+    const pickedByHand = useRef(false)
+    useEffect(() => {
+        const id = loginId.trim()
+        if (id.length < 3) { setSetUp(null); return }
+        let live = true
+        const t = setTimeout(async () => {
+            try {
+                const res = await fetch("/api/login/methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: id }) })
+                const d = await res.json().catch(() => null)
+                if (!live || !d) return
+                const s = { mpin: !!d.mpin, password: !!d.password }
+                setSetUp(s)
+                if (!pickedByHand.current) {
+                    setMethod(defaultFor(s, otpEnabled))
+                    setSecret("")
+                }
+            } catch { /* keep the current order */ }
+        }, 400)
+        return () => { live = false; clearTimeout(t) }
+    }, [loginId, otpEnabled])
 
     // Auto-recover from stale JS chunks after a deploy
     useEffect(() => {
@@ -98,7 +151,8 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
         return () => clearTimeout(t)
     }, [resendIn])
 
-    const switchMethod = (m: Method) => {
+    const switchMethod = (m: Method, byHand = false) => {
+        if (byHand) pickedByHand.current = true
         setMethod(m)
         setSecret("")
         setError("")
@@ -120,7 +174,12 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
             const loginEmail = /^\d+$/.test(id) ? `${id}@cims.local` : id
             const result = await signIn("credentials", { redirect: false, email: loginEmail, password: code, method })
             if (result?.ok && !result.error) {
-                try { localStorage.setItem(LAST_ID_KEY, id) } catch { /* ignore */ }
+                try {
+                    localStorage.setItem(LAST_ID_KEY, id)
+                    // Signing in with an MPIN or password proves it's set up.
+                    const s = { mpin: (setUp?.mpin ?? false) || method === "mpin", password: (setUp?.password ?? false) || method === "password" }
+                    localStorage.setItem(METHODS_KEY, JSON.stringify({ id, ...s }))
+                } catch { /* ignore */ }
                 setSignedIn(true)
                 goToApp()
                 return
@@ -142,7 +201,7 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
         } finally {
             setLoading(false)
         }
-    }, [loginId, secret, method, goToApp, mpinLength, otpEnabled])
+    }, [loginId, secret, method, goToApp, mpinLength, otpEnabled, setUp])
 
     const sendOtp = async () => {
         const id = loginId.trim()
@@ -164,11 +223,12 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
         }
     }
 
-    const tabs: { key: Method; label: string; icon: typeof KeyRound }[] = [
-        ...(otpEnabled ? [{ key: "otp" as const, label: "OTP", icon: MessageSquareText }] : []),
-        { key: "mpin", label: "MPIN", icon: KeyRound },
-        { key: "password", label: "Password", icon: Smartphone },
-    ]
+    const TAB_INFO: Record<Method, { label: string; icon: typeof KeyRound }> = {
+        otp: { label: "OTP", icon: MessageSquareText },
+        mpin: { label: "MPIN", icon: KeyRound },
+        password: { label: "Password", icon: Smartphone },
+    }
+    const tabs = orderFor(setUp, otpEnabled).map(key => ({ key, ...TAB_INFO[key] }))
 
     return (
         <AuthShell
@@ -188,7 +248,7 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
                     spellCheck={false}
                     placeholder="9876543210 or EMP001"
                     value={loginId}
-                    onChange={e => { setLoginId(e.target.value); setOtpSentTo(null) }}
+                    onChange={e => { setLoginId(e.target.value); setOtpSentTo(null); pickedByHand.current = false }}
                     className="w-full h-12 px-4 rounded-[14px] border-2 border-[var(--border)] bg-[var(--surface2)] text-[15px] text-[var(--text)] placeholder:text-[var(--text3)] outline-none transition-all focus:bg-white focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(11,92,255,0.12)]"
                 />
 
@@ -200,7 +260,7 @@ export default function LoginForm({ otpEnabled, mpinLength }: { otpEnabled: bool
                             type="button"
                             role="tab"
                             aria-selected={method === t.key}
-                            onClick={() => switchMethod(t.key)}
+                            onClick={() => switchMethod(t.key, true)}
                             className={`h-10 rounded-[11px] text-[13.5px] font-semibold flex items-center justify-center gap-1.5 transition-all ${method === t.key ? "bg-white text-[var(--accent)] shadow-[0_2px_8px_rgba(15,23,41,0.08)]" : "text-[var(--text2)] hover:text-[var(--text)]"}`}
                         >
                             <t.icon size={15} /> {t.label}
