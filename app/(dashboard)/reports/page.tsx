@@ -163,7 +163,7 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
                     </div>
                     {active && (
                         <>
-                            <QuantityColumnsLive rows={active.buckets} nameKey="value" max={INSPECTOR_CHART_MAX} what="values" height={340} />
+                            <QuantityColumnsLive rows={active.buckets} nameKey="value" max={INSPECTOR_CHART_MAX} what="values" height={340} xLabel={active.label} />
                             <p className="text-[11px] text-[var(--text3)] mt-[6px]">{active.answered} inspections answered “{active.label}”</p>
                         </>
                     )}
@@ -202,6 +202,13 @@ const SCREEN_TICK = { fontSize: 11, fill: "#5b6478", fontWeight: 500 } as const
 /** A scale's name, written along it in the axis style (bold). */
 const axisTitle = (value: string, side: "left" | "right", t: { fontSize: number; fill: string }) => ({
     value, angle: side === "left" ? -90 : 90, position: side === "left" ? "insideLeft" : "insideRight",
+    style: { textAnchor: "middle", fontSize: t.fontSize, fill: t.fill, fontWeight: 700 },
+}) as const
+/** Client request (Nov 2026): every chart shows its axes and X / Y titles. */
+const AXIS_LINE = { stroke: "#94a3b8" }
+const X_TITLE_H = 20
+const xAxisTitle = (value: string, t: { fontSize: number; fill: string }) => ({
+    value, position: "insideBottom", offset: 0,
     style: { textAnchor: "middle", fontSize: t.fontSize, fill: t.fill, fontWeight: 700 },
 }) as const
 const ratePct = (part: unknown, total: unknown): string => {
@@ -573,7 +580,7 @@ const SERIES: Record<string, [name: string, color: string]> = {
     totalRejected: ["Total Rejected", THEME.danger],
 }
 const EXPORT_W = 700
-const EXPORT_YAXIS = 60
+const EXPORT_YAXIS = 74
 /**
  * Export chart (PDF and Excel): one group of upright bars per item — Total
  * Inspected (green), Total Rework (orange), Total Rejected (red), or the given
@@ -581,7 +588,7 @@ const EXPORT_YAXIS = 60
  * Every name is written in full under its column; the picture grows taller to
  * make room for long ones, so the bars keep `plotHeight`.
  */
-function ExportColumns({ rows, nameKey, keys = QTY, plotHeight = 230 }: { rows: any[]; nameKey: string; keys?: readonly string[]; plotHeight?: number }) {
+function ExportColumns({ rows, nameKey, keys = QTY, plotHeight = 230, xLabel, yLabel = "Quantity" }: { rows: any[]; nameKey: string; keys?: readonly string[]; plotHeight?: number; xLabel: string; yLabel?: string }) {
     const right = 10
     const { layout, left } = fitNames(rows.map(r => String(r?.[nameKey] ?? "")), EXPORT_W - right - EXPORT_YAXIS, EXPORT_YAXIS, 8, PDF_TICK, 150)
     const plotW = EXPORT_W - left - right - EXPORT_YAXIS
@@ -589,10 +596,10 @@ function ExportColumns({ rows, nameKey, keys = QTY, plotHeight = 230 }: { rows: 
     const upright = barSize < 34
     const top = 14
     return (
-        <BarChart width={EXPORT_W} height={top + plotHeight + layout.height + 4} data={rows} margin={{ top, left, right, bottom: 4 }} barGap={2}>
+        <BarChart width={EXPORT_W} height={top + plotHeight + layout.height + X_TITLE_H + 4} data={rows} margin={{ top, left, right, bottom: 4 }} barGap={2}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} height={layout.height} tick={<NameTick layout={layout} />} />
-            <YAxis width={EXPORT_YAXIS} axisLine={false} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(rows, ...keys), upright)} />
+            <XAxis dataKey={nameKey} axisLine={AXIS_LINE} tickLine={false} interval={0} height={layout.height + X_TITLE_H} tick={<NameTick layout={layout} />} label={xAxisTitle(xLabel, PDF_TICK)} />
+            <YAxis width={EXPORT_YAXIS} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(rows, ...keys), upright)} label={axisTitle(yLabel, "left", PDF_TICK)} />
             {keys.map(k => (
                 <Bar key={k} dataKey={k} name={SERIES[k][0]} fill={SERIES[k][1]} radius={[4, 4, 0, 0]} barSize={barSize} isAnimationActive={false}>
                     <LabelList dataKey={k} content={<BarValue upright={upright} />} />
@@ -608,22 +615,22 @@ const QuantityColumns = ExportColumns
  * rework, rejected — with a tooltip and a legend. Shows the first `max` rows (the lists
  * arrive busiest-first) and says so when it leaves some out.
  */
-function QuantityColumnsLive({ rows, nameKey, max, what, height = 380 }: { rows: any[]; nameKey: string; max: number; what: string; height?: number }) {
+function QuantityColumnsLive({ rows, nameKey, max, what, height = 380, xLabel }: { rows: any[]; nameKey: string; max: number; what: string; height?: number; xLabel: string }) {
     const shown = rows.slice(0, max)
     const upright = shown.length > 3
     const [boxRef, boxW] = useElementWidth()
     const nameList = shown.map(r => String(r?.[nameKey] ?? "")).join("\n")
-    const { layout, left } = useMemo(() => fitNames(nameList.split("\n"), (boxW || 900) - 10 - 60, 60, 8, SCREEN_TICK, 140), [nameList, boxW])
+    const { layout, left } = useMemo(() => fitNames(nameList.split("\n"), (boxW || 900) - 10 - 74, 74, 8, SCREEN_TICK, 140), [nameList, boxW])
     // `height` was the whole chart; the bars keep that less the room names and key used to take.
     const plotHeight = height - 130
     return (
         <>
-            <div ref={boxRef} style={{ height: 6 + 32 + plotHeight + layout.height + 4 }} className="w-full">
+            <div ref={boxRef} style={{ height: 6 + 32 + plotHeight + layout.height + X_TITLE_H + 4 }} className="w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={shown} margin={{ top: 6, left, right: 10, bottom: 4 }} barGap={2}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey={nameKey} axisLine={false} tickLine={false} interval={0} height={layout.height} tick={<NameTick layout={layout} />} />
-                        <YAxis width={60} axisLine={false} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(shown, ...QTY), upright)} />
+                        <XAxis dataKey={nameKey} axisLine={AXIS_LINE} tickLine={false} interval={0} height={layout.height + X_TITLE_H} tick={<NameTick layout={layout} />} label={xAxisTitle(xLabel, SCREEN_TICK)} />
+                        <YAxis width={74} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(shown, ...QTY), upright)} label={axisTitle("Quantity", "left", SCREEN_TICK)} />
                         <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
                         <Legend verticalAlign="top" align="right" iconType="square" itemSorter={null} wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: 10 }} />
                         <Bar dataKey="totalInspected" name="Total Inspected" fill={THEME.success} radius={[4, 4, 0, 0]} maxBarSize={40}>
@@ -1623,7 +1630,7 @@ export default function ReportsPage() {
                                         <p className="text-[11px] font-[500] text-[var(--text3)] mt-[2px]">Daily inspection volume over selected month</p>
                                     </div>
                                     {areaData.length > 0 ? (
-                                        <div className="h-[320px] w-full">
+                                        <div className="h-[340px] w-full">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <AreaChart data={areaData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                                                     <defs>
@@ -1631,8 +1638,8 @@ export default function ReportsPage() {
                                                         <linearGradient id="colorInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                                     </defs>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={SCREEN_TICK} dy={10} padding={{ left: 12, right: 6 }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} />
+                                                    <XAxis dataKey="label" axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} dy={10} padding={{ left: 12, right: 6 }} height={30 + X_TITLE_H} label={xAxisTitle("Date", SCREEN_TICK)} />
+                                                    <YAxis width={74} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} label={axisTitle("Quantity", "left", SCREEN_TICK)} />
                                                     <Tooltip content={<CustomTooltip />} />
                                                     <Legend verticalAlign="top" iconType="square" itemSorter={null} wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: 10 }} />
                                                     <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#colorInspected)">
@@ -1695,7 +1702,7 @@ export default function ReportsPage() {
                                 <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
                                     <h3 className="text-[14px] font-[600] text-[var(--text)] mb-[12px]">Part Wise Comparison</h3>
                                     {data.partWise.length > 0
-                                        ? <QuantityColumnsLive rows={data.partWise} nameKey="partName" max={PART_CHART_MAX} what="parts" height={360} />
+                                        ? <QuantityColumnsLive rows={data.partWise} nameKey="partName" max={PART_CHART_MAX} what="parts" height={360} xLabel="Part" />
                                         : <div className="h-[360px] flex items-center justify-center text-[13px] text-[var(--text3)]">No parts data</div>}
                                 </div>
                                 <BreakdownCard dimensions={(data as any).dimensions ?? []} />
@@ -1709,7 +1716,7 @@ export default function ReportsPage() {
                                         <span className="text-[11px] font-[500] text-[var(--text3)]">{data.inspectorWise?.length ?? 0} inspectors</span>
                                     </div>
                                     {(data.inspectorWise?.length ?? 0) > 0
-                                        ? <QuantityColumnsLive rows={data.inspectorWise} nameKey="inspectorName" max={INSPECTOR_CHART_MAX} what="inspectors" height={380} />
+                                        ? <QuantityColumnsLive rows={data.inspectorWise} nameKey="inspectorName" max={INSPECTOR_CHART_MAX} what="inspectors" height={380} xLabel="Inspector" />
                                         : <div className="h-[240px] flex items-center justify-center text-[13px] text-[var(--text3)]">No inspector data</div>}
                                 </div>
                             </div>
@@ -1727,13 +1734,13 @@ export default function ReportsPage() {
                                     </Badge>
                                 </div>
                                 {paretoData.length > 0 ? (
-                                    <div ref={paretoBoxRef} className="w-full" style={{ height: 26 + 300 + paretoAxis.layout.height + 4 + 34 }}>
+                                    <div ref={paretoBoxRef} className="w-full" style={{ height: 26 + 300 + paretoAxis.layout.height + X_TITLE_H + 4 + 34 }}>
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart data={paretoData} margin={{ top: 26, right: 8, left: paretoAxis.left, bottom: 4 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                <XAxis dataKey="defectName" axisLine={false} tickLine={false} interval={0} height={paretoAxis.layout.height} tick={<NameTick layout={paretoAxis.layout} />} />
-                                                <YAxis yAxisId="left" width={64} axisLine={false} tickLine={false} tick={SCREEN_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", SCREEN_TICK)} />
-                                                <YAxis yAxisId="right" width={78} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={false} tickLine={false} tick={SCREEN_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", SCREEN_TICK)} />
+                                                <XAxis dataKey="defectName" axisLine={AXIS_LINE} tickLine={false} interval={0} height={paretoAxis.layout.height + X_TITLE_H} tick={<NameTick layout={paretoAxis.layout} />} label={xAxisTitle("Defect", SCREEN_TICK)} />
+                                                <YAxis yAxisId="left" width={64} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", SCREEN_TICK)} />
+                                                <YAxis yAxisId="right" width={78} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", SCREEN_TICK)} />
                                                 <Tooltip content={<CustomTooltip />} />
                                                 <Legend itemSorter={null} wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingTop: 8 }} />
                                                 <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} maxBarSize={50} />
@@ -2073,15 +2080,15 @@ export default function ReportsPage() {
                     </div>
                     {/* Daily trend: inspected quantity labelled at each day; the rework / rejected
                         values, too small to read on this scale, are labelled in the day-wise chart below */}
-                    <div ref={trendRef} style={{ width: 700, height: 232, backgroundColor: 'white' }}>
-                        <AreaChart width={700} height={232} data={areaData} margin={{ top: 10, right: 16, left: 14, bottom: 4 }}>
+                    <div ref={trendRef} style={{ width: 700, height: 254, backgroundColor: 'white' }}>
+                        <AreaChart width={700} height={254} data={areaData} margin={{ top: 10, right: 16, left: 14, bottom: 4 }}>
                             <defs>
                                 <linearGradient id="capAccepted" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                 <linearGradient id="capInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.18} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={PDF_TICK} dy={6} padding={{ left: 14, right: 6 }} />
-                            <YAxis axisLine={false} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} />
+                            <XAxis dataKey="label" axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} dy={6} padding={{ left: 14, right: 6 }} height={30 + X_TITLE_H} label={xAxisTitle("Date", PDF_TICK)} />
+                            <YAxis width={74} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} label={axisTitle("Quantity", "left", PDF_TICK)} />
                             <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#capInspected)" dot={{ r: 2.5, fill: THEME.success, stroke: 'white', strokeWidth: 1 }} isAnimationActive={false}>
                                 <LabelList dataKey="totalInspected" content={<PointValue count={areaData.length} />} />
                             </Area>
@@ -2091,38 +2098,38 @@ export default function ReportsPage() {
                     </div>
                     {/* Part-wise chart (PDF capture): upright bars, like the shift chart */}
                     <div ref={partWiseBarRef} style={{ width: 700, backgroundColor: 'white' }}>
-                        <QuantityColumns rows={(data.partWise ?? []).slice(0, PART_CHART_MAX)} nameKey="partName" />
+                        <QuantityColumns rows={(data.partWise ?? []).slice(0, PART_CHART_MAX)} nameKey="partName" xLabel="Part" />
                     </div>
                     {/* Location-wise chart: every location named, every bar labelled */}
-                    <div ref={locationBarRef} style={{ width: 700, height: 270, backgroundColor: 'white' }}>
-                        <ExportColumns rows={data.locationWise ?? []} nameKey="location" keys={["totalInspected"]} plotHeight={200} />
+                    <div ref={locationBarRef} style={{ width: 700, backgroundColor: 'white' }}>
+                        <ExportColumns rows={data.locationWise ?? []} nameKey="location" keys={["totalInspected"]} plotHeight={200} xLabel="Location" />
                     </div>
                     {/* Inspector-wise chart (PDF capture): upright bars, like the shift chart */}
                     <div ref={inspectorBarRef} style={{ width: 700 }} className="bg-white">
-                        <QuantityColumns rows={(data.inspectorWise ?? []).slice(0, INSPECTOR_CHART_MAX)} nameKey="inspectorName" />
+                        <QuantityColumns rows={(data.inspectorWise ?? []).slice(0, INSPECTOR_CHART_MAX)} nameKey="inspectorName" xLabel="Inspector" />
                     </div>
                     {/* Shift-wise chart (PDF / Excel capture) */}
-                    <div ref={shiftBarRef} style={{ width: 700, height: 300 }} className="bg-white">
-                        <QuantityColumns rows={(data as any).shiftWise ?? []} nameKey="shiftName" plotHeight={220} />
+                    <div ref={shiftBarRef} style={{ width: 700 }} className="bg-white">
+                        <QuantityColumns rows={(data as any).shiftWise ?? []} nameKey="shiftName" plotHeight={220} xLabel="Shift" />
                     </div>
                     {/* Week-wise chart (Excel dashboard) */}
-                    <div ref={weekRef} style={{ width: 700, height: 300 }} className="bg-white">
-                        <QuantityColumns rows={weekData} nameKey="week" plotHeight={220} />
+                    <div ref={weekRef} style={{ width: 700 }} className="bg-white">
+                        <QuantityColumns rows={weekData} nameKey="week" plotHeight={220} xLabel="Week" />
                     </div>
                     {/* Day-wise rework / rejection quantity (Excel dashboard) */}
-                    <div ref={dayDefectsRef} style={{ width: 700, height: 255 }} className="bg-white">
-                        <ExportColumns rows={areaData} nameKey="label" keys={["totalRework", "totalRejected"]} plotHeight={190} />
+                    <div ref={dayDefectsRef} style={{ width: 700 }} className="bg-white">
+                        <ExportColumns rows={areaData} nameKey="label" keys={["totalRework", "totalRejected"]} plotHeight={190} xLabel="Date" />
                     </div>
                     {/* Pareto: quantity on every bar, cumulative % on every point of the line */}
-                    <div ref={paretoRef} style={{ width: 700, height: 310, backgroundColor: 'white' }}>
+                    <div ref={paretoRef} style={{ width: 700, backgroundColor: 'white' }}>
                         {(() => {
                             const ax = fitNames(paretoData.map((d: any) => String(d.defectName ?? "")), EXPORT_W - 4 - 70 - 86, 70, 26, PDF_TICK, 150)
                             return (
-                        <ComposedChart width={EXPORT_W} height={26 + 210 + ax.layout.height + 4} data={paretoData} margin={{ top: 26, right: 4, left: ax.left, bottom: 4 }}>
+                        <ComposedChart width={EXPORT_W} height={26 + 210 + ax.layout.height + X_TITLE_H + 4} data={paretoData} margin={{ top: 26, right: 4, left: ax.left, bottom: 4 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="defectName" axisLine={false} tickLine={false} interval={0} height={ax.layout.height} tick={<NameTick layout={ax.layout} />} />
-                            <YAxis yAxisId="left" width={70} axisLine={false} tickLine={false} tick={PDF_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", PDF_TICK)} />
-                            <YAxis yAxisId="right" width={86} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={false} tickLine={false} tick={PDF_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", PDF_TICK)} />
+                            <XAxis dataKey="defectName" axisLine={AXIS_LINE} tickLine={false} interval={0} height={ax.layout.height + X_TITLE_H} tick={<NameTick layout={ax.layout} />} label={xAxisTitle("Defect", PDF_TICK)} />
+                            <YAxis yAxisId="left" width={70} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", PDF_TICK)} />
+                            <YAxis yAxisId="right" width={86} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", PDF_TICK)} />
                             <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} maxBarSize={40} isAnimationActive={false} />
                             <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} maxBarSize={40} isAnimationActive={false} />
                             <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" maxBarSize={40} isAnimationActive={false} />

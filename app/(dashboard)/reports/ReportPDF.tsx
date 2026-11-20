@@ -18,13 +18,15 @@ function pct(part: number, total: number): string {
 const styles = StyleSheet.create({
     page: { fontFamily: "Helvetica", padding: 36, fontSize: 10.5, backgroundColor: "#ffffff" },
     header: { marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1.5, borderBottomColor: "#1a9e6e" },
-    headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-    headerLeft: { flex: 1 },
-    logoImg: { width: 80, height: 40, objectFit: "contain", marginLeft: 12 },
-    headerTitle: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#1a1a18", marginBottom: 3 },
-    headerProject: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#1a9e6e", marginBottom: 4 },
-    headerSub: { fontSize: 9.5, color: "#4b5563" },
-    headerMeta: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
+    // Logo left, company name centred (an equal empty box on the right keeps it truly centred).
+    headerTop: { flexDirection: "row", alignItems: "center" },
+    logoBox: { width: 80, height: 44, justifyContent: "center" },
+    logoImg: { width: 80, height: 44, objectFit: "contain", objectPositionX: 0 },
+    headerCentre: { flex: 1, alignItems: "center" },
+    headerTitle: { fontSize: 19, fontFamily: "Helvetica-Bold", color: "#1a1a18", letterSpacing: 0.6, textAlign: "center" },
+    headerProject: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#1a9e6e", marginTop: 3, textAlign: "center" },
+    headerSub: { fontSize: 9.5, color: "#4b5563", marginTop: 2, textAlign: "center" },
+    headerMeta: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginTop: 10 },
     metaItem: { marginRight: 18, marginBottom: 3 },
     metaLabel: { fontSize: 8, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 1 },
     metaValue: { fontSize: 10.5, fontFamily: "Helvetica-Bold", color: "#1a1a18" },
@@ -140,11 +142,15 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                 {/* Header with company name, project, period, logo */}
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
-                        <View style={styles.headerLeft}>
-                            <Text style={styles.headerTitle}>{companyName}</Text>
+                        <View style={styles.logoBox}>{logoUrl ? <Image src={logoUrl} style={styles.logoImg} /> : null}</View>
+                        <View style={styles.headerCentre}>
+                            <Text style={styles.headerTitle}>{COMPANY.reportName}</Text>
                             <Text style={styles.headerProject}>{project}</Text>
                             <Text style={styles.headerSub}>Quality Inspection Report</Text>
-                            <View style={styles.headerMeta}>
+                        </View>
+                        <View style={styles.logoBox} />
+                    </View>
+                    <View style={styles.headerMeta}>
                                 <View style={styles.metaItem}>
                                     <Text style={styles.metaLabel}>Period</Text>
                                     <Text style={styles.metaValue}>{period}</Text>
@@ -157,11 +163,6 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                                     <Text style={styles.metaLabel}>Generated</Text>
                                     <Text style={styles.metaValue}>{new Date().toLocaleDateString("en-IN")}</Text>
                                 </View>
-                            </View>
-                        </View>
-                        {logoUrl && (
-                            <Image src={logoUrl} style={styles.logoImg} />
-                        )}
                     </View>
                 </View>
 
@@ -423,7 +424,7 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                 )}
 
                 {/* Footer on every page */}
-                <Text style={styles.footer} fixed>Generated: {new Date().toLocaleDateString("en-IN")}  |  {companyName}  |  {COMPANY.name} Quality Report</Text>
+                <Text style={styles.footer} fixed>Generated: {new Date().toLocaleDateString("en-IN")}  |  {project}  |  {COMPANY.reportName} Quality Report</Text>
                 <Text style={styles.pageNum} fixed render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
             </Page>
         </Document>

@@ -13,6 +13,7 @@
 // No DOM access here: the page captures the charts and saves the result.
 
 import type { Workbook, Worksheet, Cell } from "exceljs"
+import { COMPANY } from "@/lib/company"
 import type { ReportSheetKey } from "./reportSheets"
 
 export type ReportExcelInput = {
@@ -26,7 +27,7 @@ export type ReportExcelInput = {
     chartImages?: Partial<Record<"pie" | "trend" | "partWise" | "location" | "inspector" | "shift" | "pareto" | "week" | "dayDefects", string | null>>
     /** The sheets to include, in any order (the workbook keeps its own order). Empty or missing = all seven. */
     sheets?: ReportSheetKey[]
-    /** The company logo as a PNG data URL, shown at the top right of every sheet as in the PDF. */
+    /** The company logo as a PNG data URL, shown at the top left of the letterhead as in the PDF. */
     logo?: string | null
 }
 
@@ -82,9 +83,9 @@ const logoIds = new WeakMap<Workbook, number>()
  * A sheet's heading. Returns the next free row.
  * - Normally: a navy title band, then one line saying what the report covers.
  * - With `letterhead` (the Dashboard only): the PDF's letterhead instead — the
- *   site name large, the project in green, the sheet's title, then a line with
- *   the inspector, period and date over a green rule, and the company logo at
- *   the top right.
+ *   company name centred, the project in green, the sheet's title, then a line
+ *   with the inspector, period and date over a green rule, and the company logo
+ *   at the top left.
  */
 function heading(ws: Worksheet, title: string, input: ReportExcelInput, span: number, letterhead = false): number {
     const on = (input.generatedOn ?? new Date()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
@@ -98,23 +99,23 @@ function heading(ws: Worksheet, title: string, input: ReportExcelInput, span: nu
         ws.getRow(1).height = 28
         ws.mergeCells(2, 1, 2, span)
         const m = ws.getCell(2, 1)
-        m.value = `Site: ${input.siteName}   |   Project: ${input.project}   |   Inspector: ${input.inspector}   |   Period: ${input.period}   |   Generated: ${on}`
+        m.value = `Project: ${input.project}   |   Inspector: ${input.inspector}   |   Period: ${input.period}   |   Generated: ${on}`
         m.font = { size: 10, color: { argb: K.muted } }
         m.alignment = { vertical: "middle", horizontal: "left", indent: 1 }
         ws.getRow(2).height = 20
         return 4
     }
-    // Text stops one column short of the end, which is kept for the logo.
-    const textSpan = Math.max(1, span - 1)
+    // Column A holds the logo; the text is centred across the rest.
+    const from = span > 2 ? 2 : 1
     const line = (row: number, value: string, font: Record<string, unknown>, height: number) => {
-        ws.mergeCells(row, 1, row, textSpan)
-        const c = ws.getCell(row, 1)
+        ws.mergeCells(row, from, row, span)
+        const c = ws.getCell(row, from)
         c.value = value
         c.font = font as any
-        c.alignment = { vertical: "middle", horizontal: "left", indent: 1 }
+        c.alignment = { vertical: "middle", horizontal: "center" }
         ws.getRow(row).height = height
     }
-    line(1, input.siteName, { bold: true, size: 18, color: { argb: K.brandText } }, 30)
+    line(1, COMPANY.reportName, { bold: true, size: 18, color: { argb: K.brandText } }, 30)
     line(2, input.project, { bold: true, size: 12, color: { argb: K.brandGreen } }, 19)
     line(3, title, { bold: true, size: 12, color: { argb: K.navy } }, 19)
     line(4, `Inspector: ${input.inspector}   |   Period: ${input.period}   |   Generated: ${on}`, { size: 10, color: { argb: K.muted } }, 18)
@@ -128,7 +129,7 @@ function heading(ws: Worksheet, title: string, input: ReportExcelInput, span: nu
         if (id === undefined) { id = wb.addImage({ base64: logo as string, extension: "png" }); logoIds.set(wb, id) }
         // 396 x 421 artwork, kept in proportion; the four letterhead rows are ~114 px tall.
         const h = 92, w = Math.round(h * pngShape(logo, 396 / 421))
-        ws.addImage(id, { tl: { col: span - 1, row: 0.12 } as any, ext: { width: w, height: h }, editAs: "absolute" } as any)
+        ws.addImage(id, { tl: { col: 0.1, row: 0.12 } as any, ext: { width: w, height: h }, editAs: "absolute" } as any)
     }
     return 6
 }

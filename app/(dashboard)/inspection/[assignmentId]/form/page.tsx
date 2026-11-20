@@ -1,6 +1,6 @@
 "use client"
 
-import { orderBasicFields } from "@/lib/form-field-order"
+import { orderBasicFields, basicFieldSlot, isRejectedQtyField } from "@/lib/form-field-order"
 import {
     OTHER_DEFECT_KEY, OTHER_DEFECT_ROW_MAX, OTHER_DEFECT_MAX_ROWS, type OtherDefectRow,
     isOtherDefectLabel, isOtherDefectNoteField, cleanRowText, otherDefectTextLength,
@@ -280,7 +280,12 @@ export default function InspectionFormPage() {
         const inspectedQty = getVal("INSPECTED QTY")
         const reworkQty = getVal("REWORK QTY")
 
-        const rejectedQty = Math.max(0, totalDefects - reworkQty)
+        // Typed by the inspector now. A form without the field keeps the old
+        // reading (defects beyond the rework count are rejected).
+        const rejectedField = templates.find(t => !t.isHidden && isRejectedQtyField(t))
+        const rejectedQty = rejectedField
+            ? (parseFloat(responses[rejectedField.id] || "0") || 0)
+            : Math.max(0, totalDefects - reworkQty)
 
         const acceptedQty = Math.max(0, inspectedQty - reworkQty - rejectedQty)
 
@@ -302,7 +307,6 @@ export default function InspectionFormPage() {
         }
 
         setIfChanged("TOTAL DEFECTS", totalDefects)
-        setIfChanged("REJECTED QTY", rejectedQty)
         setIfChanged("ACCEPTED QTY", acceptedQty)
         setIfChanged("REWORK %", reworkPct.toFixed(2))
         setIfChanged("REJECTED %", rejectedPct.toFixed(2))
@@ -364,9 +368,9 @@ export default function InspectionFormPage() {
     const visibleTemplates = templates.filter(t => !t.isHidden)
     // Fixed inspector order: Date, Shift, Location, Part Name, Part Number,
     // any other basic fields, then Inspected Qty and Rework Qty last.
-    const fixedFields = orderBasicFields(visibleTemplates.filter(t => t.category === "FIXED"))
+    const fixedFields = orderBasicFields(visibleTemplates.filter(t => t.category === "FIXED" || isRejectedQtyField(t)))
     const defectFields = visibleTemplates.filter(t => t.category === "DEFECT")
-    const autoFields = templates.filter(t => t.category === "AUTO")
+    const autoFields = templates.filter(t => t.category === "AUTO" && !isRejectedQtyField(t))
 
     // ── Step-wise wizard (payroll-style) ──────────────────────────────────────
     // Steps are built dynamically so empty sections (no defects / no auto fields)
@@ -390,7 +394,13 @@ export default function InspectionFormPage() {
     const qty = (id: string) => parseFloat(responses[id] || "0") || 0
     const reworkQty = reworkField ? qty(reworkField.id) : 0
     const defectTotal = defectFields.reduce((sum, t) => sum + qty(t.id), 0)
-    const defectShortfall = reworkField && defectFields.length > 0 ? Math.max(0, reworkQty - defectTotal) : 0
+    const rejectedInput = visibleTemplates.find(t => isRejectedQtyField(t))
+    const rejectedQtyIn = rejectedInput ? qty(rejectedInput.id) : 0
+    const inspectedInput = visibleTemplates.find(t => basicFieldSlot(t) === "INSPECTED")
+    const inspectedQtyIn = inspectedInput ? qty(inspectedInput.id) : 0
+    // Every rework and every rejected piece must be booked against a defect.
+    const badPieces = reworkQty + rejectedQtyIn
+    const defectShortfall = (reworkField || rejectedInput) && defectFields.length > 0 ? Math.max(0, badPieces - defectTotal) : 0
 
     // Pieces booked under OTHER need saying what the defects were
     // (lib/other-defect): "Other: 3" tells a reviewer nothing. One row per
@@ -454,6 +464,14 @@ export default function InspectionFormPage() {
             if (firstErrorId) {
                 const el = document.getElementById(`field-${firstErrorId}`)
                 el?.scrollIntoView({ behavior: "smooth", block: "center" })
+            }
+            return false
+        }
+        if (currentStepDef?.key === "basic" && inspectedInput && badPieces > inspectedQtyIn) {
+            const id = (rejectedInput ?? reworkField)?.id
+            if (id) {
+                setErrors(prev => ({ ...prev, [id]: `Rework + Rejected (${badPieces}) can't be more than Inspected Qty (${inspectedQtyIn})` }))
+                document.getElementById(`field-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
             }
             return false
         }
@@ -734,6 +752,12 @@ export default function InspectionFormPage() {
                             style={{ fontFamily: template.fieldType === "date" ? "Inter" : "inherit" }}
                         />
                     )}
+                    {(() => {
+                        const slot = basicFieldSlot(template)
+                        if (slot === "REWORK") return <p className="text-[11px] text-[var(--text3)] mt-1">Pieces with a defect that can be repaired and passed.</p>
+                        if (slot === "REJECTED") return <p className="text-[11px] text-[var(--text3)] mt-1">Pieces that cannot be used — scrapped or returned.</p>
+                        return null
+                    })()}
                     {error && <p className="text-[11px] font-medium text-[#dc2626] mt-1">{error}</p>}
                 </div>
             </div>
@@ -1108,7 +1132,7 @@ export default function InspectionFormPage() {
                         })()}
                         {/* Live check against Rework Qty: the defects must cover every reworked
                             piece before Next; more is fine (the extra is counted as rejected). */}
-                        {reworkField && reworkQty > 0 && (
+                        {(reworkField || rejectedInput) && badPieces > 0 && (
                             <div id="defect-total-check" role={defectShortfall > 0 && defectBlocked ? "alert" : undefined}
                                 className={cn(
                                     "mt-[12px] rounded-[9px] border px-[12px] py-[9px] text-[12.5px] flex items-center gap-2",
@@ -1117,14 +1141,17 @@ export default function InspectionFormPage() {
                                         : "bg-[#fffbeb] border-[#fde68a] text-[#92400e]",
                                 )}>
                                 <span className="font-[700] font-mono">{defectTotal}</span>
-                                <span>of rework qty</span>
+                                <span>defects for</span>
                                 <span className="font-[700] font-mono">{reworkQty}</span>
+                                <span>rework +</span>
+                                <span className="font-[700] font-mono">{rejectedQtyIn}</span>
+                                <span>rejected</span>
                                 <span className="ml-auto text-right">
                                     {defectShortfall > 0
                                         ? `Enter ${defectShortfall} more defect${defectShortfall === 1 ? "" : "s"} to continue`
-                                        : defectTotal > reworkQty
-                                        ? `${defectTotal - reworkQty} extra counted as rejected`
-                                        : "All rework pieces covered"}
+                                        : defectTotal > badPieces
+                                        ? `${defectTotal - badPieces} more defect${defectTotal - badPieces === 1 ? "" : "s"} than pieces — fine if a piece had more than one`
+                                        : "All rework and rejected pieces covered"}
                                 </span>
                             </div>
                         )}

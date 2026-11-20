@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { attendanceTimeError, postedSites } from "@/lib/attendance-guard"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -50,7 +51,10 @@ export async function GET(req: Request) {
 
         const where: Record<string, unknown> = {}
         if (employeeId) where.employeeId = employeeId
-        if (siteId) where.siteId = siteId
+        // A row marked without a site still belongs to the site the employee is
+        // posted at — otherwise filtering by site hid it and the person showed
+        // as "not marked" right after being marked.
+        if (siteId) where.OR = [{ siteId }, { siteId: null, employee: { deployments: { some: { isActive: true, siteId } } } }]
         if (status) where.status = status
 
         // Day and month windows also catch rows stored at IST midnight.
@@ -126,6 +130,10 @@ export async function POST(req: Request) {
         // Naive "YYYY-MM-DDTHH:mm:ss" from the HR form is IST wall-clock, not UTC.
         const checkInAt = parseIstDateTime(checkIn)
         const checkOutAt = parseIstDateTime(checkOut)
+        const timeErr = attendanceTimeError(attendanceDate, checkInAt, checkOutAt)
+        if (timeErr) return new NextResponse(timeErr, { status: 400 })
+        // No site chosen: use the employee's current posting.
+        const site = siteId || (await postedSites([employeeId])).get(employeeId) || null
 
         // Calculate working hours
         let workingHrs = 0
@@ -147,7 +155,7 @@ export async function POST(req: Request) {
             attendance = await prisma.attendance.update({
                 where: { id: existing.id },
                 data: {
-                    siteId: siteId || null,
+                    siteId: site,
                     checkIn: checkInAt,
                     checkOut: checkOutAt,
                     checkInLat, checkInLng, checkOutLat, checkOutLng,
@@ -162,7 +170,7 @@ export async function POST(req: Request) {
             attendance = await prisma.attendance.create({
                 data: {
                     employeeId,
-                    siteId: siteId || null,
+                    siteId: site,
                     date: attendanceDate,
                     checkIn: checkInAt,
                     checkOut: checkOutAt,

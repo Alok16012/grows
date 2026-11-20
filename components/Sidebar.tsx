@@ -165,7 +165,6 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             icon: Home,
             links: [
                 { name: "Dashboard", href: dashboardHref },
-                { name: "Approvals Inbox", href: "/approvals", permission: "approvals.view", badge: "approvals" },
                 { name: "Analytics", href: "/manager/analytics", permission: "reports.view" },
             ],
         },
@@ -175,8 +174,12 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             links: [
                 // Opens the guided stepper flow (starts on the HR Sites list =
                 // /sites); Sites, Projects and Field Tasks are reached via its rail.
-                { name: "Projects & Sites", href: "/sites", permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/field"] },
-                { name: "Inspection Assignments", href: "/assignments", permission: "assignments.view" },
+                // Assignments are a step of that flow, so the separate link only
+                // shows for people who don't get the flow (no projects.manage).
+                { name: "Projects & Sites", href: "/sites", permission: "projects.view", matchPrefixes: ["/sites", "/projects", "/field", "/assignments"] },
+                { name: "Inspection Assignments", href: "/assignments", permission: "assignments.view", hideIfHas: "projects.manage" },
+                // Reviewing submitted inspections is operations work.
+                { name: "Approvals Inbox", href: "/approvals", permission: "approvals.view", badge: "approvals" },
                 // /reports is the inspection report builder (site, project,
                 // inspector, Pareto), so it sits with the work it reports on.
                 { name: "Inspection Reports", href: "/reports", permission: "reports.view" },
@@ -209,6 +212,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Employee Documents", href: "/employees/documents", permission: "documents.view" },
                 { name: "Letters & Documents", href: "/documents/send", permissionAny: ["documents.send", "documents.view"] },
                 { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.manage", "policy.report"] },
+                { name: "Document Types", href: "/documents/types", permission: "documents.view" },
             ],
         },
         {
@@ -246,7 +250,6 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             icon: SlidersHorizontal,
             links: [
                 { name: "Departments", href: "/departments", group: "Organisation" },
-                { name: "Document Types", href: "/documents/types", permission: "documents.view", group: "Organisation" },
                 { name: "Wage Rule Book", href: "/admin/rule-book", group: "Organisation" },
                 { name: "System Users", href: "/admin/users", permissionAny: ["users.view", "users.manage"], group: "Users & Access" },
                 { name: "Employee Logins", href: "/admin/employee-logins", permission: "users.manage", group: "Users & Access" },

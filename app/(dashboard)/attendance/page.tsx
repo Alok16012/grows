@@ -158,6 +158,14 @@ function MarkAttendanceModal({
         e.preventDefault()
         const empId = preselected?.id || selectedEmpId
         if (!empId) return toast.error("Select an employee")
+        const todayKey = format(new Date(), "yyyy-MM-dd"), dayKey = format(date, "yyyy-MM-dd")
+        if (dayKey > todayKey) return toast.error("Attendance can't be marked for a future date.")
+        if (dayKey === todayKey) {
+            const nowHm = format(new Date(), "HH:mm")
+            if (form.checkIn && form.checkIn > nowHm) return toast.error("Check-in time can't be later than the current time.")
+            if (form.checkOut && form.checkOut > nowHm) return toast.error("Check-out time can't be later than the current time.")
+        }
+        if (form.checkIn && form.checkOut && form.checkOut <= form.checkIn) return toast.error("Check-out must be after check-in.")
         setLoading(true)
         try {
             const dateStr = format(date, "yyyy-MM-dd")
@@ -229,12 +237,12 @@ function MarkAttendanceModal({
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="block text-[12px] text-[var(--text2)] mb-1">Check In</label>
-                            <input type="time" value={form.checkIn} onChange={e => setForm(f => ({ ...f, checkIn: e.target.value }))}
+                            <input type="time" value={form.checkIn} max={format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") ? format(new Date(), "HH:mm") : undefined} onChange={e => setForm(f => ({ ...f, checkIn: e.target.value }))}
                                 className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
                         </div>
                         <div>
                             <label className="block text-[12px] text-[var(--text2)] mb-1">Check Out</label>
-                            <input type="time" value={form.checkOut} onChange={e => setForm(f => ({ ...f, checkOut: e.target.value }))}
+                            <input type="time" value={form.checkOut} max={format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") ? format(new Date(), "HH:mm") : undefined} onChange={e => setForm(f => ({ ...f, checkOut: e.target.value }))}
                                 className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors" />
                         </div>
                     </div>
@@ -266,7 +274,7 @@ function MarkAttendanceModal({
 // ─── Bulk Mark Modal ──────────────────────────────────────────────────────────
 
 function BulkMarkModal({ open, onClose, onSaved, employees }: {
-    open: boolean; onClose: () => void; onSaved: () => void; employees: Employee[]
+    open: boolean; onClose: () => void; onSaved: (date: string) => void; employees: Employee[]
 }) {
     const [loading, setLoading] = useState(false)
     const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"))
@@ -285,6 +293,7 @@ function BulkMarkModal({ open, onClose, onSaved, employees }: {
         e.preventDefault()
         setLoading(true)
         try {
+            if (date > format(new Date(), "yyyy-MM-dd")) { toast.error("Attendance can't be marked for a future date."); return }
             const records = Object.entries(statuses).map(([employeeId, status]) => ({ employeeId, status }))
             const res = await fetch("/api/attendance/bulk", {
                 method: "POST",
@@ -293,7 +302,7 @@ function BulkMarkModal({ open, onClose, onSaved, employees }: {
             })
             if (!res.ok) throw new Error(await res.text())
             toast.success(`Attendance marked for ${records.length} employees`)
-            onSaved()
+            onSaved(date)
             onClose()
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : "Failed to save bulk attendance")
@@ -320,7 +329,7 @@ function BulkMarkModal({ open, onClose, onSaved, employees }: {
                             an unwrapped row put the bulk-status buttons out of reach. */}
                         <div className="flex flex-wrap items-center gap-3">
                             <label className="text-[13px] font-medium text-[var(--text2)]">Date</label>
-                            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                            <input type="date" value={date} max={format(new Date(), "yyyy-MM-dd")} onChange={e => setDate(e.target.value)}
                                 className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                             <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                                 {BULK_STATUSES.map(s => (
@@ -1081,7 +1090,11 @@ function AdminView() {
             <BulkMarkModal
                 open={bulkModal}
                 onClose={() => setBulkModal(false)}
-                onSaved={() => fetchAttendances()}
+                onSaved={(d) => {
+                    // Show the day that was just marked (it may not be the one on screen).
+                    if (d !== format(selectedDate, "yyyy-MM-dd")) setSelectedDate(new Date(d + "T12:00:00"))
+                    else fetchAttendances()
+                }}
                 employees={employees}
             />
         </div>

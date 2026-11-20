@@ -18,7 +18,8 @@ const FIXED_FIELDS = [
 
 const AUTO_FIELDS = [
     { fieldLabel: "TOTAL DEFECTS", fieldType: "number", isRequired: false, category: "AUTO", defaultValue: "0" },
-    { fieldLabel: "REJECTED QTY", fieldType: "number", isRequired: false, category: "AUTO", defaultValue: "0" },
+    // Typed by the inspector (after Rework Qty), not worked out.
+    { fieldLabel: "REJECTED QTY", fieldType: "number", isRequired: false, category: "FIXED", defaultValue: "0" },
     { fieldLabel: "ACCEPTED QTY", fieldType: "number", isRequired: false, category: "AUTO", defaultValue: "0" },
     { fieldLabel: "REWORK %", fieldType: "number", isRequired: false, category: "AUTO", defaultValue: "0" },
     { fieldLabel: "REJECTED %", fieldType: "number", isRequired: false, category: "AUTO", defaultValue: "0" },

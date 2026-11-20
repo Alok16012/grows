@@ -30,6 +30,8 @@ export const COMPANY = {
     /** What follows `shortName` in `name`, e.g. "ERP". Empty when the name
      *  is a single word. */
     nameSuffix: name.slice(shortName.length).trim(),
+    /** Name centred at the top of exported inspection reports (client request). */
+    reportName: env(process.env.NEXT_PUBLIC_REPORT_COMPANY_NAME) ?? "GROWUS AUTO INDIA",
     tagline: "Pioneer in outsourcing",
     supportLine: "Contact your HR or admin.",
     developerCredit: "Blinks AI",

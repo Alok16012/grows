@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { attendanceTimeError, postedSites } from "@/lib/attendance-guard"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -28,6 +29,9 @@ export async function POST(req: Request) {
         }
 
         const attendanceDate = new Date(String(date).slice(0, 10) + "T00:00:00.000Z")
+        const timeErr = attendanceTimeError(attendanceDate, null, null)
+        if (timeErr) return new NextResponse(timeErr, { status: 400 })
+        const sites = await postedSites(records.map(r => r.employeeId))
 
         const results = await Promise.all(
             records.map(async (rec) => {
@@ -44,12 +48,14 @@ export async function POST(req: Request) {
                         data: {
                             status: rec.status,
                             markedBy: session.user.id,
+                            ...(existing.siteId ? {} : { siteId: sites.get(rec.employeeId) ?? null }),
                         },
                     })
                 } else {
                     return prisma.attendance.create({
                         data: {
                             employeeId: rec.employeeId,
+                            siteId: sites.get(rec.employeeId) ?? null,
                             date: attendanceDate,
                             status: rec.status,
                             markedBy: session.user.id,

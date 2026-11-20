@@ -1,4 +1,6 @@
 import { getServerSession } from "next-auth"
+import { attendanceTimeError, postedSites } from "@/lib/attendance-guard"
+import { istDateOnly } from "@/lib/attendance-policy"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -35,6 +37,13 @@ export async function PUT(
         const checkOutAt = parseIstDateTime(checkOut)
         const workingHrs = calcWorkingHrs(checkInAt, checkOutAt)
 
+        const current = await prisma.attendance.findUnique({ where: { id: params.id }, select: { date: true, employeeId: true, siteId: true } })
+        if (!current) return new NextResponse("Not found", { status: 404 })
+        const day = new Date(istDateOnly(new Date(current.date.getTime() + 60_000)).getTime())
+        const timeErr = attendanceTimeError(day, checkIn !== undefined ? checkInAt : null, checkOut !== undefined ? checkOutAt : null)
+        if (timeErr) return new NextResponse(timeErr, { status: 400 })
+        const site = current.siteId ? null : (await postedSites([current.employeeId])).get(current.employeeId) ?? null
+
         const updated = await prisma.attendance.update({
             where: { id: params.id },
             data: {
@@ -45,6 +54,7 @@ export async function PUT(
                 ...(remarks !== undefined && { remarks }),
                 workingHrs,
                 markedBy: session.user.id,
+                ...(site ? { siteId: site } : {}),
             },
             include: {
                 employee: {
