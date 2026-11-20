@@ -446,8 +446,8 @@ export default function PayrollPage() {
                         {/* Icon only below 2xl, so the header stays one line on a laptop. */}
                         <Settings2 size={15} /> <span className="hidden 2xl:inline">Salary structure</span>
                     </button>
-                    <button onClick={() => router.push("/payroll/reports/writer")} style={quietBtn} title="Report Writer — pick columns (Actual / TH) and download">
-                        <FileSpreadsheet size={15} /> <span className="hidden 2xl:inline">Report Writer</span>
+                    <button onClick={() => router.push("/payroll/reports/writer")} style={quietBtn} title="Reports — Report Writer, FNF settlement">
+                        <FileSpreadsheet size={15} /> <span className="hidden 2xl:inline">Reports</span>
                     </button>
                     {canManage && (
                         <button onClick={() => router.push("/payroll/settings")} style={quietBtn} title="PF / ESIC / PT rates, slabs and defaults">

@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeft, Download, Eye, Loader2, Columns3, CheckSquare, Square } from "lucide-react"
+import { Download, Eye, Loader2, Columns3, CheckSquare, Square } from "lucide-react"
 import { can } from "@/lib/can"
 import { payrollYears, currentPayrollMonth, currentPayrollYear } from "../../_components/payroll-years"
+import ReportsNav from "../_components/ReportsNav"
 import { REPORT_COLUMNS, REPORT_GROUPS, type ReportGroup } from "@/lib/report-writer"
 
 const loadXLSX = () => import("xlsx")
@@ -37,7 +37,6 @@ const PRESETS: { label: string; keys: () => string[] }[] = [
 
 export default function ReportWriterPage() {
     const { data: session } = useSession()
-    const router = useRouter()
     const [month, setMonth] = useState(currentPayrollMonth())
     const [year, setYear] = useState(currentPayrollYear())
     const [siteId, setSiteId] = useState("")
@@ -121,17 +120,7 @@ export default function ReportWriterPage() {
 
     return (
         <div className="flex flex-col gap-5 p-4 pb-12 lg:p-0">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                    <button onClick={() => router.push("/payroll")} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)]" aria-label="Back to Payroll">
-                        <ArrowLeft size={16} />
-                    </button>
-                    <div>
-                        <h1 className="m-0 text-2xl font-bold tracking-tight text-[var(--text)]">Report Writer</h1>
-                        <p className="m-0 mt-0.5 text-[13px] text-[var(--text3)]">Pick a month, tick the columns you need, download.</p>
-                    </div>
-                </div>
-            </div>
+            <ReportsNav title="Report Writer" subtitle="Pick a month, tick the columns you need, download." />
 
             {/* Filters */}
             <div className={`${card} flex flex-wrap items-end gap-3 p-4`}>
