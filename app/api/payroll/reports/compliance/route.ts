@@ -162,7 +162,22 @@ const ecrMember = (p: PayrollRow, rules: PayrollRules): EcrMember => ({
     ncpDays: ncpDays(p),
 })
 
+// `includeDraft=1` also takes DRAFT rows, so reports can be checked before the
+// month is locked. The response then carries X-Payroll-Draft: <rows>, and the
+// page marks the file DRAFT — those figures can still change.
 export async function GET(req: Request) {
+    const ctx = { draft: 0 }
+    const res = await handle(req, ctx)
+    if (ctx.draft > 0) {
+        res.headers.set("X-Payroll-Draft", String(ctx.draft))
+        res.headers.set("Access-Control-Expose-Headers", "X-Payroll-Draft")
+        const cd = res.headers.get("Content-Disposition")
+        if (cd) res.headers.set("Content-Disposition", cd.replace(/.txt"/, '_DRAFT.txt"'))
+    }
+    return res
+}
+
+async function handle(req: Request, ctx: { draft: number }): Promise<NextResponse> {
     try {
         const session = await getServerSession(authOptions)
         if (!session || !checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.view")) {
@@ -179,6 +194,7 @@ export async function GET(req: Request) {
         const type = searchParams.get("type") || "pf-summary"
         const stateFilter = searchParams.get("state") || ""
         const siteId = searchParams.get("siteId") || ""
+        const includeDraft = searchParams.get("includeDraft") === "1"
 
         if (!month || !year) {
             return new NextResponse("Month and Year required", { status: 400 })
@@ -195,7 +211,7 @@ export async function GET(req: Request) {
 
         // Only locked rows (PROCESSED/PAID) are filed — DRAFT rows are still
         // being edited, same rule as the bank sheet / export routes.
-        const where: Record<string, unknown> = { month, year, status: { in: ["PROCESSED", "PAID"] } }
+        const where: Record<string, unknown> = { month, year, status: { in: includeDraft ? ["DRAFT", "PROCESSED", "PAID"] : ["PROCESSED", "PAID"] } }
         if (siteId) where.siteId = siteId
 
         const payrolls = await prisma.payroll.findMany({
@@ -224,6 +240,8 @@ export async function GET(req: Request) {
         // time; no row / no table = pension applicable, the old behaviour.
         const statutory = await statutoryFlagsFor(payrolls.map(p => p.employee.id))
         for (const p of payrolls) p.pensionApplicable = statutory.get(p.employee.id)?.pensionApplicable ?? true
+
+        ctx.draft = (payrolls as unknown as { status: string }[]).filter(p => p.status === "DRAFT").length
 
         if (payrolls.length === 0) {
             // 409: the month may well exist as a DRAFT — it just isn't filable yet.

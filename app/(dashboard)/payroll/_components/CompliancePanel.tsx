@@ -136,18 +136,20 @@ export default function CompliancePanel({ onClose, initialMonth, initialYear }: 
             // EPFO ingests a text file, not a spreadsheet.
             if (item.type === "pf-ecr") {
                 const result = await downloadEcrTxt(month, year)
-                if (result.ok) toast.success(`Downloaded: ${item.label}`)
+                if (result.ok && result.draft) toast.warning(`Downloaded ${item.label} — DRAFT: ${result.draft} row(s) not locked yet`, { duration: 7000 }); else if (result.ok) toast.success(`Downloaded: ${item.label}`)
                 else toast.error(result.message)
                 return
             }
 
             const XLSX = await loadXLSX()
-            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}`)
+            const r = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=${item.type}&includeDraft=1`)
             if (!r.ok) {
                 // The server says why (e.g. month not locked yet) — show that, not a generic line.
                 const detail = await r.text().catch(()=>"")
                 toast.error(detail.trim() || "No data found for this period"); return
             }
+            // Not locked yet: draft figures, marked on the file and in the message.
+            const draftRows = Number(r.headers.get("X-Payroll-Draft") || 0)
             const data = await r.json()
             if (!data?.length) { toast.error("No data to download"); return }
             const wb = XLSX.utils.book_new()
@@ -167,8 +169,8 @@ export default function CompliancePanel({ onClose, initialMonth, initialYear }: 
                 const ws=await buildHierarchicalSheet(data,item.type,item.label,month,year,rules.codes)
                 XLSX.utils.book_append_sheet(wb,ws,item.label.substring(0,31))
             }
-            XLSX.writeFile(wb,`${item.label.replace(/[^a-zA-Z0-9 ]/g,"").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}.xlsx`)
-            toast.success(`Downloaded: ${item.label}`)
+            XLSX.writeFile(wb,`${item.label.replace(/[^a-zA-Z0-9 ]/g,"").replace(/ /g,"_")}_${MONTHS[month-1]}_${year}${draftRows ? "_DRAFT" : ""}.xlsx`)
+            if (draftRows) toast.warning(`Downloaded ${item.label} — DRAFT: ${draftRows} row(s) not locked yet, figures can change`, { duration: 7000 }); else toast.success(`Downloaded: ${item.label}`)
         } catch { toast.error("Download failed") }
         finally { setDlLoading(null) }
     }

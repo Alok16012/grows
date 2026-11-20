@@ -215,8 +215,8 @@ export default function PayrollPage() {
         if (counts.rows === 0) return step === 1 ? "Nothing uploaded yet" : "After attendance"
         if (step === 1) return `${counts.rows} employees · ${sites.length} sites`
         if (step === 2) return counts.draft === 0 ? "All locked" : `${counts.locked + counts.paid} of ${counts.rows} locked`
-        if (step === 3) return counts.draft === 0 ? "Ready to download" : "After locking"
-        return counts.paid === counts.rows ? "All paid" : counts.draft > 0 ? "After locking" : `${counts.paid} of ${counts.rows} paid`
+        if (step === 3) return counts.draft === 0 ? "Ready to download" : "Draft figures · final after locking"
+        return counts.paid === counts.rows ? "All paid" : counts.draft > 0 ? "Draft · lock before paying" : `${counts.paid} of ${counts.rows} paid`
     }
 
     const thisRun = runs.find(r => r.month === period.month && r.year === period.year)
@@ -490,7 +490,11 @@ export default function PayrollPage() {
                         const done   = stepDone(s.step)
                         const isNow  = activeStep?.step === s.step
                         const isOpen = openStep?.step === s.step
-                        const locked = !done && !isNow            // a later step: nothing to do yet
+                        // Reports and payslips open as soon as pay is calculated —
+                        // draft figures until the month is locked. Only an empty
+                        // month greys them out.
+                        const open   = !done && !isNow && counts.rows > 0 && s.step >= 3
+                        const locked = !done && !isNow && !open
                         const Icon   = s.icon
                         return (
                             <div key={s.step} style={{
@@ -504,19 +508,19 @@ export default function PayrollPage() {
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                     <div style={{
                                         width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                                        background: done ? "#16a34a" : isNow ? s.gradient : "var(--surface2)",
-                                        color: done || isNow ? "#fff" : "var(--text3)",
+                                        background: done ? "#16a34a" : isNow ? s.gradient : open ? s.bg : "var(--surface2)",
+                                        color: done || isNow ? "#fff" : open ? s.color : "var(--text3)",
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         fontSize: 13, fontWeight: 800,
                                     }}>
-                                        {done ? <CheckCircle2 size={18} /> : isNow ? <Icon size={17} /> : s.step}
+                                        {done ? <CheckCircle2 size={18} /> : isNow || open ? <Icon size={17} /> : s.step}
                                     </div>
                                     <div style={{ minWidth: 0 }}>
                                         <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: "var(--text)" }}>
                                             <span style={{ color: "var(--text3)", fontWeight: 600 }}>{s.step}. </span>{s.label}
                                         </p>
                                         <p style={{ margin: "1px 0 0", fontSize: 11.5, fontWeight: 600, color: done ? "#15803d" : isNow ? s.color : "var(--text3)" }}>
-                                            {done ? "Done" : isNow ? "Do this now" : "Later"} · {stepNote(s.step)}
+                                            {done ? "Done" : isNow ? "Do this now" : open ? "Open" : "Later"} · {stepNote(s.step)}
                                         </p>
                                     </div>
                                 </div>
@@ -553,7 +557,7 @@ export default function PayrollPage() {
                 <div style={{ padding: "10px 20px 12px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", gap: 8 }}>
                     <Lock size={11} style={{ color: "var(--text3)", flexShrink: 0 }} />
                     <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>
-                        Use <b>Lock month</b> at the top once the sheet is checked; reports and payslips open after that. A locked month can&apos;t be edited or re-processed — <b>Unlock month</b> reopens it (paid rows stay paid).
+                        Reports and payslips are open as soon as attendance is uploaded — they show <b>draft</b> figures (files marked DRAFT) until you use <b>Lock month</b> at the top. A locked month can&apos;t be edited or re-processed — <b>Unlock month</b> reopens it (paid rows stay paid).
                     </p>
                 </div>
             </div>

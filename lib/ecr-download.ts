@@ -12,17 +12,19 @@
 const MONTHS = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"]
 
-export type EcrDownloadResult = { ok: true } | { ok: false; message: string }
+export type EcrDownloadResult = { ok: true; draft?: number } | { ok: false; message: string }
 
 export async function downloadEcrTxt(month: number, year: number): Promise<EcrDownloadResult> {
     const res = await fetch(
-        `/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-ecr&format=txt`
+        `/api/payroll/reports/compliance?month=${month}&year=${year}&type=pf-ecr&format=txt&includeDraft=1`
     )
     if (!res.ok) {
         const detail = await res.text().catch(() => "")
         return { ok: false, message: detail.trim() || "No data found for this period" }
     }
 
+    // Rows not locked yet: the file is marked so it isn't filed by mistake.
+    const draft = Number(res.headers.get("X-Payroll-Draft") || 0)
     const text = await res.text()
     if (!text.trim()) return { ok: false, message: "No data to download" }
 
@@ -30,10 +32,10 @@ export async function downloadEcrTxt(month: number, year: number): Promise<EcrDo
     try {
         const a = document.createElement("a")
         a.href = url
-        a.download = `PF_ECR_${MONTHS[month - 1]}_${year}.txt`
+        a.download = `PF_ECR_${MONTHS[month - 1]}_${year}${draft ? "_DRAFT" : ""}.txt`
         a.click()
     } finally {
         URL.revokeObjectURL(url)
     }
-    return { ok: true }
+    return { ok: true, draft }
 }
