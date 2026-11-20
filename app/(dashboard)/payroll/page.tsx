@@ -11,7 +11,7 @@ import dynamic from "next/dynamic"
 import {
     Loader2, RefreshCw, FileSpreadsheet, ShieldCheck, Upload, IndianRupee,
     Clock, Trash2, TrendingUp, Settings2, Lock, Unlock, CheckCircle2, ChevronRight,
-    ChevronLeft, SlidersHorizontal, CalendarRange, CalendarPlus, Users, Wallet, Pencil, BadgeCheck,
+    ChevronLeft, SlidersHorizontal, CalendarRange, CalendarPlus, Users, Wallet, Pencil, BadgeCheck, Scale,
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { StatCard, statGridClass } from "@/components/StatCard"
@@ -458,6 +458,9 @@ export default function PayrollPage() {
                     <button onClick={() => router.push("/payroll/salary-master")} style={quietBtn} title="Each employee's salary structure">
                         {/* Icon only below 2xl, so the header stays one line on a laptop. */}
                         <Settings2 size={15} /> <span className="hidden 2xl:inline">Salary structure</span>
+                    </button>
+                    <button onClick={() => router.push("/payroll/arrears")} style={quietBtn} title="Salary arrears — back-dated revisions for locked / paid months, and salary history">
+                        <Scale size={15} /> <span className="hidden 2xl:inline">Arrears</span>
                     </button>
                     <button onClick={() => router.push("/payroll/reports/writer")} style={quietBtn} title="Reports — Report Writer, FNF settlement, Advance">
                         <FileSpreadsheet size={15} /> <span className="hidden 2xl:inline">Reports</span>

@@ -36,6 +36,8 @@ type PayrollRecord = {
     pfEmployee: number; esiEmployee: number; pt: number; lwf: number
     canteen: number; penalty: number; advance: number; otherDeductions: number
     totalDeductions: number; netSalary: number
+    /** Approved arrears from earlier months paid with this payroll (included in netSalary). */
+    arrears?: number
     workingDays: number|null; presentDays: number|null; overtimeHrs?: number
     pfEmployer: number; esiEmployer: number; ctc?: number
     employee: {
@@ -161,7 +163,8 @@ export default function PayslipsPanel({ onClose, initialMonth, initialYear, late
       <tr class="sub-hdr"><th>Particulars</th><th class="num">Salary Rate</th><th class="num" style="border-right:2px solid #888">Salary Amt (Rs.)</th><th></th><th class="num">Amount (Rs.)</th></tr>
       ${earnings.map((e,i)=>{const d=deductions[i];return`<tr><td>${e.label}</td><td class="num it">${e.fullRate>0?r(e.fullRate):""}</td><td class="num it" style="border-right:2px solid #888">${e.amt>0?r(e.amt):"0"}</td><td class="dlabel">${d?.label??""}</td><td class="num">${d&&d.amt>0?r(d.amt):"0"}</td></tr>`}).join("")}
       <tr class="total-row"><td><b>Gross Earnings (A)</b></td><td class="num"><b>${r(grossRate)}</b></td><td class="num" style="border-right:2px solid #888"><b>${r(p.grossSalary)}</b></td><td><b>Total Deduction</b></td><td class="num"><b>${r(p.totalDeductions)}</b></td></tr>
-      <tr class="net-row"><td colspan="2"><b>Net Pay (A) - (B)</b></td><td class="num" style="border-right:2px solid #888"><b>${r(p.netSalary)}</b></td><td><b>(B)</b></td><td></td></tr>
+      ${p.arrears ? `<tr><td colspan="2">Arrears — earlier months (C)</td><td class="num" style="border-right:2px solid #888">${p.arrears < 0 ? "-" : ""}${r(Math.abs(p.arrears))}</td><td></td><td></td></tr>` : ""}
+      <tr class="net-row"><td colspan="2"><b>Net Pay (A) - (B)${p.arrears ? " + (C)" : ""}</b></td><td class="num" style="border-right:2px solid #888"><b>${r(p.netSalary)}</b></td><td><b>(B)</b></td><td></td></tr>
       <tr><td colspan="5" class="words">Amount in words: <b><i>${numToWords(Math.round(p.netSalary))}</i></b></td></tr>
     </tbody></table>
   <div class="footer-row"><span>Place: Pune</span></div>

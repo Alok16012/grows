@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -78,6 +79,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     // One transaction: the live row, the baseline and this month's revision
     // land together or not at all. Written separately, a failed baseline left
     // past months falling back to the NEW live figures.
+    let histEntry: { year: number; month: number; before: Record<string, unknown> | null; after: Record<string, unknown> } | null = null
     const sal = await prisma.$transaction(async tx => {
         const sal = await tx.employeeSalary.upsert({
             where: { employeeId: params.employeeId },
@@ -173,6 +175,8 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
             complianceType: sal.complianceType,
             ctcMonthly: sal.ctcMonthly, ctcAnnual: sal.ctcAnnual,
         }
+        const prevRev = await tx.salaryRevision.findUnique({ where: { employeeId_effectiveYear_effectiveMonth: { employeeId: params.employeeId, effectiveYear: curYear, effectiveMonth: curMonth } } })
+        histEntry = { year: curYear, month: curMonth, before: salaryFigures(prevRev ?? before), after: salaryFigures(fields) ?? {} }
         await tx.salaryRevision.upsert({
             where: {
                 employeeId_effectiveYear_effectiveMonth: {
@@ -186,5 +190,11 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
         return sal
     })
 
+    if (histEntry) {
+        const h: { year: number; month: number; before: Record<string, unknown> | null; after: Record<string, unknown> } = histEntry
+        await logRevisions([{ employeeId: params.employeeId, effectiveYear: h.year, effectiveMonth: h.month, source: "salary-edit", before: h.before, after: h.after, changedBy: session.user.id }])
+        // Only matters if this month is already locked — then it's an arrear.
+        await refreshArrears([params.employeeId], { month: h.month, year: h.year }, session.user.id)
+    }
     return NextResponse.json(sal)
 }

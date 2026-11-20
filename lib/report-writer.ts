@@ -80,6 +80,7 @@ export const REPORT_COLUMNS: ReportColumn[] = [
     { key: "advanceDed",      label: "Advance Ded",         group: "deduction", money: true, preset: true },
     { key: "tds",             label: "TDS",                 group: "deduction", money: true },
     { key: "totalDed",        label: "Total Deductions",    group: "deduction", money: true, preset: true },
+    { key: "arrears",         label: "Arrears (earlier months)", group: "deduction", money: true },
     { key: "net",             label: "Net Pay",             group: "deduction", money: true, preset: true },
     // Employer
     { key: "pfEr",            label: "PF (Employer)",       group: "employer", money: true },

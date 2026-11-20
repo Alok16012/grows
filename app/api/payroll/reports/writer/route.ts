@@ -92,7 +92,7 @@ export async function GET(req: Request) {
                 otherAllowTh: r2(p.otherFull), grossTh: r2(p.grossFullMonth),
                 pf: r2(p.pfEmployee), esic: r2(p.esiEmployee), pt: r2(p.pt), lwf: r2(p.lwf),
                 canteen: r2(p.canteen), penalty: r2(p.penalty), otherDed: r2(p.otherDeductions),
-                advanceDed: r2(p.advance), tds: r2(p.tds), totalDed: r2(p.totalDeductions), net: r2(p.netSalary),
+                advanceDed: r2(p.advance), tds: r2(p.tds), totalDed: r2(p.totalDeductions), arrears: r2(p.arrears ?? 0), net: r2(p.netSalary),
                 pfEr: r2(p.pfEmployer), esicEr: r2(p.esiEmployer), ctc: r2(p.ctc),
             }
             return Object.fromEntries(columns.map(k => [k, all[k] ?? ""]))

@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
@@ -278,6 +279,11 @@ export async function POST(req: Request) {
     type Op = Prisma.PrismaPromise<unknown>
     const chunks: { ids: string[]; ops: Op[] }[] = []
     const CHUNK = 50
+    // History: what each employee's revision for this month held before the upload.
+    const beforeRevs = new Map((await prisma.salaryRevision.findMany({
+        where: { employeeId: { in: rows.map(r => r.employeeId) }, effectiveYear: effYear!, effectiveMonth: effMonth! },
+    })).map(r => [r.employeeId, salaryFigures(r)]))
+    const afterById = new Map<string, Record<string, unknown>>()
     for (const row of rows) {
         try {
             const basic      = Number(row.basic) || 0
@@ -316,6 +322,7 @@ export async function POST(req: Request) {
                     ctcAnnual:         ctcM * 12,
                     complianceType:    cType,
                 }
+                afterById.set(row.employeeId, salaryFigures(fields) ?? {})
                 // Re-uploading a month corrects that month rather than stacking
                 // a second revision the lookup would have to break ties on.
                 ops.push(prisma.salaryRevision.upsert({
@@ -411,9 +418,21 @@ export async function POST(req: Request) {
             .sort((a, b) => monthKey(a.year, a.month) - monthKey(b.year, b.month))
     }
 
+    // Saved rows only: record the history, then file arrears for months that
+    // were already locked / paid and now come out differently.
+    const failed = new Set(errors.map(e => e.employeeId))
+    const savedIds = chunks.flatMap(c => c.ids).filter(id => !failed.has(id))
+    await logRevisions(savedIds.filter(id => afterById.has(id)).map(id => ({
+        employeeId: id, effectiveYear: effYear!, effectiveMonth: effMonth!, source: "bulk-upload" as const,
+        before: beforeRevs.get(id) ?? null, after: afterById.get(id)!, changedBy: session.user.id,
+    })))
+    const arrearsPending = await refreshArrears(savedIds, { month: effMonth!, year: effYear! }, session.user.id)
+
     return NextResponse.json({
         updated,
         errors,
+        // Arrears filed for HR review (Payroll → Arrears) because a locked / paid month changed.
+        arrearsPending,
         // Employees whose previous structure was captured as history by this
         // upload, so earlier months keep paying what they used to.
         preserved,

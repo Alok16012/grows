@@ -1044,6 +1044,8 @@ model Payroll {
   advance             Float         @default(0)
   otherDeductions     Float         @default(0)
   totalDeductions     Float         @default(0)
+  /// Approved arrears from earlier months paid with this payroll (SalaryArrear). Included in netSalary.
+  arrears             Float         @default(0)
   // --- Net & CTC ---
   netSalary           Float         @default(0)
   ctc                 Float         @default(0) // CTC = fullGross + empPF + empESIC
@@ -2775,4 +2777,57 @@ model CustomerContact {
   updatedAt      DateTime @updatedAt
 
   @@index([siteId])
+}
+
+// Every save of a salary revision — first filing or a correction of the same
+// month — with the values before and after and who did it, so re-uploading a
+// month never loses what was there. Prod table: scripts/salary-effective.sql.
+model SalaryRevisionLog {
+  id             String   @id @default(uuid())
+  employeeId     String
+  effectiveYear  Int
+  effectiveMonth Int
+  action         String   // CREATE | UPDATE
+  source         String   // bulk-upload | salary-edit | increment
+  before         Json?
+  after          Json
+  changedBy      String?
+  changedAt      DateTime @default(now())
+
+  @@index([employeeId, changedAt])
+}
+
+// The difference a back-dated salary revision makes to a month that was
+// already locked or paid. The original payslip is never touched: HR reviews
+// the arrear and, once approved, it is paid in the next payroll processed.
+model SalaryArrear {
+  id          String    @id @default(uuid())
+  employeeId  String
+  forMonth    Int
+  forYear     Int
+  status      String    @default("PENDING") // PENDING | APPROVED | REJECTED | PAID
+  oldGross    Float     @default(0)
+  newGross    Float     @default(0)
+  oldNet      Float     @default(0)
+  newNet      Float     @default(0)
+  grossDiff   Float     @default(0)
+  pfDiff      Float     @default(0)
+  esicDiff    Float     @default(0)
+  ptDiff      Float     @default(0)
+  netDiff     Float     @default(0)
+  /// What will be paid (defaults to netDiff; HR may change it). Negative = recovery.
+  amount      Float     @default(0)
+  detail      Json?
+  note        String?
+  createdBy   String?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  paidMonth   Int?
+  paidYear    Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([forYear, forMonth])
 }

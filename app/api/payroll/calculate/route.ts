@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { isMissingTableErr } from "@/lib/asset-workflow"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -282,6 +283,29 @@ export async function POST(req: Request) {
             }
         })
 
+        // ── Approved arrears (Payroll → Arrears, reviewed by HR) ride on this
+        // month's pay as their own line: added to net, never to the month's
+        // gross / PF / ESIC, which stay this month's own figures. A re-run of
+        // the same month picks up the same arrears again.
+        const arrearIds: string[] = []
+        try {
+            const arrears = await prisma.salaryArrear.findMany({
+                where: {
+                    employeeId: { in: allRows.map(r => r.employeeId) },
+                    OR: [{ status: "APPROVED" }, { status: "PAID", paidMonth: month, paidYear: year }],
+                },
+                select: { id: true, employeeId: true, amount: true },
+            })
+            const byEmp = new Map<string, number>()
+            for (const a of arrears) { byEmp.set(a.employeeId, (byEmp.get(a.employeeId) ?? 0) + a.amount); arrearIds.push(a.id) }
+            for (const row of allRows) {
+                const add = byEmp.get(row.employeeId)
+                if (!add) continue
+                row.arrears = Math.round(add * 100) / 100
+                row.netSalary = Math.round((Number(row.netSalary) || 0) + add)
+            }
+        } catch (e) { if (!isMissingTableErr(e)) throw e }
+
         // ── STEP 2: Delete existing records for this month/year (1 DB call) ─────────
         // Then recreate all — avoids sequential per-row updates which cause timeouts
         // when Vercel (Mumbai) and Supabase are in different regions (200ms × 144 = 28s+).
@@ -301,6 +325,10 @@ export async function POST(req: Request) {
             }),
             prisma.payroll.createMany({ data: allRows }),
         ])
+
+        if (arrearIds.length) {
+            await prisma.salaryArrear.updateMany({ where: { id: { in: arrearIds } }, data: { status: "PAID", paidMonth: month, paidYear: year } })
+        }
 
         const processedCount = allRows.length
 

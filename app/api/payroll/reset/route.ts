@@ -80,7 +80,14 @@ export async function DELETE(req: Request) {
         const skippedLocked = await prisma.payroll.count({
             where: { ...scope, status: { not: "DRAFT" } },
         })
+        const draftEmps = (await prisma.payroll.findMany({ where: { ...scope, status: "DRAFT" }, select: { employeeId: true } })).map(r => r.employeeId)
         const deleted = await prisma.payroll.deleteMany({ where: { ...scope, status: "DRAFT" } })
+        if (draftEmps.length) {
+            await prisma.salaryArrear.updateMany({
+                where: { employeeId: { in: draftEmps }, status: "PAID", paidMonth: month, paidYear: year },
+                data: { status: "APPROVED", paidMonth: null, paidYear: null },
+            }).catch(() => {})
+        }
 
         if (deleted.count === 0 && skippedLocked > 0) {
             return new NextResponse(

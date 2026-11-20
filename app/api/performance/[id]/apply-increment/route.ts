@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -93,6 +94,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const note = `Increment ${r.pct}% (Basic ${r.from.basic} → ${r.to.basic}) from appraisal ${MARK(r.review.id)}`
         const now = monthInIST()
         const isNowOrPast = my.year * 12 + my.month <= now.year * 12 + now.month
+        const prevRev = await prisma.salaryRevision.findUnique({ where: { employeeId_effectiveYear_effectiveMonth: { employeeId: r.review.employeeId, effectiveYear: my.year, effectiveMonth: my.month } } })
         await prisma.$transaction(async tx => {
             await tx.salaryRevision.upsert({
                 where: { employeeId_effectiveYear_effectiveMonth: { employeeId: r.review.employeeId, effectiveYear: my.year, effectiveMonth: my.month } },
@@ -127,6 +129,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 await tx.employeeSalary.update({ where: { employeeId: r.review.employeeId }, data: { basic: r.to.basic, ctcMonthly: r.ctcTo, ctcAnnual: r.ctcTo * 12 } }).catch(() => null)
             }
         })
+        await logRevisions([{ employeeId: r.review.employeeId, effectiveYear: my.year, effectiveMonth: my.month, source: "increment", before: salaryFigures(prevRev), after: salaryFigures(fields) ?? {}, changedBy: session.user.id }])
         return NextResponse.json({ ok: true, effective: my, basicFrom: r.from.basic, basicTo: r.to.basic, ctcFrom: r.ctcFrom, ctcTo: r.ctcTo })
     } catch (e) {
         console.error("[APPRAISAL_APPLY_INCREMENT]", e)
