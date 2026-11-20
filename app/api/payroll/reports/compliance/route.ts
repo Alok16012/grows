@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { PayrollRules, esicEligibilityBase, rulesForPeriod } from "@/lib/payroll-rules"
+import { PayrollRules, esicEligibilityBase, esicChargeAmount, employerPfBase, rulesForPeriod } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { buildEcrText, EcrMember } from "@/lib/ecr-format"
 import { accessFrom, has } from "@/lib/access"
@@ -82,16 +82,22 @@ function pfWages(p: PayrollRow, rules: PayrollRules) {
 /** A PF member this month: the engine deducted employee PF. */
 const hasPf = (p: PayrollRow) => p.pfEmployee > 0
 
+/** Wages employer PF / EPS were worked out on: Basic + DA up to the employer ceiling. */
+function employerPfWages(p: PayrollRow, rules: PayrollRules) {
+    if (!hasPf(p)) return 0
+    return employerPfBase(rules.pf, p.basicSalary + p.da)
+}
+
 function epsContrib(p: PayrollRow, rules: PayrollRules) {
     // Outside the pension scheme: no EPS. epfEmployerContrib then files the
     // whole 12% employer share as EPF, matching lib/payroll-calc.ts.
     if (p.pensionApplicable === false) return 0
-    return Math.round(pfWages(p, rules) * rules.pf.employer.epsPct / 100)
+    return Math.round(employerPfWages(p, rules) * rules.pf.employer.epsPct / 100)
 }
 
 /** EPS wages: the PF wages, or 0 for a member outside the pension scheme. */
 function epsWages(p: PayrollRow, rules: PayrollRules) {
-    return p.pensionApplicable === false ? 0 : pfWages(p, rules)
+    return p.pensionApplicable === false ? 0 : employerPfWages(p, rules)
 }
 
 /**
@@ -104,7 +110,7 @@ function epsWages(p: PayrollRow, rules: PayrollRules) {
  * capped member by 1,400.
  */
 function epfEmployerContrib(p: PayrollRow, rules: PayrollRules) {
-    const w = pfWages(p, rules)
+    const w = employerPfWages(p, rules)
     const share = Math.round(w * (rules.pf.employer.epsPct + rules.pf.employer.epfPct) / 100)
     return Math.max(0, share - epsContrib(p, rules))
 }
@@ -113,11 +119,13 @@ function esiWages(p: PayrollRow, rules: PayrollRules) {
     // that disagrees with the wage sheet is the whole point of this report.
     // Clamp at 0 — excluded components > gross (e.g., zero-day month) was
     // producing negative ESI wages, which EPFO/ESIC validators reject.
-    return Math.max(0,
+    const wages = Math.max(0,
         p.grossSalary
         - (rules.esic.excludeWashing ? (p.washing ?? 0) : 0)
         - (rules.esic.excludeConveyance ? (p.conveyance ?? 0) : 0)
         - (rules.esic.excludeBonus ? (p.bonus ?? 0) : 0))
+    // Filed on what the % was charged on (Calculation Settings).
+    return esicChargeAmount(rules.esic, { esicWages: wages, basicDa: p.basicSalary + p.da })
 }
 /**
  * Out of ESIC because the member is above the eligibility limit (as opposed to
@@ -129,7 +137,7 @@ function esicExemptByLimit(p: PayrollRow, rules: PayrollRules) {
         basic: p.basicFull ?? 0,
         da: p.daFull ?? 0,
         gross: p.grossFullMonth || p.grossSalary,
-    })
+    }, { basic: p.basicSalary, da: p.da, gross: p.grossSalary })
     return base > rules.esic.eligibilityLimit
 }
 function ncpDays(p: PayrollRow) {
@@ -267,22 +275,24 @@ export async function GET(req: Request) {
             for (const [sid, rows] of siteMap) {
                 const siteName = sid === "NO_SITE" ? "Unassigned" : (nameMap.get(sid) ?? sid)
                 const totPfWages   = rows.reduce((s, p) => s + pfWages(p, rules), 0)
+                // Employer challan lines (EPS, EDLI, admin) are on the employer PF wages.
+                const totErWages   = rows.reduce((s, p) => s + employerPfWages(p, rules), 0)
                 const tot12        = rows.reduce((s, p) => s + p.pfEmployee, 0)
                 const totEPS       = rows.reduce((s, p) => s + epsContrib(p, rules), 0)
                 // p.pfEmployer already holds EDLI + admin, so "pfEmployer − EPS" put
                 // them in the 3.67% column AND again in their own columns (at the
                 // 15,000 ceiling: 700 instead of 550, total 3,900 instead of 3,750).
                 const totER367     = rows.reduce((s, p) => s + epfEmployerContrib(p, rules), 0)
-                const totEDLI      = Math.round(totPfWages * rules.pf.employer.edliPct / 100)
-                const totAdmin     = Math.round(totPfWages * rules.pf.employer.adminPct / 100)
+                const totEDLI      = Math.round(totErWages * rules.pf.employer.edliPct / 100)
+                const totAdmin     = Math.round(totErWages * rules.pf.employer.adminPct / 100)
                 const exemptRows   = rows.filter(p => p.pfEmployee === 0 && p.grossSalary > 0)
                 data.push({
                     "Sr": sr++,
                     "Site Name": siteName,
                     "No of Emp": rows.length,
                     "EPF Sal/Wag": Math.round(totPfWages),
-                    "EPS Sal/Wag": Math.round(totPfWages),
-                    "EDLI Sal/Wag": Math.round(totPfWages),
+                    "EPS Sal/Wag": Math.round(totErWages),
+                    "EDLI Sal/Wag": Math.round(totErWages),
                     [fmtPct(rules.pf.employeePct)]: Math.round(tot12),
                     [fmtPct(rules.pf.employer.epfPct)]: Math.round(totER367),
                     [fmtPct(rules.pf.employer.epsPct)]: Math.round(totEPS),
@@ -298,19 +308,20 @@ export async function GET(req: Request) {
             if (siteMap.size > 1) {
                 const all = filtered
                 const totPfW = all.reduce((s, p) => s + pfWages(p, rules), 0)
+                const totErW = all.reduce((s, p) => s + employerPfWages(p, rules), 0)
                 const t12    = all.reduce((s, p) => s + p.pfEmployee, 0)
                 const tEPS   = all.reduce((s, p) => s + epsContrib(p, rules), 0)
                 const tER    = all.reduce((s, p) => s + epfEmployerContrib(p, rules), 0) // see totER367
-                const tEDLI  = Math.round(totPfW * rules.pf.employer.edliPct / 100)
-                const tAdmin = Math.round(totPfW * rules.pf.employer.adminPct / 100)
+                const tEDLI  = Math.round(totErW * rules.pf.employer.edliPct / 100)
+                const tAdmin = Math.round(totErW * rules.pf.employer.adminPct / 100)
                 const exEmps = all.filter(p => p.pfEmployee === 0 && p.grossSalary > 0)
                 data.push({
                     "Sr": "",
                     "Site Name": "GRAND TOTAL",
                     "No of Emp": all.length,
                     "EPF Sal/Wag": Math.round(totPfW),
-                    "EPS Sal/Wag": Math.round(totPfW),
-                    "EDLI Sal/Wag": Math.round(totPfW),
+                    "EPS Sal/Wag": Math.round(totErW),
+                    "EDLI Sal/Wag": Math.round(totErW),
                     [fmtPct(rules.pf.employeePct)]: Math.round(t12),
                     [fmtPct(rules.pf.employer.epfPct)]: Math.round(tER),
                     [fmtPct(rules.pf.employer.epsPct)]: Math.round(tEPS),

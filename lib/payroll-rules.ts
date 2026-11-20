@@ -23,6 +23,14 @@ export type PtSlab = {
 //   "structureGross" → full-month structure gross (the rule up to Sep 2026)
 //   "basicDa"        → full-month Basic + DA (the rule from 1 Oct 2026)
 export type EsicEligibilityBasis = "structureGross" | "basicDa"
+// What the ESIC % is charged on:
+//   "esicWages" → earned gross minus the excluded components (Washing, Conveyance…)
+//   "basicDa"   → earned Basic + DA only
+export type EsicChargeBase = "esicWages" | "basicDa"
+// Which month figure decides eligibility:
+//   "fullMonth" → the salary structure (stable; a short month doesn't change it)
+//   "earned"    → what was earned that month after attendance
+export type EsicEligibilityPeriod = "fullMonth" | "earned"
 
 // A dated change to the statutory rules. From the effective month onward,
 // payroll uses these figures instead of the base pf/esic values; months
@@ -35,7 +43,12 @@ export type StatutoryRevision = {
     // PF wage ceiling: Basic + DA up to this is charged at 12% of actual,
     // above it PF is fixed at 12% of the ceiling (₹25,000 → ₹3,000).
     pfWageCeiling: number
+    // Employer PF (EPS + EPF + EDLI + admin) is worked out on Basic + DA up
+    // to this. null = the same ceiling as the employee's PF.
+    employerPfWageCeiling: number | null
     esicEligibilityBasis: EsicEligibilityBasis
+    esicEligibilityPeriod: EsicEligibilityPeriod
+    esicChargeBase: EsicChargeBase
     // Basic + DA up to this (inclusive) pays ESIC; above it, none.
     esicEligibilityLimit: number
 }
@@ -45,6 +58,8 @@ export type PayrollRules = {
         enabled: boolean
         // PF base = min(earned Basic + DA, wageCeiling).
         wageCeiling: number
+        // Employer contributions use min(earned Basic + DA, this). null = wageCeiling.
+        employerWageCeiling: number | null
         employeePct: number
         // When true, employees who worked fewer than prorationThresholdDays
         // pay PF on (base / threshold × workedDays) — the pre-May-2026 rule.
@@ -63,6 +78,10 @@ export type PayrollRules = {
         // Eligibility is checked on a FULL-MONTH figure — which one is set by
         // eligibilityBasis (structure gross unless a revision says otherwise).
         eligibilityBasis: EsicEligibilityBasis
+        // Full-month structure figure, or what was earned that month.
+        eligibilityPeriod: EsicEligibilityPeriod
+        // What the employee / employer % is charged on.
+        chargeBase: EsicChargeBase
         eligibilityLimit: number
         handicapLimit: number
         employeePct: number
@@ -117,6 +136,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
     pf: {
         enabled: true,
         wageCeiling: 15000,
+        employerWageCeiling: null,
         employeePct: 12,
         prorateEmployee: false,
         prorationThresholdDays: 26,
@@ -130,6 +150,8 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
     esic: {
         enabled: true,
         eligibilityBasis: "structureGross",
+        eligibilityPeriod: "fullMonth",
+        chargeBase: "esicWages",
         eligibilityLimit: 21000,
         handicapLimit: 25000,
         employeePct: 0.75,
@@ -177,7 +199,10 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         effectiveMonth: 10,
         effectiveYear: 2026,
         pfWageCeiling: 25000,
+        employerPfWageCeiling: null,
         esicEligibilityBasis: "basicDa",
+        esicEligibilityPeriod: "fullMonth",
+        esicChargeBase: "esicWages",
         esicEligibilityLimit: 21000,
     },
 }
@@ -199,8 +224,12 @@ export function rulesForPeriod(rules: PayrollRules, month: number, year: number)
     const r = rules.revision
     return {
         ...rules,
-        pf: { ...rules.pf, wageCeiling: r.pfWageCeiling },
-        esic: { ...rules.esic, eligibilityBasis: r.esicEligibilityBasis, eligibilityLimit: r.esicEligibilityLimit },
+        pf: { ...rules.pf, wageCeiling: r.pfWageCeiling, employerWageCeiling: r.employerPfWageCeiling },
+        esic: {
+            ...rules.esic,
+            eligibilityBasis: r.esicEligibilityBasis, eligibilityPeriod: r.esicEligibilityPeriod,
+            chargeBase: r.esicChargeBase, eligibilityLimit: r.esicEligibilityLimit,
+        },
     }
 }
 
@@ -210,14 +239,27 @@ export function rulesForToday(rules: PayrollRules, now: Date = new Date()): Payr
 }
 
 /**
- * The full-month figure ESIC eligibility is tested against, per the rules'
- * basis. Shared by the engine, the single-row edit route and the reports.
+ * The figure ESIC eligibility is tested against, per the rules' basis
+ * (Basic + DA or gross) and period (full-month structure or earned). Shared
+ * by the engine, the single-row edit route and the reports.
  */
 export function esicEligibilityBase(
     esic: PayrollRules["esic"],
-    full: { basic: number; da: number; gross: number }
+    full: { basic: number; da: number; gross: number },
+    earned?: { basic: number; da: number; gross: number },
 ): number {
-    return esic.eligibilityBasis === "basicDa" ? full.basic + full.da : full.gross
+    const f = esic.eligibilityPeriod === "earned" && earned ? earned : full
+    return esic.eligibilityBasis === "basicDa" ? f.basic + f.da : f.gross
+}
+
+/** What the ESIC % is charged on: ESIC wages, or earned Basic + DA. */
+export function esicChargeAmount(esic: PayrollRules["esic"], v: { esicWages: number; basicDa: number }): number {
+    return esic.chargeBase === "basicDa" ? v.basicDa : v.esicWages
+}
+
+/** Base for employer PF: earned Basic + DA up to the employer ceiling. */
+export function employerPfBase(pf: PayrollRules["pf"], basicDa: number): number {
+    return Math.min(basicDa, pf.employerWageCeiling ?? pf.wageCeiling)
 }
 
 // ─── Sanitizer ───────────────────────────────────────────────────────────────
@@ -281,6 +323,12 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
     const defaults = o.defaults ?? {}
     const codes = o.codes ?? {}
     const revision = o.revision ?? {}
+    const period = (v: unknown, fallback: EsicEligibilityPeriod): EsicEligibilityPeriod =>
+        v === "fullMonth" || v === "earned" ? v : fallback
+    const charge = (v: unknown, fallback: EsicChargeBase): EsicChargeBase =>
+        v === "esicWages" || v === "basicDa" ? v : fallback
+    const optCeiling = (v: unknown, fallback: number | null): number | null =>
+        v === null || v === "" ? null : v === undefined ? fallback : num(v, fallback ?? 0)
     const basis = (v: unknown, fallback: EsicEligibilityBasis): EsicEligibilityBasis =>
         v === "basicDa" || v === "structureGross" ? v : fallback
 
@@ -288,6 +336,7 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
         pf: {
             enabled: bool(pf.enabled, d.pf.enabled),
             wageCeiling: num(pf.wageCeiling, d.pf.wageCeiling),
+            employerWageCeiling: optCeiling(pf.employerWageCeiling, d.pf.employerWageCeiling),
             employeePct: num(pf.employeePct, d.pf.employeePct, { max: 100 }),
             prorateEmployee: bool(pf.prorateEmployee, d.pf.prorateEmployee),
             prorationThresholdDays: num(pf.prorationThresholdDays, d.pf.prorationThresholdDays, { min: 1, max: 31 }),
@@ -301,6 +350,8 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
         esic: {
             enabled: bool(esic.enabled, d.esic.enabled),
             eligibilityBasis: basis(esic.eligibilityBasis, d.esic.eligibilityBasis),
+            eligibilityPeriod: period(esic.eligibilityPeriod, d.esic.eligibilityPeriod),
+            chargeBase: charge(esic.chargeBase, d.esic.chargeBase),
             eligibilityLimit: num(esic.eligibilityLimit, d.esic.eligibilityLimit),
             handicapLimit: num(esic.handicapLimit, d.esic.handicapLimit),
             employeePct: num(esic.employeePct, d.esic.employeePct, { max: 100 }),
@@ -341,7 +392,10 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
             effectiveMonth: num(revision.effectiveMonth, d.revision.effectiveMonth, { min: 1, max: 12 }),
             effectiveYear: num(revision.effectiveYear, d.revision.effectiveYear, { min: 2000, max: 2100 }),
             pfWageCeiling: num(revision.pfWageCeiling, d.revision.pfWageCeiling),
+            employerPfWageCeiling: optCeiling(revision.employerPfWageCeiling, d.revision.employerPfWageCeiling),
             esicEligibilityBasis: basis(revision.esicEligibilityBasis, d.revision.esicEligibilityBasis),
+            esicEligibilityPeriod: period(revision.esicEligibilityPeriod, d.revision.esicEligibilityPeriod),
+            esicChargeBase: charge(revision.esicChargeBase, d.revision.esicChargeBase),
             esicEligibilityLimit: num(revision.esicEligibilityLimit, d.revision.esicEligibilityLimit),
         },
     }

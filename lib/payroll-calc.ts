@@ -37,7 +37,7 @@
 // PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
 //   200 (300 in February). Female employees exempt up to ₹25,000.
 //
-import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase } from "./payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase } from "./payroll-rules"
 
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
@@ -136,9 +136,12 @@ export function calcGrowusPayroll(sal: {
         - (rules.esic.excludeWashing ? washingEarned : 0)
         - (rules.esic.excludeConveyance ? convEarned : 0)
         - (rules.esic.excludeBonus ? bonusEarned : 0)
-    const esicBase     = esicEligibilityBase(rules.esic, { basic, da, gross: grossFullMonth })
+    // Eligibility on the full-month structure or on what was earned (settings).
+    const esicBase     = esicEligibilityBase(rules.esic, { basic, da, gross: grossFullMonth }, { basic: basicEarned, da: daEarned, gross: grossEarned })
+    // Charged on ESIC wages, or on earned Basic + DA (settings).
+    const esicCharge   = esicChargeAmount(rules.esic, { esicWages, basicDa: basicEarned + daEarned })
     const esicEligible = rules.esic.enabled && !isCALL && esicApplicable !== false && esicBase <= esicLimit
-    const esiEmployee  = esicEligible ? pctCeil(esicWages, rules.esic.employeePct) : 0
+    const esiEmployee  = esicEligible ? pctCeil(esicCharge, rules.esic.employeePct) : 0
 
     // PT: slab on EARNED gross, but the female limit on the full-month
     // STRUCTURE gross — two different figures on purpose, see computePt.
@@ -166,10 +169,12 @@ export function calcGrowusPayroll(sal: {
     const netSalary = grossEarned - totalDeductions
 
     // ─── Employer Contributions ───────────────────────────────────────────────
-    // Employer PF — 4 components on the same capped pfBase as the employee share
+    // Employer PF — 4 components on Basic + DA up to the employer ceiling
+    // (the employee's ceiling unless Calculation Settings sets another).
+    const erBase      = employerPfBase(rules.pf, basicEarned + daEarned)
     // Not in the pension scheme: no EPS, and the remainder line below then puts
     // the whole employer share into EPF — the total employer PF is unchanged.
-    const eps         = !pfApplies || pensionApplicable === false ? 0 : pctOf(pfBase, rules.pf.employer.epsPct)
+    const eps         = !pfApplies || pensionApplicable === false ? 0 : pctOf(erBase, rules.pf.employer.epsPct)
     // EPF employer is the REMAINDER of the combined EPS+EPF share, not an
     // independently rounded 3.67%. EPFO computes the 12% employer share and
     // subtracts EPS from it, so EPS + EPF must come to exactly ROUND(12%) —
@@ -179,13 +184,13 @@ export function calcGrowusPayroll(sal: {
     //   independent → ROUND(1249.5)=1250 + ROUND(550.5)=551      → ₹1,951
     //   remainder   → 1800 − 1250 = 550                          → ₹1,950  ✓
     const epfEmployer = !pfApplies ? 0
-        : pctOf(pfBase, rules.pf.employer.epsPct + rules.pf.employer.epfPct) - eps
-    const edli        = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.edliPct)
-    const epfAdmin    = !pfApplies ? 0 : pctOf(pfBase, rules.pf.employer.adminPct)
+        : pctOf(erBase, rules.pf.employer.epsPct + rules.pf.employer.epfPct) - eps
+    const edli        = !pfApplies ? 0 : pctOf(erBase, rules.pf.employer.edliPct)
+    const epfAdmin    = !pfApplies ? 0 : pctOf(erBase, rules.pf.employer.adminPct)
     const pfEmployer  = eps + epfEmployer + edli + epfAdmin
 
     // ESIC Employer: CEIL(esicWages × employer %)
-    const esiEmployer = esicEligible ? pctCeil(esicWages, rules.esic.employerPct) : 0
+    const esiEmployer = esicEligible ? pctCeil(esicCharge, rules.esic.employerPct) : 0
 
     const ctc = grossFullMonth + pfEmployer + esiEmployer
 

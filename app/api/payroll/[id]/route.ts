@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { computePt, esicEligibilityBase, rulesForPeriod } from "@/lib/payroll-rules"
+import { computePt, esicEligibilityBase, esicChargeAmount, rulesForPeriod } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { revisionsForMonth } from "@/lib/salary-revision"
 
@@ -146,14 +146,15 @@ export async function PUT(
             const esicLimit = employee?.isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
             // Same switch the wage run honours (Employee Master → ESIC Applicable).
             const esicApplicable = (await statutoryFlagsFor([existing.employeeId])).get(existing.employeeId)?.esicApplicable ?? true
-            const esicEligible = rules.esic.enabled && !isCALL && esicApplicable && esicEligibilityBase(rules.esic, { basic: existing.basicFull, da: existing.daFull, gross: existing.grossFullMonth }) <= esicLimit
+            const esicEligible = rules.esic.enabled && !isCALL && esicApplicable && esicEligibilityBase(rules.esic, { basic: existing.basicFull, da: existing.daFull, gross: existing.grossFullMonth }, { basic: existing.basicSalary, da: existing.da, gross: grossSalary }) <= esicLimit
             const esicWages = Math.max(0,
                 grossSalary
                 - (rules.esic.excludeWashing ? existing.washing : 0)
                 - (rules.esic.excludeConveyance ? existing.conveyance : 0)
                 - (rules.esic.excludeBonus ? existing.bonus : 0))
-            const esiEmployee = esicEligible ? Math.ceil(esicWages * rules.esic.employeePct / 100) : 0
-            const esiEmployer = esicEligible ? Math.ceil(esicWages * rules.esic.employerPct / 100) : 0
+            const esicCharge = esicChargeAmount(rules.esic, { esicWages, basicDa: existing.basicSalary + existing.da })
+            const esiEmployee = esicEligible ? Math.ceil(esicCharge * rules.esic.employeePct / 100) : 0
+            const esiEmployer = esicEligible ? Math.ceil(esicCharge * rules.esic.employerPct / 100) : 0
 
             // PT slab can shift when gross changes.
             const pt = computePt(grossSalary, rules.pt, {

@@ -282,14 +282,44 @@ export default function PayrollSettingsPage() {
                                     <option value="structureGross">Structure gross</option>
                                 </select>
                             </label>
+                            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={fieldLabel}>Employer PF capped at</span>
+                                <select id="rev-employer-pf"
+                                    value={rules.revision.employerPfWageCeiling === null ? "same" : String(rules.revision.employerPfWageCeiling)}
+                                    onChange={e => up("revision", { employerPfWageCeiling: e.target.value === "same" ? null : Number(e.target.value) })}
+                                    style={inputStyle}>
+                                    <option value="same">Same as employee (₹{Math.round(rules.revision.pfWageCeiling).toLocaleString("en-IN")})</option>
+                                    <option value="15000">₹15,000 (old ceiling)</option>
+                                    {![null, 15000].includes(rules.revision.employerPfWageCeiling) && (
+                                        <option value={String(rules.revision.employerPfWageCeiling)}>₹{Math.round(rules.revision.employerPfWageCeiling ?? 0).toLocaleString("en-IN")}</option>
+                                    )}
+                                </select>
+                            </label>
+                            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={fieldLabel}>ESIC % charged on</span>
+                                <select id="rev-esic-charge" value={rules.revision.esicChargeBase}
+                                    onChange={e => up("revision", { esicChargeBase: e.target.value as PayrollRules["revision"]["esicChargeBase"] })} style={inputStyle}>
+                                    <option value="esicWages">ESIC wages (gross − exclusions)</option>
+                                    <option value="basicDa">Earned Basic + DA</option>
+                                </select>
+                            </label>
+                            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={fieldLabel}>ESIC eligibility uses</span>
+                                <select id="rev-esic-period" value={rules.revision.esicEligibilityPeriod}
+                                    onChange={e => up("revision", { esicEligibilityPeriod: e.target.value as PayrollRules["revision"]["esicEligibilityPeriod"] })} style={inputStyle}>
+                                    <option value="fullMonth">Full-month salary structure</option>
+                                    <option value="earned">Amount earned that month</option>
+                                </select>
+                            </label>
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.6 }}>
                             <div>
                                 <b>PF:</b> Basic + DA ≥ ₹{Math.round(rules.revision.pfWageCeiling).toLocaleString("en-IN")} → ₹{Math.round(rules.revision.pfWageCeiling * rules.pf.employeePct / 100).toLocaleString("en-IN")} ({rules.pf.employeePct}%);
                                 {" "}below that → {rules.pf.employeePct}% of actual Basic + DA.
+                                {" "}Employer PF on Basic + DA up to ₹{Math.round(rules.revision.employerPfWageCeiling ?? rules.revision.pfWageCeiling).toLocaleString("en-IN")}.
                             </div>
                             <div>
-                                <b>ESIC:</b> {rules.revision.esicEligibilityBasis === "basicDa" ? "Basic + DA" : "Structure gross"} ≤ ₹{Math.round(rules.revision.esicEligibilityLimit).toLocaleString("en-IN")} → {rules.esic.employeePct}%;
+                                <b>ESIC:</b> {rules.revision.esicEligibilityPeriod === "earned" ? "earned" : "full-month"} {rules.revision.esicEligibilityBasis === "basicDa" ? "Basic + DA" : "gross"} ≤ ₹{Math.round(rules.revision.esicEligibilityLimit).toLocaleString("en-IN")} → {rules.esic.employeePct}% of {rules.revision.esicChargeBase === "basicDa" ? "earned Basic + DA" : "ESIC wages"};
                                 {" "}₹{Math.round(rules.revision.esicEligibilityLimit + 1).toLocaleString("en-IN")} and above → no ESIC.
                             </div>
                         </div>
