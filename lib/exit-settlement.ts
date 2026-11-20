@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma"
 import { getLeavePolicy, getLeaveBalances } from "@/lib/leave-policy-server"
 import { DAY_MS } from "@/lib/leave-policy"
+import { getPayrollRules } from "@/lib/payroll-rules-server"
 
 // Full & Final settlement for a leaver, worked out from what the system knows:
 // salary structure, attendance month, leave balance, service length, notice
@@ -16,10 +17,9 @@ export type FnfRecord = { adjustments: FnfAdjustment[]; paymentMode?: string; re
 
 const fnfKey = (exitId: string) => `exitFnf:${exitId}`
 const round = (n: number) => Math.round(n)
-const GRATUITY_CAP = 2_000_000
-// Payment of Gratuity Act: 5 years' continuous service, which courts and most
-// employers read as 4 years 240 days.
-const GRATUITY_MIN_DAYS = 4 * 365 + 240
+// Gratuity days / divisor / minimum service / cap, encashment and notice
+// divisors all come from Payroll → Calculation Settings → Full & final
+// (defaults: 15/26, 4 yr 240 d, ₹20 lakh, ÷26, ÷30).
 
 export async function getFnfRecord(exitId: string): Promise<FnfRecord> {
     try {
@@ -77,6 +77,8 @@ export async function previewSettlement(input: Omit<ExitInput, "employee" | "id"
 async function settlementFor(exit: ExitInput, record: FnfRecord) {
     const exitId = exit.id
     const e = exit.employee
+    const fnf = (await getPayrollRules()).rules.fnf
+    const fmtL = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`
 
     const lwd = exit.lastWorkingDate ?? new Date(exit.resignationDate.getTime() + exit.noticePeriodDays * DAY_MS)
     const lwdMonth = lwd.getUTCMonth() + 1, lwdYear = lwd.getUTCFullYear()
@@ -121,7 +123,8 @@ async function settlementFor(exit: ExitInput, record: FnfRecord) {
         for (const t of encashable) {
             const b = bal.find(x => x.code === t.code)
             const days = Math.max(0, b?.available ?? 0)
-            lines.push({ key: `encash-${t.code}`, label: `${t.name} encashment`, amount: round(basicDa / 26 * days), note: `${days} day(s) balance × (basic + DA) ÷ 26`, kind: "earning", auto: true })
+            const encBase = fnf.encashOn === "gross" ? gross : basicDa
+            lines.push({ key: `encash-${t.code}`, label: `${t.name} encashment`, amount: round(encBase / fnf.encashDivisor * days), note: `${days} day(s) balance × (${fnf.encashOn === "gross" ? "gross" : "basic + DA"}) ÷ ${fnf.encashDivisor}`, kind: "earning", auto: true })
         }
     }
 
@@ -130,14 +133,15 @@ async function settlementFor(exit: ExitInput, record: FnfRecord) {
         const serviceDays = Math.floor((lwd.getTime() - e.dateOfJoining.getTime()) / DAY_MS)
         const fullYears = Math.floor(serviceDays / 365.25)
         const extraMonths = Math.floor((serviceDays - fullYears * 365.25) / 30.44)
-        const years = fullYears + (extraMonths >= 6 ? 1 : 0)
+        const years = fullYears + (extraMonths >= fnf.roundUpMonthsFrom ? 1 : 0)
         const svc = `${fullYears}y ${extraMonths}m service`
-        if (serviceDays >= GRATUITY_MIN_DAYS) {
-            const amt = Math.min(GRATUITY_CAP, round(basicDa * 15 / 26 * years))
-            lines.push({ key: "gratuity", label: "Gratuity", amount: amt, note: `(basic + DA) × 15/26 × ${years} yr (${svc})${amt === GRATUITY_CAP ? " — capped at ₹20 lakh" : ""}`, kind: "earning", auto: true })
+        if (serviceDays >= fnf.gratuityMinDays) {
+            const amt = Math.min(fnf.gratuityCap, round(basicDa * fnf.gratuityDays / fnf.gratuityDivisor * years))
+            lines.push({ key: "gratuity", label: "Gratuity", amount: amt, note: `(basic + DA) × ${fnf.gratuityDays}/${fnf.gratuityDivisor} × ${years} yr (${svc})${amt === fnf.gratuityCap ? ` — capped at ${fmtL(fnf.gratuityCap)}` : ""}`, kind: "earning", auto: true })
             if (exit.exitType === "TERMINATION" || exit.exitType === "ABSCONDING") warnings.push("Gratuity can be forfeited for termination on misconduct — remove the line if that applies.")
         } else {
-            lines.push({ key: "gratuity", label: "Gratuity", amount: 0, note: `Not eligible — ${svc}, needs 4 years 240 days`, kind: "earning", auto: true })
+            const need = `${Math.floor(fnf.gratuityMinDays / 365)} years ${fnf.gratuityMinDays % 365} days`
+            lines.push({ key: "gratuity", label: "Gratuity", amount: 0, note: `Not eligible — ${svc}, needs ${need}`, kind: "earning", auto: true })
         }
     } else {
         warnings.push("Date of joining is missing — gratuity can't be worked out.")
@@ -147,9 +151,9 @@ async function settlementFor(exit: ExitInput, record: FnfRecord) {
     const served = Math.max(0, Math.round((lwd.getTime() - exit.resignationDate.getTime()) / DAY_MS))
     const short = Math.max(0, exit.noticePeriodDays - served)
     if (short > 0 && exit.exitType === "RESIGNATION") {
-        lines.push({ key: "notice", label: "Notice period shortfall", amount: round(gross / 30 * short), note: `${short} of ${exit.noticePeriodDays} notice days not served × gross ÷ 30`, kind: "deduction", auto: true })
+        lines.push({ key: "notice", label: "Notice period shortfall", amount: round(gross / fnf.noticeDivisor * short), note: `${short} of ${exit.noticePeriodDays} notice days not served × gross ÷ ${fnf.noticeDivisor}`, kind: "deduction", auto: true })
     } else if (short > 0 && exit.exitType === "TERMINATION") {
-        lines.push({ key: "notice", label: "Notice pay in lieu", amount: round(gross / 30 * short), note: `${short} of ${exit.noticePeriodDays} notice days × gross ÷ 30`, kind: "earning", auto: true })
+        lines.push({ key: "notice", label: "Notice pay in lieu", amount: round(gross / fnf.noticeDivisor * short), note: `${short} of ${exit.noticePeriodDays} notice days × gross ÷ ${fnf.noticeDivisor}`, kind: "earning", auto: true })
     }
 
     // 5. Advances and reimbursements still open.

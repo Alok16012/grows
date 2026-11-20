@@ -370,7 +370,7 @@ export default function PayrollSettingsPage() {
                 <div style={cardStyle}>
                     <div>
                         <h2 style={cardTitle}>ESIC</h2>
-                        <p style={cardHint}>Before the new rule above, eligibility is checked on the full-month structure gross. Contribution base = earned gross minus the excluded components (OT stays included).</p>
+                        <p style={cardHint}>Before the new rule above, eligibility is checked on the full-month structure gross. Contribution base = earned gross minus the components excluded below.</p>
                     </div>
                     <Toggle label="ESIC enabled" checked={rules.esic.enabled} onChange={b => up("esic", { enabled: b })} />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -382,6 +382,8 @@ export default function PayrollSettingsPage() {
                     <Toggle label="Exclude Washing from ESIC wages" checked={rules.esic.excludeWashing} onChange={b => up("esic", { excludeWashing: b })} />
                     <Toggle label="Exclude Conveyance from ESIC wages" checked={rules.esic.excludeConveyance} onChange={b => up("esic", { excludeConveyance: b })} />
                     <Toggle label="Exclude Bonus from ESIC wages" checked={rules.esic.excludeBonus} onChange={b => up("esic", { excludeBonus: b })} />
+                    <Toggle label="Exclude OT from ESIC wages" checked={rules.esic.excludeOt} onChange={b => up("esic", { excludeOt: b })} />
+                    <Toggle label="Exclude production incentive from ESIC wages" checked={rules.esic.excludeIncentive} onChange={b => up("esic", { excludeIncentive: b })} />
                 </div>
 
                 {/* ── PT ── */}
@@ -435,6 +437,13 @@ export default function PayrollSettingsPage() {
                         <NumField label="Female exempt up to" suffix="₹" value={rules.pt.femaleExemptUpTo}
                             onChange={n => up("pt", { femaleExemptUpTo: n })} />
                     </div>
+                    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span style={fieldLabel}>Female exemption checked on</span>
+                        <select value={rules.pt.femaleExemptOn} onChange={e => up("pt", { femaleExemptOn: e.target.value as PayrollRules["pt"]["femaleExemptOn"] })} style={inputStyle}>
+                            <option value="structure">Full-month salary structure</option>
+                            <option value="earned">Amount earned that month</option>
+                        </select>
+                    </label>
                     <Toggle label="Charge PT to CALL (contract) employees" checked={rules.pt.appliesToCall}
                         onChange={b => up("pt", { appliesToCall: b })}
                         hint="The wage rule book exempts CALL from PT; the system has historically charged it. Untick to follow the rule book." />
@@ -459,6 +468,76 @@ export default function PayrollSettingsPage() {
                         <NumField label="Default DA" suffix="₹" value={rules.defaults.da} onChange={n => up("defaults", { da: n })} />
                         <NumField label="Default Bonus" suffix="₹" value={rules.defaults.bonus} onChange={n => up("defaults", { bonus: n })} />
                     </div>
+                </div>
+
+                {/* ── Pay & proration ── */}
+                <div style={cardStyle}>
+                    <div>
+                        <h2 style={cardTitle}>Pay &amp; Proration</h2>
+                        <p style={cardHint}>Earned pay = structure amount × days worked ÷ month days. Basic and DA are always cut by attendance; tick an allowance to pay it in full every month instead.</p>
+                    </div>
+                    {([["hra", "HRA"], ["washing", "Washing allowance"], ["conveyance", "Conveyance"], ["leaveWithWages", "Leave with wages"], ["bonus", "Bonus"], ["otherAllowance", "Other allowance"]] as const).map(([k, l]) => (
+                        <Toggle key={k} label={`Pay ${l} in full (not by days worked)`} checked={rules.pay.fullMonth[k]}
+                            onChange={b => up("pay", { fullMonth: { ...rules.pay.fullMonth, [k]: b } })} />
+                    ))}
+                    <Toggle label="Round each earned amount to the rupee" checked={rules.pay.roundEarned}
+                        onChange={b => up("pay", { roundEarned: b })} hint="Off = kept to the paise (net pay is still a whole rupee on the bank sheet)." />
+                </div>
+
+                {/* ── Contract (CALL) employees ── */}
+                <div style={cardStyle}>
+                    <div>
+                        <h2 style={cardTitle}>Contract (CALL) Employees</h2>
+                        <p style={cardHint}>Employees whose salary structure is marked CALL. By default they get none of these; PT for CALL is set in the PT card.</p>
+                    </div>
+                    <Toggle label="Deduct PF for CALL employees" checked={rules.call.pf} onChange={b => up("call", { pf: b })} />
+                    <Toggle label="Deduct ESIC for CALL employees" checked={rules.call.esic} onChange={b => up("call", { esic: b })} />
+                    <Toggle label="Pay HRA to CALL employees" checked={rules.call.hra} onChange={b => up("call", { hra: b })} />
+                    <Toggle label="Pay Bonus to CALL employees" checked={rules.call.bonus} onChange={b => up("call", { bonus: b })} />
+                </div>
+
+                {/* ── Rounding ── */}
+                <div style={cardStyle}>
+                    <div>
+                        <h2 style={cardTitle}>Rounding</h2>
+                        <p style={cardHint}>How statutory amounts are rounded to the rupee. ESIC rules say round up; PF is normally the nearest rupee. Employer PF parts always use the nearest rupee (EPFO).</p>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        {([["pf", "Employee PF"], ["esic", "ESIC (employee & employer)"]] as const).map(([k, l]) => (
+                            <label key={k} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={fieldLabel}>{l}</span>
+                                <select value={rules.rounding[k]} onChange={e => up("rounding", { [k]: e.target.value } as Partial<PayrollRules["rounding"]>)} style={inputStyle}>
+                                    <option value="nearest">Nearest rupee</option>
+                                    <option value="up">Round up</option>
+                                </select>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* ── Full & final settlement ── */}
+                <div style={cardStyle}>
+                    <div>
+                        <h2 style={cardTitle}>Full &amp; Final Settlement</h2>
+                        <p style={cardHint}>Used for exit F&amp;F and the FNF report. Gratuity = (Basic + DA) × days ÷ divisor × years of service.</p>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <NumField label="Gratuity days per year" value={rules.fnf.gratuityDays} onChange={n => up("fnf", { gratuityDays: n })} />
+                        <NumField label="Gratuity divisor (days in month)" value={rules.fnf.gratuityDivisor} onChange={n => up("fnf", { gratuityDivisor: n })} />
+                        <NumField label="Service needed for gratuity (days)" value={rules.fnf.gratuityMinDays} onChange={n => up("fnf", { gratuityMinDays: n })} />
+                        <NumField label="Gratuity cap" suffix="₹" value={rules.fnf.gratuityCap} onChange={n => up("fnf", { gratuityCap: n })} />
+                        <NumField label="Count part-year as a year from (months)" value={rules.fnf.roundUpMonthsFrom} onChange={n => up("fnf", { roundUpMonthsFrom: n })} />
+                        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <span style={fieldLabel}>Leave encashment on</span>
+                            <select value={rules.fnf.encashOn} onChange={e => up("fnf", { encashOn: e.target.value as PayrollRules["fnf"]["encashOn"] })} style={inputStyle}>
+                                <option value="basicDa">Basic + DA</option>
+                                <option value="gross">Gross salary</option>
+                            </select>
+                        </label>
+                        <NumField label="Encashment divisor (days)" value={rules.fnf.encashDivisor} onChange={n => up("fnf", { encashDivisor: n })} />
+                        <NumField label="Notice pay divisor (days)" value={rules.fnf.noticeDivisor} onChange={n => up("fnf", { noticeDivisor: n })} />
+                    </div>
+                    <p style={cardHint}>Default service rule: 4 years 240 days = 1,700 days (Payment of Gratuity Act, as courts read 5 years).</p>
                 </div>
 
                 {/* ── Establishment codes ── */}

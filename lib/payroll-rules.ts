@@ -53,7 +53,31 @@ export type StatutoryRevision = {
     esicEligibilityLimit: number
 }
 
+export type RoundMode = "nearest" | "up"
+
 export type PayrollRules = {
+    // How earned pay is worked out from attendance (Calculation Settings → Pay & proration).
+    pay: {
+        // true = paid in full every month; false = cut by days worked (Basic and DA always are).
+        fullMonth: { hra: boolean; washing: boolean; conveyance: boolean; leaveWithWages: boolean; bonus: boolean; otherAllowance: boolean }
+        // true = each earned amount rounded to the rupee; false = kept to the paise.
+        roundEarned: boolean
+    }
+    // What contract ("CALL") employees get. Default: none of these.
+    call: { pf: boolean; esic: boolean; hra: boolean; bonus: boolean }
+    // Rounding of the employee PF and of ESIC (employee + employer).
+    rounding: { pf: RoundMode; esic: RoundMode }
+    // Full & final settlement (Exit → F&F, Payroll → Reports → FNF).
+    fnf: {
+        gratuityDays: number          // days' wages per year of service (15)
+        gratuityDivisor: number       // a month's wages ÷ this = one day (26)
+        gratuityMinDays: number       // service needed, in days (4 yr 240 d = 1700)
+        gratuityCap: number           // maximum gratuity (₹20,00,000)
+        roundUpMonthsFrom: number     // part-year of this many months or more counts as a full year (6)
+        encashOn: "basicDa" | "gross" // leave encashment rate base
+        encashDivisor: number         // ÷ this = one day's encashment (26)
+        noticeDivisor: number         // gross ÷ this = one notice day (30)
+    }
     pf: {
         enabled: boolean
         // PF base = min(earned Basic + DA, wageCeiling).
@@ -92,6 +116,8 @@ export type PayrollRules = {
         excludeWashing: boolean
         excludeConveyance: boolean
         excludeBonus: boolean
+        excludeOt: boolean
+        excludeIncentive: boolean
     }
     pt: {
         enabled: boolean
@@ -106,6 +132,8 @@ export type PayrollRules = {
         // Female employees with earned gross ≤ this pay zero PT
         // (Maharashtra notification). 0 disables the exemption.
         femaleExemptUpTo: number
+        // The female limit is checked on the full-month salary structure or on what was earned.
+        femaleExemptOn: "structure" | "earned"
     }
     lwf: {
         // LWF stays a manual per-run entry; these only prefill the attendance
@@ -133,6 +161,16 @@ export type PayrollRules = {
 }
 
 export const DEFAULT_PAYROLL_RULES: PayrollRules = {
+    pay: {
+        fullMonth: { hra: false, washing: false, conveyance: false, leaveWithWages: false, bonus: false, otherAllowance: false },
+        roundEarned: true,
+    },
+    call: { pf: false, esic: false, hra: false, bonus: false },
+    rounding: { pf: "nearest", esic: "up" },
+    fnf: {
+        gratuityDays: 15, gratuityDivisor: 26, gratuityMinDays: 4 * 365 + 240, gratuityCap: 2_000_000,
+        roundUpMonthsFrom: 6, encashOn: "basicDa", encashDivisor: 26, noticeDivisor: 30,
+    },
     pf: {
         enabled: true,
         wageCeiling: 15000,
@@ -161,6 +199,9 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         // Bonus STAYS in the ESIC base. Only Washing and Conveyance come out:
         //   ESIC wages = EarnedGross − Washing − Conveyance
         excludeBonus: false,
+        // OT and production incentive are wages for ESIC.
+        excludeOt: false,
+        excludeIncentive: false,
     },
     pt: {
         enabled: true,
@@ -172,6 +213,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         ],
         februaryAmount: 300,
         femaleExemptUpTo: 25000,
+        femaleExemptOn: "structure",
     },
     lwf: {
         employeeDefault: 0,
@@ -323,6 +365,12 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
     const defaults = o.defaults ?? {}
     const codes = o.codes ?? {}
     const revision = o.revision ?? {}
+    const pay = o.pay ?? {}
+    const fm = pay.fullMonth ?? {}
+    const call = o.call ?? {}
+    const rounding = o.rounding ?? {}
+    const fnf = o.fnf ?? {}
+    const round = (v: unknown, fallback: RoundMode): RoundMode => (v === "nearest" || v === "up" ? v : fallback)
     const period = (v: unknown, fallback: EsicEligibilityPeriod): EsicEligibilityPeriod =>
         v === "fullMonth" || v === "earned" ? v : fallback
     const charge = (v: unknown, fallback: EsicChargeBase): EsicChargeBase =>
@@ -333,6 +381,26 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
         v === "basicDa" || v === "structureGross" ? v : fallback
 
     return {
+        pay: {
+            fullMonth: {
+                hra: bool(fm.hra, d.pay.fullMonth.hra), washing: bool(fm.washing, d.pay.fullMonth.washing),
+                conveyance: bool(fm.conveyance, d.pay.fullMonth.conveyance), leaveWithWages: bool(fm.leaveWithWages, d.pay.fullMonth.leaveWithWages),
+                bonus: bool(fm.bonus, d.pay.fullMonth.bonus), otherAllowance: bool(fm.otherAllowance, d.pay.fullMonth.otherAllowance),
+            },
+            roundEarned: bool(pay.roundEarned, d.pay.roundEarned),
+        },
+        call: { pf: bool(call.pf, d.call.pf), esic: bool(call.esic, d.call.esic), hra: bool(call.hra, d.call.hra), bonus: bool(call.bonus, d.call.bonus) },
+        rounding: { pf: round(rounding.pf, d.rounding.pf), esic: round(rounding.esic, d.rounding.esic) },
+        fnf: {
+            gratuityDays: num(fnf.gratuityDays, d.fnf.gratuityDays, { min: 0, max: 60 }),
+            gratuityDivisor: num(fnf.gratuityDivisor, d.fnf.gratuityDivisor, { min: 1, max: 31 }),
+            gratuityMinDays: num(fnf.gratuityMinDays, d.fnf.gratuityMinDays, { min: 0, max: 20000 }),
+            gratuityCap: num(fnf.gratuityCap, d.fnf.gratuityCap),
+            roundUpMonthsFrom: num(fnf.roundUpMonthsFrom, d.fnf.roundUpMonthsFrom, { min: 1, max: 12 }),
+            encashOn: fnf.encashOn === "gross" || fnf.encashOn === "basicDa" ? fnf.encashOn : d.fnf.encashOn,
+            encashDivisor: num(fnf.encashDivisor, d.fnf.encashDivisor, { min: 1, max: 31 }),
+            noticeDivisor: num(fnf.noticeDivisor, d.fnf.noticeDivisor, { min: 1, max: 31 }),
+        },
         pf: {
             enabled: bool(pf.enabled, d.pf.enabled),
             wageCeiling: num(pf.wageCeiling, d.pf.wageCeiling),
@@ -359,6 +427,8 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
             excludeWashing: bool(esic.excludeWashing, d.esic.excludeWashing),
             excludeConveyance: bool(esic.excludeConveyance, d.esic.excludeConveyance),
             excludeBonus: bool(esic.excludeBonus, d.esic.excludeBonus),
+            excludeOt: bool(esic.excludeOt, d.esic.excludeOt),
+            excludeIncentive: bool(esic.excludeIncentive, d.esic.excludeIncentive),
         },
         pt: {
             enabled: bool(pt.enabled, d.pt.enabled),
@@ -366,6 +436,7 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
             slabs: sanitizeSlabs(pt.slabs, d.pt.slabs),
             februaryAmount: pt.februaryAmount === null ? null : num(pt.februaryAmount, d.pt.februaryAmount ?? 0),
             femaleExemptUpTo: num(pt.femaleExemptUpTo, d.pt.femaleExemptUpTo),
+            femaleExemptOn: pt.femaleExemptOn === "earned" || pt.femaleExemptOn === "structure" ? pt.femaleExemptOn : d.pt.femaleExemptOn,
         },
         lwf: {
             employeeDefault: num(lwf.employeeDefault, d.lwf.employeeDefault),
@@ -399,6 +470,21 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
             esicEligibilityLimit: num(revision.esicEligibilityLimit, d.revision.esicEligibilityLimit),
         },
     }
+}
+
+/** x rounded per the setting: to the nearest rupee, or up to the next rupee. */
+export function roundAmt(x: number, mode: RoundMode): number {
+    return mode === "up" ? Math.ceil(x) : Math.round(x)
+}
+
+/** ESIC wages: earned gross less the components Calculation Settings excludes. Engine, edits and reports share it. */
+export function esicWagesOf(esic: PayrollRules["esic"], c: { gross: number; washing: number; conveyance: number; bonus: number; ot: number; incentive: number }): number {
+    return Math.max(0, c.gross
+        - (esic.excludeWashing ? c.washing : 0)
+        - (esic.excludeConveyance ? c.conveyance : 0)
+        - (esic.excludeBonus ? c.bonus : 0)
+        - (esic.excludeOt ? c.ot : 0)
+        - (esic.excludeIncentive ? c.incentive : 0))
 }
 
 // ─── PT slab lookup ──────────────────────────────────────────────────────────

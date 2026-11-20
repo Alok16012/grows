@@ -37,7 +37,7 @@
 // PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
 //   200 (300 in February). Female employees exempt up to ₹25,000.
 //
-import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase } from "./payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase, roundAmt, esicWagesOf } from "./payroll-rules"
 
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
@@ -86,22 +86,27 @@ export function calcGrowusPayroll(sal: {
 
     // ─── Full month components ────────────────────────────────────────────────
     // HRA: use manually stored value from salary structure (no auto-calculation)
-    const hraFull    = isCALL ? 0 : (storedHra != null && storedHra >= 0 ? storedHra : 0)
+    // Contract (CALL) staff get HRA / Bonus only if Calculation Settings says so.
+    const hraFull    = isCALL && !rules.call.hra ? 0 : (storedHra != null && storedHra >= 0 ? storedHra : 0)
     // Bonus: use manually stored value from salary structure (no auto-calculation)
-    const bonusFull  = isCALL ? 0 : (storedBonus != null && storedBonus > 0 ? storedBonus : 0)
+    const bonusFull  = isCALL && !rules.call.bonus ? 0 : (storedBonus != null && storedBonus > 0 ? storedBonus : 0)
     const grossFullMonth = basic + da + hraFull + washing + conveyance + leaveWithWages + bonusFull + otherAllowance
 
     // ─── Prorated earned (ROUND to 0 decimal) ─────────────────────────────────
     // IMPORTANT: multiply first, then divide (matches Excel order — avoids floating-point drift)
-    const r = (x: number) => Math.round(x * workedDays / monthDays)
+    // Rounded to the rupee or kept to the paise, and each allowance either cut
+    // by days worked or paid in full — all per Calculation Settings.
+    const rnd = (x: number) => rules.pay.roundEarned ? Math.round(x) : Math.round(x * 100) / 100
+    const r = (x: number, full = false) => full ? rnd(x) : rnd(x * workedDays / monthDays)
+    const fm = rules.pay.fullMonth
     const basicEarned   = r(basic)
     const daEarned      = r(da)
-    const hraEarned     = r(hraFull)
-    const washingEarned = r(washing)
-    const convEarned    = r(conveyance)
-    const lwwEarned     = r(leaveWithWages)
-    const bonusEarned   = r(bonusFull)
-    const otherEarned   = r(otherAllowance)
+    const hraEarned     = r(hraFull, fm.hra)
+    const washingEarned = r(washing, fm.washing)
+    const convEarned    = r(conveyance, fm.conveyance)
+    const lwwEarned     = r(leaveWithWages, fm.leaveWithWages)
+    const bonusEarned   = r(bonusFull, fm.bonus)
+    const otherEarned   = r(otherAllowance, fm.otherAllowance)
 
     // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
     const otPay = Math.round(otRatePerHour * rules.ot.hoursPerDay * otDays)
@@ -115,33 +120,29 @@ export function calcGrowusPayroll(sal: {
     // same Excel-exact order as proration — dividing the pct first drifts a
     // ulp and flips .5 rounding boundaries (e.g. 5000 × 8.33%).
     const pctOf  = (x: number, pct: number) => Math.round(x * pct / 100)
-    const pctCeil = (x: number, pct: number) => Math.ceil(x * pct / 100)
 
     // PF base = min(EARNED Basic + DA, wage ceiling).
     // Below the ceiling → 12% of actual; at or above → 12% of the ceiling
     // (₹1,800 on ₹15,000; ₹3,000 on ₹25,000 from Oct 2026).
     // Default: full PF regardless of worked days; optional proration rule.
-    const pfApplies  = rules.pf.enabled && !isCALL && pfApplicable !== false
+    const pfApplies  = rules.pf.enabled && (!isCALL || rules.call.pf) && pfApplicable !== false
     const pfBase     = Math.min(basicEarned + daEarned, rules.pf.wageCeiling)
     const pfProrated = rules.pf.prorateEmployee && workedDays < rules.pf.prorationThresholdDays
     const pfEmployee = !pfApplies ? 0 : pfProrated
-        ? Math.round(pfBase / rules.pf.prorationThresholdDays * workedDays * rules.pf.employeePct / 100)
-        : pctOf(pfBase, rules.pf.employeePct)
+        ? roundAmt(pfBase / rules.pf.prorationThresholdDays * workedDays * rules.pf.employeePct / 100, rules.rounding.pf)
+        : roundAmt(pfBase * rules.pf.employeePct / 100, rules.rounding.pf)
 
     // ESIC eligibility: a full-month figure ≤ limit — structure gross, or
     // Basic + DA from Oct 2026 (rules.esic.eligibilityBasis).
     // Contribution base = EarnedGross minus excluded components (OT included)
     const esicLimit    = isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
-    const esicWages    = grossEarned
-        - (rules.esic.excludeWashing ? washingEarned : 0)
-        - (rules.esic.excludeConveyance ? convEarned : 0)
-        - (rules.esic.excludeBonus ? bonusEarned : 0)
+    const esicWages    = esicWagesOf(rules.esic, { gross: grossEarned, washing: washingEarned, conveyance: convEarned, bonus: bonusEarned, ot: otPay, incentive: productionIncentive || 0 })
     // Eligibility on the full-month structure or on what was earned (settings).
     const esicBase     = esicEligibilityBase(rules.esic, { basic, da, gross: grossFullMonth }, { basic: basicEarned, da: daEarned, gross: grossEarned })
     // Charged on ESIC wages, or on earned Basic + DA (settings).
     const esicCharge   = esicChargeAmount(rules.esic, { esicWages, basicDa: basicEarned + daEarned })
-    const esicEligible = rules.esic.enabled && !isCALL && esicApplicable !== false && esicBase <= esicLimit
-    const esiEmployee  = esicEligible ? pctCeil(esicCharge, rules.esic.employeePct) : 0
+    const esicEligible = rules.esic.enabled && (!isCALL || rules.call.esic) && esicApplicable !== false && esicBase <= esicLimit
+    const esiEmployee  = esicEligible ? roundAmt(esicCharge * rules.esic.employeePct / 100, rules.rounding.esic) : 0
 
     // PT: slab on EARNED gross, but the female limit on the full-month
     // STRUCTURE gross — two different figures on purpose, see computePt.
@@ -149,7 +150,7 @@ export function calcGrowusPayroll(sal: {
         isFebruary: isFeb,
         isFemale,
         isCall: isCALL,
-        femaleExemptBasis: grossFullMonth,
+        femaleExemptBasis: rules.pt.femaleExemptOn === "earned" ? grossEarned : grossFullMonth,
     })
 
     // Canteen & other deductions
@@ -190,7 +191,7 @@ export function calcGrowusPayroll(sal: {
     const pfEmployer  = eps + epfEmployer + edli + epfAdmin
 
     // ESIC Employer: CEIL(esicWages × employer %)
-    const esiEmployer = esicEligible ? pctCeil(esicCharge, rules.esic.employerPct) : 0
+    const esiEmployer = esicEligible ? roundAmt(esicCharge * rules.esic.employerPct / 100, rules.rounding.esic) : 0
 
     const ctc = grossFullMonth + pfEmployer + esiEmployer
 

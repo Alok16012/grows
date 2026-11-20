@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
-import { PayrollRules, esicEligibilityBase, esicChargeAmount, employerPfBase, rulesForPeriod } from "@/lib/payroll-rules"
+import { PayrollRules, esicEligibilityBase, esicChargeAmount, employerPfBase, rulesForPeriod, esicWagesOf } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { buildEcrText, EcrMember } from "@/lib/ecr-format"
 import { accessFrom, has } from "@/lib/access"
@@ -119,11 +119,7 @@ function esiWages(p: PayrollRow, rules: PayrollRules) {
     // that disagrees with the wage sheet is the whole point of this report.
     // Clamp at 0 — excluded components > gross (e.g., zero-day month) was
     // producing negative ESI wages, which EPFO/ESIC validators reject.
-    const wages = Math.max(0,
-        p.grossSalary
-        - (rules.esic.excludeWashing ? (p.washing ?? 0) : 0)
-        - (rules.esic.excludeConveyance ? (p.conveyance ?? 0) : 0)
-        - (rules.esic.excludeBonus ? (p.bonus ?? 0) : 0))
+    const wages = esicWagesOf(rules.esic, { gross: p.grossSalary, washing: p.washing ?? 0, conveyance: p.conveyance ?? 0, bonus: p.bonus ?? 0, ot: p.overtimePay ?? 0, incentive: (p as any).productionIncentive ?? 0 })
     // Filed on what the % was charged on (Calculation Settings).
     return esicChargeAmount(rules.esic, { esicWages: wages, basicDa: p.basicSalary + p.da })
 }
