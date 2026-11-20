@@ -1,3 +1,5 @@
+import { parseRef, toRef } from "@/lib/secure-files"
+import { supabaseAdmin } from "@/lib/supabase"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -24,6 +26,18 @@ function storagePathFromUrl(fileUrl: string | null | undefined): string | null {
 // Best-effort: the DB row is the source of truth, a leftover object only costs
 // storage, so a failure here is logged, not surfaced.
 async function removeStorageObject(fileUrl: string | null | undefined) {
+    // Private files (lib/secure-files): reads hand us a signed link; turn it
+    // back into its reference to find the object in the private bucket.
+    const ref = fileUrl ? parseRef(toRef(fileUrl)) : null
+    if (ref) {
+        try {
+            const { error } = await supabaseAdmin.storage.from(ref.bucket).remove([ref.path])
+            if (error) console.warn("[EMPLOYEE_DOC_DELETE] private remove failed", ref.path, error.message)
+        } catch (err) {
+            console.warn("[EMPLOYEE_DOC_DELETE] private remove threw", ref.path, err)
+        }
+        return
+    }
     const path = storagePathFromUrl(fileUrl)
     if (!path) return
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
