@@ -1494,6 +1494,79 @@ function DrawerHRApproval({
                     Approve & Complete
                 </button>
             )}
+
+            {review.hrApprovedAt && (review.incrementPercent ?? 0) > 0 && can(session, "payroll.manage") && (
+                <ApplyIncrement reviewId={review.id} percent={review.incrementPercent ?? 0} />
+            )}
+        </div>
+    )
+}
+
+// ─── Apply increment → salary revision ────────────────────────────────────────
+// After HR approval: raise Basic by the appraisal's increment % from a chosen
+// month. Preview first; saving creates that month's salary revision, which
+// payroll uses from then on (earlier months keep their pay).
+
+function ApplyIncrement({ reviewId, percent }: { reviewId: string; percent: number }) {
+    const next = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
+    const [ym, setYm] = useState(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`)
+    const [preview, setPreview] = useState<{ from: { basic: number }; to: { basic: number }; ctcFrom: number; ctcTo: number; alreadyApplied: { effectiveMonth: number; effectiveYear: number } | null } | null>(null)
+    const [busy, setBusy] = useState(false)
+    const [done, setDone] = useState<string | null>(null)
+    const [y, m] = ym.split("-").map(Number)
+    const rupee = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
+
+    const load = async () => {
+        setBusy(true); setPreview(null)
+        try {
+            const res = await fetch(`/api/performance/${reviewId}/apply-increment?month=${m}&year=${y}`)
+            const d = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(d?.error || "Could not load the preview")
+            setPreview(d)
+        } catch (e) { toast.error(e instanceof Error ? e.message : "Failed") } finally { setBusy(false) }
+    }
+    const apply = async () => {
+        setBusy(true)
+        try {
+            const res = await fetch(`/api/performance/${reviewId}/apply-increment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month: m, year: y }) })
+            const d = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(d?.error || "Could not apply the increment")
+            setDone(`Basic ${rupee(d.basicFrom)} → ${rupee(d.basicTo)} from ${m}/${y}`)
+            toast.success("Increment saved to the salary structure")
+        } catch (e) { toast.error(e instanceof Error ? e.message : "Failed") } finally { setBusy(false) }
+    }
+
+    return (
+        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] p-3.5 space-y-2.5">
+            <p className="text-[13px] font-semibold text-[var(--text)]">Apply {percent}% increment to salary</p>
+            {done || preview?.alreadyApplied ? (
+                <p className="text-[12.5px] text-[var(--success)] flex items-center gap-1.5"><Check size={14} />
+                    {done ?? `Already applied from ${preview!.alreadyApplied!.effectiveMonth}/${preview!.alreadyApplied!.effectiveYear}.`}
+                </p>
+            ) : (
+                <>
+                    <div className="flex flex-wrap items-end gap-2">
+                        <label className="flex flex-col gap-1 text-[12px] text-[var(--text2)]">
+                            Effective from
+                            <input id="increment-month" type="month" value={ym} onChange={e => { setYm(e.target.value); setPreview(null) }}
+                                className="h-8 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-2 text-[13px]" />
+                        </label>
+                        <button onClick={load} disabled={busy || !ym} className="h-8 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[12.5px] font-medium">
+                            {busy && !preview ? "Loading…" : "Preview"}
+                        </button>
+                    </div>
+                    {preview && (
+                        <div className="text-[12.5px] text-[var(--text2)] space-y-1">
+                            <p>Basic: <b className="text-[var(--text)]">{rupee(preview.from.basic)} → {rupee(preview.to.basic)}</b></p>
+                            <p>Monthly CTC: {rupee(preview.ctcFrom)} → <b className="text-[var(--text)]">{rupee(preview.ctcTo)}</b></p>
+                            <p className="text-[11.5px] text-[var(--text3)]">Only Basic changes. Payroll uses the new figure from {m}/{y}; earlier months keep their pay.</p>
+                            <button onClick={apply} disabled={busy} className="mt-1 h-8 px-3.5 rounded-[8px] bg-[var(--accent)] text-white text-[12.5px] font-semibold disabled:opacity-60">
+                                {busy ? "Saving…" : "Apply to salary"}
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
         </div>
     )
 }

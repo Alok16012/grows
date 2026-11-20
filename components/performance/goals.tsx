@@ -1,7 +1,7 @@
 "use client"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Plus, Loader2, Trash2, Check, RefreshCw, Settings, AlertTriangle, TrendingUp, TrendingDown, X, Save, RotateCcw, Users } from "lucide-react"
+import { Plus, Loader2, Trash2, Check, RefreshCw, Settings, AlertTriangle, TrendingUp, TrendingDown, X, Save, RotateCcw, Users, Target } from "lucide-react"
 import { scoreReview, bandFor, cleanDescription, kpiDirection, DEFAULT_BANDS, type Band, type Direction } from "@/lib/performance-score"
 
 // Goal sheet for one review: KRAs (weights total 100) → KPIs (weights total 100
@@ -203,6 +203,25 @@ export function GoalsPanel({ review, isManager, onChanged }: { review: Review; i
         try { await call(`/api/performance/${review.id}/kras`, "POST", { title: newKra.title, weightage: Number(newKra.weightage) || Math.max(0, 100 - kraWeightTotal) }); setNewKra({ title: "", weightage: "" }); onChanged() }
         catch (e) { toast.error(e instanceof Error ? e.message : "Failed") }
     }
+    // KRAs/KPIs from the KPI Hub template, actuals = average monthly achievement %.
+    const hubImport = async () => {
+        setBusy("hub")
+        try {
+            const go = (replace: boolean) => fetch(`/api/performance/${review.id}/hub-import`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ replace }),
+            })
+            let res = await go(false)
+            let data = await res.json().catch(() => ({}))
+            if (res.status === 409 && data?.needsConfirm) {
+                if (!window.confirm("Replace this appraisal's KRAs and KPIs (and any ratings on them) with the KPI Hub template?")) return
+                res = await go(true)
+                data = await res.json().catch(() => ({}))
+            }
+            if (!res.ok) throw new Error(data?.error || "Failed")
+            toast.success(`Loaded ${data.kras} KRA(s), ${data.kpis} KPI(s) from ${data.template}; ${data.filled} with scores from approved reports`)
+            onChanged()
+        } catch (e) { toast.error(e instanceof Error ? e.message : "Failed") } finally { setBusy(null) }
+    }
     const sync = async () => {
         setBusy("sync")
         try { const r = await call(`/api/performance/${review.id}/sync`, "POST"); toast.success(`${r.syncedCount ?? 0} KPI actual(s) pulled from attendance / inspections / recruitment`); onChanged() }
@@ -239,6 +258,12 @@ export function GoalsPanel({ review, isManager, onChanged }: { review: Review; i
 
             {isManager && (
                 <div className="flex flex-wrap items-center gap-2">
+                    {canEditGoals && (
+                        <button onClick={hubImport} disabled={!!busy} title="Use this person's KRA/KPI template from the KPI Hub, with scores from their approved monthly reports"
+                            className={`${btn} border border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent-text)] h-7`}>
+                            {busy === "hub" ? <Loader2 size={12} className="animate-spin" /> : <Target size={12} />} Load from KPI Hub
+                        </button>
+                    )}
                     {canEditGoals && roles.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[12px] text-[var(--text3)] flex items-center gap-1"><Settings size={13} /> Template:</span>
