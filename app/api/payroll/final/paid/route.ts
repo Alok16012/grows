@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { commNotify, employeeRecipients, userRecipients, fmtRange, fmtInr } from "@/lib/comm/recipients"
 
 // POST /api/payroll/final/paid  { month, year, siteIds? }
 // Marks every LOCKED (PROCESSED) row for the month as PAID in one go. Before
@@ -19,6 +20,12 @@ export async function POST(req: Request) {
 
         const { month, year, siteIds } = await req.json()
         if (!month || !year) return new NextResponse("Month and Year required", { status: 400 })
+
+        // Who is about to be paid, for the "salary credited" message.
+        const toPay = await prisma.payroll.findMany({
+            where: { month, year, status: "PROCESSED", ...(siteIds?.length ? { siteId: { in: siteIds as string[] } } : {}) },
+            select: { id: true, employeeId: true, netSalary: true },
+        })
 
         const { paid, stillDraft, runPaid } = await prisma.$transaction(async tx => {
             const paid = await tx.payroll.updateMany({
@@ -42,7 +49,12 @@ export async function POST(req: Request) {
             return { paid, stillDraft, runPaid }
         })
 
-        return NextResponse.json({ success: true, paid: paid.count, stillDraft, runPaid })
+        const monthLabel = new Date(Date.UTC(Number(year), Number(month) - 1, 1)).toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" })
+        const commQueued = await commNotify("salary_credited",
+            employeeRecipients(toPay.map(p => p.employeeId), new Map(toPay.map(p => [p.employeeId, { amount: fmtInr(p.netSalary) }]))),
+            { month: monthLabel }, { refType: "PayrollMonth", refId: `${year}-${String(month).padStart(2, "0")}`, createdBy: session.user.id, budgetMs: 2000, link: "/profile?tab=payslips" })
+
+        return NextResponse.json({ success: true, paid: paid.count, stillDraft, runPaid, commQueued })
     } catch (error) {
         console.error("[PAYROLL_FINAL_PAID]", error)
         return new NextResponse("Internal Error", { status: 500 })

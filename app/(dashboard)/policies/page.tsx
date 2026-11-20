@@ -3,6 +3,7 @@
 // designations and publishes versions. Onboarding-category policies are signed
 // on the onboarding form / joining link; other categories from My Policies.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { drainMyMessages } from "@/lib/comm/drain-client"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import {
@@ -563,9 +564,16 @@ function PublishDialog({ detail, fail, onClose, onPublished }: { detail: Detail;
     async function publish() {
         setBusy(true)
         try {
-            const r = await api<{ version: { versionNo: number }; notified: number }>(`/api/policies/${detail.id}/publish`, { body: { requireResign: resign } })
+            const r = await api<{ version: { versionNo: number }; notified: number; commQueued?: number }>(`/api/policies/${detail.id}/publish`, { body: { requireResign: resign } })
             toast.success(`Published version ${r.version.versionNo}${r.notified ? ` · ${r.notified} employee${r.notified === 1 ? "" : "s"} notified` : ""}`)
             onPublished()
+            const d = { commQueued: r.commQueued ?? 0 }
+            // WhatsApp / email for the policy keep going in the background while this page is open.
+            if (d.commQueued > 0) {
+                const t = toast.loading(`Sending ${d.commQueued} message${d.commQueued === 1 ? "" : "s"} on WhatsApp / email…`)
+                drainMyMessages(p => toast.loading(`Sending messages… ${p.remaining} left`, { id: t }))
+                    .then(n => toast.success(`${n} message${n === 1 ? "" : "s"} sent`, { id: t }))
+            }
         } catch (e) { fail(e, "Could not publish") }
         finally { setBusy(false) }
     }

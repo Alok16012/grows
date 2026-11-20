@@ -1,4 +1,5 @@
 import { statutoryFlagsFor } from "@/lib/employee-statutory"
+import { commNotify, employeeRecipients, fmtInr } from "@/lib/comm/recipients"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -197,6 +198,12 @@ export async function PUT(
                 },
             },
         })
+
+        if (updateData.status === "PAID" && existing.status !== "PAID") {
+            const monthLabel = new Date(Date.UTC(payroll.year, payroll.month - 1, 1)).toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" })
+            await commNotify("salary_credited", employeeRecipients([payroll.employeeId]), { month: monthLabel, amount: fmtInr(payroll.netSalary) },
+                { refType: "Payroll", refId: payroll.id, createdBy: session.user.id, link: "/profile?tab=payslips" })
+        }
 
         return NextResponse.json(payroll)
     } catch (error) {

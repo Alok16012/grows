@@ -6,6 +6,7 @@ import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
 import { resolveUserId } from "@/lib/resolveUserId"
 import { audienceWhere, cleanIdArray } from "@/lib/audience"
+import { commNotify } from "@/lib/comm/recipients"
 
 // GET — signed-in users see active announcements targeted at their site/role
 // (newest / pinned first). Managers/admins see all (audienceWhere → null).
@@ -57,5 +58,24 @@ export async function POST(req: Request) {
             targetRoleIds: cleanIdArray(targetRoleIds),
         },
     })
-    return NextResponse.json(announcement)
+    // WhatsApp / email to the audience (sites AND roles; empty = everyone),
+    // if switched on. Big audiences finish via /api/comm/drain from the page.
+    let commQueued = 0
+    try {
+        const sites = announcement.targetSiteIds, roles = announcement.targetRoleIds
+        const emps = await prisma.employee.findMany({
+            where: {
+                status: { in: ["ACTIVE", "ON_LEAVE"] },
+                ...(sites.length ? { deployments: { some: { isActive: true, siteId: { in: sites } } } } : {}),
+                ...(roles.length ? { user: { customRoleId: { in: roles } } } : {}),
+            },
+            select: { id: true, firstName: true, lastName: true, phone: true, email: true, userId: true },
+            take: 5000,
+        })
+        const plain = String(text).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+        commQueued = await commNotify("announcement", emps.map(e => ({ type: "employee" as const, id: e.id, name: `${e.firstName} ${e.lastName ?? ""}`.trim(), phone: e.phone, email: e.email, userId: e.userId })),
+            { title, summary: plain.length > 220 ? plain.slice(0, 217) + "…" : plain },
+            { refType: "Announcement", refId: announcement.id, createdBy, budgetMs: 2000, link: "/announcements" })
+    } catch (e) { console.error("[ANNOUNCEMENT_COMM]", e) }
+    return NextResponse.json({ ...announcement, commQueued })
 }

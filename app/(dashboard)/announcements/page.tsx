@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { drainMyMessages } from "@/lib/comm/drain-client"
 import { COMPANY } from "@/lib/company"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -544,7 +545,16 @@ function AnnouncementForm({ sites, roles, onClose, onSaved }: { sites: Site[]; r
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ title, body, category, pinned, targetSiteIds, targetRoleIds }),
             })
-            if (res.ok) { toast.success("Announcement posted"); onSaved() }
+            if (res.ok) {
+                const d = await res.json().catch(() => ({}))
+                toast.success("Announcement posted"); onSaved()
+            // WhatsApp / email for the audience keep going in the background while this page is open.
+            if (d.commQueued > 0) {
+                const t = toast.loading(`Sending ${d.commQueued} message${d.commQueued === 1 ? "" : "s"} on WhatsApp / email…`)
+                drainMyMessages(p => toast.loading(`Sending messages… ${p.remaining} left`, { id: t }))
+                    .then(n => toast.success(`${n} message${n === 1 ? "" : "s"} sent`, { id: t }))
+            }
+            }
             else toast.error((await res.text()) || "Failed to post")
         } finally {
             setSaving(false)

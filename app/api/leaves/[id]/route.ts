@@ -6,6 +6,7 @@ import { checkAccess } from "@/lib/permissions"
 import { syncLeaveStatus } from "@/lib/leave-status"
 import { checkLeaveRequest } from "@/lib/leave-policy-server"
 import { notifyApprovers, notifyEmployee } from "@/lib/hr-notify"
+import { commNotify, employeeRecipients, userRecipients, fmtRange, fmtInr } from "@/lib/comm/recipients"
 
 export async function GET(
     req: Request,
@@ -181,6 +182,13 @@ export async function PUT(
                 title: status === "APPROVED" ? "Leave approved" : status === "REJECTED" ? "Leave rejected" : "Leave cancelled",
                 message: msg, type: "leave", link: `/leaves?id=${leave.id}`,
             })
+            // WhatsApp / email, if switched on in Settings → Communication.
+            await commNotify("leave_decision", employeeRecipients([leave.employeeId]), {
+                leaveType: String(leave.type).replace(/_/g, " "),
+                dates: fmtRange(leave.startDate, leave.endDate),
+                decision: status === "APPROVED" ? "Approved" : status === "REJECTED" ? "Rejected" : "Cancelled",
+                remarks: status === "REJECTED" && rejectionReason ? `Reason: ${rejectionReason}` : "",
+            }, { refType: "Leave", refId: leave.id, createdBy: session.user.id, link: `/leaves?id=${leave.id}` })
         }
 
         return NextResponse.json(leave)

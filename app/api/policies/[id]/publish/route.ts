@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { policyErrorResponse, PolicyError, audit, versionHash } from "@/lib/policy-signoff"
 import { adminCtx, requireManage, employeesInScope, minValidVersion, notifyToSign } from "@/lib/policy-admin"
+import { commNotify, employeeRecipients } from "@/lib/comm/recipients"
 
 // POST { requireResign } — publish the draft as a new immutable version.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -48,7 +49,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         // Tell people who now have something to sign (joiners see it in onboarding).
         const scope = await employeesInScope(result.policy)
         let notified = 0
+        let toSign: { id: string }[] = []
         if (result.version.versionNo === 1) {
+            toSign = scope.filter(e => e.status !== "ONBOARDING")
             notified = await notifyToSign(scope.filter(e => e.status !== "ONBOARDING"), result.version.title, false)
         } else if (result.version.requireResign) {
             const min = minValidVersion(result.versions, result.previousNo)
@@ -57,11 +60,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 select: { employeeId: true }, distinct: ["employeeId"],
             })
             const ids = new Set(prior.map(a => a.employeeId))
+            toSign = scope.filter(e => ids.has(e.id))
             notified = await notifyToSign(scope.filter(e => ids.has(e.id)), result.version.title, true)
         }
+        const commQueued = toSign.length
+            ? await commNotify("policy_to_sign", employeeRecipients(toSign.map(e => e.id)), { policy: result.version.title },
+                { refType: "SignoffPolicy", refId: result.policy.id, createdBy: ctx.userId, budgetMs: 2000, link: "/profile?tab=policies" })
+            : 0
         return NextResponse.json({
             version: { id: result.version.id, versionNo: result.version.versionNo, contentHash: result.version.contentHash, requireResign: result.version.requireResign },
-            notified,
+            notified, commQueued,
         }, { status: 201 })
     } catch (e) {
         return policyErrorResponse(e, "[POLICY_PUBLISH]")

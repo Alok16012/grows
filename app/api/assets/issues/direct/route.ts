@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { canIssueAssets } from "@/lib/permissions"
 import { notifyEmployee } from "@/lib/hr-notify"
+import { commNotify, employeeRecipients } from "@/lib/comm/recipients"
 import {
     workflowErrorResponse, jsonError, withNumberRetry, isUniqueErr, issueAssetTx, loadIssue,
     parseIntStrict, isUnassignableStatus, unassignableEmployeeMessage, MAX_REQUEST_QTY,
@@ -69,6 +70,8 @@ export async function POST(req: Request) {
             type: "asset",
             link: "/profile?tab=assets",
         })
+        await commNotify("asset_issued", employeeRecipients([employeeId]), { asset: quantity > 1 ? `${asset.name} × ${quantity}` : asset.name },
+            { refType: "Asset", refId: issue.id, createdBy: actorId, link: "/profile?tab=assets" })
 
         return NextResponse.json({ issue: await loadIssue(prisma, issue.id), request: null }, { status: 201 })
     } catch (e) {

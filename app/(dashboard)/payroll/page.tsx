@@ -1,5 +1,6 @@
 "use client"
 import { payrollYears, payrollMonths, clampPeriod, currentPayrollMonth, currentPayrollYear } from "./_components/payroll-years"
+import { drainMyMessages } from "@/lib/comm/drain-client"
 import { latestPayrollPeriod, canCreatePeriod, shiftPeriod, periodLabel as labelOf } from "@/lib/payroll-period"
 import type { PanelPeriod } from "./_components/WageSheetPanel"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
@@ -258,6 +259,12 @@ export default function PayrollPage() {
             const d = await res.json()
             toast.success(d.paid ? `${d.paid} salaries marked paid` : "Nothing to mark — no locked rows")
             refresh()
+            // WhatsApp / email for "salary credited" keep going in the background while this page is open.
+            if (d.commQueued > 0) {
+                const t = toast.loading(`Sending ${d.commQueued} message${d.commQueued === 1 ? "" : "s"} on WhatsApp / email…`)
+                drainMyMessages(p => toast.loading(`Sending messages… ${p.remaining} left`, { id: t }))
+                    .then(n => toast.success(`${n} message${n === 1 ? "" : "s"} sent`, { id: t }))
+            }
         } catch { toast.error("Could not mark as paid") }
         finally { setMarkingPaid(false) }
     }

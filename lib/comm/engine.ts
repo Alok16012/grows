@@ -26,6 +26,8 @@ export type Recipient = {
     email?: string | null
     /** Login, for in-app notifications. */
     userId?: string | null
+    /** Values for this person only (their amount, their dates…), on top of the shared data. */
+    data?: Record<string, unknown>
 }
 export type NotifyOpts = {
     refType?: string | null
@@ -81,9 +83,10 @@ export async function notify(eventKey: string, recipients: Recipient[], data: Re
     if (!ev) throw new Error(`Unknown event ${eventKey}`)
     const settings = await getCommSettings()
     const cfg = settings.events[ev.key] ?? defaultChannels(ev)
-    const vars = withDefaults(ev, data)
+    // Events whose module already puts a notification in the bell never add a
+    // second one (only a forced test does).
     const channels = (["whatsapp", "email", "inapp"] as Channel[]).filter(c =>
-        (!opts.channels || opts.channels.includes(c)) && (opts.force ? !!opts.channels?.includes(c) : cfg[c].enabled))
+        (!opts.channels || opts.channels.includes(c)) && (opts.force ? !!opts.channels?.includes(c) : cfg[c].enabled && !(c === "inapp" && ev.inappBuiltIn)))
     if (!channels.length || !recipients.length) return { queued: 0, skipped: 0, sent: 0, failed: 0, ids: [] }
 
     // Opt-outs for every address in this batch, in one query.
@@ -100,8 +103,10 @@ export async function notify(eventKey: string, recipients: Recipient[], data: Re
     const quietUntil = afterQuietHours(settings, now)
     const rows: any[] = []
     let skipped = 0
+    const varsFor = (r: Recipient) => withDefaults(ev, { name: (r.name || "").trim().split(/\s+/)[0] || r.name, ...data, ...(r.data ?? {}) })
     for (const c of channels) {
         for (const r of recipients) {
+            const vars = varsFor(r)
             const address = addressFor(c, r)
             let status = "queued", error: string | null = null
             if (!address) { status = "skipped"; error = c === "whatsapp" ? "No valid mobile number" : c === "email" ? "No valid email" : "No app login" }
@@ -133,13 +138,13 @@ export async function notify(eventKey: string, recipients: Recipient[], data: Re
 }
 
 /** Sends due messages (optionally only `ids`) until the time budget runs out. */
-export async function processQueue({ ids, budgetMs = 20_000, limit = 200 }: { ids?: string[]; budgetMs?: number; limit?: number } = {}) {
+export async function processQueue({ ids, createdBy, budgetMs = 20_000, limit = 200 }: { ids?: string[]; createdBy?: string; budgetMs?: number; limit?: number } = {}) {
     const started = Date.now()
     let sent = 0, failed = 0, processed = 0
     // A send that died half-way (timeout) left its row "sending": retry it.
     await prisma.commMessage.updateMany({ where: { status: "sending", updatedAt: { lt: new Date(Date.now() - 10 * 60_000) } }, data: { status: "queued" } }).catch(() => {})
     const due = await prisma.commMessage.findMany({
-        where: { status: "queued", nextAttemptAt: { lte: new Date() }, ...(ids ? { id: { in: ids } } : {}) },
+        where: { status: "queued", nextAttemptAt: { lte: new Date() }, ...(ids ? { id: { in: ids } } : {}), ...(createdBy ? { createdBy } : {}) },
         orderBy: { createdAt: "asc" }, take: limit,
     })
     if (!due.length) return { sent, failed, processed, remaining: 0 }

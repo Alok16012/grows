@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { notifyEmployee } from "@/lib/hr-notify"
+import { commNotify, employeeRecipients } from "@/lib/comm/recipients"
 import { ifWorkflowInstalled, recordLedgerOnly } from "@/lib/asset-workflow"
 
 export async function POST(
@@ -95,6 +96,8 @@ export async function POST(
             // The employee can't open /assets (needs assets.view); their own list is the profile tab.
             type: "asset", link: "/profile?tab=assets",
         })
+        await commNotify("asset_issued", employeeRecipients([assignment.employeeId]), { asset: `${assignment.asset?.name ?? "An asset"}${assignment.asset?.assetCode ? ` (${assignment.asset.assetCode})` : ""}` },
+            { refType: "Asset", refId: assignment.id, createdBy: session.user.id, link: "/profile?tab=assets" })
 
         return NextResponse.json(assignment)
     } catch (error) {

@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess, canIssueAssets, canOverseeAssets } from "@/lib/permissions"
 import { notifyEmployee } from "@/lib/hr-notify"
+import { commNotify, employeeRecipients } from "@/lib/comm/recipients"
 import {
     ISSUE_STATUSES, WorkflowError, workflowErrorResponse, jsonError, withNumberRetry, isUniqueErr,
     issueAssetTx, recomputeRequestStatus, loadIssue, loadIssues, loadRequest, dateRange, pageParams,
@@ -148,6 +149,8 @@ export async function POST(req: Request) {
             type: "asset",
             link: "/profile?tab=assets",
         })
+        await commNotify("asset_issued", employeeRecipients([item.employeeId]), { asset: quantity > 1 ? `${item.asset.name} × ${quantity}` : item.asset.name },
+            { refType: "Asset", refId: issue.id, createdBy: actorId, link: "/profile?tab=assets" })
 
         const [issueOut, request] = await Promise.all([loadIssue(prisma, issue.id), loadRequest(prisma, item.requestId)])
         return NextResponse.json({ issue: issueOut, request }, { status: 201 })

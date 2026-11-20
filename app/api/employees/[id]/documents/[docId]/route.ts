@@ -1,4 +1,5 @@
 import { parseRef, toRef } from "@/lib/secure-files"
+import { commNotify, employeeRecipients } from "@/lib/comm/recipients"
 import { supabaseAdmin } from "@/lib/supabase"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
@@ -138,6 +139,11 @@ export async function PATCH(
                 verifiedBy: status === "VERIFIED" ? session.user.id : null,
             },
         })
+        if (status === "REJECTED" && existing.status !== "REJECTED") {
+            await commNotify("document_request", employeeRecipients([params.id]), {
+                document: String(existing.type).replace(/_/g, " "), note: rejectionReason ? `Reason: ${rejectionReason}` : "",
+            }, { refType: "EmployeeDocument", refId: existing.id, createdBy: session.user.id, link: "/profile?tab=documents" })
+        }
 
         return NextResponse.json(document)
     } catch (error) {

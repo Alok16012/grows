@@ -25,6 +25,10 @@ export type CommEvent = {
     waDocument?: boolean
     /** Sent outside quiet hours only (WhatsApp). */
     respectQuietHours: boolean
+    /** The module already puts this in the in-app bell, so the In-app switch is not offered. */
+    inappBuiltIn?: boolean
+    /** false = no feature raises this event yet. */
+    connected?: boolean
     defaultSubject: string
     defaultBody: string
 }
@@ -35,7 +39,7 @@ const COMPANY_VAR: CommVar = { key: "company", label: "Our company", sample: "Gr
 export const COMM_EVENTS: CommEvent[] = [
     // ── Employees ─────────────────────────────────────────────
     {
-        key: "leave_decision", label: "Leave approved / rejected", audience: "employee",
+        key: "leave_decision", inappBuiltIn: true, label: "Leave approved / rejected", audience: "employee",
         description: "When a manager approves or rejects a leave request.",
         vars: [NAME, { key: "leaveType", label: "Leave type", sample: "Casual Leave" }, { key: "dates", label: "Dates", sample: "12–14 Dec 2026" }, { key: "decision", label: "Approved / Rejected", sample: "Approved" }, { key: "remarks", label: "Manager's remarks", sample: "Enjoy your break" }, COMPANY_VAR],
         waParams: ["name", "leaveType", "dates", "decision"],
@@ -71,7 +75,7 @@ export const COMM_EVENTS: CommEvent[] = [
         defaultBody: "Hi {name},\n\nPlease upload your {document} in the Growus app.\n{note}\n\n— {company}",
     },
     {
-        key: "policy_to_sign", label: "Policy to sign", audience: "employee",
+        key: "policy_to_sign", inappBuiltIn: true, label: "Policy to sign", audience: "employee",
         description: "When a policy is published that employees must accept.",
         vars: [NAME, { key: "policy", label: "Policy", sample: "Code of Conduct" }, COMPANY_VAR],
         waParams: ["name", "policy"],
@@ -80,7 +84,7 @@ export const COMM_EVENTS: CommEvent[] = [
         defaultBody: "Hi {name},\n\nA new policy, {policy}, needs your acceptance. Please open the Growus app to read and accept it.\n\n— {company}",
     },
     {
-        key: "expense_update", label: "Expense approved / paid", audience: "employee",
+        key: "expense_update", inappBuiltIn: true, label: "Expense approved / paid", audience: "employee",
         description: "When an expense claim is approved, rejected or paid.",
         vars: [NAME, { key: "amount", label: "Amount", sample: "₹1,250" }, { key: "status", label: "Status", sample: "Approved" }, { key: "claim", label: "Claim", sample: "Travel – Chakan site visit" }, COMPANY_VAR],
         waParams: ["name", "claim", "amount", "status"],
@@ -89,7 +93,7 @@ export const COMM_EVENTS: CommEvent[] = [
         defaultBody: "Hi {name},\n\nYour expense claim \"{claim}\" for {amount} is {status}.\n\n— {company}",
     },
     {
-        key: "asset_issued", label: "Asset issued", audience: "employee",
+        key: "asset_issued", inappBuiltIn: true, label: "Asset issued", audience: "employee",
         description: "When an asset (laptop, uniform, tools…) is handed to an employee.",
         vars: [NAME, { key: "asset", label: "Asset", sample: "Safety shoes (size 8)" }, COMPANY_VAR],
         waParams: ["name", "asset"],
@@ -98,8 +102,8 @@ export const COMM_EVENTS: CommEvent[] = [
         defaultBody: "Hi {name},\n\n{asset} has been issued to you. Please take care of it and return it when asked.\n\n— {company}",
     },
     {
-        key: "attendance_missing", label: "Missing attendance", audience: "employee",
-        description: "Reminder when attendance for a day is missing.",
+        key: "attendance_missing", connected: false, label: "Missing attendance", audience: "employee",
+        description: "Reminder when attendance for a day is missing. Not connected yet: attendance here is uploaded monthly by sheet, so there is no daily gap to detect.",
         vars: [NAME, { key: "date", label: "Date", sample: "19 Nov 2026" }, COMPANY_VAR],
         waParams: ["name", "date"],
         respectQuietHours: true,

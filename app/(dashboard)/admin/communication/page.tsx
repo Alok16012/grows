@@ -166,13 +166,16 @@ function EventsTab({ info, settings, canEdit, patch }: { info: Info; settings: S
                                         <button onClick={() => setOpen(isOpen ? null : ev.key)} className="flex min-w-0 flex-1 items-start gap-2 text-left">
                                             {isOpen ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-[var(--text3)]" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-[var(--text3)]" />}
                                             <span className="min-w-0">
-                                                <span className="block text-[13.5px] font-semibold text-[var(--text)]">{ev.label}</span>
+                                                <span className="block text-[13.5px] font-semibold text-[var(--text)]">{ev.label}{ev.connected === false && <span className="ml-2 rounded-full bg-[var(--surface2)] px-2 py-0.5 text-[10.5px] font-bold text-[var(--text3)]">Not connected yet</span>}</span>
                                                 <span className="block text-[11.5px] text-[var(--text3)]">{ev.description}</span>
                                             </span>
                                         </button>
                                         <div className="flex gap-6 pl-6 sm:pl-0 sm:pr-10">
                                             {(["whatsapp", "email", "inapp"] as Channel[]).map(c => {
                                                 const Icon = CH_ICON[c]
+                                                if (c === "inapp" && ev.inappBuiltIn) return (
+                                                    <span key={c} title="This module already puts it in the bell" className="flex w-16 flex-col items-center gap-1 text-[10.5px] font-semibold text-[#16a34a]"><Icon size={14} /> Always</span>
+                                                )
                                                 const needsTemplate = c === "whatsapp" && !s.whatsapp.template
                                                 const on = s[c].enabled
                                                 return (

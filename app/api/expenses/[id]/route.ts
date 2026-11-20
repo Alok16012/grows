@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { commNotify, userRecipients, fmtInr } from "@/lib/comm/recipients"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
@@ -274,6 +275,12 @@ export async function PUT(
             }
         } catch (notifErr) {
             console.error("[EXPENSE_NOTIF]", notifErr)
+        }
+        if (action === "APPROVE" || action === "REJECT" || action === "PAID") {
+            await commNotify("expense_update", userRecipients([expense.submittedBy]), {
+                claim: `${expense.expenseNo} – ${expense.title}`, amount: fmtInr(Number(expense.amount) || 0),
+                status: action === "APPROVE" ? "approved" : action === "REJECT" ? `rejected${rejectionReason ? ` (${rejectionReason})` : ""}` : `paid${paymentMode ? ` via ${paymentMode}` : ""}`,
+            }, { refType: "Expense", refId: params.id, createdBy: session.user.id, link: `/expenses?id=${params.id}` })
         }
 
         return NextResponse.json(updated)
