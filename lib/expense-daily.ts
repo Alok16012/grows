@@ -10,7 +10,8 @@ import { managersOf } from "@/lib/expense-approval"
 export async function runExpenseDaily(now = new Date()) {
     const policy = await getExpensePolicy()
     const { remindAfterHours, escalateAfterHours, mode } = policy.approval
-    if (!remindAfterHours && !escalateAfterHours) return { reminded: 0, escalated: 0 }
+    const advancesDue = await remindAdvances(policy.advance.settleWithinDays, now)
+    if (!remindAfterHours && !escalateAfterHours) return { reminded: 0, escalated: 0, advancesDue }
     const waiting = await prisma.expense.findMany({
         where: { status: "SUBMITTED" },
         select: { id: true, expenseNo: true, submittedBy: true, amount: true, updatedAt: true, approvalStage: true, approvalTrail: true },
@@ -53,5 +54,17 @@ export async function runExpenseDaily(now = new Date()) {
             escalated = late.length
         }
     }
-    return { reminded, escalated }
+    return { reminded, escalated, advancesDue }
+}
+
+/** Paid advances not settled within the policy's days: remind the employee and Accounts. */
+async function remindAdvances(days: number, now: Date): Promise<number> {
+    if (!days) return 0
+    const cutoff = new Date(now.getTime() - days * 86_400_000)
+    const due = await prisma.expenseAdvance.findMany({ where: { status: "PAID", paidAt: { lt: cutoff } }, select: { advanceNo: true, requestedBy: true, amount: true } })
+    for (const a of due) {
+        await prisma.notification.create({ data: { userId: a.requestedBy, title: "Settle your advance", message: `${a.advanceNo} (₹${a.amount.toLocaleString("en-IN")}) was paid more than ${days} days ago — file your expense claims against it so it can be settled.`, type: "expense", link: "/expenses/advances" } }).catch(() => {})
+    }
+    if (due.length) await notifyApprovers(["expenses.manage"], { title: "Advances waiting to be settled", message: `${due.length} advance${due.length === 1 ? "" : "s"} paid more than ${days} days ago are not settled: ${due.slice(0, 5).map(a => a.advanceNo).join(", ")}${due.length > 5 ? "…" : ""}`, type: "expense", link: "/expenses/advances" })
+    return due.length
 }

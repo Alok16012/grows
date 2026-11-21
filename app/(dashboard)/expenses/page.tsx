@@ -69,6 +69,8 @@ type CategoryItem = {
 type Expense = {
     /** Two-level approval state (server): stage, label, whether I may approve now. */
     approval?: { stage: number; label: string | null; canApprove: boolean } | null
+    /** The advance this claim is filed against (Expense Claims → Advances). */
+    advanceId?: string | null
     id: string
     expenseNo: string
     title: string
@@ -538,7 +540,16 @@ function AddExpenseModal({
         description: "",
         siteId: "",
         siteName: "",
+        advanceId: "",
     })
+    // My paid advances, still to be settled — a claim can be filed against one.
+    const [myAdvances, setMyAdvances] = useState<{ id: string; advanceNo: string; amount: number; purpose: string }[]>([])
+    useEffect(() => {
+        if (!open) return
+        fetch("/api/expenses/advances?view=mine").then(r => r.ok ? r.json() : null)
+            .then(d => setMyAdvances((d?.advances ?? []).filter((a: any) => a.status === "PAID").map((a: any) => ({ id: a.id, advanceNo: a.advanceNo, amount: a.amount, purpose: a.purpose }))))
+            .catch(() => setMyAdvances([]))
+    }, [open])
     // One or more category line-items under this single expense.
     const [lines, setLines] = useState<LineItem[]>([mkLine("TRAVEL", today)])
 
@@ -588,6 +599,7 @@ function AddExpenseModal({
                 description: editExpense.description || "",
                 siteId: editExpense.siteId || "",
                 siteName: editExpense.siteName || "",
+                advanceId: editExpense.advanceId || "",
             })
             const rowsFromEntries = (entries?: TravelEntry[] | null) =>
                 (entries && entries.length)
@@ -620,7 +632,7 @@ function AddExpenseModal({
                 }])
             }
         } else {
-            setForm({ title: "", date: today, description: "", siteId: "", siteName: "" })
+            setForm({ title: "", date: today, description: "", siteId: "", siteName: "", advanceId: "" })
             setLines([mkLine("TRAVEL", today)])
         }
     }, [open, editExpense])
@@ -674,6 +686,7 @@ function AddExpenseModal({
                 description: form.description,
                 siteId: form.siteId || null,
                 siteName: form.siteName || null,
+                advanceId: form.advanceId || null,
                 receiptUrl: legacyReceipt,
                 date: form.date,
                 // Legacy columns kept populated for filters/list/back-compat.
@@ -778,6 +791,17 @@ function AddExpenseModal({
                             </select>
                         </div>
                     </div>
+                    {(myAdvances.length > 0 || form.advanceId) && (
+                        <div>
+                            <label className="block text-[12px] text-[var(--text2)] mb-1">Against advance <span className="text-[var(--text3)]">(optional)</span></label>
+                            <select value={form.advanceId} onChange={e => setForm(f => ({ ...f, advanceId: e.target.value }))}
+                                className="w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors">
+                                <option value="">— Not against an advance —</option>
+                                {myAdvances.map(a => <option key={a.id} value={a.id}>{a.advanceNo} · ₹{a.amount.toLocaleString("en-IN")} · {a.purpose}</option>)}
+                            </select>
+                            <p className="text-[11px] text-[var(--text3)] mt-1">Claims against an advance are settled with it, not paid separately.</p>
+                        </div>
+                    )}
                     <div>
                         <label className="block text-[12px] text-[var(--text2)] mb-1">Description</label>
                         <textarea
@@ -2784,6 +2808,10 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                             </a>
                         </>
                     )}
+                    <a href="/expenses/advances" title="Request an advance, or see advances to pay and settle"
+                        className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors">
+                        <Wallet size={16} /> Advances
+                    </a>
                     <button
                         onClick={() => exportExpenses("xlsx")}
                         className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors"

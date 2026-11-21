@@ -132,6 +132,18 @@ export default function ExpensePolicyPage() {
             </div>
 
             <div className={card}>
+                <p className="text-[14px] font-semibold text-[var(--text)]">Advances</p>
+                <Row label="Largest advance one request may ask for" hint="0 = no limit.">
+                    <span className="text-[12px] text-[var(--text3)]">₹</span>
+                    <input disabled={ro} type="number" min={0} className={`${inp} w-28`} value={p.advance.maxAmount} onChange={e => set("advance", { ...p.advance, maxAmount: Number(e.target.value) || 0 })} />
+                </Row>
+                <Row label="Remind to settle a paid advance after" hint="Daily reminder to the employee and Accounts until it is settled. 0 = never.">
+                    <input disabled={ro} type="number" min={0} className={`${inp} w-24`} value={p.advance.settleWithinDays} onChange={e => set("advance", { ...p.advance, settleWithinDays: Number(e.target.value) || 0 })} />
+                    <span className="text-[12px] text-[var(--text3)]">days</span>
+                </Row>
+            </div>
+
+            <div className={card}>
                 <p className="text-[14px] font-semibold text-[var(--text)]">Travel (km)</p>
                 <Row label="2-wheeler rate" hint="Travel lines are worked out as km × this rate.">
                     <span className="text-[12px] text-[var(--text3)]">₹</span>

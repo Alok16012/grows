@@ -28,6 +28,9 @@ export async function reimbursementsFor(employeeIds: string[], p: YM): Promise<M
         select: { submittedBy: true, amount: true },
     })
     for (const c of claims) { const id = byUser.get(c.submittedBy)!; out.set(id, Math.round(((out.get(id) ?? 0) + (Number(c.amount) || 0)) * 100) / 100) }
+    // Advance balances the company owes, paid with this salary (Advances → Settle).
+    const payouts = await prisma.expenseAdvance.findMany({ where: { status: "SETTLED", balanceAction: "PAY_SALARY", recoverMonth: p.month, recoverYear: p.year, requestedBy: { in: Array.from(byUser.keys()) } }, select: { requestedBy: true, balanceAmount: true } })
+    for (const a of payouts) { const id = byUser.get(a.requestedBy)!; out.set(id, Math.round(((out.get(id) ?? 0) + (Number(a.balanceAmount) || 0)) * 100) / 100) }
     return out
 }
 
@@ -60,7 +63,7 @@ export async function settleWindow() {
 
 /** Marks approved claims paid by bank. */
 export async function settleBank(ids: string[], pay: { paymentMode: string; transactionId?: string | null; paymentDate?: string | null }, actor: Actor) {
-    const claims = await prisma.expense.findMany({ where: { id: { in: ids }, status: "APPROVED" }, select: { id: true, approvalStage: true, approvalTrail: true, submittedBy: true } })
+    const claims = await prisma.expense.findMany({ where: { id: { in: ids }, status: "APPROVED", advanceId: null }, select: { id: true, approvalStage: true, approvalTrail: true, submittedBy: true } })
     const ok = claims.filter(c => c.submittedBy !== actor.id)
     const when = pay.paymentDate ? new Date(pay.paymentDate) : new Date()
     for (const c of ok) {
@@ -81,7 +84,7 @@ export async function settleWithSalary(ids: string[], p: YM, actor: Actor) {
     if (!w.allowed.some(a => a.month === p.month && a.year === p.year)) {
         throw new Error(`Pick ${w.allowed.map(ymLabel).join(" or ")} — earlier payroll months are locked`)
     }
-    const claims = await prisma.expense.findMany({ where: { id: { in: ids }, status: "APPROVED" }, select: { id: true, approvalStage: true, approvalTrail: true, submittedBy: true } })
+    const claims = await prisma.expense.findMany({ where: { id: { in: ids }, status: "APPROVED", advanceId: null }, select: { id: true, approvalStage: true, approvalTrail: true, submittedBy: true } })
     const emps = await employeesOfUsers(claims.map(c => c.submittedBy))
     const locked = new Set((await prisma.payroll.findMany({
         where: { month: p.month, year: p.year, status: { not: "DRAFT" }, employeeId: { in: Array.from(emps.values()).map(e => e.id) } }, select: { employeeId: true },

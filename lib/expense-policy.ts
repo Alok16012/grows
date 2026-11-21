@@ -40,6 +40,12 @@ export type ExpensePolicy = {
         /** Tell admins about a claim waiting longer than this. 0 = never. */
         escalateAfterHours: number
     }
+    advance: {
+        /** Most one advance request may be. 0 = no limit. */
+        maxAmount: number
+        /** Remind the employee (and Accounts) to settle a paid advance after this many days. 0 = never. */
+        settleWithinDays: number
+    }
 }
 
 export const DEFAULT_EXPENSE_POLICY: ExpensePolicy = {
@@ -49,6 +55,7 @@ export const DEFAULT_EXPENSE_POLICY: ExpensePolicy = {
     maxKmPerClaim: 0,
     limits: {},
     approval: { mode: "single", finalAbove: 0, remindAfterHours: 48, escalateAfterHours: 120 },
+    advance: { maxAmount: 0, settleWithinDays: 15 },
 }
 
 const num = (v: unknown, d: number, min = 0, max = 100_000_000) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : d }
@@ -79,6 +86,10 @@ export function sanitizeExpensePolicy(v: any): ExpensePolicy {
             finalAbove: num(v?.approval?.finalAbove, d.approval.finalAbove),
             remindAfterHours: num(v?.approval?.remindAfterHours, d.approval.remindAfterHours, 0, 24 * 60),
             escalateAfterHours: num(v?.approval?.escalateAfterHours, d.approval.escalateAfterHours, 0, 24 * 120),
+        },
+        advance: {
+            maxAmount: num(v?.advance?.maxAmount, d.advance.maxAmount),
+            settleWithinDays: num(v?.advance?.settleWithinDays, d.advance.settleWithinDays, 0, 365),
         },
     }
 }

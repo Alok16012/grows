@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { advanceRecoveriesFor } from "@/lib/expense-advance"
 import { reimbursementsFor } from "@/lib/expense-settle"
 import { otHoursOf } from "@/lib/payroll-rules"
 import { syncOtRatesToStructures } from "@/lib/payroll-ot-sync"
@@ -231,6 +232,8 @@ export async function POST(req: Request) {
             siteId ? Promise.resolve(new Map<string, string>()) : postedSites(employees.map(e => e.id)),
             manualOtResolver(),
         ])
+        // Advance balances recovered from this salary (Expense Claims → Advances → Settle).
+        const advanceRecovery = await advanceRecoveriesFor(employees.map(e => e.id), { month, year }).catch(() => new Map<string, number>())
         const allRows: PayrollRow[] = employees.map(emp => {
             const revision = revisions.get(emp.id)
             const sal      = emp.employeeSalary
@@ -252,7 +255,7 @@ export async function POST(req: Request) {
                 // engine falls back to days × rate; a typed 0 is kept as 0.
                 canteenAmount:       parseOptionalAmount(attInput.canteenAmount),
                 penalty:             Number(attInput.penalty)             || 0,
-                advance:             Number(attInput.advance)             || 0,
+                advance:             (Number(attInput.advance)            || 0) + (advanceRecovery.get(emp.id) ?? 0),
                 otherDeductions:     Number(attInput.otherDeductions)     || 0,
                 productionIncentive: Number(attInput.productionIncentive) || 0,
                 lwf:                 Number(attInput.lwf)                 || 0,

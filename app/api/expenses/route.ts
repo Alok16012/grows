@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { usableAdvance } from "@/lib/expense-advance"
 import { getExpensePolicy } from "@/lib/expense-policy-server"
 import { approvalLabel, canApproveNow, managersOf } from "@/lib/expense-approval"
 import prisma from "@/lib/prisma"
@@ -250,6 +251,8 @@ export async function POST(req: Request) {
 
         const body = await req.json()
         const { title, category, amount, date, description, employeeId, receiptUrl, projectId, siteId, siteName, travelDays, travelDailyRate, travelEntries, categoryItems } = body
+        // Filed against a paid advance of mine (Expense Claims → Advances)?
+        const advanceId = typeof body?.advanceId === "string" && body.advanceId && await usableAdvance(body.advanceId, session.user.id) ? body.advanceId : null
 
         const parsedAmount = parseFloat(String(amount))
         if (!title || !category || amount == null || isNaN(parsedAmount) || !date) {
@@ -340,6 +343,7 @@ export async function POST(req: Request) {
                     travelDailyRate: travelDailyRate ? parseFloat(String(travelDailyRate)) : null,
                     travelEntries: travelEntries ?? null,
                     categoryItems: (Array.isArray(categoryItems) ? categoryItems : null) as any,
+                    advanceId,
                 },
             })
         } catch (e1: any) {

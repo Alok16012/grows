@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const claims = await prisma.expense.findMany({
         where: {
             OR: [
-                { status: "APPROVED" },
+                { status: "APPROVED", advanceId: null }, // claims against an advance are settled through it
                 { status: "PAID", settledVia: "PAYROLL", OR: w.allowed.map(a => ({ payrollMonth: a.month, payrollYear: a.year })) },
             ],
         },

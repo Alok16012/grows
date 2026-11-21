@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { usableAdvance } from "@/lib/expense-advance"
 import { getExpensePolicy } from "@/lib/expense-policy-server"
 import { approvalLabel, canApproveNow, managerOf, needsFinal, pushTrail, startStage } from "@/lib/expense-approval"
 import { policyFlagsFor } from "@/lib/expense-policy-server"
@@ -190,6 +191,9 @@ export async function PUT(
             if (categoryItems !== undefined) {
                 updateData.categoryItems = Array.isArray(categoryItems) ? categoryItems : null
                 await ensureCategoryItemsColumn()
+            }
+            if (body?.advanceId !== undefined) {
+                updateData.advanceId = body.advanceId && await usableAdvance(String(body.advanceId), session.user.id) ? String(body.advanceId) : null
             }
         }
 
