@@ -7,7 +7,7 @@
 // the same "applies from" month, versions and draft recalculation.
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
-import { Pencil, Plus, Settings2, Trash2, X } from "lucide-react"
+import { ListChecks, Pencil, Plus, Search, Settings2, Trash2, X } from "lucide-react"
 import { OT_PARTS, OT_PART_LABELS, otFormulaLabel, otFormulaText, type OtFormula, type OtPart, type PayrollRules } from "@/lib/payroll-rules"
 
 type Ot = PayrollRules["ot"]
@@ -25,6 +25,7 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
     const [siteId, setSiteId] = useState("")
     const [rule, setRule] = useState("")
     const [editing, setEditing] = useState(false)
+    const [bulk, setBulk] = useState(false)
     useEffect(() => {
         fetch("/api/sites").then(r => r.ok ? r.json() : []).then(d => {
             if (Array.isArray(d)) setSites(d.map((s: any) => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true })))
@@ -91,6 +92,10 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
                     style={{ height: 34, padding: "0 16px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: siteId ? "pointer" : "not-allowed", opacity: siteId ? 1 : 0.5 }}>
                     Set rule
                 </button>
+                <button type="button" onClick={() => setBulk(true)} title="Change the OT rule of many sites on one page"
+                    style={{ ...iconBtn, width: "auto", padding: "0 12px", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--accent)", borderColor: "var(--accent)" }}>
+                    <ListChecks size={14} /> Bulk change
+                </button>
             </div>
 
             {/* Sites with their own rule */}
@@ -115,6 +120,7 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
             )}
 
             {editing && <OtRulesPopup ot={ot} onChange={onChange} onClose={() => setEditing(false)} />}
+            {bulk && <BulkSitesPopup ot={ot} sites={sites} onChange={onChange} onClose={() => setBulk(false)} onEditRules={() => setEditing(true)} />}
         </div>
     )
 }
@@ -150,7 +156,7 @@ function OtRulesPopup({ ot, onChange, onClose }: { ot: Ot; onChange: (patch: Par
 
     return createPortal(
         <div onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
-            style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            style={{ position: "fixed", inset: 0, zIndex: 1010, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
             <div role="dialog" aria-modal="true" aria-label="OT rules"
                 style={{ width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: 14, border: "1px solid var(--border)", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
@@ -223,6 +229,134 @@ function OtRulesPopup({ ot, onChange, onClose }: { ot: Ot; onChange: (patch: Par
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
                     <span style={{ fontSize: 11.5, color: "var(--text3)" }}>Changes are kept when you click Save on the settings page.</span>
                     <button type="button" onClick={onClose} style={{ height: 34, padding: "0 18px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Done</button>
+                </div>
+            </div>
+        </div>,
+        document.body,
+    )
+}
+
+// ── Bulk change: every site on one page ──────────────────────────────────────
+const DEFAULT = "__default__"
+
+function BulkSitesPopup({ ot, sites, onChange, onClose, onEditRules }: {
+    ot: Ot; sites: Site[]; onChange: (patch: Partial<Ot>) => void; onClose: () => void; onEditRules: () => void
+}) {
+    const formulas = ot.formulas ?? []
+    // Work on a copy; nothing changes until Apply.
+    const [draft, setDraft] = useState<Record<string, string>>(() =>
+        Object.fromEntries(Object.entries(ot.sites ?? {}).map(([id, r]) => [id, r.rule])))
+    const [q, setQ] = useState("")
+    const [picked, setPicked] = useState<Set<string>>(new Set())
+    const [toRule, setToRule] = useState(formulas[0]?.id ?? "")
+    useEffect(() => {
+        const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+        document.addEventListener("keydown", k)
+        return () => document.removeEventListener("keydown", k)
+    }, [onClose])
+
+    const shown = useMemo(() => {
+        const t = q.trim().toLowerCase()
+        return t ? sites.filter(x => x.name.toLowerCase().includes(t)) : sites
+    }, [sites, q])
+    const allPicked = shown.length > 0 && shown.every(x => picked.has(x.id))
+    const setOne = (id: string, rule: string) => setDraft(d => {
+        const n = { ...d }
+        if (rule === DEFAULT) delete n[id]; else n[id] = rule
+        return n
+    })
+    const applyToPicked = () => {
+        if (!picked.size) return
+        setDraft(d => {
+            const n = { ...d }
+            for (const id of Array.from(picked)) { if (toRule === DEFAULT) delete n[id]; else n[id] = toRule }
+            return n
+        })
+        setPicked(new Set())
+    }
+    const changed = sites.filter(x => (draft[x.id] ?? "") !== (ot.sites?.[x.id]?.rule ?? "")).length
+    const apply = () => {
+        const next: Ot["sites"] = {}
+        for (const [id, rule] of Object.entries(draft)) next[id] = { rule }
+        onChange({ sites: next })
+        onClose()
+    }
+    const defaultLabel = (() => { const f = formulas.find(x => x.id === ot.defaultRule); return f ? `Default — ${otFormulaLabel(f)}` : "Default rule" })()
+
+    return createPortal(
+        <div onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+            style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div role="dialog" aria-modal="true" aria-label="Bulk change OT rules"
+                style={{ width: "100%", maxWidth: 720, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: 14, border: "1px solid var(--border)", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--text)" }}>Bulk change — OT rule for all sites</h3>
+                        <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--text3)" }}>Change any site&apos;s rule in its row, or tick sites and set them together. Apply, then Save on the settings page.</p>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer", padding: 4 }}><X size={18} /></button>
+                </div>
+
+                {/* Search + set ticked sites */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
+                    <div style={{ position: "relative", flex: "1 1 180px" }}>
+                        <Search size={13} style={{ position: "absolute", left: 9, top: 10.5, color: "var(--text3)" }} />
+                        <input placeholder="Search sites" value={q} onChange={e => setQ(e.target.value)} style={{ ...box, width: "100%", paddingLeft: 28 }} />
+                    </div>
+                    <select value={toRule} onChange={e => e.target.value === EDIT ? onEditRules() : setToRule(e.target.value)} style={{ ...box, flex: "1 1 200px" }} aria-label="Rule for the ticked sites">
+                        {formulas.map(f => <option key={f.id} value={f.id}>{otFormulaLabel(f)}</option>)}
+                        <option value={DEFAULT}>{defaultLabel}</option>
+                        <option value={EDIT}>⚙ Add / edit OT rules…</option>
+                    </select>
+                    <button type="button" onClick={applyToPicked} disabled={!picked.size}
+                        style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: picked.size ? "pointer" : "not-allowed", opacity: picked.size ? 1 : 0.5, whiteSpace: "nowrap" }}>
+                        Set {picked.size || ""} ticked
+                    </button>
+                </div>
+
+                <div style={{ overflowY: "auto", flex: 1 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                            <tr style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
+                                <th style={{ padding: "8px 16px", width: 36, borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                                    <input type="checkbox" checked={allPicked} aria-label="Tick all listed sites" style={{ accentColor: "var(--accent)" }}
+                                        onChange={() => setPicked(p => { const n = new Set(p); shown.forEach(x => allPicked ? n.delete(x.id) : n.add(x.id)); return n })} />
+                                </th>
+                                <th style={{ padding: "8px 6px", fontSize: 11, fontWeight: 700, color: "var(--text2)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>Site ({shown.length})</th>
+                                <th style={{ padding: "8px 16px 8px 6px", fontSize: 11, fontWeight: 700, color: "var(--text2)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>OT rule</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {shown.length === 0 && <tr><td colSpan={3} style={{ padding: 20, textAlign: "center", fontSize: 12.5, color: "var(--text3)" }}>{sites.length ? "No site matches the search." : "Loading sites…"}</td></tr>}
+                            {shown.map(x => {
+                                const cur = draft[x.id] ?? DEFAULT
+                                const was = ot.sites?.[x.id]?.rule ?? DEFAULT
+                                return (
+                                    <tr key={x.id} style={{ background: cur !== was ? "#fffbeb" : undefined }}>
+                                        <td style={{ padding: "5px 16px", borderBottom: "1px solid var(--border)" }}>
+                                            <input type="checkbox" checked={picked.has(x.id)} aria-label={`Tick ${x.name}`} style={{ accentColor: "var(--accent)" }}
+                                                onChange={() => setPicked(p => { const n = new Set(p); n.has(x.id) ? n.delete(x.id) : n.add(x.id); return n })} />
+                                        </td>
+                                        <td style={{ padding: "5px 6px", fontSize: 12.5, fontWeight: 600, color: "var(--text)", borderBottom: "1px solid var(--border)" }}>{x.name}</td>
+                                        <td style={{ padding: "5px 16px 5px 6px", borderBottom: "1px solid var(--border)" }}>
+                                            <select value={cur} onChange={e => e.target.value === EDIT ? onEditRules() : setOne(x.id, e.target.value)} style={{ ...box, height: 30, width: "100%", maxWidth: 300 }} aria-label={`OT rule for ${x.name}`}>
+                                                {formulas.map(f => <option key={f.id} value={f.id}>{otFormulaLabel(f)}</option>)}
+                                                <option value={DEFAULT}>{defaultLabel}</option>
+                                                <option value={EDIT}>⚙ Add / edit OT rules…</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+                    <span style={{ fontSize: 11.5, color: "var(--text3)" }}>{changed ? `${changed} site${changed === 1 ? "" : "s"} changed` : "No changes yet"}</span>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button type="button" onClick={onClose} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+                        <button type="button" onClick={apply} style={{ height: 34, padding: "0 18px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Apply</button>
+                    </div>
                 </div>
             </div>
         </div>,
