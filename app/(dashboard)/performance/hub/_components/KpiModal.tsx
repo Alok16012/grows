@@ -234,6 +234,7 @@ export function KpiModal({ kraId, kpi, registers, metrics, onClose, onSaved, fai
                                 <select className={inputCls("!bg-white")} value={f.numeratorField} onChange={e => set("numeratorField", e.target.value)} disabled={!register}>
                                     <option value="">Select field…</option>
                                     {numericFields.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
+                                    <option value="__count">Number of entries</option>
                                 </select>
                             </div>
                             <div>
@@ -241,6 +242,7 @@ export function KpiModal({ kraId, kpi, registers, metrics, onClose, onSaved, fai
                                 <select className={inputCls("!bg-white")} value={f.denominatorField} onChange={e => set("denominatorField", e.target.value)} disabled={!register}>
                                     <option value="">Select field…</option>
                                     {numericFields.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
+                                    <option value="__count">Number of entries (e.g. closed ÷ all complaints)</option>
                                 </select>
                             </div>
                         </>)}

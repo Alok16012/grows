@@ -207,8 +207,12 @@ export type RegisterBinding = {
 }
 export type EntryLite = { date: Date; values: unknown }
 
+/** Pseudo-field for RATIO KPIs: every entry counts 1 (e.g. closed ÷ number of complaints). */
+export const ENTRY_COUNT_FIELD = "__count"
+
 const cell = (e: EntryLite, key: string | null | undefined) =>
-    key && e.values && typeof e.values === "object" ? toNum((e.values as Record<string, unknown>)[key]) : null
+    key === ENTRY_COUNT_FIELD ? 1
+        : key && e.values && typeof e.values === "object" ? toNum((e.values as Record<string, unknown>)[key]) : null
 
 /**
  * A KPI's value from the register entries in its period.

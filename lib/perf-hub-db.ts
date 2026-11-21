@@ -209,7 +209,7 @@ export async function normalizeKpi(body: unknown, existing?: KpiRow): Promise<Pa
         d.registerMode = mode
         const need = (k: string | null | undefined, label: string) => {
             if (!k) throw new PerfHubError(400, `Pick the register ${label}`)
-            if (!keys.has(k)) throw new PerfHubError(400, `Register has no field "${k}"`)
+            if (!keys.has(k) && k !== "__count") throw new PerfHubError(400, `Register has no field "${k}"`)
         }
         if (mode === "RATIO") {
             need(m.numeratorField, "numerator field")
