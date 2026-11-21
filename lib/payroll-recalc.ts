@@ -8,6 +8,7 @@
 // (PROCESSED / PAID) rows are never touched. Same engine and inputs as
 // Process Payroll; TDS entered on a row and arrears already added are kept.
 import prisma from "@/lib/prisma"
+import { syncOtRatesToStructures } from "@/lib/payroll-ot-sync"
 import { manualOtResolver } from "@/lib/payroll-manual-ot"
 import { postedSites } from "@/lib/attendance-guard"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
@@ -19,13 +20,20 @@ import { statutoryResolver } from "@/lib/employee-statutory"
 type YM = { month: number; year: number }
 const key = (p: YM) => p.year * 12 + p.month
 
-export type RecalcResult = { rows: number; months: string[] }
+export type RecalcResult = { rows: number; months: string[]; otRates?: number }
 
 /**
  * Recalculate DRAFT rows from `from` onward (only these employees, if given).
  * Never throws: the save that triggered it must not fail because of this.
  */
 export async function recalcDraftPayroll(opts: { from: YM; employeeIds?: string[] }): Promise<RecalcResult> {
+    // Salary Master OT rates follow the site OT rules first (never throws).
+    const otRates = await syncOtRatesToStructures({ employeeIds: opts.employeeIds })
+    const r = await recalcRows(opts)
+    return otRates ? { ...r, otRates } : r
+}
+
+async function recalcRows(opts: { from: YM; employeeIds?: string[] }): Promise<RecalcResult> {
     try {
         const fromKey = key(opts.from)
         const rows = await prisma.payroll.findMany({

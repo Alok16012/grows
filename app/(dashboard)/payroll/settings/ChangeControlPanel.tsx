@@ -38,7 +38,7 @@ export default function ChangeControlPanel({ versions, window, viewing, onView, 
             const r = await fetch("/api/payroll/recalc", { method: "POST" })
             const d = await r.json().catch(() => ({}))
             if (!r.ok) throw new Error(d?.error || "Could not recalculate")
-            toast.success(d.rows ? `${d.rows} draft payroll row${d.rows === 1 ? "" : "s"} recalculated (${d.months.join(", ")})` : "No draft payroll to recalculate")
+            toast.success((d.rows ? `${d.rows} draft payroll row${d.rows === 1 ? "" : "s"} recalculated (${d.months.join(", ")})` : "No draft payroll to recalculate") + (d.otRates ? ` · OT rate updated in ${d.otRates} salary structure${d.otRates === 1 ? "" : "s"}` : ""))
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
     async function saveControl(patch: Partial<W["control"]>) {

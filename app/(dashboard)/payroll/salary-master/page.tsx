@@ -921,6 +921,7 @@ function SalaryMasterInner() {
                                     {numField("otRatePerHour",     "OT Rate / Hour",     "₹/hr")}
                                     {numField("canteenRatePerDay", "Canteen Rate / Day", "₹/day")}
                                 </div>
+                                <p style={{ fontSize: 10.5, color: "var(--text3)", margin: "-4px 0 8px" }}>OT rate is set automatically when the employee&apos;s site has an OT rule (Payroll → Calculation Settings → OT Rule by Site); a value typed here is then replaced by the rule&apos;s rate.</p>
 
                                 {/* Live Calculation Preview */}
                                 <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10, background: "#f8fafc", border: "1px dashed #94a3b8" }}>

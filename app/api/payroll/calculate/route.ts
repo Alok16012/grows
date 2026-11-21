@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { syncOtRatesToStructures } from "@/lib/payroll-ot-sync"
 import { manualOtResolver } from "@/lib/payroll-manual-ot"
 import { postedSites } from "@/lib/attendance-guard"
 import { isMissingTableErr } from "@/lib/asset-workflow"
@@ -222,6 +223,8 @@ export async function POST(req: Request) {
 
         // The site whose OT rule applies: the site being processed, else each
         // person's current posting.
+        // Salary Master OT rates follow the site OT rules before the run.
+        await syncOtRatesToStructures({ employeeIds: employees.map(e => e.id) })
         const [posted, manualOt] = await Promise.all([
             siteId ? Promise.resolve(new Map<string, string>()) : postedSites(employees.map(e => e.id)),
             manualOtResolver(),

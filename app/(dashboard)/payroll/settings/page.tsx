@@ -160,7 +160,7 @@ export default function PayrollSettingsPage() {
             setViewing({ month: applyFrom.effectiveMonth, year: applyFrom.effectiveYear })
             loadRules({ month: applyFrom.effectiveMonth, year: applyFrom.effectiveYear })
             const rc = d.recalculated
-            toast.success(`Calculation settings saved — they apply from ${MONTHS[applyFrom.effectiveMonth - 1]} ${applyFrom.effectiveYear}.${rc?.rows ? ` ${rc.rows} draft payroll row${rc.rows === 1 ? "" : "s"} recalculated (${rc.months.join(", ")}).` : " No draft payroll to update."}`)
+            toast.success(`Calculation settings saved — they apply from ${MONTHS[applyFrom.effectiveMonth - 1]} ${applyFrom.effectiveYear}.${rc?.rows ? ` ${rc.rows} draft payroll row${rc.rows === 1 ? "" : "s"} recalculated (${rc.months.join(", ")}).` : " No draft payroll to update."}${rc?.otRates ? ` OT rate updated in ${rc.otRates} salary structure${rc.otRates === 1 ? "" : "s"}.` : ""}`)
         } catch (e) { toast.error((e as Error).message || "Save failed") }
         finally { setSaving(false) }
     }
