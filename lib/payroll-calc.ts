@@ -17,6 +17,10 @@
 //
 // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
 //   Default hoursPerDay = 4 (e.g. ₹170/hr × 4 = ₹680/day)
+//   The rate per hour follows the site's OT rule (Calculation Settings → OT rule
+//   by site): (Basic+DA), (Basic+DA+Conveyance) or Gross ÷ 26 ÷ 8 × 2, or a
+//   fixed rate (the site's, else the employee's own). No site / no rule → the
+//   default rule, which out of the box is the employee's own rate (as before).
 //
 // The rules passed in must be the ones for the payroll month — callers use
 // rulesForPeriod(rules, month, year), which applies the 1 Oct 2026 revision.
@@ -37,7 +41,7 @@
 // PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
 //   200 (300 in February). Female employees exempt up to ₹25,000.
 //
-import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase, roundAmt, esicWagesOf } from "./payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase, roundAmt, esicWagesOf, otRatePerHourFor } from "./payroll-rules"
 
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
@@ -52,6 +56,7 @@ export function calcGrowusPayroll(sal: {
     pfApplicable?: boolean      // false → no PF at all (employee or employer)
     pensionApplicable?: boolean // false → employer EPS 8.33% goes to EPF instead (same total)
     esicApplicable?: boolean    // false → no ESIC (employee or employer)
+    siteId?: string | null      // the site the pay is for — picks its OT rule
 }, att: {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
@@ -109,7 +114,8 @@ export function calcGrowusPayroll(sal: {
     const otherEarned   = r(otherAllowance, fm.otherAllowance)
 
     // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
-    const otPay = Math.round(otRatePerHour * rules.ot.hoursPerDay * otDays)
+    const otRate = otRatePerHourFor(rules.ot, sal.siteId, { basic, da, conveyance, gross: grossFullMonth, ownRate: otRatePerHour })
+    const otPay = Math.round(otRate * rules.ot.hoursPerDay * otDays)
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
         lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)

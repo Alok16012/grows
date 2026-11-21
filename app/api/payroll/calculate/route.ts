@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { postedSites } from "@/lib/attendance-guard"
 import { isMissingTableErr } from "@/lib/asset-workflow"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -218,6 +219,9 @@ export async function POST(req: Request) {
             )
         }
 
+        // The site whose OT rule applies: the site being processed, else each
+        // person's current posting.
+        const posted = siteId ? new Map<string, string>() : await postedSites(employees.map(e => e.id))
         const allRows: PayrollRow[] = employees.map(emp => {
             const revision = revisions.get(emp.id)
             const sal      = emp.employeeSalary
@@ -258,6 +262,7 @@ export async function POST(req: Request) {
                 canteenRatePerDay: salData?.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType:    salData?.complianceType   ?? "OR",
                 isHandicap:        emp.isHandicap            ?? false,
+                siteId:            siteId ?? posted.get(emp.id) ?? null,
                 ...(statutory.get(emp.id) ?? {}),
             }, {
                 ...att,

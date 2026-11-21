@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 import EffectiveMonthPicker, { type EffectiveChoice } from "@/components/payroll/EffectiveMonthPicker"
 import ChangeControlPanel from "./ChangeControlPanel"
+import OtSiteRules from "./OtSiteRules"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -481,7 +482,7 @@ export default function PayrollSettingsPage() {
                 <div style={cardStyle}>
                     <div>
                         <h2 style={cardTitle}>Overtime, LWF &amp; Defaults</h2>
-                        <p style={cardHint}>OT pay = OT rate/hour × hours per OT day × OT days. Defaults are used when a value is missing from a salary structure or attendance sheet.</p>
+                        <p style={cardHint}>OT pay = OT rate/hour × hours per OT day × OT days. The rate/hour follows each site&apos;s OT rule (below). Defaults are used when a value is missing from a salary structure or attendance sheet.</p>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                         <NumField label="Hours per OT day" value={rules.ot.hoursPerDay} onChange={n => up("ot", { hoursPerDay: n })} />
@@ -496,6 +497,15 @@ export default function PayrollSettingsPage() {
                         <NumField label="Default DA" suffix="₹" value={rules.defaults.da} onChange={n => up("defaults", { da: n })} />
                         <NumField label="Default Bonus" suffix="₹" value={rules.defaults.bonus} onChange={n => up("defaults", { bonus: n })} />
                     </div>
+                </div>
+
+                {/* ── OT rule by site ── */}
+                <div style={{ ...cardStyle, gridColumn: "1 / -1" }}>
+                    <div>
+                        <h2 style={cardTitle}>OT Rule by Site</h2>
+                        <p style={cardHint}>Pick one rule for each site; picking one clears the others. Formula rules use the full-month salary structure: e.g. (Basic + DA) ÷ 26 ÷ 8 × 2 = OT rate per hour. Fixed uses the rate typed for the site, or each employee&apos;s own OT rate (Salary Master) when left blank. Like every setting here, it applies from the month picked next to Save.</p>
+                    </div>
+                    <OtSiteRules ot={rules.ot} onChange={p => up("ot", p)} />
                 </div>
 
                 {/* ── Pay & proration ── */}

@@ -36,6 +36,7 @@ export async function refreshArrears(employeeIds: string[], from: Snap, createdB
                 grossSalary: true, netSalary: true, pfEmployee: true, esiEmployee: true, pt: true, arrears: true,
                 workingDays: true, presentDays: true, otDays: true, canteenDays: true, canteenAmount: true,
                 penalty: true, advance: true, otherDeductions: true, productionIncentive: true, lwf: true,
+                siteId: true,
                 employee: { select: { gender: true, isHandicap: true, basicSalary: true, employeeSalary: true } },
             },
         })
@@ -71,6 +72,7 @@ export async function refreshArrears(employeeIds: string[], from: Snap, createdB
                 otRatePerHour: sal.otRatePerHour ?? rules.defaults.otRatePerHour,
                 canteenRatePerDay: sal.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType: sal.complianceType ?? "OR", isHandicap: row.employee.isHandicap ?? false,
+                siteId: row.siteId ?? null,
                 ...statutoryAt(row.employeeId, { month: row.month, year: row.year }),
             }, {
                 monthDays: row.workingDays, workedDays: row.presentDays, otDays: row.otDays,

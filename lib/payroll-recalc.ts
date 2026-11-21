@@ -8,6 +8,7 @@
 // (PROCESSED / PAID) rows are never touched. Same engine and inputs as
 // Process Payroll; TDS entered on a row and arrears already added are kept.
 import prisma from "@/lib/prisma"
+import { postedSites } from "@/lib/attendance-guard"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { rulesForPeriod } from "@/lib/payroll-rules"
 import { getRulesResolver } from "@/lib/payroll-rules-server"
@@ -36,7 +37,7 @@ export async function recalcDraftPayroll(opts: { from: YM; employeeIds?: string[
                 id: true, employeeId: true, month: true, year: true, payrollRunId: true,
                 workingDays: true, presentDays: true, otDays: true, canteenDays: true, canteenAmount: true,
                 penalty: true, advance: true, otherDeductions: true, productionIncentive: true, lwf: true,
-                tds: true, arrears: true,
+                tds: true, arrears: true, siteId: true,
                 employee: { select: { gender: true, isHandicap: true, basicSalary: true, employeeSalary: true } },
             },
         })
@@ -44,7 +45,7 @@ export async function recalcDraftPayroll(opts: { from: YM; employeeIds?: string[
         if (!due.length) return { rows: 0, months: [] }
 
         const ids = Array.from(new Set(due.map(r => r.employeeId)))
-        const [rulesAt, statutoryAt] = await Promise.all([getRulesResolver(), statutoryResolver(ids)])
+        const [rulesAt, statutoryAt, posted] = await Promise.all([getRulesResolver(), statutoryResolver(ids), postedSites(ids)])
         const monthKeys = Array.from(new Set(due.map(r => `${r.year}-${r.month}`)))
         const inForce = new Map<string, Awaited<ReturnType<typeof revisionsForMonth>>>()
         for (const k of monthKeys) {
@@ -64,6 +65,7 @@ export async function recalcDraftPayroll(opts: { from: YM; employeeIds?: string[
                 otRatePerHour: sal?.otRatePerHour ?? rules.defaults.otRatePerHour,
                 canteenRatePerDay: sal?.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType: sal?.complianceType ?? "OR", isHandicap: row.employee.isHandicap ?? false,
+                siteId: row.siteId ?? posted.get(row.employeeId) ?? null,
                 ...statutoryAt(row.employeeId, p),
             }, {
                 monthDays: row.workingDays, workedDays: row.presentDays, otDays: row.otDays,
