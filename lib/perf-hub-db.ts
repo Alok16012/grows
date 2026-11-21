@@ -324,6 +324,20 @@ export async function systemMetricValue(metric: string, emp: { id: string; userI
             })
             return rows.reduce((n, r) => n + (r.status === "HALF_DAY" ? 0.5 : 1), 0)
         }
+        case "lms.my_completion_pct": {
+            const { teamCompletionPct } = await import("@/lib/skills")
+            return teamCompletionPct([emp.id], window.lt)
+        }
+        case "lms.team_completion_pct":
+        case "skills.multiskilled_team":
+        case "skills.matrix_updated_pct": {
+            if (!uid) return null
+            const sk = await import("@/lib/skills")
+            const team = await sk.teamEmployeeIds(uid)
+            if (metric === "lms.team_completion_pct") return sk.teamCompletionPct(team, window.lt)
+            if (metric === "skills.multiskilled_team") return sk.multiskilledCount(team)
+            return sk.matrixUpdatedPct(team, window.lt)
+        }
         case "fieldtasks.completed":
             // Older completions have no completedAt; their last update stands in.
             return prisma.fieldTask.count({

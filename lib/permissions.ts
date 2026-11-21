@@ -197,6 +197,7 @@ export const PERMISSION_GROUPS = [
         permissions: [
             { key: "lms.view",   label: "View Courses" },
             { key: "lms.manage", label: "Manage Courses & Enrollments" },
+            { key: "lms.ojt",    label: "Sign off on-the-job training (skill matrix)" },
         ]
     },
 
@@ -272,7 +273,7 @@ export const MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "expenses.view", "expenses.manage",
     "performance.view", "performance.manage",
     "exit.view", "exit.manage",
-    "lms.view", "lms.manage",
+    "lms.view", "lms.manage", "lms.ojt",
     "approvals.view", "approvals.manage",
     "helpdesk.view", "helpdesk.manage",
     "reports.view", "reports.export",
@@ -293,7 +294,7 @@ export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
     "expenses.view", "expenses.manage",
     "performance.view", "performance.manage",
     "exit.view", "exit.manage",
-    "lms.view", "lms.manage",
+    "lms.view", "lms.manage", "lms.ojt",
     "helpdesk.view", "helpdesk.manage",
     "reports.view",
 ]

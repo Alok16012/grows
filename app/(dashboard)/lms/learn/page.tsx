@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import MySkills from "./MySkills"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -955,6 +956,9 @@ export default function LearnPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Policies acknowledgment banner */}
                 <PoliciesSection onUrlPreview={(url, name) => { setPreviewUrl(url); setPreviewName(name) }} />
+
+                {/* Skill matrix levels (courses + on-the-job sign-offs) */}
+                <MySkills />
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 text-center">

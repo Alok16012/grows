@@ -2860,3 +2860,59 @@ model SalaryArrear {
   @@index([status])
   @@index([forYear, forMonth])
 }
+
+// ─── SKILL MATRIX (LMS → Skill matrix) ────────────────────────────────────────
+/// A skill on the matrix: a process, part, customer or safety skill.
+/// Levels: 0 not trained · 1 theory done (course passed) · 2 practising under
+/// supervision · 3 works independently (on-the-job sign-off) · 4 can train others.
+model Skill {
+  id          String          @id @default(uuid())
+  code        String          @unique // SK-001
+  name        String
+  category    String          @default("PROCESS") // PROCESS | PART | CUSTOMER | SAFETY
+  siteId      String?         // a site-specific skill (e.g. one customer's part); null = everywhere
+  courseId    String?         // passing this course gives the theory level
+  description String?
+  isActive    Boolean         @default(true)
+  createdBy   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  levels      EmployeeSkill[]
+  signoffs    OjtSignoff[]
+
+  @@index([siteId])
+  @@index([courseId])
+}
+
+/// An employee's current level on a skill.
+model EmployeeSkill {
+  id         String   @id @default(uuid())
+  employeeId String
+  skillId    String
+  level      Int      @default(0)
+  source     String   @default("MANUAL") // COURSE | OJT | MANUAL
+  assessedBy String?
+  assessedAt DateTime @default(now())
+  notes      String?
+  skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, skillId])
+  @@index([employeeId])
+  @@index([skillId])
+}
+
+/// On-the-job training sign-off by a supervisor (history; EmployeeSkill holds the current level).
+model OjtSignoff {
+  id               String   @id @default(uuid())
+  employeeId       String
+  skillId          String
+  level            Int
+  supervisorUserId String
+  notes            String?
+  photoUrl         String?
+  signedAt         DateTime @default(now())
+  skill            Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([skillId])
+}

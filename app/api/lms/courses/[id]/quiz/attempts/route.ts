@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { raiseSkillsFromCourse } from "@/lib/skills"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -133,6 +134,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                     certificate: enrollment.certificate ?? await nextCertificateNumber(),
                 },
             })
+            // Skills linked to this course reach the theory level (LMS → Skill matrix).
+            await raiseSkillsFromCourse(enrollment.employeeId, enrollment.courseId)
         } else {
             await prisma.courseEnrollment.update({
                 where: { id: enrollment.id },

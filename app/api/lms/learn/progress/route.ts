@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { raiseSkillsFromCourse } from "@/lib/skills"
 import { getServerSession } from "next-auth"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -46,6 +47,8 @@ export async function POST(req: Request) {
                 ...(finishes ? { completedAt: new Date(), certificate: enrollment.certificate ?? await nextCertificateNumber() } : {}),
             },
         })
+        // Skills linked to this course reach the theory level (LMS → Skill matrix).
+        if (finishes) await raiseSkillsFromCourse(enrollment.employeeId, enrollment.courseId)
         return NextResponse.json(updated)
     } catch (error) {
         console.error("[LMS_LEARN_PROGRESS]", error)

@@ -26,6 +26,15 @@ export type LmsSettings = {
         escalateAfterDays: number
         escalateTo: "hr" | "manager" | "both"
     }
+    skills: {
+        /** Level a linked skill reaches when its course is passed (theory). */
+        courseLevel: number
+        /** "Multiskilled" = at least this many skills at this level or above. */
+        multiskillMinLevel: number
+        multiskillMinSkills: number
+        /** A person's skill levels count as "updated" if reviewed within this many days. */
+        reviewEveryDays: number
+    }
     retraining: {
         /** Courses with a validity period re-enrol the person before the certificate expires. */
         enabled: boolean
@@ -38,6 +47,7 @@ export const DEFAULT_LMS_SETTINGS: LmsSettings = {
     autoAssign: { nightly: true, onChange: true },
     defaults: { dueDays: 14, passingScore: 70, maxAttempts: 3 },
     reminders: { beforeDays: 3, overdueEveryDays: 3, escalateAfterDays: 7, escalateTo: "hr" },
+    skills: { courseLevel: 1, multiskillMinLevel: 3, multiskillMinSkills: 2, reviewEveryDays: 90 },
     retraining: { enabled: true, beforeDays: 15 },
 }
 
@@ -47,7 +57,7 @@ const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d)
 
 export function sanitizeLmsSettings(v: any): LmsSettings {
     const d = DEFAULT_LMS_SETTINGS
-    const a = v?.autoAssign ?? {}, df = v?.defaults ?? {}, r = v?.reminders ?? {}, rt = v?.retraining ?? {}
+    const a = v?.autoAssign ?? {}, df = v?.defaults ?? {}, r = v?.reminders ?? {}, rt = v?.retraining ?? {}, sk = v?.skills ?? {}
     return {
         autoAssign: { nightly: bool(a.nightly, d.autoAssign.nightly), onChange: bool(a.onChange, d.autoAssign.onChange) },
         defaults: {
@@ -60,6 +70,12 @@ export function sanitizeLmsSettings(v: any): LmsSettings {
             overdueEveryDays: num(r.overdueEveryDays, d.reminders.overdueEveryDays, 0, 60),
             escalateAfterDays: num(r.escalateAfterDays, d.reminders.escalateAfterDays, 0, 180),
             escalateTo: r.escalateTo === "manager" || r.escalateTo === "both" || r.escalateTo === "hr" ? r.escalateTo : d.reminders.escalateTo,
+        },
+        skills: {
+            courseLevel: num(sk.courseLevel, d.skills.courseLevel, 1, 4),
+            multiskillMinLevel: num(sk.multiskillMinLevel, d.skills.multiskillMinLevel, 1, 4),
+            multiskillMinSkills: num(sk.multiskillMinSkills, d.skills.multiskillMinSkills, 2, 20),
+            reviewEveryDays: num(sk.reviewEveryDays, d.skills.reviewEveryDays, 7, 730),
         },
         retraining: { enabled: bool(rt.enabled, d.retraining.enabled), beforeDays: num(rt.beforeDays, d.retraining.beforeDays, 0, 180) },
     }

@@ -233,6 +233,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             links: [
                 { name: "Performance", href: "/performance/hub", permission: "performance.view", matchPrefixes: ["/performance"] },
                 { name: "Training (LMS)", href: "/lms", permission: "lms.manage" },
+                // Supervisors sign off on-the-job training from their phone.
+                { name: "OJT sign-off", href: "/lms/ojt", permissionAny: ["lms.ojt", "lms.manage"] },
             ],
         },
         {
