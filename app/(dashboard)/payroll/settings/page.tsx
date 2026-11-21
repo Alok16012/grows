@@ -503,7 +503,7 @@ export default function PayrollSettingsPage() {
                 <div style={{ ...cardStyle, gridColumn: "1 / -1" }}>
                     <div>
                         <h2 style={cardTitle}>OT Rule by Site</h2>
-                        <p style={cardHint}>Pick one rule for each site; picking one clears the others. Formula rules use the full-month salary structure: e.g. (Basic + DA) ÷ 26 ÷ 8 × 2 = OT rate per hour. Fixed uses the rate typed for the site, or each employee&apos;s own OT rate (Salary Master) when left blank. Like every setting here, it applies from the month picked next to Save.</p>
+                        <p style={cardHint}>One rule per site; sites not listed use the default. Formula rules use the full-month salary: e.g. (Basic + DA) ÷ 26 ÷ 8 × 2 = OT rate per hour.</p>
                     </div>
                     <OtSiteRules ot={rules.ot} onChange={p => up("ot", p)} />
                 </div>

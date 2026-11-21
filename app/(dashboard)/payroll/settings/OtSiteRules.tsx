@@ -1,22 +1,26 @@
 "use client"
 
-// Calculation Settings → OT rule by site. Each site has exactly one OT rule
-// (picking one clears the others). Saved with the rest of the settings, so it
-// follows the same "applies from" month, versions and draft auto-recalculation.
+// Calculation Settings → OT rule by site, compact: pick a site from a dropdown,
+// pick its one rule, Set. Only sites with a rule of their own are listed below;
+// every other site uses the default rule. Saved with the rest of the settings,
+// so it follows the same "applies from" month, versions and draft recalculation.
 import { useEffect, useMemo, useState } from "react"
-import { Search, RotateCcw } from "lucide-react"
+import { Pencil, X } from "lucide-react"
 import type { OtRule, PayrollRules } from "@/lib/payroll-rules"
 
 type Ot = PayrollRules["ot"]
 type Site = { id: string; name: string }
 
-const th: React.CSSProperties = { padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--text2)", textAlign: "center", borderBottom: "1px solid var(--border)", background: "var(--surface2)", whiteSpace: "nowrap" }
-const td: React.CSSProperties = { padding: "7px 10px", fontSize: 12.5, borderBottom: "1px solid var(--border)", textAlign: "center" }
-const input: React.CSSProperties = { padding: "6px 9px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12.5, background: "var(--surface)", color: "var(--text)", outline: "none" }
+const ALL = "__all__"
+const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px" }
+const box: React.CSSProperties = { height: 34, padding: "0 9px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12.5, background: "var(--surface)", color: "var(--text)", outline: "none" }
+const field = (w: number | string): React.CSSProperties => ({ display: "flex", flexDirection: "column", gap: 4, width: w, minWidth: 0 })
 
 export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch: Partial<Ot>) => void }) {
     const [sites, setSites] = useState<Site[]>([])
-    const [q, setQ] = useState("")
+    const [siteId, setSiteId] = useState("")
+    const [rule, setRule] = useState<OtRule>("BASIC_DA")
+    const [rate, setRate] = useState("")
     useEffect(() => {
         fetch("/api/sites").then(r => r.ok ? r.json() : []).then(d => {
             if (Array.isArray(d)) setSites(d.map((s: any) => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true })))
@@ -30,101 +34,99 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
         { value: "GROSS", label: `Gross${f}` },
         { value: "FIXED", label: "Fixed OT rate" },
     ]
-    const shown = useMemo(() => {
-        const s = q.trim().toLowerCase()
-        return s ? sites.filter(x => x.name.toLowerCase().includes(s)) : sites
-    }, [sites, q])
+    const ruleLabel = (r: OtRule) => RULES.find(x => x.value === r)?.label ?? r
+    const nameOf = useMemo(() => new Map(sites.map(s => [s.id, s.name])), [sites])
+    const own = Object.entries(ot.sites ?? {})
+        .map(([id, r]) => ({ id, name: nameOf.get(id) ?? "(site removed)", ...r }))
+        .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true }))
 
-    const setSite = (id: string, rule: OtRule | null, fixedRate?: number | null) => {
-        const next = { ...ot.sites }
-        if (rule === null) delete next[id]
-        else next[id] = rule === "FIXED" ? { rule, fixedRate: fixedRate ?? next[id]?.fixedRate ?? null } : { rule }
-        onChange({ sites: next })
+    // Choosing a site shows the rule it has now.
+    const pickSite = (id: string) => {
+        setSiteId(id)
+        const r = id && id !== ALL ? ot.sites?.[id] : undefined
+        setRule(r?.rule ?? ot.defaultRule ?? "BASIC_DA")
+        setRate(r?.rule === "FIXED" && r.fixedRate ? String(r.fixedRate) : "")
     }
-    const applyToShown = (rule: OtRule) => {
+    const set = () => {
+        if (!siteId) return
+        const fixedRate = rule === "FIXED" && Number(rate) > 0 ? Number(rate) : null
+        const value = rule === "FIXED" ? { rule, fixedRate } : { rule }
         const next = { ...ot.sites }
-        for (const s of shown) next[s.id] = rule === "FIXED" ? { rule, fixedRate: next[s.id]?.fixedRate ?? null } : { rule }
+        for (const id of siteId === ALL ? sites.map(s => s.id) : [siteId]) next[id] = value
         onChange({ sites: next })
+        setSiteId(""); setRate("")
     }
-    const custom = Object.keys(ot.sites ?? {}).length
+    const remove = (id: string) => { const next = { ...ot.sites }; delete next[id]; onChange({ sites: next }) }
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Formula and default */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
-                {([["rateDays", "Divide by days"], ["rateHours", "Divide by hours"], ["multiplier", "Multiply by"]] as const).map(([k, l]) => (
-                    <label key={k} style={{ display: "flex", flexDirection: "column", gap: 4, width: 120 }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px" }}>{l}</span>
-                        <input type="number" step="any" value={ot[k]} onChange={e => onChange({ [k]: e.target.value === "" ? 0 : Number(e.target.value) } as Partial<Ot>)} style={input} />
+                {([["rateDays", "Days"], ["rateHours", "Hours"], ["multiplier", "Multiply"]] as const).map(([k, l]) => (
+                    <label key={k} style={field(78)}>
+                        <span style={lbl}>{l}</span>
+                        <input type="number" step="any" value={ot[k]} onChange={e => onChange({ [k]: e.target.value === "" ? 0 : Number(e.target.value) } as Partial<Ot>)} style={box} />
                     </label>
                 ))}
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 230 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px" }}>Sites with no rule of their own</span>
-                    <select value={ot.defaultRule} onChange={e => onChange({ defaultRule: e.target.value as OtRule })} style={input}>
-                        {RULES.map(r => <option key={r.value} value={r.value}>{r.value === "FIXED" ? "Fixed — each employee's own OT rate" : r.label}</option>)}
+                <label style={field(260)}>
+                    <span style={lbl}>Default rule (all other sites)</span>
+                    <select value={ot.defaultRule} onChange={e => onChange({ defaultRule: e.target.value as OtRule })} style={box}>
+                        {RULES.map(r => <option key={r.value} value={r.value}>{r.value === "FIXED" ? "Fixed — employee's own OT rate" : r.label}</option>)}
                     </select>
                 </label>
             </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 320 }}>
-                    <Search size={13} style={{ position: "absolute", left: 9, top: 9, color: "var(--text3)" }} />
-                    <input placeholder="Search sites" value={q} onChange={e => setQ(e.target.value)} style={{ ...input, width: "100%", paddingLeft: 28 }} />
-                </div>
-                <select value="" onChange={e => { if (e.target.value) applyToShown(e.target.value as OtRule) }} style={input} aria-label="Apply one rule to every listed site">
-                    <option value="">Apply to all {q ? "listed" : ""} sites ({shown.length})…</option>
-                    {RULES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-                <span style={{ fontSize: 11.5, color: "var(--text3)" }}>{custom} site{custom === 1 ? "" : "s"} with their own rule</span>
+            {/* Set one site's rule */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end", padding: 10, borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)" }}>
+                <label style={field(220)}>
+                    <span style={lbl}>Site</span>
+                    <select value={siteId} onChange={e => pickSite(e.target.value)} style={box}>
+                        <option value="">Select site…</option>
+                        <option value={ALL}>All sites ({sites.length})</option>
+                        {sites.map(s => <option key={s.id} value={s.id}>{s.name}{ot.sites?.[s.id] ? " ✓" : ""}</option>)}
+                    </select>
+                </label>
+                <label style={field(230)}>
+                    <span style={lbl}>OT rule</span>
+                    <select value={rule} onChange={e => setRule(e.target.value as OtRule)} style={box} disabled={!siteId}>
+                        {RULES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                </label>
+                {rule === "FIXED" && (
+                    <label style={field(130)}>
+                        <span style={lbl}>Rate ₹/hour</span>
+                        <input type="number" min={0} step="any" value={rate} onChange={e => setRate(e.target.value)} placeholder="Own rate" disabled={!siteId}
+                            title="Blank = each employee's own OT rate (Salary Master)" style={box} />
+                    </label>
+                )}
+                <button type="button" onClick={set} disabled={!siteId}
+                    style={{ height: 34, padding: "0 16px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: siteId ? "pointer" : "not-allowed", opacity: siteId ? 1 : 0.5 }}>
+                    Set rule
+                </button>
             </div>
 
-            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
-                    <thead>
-                        <tr>
-                            <th style={{ ...th, textAlign: "left", width: 40 }}>#</th>
-                            <th style={{ ...th, textAlign: "left" }}>Site</th>
-                            {RULES.map(r => <th key={r.value} style={th}>{r.label}</th>)}
-                            <th style={th}></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {shown.length === 0 && (
-                            <tr><td colSpan={7} style={{ ...td, color: "var(--text3)", padding: 18 }}>{sites.length ? "No site matches the search." : "Loading sites…"}</td></tr>
-                        )}
-                        {shown.map((s, i) => {
-                            const own = ot.sites?.[s.id]
-                            const active = own?.rule ?? ot.defaultRule
-                            return (
-                                <tr key={s.id}>
-                                    <td style={{ ...td, textAlign: "left", color: "var(--text3)" }}>{i + 1}</td>
-                                    <td style={{ ...td, textAlign: "left", fontWeight: 600, color: "var(--text)" }}>
-                                        {s.name}
-                                        {!own && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: "var(--text3)" }}>(default)</span>}
-                                    </td>
-                                    {RULES.map(r => (
-                                        <td key={r.value} style={td}>
-                                            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                                                <input type="radio" name={`ot-${s.id}`} checked={active === r.value} onChange={() => setSite(s.id, r.value)}
-                                                    aria-label={`${s.name}: ${r.label}`} style={{ accentColor: "var(--accent)", width: 15, height: 15, cursor: "pointer" }} />
-                                                {r.value === "FIXED" && (
-                                                    <input type="number" min={0} step="any" disabled={active !== "FIXED"}
-                                                        placeholder="Own rate" title="₹ per hour for everyone at this site. Blank = each employee's own OT rate."
-                                                        value={own?.rule === "FIXED" && own.fixedRate ? own.fixedRate : ""}
-                                                        onChange={e => setSite(s.id, "FIXED", e.target.value === "" ? null : Number(e.target.value))}
-                                                        style={{ ...input, width: 86, opacity: active === "FIXED" ? 1 : 0.4 }} />
-                                                )}
-                                            </div>
-                                        </td>
-                                    ))}
-                                    <td style={td}>
-                                        {own && <button type="button" onClick={() => setSite(s.id, null)} title="Use the default rule" style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer" }}><RotateCcw size={13} /></button>}
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
-            </div>
+            {/* Sites with their own rule */}
+            {own.length === 0 ? (
+                <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>All {sites.length || ""} sites use the default rule. Pick a site above to give it its own.</p>
+            ) : (
+                <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+                    <div style={{ padding: "6px 10px", fontSize: 11, fontWeight: 700, color: "var(--text2)", background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                        {own.length} site{own.length === 1 ? "" : "s"} with their own rule · {Math.max(sites.length - own.length, 0)} on the default
+                    </div>
+                    <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                        {own.map(o => (
+                            <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderBottom: "1px solid var(--border)", fontSize: 12.5 }}>
+                                <span style={{ flex: "1 1 40%", fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
+                                <span style={{ flex: "1 1 45%", color: "var(--text2)" }}>
+                                    {ruleLabel(o.rule)}{o.rule === "FIXED" ? (o.fixedRate ? ` · ₹${o.fixedRate}/hr` : " · employee's own rate") : ""}
+                                </span>
+                                <button type="button" title="Change" onClick={() => pickSite(o.id)} style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer" }}><Pencil size={13} /></button>
+                                <button type="button" title="Use the default rule" onClick={() => remove(o.id)} style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer" }}><X size={14} /></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
