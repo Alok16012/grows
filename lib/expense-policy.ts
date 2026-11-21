@@ -30,6 +30,16 @@ export type ExpensePolicy = {
     maxKmPerClaim: number
     /** category → limits; a category not listed has none. */
     limits: Record<string, CategoryLimit>
+    approval: {
+        /** "single": Manage Expenses approves. "twoLevel": reporting manager, then final approval. */
+        mode: "single" | "twoLevel"
+        /** Two-level: claims above this also need final approval after the manager. 0 = every claim. */
+        finalAbove: number
+        /** Remind whoever must act on a claim waiting longer than this. 0 = no reminders. */
+        remindAfterHours: number
+        /** Tell admins about a claim waiting longer than this. 0 = never. */
+        escalateAfterHours: number
+    }
 }
 
 export const DEFAULT_EXPENSE_POLICY: ExpensePolicy = {
@@ -38,6 +48,7 @@ export const DEFAULT_EXPENSE_POLICY: ExpensePolicy = {
     maxAgeDays: 0,
     maxKmPerClaim: 0,
     limits: {},
+    approval: { mode: "single", finalAbove: 0, remindAfterHours: 48, escalateAfterHours: 120 },
 }
 
 const num = (v: unknown, d: number, min = 0, max = 100_000_000) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : d }
@@ -63,6 +74,12 @@ export function sanitizeExpensePolicy(v: any): ExpensePolicy {
         maxAgeDays: num(v?.maxAgeDays, d.maxAgeDays, 0, 3650),
         maxKmPerClaim: num(v?.maxKmPerClaim, d.maxKmPerClaim, 0, 1_000_000),
         limits,
+        approval: {
+            mode: v?.approval?.mode === "twoLevel" ? "twoLevel" : "single",
+            finalAbove: num(v?.approval?.finalAbove, d.approval.finalAbove),
+            remindAfterHours: num(v?.approval?.remindAfterHours, d.approval.remindAfterHours, 0, 24 * 60),
+            escalateAfterHours: num(v?.approval?.escalateAfterHours, d.approval.escalateAfterHours, 0, 24 * 120),
+        },
     }
 }
 

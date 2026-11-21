@@ -1075,6 +1075,8 @@ model Payroll {
   totalDeductions     Float         @default(0)
   /// Approved arrears from earlier months paid with this payroll (SalaryArrear). Included in netSalary.
   arrears             Float         @default(0)
+  /// Approved expense claims paid with this salary (Expense Claims → Pay with salary). Included in netSalary, not in gross / PF / ESIC.
+  reimbursement       Float         @default(0)
   // --- Net & CTC ---
   netSalary           Float         @default(0)
   ctc                 Float         @default(0) // CTC = fullGross + empPF + empESIC
@@ -2218,6 +2220,14 @@ model Expense {
   travelEntries   Json? // [{date,from,to,kms,amount}] per-journey breakdown
   categoryItems   Json? // [{category,amount,travelEntries?,vehicleType?}] multi-category line items
   status          ExpenseStatus   @default(DRAFT)
+  // Two-level approval (Expense policy): 1 = reporting manager, 2 = final (Accounts / HR).
+  approvalStage   Int             @default(1)
+  approvalTrail   Json? // [{stage,action,by,byName,at,note}]
+  // Settlement: "BANK" (paid by accounts) or "PAYROLL" (added to that month's salary).
+  settledVia      String?
+  payrollMonth    Int?
+  payrollYear     Int?
+  advanceId       String? // the advance this claim is adjusted against
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -2225,6 +2235,43 @@ model Expense {
   @@index([submittedBy])
   @@index([date])
   @@index([projectId])
+  @@index([payrollYear, payrollMonth], map: "Expense_payroll_idx")
+  @@index([advanceId])
+}
+
+/// Expense advance (Expense Claims → Advances): requested, approved, paid,
+/// then settled against the claims filed for it; the balance is recovered
+/// from salary or paid out. Created by scripts/expense-phase2.sql.
+model ExpenseAdvance {
+  id              String    @id @default(uuid())
+  advanceNo       String    @unique // ADV-0001
+  requestedBy     String // userId
+  purpose         String
+  amount          Float
+  neededBy        DateTime?
+  siteId          String?
+  siteName        String?
+  status          String    @default("REQUESTED") // REQUESTED, APPROVED, PAID, REJECTED, SETTLED
+  approvalTrail   Json?
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  paidAt          DateTime?
+  paymentMode     String?
+  transactionId   String?
+  settledAt       DateTime?
+  settledBy       String?
+  claimedAmount   Float     @default(0)
+  balanceAction   String? // RECOVER_SALARY, PAY_EMPLOYEE, NONE
+  balanceAmount   Float     @default(0)
+  recoverMonth    Int?
+  recoverYear     Int?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([requestedBy])
+  @@index([status])
 }
 
 // ─── CLIENT & CONTRACT MANAGEMENT ─────────────────────────────────────────────

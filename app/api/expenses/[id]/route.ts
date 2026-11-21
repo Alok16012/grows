@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { getExpensePolicy } from "@/lib/expense-policy-server"
+import { approvalLabel, canApproveNow, managerOf, needsFinal, pushTrail, startStage } from "@/lib/expense-approval"
 import { policyFlagsFor } from "@/lib/expense-policy-server"
 import { commNotify, userRecipients, fmtInr } from "@/lib/comm/recipients"
 import prisma from "@/lib/prisma"
@@ -84,7 +86,8 @@ export async function GET(
         if (!expense) return new NextResponse("Not Found", { status: 404 })
 
         const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.view")
-        if (!isPrivileged && expense.submittedBy !== session.user.id) {
+        const managerId = await managerOf(expense.submittedBy)
+        if (!isPrivileged && expense.submittedBy !== session.user.id && managerId !== session.user.id) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -99,10 +102,19 @@ export async function GET(
         const userMap = Object.fromEntries(users.map(u => [u.id, u]))
 
         // The policy checks, for the approver (and the claimant) to see on the claim.
-        const policyFlags = await policyFlagsFor(expense).catch(() => [])
+        const policy = await getExpensePolicy()
+        const policyFlags = await policyFlagsFor(expense, policy).catch(() => [])
+        const stage = Number((expense as any).approvalStage ?? 1)
+        const approval = {
+            mode: policy.approval.mode, stage,
+            label: approvalLabel(policy, expense.status, stage),
+            canApprove: canApproveNow({ policy, stage, status: expense.status, submittedBy: expense.submittedBy, userId: session.user.id, isAdmin: session.user.role === "ADMIN", canManage: checkAccess(session, ["MANAGER"], "expenses.manage"), managerId }),
+            trail: (expense as any).approvalTrail ?? [],
+        }
         return NextResponse.json({
             ...expense,
             policyFlags,
+            approval,
             submittedByUser: userMap[expense.submittedBy] || null,
             approvedByUser: expense.approvedBy ? (userMap[expense.approvedBy] || null) : null,
         })
@@ -125,8 +137,17 @@ export async function PUT(
 
         const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.manage")
         const isOwner = expense.submittedBy === session.user.id
+        const policy = await getExpensePolicy()
+        const managerId = await managerOf(expense.submittedBy)
+        const stage = Number((expense as any).approvalStage ?? 1)
+        const isAdmin = session.user.role === "ADMIN"
+        const mayDecide = canApproveNow({ policy, stage, status: expense.status, submittedBy: expense.submittedBy, userId: session.user.id, isAdmin, canManage: isPrivileged, managerId })
+        const actorName = session.user.name || "Someone"
+        const trailEntry = (a: "SUBMITTED" | "APPROVED" | "REJECTED" | "PAID" | "FORWARDED", note?: string | null) =>
+            pushTrail((expense as any).approvalTrail, { stage, action: a, by: session.user.id, byName: session.user.name ?? null, at: new Date().toISOString(), note: note ?? null })
+        let forwarded = false
 
-        if (!isPrivileged && !isOwner) {
+        if (!isPrivileged && !isOwner && managerId !== session.user.id) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -187,24 +208,35 @@ export async function PUT(
             if (expense.status === "REJECTED") { updateData.rejectionReason = null; updateData.rejectedAt = null }
             // Expense policy (Expense Claims → Policy): receipts, age, km and — when set
             // to block — category limits stop the submit, here, for web and mobile alike.
-            const flags = await policyFlagsFor({ ...expense, ...updateData }).catch(() => [])
+            const flags = await policyFlagsFor({ ...expense, ...updateData }, policy).catch(() => [])
             const blocking = flags.filter(f => f.blocking)
             if (blocking.length) return new NextResponse(`Can't submit — ${blocking.map(f => f.message).join("; ")}`, { status: 400 })
+            // Approval levels: the manager first when two levels are on and there is one.
+            updateData.approvalStage = await startStage(policy, expense.submittedBy)
+            updateData.approvalTrail = trailEntry("SUBMITTED")
         } else if (action === "APPROVE") {
-            // Admin/Manager approves SUBMITTED → APPROVED
-            if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
             if (expense.status !== "SUBMITTED") return new NextResponse("Only SUBMITTED can be approved", { status: 400 })
-            updateData.status = "APPROVED"
-            updateData.approvedBy = session.user.id
-            updateData.approvedAt = new Date()
+            if (!mayDecide) return new NextResponse(policy.approval.mode === "twoLevel" && stage > 1 ? "Final approval needs the Manage Expenses permission" : "Forbidden", { status: 403 })
+            // Two levels: the manager's approval passes it on for final approval
+            // (above the set amount); Accounts / HR approving at stage 1 is final.
+            if (policy.approval.mode === "twoLevel" && stage <= 1 && !isPrivileged && !isAdmin && needsFinal(policy, Number(expense.amount) || 0)) {
+                updateData.approvalStage = 2
+                updateData.approvalTrail = trailEntry("FORWARDED", "Manager approved")
+                forwarded = true
+            } else {
+                updateData.status = "APPROVED"
+                updateData.approvedBy = session.user.id
+                updateData.approvedAt = new Date()
+                updateData.approvalTrail = trailEntry("APPROVED")
+            }
         } else if (action === "REJECT") {
-            // Admin/Manager rejects SUBMITTED → REJECTED
-            if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
             if (expense.status !== "SUBMITTED") return new NextResponse("Only SUBMITTED can be rejected", { status: 400 })
+            if (!mayDecide) return new NextResponse("Forbidden", { status: 403 })
             if (!rejectionReason) return new NextResponse("rejectionReason is required", { status: 400 })
             updateData.status = "REJECTED"
             updateData.rejectionReason = rejectionReason
             updateData.rejectedAt = new Date()
+            updateData.approvalTrail = trailEntry("REJECTED", rejectionReason)
         } else if (action === "PAID") {
             // Admin/Manager marks APPROVED → PAID
             if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
@@ -215,6 +247,8 @@ export async function PUT(
             updateData.paymentMode = paymentMode
             updateData.transactionId = transactionId || null
             updateData.paymentDate = paymentDate ? new Date(paymentDate) : new Date()
+            updateData.settledVia = "BANK"
+            updateData.approvalTrail = trailEntry("PAID", `${paymentMode}${transactionId ? ` · ${transactionId}` : ""}`)
         }
 
         if (Object.keys(updateData).length === 0) {
@@ -240,9 +274,13 @@ export async function PUT(
         try {
             const expTitle = expense.title
             const expNo = expense.expenseNo
-            const actorName = session.user.name || "Someone"
 
-            if (action === "SUBMIT") {
+            if (action === "SUBMIT" && updateData.approvalStage === 1 && managerId) {
+                // Two levels: the reporting manager first.
+                await prisma.notification.create({ data: { userId: managerId, title: "Expense to approve", message: `${actorName} submitted ${expNo} — ${expTitle} (as their reporting manager)`, type: "expense", link: `/expenses?id=${params.id}` } })
+            } else if (forwarded) {
+                await notifyApprovers(["expenses.manage"], { title: "Expense for final approval", message: `${actorName} (manager) approved ${expNo} — ${expTitle}; it needs final approval`, type: "expense", link: `/expenses?id=${params.id}` }, session.user.id)
+            } else if (action === "SUBMIT") {
                 // Notify everyone who can approve it. Access comes from custom-role
                 // permissions, not the base MANAGER role, so match on those.
                 await notifyApprovers(["expenses.manage"], {
@@ -285,7 +323,7 @@ export async function PUT(
         } catch (notifErr) {
             console.error("[EXPENSE_NOTIF]", notifErr)
         }
-        if (action === "APPROVE" || action === "REJECT" || action === "PAID") {
+        if ((action === "APPROVE" && !forwarded) || action === "REJECT" || action === "PAID") {
             await commNotify("expense_update", userRecipients([expense.submittedBy]), {
                 claim: `${expense.expenseNo} – ${expense.title}`, amount: fmtInr(Number(expense.amount) || 0),
                 status: action === "APPROVE" ? "approved" : action === "REJECT" ? `rejected${rejectionReason ? ` (${rejectionReason})` : ""}` : `paid${paymentMode ? ` via ${paymentMode}` : ""}`,

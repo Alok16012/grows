@@ -66,6 +66,8 @@ type CategoryItem = {
 }
 
 type Expense = {
+    /** Two-level approval state (server): stage, label, whether I may approve now. */
+    approval?: { stage: number; label: string | null; canApprove: boolean } | null
     id: string
     expenseNo: string
     title: string
@@ -834,13 +836,18 @@ function ExpenseDrawer({
     const [actionLoading, setActionLoading] = useState(false)
     // Expense policy checks for this claim (Expense Claims → Policy), from the server.
     const [policyFlags, setPolicyFlags] = useState<{ message: string; blocking: boolean }[]>([])
+    const [approvalInfo, setApprovalInfo] = useState<{ mode: string; stage: number; label: string | null; canApprove: boolean; trail: { stage: number; action: string; byName: string | null; at: string; note?: string | null }[] } | null>(null)
     useEffect(() => {
-        setPolicyFlags([])
+        setPolicyFlags([]); setApprovalInfo(null)
         if (!expense?.id) return
         let live = true
-        fetch(`/api/expenses/${expense.id}`).then(r => r.ok ? r.json() : null).then(d => { if (live && Array.isArray(d?.policyFlags)) setPolicyFlags(d.policyFlags) }).catch(() => {})
+        fetch(`/api/expenses/${expense.id}`).then(r => r.ok ? r.json() : null).then(d => {
+            if (!live) return
+            if (Array.isArray(d?.policyFlags)) setPolicyFlags(d.policyFlags)
+            if (d?.approval) setApprovalInfo(d.approval)
+        }).catch(() => {})
         return () => { live = false }
-    }, [expense?.id, expense?.status])
+    }, [expense?.id, expense?.status, expense?.approval?.stage])
     const [showRejectBox, setShowRejectBox] = useState(false)
     const [showPayBox, setShowPayBox] = useState(false)
     const [rejectionReason, setRejectionReason] = useState("")
@@ -1007,7 +1014,7 @@ function ExpenseDrawer({
                                     className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
                                     style={{ background: stStyle.bg, color: stStyle.color }}
                                 >
-                                    {stStyle.label}
+                                    {expense.approval?.label ?? stStyle.label}
                                 </span>
                             </div>
                         </div>
@@ -1150,6 +1157,26 @@ function ExpenseDrawer({
                                         className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--surface2)]">
                                         <FileText size={14} /> View attached file
                                     </a>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Approval levels and history */}
+                        {(approvalInfo?.label || (approvalInfo?.trail?.length ?? 0) > 0) && (
+                            <div className="rounded-[10px] bg-[var(--surface2)] border border-[var(--border)] p-3">
+                                {approvalInfo?.label && (
+                                    <p className="text-[12px] font-semibold text-[#7c3aed] mb-1.5 flex items-center gap-1.5"><BadgeCheck size={14} /> {approvalInfo.label}</p>
+                                )}
+                                {(approvalInfo?.trail?.length ?? 0) > 0 && (
+                                    <ul className="space-y-1">
+                                        {approvalInfo!.trail.map((t, i) => (
+                                            <li key={i} className="text-[12px] text-[var(--text2)]">
+                                                <b>{t.action === "FORWARDED" ? "Manager approved" : t.action.charAt(0) + t.action.slice(1).toLowerCase()}</b>
+                                                {t.byName ? ` by ${t.byName}` : ""} · {format(new Date(t.at), "dd MMM yyyy, hh:mm a")}
+                                                {t.note && t.action !== "FORWARDED" ? <span className="text-[var(--text3)]"> — {t.note}</span> : null}
+                                            </li>
+                                        ))}
+                                    </ul>
                                 )}
                             </div>
                         )}
@@ -1298,7 +1325,7 @@ function ExpenseDrawer({
                             )}
 
                             {/* Admin/Manager + SUBMITTED — never on their own claim */}
-                            {isPrivileged && expense.status === "SUBMITTED" && canDecide && (
+                            {(approvalInfo ? approvalInfo.canApprove : expense.approval ? expense.approval.canApprove : isPrivileged) && expense.status === "SUBMITTED" && canDecide && (
                                 <>
                                     {verifyItems.length > 0 && (
                                         <div className="rounded-[10px] border border-[var(--border)] overflow-hidden">
@@ -1668,7 +1695,7 @@ function ExpenseRow({
                         className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
                         style={{ background: stStyle.bg, color: stStyle.color }}
                     >
-                        {stStyle.label}
+                        {expense.approval?.label ?? stStyle.label}
                     </span>
                 </div>
 
@@ -2442,7 +2469,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type ActiveTab = "mine" | "all" | "accounts" | "analytics" | "employee"
+type ActiveTab = "mine" | "all" | "accounts" | "analytics" | "employee" | "team"
 type StatusFilter = "ALL" | ExpenseStatus
 
 export default function ExpensesPage({ searchParams }: { searchParams?: { status?: string } }) {
@@ -2479,6 +2506,11 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
     const [search, setSearch] = useState("")
     const [addOpen, setAddOpen] = useState(false)
     const [reportOpen, setReportOpen] = useState(false)
+    // Claims waiting for me as reporting manager (two-level approval).
+    const [teamCount, setTeamCount] = useState(0)
+    useEffect(() => {
+        fetch("/api/expenses?teamApprovals=1&count=true").then(r => r.ok ? r.json() : null).then(d => setTeamCount(Number(d?.count) || 0)).catch(() => {})
+    }, [expenses])
     const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
     const [projectsList, setProjectsList] = useState<ExpenseProject[]>([])
     const [pendingCount, setPendingCount] = useState(0)
@@ -2533,6 +2565,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
             if (!monthFilter && dateTo) params.set("dateTo", dateTo)
             if (search) params.set("search", search)
             if (activeTab === "mine") params.set("submittedBy", userId)
+            if (activeTab === "team") params.set("teamApprovals", "1")
 
             const res = await fetch(`/api/expenses?${params.toString()}`)
             if (!res.ok) throw new Error("Failed to fetch")
@@ -2831,6 +2864,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                             { id: "accounts", label: "Accounts", icon: Wallet },
                             { id: "analytics", label: "Analytics", icon: BarChart3 },
                             { id: "mine",     label: "My Claims" },
+                            ...(teamCount > 0 ? [{ id: "team" as ActiveTab, label: "Team Approvals", icon: BadgeCheck }] : []),
                         ] as { id: ActiveTab; label: string; icon?: LucideIcon }[]).map(({ id, label, icon: TabIcon }) => (
                             <button
                                 key={id}
@@ -2851,6 +2885,9 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                             >
                                 {TabIcon && <TabIcon size={14} />}
                                 {label}
+                                {id === "team" && teamCount > 0 && (
+                                    <span style={{ background: "#7c3aed", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>{teamCount}</span>
+                                )}
                                 {id === "all" && pendingCount > 0 && (
                                     <span style={{ background: "#ef4444", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>
                                         {pendingCount}
@@ -2860,10 +2897,18 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                         ))}
                     </>
                 ) : (
-                    /* ── Regular employee: single tab ── */
-                    <button role="tab" aria-selected className="z-tab is-active">
-                        My Expenses
-                    </button>
+                    /* ── Regular employee: My Expenses (+ Team Approvals for a reporting manager) ── */
+                    <>
+                        <button role="tab" aria-selected={activeTab !== "team"} onClick={() => setActiveTab("mine")} className={`z-tab ${activeTab !== "team" ? "is-active" : ""}`}>
+                            My Expenses
+                        </button>
+                        {teamCount > 0 && (
+                            <button role="tab" aria-selected={activeTab === "team"} onClick={() => { setActiveTab("team"); setStatusFilter("ALL") }} className={`z-tab ${activeTab === "team" ? "is-active" : ""}`}>
+                                <BadgeCheck size={14} /> Team Approvals
+                                <span style={{ background: "#7c3aed", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>{teamCount}</span>
+                            </button>
+                        )}
+                    </>
                 )}
             </div></div>
 

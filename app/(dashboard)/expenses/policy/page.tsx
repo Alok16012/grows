@@ -108,6 +108,30 @@ export default function ExpensePolicyPage() {
             </div>
 
             <div className={card}>
+                <p className="text-[14px] font-semibold text-[var(--text)]">Approval</p>
+                <Row label="Approval levels" hint="Two levels: the claimant's reporting manager approves first, then Accounts / HR (Manage Expenses) give final approval. Claimants with no reporting manager go straight to final approval.">
+                    <select disabled={ro} value={p.approval.mode} onChange={e => set("approval", { ...p.approval, mode: e.target.value as ExpensePolicy["approval"]["mode"] })} className="h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white">
+                        <option value="single">One level — Manage Expenses approves</option>
+                        <option value="twoLevel">Two levels — manager, then final</option>
+                    </select>
+                </Row>
+                {p.approval.mode === "twoLevel" && (
+                    <Row label="Final approval needed above" hint="After the manager approves, claims above this amount also need final approval. 0 = every claim.">
+                        <span className="text-[12px] text-[var(--text3)]">₹</span>
+                        <input disabled={ro} type="number" min={0} className={`${inp} w-28`} value={p.approval.finalAbove} onChange={e => set("approval", { ...p.approval, finalAbove: Number(e.target.value) || 0 })} />
+                    </Row>
+                )}
+                <Row label="Remind the approver after" hint="Daily reminder to whoever must act on a waiting claim. 0 = no reminders.">
+                    <input disabled={ro} type="number" min={0} className={`${inp} w-24`} value={p.approval.remindAfterHours} onChange={e => set("approval", { ...p.approval, remindAfterHours: Number(e.target.value) || 0 })} />
+                    <span className="text-[12px] text-[var(--text3)]">hours</span>
+                </Row>
+                <Row label="Escalate to admins after" hint="0 = never.">
+                    <input disabled={ro} type="number" min={0} className={`${inp} w-24`} value={p.approval.escalateAfterHours} onChange={e => set("approval", { ...p.approval, escalateAfterHours: Number(e.target.value) || 0 })} />
+                    <span className="text-[12px] text-[var(--text3)]">hours</span>
+                </Row>
+            </div>
+
+            <div className={card}>
                 <p className="text-[14px] font-semibold text-[var(--text)]">Travel (km)</p>
                 <Row label="2-wheeler rate" hint="Travel lines are worked out as km × this rate.">
                     <span className="text-[12px] text-[var(--text3)]">₹</span>

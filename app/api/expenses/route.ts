@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { getExpensePolicy } from "@/lib/expense-policy-server"
+import { approvalLabel, canApproveNow, managersOf } from "@/lib/expense-approval"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
@@ -70,9 +72,19 @@ export async function GET(req: Request) {
         const isPrivileged = checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.manage")
 
         const where: Record<string, unknown> = {}
+        // Team approvals (two-level approval): claims from my direct reports
+        // waiting for me as their reporting manager. Open to any manager.
+        const teamMode = searchParams.get("teamApprovals") === "1"
+        const myReports = teamMode
+            ? (await prisma.employee.findMany({ where: { managerId: session.user.id, userId: { not: null } }, select: { userId: true } })).map(e => e.userId!).filter(id => id !== session.user.id)
+            : []
 
-        // Non-privileged users can only see their own expenses
-        if (!isPrivileged) {
+        if (teamMode) {
+            where.status = "SUBMITTED"
+            where.approvalStage = 1
+            where.submittedBy = { in: myReports }
+        } else if (!isPrivileged) {
+            // Non-privileged users can only see their own expenses
             where.submittedBy = session.user.id
         } else {
             if (submittedBy) where.submittedBy = submittedBy
@@ -89,7 +101,9 @@ export async function GET(req: Request) {
         }
 
         // Accounts view: only payment-relevant statuses (approved = to-pay, paid = settled)
-        if (accountsView) {
+        if (teamMode) {
+            // fixed above
+        } else if (accountsView) {
             if (status && status !== "ALL") where.status = status
             else where.status = { in: ["APPROVED", "PAID"] }
         } else if (status && status !== "ALL") where.status = status
@@ -185,7 +199,7 @@ export async function GET(req: Request) {
         // Final safety net: regardless of which query path ran,
         // non-privileged users must NEVER receive another user's expense.
         if (!isPrivileged) {
-            expenses = expenses.filter((e: any) => e.submittedBy === session.user.id)
+            expenses = expenses.filter((e: any) => e.submittedBy === session.user.id || (teamMode && myReports.includes(e.submittedBy)))
         }
 
         // Fetch user info for submittedBy and approvedBy
@@ -207,8 +221,17 @@ export async function GET(req: Request) {
             // non-fatal: expense list still returns, just without user names
         }
 
+        // Approval state per claim (two-level approval).
+        const policy = await getExpensePolicy()
+        const managers = policy.approval.mode === "twoLevel" ? await managersOf(expenses.filter(e => e.status === "SUBMITTED").map(e => e.submittedBy)) : new Map<string, string>()
+        const isAdmin = session.user.role === "ADMIN"
         const result = expenses.map(e => ({
             ...e,
+            approval: e.status === "SUBMITTED" ? {
+                stage: Number((e as any).approvalStage ?? 1),
+                label: approvalLabel(policy, e.status, Number((e as any).approvalStage ?? 1)),
+                canApprove: canApproveNow({ policy, stage: Number((e as any).approvalStage ?? 1), status: e.status, submittedBy: e.submittedBy, userId: session.user.id, isAdmin, canManage: isPrivileged, managerId: managers.get(e.submittedBy) ?? null }),
+            } : null,
             submittedByUser: userMap[e.submittedBy] || null,
             approvedByUser: e.approvedBy ? (userMap[e.approvedBy] || null) : null,
         }))
