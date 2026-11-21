@@ -283,6 +283,14 @@ function verifyItemsOf(exp: any): VerifyItem[] {
     }]
 }
 
+/** A journey's date as "05 Oct" (with the year when it isn't this year); blank when it has none. */
+function journeyDate(v: unknown): string {
+    if (!v) return ""
+    const d = new Date(String(v))
+    if (isNaN(d.getTime())) return ""
+    return format(d, d.getFullYear() === new Date().getFullYear() ? "dd MMM" : "dd MMM yyyy")
+}
+
 const isImageUrl = (u: string) => /\.(jpe?g|png|gif|webp|avif)$/i.test(u)
 
 function avatarColor(name: string): string {
@@ -1125,7 +1133,7 @@ function ExpenseDrawer({
                                                     <div className="px-3 py-1.5 space-y-1 bg-white">
                                                         {journeys.map((j, ji) => (
                                                             <div key={ji} className="flex items-center justify-between gap-2 text-[11px] text-[var(--text3)]">
-                                                                <span className="truncate">{j.from} → {j.to}</span>
+                                                                <span className="truncate"><span className="font-semibold text-[var(--text2)] tabular-nums mr-1.5">{journeyDate(j.date)}</span>{j.from} → {j.to}</span>
                                                                 <span className="shrink-0">{j.kms} km · {formatINR(j.amount)}</span>
                                                             </div>
                                                         ))}
@@ -1562,7 +1570,7 @@ function ExpenseDrawer({
                                             <p className="text-[11px] font-semibold text-[var(--text3)] uppercase">Journeys</p>
                                             {journeys.map((j, ji) => (
                                                 <div key={ji} className="flex items-center justify-between gap-2 text-[12px] text-[var(--text2)] border-t border-[var(--border)] pt-1.5">
-                                                    <span className="truncate">{j.from} → {j.to}</span>
+                                                    <span className="truncate"><span className="font-semibold text-[var(--text2)] tabular-nums mr-1.5">{journeyDate(j.date)}</span>{j.from} → {j.to}</span>
                                                     <span className="shrink-0">{j.kms} km · {formatINR(j.amount)}</span>
                                                 </div>
                                             ))}
