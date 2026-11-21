@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { autoLinkDefects } from "@/lib/defect-library"
 import { NextResponse } from "next/server"
 import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -129,6 +130,7 @@ export async function POST(req: Request) {
             ...(toHide.length ? [prisma.formTemplate.updateMany({ where: { id: { in: toHide.map(f => f.id) } }, data: { isHidden: true } })] : []),
         ]
         if (writes.length) await prisma.$transaction(writes)
+        if (toAdd.length) await autoLinkDefects(projectId)
 
         return NextResponse.json({
             added: toAdd.map(i => i.label),

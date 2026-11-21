@@ -17,8 +17,16 @@ export const REPORT_ROLES = [
     { value: "ACCEPTED",    label: "Accepted Qty" },
     { value: "REWORK",      label: "Rework Qty" },
     { value: "REJECTED",    label: "Rejected Qty" },
+    // Traceability (Quality → Traceability; the inspector can scan a barcode / QR).
+    { value: "LOT_NUMBER",  label: "Lot / Batch No." },
+    { value: "MACHINE",     label: "Machine / Line" },
+    { value: "SUPPLIER",    label: "Supplier" },
+    { value: "CUSTOMER_PART", label: "Customer Part No." },
 ] as const
 
 export type ReportRole = (typeof REPORT_ROLES)[number]["value"]
 
 export const REPORT_ROLE_VALUES: string[] = REPORT_ROLES.map(r => r.value)
+
+/** Roles searched by Quality → Traceability; their fields get a Scan button on the inspector form. */
+export const TRACE_ROLES: string[] = ["LOT_NUMBER", "MACHINE", "SUPPLIER", "CUSTOMER_PART", "PART_NUMBER"]

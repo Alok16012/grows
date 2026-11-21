@@ -1,6 +1,8 @@
 "use client"
 
 import { orderBasicFields, basicFieldSlot, isRejectedQtyField } from "@/lib/form-field-order"
+import BarcodeScanButton from "@/components/BarcodeScanButton"
+import { TRACE_ROLES } from "@/lib/report-roles"
 import {
     OTHER_DEFECT_KEY, OTHER_DEFECT_ROW_MAX, OTHER_DEFECT_MAX_ROWS, type OtherDefectRow,
     isOtherDefectLabel, isOtherDefectNoteField, cleanRowText, otherDefectTextLength,
@@ -775,6 +777,10 @@ export default function InspectionFormPage() {
                             className="w-full bg-transparent border-none outline-none text-[14px] font-[500] text-[var(--text)] placeholder:text-[var(--text3)]"
                             style={{ fontFamily: template.fieldType === "date" ? "Inter" : "inherit" }}
                         />
+                    )}
+                    {/* Traceability fields (Form Builder role): scan the lot / part label. */}
+                    {template.reportRole && TRACE_ROLES.includes(template.reportRole) && (template.fieldType === "text" || template.fieldType === "number") && !readOnly && (
+                        <div className="mt-[4px]"><BarcodeScanButton onResult={v => handleFieldChange(template.id, v)} /></div>
                     )}
                     {(() => {
                         const slot = basicFieldSlot(template)

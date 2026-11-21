@@ -262,10 +262,33 @@ model FormTemplate {
   isHidden     Boolean          @default(false)
   displayOrder Int              @default(0)
   createdAt    DateTime         @default(now())
+  /// DEFECT fields: the central defect library entry this column counts (Quality → Defect library).
+  defectTypeId String?
+  defectType   DefectType?      @relation(fields: [defectTypeId], references: [id], onDelete: SetNull)
   project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   responses    InspectionData[]
 
   @@index([projectId])
+  @@index([defectTypeId])
+}
+
+/// Central defect library: one list shared by every project, so defects can be
+/// compared across customers. Project defect columns link to it (FormTemplate.defectTypeId).
+model DefectType {
+  id          String         @id @default(uuid())
+  code        String         @unique // D-001
+  name        String
+  severity    String         @default("MINOR") // CRITICAL | MAJOR | MINOR
+  category    String?
+  description String?
+  photoUrl    String?
+  /// Normalised spellings that map to this defect (e.g. SCRATCH MARK, SCRATCH MARKS).
+  aliases     String[]       @default([])
+  isActive    Boolean        @default(true)
+  createdBy   String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  fields      FormTemplate[]
 }
 
 model ProjectManager {

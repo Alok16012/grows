@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { autoLinkDefects } from "@/lib/defect-library"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
             })
         ])
 
+        await autoLinkDefects(projectId)
         return NextResponse.json({ success: true, count: formattedFields.length })
     } catch (error) {
         console.error("[FORM_TEMPLATES_BULK_DEFAULT_POST]", error)

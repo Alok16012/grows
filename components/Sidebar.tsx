@@ -183,6 +183,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 // /reports is the inspection report builder (site, project,
                 // inspector, Pareto), so it sits with the work it reports on.
                 { name: "Inspection Reports", href: "/reports", permission: "reports.view" },
+                // Defect library, cross-customer Pareto and lot / batch traceability.
+                { name: "Quality", href: "/quality", permissionAny: ["reports.view", "approvals.view", "projects.view"] },
             ],
         },
         {
