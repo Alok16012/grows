@@ -182,6 +182,11 @@ export default function ReviewInspectionPage() {
     let gps: { lat: number; lng: number } | null = null
     try { if (inspection.gpsLocation) gps = JSON.parse(inspection.gpsLocation) } catch {}
 
+    // Only the defects that were found: a defect field left empty or 0 is not
+    // listed (it read "Not filled" for every defect the part didn't have).
+    const shownResponses = (inspection.responses as any[]).filter(r =>
+        r.field?.category !== "DEFECT" || (String(r.value ?? "").trim() !== "" && Number(r.value) !== 0))
+
     const renderFieldValue = (field: any, value: string) => {
         if (!value) return <p className="text-[13px] text-[var(--border2)] italic">Not filled</p>
 
@@ -378,7 +383,7 @@ export default function ReviewInspectionPage() {
                     <div className="flex items-center justify-between px-0.5">
                         <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspection Responses</h2>
                         <span className="text-[12px] text-[var(--text3)] bg-[#f0ede8] px-2.5 py-1 rounded-full">
-                            {inspection.responses.length} fields
+                            {shownResponses.length} fields
                         </span>
                     </div>
 
@@ -391,7 +396,7 @@ export default function ReviewInspectionPage() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {inspection.responses
+                            {shownResponses
                                 .sort((a: any, b: any) => a.field.displayOrder - b.field.displayOrder)
                                 .map((resp: any) => (
                                     <div key={resp.id} className="bg-white border border-[var(--border)] rounded-[12px] p-4 hover:border-[var(--border2)] transition-colors">

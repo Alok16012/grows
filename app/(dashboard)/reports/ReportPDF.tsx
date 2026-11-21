@@ -103,9 +103,6 @@ function Stat({ label, value, hint, color }: { label: string; value: string; hin
     )
 }
 
-/** Parts / inspectors drawn in the charts. Keep equal to the same names in reports/page.tsx, which captures them. */
-const PART_CHART_MAX = 12
-const INSPECTOR_CHART_MAX = 15
 /** 2026-11-04 -> 04-Nov-2026 */
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const dayText = (iso: unknown) => {
@@ -126,14 +123,6 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
     const dayWise: any[] = data?.dayWise || []
     const partWise: any[] = data?.partWise || []
     const inspectorWise: any[] = data?.inspectorWise || []
-    const partNote = partWise.length > PART_CHART_MAX
-        ? `Top ${PART_CHART_MAX} of ${partWise.length} parts by inspected quantity; all parts are in the Part-Wise Summary table.`
-        : undefined
-    const inspectorNote = inspectorWise.length > INSPECTOR_CHART_MAX
-        ? `Top ${INSPECTOR_CHART_MAX} of ${inspectorWise.length} inspectors by inspected quantity; all are in the Inspector-Wise Summary table.`
-        : undefined
-    const split = data?.defectSplit as { exact: number; estimated: number; unclassified: number } | undefined
-    const splitTotal = (split?.exact || 0) + (split?.estimated || 0) + (split?.unclassified || 0)
 
     return (
         <Document>
@@ -255,9 +244,7 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                         <ChartLegend items={[
                             { label: "Rework defects", color: C.orange },
                             { label: "Rejected defects", color: C.red },
-                        ]} note={split && splitTotal > 0 && split.estimated > 0
-                            ? `Split follows each inspection's rework and rejected totals. ${pct(split.estimated, splitTotal)} of the defect quantity is from inspections with both, where the split is in proportion.`
-                            : "Share = this defect's part of all defects found"} />
+                        ]} />
                     </View>
                 )}
 
@@ -267,7 +254,6 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                         <Text style={styles.sectionTitle}>Pareto Analysis — Defect Frequency</Text>
                         <View style={{ borderWidth: 1, borderColor: "#e8e6e1", borderRadius: 6, padding: 6, marginBottom: 8 }}>
                             <Image src={chartImages.pareto} style={{ width: "100%" }} />
-                            <Text style={styles.legendNote}>Bars: quantity of each defect. Line: running share of all defects.</Text>
                         </View>
                     </View>
                 )}
@@ -276,10 +262,9 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                     The chart shows the busiest parts; the table further down has all. */}
                 {chartImages?.partWise && (
                     <View style={{ marginBottom: 8 }} wrap={false}>
-                        <Text style={styles.sectionTitle}>Part Wise Comparison</Text>
+                        <Text style={styles.sectionTitle}>Part Wise Analysis</Text>
                         <View style={{ borderWidth: 1, borderColor: "#e8e6e1", borderRadius: 6, padding: 6 }}>
                             <Image src={chartImages.partWise} style={{ width: "100%" }} />
-                            {partNote && <Text style={styles.legendNote}>{partNote}</Text>}
                         </View>
                     </View>
                 )}
@@ -300,7 +285,6 @@ export function ReportDocument({ data, companyName, period, project, inspector, 
                         <Text style={styles.sectionTitle}>Inspector-Wise Analysis</Text>
                         <View style={{ borderWidth: 1, borderColor: "#e8e6e1", borderRadius: 6, padding: 6 }}>
                             <Image src={chartImages.inspector} style={{ width: "100%" }} />
-                            {inspectorNote && <Text style={styles.legendNote}>{inspectorNote}</Text>}
                         </View>
                     </View>
                 )}

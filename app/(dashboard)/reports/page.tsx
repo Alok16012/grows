@@ -506,7 +506,7 @@ function ParetoLabels({ x = 0, index = 0, rows, top, barWidth, size = 11 }: { x?
  * slice's name leads the label; where there isn't room for the full text the
  * share alone is shown.
  */
-function sliceLabels(rows: { name: string; value: number; color: string }[], whole: number, pad: number, opts: { names?: boolean; size?: number } = {}) {
+function sliceLabels(rows: { name: string; value: number; color: string }[], whole: number, pad: number, opts: { names?: boolean; size?: number; skip?: string[] } = {}) {
     const size = opts.size ?? 13
     const sum = rows.reduce((a, r) => a + (Number(r.value) || 0), 0)
     const SliceLabel = (p: any) => {
@@ -531,7 +531,7 @@ function sliceLabels(rows: { name: string; value: number; color: string }[], who
             if (over > 0) list.forEach(q => { q.y -= over })
         }
         const me = pts.find(q => q.i === index)
-        if (!me) return null
+        if (!me || opts.skip?.includes(row.name)) return null
         const dir = me.right ? 1 : -1
         const tx = cx + dir * (R + 26)
         const room = cx - R - 30
@@ -616,7 +616,7 @@ const QuantityColumns = ExportColumns
  * arrive busiest-first) and says so when it leaves some out.
  */
 function QuantityColumnsLive({ rows, nameKey, max, what, height = 380, xLabel }: { rows: any[]; nameKey: string; max: number; what: string; height?: number; xLabel: string }) {
-    const shown = rows.slice(0, max)
+    const shown = azBy(rows.slice(0, max), nameKey)
     const upright = shown.length > 3
     const [boxRef, boxW] = useElementWidth()
     const nameList = shown.map(r => String(r?.[nameKey] ?? "")).join("\n")
@@ -717,6 +717,17 @@ async function captureChartToImage(el: HTMLDivElement | null, key?: KeyItem[]): 
     })
 }
 
+
+/**
+ * Chart rows A → Z by their axis name (case-insensitive, natural: "Plant 2"
+ * before "Plant 10"); a folded "Other (n)" bucket stays last. Client
+ * correction: every graph's axis reads A–Z.
+ */
+function azBy<T>(rows: T[], key: string): T[] {
+    const name = (r: any) => String(r?.[key] ?? "")
+    const other = (r: any) => /^Other \(\d+\)$/.test(name(r)) ? 1 : 0
+    return [...rows].sort((a, b) => other(a) - other(b) || name(a).localeCompare(name(b), "en", { sensitivity: "base", numeric: true }))
+}
 
 /** Alphabetical, case-insensitive, natural ("Plant 2" before "Plant 10"). */
 function sortByName<T extends { name: string }>(items: T[]): T[] {
@@ -1605,7 +1616,7 @@ export default function ReportsPage() {
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <PieChart>
                                                         <Pie data={pieData} innerRadius={62} outerRadius={88} paddingAngle={4} dataKey="value" stroke="none"
-                                                            label={sliceLabels(pieData, s?.totalInspected || 0, 4, { size: 12 })} labelLine={false}>
+                                                            label={sliceLabels(pieData, s?.totalInspected || 0, 4, { size: 12, skip: ["Accepted"] })} labelLine={false}>
                                                             {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
                                                         </Pie>
                                                         <Tooltip content={<CustomTooltip />} />
@@ -1700,7 +1711,7 @@ export default function ReportsPage() {
                         {activeTab === "Graphical" && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
                                 <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
-                                    <h3 className="text-[14px] font-[600] text-[var(--text)] mb-[12px]">Part Wise Comparison</h3>
+                                    <h3 className="text-[14px] font-[600] text-[var(--text)] mb-[12px]">Part Wise Analysis</h3>
                                     {data.partWise.length > 0
                                         ? <QuantityColumnsLive rows={data.partWise} nameKey="partName" max={PART_CHART_MAX} what="parts" height={360} xLabel="Part" />
                                         : <div className="h-[360px] flex items-center justify-center text-[13px] text-[var(--text3)]">No parts data</div>}
@@ -2098,19 +2109,19 @@ export default function ReportsPage() {
                     </div>
                     {/* Part-wise chart (PDF capture): upright bars, like the shift chart */}
                     <div ref={partWiseBarRef} style={{ width: 700, backgroundColor: 'white' }}>
-                        <QuantityColumns rows={(data.partWise ?? []).slice(0, PART_CHART_MAX)} nameKey="partName" xLabel="Part" />
+                        <QuantityColumns rows={azBy((data.partWise ?? []).slice(0, PART_CHART_MAX), "partName")} nameKey="partName" xLabel="Part" />
                     </div>
                     {/* Location-wise chart: every location named, every bar labelled */}
                     <div ref={locationBarRef} style={{ width: 700, backgroundColor: 'white' }}>
-                        <ExportColumns rows={data.locationWise ?? []} nameKey="location" keys={["totalInspected"]} plotHeight={200} xLabel="Location" />
+                        <ExportColumns rows={azBy(data.locationWise ?? [], "location")} nameKey="location" keys={["totalInspected"]} plotHeight={200} xLabel="Location" />
                     </div>
                     {/* Inspector-wise chart (PDF capture): upright bars, like the shift chart */}
                     <div ref={inspectorBarRef} style={{ width: 700 }} className="bg-white">
-                        <QuantityColumns rows={(data.inspectorWise ?? []).slice(0, INSPECTOR_CHART_MAX)} nameKey="inspectorName" xLabel="Inspector" />
+                        <QuantityColumns rows={azBy((data.inspectorWise ?? []).slice(0, INSPECTOR_CHART_MAX), "inspectorName")} nameKey="inspectorName" xLabel="Inspector" />
                     </div>
                     {/* Shift-wise chart (PDF / Excel capture) */}
                     <div ref={shiftBarRef} style={{ width: 700 }} className="bg-white">
-                        <QuantityColumns rows={(data as any).shiftWise ?? []} nameKey="shiftName" plotHeight={220} xLabel="Shift" />
+                        <QuantityColumns rows={azBy((data as any).shiftWise ?? [], "shiftName")} nameKey="shiftName" plotHeight={220} xLabel="Shift" />
                     </div>
                     {/* Week-wise chart (Excel dashboard) */}
                     <div ref={weekRef} style={{ width: 700 }} className="bg-white">

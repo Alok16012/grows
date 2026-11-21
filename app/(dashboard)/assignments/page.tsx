@@ -1,6 +1,7 @@
 "use client"
 
 import { sortSitesByName } from "@/lib/site-sort"
+import { ASSIGNMENT_TYPES, assignmentKind, assignmentFields, assignmentKindLabel } from "@/lib/assignment-type"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
@@ -86,11 +87,6 @@ const WIZARD_STEPS = [
     { key: "review", label: "Type & Review" },
 ]
 
-const RECURRENCE_OPTIONS = [
-    { value: "none", label: "One-time" },
-    { value: "daily", label: "Recurring — Daily" },
-    { value: "weekly", label: "Recurring — Weekly" },
-]
 
 const inputCls = "w-full h-9 rounded-[8px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text3)]"
 const selectCls = inputCls + " cursor-pointer"
@@ -212,7 +208,7 @@ function RowMenu({ assignment, onEdit, onDelete, onStopRecurrence, onClose, onTo
                     </button>
                     {assignment.status !== "completed" && (
                         <button role="menuitem" onClick={pick(onToggleMultiPart)} className={item}>
-                            <Layers size={13} /> {assignment.isMultiPart ? "Make One-time" : "Convert to Multi-part"}
+                            <Layers size={13} /> {assignment.isMultiPart ? "Make One-time" : "Make Ongoing (multi-part)"}
                         </button>
                     )}
                     {assignment.isMultiPart && assignment.status !== "completed" && (
@@ -246,7 +242,7 @@ function EditAssignmentModal({ assignment, inspectors, onClose, onSaved }: {
 }) {
     const [inspectorId, setInspectorId] = useState(assignment.inspectionBoyId ?? "")
     const [startDate, setStartDate] = useState((assignment.startDate ?? "").slice(0, 10))
-    const [recurrence, setRecurrence] = useState(assignment.recurrenceType && assignment.recurrenceType !== "none" ? assignment.recurrenceType : "none")
+    const [kind, setKind] = useState<string>(assignmentKind(assignment))
     const [notes, setNotes] = useState(assignment.notes ?? "")
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState("")
@@ -273,7 +269,7 @@ function EditAssignmentModal({ assignment, inspectors, onClose, onSaved }: {
             const res = await fetch(`/api/assignments/${assignment.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ inspectionBoyId: inspectorId, startDate: startDate || null, recurrenceType: recurrence, notes }),
+                body: JSON.stringify({ inspectionBoyId: inspectorId, startDate: startDate || null, ...assignmentFields(kind), notes }),
             })
             const d = await res.json().catch(() => ({}))
             if (!res.ok) { setError(d.error || "Couldn't save the assignment"); return }
@@ -282,8 +278,9 @@ function EditAssignmentModal({ assignment, inspectors, onClose, onSaved }: {
                 inspectionBoyId: d.inspectionBoyId ?? inspectorId,
                 inspectionBoy: d.inspectionBoy ?? assignment.inspectionBoy,
                 startDate: d.startDate ?? null,
-                recurrenceType: d.recurrenceType ?? recurrence,
-                recurrenceActive: d.recurrenceActive ?? recurrence !== "none",
+                recurrenceType: d.recurrenceType ?? assignmentFields(kind).recurrenceType,
+                recurrenceActive: d.recurrenceActive ?? assignmentFields(kind).recurrenceType !== "none",
+                isMultiPart: d.isMultiPart ?? assignmentFields(kind).isMultiPart,
                 notes: d.notes ?? null,
             })
         } catch {
@@ -320,11 +317,9 @@ function EditAssignmentModal({ assignment, inspectors, onClose, onSaved }: {
                             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
                         </div>
                         <div>
-                            <label className="block text-[12px] font-medium text-[var(--text)] mb-1">Recurrence</label>
-                            <select value={recurrence} onChange={e => setRecurrence(e.target.value)} className={selectCls}>
-                                <option value="none">One-time</option>
-                                <option value="daily">Daily</option>
-                                <option value="weekly">Weekly</option>
+                            <label className="block text-[12px] font-medium text-[var(--text)] mb-1">Assignment type</label>
+                            <select value={kind} onChange={e => setKind(e.target.value)} className={selectCls}>
+                                {ASSIGNMENT_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
                         </div>
                     </div>
@@ -388,8 +383,7 @@ export default function AssignmentsPage() {
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
     const [selectedInspectorIds, setSelectedInspectorIds] = useState<string[]>([])
     const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
-    const [recurrenceType, setRecurrenceType] = useState("none")
-    const [isMultiPart, setIsMultiPart] = useState(false)
+    const [kind, setKind] = useState<string>("ongoing")
     const [startDate, setStartDate] = useState("")
     const [notes, setNotes] = useState("")
     const [loading, setLoading] = useState(false)
@@ -522,8 +516,7 @@ export default function AssignmentsPage() {
         setSelectedProjectIds([])
         setWholeSite(true)
         setSelectedSiteId("")
-        setRecurrenceType("none")
-        setIsMultiPart(false)
+        setKind("ongoing")
         setStartDate("")
         setNotes("")
         setPrefilled(false)
@@ -565,8 +558,7 @@ export default function AssignmentsPage() {
                     projectIds: wholeSite ? undefined : selectedProjectIds,
                     inspectorIds: selectedInspectorIds.length > 0 ? selectedInspectorIds : undefined,
                     managerIds: selectedManagerIds.length > 0 ? selectedManagerIds : undefined,
-                    recurrenceType,
-                    isMultiPart,
+                    ...assignmentFields(kind),
                     startDate: startDate || undefined,
                     notes: notes || undefined,
                 }),
@@ -678,8 +670,8 @@ export default function AssignmentsPage() {
     const stats = useMemo(() => ({
         total: realAssignments.length,
         active: realAssignments.filter(a => displayStatus(a).label === "Active").length,
-        oneTime: realAssignments.filter(a => (a.recurrenceType ?? "none") === "none").length,
-        recurring: realAssignments.filter(a => (a.recurrenceType ?? "none") !== "none").length,
+        oneTime: realAssignments.filter(a => assignmentKind(a) === "none").length,
+        recurring: realAssignments.filter(a => assignmentKind(a) !== "none").length,
     }), [realAssignments])
 
     const filteredAssignments = useMemo(() => {
@@ -720,7 +712,7 @@ export default function AssignmentsPage() {
             inspectorTitle: virtual ? (teamInspectors.join(", ") || undefined) : (a.inspectionBoy?.name || undefined),
             inspectorMuted: virtual && teamInspectors.length === 0,
             inspectorNote: virtual ? `Team inspector${teamInspectors.length === 1 ? "" : "s"} · not yet issued` : "Inspector",
-            typeLabel: virtual ? "—" : (a.recurrenceType ?? "none") === "none" ? "One-time" : "Recurring",
+            typeLabel: virtual ? "—" : assignmentKindLabel(assignmentKind(a)),
             startLabel: virtual ? "—" : fmtDate(a.startDate ?? a.createdAt),
         }
     }
@@ -788,7 +780,7 @@ export default function AssignmentsPage() {
                     <span className="w-9 h-9 rounded-[9px] bg-[#f5f3ff] flex items-center justify-center"><RefreshCw size={15} className="text-[#7c3aed]" /></span>
                     <span>
                         <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.recurring}</span>
-                        <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Recurring</span>
+                        <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Ongoing / Recurring</span>
                     </span>
                 </div>
             </div>
@@ -931,25 +923,13 @@ export default function AssignmentsPage() {
                                     <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
                                 </div>
                                 <div>
-                                    <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Recurrence</label>
-                                    <select value={recurrenceType} onChange={e => setRecurrenceType(e.target.value)} className={selectCls}>
-                                        {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Assignment type</label>
+                                    <select value={kind} onChange={e => setKind(e.target.value)} className={selectCls}>
+                                        {ASSIGNMENT_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                     </select>
                                 </div>
                             </div>
-
-                            <label className="flex items-start gap-2.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5 cursor-pointer">
-                                <input type="checkbox" checked={isMultiPart} onChange={e => setIsMultiPart(e.target.checked)}
-                                    className="mt-0.5 accent-[var(--accent)]" />
-                                <span>
-                                    <span className="block text-[12.5px] font-medium text-[var(--text)]">Multi-part inspection</span>
-                                    <span className="block text-[11px] text-[var(--text3)] leading-relaxed">
-                                        For work covered over several visits. The inspector can start the next part once
-                                        the previous one is submitted, and the assignment stays on their list until you
-                                        close it — approving a part won&apos;t close it.
-                                    </span>
-                                </span>
-                            </label>
+                            <p className="-mt-1 text-[11px] text-[var(--text3)] leading-relaxed">{ASSIGNMENT_TYPES.find(o => o.value === kind)?.hint}</p>
 
                             <div>
                                 <label className="block text-[12px] font-medium text-[var(--text)] mb-1.5">Notes / Summary <span className="text-[var(--text3)] font-normal">(Optional)</span></label>
@@ -1032,7 +1012,7 @@ export default function AssignmentsPage() {
                                 // Past/today → Active at once; future → Scheduled. Said here so the
                                 // confirm on Create is not the first time the user hears it.
                                 { label: "Status on creation", value: startsInFuture ? "Scheduled" : startsInPast ? "Active immediately (backdated)" : "Active immediately" },
-                                { label: "Recurrence", value: RECURRENCE_OPTIONS.find(o => o.value === recurrenceType)?.label ?? "One-time" },
+                                { label: "Assignment type", value: assignmentKindLabel(kind as any) },
                                 { label: "Inspectors", value: selectedInspectorIds.length > 0 ? `${selectedInspectorIds.length} selected` : "None" },
                                 { label: "Managers", value: selectedManagerIds.length > 0 ? `${selectedManagerIds.length} selected` : "None" },
                             ].map(r => (
@@ -1141,11 +1121,6 @@ export default function AssignmentsPage() {
                                                     <dt className="text-[var(--text3)]">Type</dt>
                                                     <dd className="text-[var(--text2)] min-w-0">
                                                         {r.typeLabel}
-                                                        {a.isMultiPart && (
-                                                            <span className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#eef2ff] text-[#4338ca] text-[10px] font-semibold align-middle">
-                                                                <Layers size={9} /> Multi-part
-                                                            </span>
-                                                        )}
                                                     </dd>
                                                     <dt className="text-[var(--text3)]">Start</dt>
                                                     <dd className="text-[var(--text2)] tabular-nums">{r.startLabel}</dd>
@@ -1215,12 +1190,6 @@ export default function AssignmentsPage() {
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text2)] whitespace-nowrap">
                                                         {r.typeLabel}
-                                                        {a.isMultiPart && (
-                                                            <span title="Inspected over several visits — stays open until closed"
-                                                                className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#eef2ff] text-[#4338ca] text-[10px] font-semibold align-middle">
-                                                                <Layers size={9} /> Multi-part
-                                                            </span>
-                                                        )}
                                                     </td>
                                                     <td className="px-3 py-2.5 text-[var(--text3)] whitespace-nowrap tabular-nums">{r.startLabel}</td>
                                                     <td className={`px-4 py-2.5 text-right whitespace-nowrap ${pinActions ? "sticky right-0 bg-white group-hover:bg-[#f6f8fc] shadow-[inset_1px_0_0_var(--border)] transition-colors" : ""}`}

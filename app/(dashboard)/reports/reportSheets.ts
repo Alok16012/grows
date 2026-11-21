@@ -10,8 +10,8 @@ export const REPORT_SHEETS: { key: ReportSheetKey; label: string; note: string; 
     { key: "dashboard", label: "Dashboard", note: "Summary tiles and all charts", file: "Dashboard" },
     { key: "summary", label: "Summary", note: "Totals by site, part, day and week", file: "Summary" },
     { key: "pareto", label: "Pareto Analysis", note: "Defects by quantity with cumulative %, and the Pareto chart", file: "Pareto" },
-    { key: "inspector", label: "Inspector-Wise Comparison", note: "Each inspector's quantities, rates and PPM, with chart", file: "InspectorWise" },
-    { key: "shift", label: "Shift-Wise Comparison", note: "Each shift's quantities, rates and PPM, with chart", file: "ShiftWise" },
+    { key: "inspector", label: "Inspector-Wise Analysis", note: "Each inspector's quantities, rates and PPM, with chart", file: "InspectorWise" },
+    { key: "shift", label: "Shift-Wise Analysis", note: "Each shift's quantities, rates and PPM, with chart", file: "ShiftWise" },
     { key: "top5", label: "Top 5 Defects", note: "Most frequent defects, split into rework and rejected", file: "Top5Defects" },
     { key: "detailed", label: "Detailed Inspection Data", note: "Daily inspection report: every inspection and its defects", file: "DailyInspection" },
 ]

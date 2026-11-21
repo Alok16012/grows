@@ -344,14 +344,14 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
         // is captured on the reports page); the line under it only adds what the
         // picture can't say. Shapes are the capture sizes there, key included.
         const charts: [title: string, url: string | null | undefined, shape: number, caption: string][] = [
-            ["Defect Wise (Pareto)", img.pareto, 700 / 340, "Bars: quantity of each defect. Line: running share of all defects."],
-            ["Week Wise", img.week, 700 / 330, "Week 1 = days 1-7, Week 2 = days 8-14, and so on."],
+            ["Defect Wise (Pareto)", img.pareto, 700 / 340, ""],
+            ["Week Wise", img.week, 700 / 330, ""],
             ["Shift Wise", shiftRecorded ? img.shift : null, 700 / 330, ""],
-            ["Inspector Wise", img.inspector, 700 / 370, "Busiest 15; everyone is on the Inspector-Wise Comparison sheet."],
-            ["Overall Status", img.pie, 700 / 180, "Whole ring = total inspected."],
-            ["Part Wise", img.partWise, 700 / 370, "Busiest 12; all parts are on the Summary sheet."],
-            ["Rework / Rejection Qty (day wise)", img.dayDefects, 700 / 285, "Quantity per day."],
-            ["Daily Performance Trend", img.trend, 700 / 262, "Quantity per day. Rework and rejected are labelled in the day-wise chart."],
+            ["Inspector Wise", img.inspector, 700 / 370, ""],
+            ["Overall Status", img.pie, 700 / 180, ""],
+            ["Part Wise", img.partWise, 700 / 370, ""],
+            ["Rework / Rejection Qty (day wise)", img.dayDefects, 700 / 285, ""],
+            ["Daily Performance Trend", img.trend, 700 / 262, ""],
             ["Location Wise", img.location, 700 / 300, ""],
         ]
         const shown = charts.filter(c => !!c[1])
@@ -378,12 +378,13 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
     if (want("summary")) {
         const ws = wb.addWorksheet("Summary", { views: [{ showGridLines: false }] })
         let r = heading(ws, `FINAL INSPECTION SUMMARY — ${input.period}`, input, 11)
-        label(ws, r, 1, "Site-wise summary")
-        const sites: any[] = data?.siteWise?.length ? data.siteWise : [{ siteName: input.siteName, ...{ totalInspected: total, totalAccepted: s.totalAccepted, totalRework: s.totalRework, totalRejected: s.totalRejected } }]
+        const oneProject = !!input.project && input.project !== "All Projects"
+        label(ws, r, 1, oneProject ? "Project summary" : "Site-wise summary")
+        const sites: any[] = !oneProject && data?.siteWise?.length ? data.siteWise : [{ siteName: oneProject ? input.project : input.siteName, ...{ totalInspected: total, totalAccepted: s.totalAccepted, totalRework: s.totalRework, totalRejected: s.totalRejected } }]
         // The client's own summary columns. Their "Total FG Qty." is Accepted minus
         // Rejected (cell K4 of their SUMMARY sheet), kept exactly as they compute it.
         r = table(ws, r + 1, 1, [
-            { header: "Part Model / Site", key: "name", width: 34 },
+            { header: oneProject ? "Project" : "Part Model / Site", key: "name", width: 34 },
             { header: "Total Inspection", key: "inspected", width: 16, fmt: INT, tone: "green", total: "sum" },
             { header: "Total Qty. Accepted", key: "accepted", width: 16, fmt: INT, tone: "green", total: "sum" },
             { header: "Total Qty. Rework", key: "rework", width: 14, fmt: INT, tone: "orange", total: "sum" },
@@ -441,13 +442,7 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
             { header: "CUMM%", key: "cumPct", width: 11, fmt: PCT },
         ], rows, { totalLabel: "TOTAL", empty: "No defects recorded for this period" })
         for (let c = 9; c <= 16; c++) ws.getColumn(c).width = 13
-        if (picture(wb, ws, img.pareto, 9, r + 1, 720, 700 / 340)) {
-            const below = r + 2 + Math.ceil(720 / pngShape(img.pareto, 700 / 340) / 20)
-            ws.mergeCells(below, 9, below, 16)
-            const l = ws.getCell(below, 9)
-            l.value = "Bars: quantity of each defect. Line: running share of all defects."
-            l.font = { size: 9, color: { argb: K.muted } }
-        }
+        picture(wb, ws, img.pareto, 9, r + 1, 720, 700 / 340)
 
     }
 
@@ -456,23 +451,17 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
         const ws = wb.addWorksheet(sheet, { views: [{ showGridLines: false }] })
         const r = heading(ws, title, input, 10)
         const next = table(ws, r, 1, qtyCols({ header: first, key: "name", width: 30 }), list.map(x => qtyRow({ name: x[nameKey] }, x)), { totalLabel: "Grand Total", empty })
-        if (picture(wb, ws, url, 1, next + 1, 760, 700 / (sheet.startsWith("Shift") ? 330 : 370))) {
-            const below = next + 2 + Math.ceil(760 / pngShape(url, 700 / 370) / 20)
-            ws.mergeCells(below, 1, below, 10)
-            const l = ws.getCell(below, 1)
-            l.value = !sheet.startsWith("Shift") && list.length > 15 ? "Chart shows the 15 busiest; the table lists everyone." : ""
-            l.font = { size: 9, color: { argb: K.muted } }
-        }
+        picture(wb, ws, url, 1, next + 1, 760, 700 / (sheet.startsWith("Shift") ? 330 : 370))
     }
-    if (want("inspector")) comparison("Inspector-Wise Comparison", "INSPECTOR-WISE COMPARISON", "Inspector Name", data?.inspectorWise ?? [], "inspectorName", img.inspector, "No inspections for this period")
-    if (want("shift")) comparison("Shift-Wise Comparison", "SHIFT-WISE COMPARISON", "Shift", shiftRecorded ? data?.shiftWise ?? [] : [], "shiftName", shiftRecorded ? img.shift : null,
+    if (want("inspector")) comparison("Inspector-Wise Analysis", "INSPECTOR-WISE ANALYSIS", "Inspector Name", data?.inspectorWise ?? [], "inspectorName", img.inspector, "No inspections for this period")
+    if (want("shift")) comparison("Shift-Wise Analysis", "SHIFT-WISE ANALYSIS", "Shift", shiftRecorded ? data?.shiftWise ?? [] : [], "shiftName", shiftRecorded ? img.shift : null,
         "These inspection forms do not record a shift")
 
     // ── 6. Top 5 Defects ────────────────────────────────────────────────────
     if (want("top5")) {
         const ws = wb.addWorksheet("Top 5 Defects", { views: [{ showGridLines: false }] })
         const r = heading(ws, "TOP 5 DEFECTS", input, 6)
-        const next = table(ws, r, 1, [
+        table(ws, r, 1, [
             { header: "Rank", key: "rank", width: 8, align: "center" },
             { header: "Defect", key: "name", width: 34 },
             { header: "Rework Defects", key: "rework", width: 16, fmt: INT, tone: "orange", total: "sum" },
@@ -481,15 +470,6 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
             { header: "Share of all defects (%)", key: "sharePct", width: 22, fmt: PCT, total: rows => rows.reduce((a, x) => a + num(x.sharePct), 0) },
         ], defects.slice(0, 5).map((d, i) => ({ rank: i + 1, name: d.defectName, rework: num(d.rework), rejected: num(d.rejected), qty: num(d.count), sharePct: num(d.percentage) / 100 })),
             { totalLabel: "Total", empty: "No defects recorded for this period" })
-        const sp = data?.defectSplit
-        const spTotal = num(sp?.exact) + num(sp?.estimated) + num(sp?.unclassified)
-        if (sp && spTotal > 0 && num(sp.estimated) > 0) {
-            ws.mergeCells(next, 1, next + 1, 6)
-            const n = ws.getCell(next, 1)
-            n.value = `Rework / rejected split follows each inspection's own rework and rejected totals. ${(share(num(sp.estimated), spTotal) * 100).toFixed(2)}% of the defect quantity is from inspections with both, where the split is in proportion.`
-            n.font = { size: 9, italic: true, color: { argb: K.muted } }
-            n.alignment = { wrapText: true, vertical: "top" }
-        }
     }
 
     // ── 7. Detailed Inspection Data ─────────────────────────────────────────
@@ -552,7 +532,7 @@ export async function buildReportWorkbook(input: ReportExcelInput): Promise<Arra
             { header: "DIFFERENCE", key: "difference", width: 13, fmt: INT, total: "sum" },
             { header: "REWORK PPM", key: "reworkPpm", width: 11, fmt: INT, total: rows => ppm(sum(rows, "rework"), sum(rows, "inspected")) },
             { header: "REJECTED PPM", key: "rejectPpm", width: 12, fmt: INT, total: rows => ppm(sum(rows, "rejected"), sum(rows, "inspected")) },
-            { header: "SITE", key: "site", width: 24 },
+            ...(input.project && input.project !== "All Projects" ? [] : [{ header: "SITE", key: "site", width: 24 } as Col]),
             { header: "PROJECT", key: "project", width: 22 },
             { header: "LOCATION", key: "location", width: 16 },
             ...otherLabels.map((l, k): Col => ({ header: l.toUpperCase(), key: `x${k}`, width: 18 })),

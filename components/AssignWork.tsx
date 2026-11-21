@@ -9,6 +9,7 @@
 // team still never cancels their work.
 
 import { useEffect, useRef, useState } from "react"
+import { ASSIGNMENT_TYPES, assignmentFields } from "@/lib/assignment-type"
 import { toast } from "sonner"
 import { Check, User } from "lucide-react"
 
@@ -16,8 +17,7 @@ export type AssignWork = {
     on: boolean
     ids: string[]
     start: string
-    recur: string
-    multiPart: boolean
+    kind: string
     notes: string
 }
 
@@ -31,7 +31,7 @@ const todayLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 
  * the team drops out, and ticking them back onto the team picks them again.
  */
 export function useAssignWork(teamIds: string[]) {
-    const [value, setValue] = useState<AssignWork>(() => ({ on: false, ids: [], start: todayLocal(), recur: "none", multiPart: false, notes: "" }))
+    const [value, setValue] = useState<AssignWork>(() => ({ on: false, ids: [], start: todayLocal(), kind: "ongoing", notes: "" }))
     const prevTeam = useRef<string[]>([])
     useEffect(() => {
         const added = teamIds.filter(id => !prevTeam.current.includes(id))
@@ -58,8 +58,7 @@ export async function createAssignments(projectId: string, v: AssignWork): Promi
             body: JSON.stringify({
                 projectId,
                 inspectorIds: v.ids,
-                recurrenceType: v.recur,
-                isMultiPart: v.multiPart,
+                ...assignmentFields(v.kind),
                 startDate: v.start,
                 notes: v.notes || undefined,
             }),
@@ -137,22 +136,13 @@ export function AssignWorkSection({ value, onChange, teamIds, nameOf, whenText, 
                             <input id="assign-work-start" type="date" value={value.start} onChange={e => set({ start: e.target.value })} className={inputCls} />
                         </div>
                         <div>
-                            <label htmlFor="assign-work-recur" className="block text-[12px] font-medium text-[var(--text2)] mb-1">Recurrence</label>
-                            <select id="assign-work-recur" value={value.recur} onChange={e => set({ recur: e.target.value })} className={inputCls}>
-                                <option value="none">One-time</option>
-                                <option value="daily">Daily</option>
-                                <option value="weekly">Weekly</option>
+                            <label htmlFor="assign-work-recur" className="block text-[12px] font-medium text-[var(--text2)] mb-1">Assignment type</label>
+                            <select id="assign-work-recur" value={value.kind} onChange={e => set({ kind: e.target.value })} className={inputCls}>
+                                {ASSIGNMENT_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
                         </div>
                     </div>
-                    <label className="flex items-start gap-2.5 cursor-pointer rounded-[10px] bg-[var(--surface2)] px-3 py-2.5">
-                        <input type="checkbox" checked={value.multiPart} onChange={e => set({ multiPart: e.target.checked })}
-                            className="mt-[3px] h-4 w-4 accent-[var(--accent)]" />
-                        <span>
-                            <span className="block text-[13px] font-medium text-[var(--text)]">Multi-part inspection</span>
-                            <span className="block text-[11.5px] text-[var(--text3)]">For work covered over several visits. The assignment stays on the inspector&apos;s list until you close it.</span>
-                        </span>
-                    </label>
+                    <p className="text-[11.5px] text-[var(--text3)]">{ASSIGNMENT_TYPES.find(o => o.value === value.kind)?.hint}</p>
                     <div>
                         <label htmlFor="assign-work-notes" className="block text-[12px] font-medium text-[var(--text2)] mb-1">Notes / Summary <span className="text-[var(--text3)] font-normal">(optional)</span></label>
                         <textarea id="assign-work-notes" value={value.notes} onChange={e => set({ notes: e.target.value.slice(0, 250) })} rows={2}
