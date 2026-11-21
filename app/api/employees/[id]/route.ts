@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { assignAfterEmployeeChange } from "@/lib/lms-auto"
 import { normalizeEmploymentType } from "@/lib/employment-type"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -452,6 +453,9 @@ export async function PUT(
                 }
             }
         }
+
+        // A new designation / department / branch can bring new required courses.
+        if (designation !== undefined || departmentId !== undefined || branchId !== undefined) await assignAfterEmployeeChange([employee.id], session?.user?.id ?? null)
 
         return NextResponse.json(maskEmployee(employee, access))
     } catch (error) {

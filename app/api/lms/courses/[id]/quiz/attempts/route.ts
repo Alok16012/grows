@@ -79,14 +79,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const moduleCount = await prisma.courseModule.count({ where: { courseId: params.id, isRequired: true } })
         if (moduleCount > 0 && enrollment.progress < 100) return new NextResponse("Finish all modules before taking the assessment", { status: 400 })
 
-        if (quiz.maxAttempts && quiz.attempts.length >= quiz.maxAttempts) {
+        // Attempts count from the current enrolment (a refresher or re-enrolment starts afresh).
+        const used = quiz.attempts.filter(a => a.startedAt >= enrollment.enrolledAt).length
+        if (quiz.maxAttempts && used >= quiz.maxAttempts) {
             return new NextResponse(`Maximum ${quiz.maxAttempts} attempts allowed`, { status: 400 })
         }
 
         let totalPoints = 0
         let earnedPoints = 0
         const results: { questionId: string; correct: boolean; correctOptionId: string | null }[] = []
-        const attemptsLeft = quiz.maxAttempts ? quiz.maxAttempts - quiz.attempts.length - 1 : null
+        const attemptsLeft = quiz.maxAttempts ? quiz.maxAttempts - used - 1 : null
 
         for (const question of quiz.questions) {
             totalPoints += question.points || 1

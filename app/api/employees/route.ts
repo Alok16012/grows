@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { assignAfterEmployeeChange } from "@/lib/lms-auto"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -431,6 +432,9 @@ export async function POST(req: Request) {
             action: "employee.create", employeeId: employee.id, source: "Employee form",
             joiningDate: employee.dateOfJoining, ...actorOf(session), extra: { status: employee.status }, req,
         })
+
+        // Courses whose assignment rules match the new joiner (LMS → Settings).
+        await assignAfterEmployeeChange([employee.id], session?.user?.id ?? null)
 
         // The creator gets the joining link once, here; the token itself is not
         // echoed with the record (lib/access NEVER_RETURNED).

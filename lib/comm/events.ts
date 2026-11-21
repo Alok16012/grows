@@ -103,6 +103,15 @@ export const COMM_EVENTS: CommEvent[] = [
         defaultBody: "Hi {name},\n\n{asset} has been issued to you. Please take care of it and return it when asked.\n\n— {company}",
     },
     {
+        key: "training_due", inappBuiltIn: true, label: "Training due / overdue", audience: "employee",
+        description: "Reminder before a course's due date and while it's overdue (LMS → Settings → Reminders). The bell notification is always sent; this adds WhatsApp / email.",
+        vars: [NAME, { key: "course", label: "Course", sample: "Inspector induction" }, { key: "dueDate", label: "Due date", sample: "28 Nov 2026" }, { key: "status", label: "Status", sample: "due in 3 days" }, COMPANY_VAR],
+        waParams: ["name", "course", "dueDate", "status"],
+        respectQuietHours: true,
+        defaultSubject: "Training {status}: {course}",
+        defaultBody: "Hi {name},\n\nYour training \"{course}\" is {status} (due {dueDate}). Please complete it in the Growus app → My Learning.\n\n— {company}",
+    },
+    {
         key: "attendance_missing", connected: false, label: "Missing attendance", audience: "employee",
         description: "Reminder when attendance for a day is missing. Not connected yet: attendance here is uploaded monthly by sheet, so there is no daily gap to detect.",
         vars: [NAME, { key: "date", label: "Date", sample: "19 Nov 2026" }, COMPANY_VAR],

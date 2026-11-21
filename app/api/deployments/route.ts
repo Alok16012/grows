@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { assignAfterEmployeeChange } from "@/lib/lms-auto"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -143,6 +144,9 @@ export async function POST(req: Request) {
             source: source === "new-joiners" ? "New joiners" : "Deployments",
             ...actorOf(session), extra: { shift: shift || null, role: role || null }, req,
         })
+
+        // A new site can bring site / client courses (LMS → Settings).
+        await assignAfterEmployeeChange([employeeId], actorId)
 
         return NextResponse.json(deployment)
     } catch (error) {

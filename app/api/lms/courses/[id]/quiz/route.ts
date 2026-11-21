@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { getLmsSettings } from "@/lib/lms-settings"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -53,7 +54,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 description: description || null,
                 passingScore: passingScore ? parseInt(passingScore) : 70,
                 timeLimit: timeLimit ? parseInt(timeLimit) : null,
-                maxAttempts: maxAttempts ? parseInt(maxAttempts) : 3,
+                maxAttempts: maxAttempts ? parseInt(maxAttempts) : (await getLmsSettings()).defaults.maxAttempts,
             },
         })
 

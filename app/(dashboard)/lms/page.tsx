@@ -11,11 +11,12 @@ import {
     ExternalLink, Trash2, Edit2, Eye,
     TrendingUp, FileQuestion, Clock, Target, Users2,
     Building2, MapPin, User, LayoutGrid,
-    Calendar, Bell, Shield, Star, Send, UserCheck, FileText
+    Calendar, Bell, Shield, Star, Send, UserCheck, FileText, Settings
 } from "lucide-react"
 import { format } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import LmsSettingsTab from "./LmsSettingsTab"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1566,7 +1567,7 @@ export default function LMSPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
 
-    const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "enrollments" | "compliance" | "ilt" | "policies" | "notifications">("dashboard")
+    const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "enrollments" | "compliance" | "ilt" | "policies" | "notifications" | "settings">("dashboard")
     const [courses, setCourses] = useState<Course[]>([])
     const [enrollments, setEnrollments] = useState<Enrollment[]>([])
     const [loadingCourses, setLoadingCourses] = useState(true)
@@ -1728,6 +1729,7 @@ export default function LMSPage() {
                         { key: "policies", label: "Policies", icon: <Shield size={14} /> },
                         { key: "compliance", label: "Compliance", icon: <AlertTriangle size={14} /> },
                         { key: "notifications", label: "Alerts", icon: <Bell size={14} /> },
+                        { key: "settings", label: "Settings", icon: <Settings size={14} /> },
                     ]).map(tab => (
                         <button
                             key={tab.key}
@@ -1958,6 +1960,9 @@ export default function LMSPage() {
                 {activeTab === "notifications" && (
                     <NotificationsTab />
                 )}
+
+                {/* ── Settings Tab ── */}
+                {activeTab === "settings" && <LmsSettingsTab />}
 
                 {/* ── Enrollments Tab ── */}
                 {activeTab === "enrollments" && (
