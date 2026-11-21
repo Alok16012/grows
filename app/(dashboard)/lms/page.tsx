@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import { videoEmbed } from "@/lib/video-embed"
 import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -696,9 +697,17 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                     <input
                                         value={moduleForm.videoUrl}
                                         onChange={e => setModuleForm(f => ({ ...f, videoUrl: e.target.value }))}
-                                        placeholder="Video URL (optional)"
+                                        placeholder="Video link (optional) — e.g. https://youtu.be/…"
                                         className="w-full h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
                                     />
+                                    {(() => {
+                                        // Tell the admin straight away whether learners will be able to play it inside the app.
+                                        if (!moduleForm.videoUrl.trim()) return <p className="text-[11px] text-[var(--text3)] -mt-1">Upload the video to YouTube as <b>Unlisted</b> (only people with the link can see it), then paste the link here. Vimeo, Google Drive (shared with anyone with the link) and .mp4 links work too.</p>
+                                        const v = videoEmbed(moduleForm.videoUrl)
+                                        if (!v) return <p className="text-[11px] text-[#dc2626] -mt-1">That doesn&apos;t look like a link.</p>
+                                        if (v.kind === "link") return <p className="text-[11px] text-[#b45309] -mt-1">This link will open in a new tab. YouTube, Vimeo, Google Drive and .mp4 links play inside the course.</p>
+                                        return <p className="text-[11px] text-[var(--success-strong)] -mt-1">✓ Plays inside the course{v.kind === "iframe" ? ` (${v.provider})` : ""}.</p>
+                                    })()}
                                     <div className="grid grid-cols-2 gap-3">
                                         <input
                                             type="number"

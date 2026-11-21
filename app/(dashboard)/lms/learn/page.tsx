@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import ModuleVideo from "@/components/lms/ModuleVideo"
 import MySkills from "./MySkills"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -784,16 +785,9 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="text-[14px] font-medium text-[var(--text)]">{mod.title}</h3>
-                                        {mod.content && <p className="text-[12px] text-[var(--text3)] mt-1">{mod.content}</p>}
-                                        {mod.videoUrl && (
-                                            <button 
-                                                type="button"
-                                                onClick={() => onUrlPreview(mod.videoUrl!, mod.title)}
-                                                className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] mt-2 hover:underline"
-                                            >
-                                                <PlayCircle size={14} /> Watch Content
-                                            </button>
-                                        )}
+                                        {mod.content && <p className="text-[12.5px] text-[var(--text2)] mt-1 whitespace-pre-line leading-relaxed">{mod.content}</p>}
+                                        {/* YouTube / Vimeo / Drive / .mp4 plays here; the next module opens with its video ready. */}
+                                        {mod.videoUrl && <ModuleVideo url={mod.videoUrl} title={mod.title} defaultOpen={isNext && !isComplete} />}
                                     </div>
                                     {!isComplete && !isNext && (
                                         <span className="h-8 px-3 text-[11.5px] text-[var(--text3)] flex items-center">Locked</span>
