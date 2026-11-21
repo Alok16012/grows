@@ -203,6 +203,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Employee Directory", href: "/employees", permission: "employees.view" },
                 { name: "Employee Master Data", href: "/employees/master", permission: "employees.view" },
                 { name: "Data Quality", href: "/employees/quality", permission: "employees.view" },
+                { name: "Masters", href: "/employees/masters", permission: "employees.view" },
                 { name: "New Joiners", href: "/employees/new-joiners", permission: "employees.view" },
                 // An employee leaving is an HR process (clearance, F&F), not growth.
                 { name: "Exit Management", href: "/exit", permission: "exit.view" },

@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { standardDesignation } from "@/lib/people-masters-server"
 import { assignAfterEmployeeChange } from "@/lib/lms-auto"
 import { normalizeEmploymentType } from "@/lib/employment-type"
 import { NextResponse } from "next/server"
@@ -202,7 +203,8 @@ export async function PUT(
         if (bankIFSC !== undefined) updateData.bankIFSC = bankIFSC ? normalizeUpper(bankIFSC) : bankIFSC
         if (bankName !== undefined) updateData.bankName = bankName
         if (photo !== undefined) updateData.photo = photo
-        if (designation !== undefined) updateData.designation = designation
+        // People → Masters: the standard spelling when the designation list knows it.
+        if (designation !== undefined) updateData.designation = await standardDesignation(designation)
         if (departmentId !== undefined) updateData.departmentId = departmentId || null
         if (branchId !== undefined) updateData.branchId = branchId || null
         if (dateOfJoining !== undefined) updateData.dateOfJoining = dateOfJoining ? new Date(dateOfJoining) : null

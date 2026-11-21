@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { standardDesignation } from "@/lib/people-masters-server"
+import { getDesignations } from "@/lib/people-masters-server"
 import { normalizeEmploymentType } from "@/lib/employment-type"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -87,6 +89,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     const importer = accessFrom(session!)
+    // People → Masters: imported designations take the standard spelling.
+    const designationMaster = await getDesignations()
     const refusals = new Map<string, string | null>()
     const roleRefusal = async (roleId: string) => {
         if (!refusals.has(roleId)) {
@@ -250,7 +254,7 @@ export async function POST(req: Request) {
                     phone:         phone || "",
                     email:         strN(row.email),
                     alternatePhone: strN(row.alternatePhone),
-                    designation:   strN(row.designation),
+                    designation:   await standardDesignation(strN(row.designation), designationMaster),
                     employmentType: normalizeEmploymentType(str(row.employmentType)) || "Full-time",
                     status:        "ACTIVE",
                     onboardingToken,

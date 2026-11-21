@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { standardDesignation } from "@/lib/people-masters-server"
 import { assignAfterEmployeeChange } from "@/lib/lms-auto"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -353,7 +354,7 @@ export async function POST(req: Request) {
                 bankIFSC: bankIFSC ? normalizeUpper(bankIFSC) : bankIFSC,
                 bankName,
                 photo,
-                designation,
+                designation: await standardDesignation(designation),
                 departmentId: departmentId || null,
                 branchId: branchId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
