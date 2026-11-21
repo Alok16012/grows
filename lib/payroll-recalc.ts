@@ -8,6 +8,7 @@
 // (PROCESSED / PAID) rows are never touched. Same engine and inputs as
 // Process Payroll; TDS entered on a row and arrears already added are kept.
 import prisma from "@/lib/prisma"
+import { manualOtResolver } from "@/lib/payroll-manual-ot"
 import { postedSites } from "@/lib/attendance-guard"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { rulesForPeriod } from "@/lib/payroll-rules"
@@ -45,7 +46,7 @@ export async function recalcDraftPayroll(opts: { from: YM; employeeIds?: string[
         if (!due.length) return { rows: 0, months: [] }
 
         const ids = Array.from(new Set(due.map(r => r.employeeId)))
-        const [rulesAt, statutoryAt, posted] = await Promise.all([getRulesResolver(), statutoryResolver(ids), postedSites(ids)])
+        const [rulesAt, statutoryAt, posted, manualOt] = await Promise.all([getRulesResolver(), statutoryResolver(ids), postedSites(ids), manualOtResolver()])
         const monthKeys = Array.from(new Set(due.map(r => `${r.year}-${r.month}`)))
         const inForce = new Map<string, Awaited<ReturnType<typeof revisionsForMonth>>>()
         for (const k of monthKeys) {
@@ -66,12 +67,14 @@ export async function recalcDraftPayroll(opts: { from: YM; employeeIds?: string[
                 canteenRatePerDay: sal?.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType: sal?.complianceType ?? "OR", isHandicap: row.employee.isHandicap ?? false,
                 siteId: row.siteId ?? posted.get(row.employeeId) ?? null,
+                employeeId: row.employeeId,
                 ...statutoryAt(row.employeeId, p),
             }, {
                 monthDays: row.workingDays, workedDays: row.presentDays, otDays: row.otDays,
                 canteenDays: row.canteenDays, canteenAmount: row.canteenAmount, penalty: row.penalty,
                 advance: row.advance, otherDeductions: row.otherDeductions, productionIncentive: row.productionIncentive,
                 lwf: row.lwf, gender: row.employee.gender ?? "Male", month: row.month,
+                otAmount: manualOt(row.employeeId, p),
             }, rules)
             const tds = row.tds || 0, arrears = row.arrears || 0
             return prisma.payroll.update({

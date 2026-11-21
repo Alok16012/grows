@@ -42,7 +42,7 @@
 // PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
 //   200 (300 in February). Female employees exempt up to ₹25,000.
 //
-import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase, roundAmt, esicWagesOf, otRatePerHourFor } from "./payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase, roundAmt, esicWagesOf, otRatePerHourFor, otRuleFor } from "./payroll-rules"
 
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
@@ -58,12 +58,15 @@ export function calcGrowusPayroll(sal: {
     pensionApplicable?: boolean // false → employer EPS 8.33% goes to EPF instead (same total)
     esicApplicable?: boolean    // false → no ESIC (employee or employer)
     siteId?: string | null      // the site the pay is for — picks its OT rule
+    employeeId?: string | null  // for a "Manual OT — rate per employee" rule
 }, att: {
     monthDays: number; workedDays: number; otDays: number
     canteenDays: number; penalty: number; advance: number
     /** Manual canteen deduction. null/undefined → canteenDays × rate. */
     canteenAmount?: number | null
     otherDeductions: number; productionIncentive: number; lwf: number
+    /** "Manual OT — monthly amount" rule: the ₹ OT typed for this month. null → OT days × rate. */
+    otAmount?: number | null
     gender?: string            // "Male" | "Female" (default "Male")
     month?: number             // 1–12, used for February PT (default: current month)
 }, rules: PayrollRules = DEFAULT_PAYROLL_RULES) {
@@ -116,8 +119,10 @@ export function calcGrowusPayroll(sal: {
 
     // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
     const otRate = otRatePerHourFor(rules.ot, sal.siteId,
-        { basic, da, hra: hraFull, washing, conveyance, leaveWithWages, bonus: bonusFull, otherAllowance }, otRatePerHour)
-    const otPay = Math.round(otRate * rules.ot.hoursPerDay * otDays)
+        { basic, da, hra: hraFull, washing, conveyance, leaveWithWages, bonus: bonusFull, otherAllowance }, otRatePerHour, sal.employeeId)
+    const manualAmount = otRuleFor(rules.ot, sal.siteId).formula?.kind === "MANUAL_AMOUNT"
+        && att.otAmount != null && Number.isFinite(att.otAmount) ? att.otAmount : null
+    const otPay = manualAmount !== null ? Math.round(manualAmount) : Math.round(otRate * rules.ot.hoursPerDay * otDays)
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
         lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)

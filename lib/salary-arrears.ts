@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { manualOtResolver } from "@/lib/payroll-manual-ot"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { rulesForPeriod } from "@/lib/payroll-rules"
 import { getRulesResolver } from "@/lib/payroll-rules-server"
@@ -60,6 +61,7 @@ export async function refreshArrears(employeeIds: string[], from: Snap, createdB
         const key = (e: string, y: number, m: number) => `${e}|${y}|${m}`
         const settledBy = new Map(settledRows.map(x => [key(x.employeeId, x.forYear, x.forMonth), x._sum.amount ?? 0]))
 
+        const manualOt = await manualOtResolver()
         const toCreate: any[] = []
         for (const row of due) {
             const sal: any = inForce.get(`${row.year}-${row.month}`)?.get(row.employeeId) ?? row.employee.employeeSalary
@@ -73,12 +75,14 @@ export async function refreshArrears(employeeIds: string[], from: Snap, createdB
                 canteenRatePerDay: sal.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType: sal.complianceType ?? "OR", isHandicap: row.employee.isHandicap ?? false,
                 siteId: row.siteId ?? null,
+                employeeId: row.employeeId,
                 ...statutoryAt(row.employeeId, { month: row.month, year: row.year }),
             }, {
                 monthDays: row.workingDays, workedDays: row.presentDays, otDays: row.otDays,
                 canteenDays: row.canteenDays, canteenAmount: row.canteenAmount, penalty: row.penalty,
                 advance: row.advance, otherDeductions: row.otherDeductions, productionIncentive: row.productionIncentive,
                 lwf: row.lwf, gender: row.employee.gender ?? "Male", month: row.month,
+                otAmount: manualOt(row.employeeId, { month: row.month, year: row.year }),
             }, rules)
 
             // Compare like with like: the stored net may include arrears it

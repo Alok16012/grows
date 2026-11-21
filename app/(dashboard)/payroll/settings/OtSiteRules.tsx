@@ -7,8 +7,9 @@
 // the same "applies from" month, versions and draft recalculation.
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
-import { ListChecks, Pencil, Plus, Search, Settings2, Trash2, X } from "lucide-react"
-import { OT_PARTS, OT_PART_LABELS, otFormulaLabel, otFormulaText, type OtFormula, type OtPart, type PayrollRules } from "@/lib/payroll-rules"
+import { ListChecks, Pencil, Plus, Search, Settings2, Trash2, Users, X } from "lucide-react"
+import { OT_PARTS, OT_PART_LABELS, isManualOt, otFormulaLabel, otFormulaText, type OtFormula, type OtPart, type PayrollRules } from "@/lib/payroll-rules"
+import ManualOtPopup from "./ManualOtPopup"
 
 type Ot = PayrollRules["ot"]
 type Site = { id: string; name: string }
@@ -26,6 +27,7 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
     const [rule, setRule] = useState("")
     const [editing, setEditing] = useState(false)
     const [bulk, setBulk] = useState(false)
+    const [manualFor, setManualFor] = useState<{ site: Site; kind: string | null } | null>(null)
     useEffect(() => {
         fetch("/api/sites").then(r => r.ok ? r.json() : []).then(d => {
             if (Array.isArray(d)) setSites(d.map((s: any) => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true })))
@@ -96,6 +98,12 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
                     style={{ ...iconBtn, width: "auto", padding: "0 12px", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--accent)", borderColor: "var(--accent)" }}>
                     <ListChecks size={14} /> Bulk change
                 </button>
+                {siteId && siteId !== ALL && isManualOt(byId.get(rule)) && (
+                    <button type="button" onClick={() => setManualFor({ site: { id: siteId, name: nameOf.get(siteId) ?? "" }, kind: byId.get(rule)?.kind ?? null })} title="Set this site's employees' OT — type it or upload Excel"
+                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
+                    <Users size={13} /> Set employee OT
+                </button>
+                )}
             </div>
 
             {/* Sites with their own rule */}
@@ -111,6 +119,10 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
                             <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderBottom: "1px solid var(--border)", fontSize: 12.5 }}>
                                 <span style={{ flex: "1 1 40%", fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
                                 <span style={{ flex: "1 1 45%", color: "var(--text2)" }}>{o.formula ? otFormulaLabel(o.formula) : "—"}</span>
+                                {isManualOt(o.formula) && <button type="button" onClick={() => setManualFor({ site: { id: o.id, name: o.name }, kind: o.formula?.kind ?? null })} title="Set this site's employees' OT — type it or upload Excel"
+                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
+                    <Users size={13} /> Employees
+                </button>}
                                 <button type="button" title="Change" onClick={() => pickSite(o.id)} style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer" }}><Pencil size={13} /></button>
                                 <button type="button" title="Use the default rule" onClick={() => remove(o.id)} style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer" }}><X size={14} /></button>
                             </div>
@@ -120,7 +132,9 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
             )}
 
             {editing && <OtRulesPopup ot={ot} onChange={onChange} onClose={() => setEditing(false)} />}
-            {bulk && <BulkSitesPopup ot={ot} sites={sites} onChange={onChange} onClose={() => setBulk(false)} onEditRules={() => setEditing(true)} />}
+            {bulk && <BulkSitesPopup ot={ot} sites={sites} onChange={onChange} onClose={() => setBulk(false)} onEditRules={() => setEditing(true)}
+                onManual={(site, kind) => setManualFor({ site, kind })} />}
+            {manualFor && <ManualOtPopup site={manualFor.site} ot={ot} ruleKind={manualFor.kind} onChange={onChange} onClose={() => setManualFor(null)} />}
         </div>
     )
 }
@@ -179,13 +193,21 @@ function OtRulesPopup({ ot, onChange, onClose }: { ot: Ot; onChange: (patch: Par
                                         {isDefault && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: "#15803d", background: "#dcfce7", padding: "1px 7px", borderRadius: 20 }}>default</span>}
                                         {users > 0 && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: "var(--text3)" }}>{users} site{users === 1 ? "" : "s"}</span>}
                                     </span>
-                                    <select value={f.kind} onChange={e => patch(f.id, e.target.value === "FIXED" ? { kind: "FIXED" } : { kind: "FORMULA", parts: f.parts.length ? f.parts : ["basic", "da"] })} style={{ ...box, width: 130 }}>
+                                    {!isManualOt(f) && <select value={f.kind} onChange={e => patch(f.id, e.target.value === "FIXED" ? { kind: "FIXED" } : { kind: "FORMULA", parts: f.parts.length ? f.parts : ["basic", "da"] })} style={{ ...box, width: 130 }}>
                                         <option value="FORMULA">Formula</option>
                                         <option value="FIXED">Fixed rate</option>
-                                    </select>
-                                    <button type="button" title={isDefault ? "The default rule can't be removed — pick another default first" : "Remove rule"} disabled={isDefault} onClick={() => del(f)}
-                                        style={{ ...iconBtn, color: isDefault ? "var(--border2)" : "#dc2626", cursor: isDefault ? "not-allowed" : "pointer" }}><Trash2 size={14} /></button>
+                                    </select>}
+                                    {!isManualOt(f) && <button type="button" title={isDefault ? "The default rule can't be removed — pick another default first" : "Remove rule"} disabled={isDefault} onClick={() => del(f)}
+                                        style={{ ...iconBtn, color: isDefault ? "var(--border2)" : "#dc2626", cursor: isDefault ? "not-allowed" : "pointer" }}><Trash2 size={14} /></button>}
                                 </div>
+                                {isManualOt(f) ? (
+                                    <p style={{ margin: 0, fontSize: 12, color: "var(--text2)" }}>
+                                        {f.kind === "MANUAL_RATE"
+                                            ? "Each employee's ₹/hour OT rate is typed or uploaded (Excel) per site — use \"Employee OT\" on a site with this rule. Kept until changed."
+                                            : "Each employee's ₹ OT amount is typed or uploaded (Excel) for each payroll month — use \"Employee OT\" on a site with this rule."}
+                                        {" "}Anyone left blank gets OT days × their own rate.
+                                    </p>
+                                ) : (<>
                                 <label style={field("100%")}>
                                     <span style={lbl}>Name (optional)</span>
                                     <input value={f.name} maxLength={60} placeholder="e.g. Client OT policy" onChange={e => patch(f.id, { name: e.target.value })} style={box} />
@@ -220,6 +242,7 @@ function OtRulesPopup({ ot, onChange, onClose }: { ot: Ot; onChange: (patch: Par
                                     </label>
                                 )}
                                 <p style={{ margin: 0, fontSize: 11.5, color: "var(--text3)" }}>Example: {sampleRate(f)}</p>
+                                </>)}
                             </div>
                         )
                     })}
@@ -239,8 +262,9 @@ function OtRulesPopup({ ot, onChange, onClose }: { ot: Ot; onChange: (patch: Par
 // ── Bulk change: every site on one page ──────────────────────────────────────
 const DEFAULT = "__default__"
 
-function BulkSitesPopup({ ot, sites, onChange, onClose, onEditRules }: {
+function BulkSitesPopup({ ot, sites, onChange, onClose, onEditRules, onManual }: {
     ot: Ot; sites: Site[]; onChange: (patch: Partial<Ot>) => void; onClose: () => void; onEditRules: () => void
+    onManual: (site: Site, kind: string | null) => void
 }) {
     const formulas = ot.formulas ?? []
     // Work on a copy; nothing changes until Apply.
@@ -281,7 +305,8 @@ function BulkSitesPopup({ ot, sites, onChange, onClose, onEditRules }: {
         onChange({ sites: next })
         onClose()
     }
-    const defaultLabel = (() => { const f = formulas.find(x => x.id === ot.defaultRule); return f ? `Default — ${otFormulaLabel(f)}` : "Default rule" })()
+    const defaultLabel = "↺ Default rule"
+    const defaultText = (() => { const f = formulas.find(x => x.id === ot.defaultRule); return f ? otFormulaLabel(f) : "" })()
 
     return createPortal(
         <div onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
@@ -291,7 +316,7 @@ function BulkSitesPopup({ ot, sites, onChange, onClose, onEditRules }: {
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
                     <div>
                         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--text)" }}>Bulk change — OT rule for all sites</h3>
-                        <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--text3)" }}>Change any site&apos;s rule in its row, or tick sites and set them together. Apply, then Save on the settings page.</p>
+                        <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--text3)" }}>Change any site&apos;s rule in its row, or tick sites and set them together. Apply, then Save on the settings page. Default rule: {defaultText}. For a Manual OT site, click Employee OT to type or upload each employee&apos;s OT.</p>
                     </div>
                     <button type="button" onClick={onClose} aria-label="Close" style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer", padding: 4 }}><X size={18} /></button>
                 </div>
@@ -338,11 +363,17 @@ function BulkSitesPopup({ ot, sites, onChange, onClose, onEditRules }: {
                                         </td>
                                         <td style={{ padding: "5px 6px", fontSize: 12.5, fontWeight: 600, color: "var(--text)", borderBottom: "1px solid var(--border)" }}>{x.name}</td>
                                         <td style={{ padding: "5px 16px 5px 6px", borderBottom: "1px solid var(--border)" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                             <select value={cur} onChange={e => e.target.value === EDIT ? onEditRules() : setOne(x.id, e.target.value)} style={{ ...box, height: 30, width: "100%", maxWidth: 300 }} aria-label={`OT rule for ${x.name}`}>
                                                 {formulas.map(f => <option key={f.id} value={f.id}>{otFormulaLabel(f)}</option>)}
                                                 <option value={DEFAULT}>{defaultLabel}</option>
                                                 <option value={EDIT}>⚙ Add / edit OT rules…</option>
                                             </select>
+                                            {isManualOt(formulas.find(f => f.id === (cur === DEFAULT ? ot.defaultRule : cur))) && <button type="button" onClick={() => onManual(x, formulas.find(f => f.id === (cur === DEFAULT ? ot.defaultRule : cur))?.kind ?? null)} title="Set this site's employees' OT — type it or upload Excel"
+                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
+                    <Users size={13} /> Employee OT
+                </button>}
+                                            </div>
                                         </td>
                                     </tr>
                                 )

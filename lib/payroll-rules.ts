@@ -61,6 +61,9 @@ export type RoundMode = "nearest" | "up"
  *   FORMULA  (sum of the ticked salary parts) ÷ days ÷ hours × multiplier
  *            e.g. (Basic + DA) ÷ 26 ÷ 8 × 2 = OT rate per hour
  *   FIXED    a fixed ₹ rate per hour; blank = each employee's own OT rate
+ *   MANUAL_RATE    a ₹/hour rate typed per employee (ot.manualRates); none typed = own rate
+ *   MANUAL_AMOUNT  a ₹ OT amount typed per employee for each payroll month
+ *                  (lib/payroll-manual-ot); none typed = OT days × own rate
  * Parts are the full-month salary structure, not the days-worked figures.
  * Every site uses one rule (its own, else the default rule).
  */
@@ -73,7 +76,7 @@ export const OT_PART_LABELS: Record<OtPart, string> = {
 export type OtFormula = {
     id: string
     name: string                 // optional label; blank → the formula itself
-    kind: "FORMULA" | "FIXED"
+    kind: "FORMULA" | "FIXED" | "MANUAL_RATE" | "MANUAL_AMOUNT"
     parts: OtPart[]
     days: number
     hours: number
@@ -89,10 +92,16 @@ export const DEFAULT_OT_FORMULAS: OtFormula[] = [
     otFormula("BASIC_DA_CONV", ["basic", "da", "conveyance"]),
     otFormula("GROSS", [...OT_PARTS]),
     otFormula("FIXED", [], "FIXED"),
+    otFormula("MANUAL_RATE", [], "MANUAL_RATE"),
+    otFormula("MANUAL_AMOUNT", [], "MANUAL_AMOUNT"),
 ]
+const MANUAL_KINDS: OtFormula["kind"][] = ["MANUAL_RATE", "MANUAL_AMOUNT"]
+export const isManualOt = (f?: OtFormula | null) => !!f && MANUAL_KINDS.includes(f.kind)
 
 /** What a rule does, in words: "(Basic+DA)/26/8×2", "Gross/26/8×2", "Fixed ₹150/hr". */
 export function otFormulaText(f: OtFormula): string {
+    if (f.kind === "MANUAL_RATE") return "Manual OT — rate per employee"
+    if (f.kind === "MANUAL_AMOUNT") return "Manual OT — monthly amount per employee"
     if (f.kind === "FIXED") return f.fixedRate && f.fixedRate > 0 ? `Fixed ₹${f.fixedRate}/hr` : "Fixed — employee's own OT rate"
     const base = f.parts.length === OT_PARTS.length ? "Gross"
         : f.parts.length === 1 ? OT_PART_LABELS[f.parts[0]]
@@ -196,6 +205,8 @@ export type PayrollRules = {
         hoursPerDay: number
         // The OT rules a site can use (editable in the popup).
         formulas: OtFormula[]
+        // MANUAL_RATE rule: employeeId → ₹ per hour.
+        manualRates: Record<string, number>
         // Rule id for sites with no rule of their own. FIXED = each employee's own OT rate (as before).
         defaultRule: string
         // siteId → that site's rule.
@@ -278,6 +289,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
     ot: {
         hoursPerDay: 4,
         formulas: DEFAULT_OT_FORMULAS.map(f => ({ ...f, parts: [...f.parts] })),
+        manualRates: {},
         defaultRule: "FIXED",
         sites: {},
     },
@@ -433,11 +445,13 @@ function sanitizeOtFormulas(v: unknown, old: Record<string, any>): OtFormula[] {
         let id = typeof raw.id === "string" ? raw.id.trim().slice(0, 40) : ""
         if (!id || seen.has(id)) id = `RULE_${out.length + 1}_${seen.size}`
         seen.add(id)
-        const kind: OtFormula["kind"] = raw.kind === "FIXED" ? "FIXED" : "FORMULA"
+        const kind: OtFormula["kind"] = ["FIXED", ...MANUAL_KINDS].includes(raw.kind) ? raw.kind : "FORMULA"
+        // One of each manual kind is enough.
+        if (MANUAL_KINDS.includes(kind) && out.some(f => f.kind === kind)) continue
         const parts = Array.isArray(raw.parts) ? OT_PARTS.filter(p => raw.parts.includes(p)) : []
         if (kind === "FORMULA" && !parts.length) continue
         out.push({
-            id, kind, parts: kind === "FIXED" ? [] : parts,
+            id, kind, parts: kind === "FORMULA" ? parts : [],
             name: typeof raw.name === "string" ? raw.name.trim().slice(0, 60) : "",
             days: num(raw.days, 26, { min: 1, max: 31 }),
             hours: num(raw.hours, 8, { min: 1, max: 24 }),
@@ -445,7 +459,23 @@ function sanitizeOtFormulas(v: unknown, old: Record<string, any>): OtFormula[] {
             fixedRate: kind === "FIXED" ? money(raw.fixedRate) : null,
         })
     }
-    return out.length ? out : seed
+    if (!out.length) return seed
+    // The two manual options are always offered.
+    for (const k of MANUAL_KINDS) if (!out.some(f => f.kind === k)) {
+        const id = seen.has(k) ? `${k}_${out.length}` : k
+        out.push({ ...DEFAULT_OT_FORMULAS.find(f => f.kind === k)!, id })
+    }
+    return out
+}
+
+function sanitizeRates(v: unknown): Record<string, number> {
+    const out: Record<string, number> = {}
+    if (!v || typeof v !== "object") return out
+    for (const [id, r] of Object.entries(v as Record<string, unknown>).slice(0, 20000)) {
+        const n = money(r)
+        if (id && id.length <= 64 && n !== null) out[id] = n
+    }
+    return out
 }
 
 function sanitizeOtSites(v: unknown, ids: Set<string>): Record<string, OtSiteRule> {
@@ -471,9 +501,11 @@ export function otRuleFor(ot: PayrollRules["ot"], siteId?: string | null): { for
  * full-month salary structure; `ownRate` the employee's own OT rate.
  */
 export function otRatePerHourFor(ot: PayrollRules["ot"], siteId: string | null | undefined,
-    parts: Record<OtPart, number>, ownRate: number): number {
+    parts: Record<OtPart, number>, ownRate: number, employeeId?: string | null): number {
     const { formula: f, siteRate } = otRuleFor(ot, siteId)
     if (!f) return ownRate
+    if (f.kind === "MANUAL_RATE") return (employeeId && ot.manualRates?.[employeeId]) || ownRate
+    if (f.kind === "MANUAL_AMOUNT") return ownRate
     if (f.kind === "FIXED") return siteRate ?? (f.fixedRate && f.fixedRate > 0 ? f.fixedRate : ownRate)
     const base = f.parts.reduce((a, p) => a + (Number(parts[p]) || 0), 0)
     return base / (f.days || 26) / (f.hours || 8) * f.multiplier
@@ -575,7 +607,7 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
                 const ids = new Set(formulas.map(f => f.id))
                 const defaultRule = ids.has(ot.defaultRule) ? ot.defaultRule
                     : (formulas.find(f => f.kind === "FIXED" && !f.fixedRate) ?? formulas[0]).id
-                return { formulas, defaultRule, sites: sanitizeOtSites(ot.sites, ids) }
+                return { formulas, defaultRule, sites: sanitizeOtSites(ot.sites, ids), manualRates: sanitizeRates(ot.manualRates) }
             })(),
         },
         defaults: {
