@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { reimbursementsFor } from "@/lib/expense-settle"
 import { otHoursOf } from "@/lib/payroll-rules"
 import { syncOtRatesToStructures } from "@/lib/payroll-ot-sync"
 import { manualOtResolver } from "@/lib/payroll-manual-ot"
@@ -320,6 +321,19 @@ export async function POST(req: Request) {
                 row.netSalary = Math.round((Number(row.netSalary) || 0) + add)
             }
         } catch (e) { if (!isMissingTableErr(e)) throw e }
+
+        // ── Expense claims paid with this salary (Expense Claims → Settle → Add to
+        // salary): their own Reimbursement line, into net pay only — never gross,
+        // PF or ESIC. A re-run of the month picks them up again.
+        try {
+            const reimb = await reimbursementsFor(allRows.map(r => r.employeeId), { month, year })
+            for (const row of allRows) {
+                const add = reimb.get(row.employeeId)
+                if (!add) continue
+                ;(row as any).reimbursement = add
+                row.netSalary = Math.round((Number(row.netSalary) || 0) + add)
+            }
+        } catch (e) { console.error("[PAYROLL_REIMBURSEMENT]", e) }
 
         // ── STEP 2: Delete existing records for this month/year (1 DB call) ─────────
         // Then recreate all — avoids sequential per-row updates which cause timeouts

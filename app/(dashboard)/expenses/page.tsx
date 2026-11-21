@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import ExpenseReport from "./ExpenseReport"
+import SettleClaims from "./SettleClaims"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
 import { format } from "date-fns"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
@@ -2506,6 +2507,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
     const [search, setSearch] = useState("")
     const [addOpen, setAddOpen] = useState(false)
     const [reportOpen, setReportOpen] = useState(false)
+    const [settleOpen, setSettleOpen] = useState(false)
     // Claims waiting for me as reporting manager (two-level approval).
     const [teamCount, setTeamCount] = useState(0)
     useEffect(() => {
@@ -2768,6 +2770,10 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                 <div className="page-actions">
                     {isPrivileged && (
                         <>
+                            <button onClick={() => setSettleOpen(true)} title="Pay approved claims together — by bank or with salary"
+                                className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors">
+                                <Banknote size={16} /> Settle
+                            </button>
                             <button onClick={() => setReportOpen(true)} title="Expense report: summary, by employee / category / site / month and every line"
                                 className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors">
                                 <FileSpreadsheet size={16} /> Report
@@ -2816,6 +2822,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                 </div>
             </div>
             {reportOpen && <ExpenseReport onClose={() => setReportOpen(false)} />}
+            {settleOpen && <SettleClaims onClose={() => setSettleOpen(false)} onDone={() => fetchExpenses()} />}
 
             {/* Stats Row */}
             <div className={`${statGridClass(4)} mb-6`}>

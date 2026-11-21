@@ -28,7 +28,7 @@ export async function GET(req: Request) {
             otherDeductions: true, totalDeductions: true,
             netSalary: true, workingDays: true, presentDays: true,
             otDays: true, pfEmployer: true, esiEmployer: true, ctc: true,
-            grossFullMonth: true, paidAt: true, arrears: true,
+            grossFullMonth: true, paidAt: true, arrears: true, reimbursement: true,
         }
     })
 

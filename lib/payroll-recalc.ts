@@ -46,7 +46,7 @@ async function recalcRows(opts: { from: YM; employeeIds?: string[] }): Promise<R
                 id: true, employeeId: true, month: true, year: true, payrollRunId: true,
                 workingDays: true, presentDays: true, otDays: true, canteenDays: true, canteenAmount: true,
                 penalty: true, advance: true, otherDeductions: true, productionIncentive: true, lwf: true,
-                tds: true, arrears: true, siteId: true,
+                tds: true, arrears: true, reimbursement: true, siteId: true,
                 employee: { select: { gender: true, isHandicap: true, basicSalary: true, employeeSalary: true } },
             },
         })
@@ -84,7 +84,7 @@ async function recalcRows(opts: { from: YM; employeeIds?: string[] }): Promise<R
                 lwf: row.lwf, gender: row.employee.gender ?? "Male", month: row.month,
                 otAmount: manualOt(row.employeeId, p),
             }, rules)
-            const tds = row.tds || 0, arrears = row.arrears || 0
+            const tds = row.tds || 0, arrears = row.arrears || 0, reimbursement = row.reimbursement || 0
             return prisma.payroll.update({
                 where: { id: row.id },
                 data: {
@@ -92,7 +92,7 @@ async function recalcRows(opts: { from: YM; employeeIds?: string[] }): Promise<R
                     overtimeHrs: otHoursOf(rules.ot, row.otDays || 0),
                     lwpDays: Math.max(row.workingDays - row.presentDays, 0),
                     totalDeductions: calc.totalDeductions + tds,
-                    netSalary: Math.round(calc.netSalary - tds + arrears),
+                    netSalary: Math.round(calc.netSalary - tds + arrears + reimbursement),
                 },
             })
         })
