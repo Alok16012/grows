@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { policyFlagsFor } from "@/lib/expense-policy-server"
 import { commNotify, userRecipients, fmtInr } from "@/lib/comm/recipients"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
@@ -97,8 +98,11 @@ export async function GET(
         })
         const userMap = Object.fromEntries(users.map(u => [u.id, u]))
 
+        // The policy checks, for the approver (and the claimant) to see on the claim.
+        const policyFlags = await policyFlagsFor(expense).catch(() => [])
         return NextResponse.json({
             ...expense,
+            policyFlags,
             submittedByUser: userMap[expense.submittedBy] || null,
             approvedByUser: expense.approvedBy ? (userMap[expense.approvedBy] || null) : null,
         })
@@ -181,6 +185,11 @@ export async function PUT(
             if (expense.status !== "DRAFT" && expense.status !== "REJECTED") return new NextResponse("Only a draft or rejected claim can be submitted", { status: 400 })
             updateData.status = "SUBMITTED"
             if (expense.status === "REJECTED") { updateData.rejectionReason = null; updateData.rejectedAt = null }
+            // Expense policy (Expense Claims → Policy): receipts, age, km and — when set
+            // to block — category limits stop the submit, here, for web and mobile alike.
+            const flags = await policyFlagsFor({ ...expense, ...updateData }).catch(() => [])
+            const blocking = flags.filter(f => f.blocking)
+            if (blocking.length) return new NextResponse(`Can't submit — ${blocking.map(f => f.message).join("; ")}`, { status: 400 })
         } else if (action === "APPROVE") {
             // Admin/Manager approves SUBMITTED → APPROVED
             if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })

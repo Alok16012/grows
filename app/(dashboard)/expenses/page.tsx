@@ -10,10 +10,11 @@ import {
     XCircle, Wallet, Calendar, MoreVertical,
     Trash2, Edit2, Send, BadgeCheck, Ban, Banknote,
     Upload, FileText, Paperclip, Briefcase, MapPin, Download, Eye, AlertCircle,
-    Users, ClipboardList, BarChart3, Settings, Bike, Car, AlertTriangle,
+    Users, ClipboardList, BarChart3, Settings, Bike, Car, AlertTriangle, FileSpreadsheet,
     type LucideIcon
 } from "lucide-react"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import ExpenseReport from "./ExpenseReport"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
 import { format } from "date-fns"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
@@ -831,6 +832,15 @@ function ExpenseDrawer({
     onNext?: () => void
 }) {
     const [actionLoading, setActionLoading] = useState(false)
+    // Expense policy checks for this claim (Expense Claims → Policy), from the server.
+    const [policyFlags, setPolicyFlags] = useState<{ message: string; blocking: boolean }[]>([])
+    useEffect(() => {
+        setPolicyFlags([])
+        if (!expense?.id) return
+        let live = true
+        fetch(`/api/expenses/${expense.id}`).then(r => r.ok ? r.json() : null).then(d => { if (live && Array.isArray(d?.policyFlags)) setPolicyFlags(d.policyFlags) }).catch(() => {})
+        return () => { live = false }
+    }, [expense?.id, expense?.status])
     const [showRejectBox, setShowRejectBox] = useState(false)
     const [showPayBox, setShowPayBox] = useState(false)
     const [rejectionReason, setRejectionReason] = useState("")
@@ -1141,6 +1151,18 @@ function ExpenseDrawer({
                                         <FileText size={14} /> View attached file
                                     </a>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Expense policy */}
+                        {policyFlags.length > 0 && expense.status !== "PAID" && (
+                            <div className="rounded-[10px] bg-[#fffbeb] border border-[#fde68a] p-3">
+                                <p className="text-[12px] font-semibold text-[#b45309] mb-1 flex items-center gap-1.5">
+                                    <AlertTriangle size={14} /> Expense policy — {policyFlags.length} point{policyFlags.length === 1 ? "" : "s"} to check
+                                </p>
+                                <ul className="list-disc pl-5 space-y-0.5">
+                                    {policyFlags.map((f, i) => <li key={i} className="text-[12.5px] text-[#92400e]">{f.message}</li>)}
+                                </ul>
                             </div>
                         )}
 
@@ -2456,6 +2478,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
     const [dateTo, setDateTo] = useState("")
     const [search, setSearch] = useState("")
     const [addOpen, setAddOpen] = useState(false)
+    const [reportOpen, setReportOpen] = useState(false)
     const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
     const [projectsList, setProjectsList] = useState<ExpenseProject[]>([])
     const [pendingCount, setPendingCount] = useState(0)
@@ -2710,6 +2733,18 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Track and manage employee expense claims.</p>
                 </div>
                 <div className="page-actions">
+                    {isPrivileged && (
+                        <>
+                            <button onClick={() => setReportOpen(true)} title="Expense report: summary, by employee / category / site / month and every line"
+                                className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors">
+                                <FileSpreadsheet size={16} /> Report
+                            </button>
+                            <a href="/expenses/policy" title="Expense policy: limits, receipts, claim age, travel rates"
+                                className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors">
+                                <Settings size={16} /> Policy
+                            </a>
+                        </>
+                    )}
                     <button
                         onClick={() => exportExpenses("xlsx")}
                         className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors"
@@ -2747,6 +2782,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                     </button>
                 </div>
             </div>
+            {reportOpen && <ExpenseReport onClose={() => setReportOpen(false)} />}
 
             {/* Stats Row */}
             <div className={`${statGridClass(4)} mb-6`}>
