@@ -56,16 +56,54 @@ export type StatutoryRevision = {
 export type RoundMode = "nearest" | "up"
 
 /**
- * How a site's OT rate per hour is worked out (Calculation Settings → OT rule by site):
- *   BASIC_DA      (Basic + DA) ÷ rate days ÷ rate hours × multiplier   e.g. ÷26 ÷8 ×2
- *   BASIC_DA_CONV (Basic + DA + Conveyance) ÷ … the same
- *   GROSS         full-month gross ÷ … the same
- *   FIXED         a fixed rate: the site's rate if set, else each employee's own OT rate
- * Amounts are the full-month salary structure, not the days-worked figures.
+ * OT rules (Calculation Settings → OT Rule by Site → "Edit OT rules" popup).
+ * Each rule is either
+ *   FORMULA  (sum of the ticked salary parts) ÷ days ÷ hours × multiplier
+ *            e.g. (Basic + DA) ÷ 26 ÷ 8 × 2 = OT rate per hour
+ *   FIXED    a fixed ₹ rate per hour; blank = each employee's own OT rate
+ * Parts are the full-month salary structure, not the days-worked figures.
+ * Every site uses one rule (its own, else the default rule).
  */
-export type OtRule = "BASIC_DA" | "BASIC_DA_CONV" | "GROSS" | "FIXED"
-export const OT_RULES: OtRule[] = ["BASIC_DA", "BASIC_DA_CONV", "GROSS", "FIXED"]
-export type OtSiteRule = { rule: OtRule; fixedRate?: number | null }
+export const OT_PARTS = ["basic", "da", "hra", "washing", "conveyance", "leaveWithWages", "bonus", "otherAllowance"] as const
+export type OtPart = typeof OT_PARTS[number]
+export const OT_PART_LABELS: Record<OtPart, string> = {
+    basic: "Basic", da: "DA", hra: "HRA", washing: "Washing", conveyance: "Conveyance",
+    leaveWithWages: "Leave with wages", bonus: "Bonus", otherAllowance: "Other allowance",
+}
+export type OtFormula = {
+    id: string
+    name: string                 // optional label; blank → the formula itself
+    kind: "FORMULA" | "FIXED"
+    parts: OtPart[]
+    days: number
+    hours: number
+    multiplier: number
+    fixedRate: number | null     // FIXED only; null = employee's own OT rate
+}
+export type OtSiteRule = { rule: string; fixedRate?: number | null }
+
+const otFormula = (id: string, parts: OtPart[], kind: OtFormula["kind"] = "FORMULA"): OtFormula =>
+    ({ id, name: "", kind, parts, days: 26, hours: 8, multiplier: 2, fixedRate: null })
+export const DEFAULT_OT_FORMULAS: OtFormula[] = [
+    otFormula("BASIC_DA", ["basic", "da"]),
+    otFormula("BASIC_DA_CONV", ["basic", "da", "conveyance"]),
+    otFormula("GROSS", [...OT_PARTS]),
+    otFormula("FIXED", [], "FIXED"),
+]
+
+/** What a rule does, in words: "(Basic+DA)/26/8×2", "Gross/26/8×2", "Fixed ₹150/hr". */
+export function otFormulaText(f: OtFormula): string {
+    if (f.kind === "FIXED") return f.fixedRate && f.fixedRate > 0 ? `Fixed ₹${f.fixedRate}/hr` : "Fixed — employee's own OT rate"
+    const base = f.parts.length === OT_PARTS.length ? "Gross"
+        : f.parts.length === 1 ? OT_PART_LABELS[f.parts[0]]
+        : `(${f.parts.map(p => OT_PART_LABELS[p]).join("+")})`
+    return `${base}/${f.days}/${f.hours}×${f.multiplier}`
+}
+/** The rule's name if it has one, with its formula. */
+export function otFormulaLabel(f: OtFormula): string {
+    const t = otFormulaText(f)
+    return f.name.trim() ? `${f.name.trim()} — ${t}` : t
+}
 
 export type PayrollRules = {
     // How earned pay is worked out from attendance (Calculation Settings → Pay & proration).
@@ -156,12 +194,10 @@ export type PayrollRules = {
     ot: {
         // 1 OT day = this many hours at the employee's per-hour OT rate.
         hoursPerDay: number
-        // Formula rules: base ÷ rateDays ÷ rateHours × multiplier = rate per hour.
-        rateDays: number
-        rateHours: number
-        multiplier: number
-        // For sites with no rule of their own. FIXED = each employee's own OT rate (as before).
-        defaultRule: OtRule
+        // The OT rules a site can use (editable in the popup).
+        formulas: OtFormula[]
+        // Rule id for sites with no rule of their own. FIXED = each employee's own OT rate (as before).
+        defaultRule: string
         // siteId → that site's rule.
         sites: Record<string, OtSiteRule>
     }
@@ -241,9 +277,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
     },
     ot: {
         hoursPerDay: 4,
-        rateDays: 26,
-        rateHours: 8,
-        multiplier: 2,
+        formulas: DEFAULT_OT_FORMULAS.map(f => ({ ...f, parts: [...f.parts] })),
         defaultRule: "FIXED",
         sites: {},
     },
@@ -378,37 +412,71 @@ function sanitizeSlabs(v: unknown, fallback: PtSlab[]): PtSlab[] {
     return [...bounded, top]
 }
 
-function sanitizeOtSites(v: unknown): Record<string, OtSiteRule> {
+const money = (v: unknown): number | null => {
+    const n = Number(v)
+    return v !== null && v !== "" && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null
+}
+
+function sanitizeOtFormulas(v: unknown, old: Record<string, any>): OtFormula[] {
+    // Settings saved before rules were editable had one days / hours / multiplier for all.
+    const seed = DEFAULT_OT_FORMULAS.map(f => ({
+        ...f, parts: [...f.parts],
+        days: num(old.rateDays, f.days, { min: 1, max: 31 }),
+        hours: num(old.rateHours, f.hours, { min: 1, max: 24 }),
+        multiplier: num(old.multiplier, f.multiplier, { min: 0, max: 10 }),
+    }))
+    if (!Array.isArray(v) || !v.length) return seed
+    const out: OtFormula[] = []
+    const seen = new Set<string>()
+    for (const raw of v.slice(0, 30)) {
+        if (!raw || typeof raw !== "object") continue
+        let id = typeof raw.id === "string" ? raw.id.trim().slice(0, 40) : ""
+        if (!id || seen.has(id)) id = `RULE_${out.length + 1}_${seen.size}`
+        seen.add(id)
+        const kind: OtFormula["kind"] = raw.kind === "FIXED" ? "FIXED" : "FORMULA"
+        const parts = Array.isArray(raw.parts) ? OT_PARTS.filter(p => raw.parts.includes(p)) : []
+        if (kind === "FORMULA" && !parts.length) continue
+        out.push({
+            id, kind, parts: kind === "FIXED" ? [] : parts,
+            name: typeof raw.name === "string" ? raw.name.trim().slice(0, 60) : "",
+            days: num(raw.days, 26, { min: 1, max: 31 }),
+            hours: num(raw.hours, 8, { min: 1, max: 24 }),
+            multiplier: num(raw.multiplier, 2, { min: 0, max: 10 }),
+            fixedRate: kind === "FIXED" ? money(raw.fixedRate) : null,
+        })
+    }
+    return out.length ? out : seed
+}
+
+function sanitizeOtSites(v: unknown, ids: Set<string>): Record<string, OtSiteRule> {
     const out: Record<string, OtSiteRule> = {}
     if (!v || typeof v !== "object") return out
     for (const [id, raw] of Object.entries(v as Record<string, any>)) {
-        if (!id || id.length > 64 || !raw || !OT_RULES.includes(raw.rule)) continue
-        const rate = Number(raw.fixedRate)
-        out[id] = raw.rule === "FIXED" && Number.isFinite(rate) && rate > 0
-            ? { rule: "FIXED", fixedRate: Math.round(rate * 100) / 100 }
-            : { rule: raw.rule }
+        if (!id || id.length > 64 || !raw || !ids.has(raw.rule)) continue
+        const rate = money(raw.fixedRate)
+        out[id] = rate ? { rule: raw.rule, fixedRate: rate } : { rule: raw.rule }
     }
     return out
 }
 
 /** The OT rule in force for a site (its own, else the default). */
-export function otRuleFor(ot: PayrollRules["ot"], siteId?: string | null): OtSiteRule {
-    return (siteId && ot.sites?.[siteId]) || { rule: ot.defaultRule ?? "FIXED" }
+export function otRuleFor(ot: PayrollRules["ot"], siteId?: string | null): { formula: OtFormula | null; siteRate: number | null } {
+    const own = siteId ? ot.sites?.[siteId] : undefined
+    const id = own?.rule ?? ot.defaultRule
+    return { formula: ot.formulas?.find(f => f.id === id) ?? null, siteRate: own?.fixedRate ?? null }
 }
 
 /**
- * OT rate per hour for one employee under a site's rule. `s` is the
- * full-month structure; `gross` the full-month gross (without OT).
+ * OT rate per hour for one employee under their site's rule. `parts` is the
+ * full-month salary structure; `ownRate` the employee's own OT rate.
  */
 export function otRatePerHourFor(ot: PayrollRules["ot"], siteId: string | null | undefined,
-    s: { basic: number; da: number; conveyance: number; gross: number; ownRate: number }): number {
-    const r = otRuleFor(ot, siteId)
-    if (r.rule === "FIXED") return r.fixedRate && r.fixedRate > 0 ? r.fixedRate : s.ownRate
-    const base = r.rule === "BASIC_DA" ? s.basic + s.da
-        : r.rule === "BASIC_DA_CONV" ? s.basic + s.da + s.conveyance
-        : s.gross
-    const days = ot.rateDays || 26, hours = ot.rateHours || 8
-    return base / days / hours * (ot.multiplier ?? 2)
+    parts: Record<OtPart, number>, ownRate: number): number {
+    const { formula: f, siteRate } = otRuleFor(ot, siteId)
+    if (!f) return ownRate
+    if (f.kind === "FIXED") return siteRate ?? (f.fixedRate && f.fixedRate > 0 ? f.fixedRate : ownRate)
+    const base = f.parts.reduce((a, p) => a + (Number(parts[p]) || 0), 0)
+    return base / (f.days || 26) / (f.hours || 8) * f.multiplier
 }
 
 export function sanitizePayrollRules(input: unknown): PayrollRules {
@@ -502,11 +570,13 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
         },
         ot: {
             hoursPerDay: num(ot.hoursPerDay, d.ot.hoursPerDay, { min: 0, max: 24 }),
-            rateDays: num(ot.rateDays, d.ot.rateDays, { min: 1, max: 31 }),
-            rateHours: num(ot.rateHours, d.ot.rateHours, { min: 1, max: 24 }),
-            multiplier: num(ot.multiplier, d.ot.multiplier, { min: 0, max: 10 }),
-            defaultRule: OT_RULES.includes(ot.defaultRule) ? ot.defaultRule : d.ot.defaultRule,
-            sites: sanitizeOtSites(ot.sites),
+            ...(() => {
+                const formulas = sanitizeOtFormulas(ot.formulas, ot)
+                const ids = new Set(formulas.map(f => f.id))
+                const defaultRule = ids.has(ot.defaultRule) ? ot.defaultRule
+                    : (formulas.find(f => f.kind === "FIXED" && !f.fixedRate) ?? formulas[0]).id
+                return { formulas, defaultRule, sites: sanitizeOtSites(ot.sites, ids) }
+            })(),
         },
         defaults: {
             monthDays: num(defaults.monthDays, d.defaults.monthDays, { min: 1, max: 31 }),

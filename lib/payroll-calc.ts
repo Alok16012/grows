@@ -18,9 +18,10 @@
 // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
 //   Default hoursPerDay = 4 (e.g. ₹170/hr × 4 = ₹680/day)
 //   The rate per hour follows the site's OT rule (Calculation Settings → OT rule
-//   by site): (Basic+DA), (Basic+DA+Conveyance) or Gross ÷ 26 ÷ 8 × 2, or a
-//   fixed rate (the site's, else the employee's own). No site / no rule → the
-//   default rule, which out of the box is the employee's own rate (as before).
+//   by site; rules editable there): ticked salary parts ÷ days ÷ hours ×
+//   multiplier, e.g. (Basic+DA) ÷ 26 ÷ 8 × 2, or a fixed rate (blank = the
+//   employee's own). No site / no rule → the default rule, which out of the box
+//   is the employee's own rate (as before).
 //
 // The rules passed in must be the ones for the payroll month — callers use
 // rulesForPeriod(rules, month, year), which applies the 1 Oct 2026 revision.
@@ -114,7 +115,8 @@ export function calcGrowusPayroll(sal: {
     const otherEarned   = r(otherAllowance, fm.otherAllowance)
 
     // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
-    const otRate = otRatePerHourFor(rules.ot, sal.siteId, { basic, da, conveyance, gross: grossFullMonth, ownRate: otRatePerHour })
+    const otRate = otRatePerHourFor(rules.ot, sal.siteId,
+        { basic, da, hra: hraFull, washing, conveyance, leaveWithWages, bonus: bonusFull, otherAllowance }, otRatePerHour)
     const otPay = Math.round(otRate * rules.ot.hoursPerDay * otDays)
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
