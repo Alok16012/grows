@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { isPdfUrl, paperPages } from "@/lib/paper-form"
 import { basicFieldSlot } from "@/lib/form-field-order"
 import { useRouter, useParams } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -423,33 +424,38 @@ export default function ReviewInspectionPage() {
                     )}
 
                     {/* The inspector's photo of the filled paper form, to check against the entries */}
-                    {inspection.paperFormPhoto ? (
-                        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4 flex flex-col sm:flex-row gap-4 items-start">
-                            {/\.pdf($|\?)/i.test(inspection.paperFormPhoto) ? (
-                                <div className="h-[140px] w-full sm:w-[140px] shrink-0 rounded-[10px] bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center">
-                                    <FileText className="h-8 w-8 text-[var(--border2)]" />
+                    {paperPages(inspection.paperFormPhoto).length ? (() => {
+                        const pages = paperPages(inspection.paperFormPhoto)
+                        return (
+                            <div className="bg-white border border-[var(--border)] rounded-[14px] p-4">
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                    <div>
+                                        <p className="text-[14px] font-semibold text-[var(--text)]">Paper form <span className="text-[12px] font-medium text-[var(--text3)]">· {pages.length} page{pages.length === 1 ? "" : "s"}</span></p>
+                                        <p className="text-[12px] text-[var(--text3)] mt-0.5">Photos of the filled paper form the inspector uploaded. Check the entries below against them before approving.</p>
+                                    </div>
                                 </div>
-                            ) : (
-                                <img src={inspection.paperFormPhoto} alt="Paper form"
-                                    onClick={() => { setPreviewUrl(inspection.paperFormPhoto); setPreviewName("Paper form") }}
-                                    className="h-[140px] w-full sm:w-[140px] shrink-0 rounded-[10px] object-cover cursor-zoom-in border border-[var(--border)]" />
-                            )}
-                            <div className="min-w-0">
-                                <p className="text-[14px] font-semibold text-[var(--text)]">Paper form</p>
-                                <p className="text-[12px] text-[var(--text3)] mt-0.5 mb-3">Photo of the filled paper form the inspector uploaded. Check the entries below against it before approving.</p>
-                                <div className="flex flex-wrap gap-2">
-                                    <button type="button" onClick={() => { setPreviewUrl(inspection.paperFormPhoto); setPreviewName("Paper form") }}
-                                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--bg)]">
-                                        <Eye className="h-3.5 w-3.5" /> View full size
-                                    </button>
-                                    <a href={inspection.paperFormPhoto} target="_blank" rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--bg)]">
-                                        <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
-                                    </a>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                    {pages.map((u, i) => (
+                                        <div key={u + i} className="rounded-[10px] border border-[var(--border)] overflow-hidden bg-[var(--bg)]">
+                                            {isPdfUrl(u) ? (
+                                                <a href={u} target="_blank" rel="noopener noreferrer" className="h-[120px] flex items-center justify-center"><FileText className="h-7 w-7 text-[var(--border2)]" /></a>
+                                            ) : (
+                                                <img src={u} alt={`Paper form page ${i + 1}`} onClick={() => { setPreviewUrl(u); setPreviewName(`Paper form — page ${i + 1}`) }}
+                                                    className="h-[120px] w-full object-cover cursor-zoom-in" />
+                                            )}
+                                            <div className="flex items-center justify-between px-2 py-1.5 bg-white border-t border-[var(--border)]">
+                                                <span className="text-[11px] font-semibold text-[var(--text2)]">Page {i + 1}</span>
+                                                <span className="flex items-center gap-2">
+                                                    {!isPdfUrl(u) && <button type="button" title="View full size" onClick={() => { setPreviewUrl(u); setPreviewName(`Paper form — page ${i + 1}`) }} className="text-[var(--text3)] hover:text-[var(--text)]"><Eye className="h-3.5 w-3.5" /></button>}
+                                                    <a href={u} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="text-[var(--text3)] hover:text-[var(--text)]"><ExternalLink className="h-3.5 w-3.5" /></a>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        </div>
-                    ) : (
+                        )
+                    })() : (
                         <div className="bg-white border border-dashed border-[var(--border)] rounded-[14px] px-4 py-3 text-[12px] text-[var(--text3)]">No paper form photo was uploaded with this inspection.</div>
                     )}
 

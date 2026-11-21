@@ -1,5 +1,6 @@
 
 import { NextResponse } from "next/server"
+import { paperPages, paperValue } from "@/lib/paper-form"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -162,7 +163,9 @@ export async function PATCH(
 
         const paperFormResponseIndex = validResponses.findIndex((r: any) => r.fieldId === "paperFormPhoto")
         if (paperFormResponseIndex !== -1) {
-            updateData.paperFormPhoto = validResponses[paperFormResponseIndex].value
+            // One or more pages (lib/paper-form): links only, in order, up to the page limit.
+            const pages = paperPages(String(validResponses[paperFormResponseIndex].value ?? "")).filter(u => /^(https?:\/\/|\/)/.test(u))
+            updateData.paperFormPhoto = paperValue(pages) || null
             validResponses.splice(paperFormResponseIndex, 1)
         }
 

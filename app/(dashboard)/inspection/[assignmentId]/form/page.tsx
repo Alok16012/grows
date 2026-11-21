@@ -1,6 +1,7 @@
 "use client"
 
 import { orderBasicFields, basicFieldSlot, isRejectedQtyField } from "@/lib/form-field-order"
+import { MAX_PAPER_PAGES, paperPages, paperValue } from "@/lib/paper-form"
 import BarcodeScanButton from "@/components/BarcodeScanButton"
 import { TRACE_ROLES } from "@/lib/report-roles"
 import {
@@ -615,6 +616,8 @@ export default function InspectionFormPage() {
             const data = await res.json()
             if (data.url) {
                 if (fieldId.startsWith("defect:")) addDefectPhoto(fieldId.slice(7), data.url)
+                // Paper form: every photo is another page.
+                else if (fieldId === "paperFormPhoto") handleFieldChange(fieldId, paperValue([...paperPages(responses["paperFormPhoto"]), data.url]))
                 else handleFieldChange(fieldId, data.url)
             } else {
                 alert("Upload failed")
@@ -624,6 +627,26 @@ export default function InspectionFormPage() {
         } finally {
             setSaving(false)
         }
+    }
+
+    // Several paper form pages picked at once: uploaded one after another, added in order.
+    const uploadPaperPages = async (files: File[]) => {
+        if (!canEdit) return
+        const pages = paperPages(responses["paperFormPhoto"])
+        const room = Math.max(MAX_PAPER_PAGES - pages.length, 0)
+        if (files.length > room) alert(`Only ${room} more page${room === 1 ? "" : "s"} can be added (up to ${MAX_PAPER_PAGES})`)
+        setSaving(true)
+        try {
+            let failed = 0
+            for (const file of files.slice(0, room)) {
+                const fd = new FormData()
+                fd.append("file", file)
+                const data = await fetch("/api/upload", { method: "POST", body: fd }).then(r => r.json()).catch(() => null)
+                if (data?.url) pages.push(data.url); else failed++
+            }
+            handleFieldChange("paperFormPhoto", paperValue(pages))
+            if (failed) alert(`${failed} page${failed === 1 ? "" : "s"} could not be uploaded`)
+        } finally { setSaving(false) }
     }
 
     const renderBasicField = (template: any) => {
@@ -1257,63 +1280,60 @@ export default function InspectionFormPage() {
                     Attachments & Paper Form
                 </div>
                 <div className="bg-white border border-[var(--border)] rounded-[10px] p-[16px]">
-                    {responses["paperFormPhoto"] ? (
-                        <div className="flex flex-col sm:flex-row items-center gap-[14px]">
-                            <div className="relative h-[120px] w-full sm:w-[120px] rounded-[8px] border border-[var(--border)] overflow-hidden bg-[var(--surface2)]">
-                                <img src={responses["paperFormPhoto"]} alt="Paper form" className="h-[120px] w-full sm:w-[120px] object-cover" />
+                    {(() => {
+                        const pages = paperPages(responses["paperFormPhoto"])
+                        const removePage = (i: number) => handleFieldChange("paperFormPhoto", paperValue(pages.filter((_, j) => j !== i)))
+                        const full = pages.length >= MAX_PAPER_PAGES
+                        if (!pages.length && !canEdit) return (
+                            <div className="h-[80px] flex items-center justify-center text-[12px] text-[var(--text3)] italic bg-[var(--surface2)] rounded-[8px] border border-dashed border-[var(--border)]">
+                                No paper form attached
                             </div>
-                            <div className="flex-1 text-center sm:text-left">
-                                <p className="text-[13px] font-[600] text-[var(--text)] mb-[4px]">Paper form uploaded</p>
-                                <div className="flex gap-[8px] justify-center sm:justify-start mt-[10px]">
-                                    <button 
-                                        type="button"
-                                        onClick={() => {
-                                            setPreviewUrl(responses["paperFormPhoto"])
-                                            setPreviewName("Paper Form Photo")
-                                        }}
-                                        className="inline-flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white"
-                                    >
-                                        <ExternalLink size={12} className="mr-[6px]" /> View Image
-                                    </button>
-                                    {canEdit && (
-                                        <button type="button" onClick={() => handleFieldChange("paperFormPhoto", "")} className="inline-flex items-center justify-center bg-[#fef2f2] border border-[var(--border)] text-[#dc2626] rounded-[6px] text-[11px] font-medium px-[12px] py-[6px] hover:bg-white border-transparent">
-                                            Remove
+                        )
+                        return (
+                            <div className="space-y-[12px]">
+                                {pages.length > 0 && (
+                                    <>
+                                        <p className="text-[13px] font-[600] text-[var(--text)]">Paper form — {pages.length} page{pages.length === 1 ? "" : "s"} uploaded</p>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-[10px]">
+                                            {pages.map((u, i) => (
+                                                <div key={u + i} className="relative rounded-[8px] border border-[var(--border)] overflow-hidden bg-[var(--surface2)]">
+                                                    <button type="button" onClick={() => { setPreviewUrl(u); setPreviewName(`Paper form — page ${i + 1}`) }} className="block w-full" title="View">
+                                                        <img src={u} alt={`Paper form page ${i + 1}`} className="h-[110px] w-full object-cover" />
+                                                    </button>
+                                                    <span className="absolute left-[6px] top-[6px] rounded-full bg-black/60 px-[7px] py-[1px] text-[10px] font-[700] text-white">{i + 1}</span>
+                                                    {canEdit && (
+                                                        <button type="button" onClick={() => removePage(i)} title="Remove this page"
+                                                            className="absolute right-[6px] top-[6px] h-[22px] w-[22px] rounded-full bg-white/95 text-[#dc2626] text-[13px] font-[700] leading-none shadow">×</button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                                {canEdit && !full && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-[10px]">
+                                        <label className="flex flex-col items-center justify-center w-full h-[86px] border-[1.5px] border-dashed border-[var(--border2)] rounded-[8px] cursor-pointer bg-[var(--surface2)] hover:bg-[var(--bg)] transition-colors">
+                                            <Upload className="w-[18px] h-[18px] mb-[6px] text-[var(--text3)]" />
+                                            <p className="text-[12px] font-[500] text-[var(--text2)]">{pages.length ? "Add more pages" : "Upload paper form photos"}</p>
+                                            <p className="text-[10.5px] text-[var(--text3)]">You can select several pages at once</p>
+                                            <input type="file" className="hidden" accept="image/*" multiple
+                                                onChange={(e) => {
+                                                    const files = Array.from(e.target.files ?? [])
+                                                    e.target.value = ""
+                                                    if (files.length) uploadPaperPages(files)
+                                                }} />
+                                        </label>
+                                        <button type="button" onClick={() => setCameraFieldId("paperFormPhoto")}
+                                            className="w-full h-[86px] inline-flex flex-col items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] rounded-[8px] text-[12px] font-medium hover:bg-white">
+                                            <Camera className="h-[18px] w-[18px] mb-[6px]" />
+                                            {pages.length ? `Take photo of page ${pages.length + 1}` : "Use camera"}
                                         </button>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
+                                {full && canEdit && <p className="text-[11px] text-[var(--text3)]">Up to {MAX_PAPER_PAGES} pages.</p>}
                             </div>
-                        </div>
-                    ) : canEdit ? (
-                        <div className="space-y-[12px]">
-                            <label className="flex flex-col items-center justify-center w-full h-[100px] border-[1.5px] border-dashed border-[var(--border2)] rounded-[8px] cursor-pointer bg-[var(--surface2)] hover:bg-[var(--bg)] transition-colors">
-                                <div className="flex flex-col items-center justify-center">
-                                    <Upload className="w-[20px] h-[20px] mb-[8px] text-[var(--text3)]" />
-                                    <p className="text-[12px] font-[500] text-[var(--text2)]">Click or drag to upload photo</p>
-                                </div>
-                                <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0]
-                                        if (file) handleFileUpload("paperFormPhoto", file)
-                                    }}
-                                />
-                            </label>
-                            <button
-                                type="button"
-                                className="w-full inline-flex items-center justify-center bg-[var(--surface2)] border border-[var(--border)] text-[var(--text2)] rounded-[8px] text-[12px] font-medium px-[16px] py-[10px] hover:bg-white"
-                                onClick={() => setCameraFieldId("paperFormPhoto")}
-                            >
-                                <Camera className="h-[14px] w-[14px] mr-[8px]" />
-                                Use Camera Instead
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="h-[80px] flex items-center justify-center text-[12px] text-[var(--text3)] italic bg-[var(--surface2)] rounded-[8px] border border-dashed border-[var(--border)]">
-                            No paper form attached
-                        </div>
-                    )}
+                        )
+                    })()}
                 </div>
                 </>)}
 
