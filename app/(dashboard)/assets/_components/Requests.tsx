@@ -540,8 +540,15 @@ export function PendingIssueTab({ refreshKey, onIssue, onOpen }: {
     const onError = useApiError()
     const [requests, setRequests] = useState<AssetRequest[] | null>(null)
     const [search, setSearch] = useState("")
+    // Bulk issue (tick lines → Issue selected).
+    const [picked, setPicked] = useState<Set<string>>(new Set())
+    const [handedOver, setHandedOver] = useState(true)
+    const [bulkRemarks, setBulkRemarks] = useState("")
+    const [bulkBusy, setBulkBusy] = useState(false)
+    const [failures, setFailures] = useState<{ label: string; error: string }[]>([])
 
     const load = useCallback(async () => {
+        setPicked(new Set())
         try {
             const [a, b] = await Promise.all(["NOT_ISSUED", "PARTIALLY_ISSUED"].map(f =>
                 api<ListResponse>(`/api/assets/requests?${qs({ fulfilment: f, search, pageSize: 100 })}`)))
@@ -554,6 +561,40 @@ export function PendingIssueTab({ refreshKey, onIssue, onOpen }: {
 
     const lines = useMemo(() => (requests ?? []).flatMap(r => issuableItems(r).map(i => ({ r, i })))
         .sort((x, y) => x.r.createdAt.localeCompare(y.r.createdAt)), [requests])
+    const pickable = lines.filter(l => l.i.asset.available > 0)
+    const allPicked = pickable.length > 0 && pickable.every(l => picked.has(l.i.id))
+    const pickedLines = lines.filter(l => picked.has(l.i.id))
+    const pickedUnits = sumBy(pickedLines, l => remainingOf(l.i))
+    // Units needed per asset vs stock, so a short asset is visible before issuing.
+    const shortOf = useMemo(() => {
+        const need = new Map<string, { name: string; need: number; have: number }>()
+        for (const l of pickedLines) {
+            const k = l.i.asset.id
+            const cur = need.get(k) ?? { name: l.i.asset.name, need: 0, have: l.i.asset.available }
+            cur.need += remainingOf(l.i); need.set(k, cur)
+        }
+        return Array.from(need.values()).filter(n => n.need > n.have)
+    }, [pickedLines])
+
+    async function issueSelected() {
+        if (!pickedLines.length) return
+        if (!confirm(`Issue ${pickedLines.length} line(s), ${pickedUnits} unit(s), to ${new Set(pickedLines.map(l => l.i.employee.id)).size} employee(s)?`)) return
+        setBulkBusy(true); setFailures([])
+        try {
+            const res = await api<{ issued: number; units: number; employees: number; failed: { requestItemId: string; error: string }[] }>("/api/assets/issues/bulk", {
+                method: "POST",
+                body: { lines: pickedLines.map(l => ({ requestItemId: l.i.id })), acknowledged: handedOver, remarks: bulkRemarks || null },
+            })
+            if (res.issued) toast.success(`Issued ${res.units} unit(s) on ${res.issued} line(s) to ${res.employees} employee(s)`)
+            if (res.failed.length) {
+                const label = (id: string) => { const l = lines.find(x => x.i.id === id); return l ? `${l.r.requestNo} · ${fullName(l.i.employee)} · ${l.i.asset.name}` : id }
+                setFailures(res.failed.map(f => ({ label: label(f.requestItemId), error: f.error })))
+                toast.error(`${res.failed.length} line(s) could not be issued — see the list`)
+            }
+            setBulkRemarks("")
+            await load()
+        } catch (e) { onError(e, "Couldn't issue") } finally { setBulkBusy(false) }
+    }
 
     return (
         <>
@@ -565,6 +606,28 @@ export function PendingIssueTab({ refreshKey, onIssue, onOpen }: {
                 </div>
                 <span className="text-[12px] text-[var(--text3)]">{lines.length} line{lines.length === 1 ? "" : "s"} · {sumBy(lines, l => remainingOf(l.i))} unit{sumBy(lines, l => remainingOf(l.i)) === 1 ? "" : "s"} to issue</span>
             </div>
+            {pickedLines.length > 0 && (
+                <div className="mb-3 rounded-[12px] border-2 border-[var(--accent)] bg-[var(--accent)]/5 p-3 flex flex-wrap items-center gap-3">
+                    <span className="text-[13px] font-semibold text-[var(--text)]">{pickedLines.length} line{pickedLines.length === 1 ? "" : "s"} · {pickedUnits} unit{pickedUnits === 1 ? "" : "s"} · {new Set(pickedLines.map(l => l.i.employee.id)).size} employee(s)</span>
+                    <label className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--text2)] cursor-pointer" title="Ticked: you handed the items over in person, so receipt is confirmed on the employees' behalf. Unticked: each employee is asked to confirm.">
+                        <input type="checkbox" checked={handedOver} onChange={e => setHandedOver(e.target.checked)} /> Handed over in person
+                    </label>
+                    <input value={bulkRemarks} onChange={e => setBulkRemarks(e.target.value)} placeholder="Remarks (optional)" className="h-8 flex-1 min-w-[160px] rounded-[8px] border border-[var(--border)] bg-white px-2 text-[12px]" />
+                    <button className={btnPrimary} onClick={issueSelected} disabled={bulkBusy}>
+                        {bulkBusy ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />} Issue selected
+                    </button>
+                    <button className={btnGhost} onClick={() => setPicked(new Set())} disabled={bulkBusy}>Clear</button>
+                    {shortOf.length > 0 && (
+                        <p className="w-full text-[12px] text-red-600">Not enough stock: {shortOf.map(n => `${n.name} (need ${n.need}, have ${n.have})`).join(", ")} — the lines that do not fit will be skipped.</p>
+                    )}
+                </div>
+            )}
+            {failures.length > 0 && (
+                <div className="mb-3 rounded-[12px] border border-red-200 bg-red-50 p-3">
+                    <p className="text-[12.5px] font-semibold text-red-700 mb-1">Not issued</p>
+                    <ul className="list-disc pl-5 space-y-0.5">{failures.map((f, i) => <li key={i} className="text-[12px] text-red-700">{f.label} — {f.error}</li>)}</ul>
+                </div>
+            )}
             <Card>
                 {!requests ? <Loading /> : lines.length === 0 ? (
                     <Empty icon={<PackageCheck size={40} />} title="Nothing waiting to be issued" sub="Approved requests show up here until they're fulfilled." />
@@ -573,6 +636,7 @@ export function PendingIssueTab({ refreshKey, onIssue, onOpen }: {
                         <table className="w-full min-w-[960px] text-[13px]">
                             <thead>
                                 <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
+                                    <th className={`${thCls} w-8`}><input type="checkbox" aria-label="Tick all lines" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(pickable.map(l => l.i.id)))} /></th>
                                     <th className={thCls}>Request ID</th><th className={thCls}>Employee</th><th className={thCls}>Asset</th><th className={thCls}>Size</th>
                                     <th className={`${thCls} !text-right`}>Approved</th><th className={`${thCls} !text-right`}>Issued</th>
                                     <th className={`${thCls} !text-right`}>Remaining</th><th className={`${thCls} !text-right`}>In stock</th><th className={`${thCls} !text-right`}></th>
@@ -580,7 +644,11 @@ export function PendingIssueTab({ refreshKey, onIssue, onOpen }: {
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
                                 {lines.map(({ r, i }) => (
-                                    <tr key={i.id} className="hover:bg-[var(--surface2)]/50">
+                                    <tr key={i.id} className={`hover:bg-[var(--surface2)]/50 ${picked.has(i.id) ? "bg-[var(--accent)]/5" : ""}`}>
+                                        <td className={tdCls}>
+                                            <input type="checkbox" aria-label={`Tick ${r.requestNo}`} disabled={i.asset.available === 0} checked={picked.has(i.id)}
+                                                onChange={() => setPicked(p => { const n = new Set(p); n.has(i.id) ? n.delete(i.id) : n.add(i.id); return n })} />
+                                        </td>
                                         <td className={tdCls}>
                                             <button onClick={() => onOpen(r.id)} className="font-mono text-[12px] font-semibold text-[var(--accent)] hover:underline">{r.requestNo}</button>
                                             <p className="text-[11px] text-[var(--text3)]">Approved {fmtDate(r.decidedAt)}</p>

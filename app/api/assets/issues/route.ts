@@ -6,10 +6,10 @@ import { checkAccess, canIssueAssets, canOverseeAssets } from "@/lib/permissions
 import { notifyEmployee } from "@/lib/hr-notify"
 import { commNotify, employeeRecipients } from "@/lib/comm/recipients"
 import {
-    ISSUE_STATUSES, WorkflowError, workflowErrorResponse, jsonError, withNumberRetry, isUniqueErr,
-    issueAssetTx, recomputeRequestStatus, loadIssue, loadIssues, loadRequest, dateRange, pageParams,
-    parseIntStrict, isUnassignableStatus, unassignableEmployeeMessage,
+    ISSUE_STATUSES, workflowErrorResponse, jsonError, isUniqueErr,
+    loadIssue, loadIssues, loadRequest, dateRange, pageParams, parseIntStrict,
 } from "@/lib/asset-workflow"
+import { issueRequestLine } from "@/lib/asset-issue"
 
 // GET — issue register. Asset staff see everyone's; anyone else only their own.
 export async function GET(req: Request) {
@@ -32,6 +32,8 @@ export async function GET(req: Request) {
         if (sp.get("assetId")) where.assetId = sp.get("assetId")!
         const status = sp.get("status")
         if (status && (ISSUE_STATUSES as readonly string[]).includes(status)) where.status = status
+        // Receipts the employee hasn't confirmed yet (Issued → Not confirmed).
+        if (sp.get("ack") === "pending") { where.acknowledgedAt = null; where.status = "ACTIVE" }
         const issuedAt = dateRange(sp.get("from"), sp.get("to"))
         if (issuedAt) where.issuedAt = issuedAt
         const search = sp.get("search")?.trim()
@@ -90,49 +92,12 @@ export async function POST(req: Request) {
 
         if (quantity === null || quantity < 1) return jsonError(400, "Quantity must be a whole number of at least 1")
 
-        const item = await prisma.assetRequestItem.findUnique({
-            where: { id: requestItemId },
-            include: {
-                request: { select: { id: true, status: true, requestNo: true } },
-                asset: { select: { id: true, name: true, available: true, isActive: true } },
-                employee: { select: { id: true, firstName: true, lastName: true, status: true } },
-            },
-        })
-        if (!item) return jsonError(404, "Request item not found")
-        if (!["APPROVED", "PARTIALLY_APPROVED"].includes(item.request.status)) {
-            return jsonError(409, `Request ${item.request.requestNo} is ${item.request.status.toLowerCase().replace("_", " ")} — only approved requests can be issued`)
-        }
-        const left = (item.approvedQty ?? 0) - item.issuedQty
-        if (quantity > left) return jsonError(400, `Only ${Math.max(0, left)} left to issue on this request`)
-        if (quantity > item.asset.available) return jsonError(400, `Only ${item.asset.available} in stock`)
-        if (isUnassignableStatus(item.employee.status)) return jsonError(400, unassignableEmployeeMessage(item.employee))
-
-        let issue
+        let issue, item
         try {
-            issue = await withNumberRetry("issueNo", bump => prisma.$transaction(async tx => {
-                // Re-checked under the transaction: the request can't have been
-                // cancelled, and two issuers can't over-issue the same item.
-                const req2 = await tx.assetRequest.findUnique({ where: { id: item.request.id }, select: { status: true } })
-                if (!req2 || !["APPROVED", "PARTIALLY_APPROVED"].includes(req2.status)) {
-                    throw new WorkflowError(409, "This request is no longer open for issue")
-                }
-                const bumped = await tx.$queryRaw<{ issuedQty: number; approvedQty: number | null }[]>(Prisma.sql`
-                    UPDATE "AssetRequestItem" SET "issuedQty" = "issuedQty" + ${quantity}
-                    WHERE "id" = ${item.id} AND "issuedQty" + ${quantity} <= COALESCE("approvedQty", 0)
-                    RETURNING "issuedQty", "approvedQty"`)
-                if (bumped.length === 0) {
-                    const now = await tx.assetRequestItem.findUnique({ where: { id: item.id }, select: { issuedQty: true, approvedQty: true } })
-                    throw new WorkflowError(400, `Only ${Math.max(0, (now?.approvedQty ?? 0) - (now?.issuedQty ?? 0))} left to issue on this request`)
-                }
-                const created = await issueAssetTx(tx, {
-                    employeeId: item.employeeId, assetId: item.assetId, quantity,
-                    size: item.size, serialNo: body?.serialNo?.toString(), remarks: body?.remarks?.toString(),
-                    attachmentUrl: body?.attachmentUrl?.toString(), idempotencyKey,
-                    acknowledged: body?.acknowledged === true, replacesIssueId: body?.replacesIssueId?.toString(),
-                    requestItemId: item.id, actorId, refType: "REQUEST",
-                }, bump)
-                await recomputeRequestStatus(tx, item.requestId)
-                return created
+            ({ issue, item } = await issueRequestLine({
+                requestItemId, quantity, actorId, acknowledged: body?.acknowledged === true,
+                serialNo: body?.serialNo?.toString(), remarks: body?.remarks?.toString(),
+                attachmentUrl: body?.attachmentUrl?.toString(), idempotencyKey, replacesIssueId: body?.replacesIssueId?.toString(),
             }))
         } catch (e) {
             // Same key raced in from a second tab: the other one won, return it.

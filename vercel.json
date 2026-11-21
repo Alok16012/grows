@@ -29,6 +29,10 @@
     {
       "path": "/api/cron/expense-daily",
       "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/asset-daily",
+      "schedule": "50 3 * * *"
     }
   ]
 }

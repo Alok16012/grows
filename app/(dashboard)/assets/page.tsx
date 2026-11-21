@@ -14,7 +14,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-    Plus, Package, Users, AlertTriangle, BarChart3, LayoutDashboard, ClipboardList, PackageCheck, Boxes, FileBarChart2, ClipboardPlus,
+    Plus, Package, Users, AlertTriangle, BarChart3, LayoutDashboard, ClipboardList, PackageCheck, Boxes, FileBarChart2, ClipboardPlus, Settings,
 } from "lucide-react"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
@@ -170,6 +170,12 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
                         </p>
                     </div>
                     <div className="page-actions">
+                        {(canManage || canIssue) && (
+                            <a href="/assets/settings" title="Asset settings: reminders and limits"
+                                className="inline-flex items-center justify-center gap-2 h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
+                                <Settings size={16} /> Settings
+                            </a>
+                        )}
                         {canManage && (
                             <button onClick={() => setAddModal(true)}
                                 className="inline-flex items-center justify-center gap-2 h-[42px] px-5 border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">

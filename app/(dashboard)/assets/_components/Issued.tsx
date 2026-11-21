@@ -6,7 +6,7 @@ import { Avatar } from "@/components/Avatar"
 import {
     AssetIssue, IssueStatus, ISSUE_STATUS, RequestPrefill, StockItem, PickerEmployee,
     Pill, api, qs, useApiError, Modal, Card, Loading, Empty, Pager, Label,
-    inputCls, selectCls, filterCls, btnPrimary, btnGhost, btnDanger, btnSmall, thCls, tdCls,
+    inputCls, selectCls, filterCls, btnPrimary, btnGhost, btnDanger, btnSmall, btnSmallAccent, thCls, tdCls,
     fmtDate, fullName, newKey,
 } from "./shared"
 
@@ -31,18 +31,32 @@ export function IssuedTab({ refreshKey, canIssue, canRequest, onChanged, onRepla
     const [loading, setLoading] = useState(true)
     const [target, setTarget] = useState<{ issue: AssetIssue; action: Action } | null>(null)
     const [menu, setMenu] = useState<string | null>(null)
+    // Not confirmed by the employee yet — with bulk "confirm on their behalf".
+    const [pendingOnly, setPendingOnly] = useState(false)
+    const [picked, setPicked] = useState<Set<string>>(new Set())
+    const [bulkAcking, setBulkAcking] = useState(false)
     const pageSize = 25
 
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            setData(await api(`/api/assets/issues?${qs({ status: status === "ALL" ? "" : status, search, from, to, page, pageSize })}`))
+            setData(await api(`/api/assets/issues?${qs({ status: status === "ALL" ? "" : status, search, from, to, page, pageSize, ack: pendingOnly ? "pending" : "" })}`))
+            setPicked(new Set())
         } catch (e) { onError(e, "Couldn't load issued items") }
         finally { setLoading(false) }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, search, from, to, page, refreshKey])
+    }, [status, search, from, to, page, refreshKey, pendingOnly])
     useEffect(() => { const t = setTimeout(load, search ? 250 : 0); return () => clearTimeout(t) }, [load, search])
-    useEffect(() => { setPage(1) }, [status, search, from, to])
+    useEffect(() => { setPage(1) }, [status, search, from, to, pendingOnly])
+    async function acknowledgeSelected() {
+        if (!picked.size || !confirm(`Confirm receipt of ${picked.size} item(s) on the employees' behalf (handed over / signed receipt)?`)) return
+        setBulkAcking(true)
+        try {
+            const r = await api<{ acknowledged: number }>("/api/assets/issues/acknowledge", { method: "POST", body: { ids: Array.from(picked) } })
+            toast.success(`${r.acknowledged} receipt(s) confirmed`)
+            load()
+        } catch (e) { onError(e) } finally { setBulkAcking(false) }
+    }
 
     const rows = data?.issues ?? []
     const done = () => { setTarget(null); load(); onChanged() }
@@ -73,6 +87,9 @@ export function IssuedTab({ refreshKey, canIssue, canRequest, onChanged, onRepla
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search issue no, employee, asset, serial…"
                             className="flex-1 min-w-0 text-[12px] text-[var(--text)] bg-transparent outline-none placeholder:text-[var(--text3)]" />
                     </div>
+                    <label className="filter-full inline-flex items-center gap-1.5 text-[12px] text-[var(--text2)] cursor-pointer whitespace-nowrap">
+                        <input type="checkbox" checked={pendingOnly} onChange={e => setPendingOnly(e.target.checked)} /> Only not confirmed by employee
+                    </label>
                     <div className="filter-full flex items-center gap-1">
                         <Calendar size={13} className="text-[var(--text3)] shrink-0" />
                         <input type="date" value={from} onChange={e => setFrom(e.target.value)} className={filterCls} aria-label="Issued from" />
@@ -82,9 +99,16 @@ export function IssuedTab({ refreshKey, canIssue, canRequest, onChanged, onRepla
                 </div>
             </div>
 
+            {pendingOnly && canIssue && rows.length > 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-2">
+                    <span className="text-[12.5px] text-amber-800">{data?.total ?? rows.length} item(s) not confirmed by the employee. Tick the ones you handed over in person:</span>
+                    <button className={btnSmall} onClick={() => setPicked(picked.size === rows.length ? new Set() : new Set(rows.map(r => r.id)))}>{picked.size === rows.length ? "Untick all" : "Tick all on this page"}</button>
+                    <button className={btnSmallAccent} disabled={!picked.size || bulkAcking} onClick={acknowledgeSelected}>{bulkAcking ? "…" : `Confirm ${picked.size || ""} on their behalf`}</button>
+                </div>
+            )}
             <Card>
                 {loading && !data ? <Loading /> : rows.length === 0 ? (
-                    <Empty icon={<Users size={40} />} title="No issued items found" />
+                    <Empty icon={<Users size={40} />} title={pendingOnly ? "Every receipt is confirmed" : "No issued items found"} />
                 ) : (
                     <div className={`overflow-x-auto ${loading ? "opacity-60" : ""}`}>
                         <table className="w-full min-w-[1180px] text-[13px]">
@@ -102,7 +126,13 @@ export function IssuedTab({ refreshKey, canIssue, canRequest, onChanged, onRepla
                                     const active = s.status === "ACTIVE" && outstanding > 0
                                     return (
                                         <tr key={s.id} className="hover:bg-[var(--surface2)]/50 transition-colors">
-                                            <td className={`${tdCls} font-mono text-[12px] font-semibold text-[var(--accent)]`}>{s.issueNo}</td>
+                                            <td className={`${tdCls} font-mono text-[12px] font-semibold text-[var(--accent)]`}>
+                                                {pendingOnly && canIssue && (
+                                                    <input type="checkbox" className="mr-2 align-middle" aria-label={`Tick ${s.issueNo}`} checked={picked.has(s.id)}
+                                                        onChange={() => setPicked(p => { const n = new Set(p); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n })} />
+                                                )}
+                                                {s.issueNo}
+                                            </td>
                                             <td className={tdCls}>
                                                 <div className="flex items-center gap-2.5">
                                                     <Avatar firstName={s.employee.firstName} lastName={s.employee.lastName} size={30} />
