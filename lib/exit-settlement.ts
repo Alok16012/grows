@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { unitValue } from "@/lib/asset-recovery"
 import { getLeavePolicy, getLeaveBalances } from "@/lib/leave-policy-server"
 import { DAY_MS } from "@/lib/leave-policy"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
@@ -175,10 +176,22 @@ async function settlementFor(exit: ExitInput, record: FnfRecord) {
         where: { employeeId: e.id, isActive: true, returnedAt: null },
         include: { asset: { select: { name: true, assetCode: true, purchaseCost: true } } },
     })
-    if (held.length) {
-        const cost = held.reduce((t, h) => t + (h.asset.purchaseCost || 0), 0)
-        lines.push({ key: "assets", label: "Unreturned assets", amount: round(cost), note: held.map(h => `${h.asset.name} (${h.asset.assetCode})`).join(", ") + " — at purchase cost; remove once returned", kind: "deduction", auto: true })
+    // Valued as Assets → Settings → Recovery says (cost basis, depreciation);
+    // items already charged as a recovery are counted there, not twice.
+    const charged = new Set((await prisma.assetRecovery.findMany({ where: { employeeId: e.id, status: { not: "WAIVED" } }, select: { issueId: true } }).catch(() => [])).map(r => r.issueId).filter(Boolean))
+    const issueOf = new Map((await prisma.assetIssue.findMany({ where: { employeeAssetId: { in: held.map(h => h.id) } }, select: { id: true, employeeAssetId: true, issuedAt: true, quantity: true, returnedQty: true } }).catch(() => [])).map(i => [i.employeeAssetId!, i]))
+    const heldOpen = held.filter(h => !charged.has(issueOf.get(h.id)?.id ?? "-"))
+    if (heldOpen.length) {
+        let cost = 0
+        for (const h of heldOpen) {
+            const i = issueOf.get(h.id)
+            cost += (await unitValue(h.assetId, i?.issuedAt ?? h.issuedAt).catch(() => h.asset.purchaseCost || 0)) * Math.max(1, (i?.quantity ?? 1) - (i?.returnedQty ?? 0))
+        }
+        lines.push({ key: "assets", label: "Unreturned assets", amount: round(cost), note: heldOpen.map(h => `${h.asset.name} (${h.asset.assetCode})`).join(", ") + " — at recovery value (Assets → Settings); remove once returned", kind: "deduction", auto: true })
     }
+    // Asset recoveries to settle in the F&F (or still undecided).
+    const recs = await prisma.assetRecovery.findMany({ where: { employeeId: e.id, OR: [{ status: "PENDING" }, { status: "SCHEDULED", via: "FNF" }] }, select: { recoveryNo: true, amount: true } }).catch(() => [])
+    if (recs.length) lines.push({ key: "assetRecovery", label: "Asset recoveries", amount: round(recs.reduce((t, r) => t + r.amount, 0)), note: recs.map(r => r.recoveryNo).join(", ") + " — lost / damaged / not returned (Assets → Recoveries)", kind: "deduction", auto: true })
 
     const excluded = new Set(record.excluded ?? [])
     const all: (FnfLine & { excluded?: boolean })[] = [

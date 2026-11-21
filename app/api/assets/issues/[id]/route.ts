@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { createRecovery } from "@/lib/asset-recovery"
+import { getAssetSettings } from "@/lib/asset-settings"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess, canIssueAssets, canOverseeAssets, canRequestAssets } from "@/lib/permissions"
@@ -82,10 +84,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             if (!canIssueAssets(session)) return jsonError(403, "Forbidden")
             const note = body?.note?.toString().trim() ?? ""
             if (note.length < 3) return jsonError(400, "Add a note (at least 3 characters)")
-            await prisma.$transaction(tx => closeIssueTx(tx, {
+            const { outstanding } = await prisma.$transaction(tx => closeIssueTx(tx, {
                 issueId: issue.id, status: action as (typeof CLOSE_ACTIONS)[number], note, actorId,
             }))
-            return NextResponse.json({ issue: await loadIssue(prisma, issue.id) })
+            // Assets → Settings → Recovery: a charge to check, for lost / damaged items.
+            let recovery = null
+            if ((action === "LOST" || action === "DAMAGED") && outstanding > 0 && (await getAssetSettings()).recovery.autoChargeLostDamaged) {
+                recovery = await createRecovery({ employeeId: issue.employeeId, assetId: issue.assetId, issueId: issue.id, quantity: outstanding, reason: action, note, actorId }).catch(e => { console.error("[ASSET_AUTO_RECOVERY]", e); return null })
+            }
+            return NextResponse.json({ issue: await loadIssue(prisma, issue.id), recovery })
         }
 
         if (action === "REPLACE") {

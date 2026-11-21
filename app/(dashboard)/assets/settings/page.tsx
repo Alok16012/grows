@@ -99,6 +99,24 @@ export default function AssetSettingsPage() {
                     </button>
                 )}
             </div>
+
+            <div className={card}>
+                <p className="text-[14px] font-semibold text-[var(--text)]">Recovery (lost / damaged / not returned)</p>
+                <p className="text-[12px] text-[var(--text3)]">Charges are listed under Assets → Recoveries and deducted from salary or in the F&amp;F.</p>
+                <Row label="Charge items at" hint="Each falls back to the other when not set. The recovery cost is set per asset (Kits & sizes → Item groups → Edit, or the asset).">
+                    <select disabled={ro} value={s.recovery.basis} onChange={e => setS(p => ({ ...p, recovery: { ...p.recovery, basis: e.target.value as AssetSettings["recovery"]["basis"] } }))} className="h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white">
+                        <option value="purchaseCost">Purchase cost</option>
+                        <option value="recoveryCost">Recovery cost set on the asset</option>
+                    </select>
+                </Row>
+                <Row label="Less, for every year it was with the employee" hint="0 = full value.">
+                    <input disabled={ro} type="number" min={0} max={100} className={inp} value={s.recovery.depreciationPctPerYear} onChange={e => setS(p => ({ ...p, recovery: { ...p.recovery, depreciationPctPerYear: Number(e.target.value) || 0 } }))} />
+                    <span className="text-[12px] text-[var(--text3)]">% / year</span>
+                </Row>
+                <Row label="Create a charge when an item is marked Lost / Damaged" hint="You still decide: salary, F&F, cash or waive.">
+                    <input disabled={ro} type="checkbox" checked={s.recovery.autoChargeLostDamaged} onChange={e => setS(p => ({ ...p, recovery: { ...p.recovery, autoChargeLostDamaged: e.target.checked } }))} />
+                </Row>
+            </div>
         </div>
     )
 }
